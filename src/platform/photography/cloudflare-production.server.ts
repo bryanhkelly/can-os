@@ -4,6 +4,7 @@ import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult} from "./fal-generation.server";
 import {verifyPhotoBytes,verifyPhotoAspectRatio,type VerifiedPhoto} from "./photo-binary.server";
 import {allowedTemplateVariantWidth} from "@/domain/template-photo-responsive";
+import {advanceTemplatePhotoReset,readTemplatePhotoResetState,PHOTO_RESET_ID} from "./r2-photo-reset.server";
 
 /**
  * Native Cloudflare R2 binding, not an S3 presigned-URL client.
@@ -11,9 +12,10 @@ import {allowedTemplateVariantWidth} from "@/domain/template-photo-responsive";
  */
 export interface TemplatePhotoBucket {
   head(key:string):Promise<{size:number;httpMetadata?:{contentType?:string}}|null>;
+  delete(key:string):Promise<void>;
   list(options:{prefix:string;limit?:number}):Promise<{objects:Array<{key:string}>}>;
   get(key:string):Promise<{body:ReadableStream; text():Promise<string>;httpMetadata?:{contentType?:string}}|null>;
-  put(key:string,value:string|ArrayBuffer|ArrayBufferView,options?:{
+  put(key:string,value:string|ArrayBuffer|ArrayBufferView|ReadableStream,options?:{
     onlyIf?:{etagDoesNotMatch:string};
     httpMetadata?:{contentType:string};
   }):Promise<{key:string}|null>;
@@ -35,6 +37,8 @@ export interface PhotoWorkerEnv {
   CAN_TEMPLATE_PHOTOGRAPHY_GENERATE?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_BULK?:string;
+  CAN_TEMPLATE_PHOTO_RESET_ONCE?:string;
+  CAN_TEMPLATE_PHOTO_RECOVER_HISTORY?:string;
   CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED?:string;
 }
 const templateSet=new Set<string>(siteTemplateIds);
@@ -485,6 +489,16 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)
     throw Error("Missing photography production binding or key");
   const bucket=env.TEMPLATE_PHOTO_BUCKET;
+  // A bounded archival reset must complete before existing result imports or
+  // any paid new job submissions. Reset is one-time and idempotent in R2.
+  if(env.CAN_TEMPLATE_PHOTO_RESET_ONCE===PHOTO_RESET_ID){
+    const state=await advanceTemplatePhotoReset(bucket);
+    console.info("CAN template photo reset tick",{
+      phase:state.phase,removed:state.removed,copied:state.copied,
+      reason:state.reason,
+    });
+    if(state.phase!=="completed")return result;
+  }
   const falKey=normalizeFalKey(env.FAL_KEY);
   result.status="active";
   // Prove the native binding can write and read before attempting a media PUT.
@@ -557,8 +571,11 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   // Never create more paid images by default, including after job failure.
   if(env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT!=="true"){
     // Read-only historical recovery does not send any billable model request.
-    const recovered=await importAlreadyGeneratedFalHistory(bucket,falKey);
-    result.uploaded+=recovered.uploaded;
+    // A clean 84-image rebuild must not import superseded fal.ai outputs.
+    if(env.CAN_TEMPLATE_PHOTO_RECOVER_HISTORY==="true"){
+      const recovered=await importAlreadyGeneratedFalHistory(bucket,falKey);
+      result.uploaded+=recovered.uploaded;
+    }
     return result;
   }
 
@@ -663,6 +680,7 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
       responsiveDeliveryEnabled:env.CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED==="true",
       uploadRecovery:await readHistoryDiagnostic(bucket),
       r2WriteVerified:Boolean(await bucket.head(r2ProbeKey)),
+      photoReset:await readTemplatePhotoResetState(bucket),
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
     }});
