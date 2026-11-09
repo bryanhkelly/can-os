@@ -10,7 +10,7 @@
   "images": { "binding": "IMAGES" },
   "cache": { "enabled": true },
   "observability": { "enabled": true, "logs": { "enabled": true } },
-  "vars": { "CAN_TEMPLATE_PHOTOGRAPHY_GENERATE": "true", "CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT": "true", "CAN_TEMPLATE_PHOTOGRAPHY_BULK": "true", "CAN_TEMPLATE_PHOTO_RESET_ONCE": "2026-11-09-template-photo-refresh", "CAN_TEMPLATE_PHOTO_RECOVER_HISTORY": "false", "CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED": "false", "CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED": "false" },
+  "vars": { "CAN_TEMPLATE_PHOTOGRAPHY_GENERATE": "true", "CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT": "true", "CAN_TEMPLATE_PHOTOGRAPHY_BULK": "true", "CAN_TEMPLATE_PHOTO_RESET_ONCE": "2026-11-09-template-photo-refresh", "CAN_TEMPLATE_PHOTO_RECOVER_HISTORY": "false", "CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED": "false", "CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED": "true" },
   "ratelimits": [
     { "name": "ACCESS_REQUEST_LIMIT", "namespace_id": "1001", "simple": { "limit": 20, "period": 60 } },
     { "name": "ACCESS_VERIFY_LIMIT", "namespace_id": "1002", "simple": { "limit": 40, "period": 60 } }
