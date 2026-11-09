@@ -107,6 +107,7 @@ export async function advanceTemplatePhotoReset(
         await writeState(bucket,state);
         return state;
       }
+      try{
       const source=await bucket.get(key);
       if(!source)continue;
       const sourceInfo=await bucket.head(key);
@@ -146,6 +147,14 @@ export async function advanceTemplatePhotoReset(
         currentPrefix:prefix,updatedAt:timestamp()};
       await writeState(bucket,state);
       budget--;
+      }catch(error){
+        state={...state,phase:"blocked",currentPrefix:prefix,
+          reason:error instanceof Error?error.message.slice(0,140):
+            "R2 archival verification or deletion failed",
+          updatedAt:timestamp()};
+        await writeState(bucket,state);
+        return state;
+      }
     }
   }
 
