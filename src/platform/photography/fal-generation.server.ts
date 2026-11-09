@@ -77,7 +77,7 @@ export async function submitSchoolPhoto(
 export async function schoolPhotoStatus(requestId:string,injectedKey?:string):Promise<"IN_QUEUE"|"IN_PROGRESS"|"COMPLETED"> {
   if(!uuid.test(requestId))throw new Error("Invalid request identifier");
   const result=await safeJson(await fetch(`${endpoint}/requests/${requestId}/status`,{
-    headers:headers(injectedKey),method:"GET",cache:"no-store",
+    headers:headers(injectedKey),method:"GET",
   }));
   if(result.status!=="IN_QUEUE"&&result.status!=="IN_PROGRESS"&&result.status!=="COMPLETED")
     throw new Error("Unknown fal.ai queue state");
@@ -91,7 +91,7 @@ export async function schoolPhotoStatus(requestId:string,injectedKey?:string):Pr
 export async function schoolPhotoResult(requestId:string,injectedKey?:string):Promise<{imageUrl:string}> {
   if(!uuid.test(requestId))throw new Error("Invalid request identifier");
   const result=await safeJson(await fetch(`${endpoint}/requests/${requestId}`,{
-    headers:headers(injectedKey),method:"GET",cache:"no-store",
+    headers:headers(injectedKey),method:"GET",
   }));
   const images=result.images;
   if(!Array.isArray(images)||images.length!==1)throw new Error("Expected exactly one generated photo");
