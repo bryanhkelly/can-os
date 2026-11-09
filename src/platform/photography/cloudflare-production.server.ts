@@ -37,6 +37,7 @@ const stateKey=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
     ? "school-template-production/pilot-summit-20261108/hero.json"
     : `school-template-production/v1/${template}/${role}.json`;
 const cursorKey="school-template-production/v1/cursor.json";
+const r2ProbeKey="school-template-production/v1/r2-write-verified.json";
 type JobState={
   status:"reserved"|"submitted"|"completed"|"rejected";
   requestId?:string;resultUrl?:string;statusUrl?:string;
@@ -80,6 +81,26 @@ async function inspectFile(resultUrl:string,minimum:{width:number;height:number}
   // an object body or infer media type from a misleading .jpg key suffix.
   const bytes=await result.arrayBuffer();
   return verifyPhotoBytes(bytes,minimum);
+}
+
+/**
+ * One-time Worker-to-R2 binary write/read verification.
+ * No provider calls and no paid image generation. This distinguishes a broken
+ * R2 binding from fal queue/CDN transfer failures.
+ */
+async function verifyNativeR2Write(bucket:TemplatePhotoBucket):Promise<void>{
+  const previous=await bucket.get(r2ProbeKey);
+  if(previous){
+    const data=await previous.text();
+    try{
+      if((JSON.parse(data) as {verified?:boolean}).verified===true)return;
+    }catch{/* Probe is corrupt; verify a fresh round trip below. */}
+  }
+  const payload=JSON.stringify({verified:true,checkedAt:now()});
+  await bucket.put(r2ProbeKey,payload,{httpMetadata:{contentType:"application/json"}});
+  const copy=await bucket.get(r2ProbeKey);
+  if(!copy||(await copy.text())!==payload)
+    throw Error("R2 write/read verification failed");
 }
 
 async function getJob(bucket:TemplatePhotoBucket,key:string):Promise<JobState|null>{
@@ -449,6 +470,8 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   const bucket=env.TEMPLATE_PHOTO_BUCKET;
   const falKey=normalizeFalKey(env.FAL_KEY);
   result.status="active";
+  // Prove the native binding can write and read before attempting a media PUT.
+  await verifyNativeR2Write(bucket);
 
   // Recover the already-paid Community photograph without calling fal.ai's
   // billable submission endpoint. Never overwrite a different accepted job.
@@ -600,6 +623,7 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
       heroNextRetryAt:heroJob?.nextAttemptAt,
       newSubmissionsEnabled:env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true",
       uploadRecovery:await readHistoryDiagnostic(bucket),
+      r2WriteVerified:Boolean(await bucket.head(r2ProbeKey)),
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
     }});
