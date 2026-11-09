@@ -29,9 +29,9 @@ export const Route=createFileRoute("/template-photo/$template/$role")({
     if(!templateIds.has(params.template)||!roles.has(params.role))return notFound();
     const template=params.template as SiteTemplateId;
     const role=params.role as TemplatePhotographyRole;
-    const generated=process.env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"
-      ? `school-template-previews/v3/${family[template]}/${role}.jpg`
-      : undefined;
+    // Both Cloudflare and Netlify must reference only the fresh v3 master.
+    // This does not submit or generate images; it only serves stored R2 bytes.
+    const generated=`school-template-previews/v3/${family[template]}/${role}.jpg`;
     const staged=process.env.CAN_TEMPLATE_PHOTOS_V2_ENABLED==="true"
       ? stagedManifest.files.find(f=>f.template===family[template]&&f.role===role)?.key
       : undefined;
@@ -44,11 +44,10 @@ export const Route=createFileRoute("/template-photo/$template/$role")({
         : undefined;
     try{
       let upstream:Response|null=null;
-      // Fresh 84-photo production must never silently serve a legacy v1/v2
-      // template asset when the latest v3 master has not been delivered yet.
-      const freshRun=process.env.CAN_TEMPLATE_PHOTO_RESET_ONCE===
-        "2026-11-09-template-photo-refresh";
-      for(const key of freshRun?[generated]:[generated,staged,fallback]){
+      // An explicit development-only switch can still inspect legacy
+      // preview media; production defaults to fresh v3 only on both hosts.
+      const allowLegacy=process.env.CAN_TEMPLATE_PHOTO_ALLOW_LEGACY_FALLBACK==="true";
+      for(const key of allowLegacy?[generated,staged,fallback]:[generated]){
         if(!key||!allowedKey.test(key))continue;
         const candidate=await fetch(signPrivateObjectUrl({
           method:"GET",key,keyPattern:allowedKey,expiresSeconds:30,
@@ -57,9 +56,12 @@ export const Route=createFileRoute("/template-photo/$template/$role")({
         if(candidate.status!==404)return notFound();
       }
       if(!upstream||!upstream.body)return notFound();
+      const candidateType=upstream.headers.get("Content-Type");
+      const contentType=["image/jpeg","image/png","image/webp"].includes(
+        candidateType??"") ? candidateType! : "image/jpeg";
       return new Response(upstream.body,{status:200,headers:{
-        "Content-Type":"image/jpeg",
-        "Cache-Control":"public, max-age=3600",
+        "Content-Type":contentType,
+        "Cache-Control":"public, max-age=900",
         "X-Content-Type-Options":"nosniff",
         "Content-Disposition":"inline",
         "Referrer-Policy":"no-referrer",
