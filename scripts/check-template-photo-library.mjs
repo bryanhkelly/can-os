@@ -7,6 +7,7 @@
  * node scripts/check-template-photo-library.mjs --require-heroes
  * node scripts/check-template-photo-library.mjs --require-complete
  * node scripts/check-template-photo-library.mjs --check-responsive
+ * node scripts/check-template-photo-library.mjs --require-reset
  */
 const base=(process.env.CAN_OS_BASE_URL || "https://can-os.bryanhkelly.workers.dev").replace(/\/$/,"");
 const templates=["heritage","community","modern","bright-futures","summit","classic","campus"];
@@ -16,6 +17,7 @@ const requireHeroes=process.argv.includes("--require-heroes")||
   process.argv.includes("--require-complete");
 const requireComplete=process.argv.includes("--require-complete");
 const checkResponsive=process.argv.includes("--check-responsive");
+const requireReset=process.argv.includes("--require-reset");
 let failed=false,received=0;
 
 for(const template of templates){
@@ -38,8 +40,16 @@ for(const template of templates){
       newSubmissionsEnabled:body.newSubmissionsEnabled,
       responsiveDeliveryEnabled:body.responsiveDeliveryEnabled,
       r2WriteVerified:body.r2WriteVerified,
+      photoReset:body.photoReset?.phase,
+      removedOldObjects:body.photoReset?.removed,
       uploadRecovery:body.uploadRecovery?.state,
     }));
+    if(requireReset &&
+       (body.photoReset?.phase!=="completed" ||
+        body.newSubmissionsEnabled===true)){
+      console.error("Cleanup not complete or paid submissions unexpectedly enabled for "+template);
+      failed=true;
+    }
     if(body.newSubmissionsEnabled===true)
       console.error("WARNING: paid submissions enabled on "+template);
     if(requireHeroes&&!ready.includes("hero"))failed=true;
