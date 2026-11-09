@@ -3,6 +3,7 @@ import {schoolPhotographyBrief,templatePhotographyRoles} from "@/domain/template
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult} from "./fal-generation.server";
 import {verifyPhotoBytes,type VerifiedPhoto} from "./photo-binary.server";
+import {allowedTemplateVariantWidth} from "@/domain/template-photo-responsive";
 
 /**
  * Native Cloudflare R2 binding, not an S3 presigned-URL client.
@@ -17,8 +18,19 @@ export interface TemplatePhotoBucket {
     httpMetadata?:{contentType:string};
   }):Promise<{key:string}|null>;
 }
+/** Cloudflare Images binding transforms private R2 byte streams on demand. */
+export interface TemplatePhotoImages {
+  input(source:ReadableStream):{
+    transform(options:{width:number}):{
+      output(options:{format:"image/webp";quality:number}):{
+        response(options?:{headers:HeadersInit}):Promise<Response>|Response;
+      };
+    };
+  };
+}
 export interface PhotoWorkerEnv {
   TEMPLATE_PHOTO_BUCKET?:TemplatePhotoBucket;
+  IMAGES?:TemplatePhotoImages;
   FAL_KEY?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_GENERATE?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT?:string;
@@ -581,15 +593,36 @@ export async function readBoundTemplatePhoto(request:Request,env:PhotoWorkerEnv)
   const match=new URL(request.url).pathname.match(/^\/template-photo\/([^/]+)\/([^/]+)$/);
   if(!match||!templateSet.has(match[1])||!roleSet.has(match[2]))return invalid();
   const template=match[1] as SiteTemplateId,role=match[2] as TemplatePhotographyRole;
+  const url=new URL(request.url);
+  const width=allowedTemplateVariantWidth(role,url.searchParams.get("w"));
+  if(width===undefined)return invalid();
   try {
     const obj=await bucket.get(keyFor(template,role));
     if(!obj)return invalid();
+    if(width!==null){
+      // Each known width is generated on demand from the original private
+      // R2 asset. There are no new fal.ai generation requests.
+      if(!env.IMAGES)return unavailable();
+      return await env.IMAGES.input(obj.body)
+        .transform({width})
+        .output({format:"image/webp",quality:80})
+        .response({headers:{
+          "Cache-Control":"public, max-age=86400, stale-while-revalidate=86400",
+          "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
+        }});
+    }
     return new Response(obj.body,{headers:{
       "Content-Type":obj.httpMetadata?.contentType??"image/jpeg",
       "Cache-Control":"public, max-age=900",
       "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
     }});
-  }catch{return unavailable();}
+  }catch(error){
+    console.error("Template image delivery failed",{
+      template,role,width,
+      failure:error instanceof Error?error.name:"unknown",
+    });
+    return unavailable();
+  }
 }
 export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWorkerEnv):Promise<Response>{
   const template=new URL(request.url).searchParams.get("template");
