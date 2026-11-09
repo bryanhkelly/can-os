@@ -97,6 +97,60 @@ describe("scheduled template image generation to R2",()=>{
 
   });
 
+  it("recovers an already-paid Summit result into R2 without submitting any new request",async()=>{
+    const {bucket,objects}=fakeR2();
+    const key="school-template-production/pilot-summit-20261108/hero.json";
+    const bytes=new TextEncoder().encode(JSON.stringify({
+      status:"rejected",requestId,updatedAt:"2026-11-08T22:15:00.000Z",
+      reason:"result-url:Provider connection failed",importAttempts:8,
+    }));
+    objects.set(key,bytes);
+    // Keep unrelated Community recovery out of this focused test.
+    objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
+    const called:string[]=[];
+    vi.stubGlobal("fetch",vi.fn(async (input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);
+      called.push(url);
+      if(init?.method==="POST")throw Error("Unexpected paid image generation");
+      if(url.endsWith(`/requests/${requestId}`))
+        return Response.json({images:[{url:"https://y3b.fal.media/files/test/hero.jpg"}]});
+      if(url==="https://y3b.fal.media/files/test/hero.jpg")
+        return new Response(new Uint8Array(jpeg4k()).buffer,{status:200});
+      throw Error("Unexpected GET "+url);
+    }));
+    const env={
+      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",
+      FAL_KEY:"test:key",TEMPLATE_PHOTO_BUCKET:bucket,
+    };
+    const completed=await runBoundTemplatePhotoProduction(env);
+    expect(completed.submitted).toBe(0);
+    expect(completed.uploaded).toBe(1);
+    expect(objects.get(summitKey)?.byteLength).toBe(4096);
+    const saved=JSON.parse(new TextDecoder().decode(objects.get(key)));
+    expect(saved.status).toBe("completed");
+    const result=await readBoundTemplatePhotoStatus(
+      new Request("https://can-os.example/template-photo-status?template=summit"),env);
+    expect(await result.json()).toMatchObject({
+      template:"summit",generated:1,ready:["hero"],heroStatus:"completed",
+    });
+    expect(called.some(url=>url==="https://queue.fal.run/fal-ai/nano-banana-2")).toBe(false);
+  });
+
+  it("never generates an image when the new paid-submission switch is off",async()=>{
+    const {bucket,objects}=fakeR2();
+    objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
+    const fetchMock=vi.fn();
+    vi.stubGlobal("fetch",fetchMock);
+    const result=await runBoundTemplatePhotoProduction({
+      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",
+      TEMPLATE_PHOTO_BUCKET:bucket,FAL_KEY:"test:key",
+    });
+    expect(result.submitted).toBe(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("does not run any paid job when disabled",async()=>{
     const {bucket}=fakeR2();
     const fetchMock=vi.fn();
