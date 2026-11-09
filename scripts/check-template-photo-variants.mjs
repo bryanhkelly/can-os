@@ -45,8 +45,10 @@ function sizeOf(bytes,mime){
 async function retrieve(path,readBytes=false){
   const response=await fetch(origin+path,{redirect:"error",
     signal:AbortSignal.timeout(25000)});
-  if(response.status!==200)
-    throw Error(path+" returned HTTP "+response.status);
+  if(response.status!==200){
+    const detail=(await response.text()).slice(0,220).replace(/[\r\n]/g," ");
+    throw Error(path+" returned HTTP "+response.status+" "+detail);
+  }
   const mime=response.headers.get("content-type")||"";
   if(!/^image\/(jpeg|png|webp)/.test(mime))
     throw Error(path+" did not return an image ("+mime+")");
