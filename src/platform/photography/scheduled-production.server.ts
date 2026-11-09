@@ -72,12 +72,12 @@ export function jpegDimensions(bytes:Uint8Array):{width:number;height:number}|nu
     if(marker===216||marker===217||marker===1)continue;
     if(marker===218)break;
     if(pos+2>bytes.length)return null;
-    const size=(bytes[pos]<<8)|bytes[pos+1];
+    const size=((bytes[pos]??0)<<8)|(bytes[pos+1]??0);
     if(size<2||pos+size>bytes.length)return null;
     if([192,193,194,195,198,199,201,202].includes(marker)){
       if(size<7)return null;
-      const height=(bytes[pos+3]<<8)|bytes[pos+4];
-      const width=(bytes[pos+5]<<8)|bytes[pos+6];
+      const height=((bytes[pos+3]??0)<<8)|(bytes[pos+4]??0);
+      const width=((bytes[pos+5]??0)<<8)|(bytes[pos+6]??0);
       return width>0&&height>0?{width,height}:null;
     }
     pos+=size;
