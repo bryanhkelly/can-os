@@ -53,7 +53,11 @@ describe("scheduled template image generation to R2",()=>{
         expect(args.resolution).toBe("4K");
         expect(args.output_format).toBe("jpeg");
         expect(args.prompt).toContain("Summit Preparatory");
-        return Response.json({request_id:requestId});
+        return Response.json({
+          request_id:requestId,
+          response_url:`https://queue.fal.run/fal-ai/nano-banana-2/requests/${requestId}`,
+          status_url:`https://queue.fal.run/fal-ai/nano-banana-2/requests/${requestId}/status`,
+        });
       }
       if(url.endsWith(`/requests/${requestId}/status`))
         return Response.json({status:"COMPLETED"});
@@ -75,7 +79,11 @@ describe("scheduled template image generation to R2",()=>{
     expect(first.submitted).toBe(1);
     expect(objects.has(summitKey)).toBe(false);
     const jobKey="school-template-production/pilot-summit-20261108/hero.json";
-    expect(JSON.parse(new TextDecoder().decode(objects.get(jobKey))).requestId).toBe(requestId);
+    const storedJob=JSON.parse(new TextDecoder().decode(objects.get(jobKey)));
+    expect(storedJob.requestId).toBe(requestId);
+    expect(storedJob.resultUrl).toBe(
+      `https://queue.fal.run/fal-ai/nano-banana-2/requests/${requestId}`,
+    );
     const second=await runBoundTemplatePhotoProduction(env);
     expect(second.uploaded).toBe(1);
     expect(objects.get(summitKey)?.byteLength).toBe(4096);
