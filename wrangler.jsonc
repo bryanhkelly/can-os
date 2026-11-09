@@ -5,7 +5,7 @@
   "compatibility_date": "2026-11-06",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
-  "triggers": { "crons": ["*/5 * * * *"] },
+  "triggers": { "crons": ["* * * * *"] },
   "r2_buckets": [{ "binding": "TEMPLATE_PHOTO_BUCKET", "bucket_name": "can-os" }],
   "observability": { "enabled": true, "logs": { "enabled": true } },
   "vars": { "CAN_TEMPLATE_PHOTOGRAPHY_GENERATE": "true" },
