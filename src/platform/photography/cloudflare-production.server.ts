@@ -39,7 +39,8 @@ const stateKey=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
 const cursorKey="school-template-production/v1/cursor.json";
 type JobState={
   status:"reserved"|"submitted"|"completed"|"rejected";
-  requestId?:string;assetUrl?:string;reason?:string;updatedAt:string;
+  requestId?:string;resultUrl?:string;statusUrl?:string;
+  assetUrl?:string;reason?:string;updatedAt:string;
   rescueCount?:number;importAttempts?:number;nextAttemptAt?:string;
 };
 const now=()=>new Date().toISOString();
@@ -201,6 +202,7 @@ async function queuePhoto(bucket:TemplatePhotoBucket,
   try{
     const response=await submitSchoolPhoto(template,role,falKey);
     await saveJob(bucket,key,{status:"submitted",requestId:response.requestId,
+      resultUrl:response.responseUrl,statusUrl:response.statusUrl,
       rescueCount,updatedAt:now()});
     return true;
   }catch(error){
@@ -232,7 +234,7 @@ async function completePhoto(bucket:TemplatePhotoBucket,
       // images[0].url; a separate queue-status network hop is unnecessary and
       // was preventing completed requests from reaching R2 when it failed.
       stage="result-url";
-      const completed=await schoolPhotoResult(job.requestId,falKey);
+      const completed=await schoolPhotoResult(job.requestId,falKey,job.resultUrl);
       assetUrl=completed.imageUrl;
       // Check source before persisting potentially untrusted API output.
       const source=new URL(assetUrl);
