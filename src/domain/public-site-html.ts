@@ -174,7 +174,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const sampleForRole = (role:import("./template-sample-images").TemplatePhotographyRole) => {
     const sample=templateSampleImage(templateId,role);
     return sample ? {src:sample,altText:"Illustrative template photography, not this school's students or facilities",
-      assetId:"template-sample",sourceRevision:"v2"} : null;
+      assetId:"template-sample",sourceRevision:"v3"} : null;
   };
   const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => sampleForRole(roleForSlot[slot]);
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
