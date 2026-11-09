@@ -2,6 +2,7 @@ import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
 import { templateSampleImage } from "./template-sample-images";
+import { templateResponsiveAttributes } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
@@ -189,6 +190,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     }
     return options?.localPreview ? sampleMedia(slot) : null;
   };
+  // Cloudflare receives bandwidth-appropriate responsive variants from its
+  // private R2-backed Images binding. Netlify and user-owned media are unchanged.
+  const responsiveTemplatePhotos=process.env.CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED==="true";
+  const responsiveAttrs=(source:string,placement:"hero"|"interior"|"mosaic")=>
+    templateResponsiveAttributes(source,placement,responsiveTemplatePhotos);
   const approvedHero=ownedMedia("hero");
   const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src;
   const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
@@ -197,7 +203,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const campusMosaicImages = (["academics", "studentLife", "campus"] as const).map(slot => {
     const media=ownedMedia(slot);
     return media ? '<img src="' + escapePublicHtml(media.src) +
-      '" alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
+      '"' + responsiveAttrs(media.src,"mosaic") +
+      ' alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
   });
   const pageLabels: Record<PublicSitePath, string> = {
     "/": "Home", "/about": "About", "/academics": "Academics",
@@ -364,7 +371,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         ? '<a class="hero-text-link" href="/contact">School information →</a>' : ""),
     image: heroPhotoSrc
       ? '<img class="hero-background-image" src="' + escapePublicHtml(heroPhotoSrc) +
-        '" alt="' + escapePublicHtml(heroPhotoAlt) + '" decoding="async"/>' : "",
+        '"' + responsiveAttrs(heroPhotoSrc,"hero") +
+        ' alt="' + escapePublicHtml(heroPhotoAlt) + '" decoding="async" fetchpriority="high"/>' : "",
     mosaicImages: campusMosaicImages,
   });
   // The homepage introduces the school; detailed church content belongs on
@@ -644,7 +652,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ? sampleForRole(interiorRole) : siteInterior;
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero${approvedInterior?" has-image":""}">
-      ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}" alt="${escapePublicHtml(approvedInterior.altText)}" decoding="async"/>` : ""}
+      ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}"${responsiveAttrs(approvedInterior.src,"interior")} alt="${escapePublicHtml(approvedInterior.altText)}" decoding="async"/>` : ""}
       <p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   // The parent journey uses only pages backed by approved public projections.
   // This navigation is shared by all schools and never fabricates availability.
