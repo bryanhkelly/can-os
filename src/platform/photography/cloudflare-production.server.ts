@@ -51,7 +51,7 @@ const keyFor=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
   `school-template-previews/v3/${family[template]}/${role}.jpg`;
 const stateKey=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
   template==="summit"&&role==="hero"
-    ? "school-template-production/pilot-summit-20261108/hero.json"
+    ? "school-template-production/pilot-summit-20261109/hero.json"
     : `school-template-production/v1/${template}/${role}.json`;
 const cursorKey="school-template-production/v1/cursor.json";
 const r2ProbeKey="school-template-maintenance/r2-write-verified.json";
