@@ -16,6 +16,7 @@ on:
       - "wrangler.jsonc"
       - "tests/unit/template-photo-cron.test.ts"
       - "tests/unit/template-photo-responsive.test.ts"
+      - "tests/unit/template-photo-preview-roles.test.ts"
       - "scripts/check-template-photo-library.mjs"
       - ".github/workflows/template-photo-pipeline.yml"
 
@@ -38,7 +39,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify fal.ai to R2 mock end-to-end (no API charges)
-        run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts tests/unit/template-photo-responsive.test.ts
+        run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts tests/unit/template-photo-responsive.test.ts tests/unit/template-photo-preview-roles.test.ts
       - name: Build Cloudflare Worker
         run: npm run build:cloudflare
 
