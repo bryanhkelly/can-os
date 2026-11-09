@@ -74,7 +74,7 @@ export default {
     // Workerd disallows WebSocket I/O from a pool created in a different
     // request. This encompasses SSR, server functions, and their queries.
     const response = await withRequestDatabase(
-      () => handler.fetch(request),
+      async () => await handler.fetch(request),
       env.DATABASE_URL ?? process.env.DATABASE_URL,
     );
     const headers = new Headers(response.headers);
