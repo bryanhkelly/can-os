@@ -79,3 +79,39 @@ Production test URLs:
 Treat these routes, the GitHub Action result, and Cloudflare cron logs as the
 source of verification. Committing code does not itself prove a live asset was
 generated or uploaded.
+
+## November 8 follow-up — stop duplicate fal charges; ingest existing Summit assets
+
+After two Summit Preparatory generations were visible in fal.ai history but no
+Summit JPEG was verified in R2, the Worker was separated into **two independent
+controls**:
+
+- `CAN_TEMPLATE_PHOTOGRAPHY_GENERATE=true` enables reading previously paid
+  request results and transferring those assets to R2. It does not authorize a
+  new generation request on its own.
+- `CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT=false` (default in `wrangler.jsonc`)
+  explicitly disables **all new paid fal.ai POSTs**, including the Summit
+  pilot. Keep it disabled during reconciliation.
+- `CAN_TEMPLATE_PHOTOGRAPHY_BULK=false` additionally prevents bulk paid
+  requests. Bulk requires both switches to be set to true and a verified
+  Summit JPEG in R2.
+
+The cron now checks existing durable records in both
+`school-template-production/pilot-summit-20261108/hero.json` and
+`school-template-production/v1/summit/hero.json`, plus the earlier Community
+request. It retrieves each accepted request's completed result directly from
+fal.ai, saves the CDN `images[0].url`, validates JPEG bytes/dimensions, and
+writes the asset to its template-specific R2 key. Repeated failures incur **no
+new image-generation charges** and back off with safe stage-specific errors
+(`result-url`, `download`, `r2-upload`). No request IDs or asset URLs are
+returned by the public status route.
+
+The fal.ai submit adapter also preserves provider-returned `response_url`
+and `status_url` for future jobs instead of relying solely on reconstructing
+an API path.
+
+**Verification must be performed against live Cloudflare**, not inferred from a
+successful fal.ai generation: `/template-photo-status?template=summit` must
+report `generated > 0`, `ready` containing `hero`,
+`newSubmissionsEnabled:false`, and `/template-photo/summit/hero` must
+serve a valid JPEG. No live upload was confirmed at the time of this change.
