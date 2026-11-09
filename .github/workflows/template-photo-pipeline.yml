@@ -48,10 +48,56 @@ jobs:
         run: npm run build:cloudflare
 
   verify-live:
-    if: github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 14
+    timeout-minutes: 17
     steps:
-      - name: Inventory all seven templates and their 84 roles (read only)
-        run: node scripts/check-template-photo-library.mjs --require-reset
+      - uses: actions/checkout@v4
+      - name: Wait for deployed R2 archive/reset completion (read only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://can-os.bryanhkelly.workers.dev/template-photo-status?template=community"
+          for attempt in $(seq 1 24); do
+            echo "Checking reset phase: attempt $attempt of 24"
+            response=$(curl -fsS --retry 1 --max-time 20 "$url" || true)
+            if [ -n "$response" ]; then
+              echo "$response" | node -e '
+                let json=""; process.stdin.on("data",d=>json+=d);
+                process.stdin.on("end",()=>{
+                  try {
+                    const s=JSON.parse(json);
+                    console.log(JSON.stringify({
+                      phase:s.photoReset?.phase,
+                      copied:s.photoReset?.copied,
+                      removed:s.photoReset?.removed,
+                      error:s.photoReset?.reason,
+                      active:s.generated,
+                      newSubmissionsEnabled:s.newSubmissionsEnabled,
+                    }));
+                  }catch {console.log("Response not valid JSON");}
+                });
+              '
+              if PHOTO_RESET_STATUS="$response" node -e '
+                try {
+                  const s=JSON.parse(process.env.PHOTO_RESET_STATUS);
+                  if(s.photoReset?.phase==="blocked"){
+                    console.error("R2 reset is blocked: "+(s.photoReset.reason??"inspect logs"));
+                    process.exit(2);
+                  }
+                  if(s.photoReset?.phase==="completed" &&
+                     s.photoReset.copied===s.photoReset.removed &&
+                     s.newSubmissionsEnabled===false)process.exit(0);
+                }catch{}
+                process.exit(1);
+              '; then
+                echo "Reset completed. Auditing all seven template inventories."
+                node scripts/check-template-photo-library.mjs --require-reset
+                echo "All seven templates verified clean. No paid generation requested."
+                exit 0
+              fi
+            fi
+            sleep 30
+          done
+          echo "::error::Photo reset not verified complete; see Cloudflare scheduled Worker logs"
+          exit 1
