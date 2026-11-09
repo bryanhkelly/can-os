@@ -8,6 +8,7 @@ on:
       - "src/platform/photography/**"
       - "src/domain/template-photography-production.ts"
       - "src/domain/template-photo-responsive.ts"
+      - "src/domain/template-sample-images.ts"
       - "src/platform/photography/r2-photo-reset.server.ts"
       - "src/domain/public-site-html.ts"
       - "src/routes/template-photo*"
