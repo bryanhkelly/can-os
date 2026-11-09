@@ -44,11 +44,23 @@ for(const template of templates){
       removedOldObjects:body.photoReset?.removed,
       uploadRecovery:body.uploadRecovery?.state,
     }));
-    if(requireReset &&
-       (body.photoReset?.phase!=="completed" ||
-        body.newSubmissionsEnabled===true)){
-      console.error("Cleanup not complete or paid submissions unexpectedly enabled for "+template);
-      failed=true;
+    if(requireReset){
+      const reset=body.photoReset;
+      const validReset=reset?.phase==="completed" &&
+        reset.copied===reset.removed &&
+        Number.isInteger(reset.removed) &&
+        reset.removed>=0 &&
+        ready.length===0 &&
+        body.newSubmissionsEnabled===false;
+      if(!validReset){
+        console.error(JSON.stringify({
+          error:"R2 cleanup or safety gate incomplete",template,
+          resetPhase:reset?.phase,copied:reset?.copied,
+          removed:reset?.removed,activePhotos:ready.length,
+          newSubmissionsEnabled:body.newSubmissionsEnabled,
+        }));
+        failed=true;
+      }
     }
     if(body.newSubmissionsEnabled===true)
       console.error("WARNING: paid submissions enabled on "+template);
