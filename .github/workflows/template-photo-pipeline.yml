@@ -84,8 +84,8 @@ jobs:
                   const s=JSON.parse(process.env.PHOTO_RESET_STATUS);
                   if(s.photoReset?.phase==="blocked")process.stdout.write("blocked");
                   else if(s.photoReset?.phase==="completed" &&
-                     s.photoReset.copied===s.photoReset.removed &&
-                     s.newSubmissionsEnabled===false)process.stdout.write("completed");
+                     s.photoReset.copied===s.photoReset.removed)
+                     process.stdout.write("completed");
                   else process.stdout.write("pending");
                 }catch{process.stdout.write("pending");}
               ')
@@ -96,7 +96,7 @@ jobs:
               if [ "$phase" = "completed" ]; then
                 echo "Reset completed. Auditing all seven template inventories."
                 node scripts/check-template-photo-library.mjs --require-reset
-                echo "All seven templates verified clean. No paid generation requested."
+                echo "One-time R2 cleanup archive verified; campaign can now populate fresh 84-image slots."
                 exit 0
               fi
             fi
