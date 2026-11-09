@@ -7,7 +7,9 @@ const page={
     name:"Illustrative School",organizationName:"CAN demonstration",
   },
   offerings:[],demonstration:true,
-  localContent:{...emptySiteLocalContent,branding:{
+  localContent:{...emptySiteLocalContent,
+    schoolVision:"An illustrative, fictional school learning community.",
+    branding:{
     ...emptySiteLocalContent.branding,
     theme:"classic" as const,paletteId:"heritage" as const,
     typographyId:"editorial" as const,heroImage:null,
@@ -20,7 +22,7 @@ describe("all twelve template photo roles have nonpublished preview placements",
     vi.stubEnv("CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED","true");
     vi.stubEnv("CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED","true");
     const html=renderPublicSiteHtml(page,{
-      sampleTemplate:"heritage",templateGallery:true,path:"/academics",
+      sampleTemplate:"heritage",templateGallery:true,localPreview:true,path:"/academics",
     });
     expect(html).toContain("/template-photo/heritage/program_03");
     expect(html).toContain("Creative exploration");
@@ -30,7 +32,7 @@ describe("all twelve template photo roles have nonpublished preview placements",
     vi.stubEnv("CAN_TEMPLATE_PHOTOGRAPHY_GENERATE","true");
     vi.stubEnv("CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED","true");
     const preview=renderPublicSiteHtml(page,{
-      sampleTemplate:"community",templateGallery:true,path:"/student-life",
+      sampleTemplate:"community",templateGallery:true,localPreview:true,path:"/student-life",
     });
     expect(preview).toContain("/template-photo/community/portrait_01");
     const published=renderPublicSiteHtml(page,{path:"/student-life"});
@@ -40,7 +42,7 @@ describe("all twelve template photo roles have nonpublished preview placements",
     vi.stubEnv("CAN_TEMPLATE_PHOTOGRAPHY_GENERATE","true");
     vi.stubEnv("CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED","false");
     const preview=renderPublicSiteHtml(page,{
-      sampleTemplate:"modern",templateGallery:true,path:"/academics",
+      sampleTemplate:"modern",templateGallery:true,localPreview:true,path:"/academics",
     });
     expect(preview).not.toContain("/template-photo/modern/program_03");
   });
