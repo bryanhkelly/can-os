@@ -2,16 +2,16 @@ import {siteTemplateIds,type SiteTemplateId} from "@/domain/site-theme";
 import {schoolPhotographyBrief,templatePhotographyRoles} from "@/domain/template-photography-production";
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult} from "./fal-generation.server";
-import {jpegDimensions} from "./scheduled-production.server";
+import {verifyPhotoBytes,type VerifiedPhoto} from "./photo-binary.server";
 
 /**
  * Native Cloudflare R2 binding, not an S3 presigned-URL client.
  * Access is granted by Wrangler to the existing private can-os bucket.
  */
 export interface TemplatePhotoBucket {
-  head(key:string):Promise<{size:number}|null>;
+  head(key:string):Promise<{size:number;httpMetadata?:{contentType?:string}}|null>;
   list(options:{prefix:string;limit?:number}):Promise<{objects:Array<{key:string}>}>;
-  get(key:string):Promise<{body:ReadableStream; text():Promise<string>}|null>;
+  get(key:string):Promise<{body:ReadableStream; text():Promise<string>;httpMetadata?:{contentType?:string}}|null>;
   put(key:string,value:string|ArrayBuffer|ArrayBufferView,options?:{
     onlyIf?:{etagDoesNotMatch:string};
     httpMetadata?:{contentType:string};
@@ -58,7 +58,7 @@ const allowedGeneratedHost=(host:string,path:string)=>
  * fal's storage domain can legitimately redirect to its object storage; follow
  * no more than two redirects, validating EVERY new destination before fetching.
  */
-async function inspectFile(resultUrl:string,minimum:{width:number;height:number}):Promise<ArrayBuffer>{
+async function inspectFile(resultUrl:string,minimum:{width:number;height:number}):Promise<VerifiedPhoto>{
   let url=new URL(resultUrl);
   let result:Response|undefined;
   for(let redirects=0;redirects<=2;redirects++){
@@ -76,13 +76,10 @@ async function inspectFile(resultUrl:string,minimum:{width:number;height:number}
   if(!result.ok)throw Error(`Generated media HTTP ${result.status}`);
   if(Number(result.headers.get("content-length")||0)>25_000_000)
     throw Error("Generated file unavailable or exceeds size limit");
+  // Materialize the media bytes BEFORE R2 PUT. Never pass the CDN URL as
+  // an object body or infer media type from a misleading .jpg key suffix.
   const bytes=await result.arrayBuffer();
-  if(bytes.byteLength<4096||bytes.byteLength>25_000_000)
-    throw Error("Generated file has invalid size");
-  const size=jpegDimensions(new Uint8Array(bytes));
-  if(!size||size.width<minimum.width||size.height<minimum.height)
-    throw Error("Generated photo does not meet required resolution");
-  return bytes;
+  return verifyPhotoBytes(bytes,minimum);
 }
 
 async function getJob(bucket:TemplatePhotoBucket,key:string):Promise<JobState|null>{
@@ -250,14 +247,16 @@ async function completePhoto(bucket:TemplatePhotoBucket,
     }
     stage="download";
     const brief=schoolPhotographyBrief(template,role);
-    const bytes=await inspectFile(assetUrl,brief.minimum);
+    const photo=await inspectFile(assetUrl,brief.minimum);
     stage="r2-upload";
     const target=keyFor(template,role);
     // If another run already delivered the same slot, keep its verified object.
     if(!await bucket.head(target))
-      await bucket.put(target,bytes,{onlyIf:{etagDoesNotMatch:"*"},
-        httpMetadata:{contentType:"image/jpeg"}});
-    if(!await bucket.head(target))throw Error("R2 file verification failed");
+      await bucket.put(target,photo.bytes,{onlyIf:{etagDoesNotMatch:"*"},
+        httpMetadata:{contentType:photo.contentType}});
+    const verified=await bucket.head(target);
+    if(!verified||verified.size!==photo.bytes.byteLength)
+      throw Error("R2 file verification failed");
     await saveJob(bucket,stateKeyPath,{
       status:"completed",requestId:job.requestId,updatedAt:now(),
     });
@@ -380,24 +379,24 @@ async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
       checked++;
       try{
         const brief=schoolPhotographyBrief(template,"hero");
-        const bytes=await inspectFile(source,brief.minimum);
+        const photo=await inspectFile(source,brief.minimum);
         if(!await bucket.head(archiveKey)){
-          await bucket.put(archiveKey,bytes,{
+          await bucket.put(archiveKey,photo.bytes,{
             onlyIf:{etagDoesNotMatch:"*"},
-            httpMetadata:{contentType:"image/jpeg"},
+            httpMetadata:{contentType:photo.contentType},
           });
           diagnostic.archived=(diagnostic.archived??0)+1;
         }
         const archive=await bucket.head(archiveKey);
-        if(!archive||archive.size!==bytes.byteLength)
+        if(!archive||archive.size!==photo.bytes.byteLength)
           throw Error("R2 archive verification failed");
         if(!await bucket.head(fileKey)){
-          await bucket.put(fileKey,bytes,{
+          await bucket.put(fileKey,photo.bytes,{
             onlyIf:{etagDoesNotMatch:"*"},
-            httpMetadata:{contentType:"image/jpeg"},
+            httpMetadata:{contentType:photo.contentType},
           });
           const head=await bucket.head(fileKey);
-          if(!head||head.size!==bytes.byteLength)
+          if(!head||head.size!==photo.bytes.byteLength)
             throw Error("R2 file verification failed");
           await saveJob(bucket,stateKey(template,"hero"),{
             status:"completed",requestId,updatedAt:now(),
@@ -406,7 +405,7 @@ async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
           diagnostic.state="imported";
         }
         console.info("CAN completed fal media copied to R2",{template,
-          role:"hero",bytes:bytes.byteLength});
+          role:"hero",bytes:photo.bytes.byteLength});
       }catch(error){
         // Continue to the other already-paid Summit request. Never re-generate.
         diagnostic.reason=safeError(error);
@@ -563,7 +562,8 @@ export async function readBoundTemplatePhoto(request:Request,env:PhotoWorkerEnv)
     const obj=await bucket.get(keyFor(template,role));
     if(!obj)return invalid();
     return new Response(obj.body,{headers:{
-      "Content-Type":"image/jpeg","Cache-Control":"public, max-age=900",
+      "Content-Type":obj.httpMetadata?.contentType??"image/jpeg",
+      "Cache-Control":"public, max-age=900",
       "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
     }});
   }catch{return unavailable();}
