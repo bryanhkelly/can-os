@@ -2,7 +2,7 @@ import {siteTemplateIds,type SiteTemplateId} from "@/domain/site-theme";
 import {schoolPhotographyBrief,templatePhotographyRoles} from "@/domain/template-photography-production";
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult} from "./fal-generation.server";
-import {verifyPhotoBytes,type VerifiedPhoto} from "./photo-binary.server";
+import {verifyPhotoBytes,verifyPhotoAspectRatio,type VerifiedPhoto} from "./photo-binary.server";
 import {allowedTemplateVariantWidth} from "@/domain/template-photo-responsive";
 
 /**
@@ -208,6 +208,7 @@ function safeError(error:unknown):string{
   if(error.message==="Invalid header value.")return "Invalid Authorization header";
   const verifiableFailures=new Set([
     "Generated photo does not meet required resolution",
+    "Generated photo does not match required aspect ratio",
     "Unsupported image source",
     "Generated file unavailable or exceeds size limit",
     "Generated file has invalid size",
@@ -282,6 +283,7 @@ async function completePhoto(bucket:TemplatePhotoBucket,
     stage="download";
     const brief=schoolPhotographyBrief(template,role);
     const photo=await inspectFile(assetUrl,brief.minimum);
+    verifyPhotoAspectRatio(photo,brief.aspect_ratio);
     stage="r2-upload";
     const target=keyFor(template,role);
     // If another run already delivered the same slot, keep its verified object.
@@ -304,6 +306,7 @@ async function completePhoto(bucket:TemplatePhotoBucket,
     const terminal=attempts>=30 ||
       reason.includes("Unsupported image source") ||
       reason.includes("does not meet required resolution") ||
+      reason.includes("does not match required aspect ratio") ||
       reason.includes("invalid size");
     // Network failures are non-billable; back off instead of rejecting the
     // already-paid fal result permanently after a few cron ticks.
@@ -414,6 +417,7 @@ async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
       try{
         const brief=schoolPhotographyBrief(template,"hero");
         const photo=await inspectFile(source,brief.minimum);
+        verifyPhotoAspectRatio(photo,brief.aspect_ratio);
         if(!await bucket.head(archiveKey)){
           await bucket.put(archiveKey,photo.bytes,{
             onlyIf:{etagDoesNotMatch:"*"},
