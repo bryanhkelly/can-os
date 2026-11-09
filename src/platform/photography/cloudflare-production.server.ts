@@ -492,12 +492,16 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   // A bounded archival reset must complete before existing result imports or
   // any paid new job submissions. Reset is one-time and idempotent in R2.
   if(env.CAN_TEMPLATE_PHOTO_RESET_ONCE===PHOTO_RESET_ID){
+    const previous=await readTemplatePhotoResetState(bucket);
     const state=await advanceTemplatePhotoReset(bucket);
     console.info("CAN template photo reset tick",{
       phase:state.phase,removed:state.removed,copied:state.copied,
       reason:state.reason,
     });
-    if(state.phase!=="completed")return result;
+    // Never place a billable fal.ai request in the same cron invocation that
+    // first writes the cleanup-completed marker. Require a subsequent tick to
+    // observe the durable completed checkpoint before proceeding.
+    if(state.phase!=="completed"||previous?.phase!=="completed")return result;
   }
   if(!env.FAL_KEY)throw Error("Missing FAL_KEY for active photography ingestion");
   const falKey=normalizeFalKey(env.FAL_KEY);
