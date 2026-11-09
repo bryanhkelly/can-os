@@ -35,6 +35,7 @@ export interface PhotoWorkerEnv {
   CAN_TEMPLATE_PHOTOGRAPHY_GENERATE?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_BULK?:string;
+  CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED?:string;
 }
 const templateSet=new Set<string>(siteTemplateIds);
 const roleSet=new Set<string>(templatePhotographyRoles);
@@ -655,6 +656,7 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
       heroLastAttemptAt:heroJob?.updatedAt,
       heroNextRetryAt:heroJob?.nextAttemptAt,
       newSubmissionsEnabled:env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true",
+      responsiveDeliveryEnabled:env.CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED==="true",
       uploadRecovery:await readHistoryDiagnostic(bucket),
       r2WriteVerified:Boolean(await bucket.head(r2ProbeKey)),
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
