@@ -49,21 +49,37 @@ const allowedGeneratedHost=(host:string,path:string)=>
   host==="fal.media"||host.endsWith(".fal.media")||
   host==="storage.googleapis.com"&&path.startsWith("/falserverless/");
 
+/**
+ * Download generated media via a tightly constrained HTTPS CDN allowlist.
+ * fal's storage domain can legitimately redirect to its object storage; follow
+ * no more than two redirects, validating EVERY new destination before fetching.
+ */
 async function inspectFile(resultUrl:string,minimum:{width:number;height:number}):Promise<ArrayBuffer>{
-  const url=new URL(resultUrl);
-  if(url.protocol!=="https:"||!allowedGeneratedHost(url.hostname,url.pathname))
-    throw new Error("Unsupported image source");
-  const result=await fetch(url.toString(),{redirect:"error"});
-  if(!result.ok||Number(result.headers.get("content-length")||0)>25_000_000)
-    throw new Error("Generated file unavailable or exceeds size limit");
+  let url=new URL(resultUrl);
+  let result:Response|undefined;
+  for(let redirects=0;redirects<=2;redirects++){
+    if(url.protocol!=="https:"||!allowedGeneratedHost(url.hostname,url.pathname))
+      throw Error("Unsupported image source");
+    result=await fetch(url.toString(),{method:"GET",redirect:"manual"});
+    if(![301,302,303,307,308].includes(result.status))break;
+    if(redirects===2)throw Error("Media redirect limit exceeded");
+    const target=result.headers.get("location");
+    if(!target)throw Error("Missing media redirect location");
+    url=new URL(target,url);
+    result=undefined;
+  }
+  if(!result||!result.ok||
+    Number(result.headers.get("content-length")||0)>25_000_000)
+    throw Error("Generated file unavailable or exceeds size limit");
   const bytes=await result.arrayBuffer();
   if(bytes.byteLength<4096||bytes.byteLength>25_000_000)
-    throw new Error("Generated file has invalid size");
+    throw Error("Generated file has invalid size");
   const size=jpegDimensions(new Uint8Array(bytes));
   if(!size||size.width<minimum.width||size.height<minimum.height)
-    throw new Error("Generated photo does not meet required resolution");
+    throw Error("Generated photo does not meet required resolution");
   return bytes;
 }
+
 async function getJob(bucket:TemplatePhotoBucket,key:string):Promise<JobState|null>{
   const object=await bucket.get(key);
   if(!object)return null;
@@ -158,6 +174,8 @@ function safeError(error:unknown):string{
     "Expected exactly one generated photo",
     "Image URL missing",
     "Unknown fal.ai queue state",
+    "Media redirect limit exceeded",
+    "Missing media redirect location",
   ]);
   if(verifiableFailures.has(error.message))return error.message;
   return error.name==="TypeError"?"Provider connection failed":error.name.slice(0,64);
@@ -377,7 +395,10 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
     const heroJob=await getJob(bucket,stateKey(t,"hero"));
     return Response.json({template:t,generated:ready.length,total:12,ready,
       heroStatus:heroJob?.status??"unstarted",
-      heroError:heroJob?.status==="rejected"?heroJob.reason:undefined,
+      heroError:heroJob?.status==="rejected" ||
+        (heroJob?.status==="submitted"&&heroJob.importAttempts)
+          ?heroJob.reason:undefined,
+      heroImportAttempts:heroJob?.importAttempts??0,
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
     }});
