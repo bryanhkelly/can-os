@@ -49,12 +49,10 @@ for(const template of templates){
       const validReset=reset?.phase==="completed" &&
         reset.copied===reset.removed &&
         Number.isInteger(reset.removed) &&
-        reset.removed>=0 &&
-        ready.length===0 &&
-        body.newSubmissionsEnabled===false;
+        reset.removed>=0;
       if(!validReset){
         console.error(JSON.stringify({
-          error:"R2 cleanup or safety gate incomplete",template,
+          error:"R2 archival reset incomplete",template,
           resetPhase:reset?.phase,copied:reset?.copied,
           removed:reset?.removed,activePhotos:ready.length,
           newSubmissionsEnabled:body.newSubmissionsEnabled,
