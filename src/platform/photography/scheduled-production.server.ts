@@ -69,6 +69,7 @@ export function jpegDimensions(bytes:Uint8Array):{width:number;height:number}|nu
     if(bytes[pos]!==255){pos++;continue;}
     while(bytes[pos]===255)pos++;
     const marker=bytes[pos++];
+    if(marker===undefined)return null;
     if(marker===216||marker===217||marker===1)continue;
     if(marker===218)break;
     if(pos+2>bytes.length)return null;
