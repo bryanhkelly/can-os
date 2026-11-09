@@ -42,7 +42,9 @@ for(const template of templates){
     rows.push({template,ready:data.ready.length,hero,served,
       reset:data.photoReset??null,campaign:data.campaign??null,
       heroStatus:data.heroStatus??"unknown",error:data.heroError??null,
-      newSubmissionsEnabled:data.newSubmissionsEnabled});
+      newSubmissionsEnabled:data.newSubmissionsEnabled,
+      imagesBindingAvailable:data.imagesBindingAvailable,
+      responsiveDeliveryEnabled:data.responsiveDeliveryEnabled});
   }catch(e){
     const error=e instanceof Error?e.message:"unknown error";
     failures.push(template+": "+error);
@@ -82,6 +84,8 @@ const report=`# CAN OS — 84-image production
 | In-flight generations | ${safe(campaign?.inFlight??"unknown")} |
 | Rejected generations | ${safe(campaign?.rejected??"unknown")} |
 | New submission switch | ${safe(campaign?.newSubmissionsEnabled??"unknown")} |
+| Cloudflare Images binding detected | ${safe(rows.find(row=>row.imagesBindingAvailable!==undefined)?.imagesBindingAvailable??"unknown")} |
+| Responsive HTML enabled | ${safe(rows.find(row=>row.responsiveDeliveryEnabled!==undefined)?.responsiveDeliveryEnabled??"unknown")} |
 
 ## Individual templates
 
