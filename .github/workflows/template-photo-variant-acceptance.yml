@@ -1,0 +1,51 @@
+name: CAN OS — 84-photo responsive delivery acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/check-template-photo-variants.mjs"
+      - ".github/workflows/template-photo-variant-acceptance.yml"
+      - "src/domain/template-photo-responsive.ts"
+      - "src/platform/photography/cloudflare-production.server.ts"
+      - "src/domain/public-site-html.ts"
+      - "wrangler.jsonc"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photo-variant-acceptance
+  cancel-in-progress: true
+
+jobs:
+  verify-r2-and-crops:
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate 84 R2 delivery routes, seven 4K originals, and three viewport variants
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 5); do
+            if node scripts/check-template-photo-variants.mjs; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "::error::Live photograph/crop audit failed. Check whether Cloudflare deployed the latest Worker."
+              exit 1
+            fi
+            echo "Cloudflare may still be deploying; retry $attempt/5"
+            sleep 35
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: template-photo-variant-results
+          path: artifacts/photo-acceptance/result.json
+          retention-days: 14
+          if-no-files-found: warn
