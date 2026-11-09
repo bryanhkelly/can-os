@@ -595,10 +595,33 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   }
   if(env.CAN_TEMPLATE_PHOTOGRAPHY_BULK!=="true")return result;
 
+  // Cost-safety gate: no more than two unsettled, billable requests and never
+  // continue spending after a rejection. The job records are durable and
+  // uniqueness is protected by conditional R2 reservations.
+  const existing=await bucket.list({prefix:jobPrefix,limit:250});
+  let inflight=0,billedSlots=1; // verified Summit hero uses one paid request
+  let rejected=0;
+  for(const object of existing.objects){
+    const parts=object.key.split("/");
+    if(parts.length!==4||parts[0]!=="school-template-production"||
+       parts[1]!=="v1"||!parts[3].endsWith(".json"))continue;
+    if(!templateSet.has(parts[2])||!roleSet.has(parts[3].slice(0,-5)))continue;
+    const state=await getJob(bucket,object.key);
+    if(!state)continue;
+    billedSlots++;
+    if(state.status==="submitted"||state.status==="reserved")inflight++;
+    if(state.status==="rejected")rejected++;
+  }
+  if(rejected>0){
+    console.error("CAN photography campaign paused after rejected job",{rejected});
+    return result;
+  }
+  if(inflight>=2||billedSlots>=84)return result;
+
   const cursor=await getCursor(bucket);
   let advance=0;
   for(;advance<6;advance++){
-    if(result.submitted>=2||result.rejected>0)break;
+    if(result.submitted>=2-inflight||result.rejected>0||billedSlots+result.submitted>=84)break;
     const {template,role}=keys[(cursor+advance)%keys.length]!;
     if(await bucket.head(keyFor(template,role)))continue;
     const key=stateKey(template,role);
