@@ -103,6 +103,27 @@ export type PhotoCronResult={status:"disabled"|"active";scanned:number;submitted
  * for a single carefully bounded recovery: their provider HTTP request was
  * never sent, because the invalid header failed request construction.
  */
+/**
+ * One-time, non-billable reconciliation for the Community & Faith hero already
+ * generated successfully on fal.ai (HTTP 200, user-provided request details
+ * dated 2026-11-08). Resolve the provider result rather than re-generating.
+ * Remove this recovery hint after verifying the canonical R2 JPEG.
+ */
+const communityHeroCompletedFalRequestId="01a1bd6d-371f-7153-8d96-484fa643cac1";
+export function canAdoptCompletedCommunityHero(job:JobState|null):boolean{
+  if(!job)return true;
+  if(job.status==="completed"||job.status==="submitted")return false;
+  // Never overwrite a different accepted request ID: its billing/status may
+  // still be valid even if an earlier transfer failed.
+  if(job.requestId && job.requestId!==communityHeroCompletedFalRequestId)return false;
+  // Never repeatedly retry a rejected transfer of this already-known image.
+  if(job.requestId===communityHeroCompletedFalRequestId)
+    return job.status==="rejected" && (job.rescueCount??0)===0;
+  // Old preflight failures or reserved jobs never reached fal.ai.
+  return job.status==="reserved" ||
+    job.status==="rejected" &&
+      job.reason==="FAL_KEY contains invalid HTTP header characters";
+}
 const legacyHeaderFailureCutoff="2026-11-08T19:50:00.000Z";
 const jobPrefix="school-template-production/v1/";
 function canRescue(job:JobState):boolean{
@@ -199,8 +220,21 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   // Verify exactly one full-size, delivered photo before launching 83 jobs.
   const firstTemplate:"community"="community",firstRole:"hero"="hero";
   if(!await bucket.head(keyFor(firstTemplate,firstRole))){
-    const key=stateKey(firstTemplate,firstRole),job=await getJob(bucket,key);
+    const key=stateKey(firstTemplate,firstRole);
+    let job=await getJob(bucket,key);
     result.scanned++;
+    if(canAdoptCompletedCommunityHero(job)){
+      // This is a GET-only recovery path. No new paid fal.ai generation call.
+      const adopted:JobState={
+        status:"submitted",requestId:communityHeroCompletedFalRequestId,
+        updatedAt:now(),rescueCount:1,
+      };
+      await saveJob(bucket,key,adopted);
+      job=adopted;
+      console.info("CAN photo matched existing completed fal.ai request",{
+        template:firstTemplate,role:firstRole,
+      });
+    }
     if(job?.status==="submitted"&&job.requestId){
       const completed=await completePhoto(bucket,firstTemplate,firstRole,job,falKey);
       if(completed==="ready")result.uploaded++;
