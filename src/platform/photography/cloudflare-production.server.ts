@@ -40,7 +40,7 @@ const cursorKey="school-template-production/v1/cursor.json";
 type JobState={
   status:"reserved"|"submitted"|"completed"|"rejected";
   requestId?:string;assetUrl?:string;reason?:string;updatedAt:string;
-  rescueCount?:number;importAttempts?:number;
+  rescueCount?:number;importAttempts?:number;nextAttemptAt?:string;
 };
 const now=()=>new Date().toISOString();
 const noStore={"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
@@ -276,6 +276,14 @@ async function completePhoto(bucket:TemplatePhotoBucket,
   }
 }
 
+/**
+ * Production cron has two separate responsibilities:
+ * (1) Ingest previously generated (already billable) fal.ai request IDs.
+ * (2) Submit NEW requests ONLY after explicit CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT
+ *     opt-in. Disabling new billing does NOT disable ingestion.
+ *
+ * R2 stores job state durably so there is no duplicate paid POST on each tick.
+ */
 export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promise<PhotoCronResult>{
   const result:PhotoCronResult={status:"disabled",scanned:0,submitted:0,
     uploaded:0,inProgress:0,rejected:0};
@@ -283,82 +291,98 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)
     throw Error("Missing photography production binding or key");
   const bucket=env.TEMPLATE_PHOTO_BUCKET;
+  const falKey=normalizeFalKey(env.FAL_KEY);
   result.status="active";
-  let falKey:string;
-  try{
-    // fal.ai keys cannot contain whitespace; strip accidental paste formatting
-    // locally before constructing the Authorization header.
-    falKey=normalizeFalKey(env.FAL_KEY);
-  }catch{
-    console.error("CAN photo generation blocked: invalid FAL_KEY formatting");
-    return result;
-  }
-  // Verify exactly one full-size, delivered photo before launching 83 jobs.
-  // One paid Summit hero is the controlled, fresh end-to-end production test.
-  // Never submit an 84-image batch until this image is verifiably in R2.
-  const firstTemplate:"summit"="summit",firstRole:"hero"="hero";
-  if(!await bucket.head(keyFor(firstTemplate,firstRole))){
-    const key=stateKey(firstTemplate,firstRole);
-    let job=await getJob(bucket,key);
-    result.scanned++;
-    if(job?.status==="submitted"&&job.requestId){
-      const completed=await completePhoto(bucket,firstTemplate,firstRole,job,falKey);
-      if(completed==="ready")result.uploaded++;
-      else if(completed==="pending")result.inProgress++;
-      else result.rejected++;
-    }else if(!job||canRescue(job)){
-      if(await queuePhoto(bucket,firstTemplate,firstRole,key,falKey,job??undefined))
-        result.submitted++;
-      else result.rejected++;
-    }else if(job?.status==="rejected"){
-      result.rejected++;
-      console.error("CAN first hero requires intervention",{
-        template:firstTemplate,role:firstRole,reason:job.reason??"unknown",
+
+  // Recover the already-paid Community photograph without calling fal.ai's
+  // billable submission endpoint. Never overwrite a different accepted job.
+  const communityKey=stateKey("community","hero");
+  if(!await bucket.head(keyFor("community","hero"))){
+    const community=await getJob(bucket,communityKey);
+    if(canAdoptCompletedCommunityHero(community)){
+      await saveJob(bucket,communityKey,{
+        status:"submitted",requestId:communityHeroCompletedFalRequestId,
+        rescueCount:1,updatedAt:now(),
       });
+      console.info("CAN photography adopted existing Community fal request");
     }
-    // Never spend on secondary roles until the first real 4K hero is verified.
-    return result;
   }
 
-  // Explicit operator switch is needed for the full 84-image paid campaign.
-  // The single Summit pilot runs without this switch.
-  if(env.CAN_TEMPLATE_PHOTOGRAPHY_BULK!=="true")return result;
-
-  // Revisit all pending queue IDs promptly. A cursor alone would require a
-  // 70-minute round trip before polling the earliest submitted request.
-  const jobs=await bucket.list({prefix:jobPrefix,limit:250});
-  for(const object of jobs.objects){
-    if(result.uploaded+result.inProgress+result.rejected>=5)break;
+  // The Summit pilot has its own durable state path. Older Summit requests
+  // may also exist under /v1; process BOTH, but upload to only one JPEG slot.
+  const pilotKey=stateKey("summit","hero");
+  const historical=await bucket.list({prefix:jobPrefix,limit:250});
+  const candidates:Array<{path:string;template:SiteTemplateId;role:TemplatePhotographyRole}>=[
+    {path:pilotKey,template:"summit",role:"hero"},
+  ];
+  for(const object of historical.objects){
     const parts=object.key.split("/");
     if(parts.length!==4||parts[0]!=="school-template-production"||
        parts[1]!=="v1"||!parts[3].endsWith(".json"))continue;
-    const templatePart=parts[2],rolePart=parts[3].slice(0,-5);
-    if(!templateSet.has(templatePart)||!roleSet.has(rolePart))continue;
-    const t=templatePart as SiteTemplateId,r=rolePart as TemplatePhotographyRole;
-    if(await bucket.head(keyFor(t,r)))continue;
-    const job=await getJob(bucket,object.key);
-    if(job?.status==="submitted"&&job.requestId){
-      const completed=await completePhoto(bucket,t,r,job,falKey);
-      if(completed==="ready")result.uploaded++;
-      else if(completed==="pending")result.inProgress++;
-      else result.rejected++;
-    }else if(job&&canRescue(job)){
-      if(await queuePhoto(bucket,t,r,object.key,falKey,job))
+    const t=parts[2],r=parts[3].slice(0,-5);
+    if(!templateSet.has(t)||!roleSet.has(r))continue;
+    candidates.push({
+      path:object.key,template:t as SiteTemplateId,role:r as TemplatePhotographyRole,
+    });
+  }
+  candidates.sort((a,b)=>Number(b.role==="hero")-Number(a.role==="hero"));
+  let processed=0;
+  for(const candidate of candidates){
+    if(processed>=6)break;
+    const job=await getJob(bucket,candidate.path);
+    if(!job)continue;
+    result.scanned++;
+    const key=keyFor(candidate.template,candidate.role);
+    if(await bucket.head(key)){
+      // Reconcile legacy state without additional provider calls.
+      if(job.status!=="completed"&&job.requestId)
+        await saveJob(bucket,candidate.path,{
+          status:"completed",requestId:job.requestId,updatedAt:now(),
+        });
+      continue;
+    }
+    // Accepted fal request IDs can be re-fetched without paying again.
+    // Previous "rejected" state is not proof an already-paid image is lost.
+    if(!job.requestId||!["submitted","rejected"].includes(job.status))continue;
+    const attempts=job.importAttempts??0;
+    if(attempts>=30)continue;
+    if(job.nextAttemptAt&&Date.parse(job.nextAttemptAt)>Date.now())continue;
+    if(job.reason?.includes("Unsupported image source")||
+       job.reason?.includes("does not meet required resolution"))continue;
+    processed++;
+    const outcome=await completePhoto(bucket,candidate.template,candidate.role,
+      job,falKey,candidate.path);
+    if(outcome==="ready")result.uploaded++;
+    else if(outcome==="pending")result.inProgress++;
+    else result.rejected++;
+  }
+
+  // The generated images visible in fal.ai show we've submitted enough.
+  // Never create more paid images by default, including after job failure.
+  if(env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT!=="true")return result;
+
+  // Even when explicitly enabled, require a verified Summit hero BEFORE bulk.
+  if(!await bucket.head(keyFor("summit","hero"))){
+    const job=await getJob(bucket,pilotKey);
+    if(!job){
+      if(await queuePhoto(bucket,"summit","hero",pilotKey,falKey))
         result.submitted++;
       else result.rejected++;
     }
+    return result;
   }
+  if(env.CAN_TEMPLATE_PHOTOGRAPHY_BULK!=="true")return result;
 
-  // Submit new jobs slowly, and stop on the first provider rejection.
   const cursor=await getCursor(bucket);
   let advance=0;
   for(;advance<6;advance++){
     if(result.submitted>=2||result.rejected>0)break;
     const {template,role}=keys[(cursor+advance)%keys.length]!;
-    result.scanned++;
     if(await bucket.head(keyFor(template,role)))continue;
-    const key=stateKey(template,role),job=await getJob(bucket,key);
-    if(job)continue;
+    const key=stateKey(template,role);
+    const existing=await getJob(bucket,key);
+    // In-flight, completed, rejected, or reserved all prohibit a new charge.
+    if(existing)continue;
     if(await queuePhoto(bucket,template,role,key,falKey))result.submitted++;
     else {result.rejected++;break;}
   }
