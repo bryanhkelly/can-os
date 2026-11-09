@@ -32,7 +32,9 @@ function fakeR2(){
       if(options?.onlyIf?.etagDoesNotMatch==="*"&&objects.has(key))return null;
       const bytes=typeof value==="string"?new TextEncoder().encode(value)
         :value instanceof ArrayBuffer?new Uint8Array(value)
-        :new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
+        :value instanceof ReadableStream?
+          new Uint8Array(await new Response(value).arrayBuffer())
+          :new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
       objects.set(key,new Uint8Array(bytes));
       if(options?.httpMetadata?.contentType)
         contentTypes.set(key,options.httpMetadata.contentType);
