@@ -199,6 +199,7 @@ describe("scheduled template image generation to R2",()=>{
     const result=await runBoundTemplatePhotoProduction({
       CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
       CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",
+      CAN_TEMPLATE_PHOTO_RECOVER_HISTORY:"true",
       TEMPLATE_PHOTO_BUCKET:bucket,FAL_KEY:"test:key",
     });
     expect(result.submitted).toBe(0);
@@ -245,6 +246,7 @@ describe("scheduled template image generation to R2",()=>{
     }));
     const env={CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
       CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",
+      CAN_TEMPLATE_PHOTO_RECOVER_HISTORY:"true",
       FAL_KEY:"test:key",TEMPLATE_PHOTO_BUCKET:bucket};
     const result=await runBoundTemplatePhotoProduction(env);
     expect(result.submitted).toBe(0);
@@ -286,7 +288,8 @@ describe("scheduled template image generation to R2",()=>{
       throw Error("Unexpected external request: "+url);
     }));
     const env={CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
-      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",FAL_KEY:"test:key",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",
+      CAN_TEMPLATE_PHOTO_RECOVER_HISTORY:"true",FAL_KEY:"test:key",
       TEMPLATE_PHOTO_BUCKET:bucket};
     const result=await runBoundTemplatePhotoProduction(env);
     expect(result.uploaded).toBe(1);
