@@ -1255,6 +1255,24 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/template-photo-status.ts",
+      "route": "/template-photo-status",
+      "owner": "sites",
+      "verification": "source, unit and live R2 inventory checks; no user-supplied asset keys",
+      "roleJourney": "anonymous visitor checks progress of fictional school sample-photo generation; no school data exposed",
+      "writeBoundary": "GET only; reads bounded R2 template status; no mutations and no provider submit calls",
+      "readBoundary": "fixed template allowlist only, exposes aggregate readiness and safe errors without fal.ai keys or media URLs"
+    },
+    {
+      "file": "src/routes/template-photo.$template.$role.ts",
+      "route": "/template-photo/$template/$role",
+      "owner": "sites",
+      "verification": "source, unit and live HTTP image and variant checks; publication separation",
+      "roleJourney": "anonymous visitor or private editor previews one fictional school template image; never school-owned media",
+      "writeBoundary": "GET only, bounded source and variant parameters; no R2 writes or paid image generation",
+      "readBoundary": "fixed template/role allowlists, image objects from private can-os R2 v3; no arbitrary object paths"
+    },
+    {
       "file": "src/routes/website-preview.ts",
       "route": "/website-preview",
       "owner": "sites",
