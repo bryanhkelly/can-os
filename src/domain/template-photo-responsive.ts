@@ -31,6 +31,30 @@ export function templateResponsiveAttributes(
   return ` srcset="${srcset}" sizes="${templateResponsiveSizes[placement]}"`;
 }
 
+/** Crops from one master R2 hero: no additional fal.ai generations. */
+export const templateHeroCropWidths={
+  mobile:[640,960,1280],
+  tablet:[960,1280,1920,2560],
+} as const;
+
+/** Browser-selected art direction; the caller emits the fallback <img>. */
+export function templateHeroPictureSources(source:string,enabled:boolean):string{
+  if(!enabled || !templatePhotoPath.test(source) ||
+    !/\\/hero(?:\\?v=20261109)?$/.test(source))return "";
+  const joiner=source.includes("?")?"&":"?";
+  const srcset=(crop:"mobile"|"tablet")=>
+    templateHeroCropWidths[crop].map(width=>
+      `${source}${joiner}c=${crop}&w=${width} ${width}w`).join(", ");
+  return `<source media="(max-width: 699px)" type="image/webp" srcset="${srcset("mobile")}" sizes="100vw"/>`+
+    `<source media="(max-width: 1100px)" type="image/webp" srcset="${srcset("tablet")}" sizes="100vw"/>`;
+}
+
+export function allowedTemplateCrop(role:string,raw:string|null):"mobile"|"tablet"|null|undefined{
+  if(raw===null)return null;
+  if(role!=="hero")return undefined;
+  return raw==="mobile"||raw==="tablet"?raw:undefined;
+}
+
 /** Only allow well-known sizes for an individual asset role. */
 export function allowedTemplateVariantWidth(
   role:string,raw:string|null,
