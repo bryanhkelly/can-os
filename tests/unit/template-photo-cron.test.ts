@@ -42,6 +42,7 @@ function fakeR2(){
     },
     list:async ({prefix,limit})=>({objects:[...objects.keys()]
       .filter(key=>key.startsWith(prefix)).slice(0,limit??1000).map(key=>({key}))}),
+    delete:async key=>{objects.delete(key);},
   };
   return {bucket,objects,contentTypes};
 }
@@ -345,6 +346,105 @@ describe("scheduled template image generation to R2",()=>{
     expect(await info.json()).toMatchObject({generated:1,r2WriteVerified:true,
       newSubmissionsEnabled:false,heroStatus:"completed"});
     expect(calls.filter(x=>x==="https://queue.fal.run/fal-ai/nano-banana-2")).toHaveLength(0);
+  });
+
+
+  it("archives legacy objects and observes cleanup completion before authorizing even one paid request",async()=>{
+    const {bucket,objects}=fakeR2();
+    const enc=(value:unknown)=>new TextEncoder().encode(JSON.stringify(value));
+    // Five obsolete records require more than the four-object per-tick reset budget.
+    const old=[
+      "school-template-previews/v3/community/hero.jpg",
+      "school-template-previews/v3/summit/hero.jpg",
+      "school-template-production/v1/community/hero.json",
+      "school-template-production/v1/summit/hero.json",
+      "school-template-production/pilot-summit-20261108/hero.json",
+    ];
+    for(const key of old)objects.set(key,enc({status:"rejected"}));
+    const post:string[]=[];
+    vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      if(init?.method!=="POST")throw Error("Unexpected HTTP GET in reset test");
+      post.push(String(input));
+      return Response.json({request_id:requestId});
+    }));
+    const env={
+      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_BULK:"true",
+      CAN_TEMPLATE_PHOTO_RESET_ONCE:"2026-11-09-template-photo-refresh",
+      FAL_KEY:"test:key",TEMPLATE_PHOTO_BUCKET:bucket,
+    };
+    const first=await runBoundTemplatePhotoProduction(env);
+    expect(first.submitted).toBe(0);
+    expect(post).toHaveLength(0);
+    const second=await runBoundTemplatePhotoProduction(env);
+    expect(second.submitted).toBe(0);
+    expect(post).toHaveLength(0);
+    const checkpoint=JSON.parse(new TextDecoder().decode(
+      objects.get("school-template-maintenance/2026-11-09-template-photo-refresh.json")));
+    expect(checkpoint.phase).toBe("completed");
+    expect(checkpoint.copied).toBe(5);
+    expect(checkpoint.removed).toBe(5);
+    for(const key of old)expect(objects.has(key)).toBe(false);
+    const third=await runBoundTemplatePhotoProduction(env);
+    expect(third.submitted).toBe(1);
+    expect(post).toHaveLength(1);
+  });
+
+  it("limits bulk paid submissions to two unsettled jobs across cron ticks",async()=>{
+    const {bucket,objects}=fakeR2();
+    objects.set(summitKey,jpeg4k());
+    const post:string[]=[];
+    vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);
+      if(init?.method==="POST"){
+        post.push(url);
+        const count=post.length;
+        return Response.json({
+          request_id:`00000000-0000-4000-8000-${String(count).padStart(12,"0")}`,
+        });
+      }
+      if(url.includes("/requests/"))
+        return new Response("Not ready",{status:404});
+      throw Error("Unexpected provider HTTP request: "+url);
+    }));
+    const env={
+      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_BULK:"true",
+      FAL_KEY:"test:key",TEMPLATE_PHOTO_BUCKET:bucket,
+    };
+    const first=await runBoundTemplatePhotoProduction(env);
+    expect(first.submitted).toBe(2);
+    const second=await runBoundTemplatePhotoProduction(env);
+    expect(second.submitted).toBe(0);
+    expect(post).toHaveLength(2);
+    const stat=await readBoundTemplatePhotoStatus(
+      new Request("https://can-os.example/template-photo-status?template=heritage"),env);
+    expect(await stat.json()).toMatchObject({
+      campaign:{ready:1,target:84,inFlight:2,rejected:0,
+        newSubmissionsEnabled:true},
+    });
+  });
+
+  it("pauses all new charges when any existing image job is rejected",async()=>{
+    const {bucket,objects}=fakeR2();
+    objects.set(summitKey,jpeg4k());
+    objects.set("school-template-production/v1/heritage/story_01.json",
+      new TextEncoder().encode(JSON.stringify({
+        status:"rejected",updatedAt:"2026-11-09T09:00:00Z",
+        reason:"Generated photo does not meet required resolution",
+      })));
+    const network=vi.fn();
+    vi.stubGlobal("fetch",network);
+    const env={
+      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_BULK:"true",
+      FAL_KEY:"test:key",TEMPLATE_PHOTO_BUCKET:bucket,
+    };
+    expect((await runBoundTemplatePhotoProduction(env)).submitted).toBe(0);
+    expect(network).not.toHaveBeenCalled();
   });
 
   it("does not run any paid job when disabled",async()=>{
