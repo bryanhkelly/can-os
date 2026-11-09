@@ -285,6 +285,134 @@ async function completePhoto(bucket:TemplatePhotoBucket,
 }
 
 /**
+ * fal.ai Platform API: read-only request history with stored input/output.
+ * This recovers existing paid images even if an old queue GET has expired or
+ * a job's request_id was lost from R2 after the model completed.
+ *
+ * NEVER POST to fal.ai, never use a dashboard/cookie login, never auto-generate.
+ */
+const falHistoryKey="school-template-production/v1/fal-history-recovery.json";
+type FalHistoryDiagnostic={
+  checkedAt:string;state:"running"|"imported"|"no-match"|"error";
+  matching:number;uploaded:number;reason?:string;nextCheckAt?:string;
+};
+const allowedHistoryStart="2026-11-08T00:00:00Z";
+async function readHistoryDiagnostic(bucket:TemplatePhotoBucket):Promise<FalHistoryDiagnostic|null>{
+  const obj=await bucket.get(falHistoryKey);
+  if(!obj)return null;
+  try{return JSON.parse(await obj.text()) as FalHistoryDiagnostic;}catch{return null;}
+}
+async function writeHistoryDiagnostic(bucket:TemplatePhotoBucket,diagnostic:FalHistoryDiagnostic){
+  await bucket.put(falHistoryKey,JSON.stringify(diagnostic),{
+    httpMetadata:{contentType:"application/json"},
+  });
+}
+function templateFromSavedPrompt(input:unknown):"summit"|"community"|null{
+  if(!input||typeof input!=="object")return null;
+  const prompt=(input as {prompt?:unknown}).prompt;
+  if(typeof prompt!=="string")return null;
+  if(prompt.startsWith("Summit Preparatory:"))return "summit";
+  if(prompt.startsWith("Community & Faith:"))return "community";
+  return null;
+}
+function extractHistoryImage(output:unknown):string|null{
+  if(!output||typeof output!=="object")return null;
+  const images=(output as {images?:unknown}).images;
+  if(!Array.isArray(images)||images.length!==1)return null;
+  const url=(images[0] as {url?:unknown}|null)?.url;
+  return typeof url==="string"?url:null;
+}
+async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
+  falKey:string):Promise<{uploaded:number;matched:number}>{
+  if(await bucket.head(keyFor("summit","hero")) &&
+     await bucket.head(keyFor("community","hero")))return {uploaded:0,matched:0};
+  const previous=await readHistoryDiagnostic(bucket);
+  if(previous?.nextCheckAt&&Date.parse(previous.nextCheckAt)>Date.now())
+    return {uploaded:0,matched:0};
+  const base:FalHistoryDiagnostic={
+    state:"running",checkedAt:now(),matching:0,uploaded:0,
+  };
+  await writeHistoryDiagnostic(bucket,base);
+  let diagnostic:FalHistoryDiagnostic={...base,state:"no-match"};
+  try{
+    const url=new URL("https://api.fal.ai/v1/models/requests/by-endpoint");
+    url.searchParams.set("endpoint_id","fal-ai/nano-banana-2");
+    url.searchParams.set("start",allowedHistoryStart);
+    url.searchParams.set("status","success");
+    url.searchParams.set("expand","payloads");
+    url.searchParams.set("limit","50");
+    const response=await fetch(url.toString(),{
+      method:"GET",headers:{
+        "Authorization":`Key ${falKey}`,"Accept":"application/json",
+      },redirect:"error",
+    });
+    if(!response.ok)throw Error(`fal history HTTP ${response.status}`);
+    const json=await response.json() as {items?:unknown};
+    if(!Array.isArray(json.items))throw Error("fal history response missing items");
+    const tried=new Set<string>();
+    let checked=0;
+    for(const request of json.items){
+      if(checked>=6 || diagnostic.uploaded>=2)break;
+      if(!request||typeof request!=="object")continue;
+      const item=request as {
+        request_id?:unknown;endpoint_id?:unknown;status_code?:unknown;
+        json_input?:unknown;json_output?:unknown;
+      };
+      if(item.endpoint_id!=="fal-ai/nano-banana-2"||item.status_code!==200)continue;
+      const template=templateFromSavedPrompt(item.json_input);
+      if(!template)continue;
+      const requestId=item.request_id;
+      if(typeof requestId!=="string"||
+         !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(requestId)||
+         tried.has(requestId))continue;
+      tried.add(requestId);
+      const source=extractHistoryImage(item.json_output);
+      if(!source)continue;
+      diagnostic.matching++;
+      if(await bucket.head(keyFor(template,"hero")))continue;
+      checked++;
+      try{
+        const brief=schoolPhotographyBrief(template,"hero");
+        const bytes=await inspectFile(source,brief.minimum);
+        const fileKey=keyFor(template,"hero");
+        if(!await bucket.head(fileKey))
+          await bucket.put(fileKey,bytes,{
+            onlyIf:{etagDoesNotMatch:"*"},
+            httpMetadata:{contentType:"image/jpeg"},
+          });
+        const head=await bucket.head(fileKey);
+        if(!head||head.size!==bytes.byteLength)
+          throw Error("R2 file verification failed");
+        await saveJob(bucket,stateKey(template,"hero"),{
+          status:"completed",requestId,updatedAt:now(),
+        });
+        diagnostic.uploaded++;
+        diagnostic.state="imported";
+        console.info("CAN prior fal image imported to R2",{template,role:"hero",
+          bytes:bytes.byteLength});
+      }catch(error){
+        // Continue to the other already-paid Summit request. Never re-generate.
+        diagnostic.reason=safeError(error);
+        console.error("CAN saved fal media transfer failed",{template,
+          reason:diagnostic.reason});
+      }
+    }
+    if(diagnostic.uploaded===0&&diagnostic.matching>0){
+      diagnostic.state="error";
+      diagnostic.reason??="Completed media is not yet available for import";
+    }
+  }catch(error){
+    diagnostic.state="error";
+    diagnostic.reason=safeError(error);
+    console.error("CAN fal request-history recovery unavailable",{reason:diagnostic.reason});
+  }
+  diagnostic.checkedAt=now();
+  diagnostic.nextCheckAt=new Date(Date.now()+3*60*1000).toISOString();
+  await writeHistoryDiagnostic(bucket,diagnostic);
+  return {uploaded:diagnostic.uploaded,matched:diagnostic.matching};
+}
+
+/**
  * Production cron has two separate responsibilities:
  * (1) Ingest previously generated (already billable) fal.ai request IDs.
  * (2) Submit NEW requests ONLY after explicit CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT
@@ -367,7 +495,12 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
 
   // The generated images visible in fal.ai show we've submitted enough.
   // Never create more paid images by default, including after job failure.
-  if(env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT!=="true")return result;
+  if(env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT!=="true"){
+    // Read-only historical recovery does not send any billable model request.
+    const recovered=await importAlreadyGeneratedFalHistory(bucket,falKey);
+    result.uploaded+=recovered.uploaded;
+    return result;
+  }
 
   // Even when explicitly enabled, require a verified Summit hero BEFORE bulk.
   if(!await bucket.head(keyFor("summit","hero"))){
@@ -445,6 +578,7 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
       heroLastAttemptAt:heroJob?.updatedAt,
       heroNextRetryAt:heroJob?.nextAttemptAt,
       newSubmissionsEnabled:env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true",
+      uploadRecovery:await readHistoryDiagnostic(bucket),
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
     }});
