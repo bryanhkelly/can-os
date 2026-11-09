@@ -243,18 +243,6 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
     const key=stateKey(firstTemplate,firstRole);
     let job=await getJob(bucket,key);
     result.scanned++;
-    if(firstTemplate==="community" && canAdoptCompletedCommunityHero(job)){
-      // This is a GET-only recovery path. No new paid fal.ai generation call.
-      const adopted:JobState={
-        status:"submitted",requestId:communityHeroCompletedFalRequestId,
-        updatedAt:now(),rescueCount:1,
-      };
-      await saveJob(bucket,key,adopted);
-      job=adopted;
-      console.info("CAN photo matched existing completed fal.ai request",{
-        template:firstTemplate,role:firstRole,
-      });
-    }
     if(job?.status==="submitted"&&job.requestId){
       const completed=await completePhoto(bucket,firstTemplate,firstRole,job,falKey);
       if(completed==="ready")result.uploaded++;
