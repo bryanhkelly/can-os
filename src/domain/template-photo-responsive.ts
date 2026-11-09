@@ -40,7 +40,7 @@ export const templateHeroCropWidths={
 /** Browser-selected art direction; the caller emits the fallback <img>. */
 export function templateHeroPictureSources(source:string,enabled:boolean):string{
   if(!enabled || !templatePhotoPath.test(source) ||
-    !/\\/hero(?:\\?v=20261109)?$/.test(source))return "";
+    !source.split("?")[0].endsWith("/hero"))return "";
   const joiner=source.includes("?")?"&":"?";
   const srcset=(crop:"mobile"|"tablet")=>
     templateHeroCropWidths[crop].map(width=>
