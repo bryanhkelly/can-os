@@ -169,7 +169,10 @@ function safeError(error:unknown):string{
   if(!(error instanceof Error))return "Unknown provider submission failure";
   if(error.message.includes("FAL_KEY"))return error.message.slice(0,120);
   if(error.message.startsWith("fal.ai request failed with HTTP")||
-     /^Generated media HTTP [0-9]{3}$/.test(error.message))
+     /^Generated media HTTP [0-9]{3}$/.test(error.message)||
+     /^fal history HTTP [0-9]{3}$/.test(error.message)||
+     error.message==="fal history response missing items"||
+     error.message==="Completed media is not yet available for import")
     return error.message.slice(0,90);
   if(error.message==="Invalid header value.")return "Invalid Authorization header";
   const verifiableFailures=new Set([
