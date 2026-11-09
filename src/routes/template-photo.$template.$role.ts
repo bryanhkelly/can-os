@@ -44,7 +44,11 @@ export const Route=createFileRoute("/template-photo/$template/$role")({
         : undefined;
     try{
       let upstream:Response|null=null;
-      for(const key of [generated,staged,fallback]){
+      // Fresh 84-photo production must never silently serve a legacy v1/v2
+      // template asset when the latest v3 master has not been delivered yet.
+      const freshRun=process.env.CAN_TEMPLATE_PHOTO_RESET_ONCE===
+        "2026-11-09-template-photo-refresh";
+      for(const key of freshRun?[generated]:[generated,staged,fallback]){
         if(!key||!allowedKey.test(key))continue;
         const candidate=await fetch(signPrivateObjectUrl({
           method:"GET",key,keyPattern:allowedKey,expiresSeconds:30,
