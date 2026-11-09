@@ -25,6 +25,11 @@ describe("template preview responsive image delivery",()=>{
     expect(markup).toContain(`${trusted}?w=640 640w`);
     expect(markup).toContain(`${trusted}?w=3840 3840w`);
     expect(markup).toContain('sizes="100vw"');
+    const versioned="/template-photo/summit/hero?v=20261109";
+    const versionedSet=templateResponsiveAttributes(versioned,"hero",true);
+    expect(versionedSet).toContain(`${versioned}&w=640 640w`);
+    expect(versionedSet).toContain(`${versioned}&w=3840 3840w`);
+    expect(versionedSet).not.toContain("?v=20261109?w=");
     expect(templateResponsiveAttributes(trusted,"hero",false)).toBe("");
     expect(templateResponsiveAttributes("/media/private-asset","hero",true)).toBe("");
     expect(templateResponsiveAttributes("javascript:alert(1)","hero",true)).toBe("");
