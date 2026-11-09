@@ -650,6 +650,32 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const approvedInterior = (options?.localPreview || options?.templateGallery) && interiorRole
     && siteInterior?.assetId === "template-sample"
     ? sampleForRole(interiorRole) : siteInterior;
+  // The extra two template photography roles are intentionally mounted only
+  // in fictional/private preview experiences after the full R2 library passes
+  // the twelve-role readiness gate. Never imply these are real school pupils.
+  const includeExtraTemplatePhotoSections=
+    process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED==="true" &&
+    Boolean(options?.templateGallery || options?.localPreview || sampleTemplate);
+  const extraTemplatePhotoSection=(role:import("./template-sample-images").TemplatePhotographyRole,
+    placement:"creative"|"portrait",label:string,title:string,summary:string)=>{
+    if(!includeExtraTemplatePhotoSections)return "";
+    const media=sampleForRole(role);
+    if(!media)return "";
+    return `<section class="template-photo-extra template-photo-extra-${placement}"
+      aria-label="Illustrative ${escapePublicHtml(label)}">
+      <img src="${escapePublicHtml(media.src)}"${responsiveAttrs(media.src,"interior")}
+        alt="${escapePublicHtml(media.altText)}" loading="lazy" decoding="async"/>
+      <div><p class="tag">${escapePublicHtml(label)}</p>
+        <h2>${escapePublicHtml(title)}</h2>
+        <p>${escapePublicHtml(summary)}</p></div>
+      </section>`;
+  };
+  const creativeSampleSection=extraTemplatePhotoSection("program_03","creative",
+    "Creative exploration","Ideas deserve room to take shape.",
+    "Writing, design, and the arts make room for students to discover new ways of expressing what they know.");
+  const studentPortraitSampleSection=extraTemplatePhotoSection("portrait_01","portrait",
+    "Student perspective","Every student has a story worth hearing.",
+    "The best learning communities make space for individual interests, friendships, and the confidence to participate.");
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero${approvedInterior?" has-image":""}">
       ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}"${responsiveAttrs(approvedInterior.src,"interior")} alt="${escapePublicHtml(approvedInterior.altText)}" decoding="async"/>` : ""}
@@ -696,9 +722,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
       demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection),
     "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
-      demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection),
+      demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection + creativeSampleSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", demo ? "Find your people. Follow your curiosity." : "Student life",
-      demo ? "From creative exploration to service and student-led projects, the most memorable lessons often happen together." : "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, ""),
+      demo ? "From creative exploration to service and student-led projects, the most memorable lessons often happen together." : "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, studentPortraitSampleSection),
     "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", demo ? "A day designed for more than lessons." : "What a day of learning looks like",
       demo ? "A thoughtful rhythm of independent discovery, academic guidance, and time to connect." : "See how learning is organized, with confirmed schedules and attendance details where available."),
       reviewedSchoolDay + (demo ? "" : schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
@@ -829,6 +855,15 @@ ${publicSiteTemplateCss}
 /* Consistent public preopening disclosure across all seven school designs. */
 .launch-status-banner{padding:14px clamp(20px,4vw,52px);background:#fff3d8;color:#3d2d15;border-bottom:1px solid #c9a663;font:600 14px/1.55 system-ui,sans-serif}
 .launch-status-banner strong{display:block;font-weight:800}
+.template-photo-extra{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:clamp(22px,4vw,56px);align-items:center;margin:42px 0;padding:clamp(18px,3vw,32px);
+  border:1px solid rgba(55,65,81,.18);border-radius:12px}
+.template-photo-extra img{display:block;width:100%;max-height:440px;aspect-ratio:4/3;object-fit:cover;border-radius:8px}
+.template-photo-extra-portrait img{aspect-ratio:4/5;max-height:460px;max-width:350px}
+.template-photo-extra h2{font-size:clamp(1.6rem,2.6vw,2.6rem);line-height:1.15}
+.template-photo-extra p:last-child{line-height:1.7}
+@media(max-width:760px){.template-photo-extra{grid-template-columns:1fr}
+  .template-photo-extra img{max-width:100%;max-height:380px}}
 ${sevenSchoolCss}
 </style>
 </head>
