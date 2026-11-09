@@ -44,6 +44,8 @@ jobs:
       - name: Verify fal.ai to R2 mock end-to-end (no API charges)
         run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts tests/unit/template-photo-responsive.test.ts tests/unit/template-photo-preview-roles.test.ts tests/unit/template-photo-reset.test.ts
       - name: Typecheck photography integration
+        env:
+          NODE_OPTIONS: "--max-old-space-size=6144"
         run: npm run typecheck
       - name: Build Cloudflare Worker
         run: npm run build:cloudflare
