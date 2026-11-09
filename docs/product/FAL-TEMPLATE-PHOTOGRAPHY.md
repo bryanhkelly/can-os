@@ -45,3 +45,37 @@ The scheduled worker reserves each job in private R2 before a paid fal request, 
 The private website image resolver points to `/template-photo/<template>/<role>` and prefers existing validated v3 objects, with narrow fallback for older sample assets; public school-owned media remains separate. A read-only route at `/template-photo-status?template=community` reports progress by template once code is deployed.
 
 **Deployment is mandatory.** The Netlify site was confirmed running an older November 5 commit, and the Cloudflare public status URL showed the app's 404 page on November 8; neither observation constitutes a successful production deploy. Deployment requires an authenticated Cloudflare session or an authorized CI runner. Once deployed, verify the Worker has the `FAL_KEY` secret and the existing `CAN_R2_ACCOUNT_ID`, `CAN_R2_BUCKET`, `CAN_R2_ACCESS_KEY_ID`, and `CAN_R2_SECRET_ACCESS_KEY` secrets. Do not print secret values. Verify a real 4K hero R2 object and rendered template image before considering the process operational.
+
+## November 8 — Summit Preparatory isolated production pilot
+
+The current Cloudflare deployment configuration creates exactly **one** new billed image job:
+`summit/hero` (requested JPEG, `4K`, `16:9`). It uses a fresh durable
+reservation at `school-template-production/pilot-summit-20261108/hero.json`,
+isolated from previous attempts. Worker cron runs once per minute. New
+generation is submitted only when neither a verified R2 file nor an existing
+pilot request exists. After submission, the Worker polls fal.ai, fetches
+`images[0].url` from the completed result, persists that URL in the private
+R2 job state, downloads the bytes from allowlisted HTTPS media hosts, validates
+JPEG dimensions, uploads to `school-template-previews/v3/summit/hero.jpg`,
+and verifies the R2 object before reporting `completed`.
+
+Import failures preserve both the provider request ID and available asset URL
+and attempt a bounded recovery up to eight times; they do **not** submit a
+replacement image request. Bulk photo submission is disabled unless the
+Cloudflare environment explicitly sets
+`CAN_TEMPLATE_PHOTOGRAPHY_BULK=true`. Do not enable bulk before this pilot's
+R2 asset and displayed preview are verified.
+
+The GitHub workflow `.github/workflows/template-photo-pipeline.yml`
+validates the mock submit→complete→R2→website lifecycle and Cloudflare build,
+then polls the production Summit status and image routes. It has no fal.ai
+secret and never makes a paid submission.
+
+Production test URLs:
+
+- `https://can-os.bryanhkelly.workers.dev/template-photo-status?template=summit`
+- `https://can-os.bryanhkelly.workers.dev/template-photo/summit/hero`
+
+Treat these routes, the GitHub Action result, and Cloudflare cron logs as the
+source of verification. Committing code does not itself prove a live asset was
+generated or uploaded.
