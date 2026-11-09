@@ -73,7 +73,7 @@ describe("scheduled template image generation to R2",()=>{
     const first=await runBoundTemplatePhotoProduction(env);
     expect(first.submitted).toBe(1);
     expect(objects.has(summitKey)).toBe(false);
-    const jobKey="school-template-production/v1/summit/hero.json";
+    const jobKey="school-template-production/pilot-summit-20261108/hero.json";
     expect(JSON.parse(new TextDecoder().decode(objects.get(jobKey))).requestId).toBe(requestId);
     const second=await runBoundTemplatePhotoProduction(env);
     expect(second.uploaded).toBe(1);
