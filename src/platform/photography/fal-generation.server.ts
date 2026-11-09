@@ -38,6 +38,8 @@ async function safeJson(response:Response):Promise<Record<string,unknown>> {
 }
 export type FalPhotographyJob={
   requestId:string;
+  responseUrl?:string;
+  statusUrl?:string;
   template:SiteTemplateId;
   role:TemplatePhotographyRole;
   proposedFilename:string;
@@ -68,7 +70,21 @@ export async function submitSchoolPhoto(
   const data=await safeJson(response);
   if(typeof data.request_id!=="string"||!uuid.test(data.request_id))
     throw new Error("fal.ai did not return a valid request identifier");
-  return {requestId:data.request_id,template,role,
+  // Preserve the canonical provider-provided result/status links, as the
+  // queue API can route these differently from the original submit URL.
+  const checkQueueUrl=(value:unknown,kind:"result"|"status"):string|undefined=>{
+    if(typeof value!=="string")return undefined;
+    const target=new URL(value);
+    const base=`/fal-ai/nano-banana-2/requests/${data.request_id}`;
+    if(target.protocol!=="https:"||target.hostname!=="queue.fal.run"||
+       target.pathname!==(kind==="status"?base+"/status":base))
+      throw new Error("fal.ai returned an unexpected queue URL");
+    return target.toString();
+  };
+  return {requestId:data.request_id,
+    responseUrl:checkQueueUrl(data.response_url,"result"),
+    statusUrl:checkQueueUrl(data.status_url,"status"),
+    template,role,
     proposedFilename:brief.filename,
     requestedWidth:brief.minimum.width,requestedHeight:brief.minimum.height};
 }
@@ -88,9 +104,19 @@ export async function schoolPhotoStatus(requestId:string,injectedKey?:string):Pr
  * Returned provider URL is not a public CAN OS media URL and must never go into
  * the website image manifest before download, resolution/quality checks and R2 upload.
  */
-export async function schoolPhotoResult(requestId:string,injectedKey?:string):Promise<{imageUrl:string}> {
+export async function schoolPhotoResult(
+  requestId:string,injectedKey?:string,providerResponseUrl?:string,
+):Promise<{imageUrl:string}> {
   if(!uuid.test(requestId))throw new Error("Invalid request identifier");
-  const result=await safeJson(await fetch(`${endpoint}/requests/${requestId}`,{
+  let resultUrl=`${endpoint}/requests/${requestId}`;
+  if(providerResponseUrl){
+    const candidate=new URL(providerResponseUrl);
+    if(candidate.protocol!=="https:"||candidate.hostname!=="queue.fal.run"||
+       candidate.pathname!==`/fal-ai/nano-banana-2/requests/${requestId}`)
+      throw Error("Unsupported fal.ai result URL");
+    resultUrl=candidate.toString();
+  }
+  const result=await safeJson(await fetch(resultUrl,{
     headers:headers(injectedKey),method:"GET",
   }));
   const images=result.images;
