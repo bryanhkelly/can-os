@@ -78,19 +78,21 @@ jobs:
                   }catch {console.log("Response not valid JSON");}
                 });
               '
-              if PHOTO_RESET_STATUS="$response" node -e '
+              phase=$(PHOTO_RESET_STATUS="$response" node -e '
                 try {
                   const s=JSON.parse(process.env.PHOTO_RESET_STATUS);
-                  if(s.photoReset?.phase==="blocked"){
-                    console.error("R2 reset is blocked: "+(s.photoReset.reason??"inspect logs"));
-                    process.exit(2);
-                  }
-                  if(s.photoReset?.phase==="completed" &&
+                  if(s.photoReset?.phase==="blocked")process.stdout.write("blocked");
+                  else if(s.photoReset?.phase==="completed" &&
                      s.photoReset.copied===s.photoReset.removed &&
-                     s.newSubmissionsEnabled===false)process.exit(0);
-                }catch{}
-                process.exit(1);
-              '; then
+                     s.newSubmissionsEnabled===false)process.stdout.write("completed");
+                  else process.stdout.write("pending");
+                }catch{process.stdout.write("pending");}
+              ')
+              if [ "$phase" = "blocked" ]; then
+                echo "::error::R2 photo reset blocked. Inspect the public status reason and Cloudflare Worker logs."
+                exit 1
+              fi
+              if [ "$phase" = "completed" ]; then
                 echo "Reset completed. Auditing all seven template inventories."
                 node scripts/check-template-photo-library.mjs --require-reset
                 echo "All seven templates verified clean. No paid generation requested."
