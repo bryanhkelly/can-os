@@ -24,9 +24,9 @@ export interface TemplatePhotoBucket {
 export interface TemplatePhotoImages {
   input(source:ReadableStream):{
     transform(options:{width:number;height?:number;fit?:"cover";gravity?:"auto"}):{
-      output(options:{format:"image/webp";quality:number}):{
-        response(options?:{headers:HeadersInit}):Promise<Response>|Response;
-      };
+      output(options:{format:"image/webp";quality:number}):Promise<{
+        response(options?:{headers:HeadersInit}):Response;
+      }>;
     };
   };
 }
@@ -667,13 +667,15 @@ export async function readBoundTemplatePhoto(request:Request,env:PhotoWorkerEnv)
         crop==="tablet"?
         {width,height:Math.round(width*3/4),fit:"cover" as const,gravity:"auto" as const}:
         {width};
-      return await env.IMAGES.input(obj.body)
+      // Cloudflare Images output() is async. It must resolve before we can
+      // invoke response() on its result; otherwise this throws and returns 503.
+      const transformed=await env.IMAGES.input(obj.body)
         .transform(options)
-        .output({format:"image/webp",quality:80})
-        .response({headers:{
-          "Cache-Control":"public, max-age=86400, stale-while-revalidate=86400",
-          "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
-        }});
+        .output({format:"image/webp",quality:80});
+      return transformed.response({headers:{
+        "Cache-Control":"public, max-age=86400, stale-while-revalidate=86400",
+        "X-Content-Type-Options":"nosniff","Referrer-Policy":"no-referrer",
+      }});
     }
     return new Response(obj.body,{headers:{
       "Content-Type":obj.httpMetadata?.contentType??"image/jpeg",
@@ -741,6 +743,7 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
       heroNextRetryAt:heroJob?.nextAttemptAt,
       newSubmissionsEnabled:env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true",
       responsiveDeliveryEnabled:env.CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED==="true",
+      imagesBindingAvailable:typeof env.IMAGES?.input==="function",
       uploadRecovery:await readHistoryDiagnostic(bucket),
       r2WriteVerified:Boolean(await bucket.head(r2ProbeKey)),
       photoReset:await readTemplatePhotoResetState(bucket),
