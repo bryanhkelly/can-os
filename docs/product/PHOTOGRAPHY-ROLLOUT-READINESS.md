@@ -51,11 +51,11 @@ school-owned photos; they are fictional illustrative template samples.
 `CAN_TEMPLATE_PHOTOGRAPHY_GENERATE=true`: process existing result IDs,
 read-only fal history, image bytes, validation, and R2 imports.
 
-`CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT=false`: **no new paid fal.ai requests**.
+`CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT=true`: armed for new paid requests **only after the one-time R2 cleanup is durably complete**.
 
-`CAN_TEMPLATE_PHOTOGRAPHY_BULK=false`: do not launch the remaining 84 roles.
+`CAN_TEMPLATE_PHOTOGRAPHY_BULK=true`: enables remaining roles **only after the fresh Summit pilot is verified in R2**.
 
-A paid submission (when explicitly re-enabled later) stores its provider
+Each newly authorized paid submission stores its provider
 `request_id`, `response_url` and state. Subsequent operations retrieve the
 returned `images[0].url`, download and verify actual image bytes, upload to
 the private `can-os` R2 bucket, then confirm the target object. Failed
@@ -145,9 +145,7 @@ been independently verified.
    library, use `--require-complete --check-responsive`. This script is
    read-only; it does not call the fal.ai POST endpoint.
 7. Confirm the available fal.ai credit/budget and delivery per-template quota.
-   Turn on `CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT` and
-   `CAN_TEMPLATE_PHOTOGRAPHY_BULK` **only** when the above passes and the
-   remaining, role-specific jobs are understood. Monitor the 7×12 status
+   The production flags are now armed, but the Worker must enforce the completed R2 reset checkpoint, verified fresh Summit hero, maximum of two in-flight requests, and no new charges after any rejected job. Monitor the 7×12 status
    matrix until 84/84 and inspect website previews.
 
 ### Verification limitation
@@ -157,3 +155,12 @@ balance during this review even after the user said funds were added; fal.ai
 billing and that separate browser-service wallet are not the same account.
 Cloudflare production deploy status and actual R2 object content therefore
 remain unverified. Neither code commits nor mock tests prove a live upload.
+
+## Active campaign controls (Nov 9, 2026)
+
+The GitHub main configuration now arms the production campaign following
+R2 cleanup. Check the live `campaign.ready` count (out of 84), `inFlight`
+count (maximum two), and `rejected` count on the production status API.
+If Cloudflare has not deployed the latest main commit, no new paid runs
+should be assumed. The 3 original fal.ai requests remain the only
+user-confirmed completed generations until the live dashboard changes.
