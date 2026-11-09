@@ -51,7 +51,12 @@ export async function submitSchoolPhoto(
 ):Promise<FalPhotographyJob>{
   const brief=schoolPhotographyBrief(template,role);
   const response=await fetch(endpoint,{
-    method:"POST",headers:headers(injectedKey),
+    method:"POST",headers:{
+      ...headers(injectedKey),
+      // Preserve the result in request history while R2 ingestion completes.
+      // This is not an instruction to generate any additional images.
+      "X-Fal-Store-IO":"1",
+    },
     body:JSON.stringify({
       prompt:brief.prompt,aspect_ratio:brief.aspect_ratio,
       resolution:"4K",output_format:"jpeg",
