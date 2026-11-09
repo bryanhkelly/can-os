@@ -535,9 +535,10 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   ];
   for(const object of historical.objects){
     const parts=object.key.split("/");
+    const filename=parts[3];
     if(parts.length!==4||parts[0]!=="school-template-production"||
-       parts[1]!=="v1"||!parts[3].endsWith(".json"))continue;
-    const t=parts[2],r=parts[3].slice(0,-5);
+       parts[1]!=="v1"||!filename?.endsWith(".json"))continue;
+    const t=parts[2]??"",r=filename.slice(0,-5);
     if(!templateSet.has(t)||!roleSet.has(r))continue;
     candidates.push({
       path:object.key,template:t as SiteTemplateId,role:r as TemplatePhotographyRole,
@@ -607,9 +608,10 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   let rejected=0;
   for(const object of existing.objects){
     const parts=object.key.split("/");
+    const filename=parts[3];
     if(parts.length!==4||parts[0]!=="school-template-production"||
-       parts[1]!=="v1"||!parts[3].endsWith(".json"))continue;
-    if(!templateSet.has(parts[2])||!roleSet.has(parts[3].slice(0,-5)))continue;
+       parts[1]!=="v1"||!filename?.endsWith(".json"))continue;
+    if(!templateSet.has(parts[2]??"")||!roleSet.has(filename.slice(0,-5)))continue;
     const state=await getJob(bucket,object.key);
     if(!state)continue;
     billedSlots++;
@@ -644,7 +646,7 @@ export async function readBoundTemplatePhoto(request:Request,env:PhotoWorkerEnv)
   const bucket=env.TEMPLATE_PHOTO_BUCKET;
   if(!bucket)return unavailable();
   const match=new URL(request.url).pathname.match(/^\/template-photo\/([^/]+)\/([^/]+)$/);
-  if(!match||!templateSet.has(match[1])||!roleSet.has(match[2]))return invalid();
+  if(!match||!templateSet.has(match[1]??"")||!roleSet.has(match[2]??""))return invalid();
   const template=match[1] as SiteTemplateId,role=match[2] as TemplatePhotographyRole;
   const url=new URL(request.url);
   const width=allowedTemplateVariantWidth(role,url.searchParams.get("w"));
@@ -714,8 +716,8 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
     let submittedAll=0,rejectedAll=0;
     for(const item of tracked.objects){
       const parts=item.key.split("/");
-      if(parts.length!==4||parts[1]!=="v1"||!templateSet.has(parts[2])||
-        !roleSet.has(parts[3].replace(/\.json$/,"")))continue;
+      if(parts.length!==4||parts[1]!=="v1"||!templateSet.has(parts[2]??"")||
+        !roleSet.has((parts[3]??"").replace(/\.json$/,"")))continue;
       const job=await getJob(bucket,item.key);
       if(job?.status==="submitted"||job?.status==="reserved")submittedAll++;
       if(job?.status==="rejected")rejectedAll++;
