@@ -13,14 +13,19 @@ function jpeg4k(){
 }
 function fakeR2(){
   const objects=new Map<string,Uint8Array>();
+  const contentTypes=new Map<string,string>();
   const bucket:TemplatePhotoBucket={
-    head:async key=>objects.has(key)?{size:objects.get(key)!.byteLength}:null,
+    head:async key=>objects.has(key)?{
+      size:objects.get(key)!.byteLength,
+      httpMetadata:{contentType:contentTypes.get(key)},
+    }:null,
     get:async key=>{
       const value=objects.get(key);
       if(!value)return null;
       return {
         body:new Response(new Uint8Array(value).buffer).body!,
         text:async()=>new TextDecoder().decode(value),
+        httpMetadata:{contentType:contentTypes.get(key)},
       };
     },
     put:async (key,value,options)=>{
@@ -29,12 +34,14 @@ function fakeR2(){
         :value instanceof ArrayBuffer?new Uint8Array(value)
         :new Uint8Array(value.buffer,value.byteOffset,value.byteLength);
       objects.set(key,new Uint8Array(bytes));
+      if(options?.httpMetadata?.contentType)
+        contentTypes.set(key,options.httpMetadata.contentType);
       return {key};
     },
     list:async ({prefix,limit})=>({objects:[...objects.keys()]
       .filter(key=>key.startsWith(prefix)).slice(0,limit??1000).map(key=>({key}))}),
   };
-  return {bucket,objects};
+  return {bucket,objects,contentTypes};
 }
 
 afterEach(()=>vi.unstubAllGlobals());
@@ -290,6 +297,49 @@ describe("scheduled template image generation to R2",()=>{
     expect(diag.archived).toBe(2);
     expect(diag.matching).toBe(2);
     expect(calls.some(url=>url==="https://queue.fal.run/fal-ai/nano-banana-2")).toBe(false);
+  });
+
+  it("fetches a completed PNG as an ArrayBuffer, writes it through native R2, and serves image/png",async()=>{
+    const {bucket,objects,contentTypes}=fakeR2();
+    const sourceKey="school-template-production/pilot-summit-20261108/hero.json";
+    const req="c0ffee00-1111-4222-8333-444444444444";
+    objects.set(sourceKey,new TextEncoder().encode(JSON.stringify({
+      status:"submitted",requestId:req,
+      updatedAt:"2026-11-08T22:00:00.000Z",
+    })));
+    objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
+    const png=new Uint8Array(4096);
+    png.set([137,80,78,71,13,10,26,10,0,0,0,13,73,72,68,82],0);
+    png.set([0,0,16,0,0,0,9,0],16);
+    const calls:string[]=[];
+    vi.stubGlobal("fetch",vi.fn(async (input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);calls.push(url);
+      expect(init?.method).not.toBe("POST");
+      if(url.endsWith(`/requests/${req}`))
+        return Response.json({images:[{url:"https://y3b.fal.media/files/test/image.png"}]});
+      if(url==="https://y3b.fal.media/files/test/image.png")
+        return new Response(png.buffer,{status:200,headers:{"Content-Type":"image/png"}});
+      if(url.startsWith("https://api.fal.ai/v1/models/requests/by-endpoint?"))
+        return Response.json({items:[],has_more:false,next_cursor:null});
+      throw Error("Unexpected request: "+url);
+    }));
+    const env={CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",FAL_KEY:"test:key",
+      TEMPLATE_PHOTO_BUCKET:bucket};
+    const output=await runBoundTemplatePhotoProduction(env);
+    expect(output.submitted).toBe(0);
+    expect(output.uploaded).toBe(1);
+    expect(objects.get(summitKey)?.byteLength).toBe(4096);
+    expect(contentTypes.get(summitKey)).toBe("image/png");
+    const response=await readBoundTemplatePhoto(
+      new Request("https://can-os.test/template-photo/summit/hero"),env);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toBe("image/png");
+    const info=await readBoundTemplatePhotoStatus(
+      new Request("https://can-os.test/template-photo-status?template=summit"),env);
+    expect(await info.json()).toMatchObject({generated:1,r2WriteVerified:true,
+      newSubmissionsEnabled:false,heroStatus:"completed"});
+    expect(calls.filter(x=>x==="https://queue.fal.run/fal-ai/nano-banana-2")).toHaveLength(0);
   });
 
   it("does not run any paid job when disabled",async()=>{
