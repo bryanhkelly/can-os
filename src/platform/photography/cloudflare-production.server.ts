@@ -507,7 +507,10 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   // Recover the already-paid Community photograph without calling fal.ai's
   // billable submission endpoint. Never overwrite a different accepted job.
   const communityKey=stateKey("community","hero");
-  if(!await bucket.head(keyFor("community","hero"))){
+  // Never repopulate freshly reset R2 folders with old November images.
+  // Historical recovery must be separately opted into by an operator.
+  if(env.CAN_TEMPLATE_PHOTO_RECOVER_HISTORY==="true" &&
+      !await bucket.head(keyFor("community","hero"))){
     const community=await getJob(bucket,communityKey);
     if(canAdoptCompletedCommunityHero(community)){
       await saveJob(bucket,communityKey,{
