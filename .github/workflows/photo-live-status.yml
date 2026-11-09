@@ -1,0 +1,47 @@
+name: CAN OS photography — direct live API status
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/photo-live-status.mjs"
+      - ".github/workflows/photo-live-status.yml"
+      - "wrangler.jsonc"
+      - "src/platform/photography/**"
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: photo-live-status
+  cancel-in-progress: true
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check seven template status endpoints and R2-backed hero responses
+        run: node scripts/photo-live-status.mjs
+        env:
+          PHOTO_REPORT_PATH: /tmp/can-os-photo-live.md
+      - name: Update single operations issue from live API
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if [ -s /tmp/can-os-photo-live.md ]; then
+            gh issue edit 274 --body-file /tmp/can-os-photo-live.md
+          else
+            printf '# CAN OS photography monitor\n\nNo usable status response was produced by GitHub Actions. Check the workflow job logs.\n' > /tmp/can-os-photo-live.md
+            gh issue edit 274 --body-file /tmp/can-os-photo-live.md
+          fi
