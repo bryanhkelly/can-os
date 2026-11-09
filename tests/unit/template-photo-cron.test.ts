@@ -67,7 +67,8 @@ describe("scheduled template image generation to R2",()=>{
       throw Error(`Unexpected test network call: ${url}`);
     }));
     const env={
-      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",FAL_KEY:"test:key",
+      CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_BULK:"false",FAL_KEY:"test:key",
       TEMPLATE_PHOTO_BUCKET:bucket,
     };
     const first=await runBoundTemplatePhotoProduction(env);
@@ -92,6 +93,8 @@ describe("scheduled template image generation to R2",()=>{
     const third=await runBoundTemplatePhotoProduction(env);
     expect(third.submitted).toBe(0);
     expect(calls.filter(url=>url==="https://queue.fal.run/fal-ai/nano-banana-2")).toHaveLength(1);
+    expect(calls.filter(url=>url.endsWith(`/requests/${requestId}`)).length).toBeGreaterThan(0);
+
   });
 
   it("does not run any paid job when disabled",async()=>{
