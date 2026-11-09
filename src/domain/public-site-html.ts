@@ -2,7 +2,7 @@ import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
 import { templateSampleImage } from "./template-sample-images";
-import { templateResponsiveAttributes } from "./template-photo-responsive";
+import { templateResponsiveAttributes,templateHeroPictureSources } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
@@ -195,6 +195,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const responsiveTemplatePhotos=process.env.CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED==="true";
   const responsiveAttrs=(source:string,placement:"hero"|"interior"|"mosaic")=>
     templateResponsiveAttributes(source,placement,responsiveTemplatePhotos);
+  const heroPhotoElement=(source:string,altText:string)=>{
+    const imageMarkup='<img class="hero-background-image" src="' +
+      escapePublicHtml(source) + '"' + responsiveAttrs(source,"hero") +
+      ' alt="' + escapePublicHtml(altText) +
+      '" decoding="async" fetchpriority="high"/>';
+    const artDirection=templateHeroPictureSources(source,responsiveTemplatePhotos);
+    return artDirection?'<picture>'+artDirection+imageMarkup+'</picture>':imageMarkup;
+  };
   const approvedHero=ownedMedia("hero");
   const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src;
   const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
@@ -369,10 +377,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
       (!availablePaths.includes("/academics") && availablePaths.includes("/contact")
         ? '<a class="hero-text-link" href="/contact">School information →</a>' : ""),
-    image: heroPhotoSrc
-      ? '<img class="hero-background-image" src="' + escapePublicHtml(heroPhotoSrc) +
-        '"' + responsiveAttrs(heroPhotoSrc,"hero") +
-        ' alt="' + escapePublicHtml(heroPhotoAlt) + '" decoding="async" fetchpriority="high"/>' : "",
+    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt):"",
     mosaicImages: campusMosaicImages,
   });
   // The homepage introduces the school; detailed church content belongs on
