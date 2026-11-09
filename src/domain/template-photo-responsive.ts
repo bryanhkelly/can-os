@@ -18,7 +18,7 @@ export const templateResponsiveSizes={
   mosaic:"(max-width: 760px) 100vw, (max-width: 1200px) 50vw, 33vw",
 } as const satisfies Record<TemplateImagePlacement,string>;
 
-const templatePhotoPath=/^\/template-photo\/(heritage|community|modern|bright-futures|summit|classic|campus)\/(hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123 ])(?:\\?v=20261109)?$/;
+const templatePhotoPath=/^\/template-photo\/(heritage|community|modern|bright-futures|summit|classic|campus)\/(hero|story_0[12]|program_0[123]|community_0[12]|admissions|portrait_0[123])(?:\?v=20261109)?$/;
 
 /** A narrow, server-rendered HTML snippet; never construct a CDN origin URL. */
 export function templateResponsiveAttributes(
