@@ -3,7 +3,7 @@ import {schoolPhotographyBrief,templatePhotographyRoles} from "@/domain/template
 import type {TemplatePhotographyRole} from "@/domain/template-sample-images";
 import {normalizeFalKey,submitSchoolPhoto,schoolPhotoResult} from "./fal-generation.server";
 import {verifyPhotoBytes,verifyPhotoAspectRatio,type VerifiedPhoto} from "./photo-binary.server";
-import {allowedTemplateVariantWidth} from "@/domain/template-photo-responsive";
+import {allowedTemplateCrop,allowedTemplateVariantWidth,templateHeroCropWidths} from "@/domain/template-photo-responsive";
 import {advanceTemplatePhotoReset,readTemplatePhotoResetState,PHOTO_RESET_ID} from "./r2-photo-reset.server";
 
 /**
@@ -23,7 +23,7 @@ export interface TemplatePhotoBucket {
 /** Cloudflare Images binding transforms private R2 byte streams on demand. */
 export interface TemplatePhotoImages {
   input(source:ReadableStream):{
-    transform(options:{width:number}):{
+    transform(options:{width:number;height?:number;fit?:"cover";gravity?:"auto"}):{
       output(options:{format:"image/webp";quality:number}):{
         response(options?:{headers:HeadersInit}):Promise<Response>|Response;
       };
@@ -648,7 +648,11 @@ export async function readBoundTemplatePhoto(request:Request,env:PhotoWorkerEnv)
   const template=match[1] as SiteTemplateId,role=match[2] as TemplatePhotographyRole;
   const url=new URL(request.url);
   const width=allowedTemplateVariantWidth(role,url.searchParams.get("w"));
-  if(width===undefined)return invalid();
+  const crop=allowedTemplateCrop(role,url.searchParams.get("c"));
+  if(width===undefined||crop===undefined)return invalid();
+  if(crop!==null && (width===null ||
+    !(templateHeroCropWidths[crop] as readonly number[]).includes(width)))
+    return invalid();
   try {
     const obj=await bucket.get(keyFor(template,role));
     if(!obj)return invalid();
@@ -656,8 +660,13 @@ export async function readBoundTemplatePhoto(request:Request,env:PhotoWorkerEnv)
       // Each known width is generated on demand from the original private
       // R2 asset. There are no new fal.ai generation requests.
       if(!env.IMAGES)return unavailable();
+      const options=crop==="mobile"?
+        {width,height:Math.round(width*5/4),fit:"cover" as const,gravity:"auto" as const}:
+        crop==="tablet"?
+        {width,height:Math.round(width*3/4),fit:"cover" as const,gravity:"auto" as const}:
+        {width};
       return await env.IMAGES.input(obj.body)
-        .transform({width})
+        .transform(options)
         .output({format:"image/webp",quality:80})
         .response({headers:{
           "Cache-Control":"public, max-age=86400, stale-while-revalidate=86400",
