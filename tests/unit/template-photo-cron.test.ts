@@ -137,6 +137,39 @@ describe("scheduled template image generation to R2",()=>{
     expect(called.some(url=>url==="https://queue.fal.run/fal-ai/nano-banana-2")).toBe(false);
   });
 
+  it("imports an older paid Summit job even when the newer pilot record is rejected",async()=>{
+    const {bucket,objects}=fakeR2();
+    const older="school-template-production/v1/summit/hero.json";
+    const pilot="school-template-production/pilot-summit-20261108/hero.json";
+    const encode=(data:unknown)=>new TextEncoder().encode(JSON.stringify(data));
+    objects.set(older,encode({status:"submitted",requestId,
+      updatedAt:"2026-11-08T23:00:00.000Z"}));
+    objects.set(pilot,encode({status:"rejected",
+      reason:"Invalid Authorization header",updatedAt:"2026-11-08T23:02:00.000Z"}));
+    objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
+    const called:string[]=[];
+    vi.stubGlobal("fetch",vi.fn(async (input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);
+      called.push(url);
+      if(init?.method==="POST")throw Error("Unexpected new paid fal request");
+      if(url.endsWith(`/requests/${requestId}`))
+        return Response.json({images:[{url:"https://y3b.fal.media/files/test/hero.jpg"}]});
+      if(url==="https://y3b.fal.media/files/test/hero.jpg")
+        return new Response(new Uint8Array(jpeg4k()).buffer,{status:200});
+      throw Error("Unexpected GET "+url);
+    }));
+    const env={CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",FAL_KEY:"test:key",
+      TEMPLATE_PHOTO_BUCKET:bucket};
+    expect((await runBoundTemplatePhotoProduction(env)).uploaded).toBe(1);
+    expect(objects.has(summitKey)).toBe(true);
+    const stat=await readBoundTemplatePhotoStatus(
+      new Request("https://can-os.example/template-photo-status?template=summit"),env);
+    expect(await stat.json()).toMatchObject({generated:1,
+      heroStatus:"completed",newSubmissionsEnabled:false});
+    expect(called.filter(url=>url==="https://queue.fal.run/fal-ai/nano-banana-2")).toHaveLength(0);
+  });
+
   it("never generates an image when the new paid-submission switch is off",async()=>{
     const {bucket,objects}=fakeR2();
     objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
