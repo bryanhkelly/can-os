@@ -21,6 +21,7 @@ export interface PhotoWorkerEnv {
   TEMPLATE_PHOTO_BUCKET?:TemplatePhotoBucket;
   FAL_KEY?:string;
   CAN_TEMPLATE_PHOTOGRAPHY_GENERATE?:string;
+  CAN_TEMPLATE_PHOTOGRAPHY_BULK?:string;
 }
 const templateSet=new Set<string>(siteTemplateIds);
 const roleSet=new Set<string>(templatePhotographyRoles);
@@ -235,12 +236,14 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
     return result;
   }
   // Verify exactly one full-size, delivered photo before launching 83 jobs.
-  const firstTemplate:"community"="community",firstRole:"hero"="hero";
+  // One paid Summit hero is the controlled, fresh end-to-end production test.
+  // Never submit an 84-image batch until this image is verifiably in R2.
+  const firstTemplate:"summit"="summit",firstRole:"hero"="hero";
   if(!await bucket.head(keyFor(firstTemplate,firstRole))){
     const key=stateKey(firstTemplate,firstRole);
     let job=await getJob(bucket,key);
     result.scanned++;
-    if(canAdoptCompletedCommunityHero(job)){
+    if(firstTemplate==="community" && canAdoptCompletedCommunityHero(job)){
       // This is a GET-only recovery path. No new paid fal.ai generation call.
       const adopted:JobState={
         status:"submitted",requestId:communityHeroCompletedFalRequestId,
@@ -270,6 +273,10 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
     // Never spend on secondary roles until the first real 4K hero is verified.
     return result;
   }
+
+  // Explicit operator switch is needed for the full 84-image paid campaign.
+  // The single Summit pilot runs without this switch.
+  if(env.CAN_TEMPLATE_PHOTOGRAPHY_BULK!=="true")return result;
 
   // Revisit all pending queue IDs promptly. A cursor alone would require a
   // 70-minute round trip before polling the earliest submitted request.
