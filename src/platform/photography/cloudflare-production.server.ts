@@ -54,7 +54,7 @@ const stateKey=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
     ? "school-template-production/pilot-summit-20261108/hero.json"
     : `school-template-production/v1/${template}/${role}.json`;
 const cursorKey="school-template-production/v1/cursor.json";
-const r2ProbeKey="school-template-production/v1/r2-write-verified.json";
+const r2ProbeKey="school-template-maintenance/r2-write-verified.json";
 type JobState={
   status:"reserved"|"submitted"|"completed"|"rejected";
   requestId?:string;resultUrl?:string;statusUrl?:string;
