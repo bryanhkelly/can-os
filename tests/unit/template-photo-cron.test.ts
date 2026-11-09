@@ -246,6 +246,7 @@ describe("scheduled template image generation to R2",()=>{
     expect(diag.state).toBe("imported");
     expect(diag.matching).toBe(2);
     expect(diag.uploaded).toBe(1);
+    expect(diag.archived).toBe(1);
     const status=await readBoundTemplatePhotoStatus(
       new Request("https://can-os.example/template-photo-status?template=summit"),env);
     expect(await status.json()).toMatchObject({
@@ -254,6 +255,41 @@ describe("scheduled template image generation to R2",()=>{
       uploadRecovery:{state:"imported",uploaded:1},
     });
     expect(calls.some(x=>x.method==="POST")).toBe(false);
+  });
+
+  it("archives both paid Summit alternatives but selects just one canonical website hero",async()=>{
+    const {bucket,objects}=fakeR2();
+    const oldId="aaaaaaaa-1111-4222-8333-444444444444";
+    const newId="bbbbbbbb-1111-4222-8333-444444444444";
+    objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
+    const calls:string[]=[];
+    vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);calls.push(url);
+      expect(init?.method).not.toBe("POST");
+      if(url.startsWith("https://api.fal.ai/v1/models/requests/by-endpoint?"))
+        return Response.json({items:[oldId,newId].map((request_id,index)=>({
+          endpoint_id:"fal-ai/nano-banana-2",status_code:200,request_id,
+          json_input:{prompt:"Summit Preparatory: completed and paid"},
+          json_output:{images:[{url:`https://y3b.fal.media/files/${index}.jpg`}]},
+        }))});
+      if(url.startsWith("https://y3b.fal.media/files/"))
+        return new Response(new Uint8Array(jpeg4k()).buffer,{status:200});
+      throw Error("Unexpected external request: "+url);
+    }));
+    const env={CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",FAL_KEY:"test:key",
+      TEMPLATE_PHOTO_BUCKET:bucket};
+    const result=await runBoundTemplatePhotoProduction(env);
+    expect(result.uploaded).toBe(1);
+    expect(result.submitted).toBe(0);
+    expect(objects.has(summitKey)).toBe(true);
+    for(const id of [oldId,newId])
+      expect(objects.has(`school-template-previews/v3/_archive/summit/${id}.jpg`)).toBe(true);
+    const diag=JSON.parse(new TextDecoder().decode(objects.get(
+      "school-template-production/v1/fal-history-recovery.json")));
+    expect(diag.archived).toBe(2);
+    expect(diag.matching).toBe(2);
+    expect(calls.some(url=>url==="https://queue.fal.run/fal-ai/nano-banana-2")).toBe(false);
   });
 
   it("does not run any paid job when disabled",async()=>{
