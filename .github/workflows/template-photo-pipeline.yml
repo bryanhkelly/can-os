@@ -1,4 +1,4 @@
-name: Template photo pipeline — seven-template readiness
+name: Template photo pipeline — R2 cleanup and seven-template readiness
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
       - "src/platform/photography/**"
       - "src/domain/template-photography-production.ts"
       - "src/domain/template-photo-responsive.ts"
+      - "src/platform/photography/r2-photo-reset.server.ts"
       - "src/domain/public-site-html.ts"
       - "src/routes/template-photo*"
       - "src/cloudflare-demo.ts"
@@ -16,6 +17,7 @@ on:
       - "wrangler.jsonc"
       - "tests/unit/template-photo-cron.test.ts"
       - "tests/unit/template-photo-responsive.test.ts"
+      - "tests/unit/template-photo-reset.test.ts"
       - "tests/unit/template-photo-preview-roles.test.ts"
       - "scripts/check-template-photo-library.mjs"
       - ".github/workflows/template-photo-pipeline.yml"
@@ -39,7 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Verify fal.ai to R2 mock end-to-end (no API charges)
-        run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts tests/unit/template-photo-responsive.test.ts tests/unit/template-photo-preview-roles.test.ts
+        run: npx vitest run tests/unit/template-photo-cron.test.ts tests/unit/template-photography-worker.test.ts tests/unit/photo-binary.test.ts tests/unit/template-photo-responsive.test.ts tests/unit/template-photo-preview-roles.test.ts tests/unit/template-photo-reset.test.ts
       - name: Typecheck photography integration
         run: npm run typecheck
       - name: Build Cloudflare Worker
@@ -52,48 +54,4 @@ jobs:
     timeout-minutes: 14
     steps:
       - name: Inventory all seven templates and their 84 roles (read only)
-        run: node scripts/check-template-photo-library.mjs
-      - name: Check public R2-backed Summit pilot
-        env:
-          BASE: "https://can-os.bryanhkelly.workers.dev"
-        shell: bash
-        run: |
-          set -euo pipefail
-          # Cloudflare GitHub deployments occur separately. Poll for up to 10m.
-          # This job never invokes fal.ai or submits additional paid requests.
-          for attempt in $(seq 1 20); do
-            echo "Checking live Summit hero (attempt $attempt)"
-            response=$(curl -fLsS --retry 2 --max-time 20 "$BASE/template-photo-status?template=summit" || true)
-            if [ -n "$response" ]; then
-              echo "$response" | node -e '
-                let data=""; process.stdin.on("data",c=>data+=c);
-                process.stdin.on("end",()=>{
-                  try {
-                    const s=JSON.parse(data);
-                    console.log(JSON.stringify({
-                      template:s.template,generated:s.generated,
-                      total:s.total,heroStatus:s.heroStatus,
-                      heroError:s.heroError,heroImportAttempts:s.heroImportAttempts
-                    }));
-                  } catch { console.log("Status endpoint did not return JSON"); }
-                });
-              '
-              if STATUS_JSON="$response" node -e '
-                try{ const s=JSON.parse(process.env.STATUS_JSON);
-                  if(s.template==="summit"&&s.generated>0&&s.ready?.includes("hero"))process.exit(0);
-                }catch{}
-                process.exit(1);
-              '; then
-                echo "Summit hero is ready in R2. Checking public JPEG..."
-                curl -fLsS --max-time 30 -o /tmp/summit-hero.jpg "$BASE/template-photo/summit/hero"
-                file /tmp/summit-hero.jpg
-                file --mime-type /tmp/summit-hero.jpg | grep -q 'image/jpeg'
-                test "$(wc -c < /tmp/summit-hero.jpg)" -gt 4096
-                echo "SUCCESS: verified real JPEG from public Summit template endpoint"
-                exit 0
-              fi
-            fi
-            sleep 30
-          done
-          echo "::error::Summit hero was not imported and served within the verification window. Check Worker cron logs and template-photo-status?template=summit."
-          exit 1
+        run: node scripts/check-template-photo-library.mjs --require-reset
