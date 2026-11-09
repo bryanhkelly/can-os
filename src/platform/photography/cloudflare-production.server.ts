@@ -708,7 +708,8 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
       if(job?.status==="rejected")rejectedAll++;
     }
     const pilot=await getJob(bucket,stateKey("summit","hero"));
-    if(pilot && !readyAll && pilot.status==="submitted")submittedAll++;
+    if(pilot && !await bucket.head(keyFor("summit","hero")) &&
+       (pilot.status==="submitted"||pilot.status==="reserved"))submittedAll++;
     return Response.json({
       campaign:{ready:readyAll,target:84,inFlight:submittedAll,
         rejected:rejectedAll,newSubmissionsEnabled:
