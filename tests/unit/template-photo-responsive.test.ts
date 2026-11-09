@@ -63,7 +63,7 @@ describe("template preview responsive image delivery",()=>{
     };
     const transform=vi.fn((opts:{width:number;height?:number;fit?:string;gravity?:string})=>{
       expect(opts).toEqual({width:640,height:800,fit:"cover",gravity:"auto"});
-      return {output:()=>({response:async()=>new Response(new Uint8Array([82,73,70,70]),{
+      return {output:async()=>({response:()=>new Response(new Uint8Array([82,73,70,70]),{
         status:200,headers:{"Content-Type":"image/webp"},
       })})};
     });
@@ -106,9 +106,9 @@ describe("template preview responsive image delivery",()=>{
         output:vi.fn(({format,quality}:{format:"image/webp";quality:number})=>{
           expect(format).toBe("image/webp");
           expect(quality).toBe(80);
-          return {response:async()=>new Response(new Uint8Array([82,73,70,70]),{
+          return Promise.resolve({response:()=>new Response(new Uint8Array([82,73,70,70]),{
             headers:{"Content-Type":"image/webp"},
-          })};
+          })});
         }),
       };
     });
