@@ -28,8 +28,8 @@ the separate maintenance marker, and previously archived material.
 Wrangler variables are currently configured for this specific one-time reset:
 
 - `CAN_TEMPLATE_PHOTO_RESET_ONCE=2026-11-09-template-photo-refresh`
-- `CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT=false`
-- `CAN_TEMPLATE_PHOTOGRAPHY_BULK=false`
+- `CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT=true` (armed; no submissions before reset completion)
+- `CAN_TEMPLATE_PHOTOGRAPHY_BULK=true` (after a verified new Summit hero)
 - `CAN_TEMPLATE_PHOTO_RECOVER_HISTORY=false`
 
 The Worker scheduled handler (once per minute) processes up to **four
@@ -64,7 +64,7 @@ Open any of:
 The `photoReset` section must show `phase:"completed"` with `copied`
 and `removed` counts. All seven template statuses should temporarily report
 `generated:0` once the reset is complete (until newly generated assets
-arrive). `newSubmissionsEnabled` must be false.
+arrive). `newSubmissionsEnabled` is now true for the armed campaign, but no new generation can occur until the reset's durable `completed` marker has been observed in a subsequent cron invocation.
 
 The R2 dashboard must show the three old prefixes empty, their contents under
 `school-template-photo-archive/2026-11-09/`, and no unexpected keys.
@@ -97,7 +97,7 @@ on changes to photography production code and performs a read-only live audit
 after the tests/build. It checks the public Cloudflare status on a bounded
 retry schedule and fails immediately if the reset is blocked. Once reset is
 marked complete it verifies all seven template inventories are empty, that
-`copied === removed`, and new fal.ai submissions are still disabled.
+`copied === removed`, and the reset gate is complete before allowing newly paid fal.ai submissions.
 
 The next Summit generation job uses the **new** private state key
 `school-template-production/pilot-summit-20261109/hero.json`; the old
@@ -113,3 +113,19 @@ image fallbacks must not be used to make the clean campaign appear complete.
 Commit-time tests and configuration are not evidence of a production R2
 delete, and the reset remains incomplete until the live status shows
 `photoReset.phase: "completed"` on all seven template status responses.
+
+## November 9 campaign activation
+
+The user approved the full 84-image campaign and confirmed available fal.ai credit.
+Wrangler is now armed with `CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT=true` and
+`CAN_TEMPLATE_PHOTOGRAPHY_BULK=true`. The Worker is fail-closed until it
+observes a *previously persisted* `photoReset.phase=completed` checkpoint.
+It then generates one fresh Summit hero, validates its R2 delivery, and only
+thereafter submits at most two outstanding requests at a time. A rejected
+job halts subsequent paid submissions. Existing first-generation imagery
+remains in the private archive, not the new active v3 slots.
+
+These flags in a GitHub commit **do not independently confirm Cloudflare
+successfully deployed or submitted jobs**. Inspect production
+`/template-photo-status?template=summit` and its `campaign` object, or
+Cloudflare Workers cron execution logs, for actual progress.
