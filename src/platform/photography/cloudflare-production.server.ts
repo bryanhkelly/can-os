@@ -12,7 +12,7 @@ import {advanceTemplatePhotoReset,readTemplatePhotoResetState,PHOTO_RESET_ID} fr
  */
 export interface TemplatePhotoBucket {
   head(key:string):Promise<{size:number;httpMetadata?:{contentType?:string}}|null>;
-  delete(key:string):Promise<void>;
+  delete?(key:string):Promise<void>;
   list(options:{prefix:string;limit?:number}):Promise<{objects:Array<{key:string}>}>;
   get(key:string):Promise<{body:ReadableStream; text():Promise<string>;httpMetadata?:{contentType?:string}}|null>;
   put(key:string,value:string|ArrayBuffer|ArrayBufferView|ReadableStream,options?:{
