@@ -68,6 +68,12 @@ async function writeState(
 }
 
 const timestamp=()=>new Date().toISOString();
+function equalBytes(a:ArrayBuffer,b:ArrayBuffer):boolean{
+  if(a.byteLength!==b.byteLength)return false;
+  const x=new Uint8Array(a),y=new Uint8Array(b);
+  for(let i=0;i<x.byteLength;i++)if(x[i]!==y[i])return false;
+  return true;
+}
 
 /**
  * Archives and removes at most four objects per cron tick, so every transfer
@@ -105,21 +111,33 @@ export async function advanceTemplatePhotoReset(
       if(!source)continue;
       const sourceInfo=await bucket.head(key);
       if(!sourceInfo)continue;
+      // Cloudflare R2 put() requires a stream with a known length. Buffering
+      // these capped 25MB originals is safer than streaming an unknown length.
+      if(sourceInfo.size>25_000_000)
+        throw Error("Photo reset refuses to buffer an oversized object");
+      const originalBytes=await new Response(source.body).arrayBuffer();
+      if(originalBytes.byteLength!==sourceInfo.size)
+        throw Error("Original R2 photo content length did not match metadata");
       const archivedKey=PHOTO_RESET_ARCHIVE_PREFIX+key;
       let archive=await bucket.head(archivedKey);
       if(!archive){
-        const copy=await bucket.put(archivedKey,source.body,{
+        const copy=await bucket.put(archivedKey,originalBytes,{
           onlyIf:{etagDoesNotMatch:"*"},
           httpMetadata:{
             contentType:source.httpMetadata?.contentType ??
               sourceInfo.httpMetadata?.contentType ?? "application/octet-stream",
           },
         });
-        if(!copy)throw Error("Template photo archive was not written");
+        // If another cleanup invocation saved it, verify its content below.
         archive=await bucket.head(archivedKey);
       }
-      if(!archive||archive.size!==sourceInfo.size)
+      if(!archive||archive.size!==originalBytes.byteLength)
         throw Error("Template photo archive size verification failed");
+      const saved=await bucket.get(archivedKey);
+      if(!saved)throw Error("Template photo archive verification read failed");
+      const savedBytes=await new Response(saved.body).arrayBuffer();
+      if(!equalBytes(originalBytes,savedBytes))
+        throw Error("Template photo archive content verification failed");
       if(!bucket.delete)throw Error("R2 photo cleanup requires delete binding");
       await bucket.delete(key);
       if(await bucket.head(key))
