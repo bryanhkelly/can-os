@@ -120,9 +120,10 @@ export function canAdoptCompletedCommunityHero(job:JobState|null):boolean{
   if(job.requestId===communityHeroCompletedFalRequestId)
     return job.status==="rejected" && (job.rescueCount??0)===0;
   // Old preflight failures or reserved jobs never reached fal.ai.
-  return job.status==="reserved" ||
-    job.status==="rejected" &&
-      job.reason==="FAL_KEY contains invalid HTTP header characters";
+  return (job.status==="reserved" &&
+      Date.now()-Date.parse(job.updatedAt)>5*60*1000) ||
+    (job.status==="rejected" &&
+      job.reason==="FAL_KEY contains invalid HTTP header characters");
 }
 const legacyHeaderFailureCutoff="2026-11-08T19:50:00.000Z";
 const jobPrefix="school-template-production/v1/";
@@ -146,6 +147,17 @@ function safeError(error:unknown):string{
   if(error.message.startsWith("fal.ai request failed with HTTP"))
     return error.message.slice(0,90);
   if(error.message==="Invalid header value.")return "Invalid Authorization header";
+  const verifiableFailures=new Set([
+    "Generated photo does not meet required resolution",
+    "Unsupported image source",
+    "Generated file unavailable or exceeds size limit",
+    "Generated file has invalid size",
+    "R2 file verification failed",
+    "Expected exactly one generated photo",
+    "Image URL missing",
+    "Unknown fal.ai queue state",
+  ]);
+  if(verifiableFailures.has(error.message))return error.message;
   return error.name==="TypeError"?"Provider connection failed":error.name.slice(0,64);
 }
 async function queuePhoto(bucket:TemplatePhotoBucket,
