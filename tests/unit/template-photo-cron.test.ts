@@ -87,7 +87,7 @@ describe("scheduled template image generation to R2",()=>{
     const first=await runBoundTemplatePhotoProduction(env);
     expect(first.submitted).toBe(1);
     expect(objects.has(summitKey)).toBe(false);
-    const jobKey="school-template-production/pilot-summit-20261108/hero.json";
+    const jobKey="school-template-production/pilot-summit-20261109/hero.json";
     const storedJob=JSON.parse(new TextDecoder().decode(objects.get(jobKey)));
     expect(storedJob.requestId).toBe(requestId);
     expect(storedJob.resultUrl).toBe(
@@ -116,7 +116,7 @@ describe("scheduled template image generation to R2",()=>{
 
   it("recovers an already-paid Summit result into R2 without submitting any new request",async()=>{
     const {bucket,objects}=fakeR2();
-    const key="school-template-production/pilot-summit-20261108/hero.json";
+    const key="school-template-production/pilot-summit-20261109/hero.json";
     const bytes=new TextEncoder().encode(JSON.stringify({
       status:"rejected",requestId,updatedAt:"2026-11-08T22:15:00.000Z",
       reason:"result-url:Provider connection failed",importAttempts:8,
@@ -157,7 +157,7 @@ describe("scheduled template image generation to R2",()=>{
   it("imports an older paid Summit job even when the newer pilot record is rejected",async()=>{
     const {bucket,objects}=fakeR2();
     const older="school-template-production/v1/summit/hero.json";
-    const pilot="school-template-production/pilot-summit-20261108/hero.json";
+    const pilot="school-template-production/pilot-summit-20261109/hero.json";
     const encode=(data:unknown)=>new TextEncoder().encode(JSON.stringify(data));
     objects.set(older,encode({status:"submitted",requestId,
       updatedAt:"2026-11-08T23:00:00.000Z"}));
@@ -303,7 +303,7 @@ describe("scheduled template image generation to R2",()=>{
 
   it("fetches a completed PNG as an ArrayBuffer, writes it through native R2, and serves image/png",async()=>{
     const {bucket,objects,contentTypes}=fakeR2();
-    const sourceKey="school-template-production/pilot-summit-20261108/hero.json";
+    const sourceKey="school-template-production/pilot-summit-20261109/hero.json";
     const req="c0ffee00-1111-4222-8333-444444444444";
     objects.set(sourceKey,new TextEncoder().encode(JSON.stringify({
       status:"submitted",requestId:req,
