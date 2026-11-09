@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {verifyPhotoBytes} from "@/platform/photography/photo-binary.server";
+import {verifyPhotoBytes,verifyPhotoAspectRatio} from "@/platform/photography/photo-binary.server";
 
 const minimum={width:3840,height:2160};
 function jpeg(){
@@ -37,6 +37,15 @@ describe("fal image download binary validation",()=>{
     const photo=verifyPhotoBytes(webp(),minimum);
     expect(photo).toMatchObject({contentType:"image/webp",extension:"webp",
       width:4096,height:2304});
+  });
+  it("rejects wrong aspect ratios even when dimensions are sufficiently large",()=>{
+    expect(()=>verifyPhotoAspectRatio({width:4096,height:2304},"16:9")).not.toThrow();
+    expect(()=>verifyPhotoAspectRatio({width:3840,height:2160},"4:5"))
+      .toThrow(/required aspect ratio/);
+    expect(()=>verifyPhotoAspectRatio({width:4096,height:4096},"16:9"))
+      .toThrow(/required aspect ratio/);
+    expect(()=>verifyPhotoAspectRatio({width:3200,height:4000},"4:5")).not.toThrow();
+    expect(()=>verifyPhotoAspectRatio({width:3000,height:2000},"3:2")).not.toThrow();
   });
   it("rejects non-images and too-small originals",()=>{
     const bad=new Uint8Array(4096); bad.fill(1);
