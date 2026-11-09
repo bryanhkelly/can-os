@@ -181,7 +181,11 @@ describe("scheduled template image generation to R2",()=>{
   it("never generates an image when the new paid-submission switch is off",async()=>{
     const {bucket,objects}=fakeR2();
     objects.set("school-template-previews/v3/community/hero.jpg",jpeg4k());
-    const fetchMock=vi.fn();
+    const fetchMock=vi.fn(async (input:RequestInfo|URL,init?:RequestInit)=>{
+      expect(init?.method).not.toBe("POST");
+      expect(String(input)).toContain("api.fal.ai/v1/models/requests/by-endpoint");
+      return Response.json({items:[],has_more:false,next_cursor:null});
+    });
     vi.stubGlobal("fetch",fetchMock);
     const result=await runBoundTemplatePhotoProduction({
       CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
@@ -189,7 +193,67 @@ describe("scheduled template image generation to R2",()=>{
       TEMPLATE_PHOTO_BUCKET:bucket,FAL_KEY:"test:key",
     });
     expect(result.submitted).toBe(0);
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("discovers two already-paid Summit images in fal history and transfers the valid JPEG to R2",async()=>{
+    const {bucket,objects}=fakeR2();
+    // The Community request is already known, so it can be ingested via its
+    // original request ID while request history discovers paid Summit assets.
+    const communityId="01a1bd6d-371f-7153-8d96-484fa643cac1";
+    const summitOld="aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    const summitGood="11111111-2222-4333-8444-555555555555";
+    const media=jpeg4k();
+    const invalid=new Uint8Array(media);
+    invalid[9]=0x04;invalid[10]=0x00; // 1024 pixels instead of 3840
+    const calls:Array<{url:string;method:string}>=[];
+    vi.stubGlobal("fetch",vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input),method=init?.method??"GET";
+      calls.push({url,method});
+      if(method==="POST")throw Error("Paid generation must be blocked");
+      if(url.endsWith(`/requests/${communityId}`))
+        return Response.json({images:[{url:"https://y3b.fal.media/files/community.jpg"}]});
+      if(url==="https://y3b.fal.media/files/community.jpg")
+        return new Response(new Uint8Array(media).buffer,{status:200});
+      if(url.startsWith("https://api.fal.ai/v1/models/requests/by-endpoint?")){
+        const query=new URL(url).searchParams;
+        expect(query.get("endpoint_id")).toBe("fal-ai/nano-banana-2");
+        expect(query.get("expand")).toBe("payloads");
+        return Response.json({items:[
+          {endpoint_id:"fal-ai/nano-banana-2",status_code:200,request_id:summitOld,
+            json_input:{prompt:"Summit Preparatory: first hero"},
+            json_output:{images:[{url:"https://y3b.fal.media/files/bad.jpg"}]}},
+          {endpoint_id:"fal-ai/nano-banana-2",status_code:200,request_id:summitGood,
+            json_input:{prompt:"Summit Preparatory: second hero"},
+            json_output:{images:[{url:"https://y3b.fal.media/files/good.jpg"}]}},
+        ],has_more:false,next_cursor:null});
+      }
+      if(url==="https://y3b.fal.media/files/bad.jpg")
+        return new Response(new Uint8Array(invalid).buffer,{status:200});
+      if(url==="https://y3b.fal.media/files/good.jpg")
+        return new Response(new Uint8Array(media).buffer,{status:200});
+      throw Error("Unexpected recovery URL: "+url);
+    }));
+    const env={CAN_TEMPLATE_PHOTOGRAPHY_GENERATE:"true",
+      CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT:"false",
+      FAL_KEY:"test:key",TEMPLATE_PHOTO_BUCKET:bucket};
+    const result=await runBoundTemplatePhotoProduction(env);
+    expect(result.submitted).toBe(0);
+    expect(result.uploaded).toBeGreaterThanOrEqual(1);
+    expect(objects.get(summitKey)?.byteLength).toBe(4096);
+    const diag=JSON.parse(new TextDecoder().decode(objects.get(
+      "school-template-production/v1/fal-history-recovery.json")));
+    expect(diag.state).toBe("imported");
+    expect(diag.matching).toBe(2);
+    expect(diag.uploaded).toBe(1);
+    const status=await readBoundTemplatePhotoStatus(
+      new Request("https://can-os.example/template-photo-status?template=summit"),env);
+    expect(await status.json()).toMatchObject({
+      generated:1,ready:["hero"],heroStatus:"completed",
+      newSubmissionsEnabled:false,
+      uploadRecovery:{state:"imported",uploaded:1},
+    });
+    expect(calls.some(x=>x.method==="POST")).toBe(false);
   });
 
   it("does not run any paid job when disabled",async()=>{
