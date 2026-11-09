@@ -36,7 +36,8 @@ const stateKey=(template:SiteTemplateId,role:TemplatePhotographyRole)=>
 const cursorKey="school-template-production/v1/cursor.json";
 type JobState={
   status:"reserved"|"submitted"|"completed"|"rejected";
-  requestId?:string;reason?:string;updatedAt:string;rescueCount?:number;
+  requestId?:string;assetUrl?:string;reason?:string;updatedAt:string;
+  rescueCount?:number;importAttempts?:number;
 };
 const now=()=>new Date().toISOString();
 const noStore={"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"};
@@ -189,35 +190,73 @@ async function queuePhoto(bucket:TemplatePhotoBucket,
     return false;
   }
 }
+/**
+ * At-most-once *generation* and retryable *ingestion*. Persist the completed
+ * asset URL BEFORE downloading: a failed R2 write must never pay to regenerate.
+ * Native R2 state is private; the website status endpoint never exposes URLs.
+ */
 async function completePhoto(bucket:TemplatePhotoBucket,
   template:SiteTemplateId,role:TemplatePhotographyRole,
   job:JobState,falKey:string):Promise<"ready"|"pending"|"rejected">{
   if(!job.requestId)return "rejected";
+  const stateKeyPath=stateKey(template,role);
+  let stage="queue-status";
+  let assetUrl=job.assetUrl;
   try{
-    // For the user's confirmed HTTP-200 Community hero, the queue state
-    // may already have aged out. Request the retained completed result
-    // directly; do not submit a second billable generation.
-    if(job.requestId!==communityHeroCompletedFalRequestId){
-      const state=await schoolPhotoStatus(job.requestId,falKey);
-      if(state!=="COMPLETED")return "pending";
+    if(!assetUrl){
+      // Existing completed Community request is explicitly confirmed by the
+      // provider. For all other jobs poll the queue until COMPLETED.
+      if(job.requestId!==communityHeroCompletedFalRequestId){
+        const status=await schoolPhotoStatus(job.requestId,falKey);
+        if(status!=="COMPLETED")return "pending";
+      }
+      stage="result-url";
+      const completed=await schoolPhotoResult(job.requestId,falKey);
+      assetUrl=completed.imageUrl;
+      // Check source before persisting potentially untrusted API output.
+      const source=new URL(assetUrl);
+      if(source.protocol!=="https:" ||
+        !allowedGeneratedHost(source.hostname,source.pathname))
+        throw Error("Unsupported image source");
+      await saveJob(bucket,stateKeyPath,{
+        ...job,status:"submitted",assetUrl,updatedAt:now(),
+      });
     }
+    stage="download";
     const brief=schoolPhotographyBrief(template,role);
-    const generated=await schoolPhotoResult(job.requestId,falKey);
-    const bytes=await inspectFile(generated.imageUrl,brief.minimum);
+    const bytes=await inspectFile(assetUrl,brief.minimum);
+    stage="r2-upload";
     const target=keyFor(template,role);
-    await bucket.put(target,bytes,{onlyIf:{etagDoesNotMatch:"*"},
-      httpMetadata:{contentType:"image/jpeg"}});
+    // If another run already delivered the same slot, keep its verified object.
+    if(!await bucket.head(target))
+      await bucket.put(target,bytes,{onlyIf:{etagDoesNotMatch:"*"},
+        httpMetadata:{contentType:"image/jpeg"}});
     if(!await bucket.head(target))throw Error("R2 file verification failed");
-    await saveJob(bucket,stateKey(template,role),{status:"completed",
-      requestId:job.requestId,updatedAt:now()});
+    await saveJob(bucket,stateKeyPath,{
+      status:"completed",requestId:job.requestId,updatedAt:now(),
+    });
+    console.info("CAN photo verified in R2",{template,role});
     return "ready";
   }catch(error){
-    await saveJob(bucket,stateKey(template,role),{status:"rejected",
-      requestId:job.requestId,reason:safeError(error),updatedAt:now()});
-    console.error("CAN photo completion rejected",{template,role,reason:safeError(error)});
-    return "rejected";
+    // Source/network/provider outage can be retried. Never re-submit the image
+    // request, and never lose the known completed asset URL.
+    const attempts=(job.importAttempts??0)+1;
+    const reason=stage+":"+safeError(error);
+    const terminal=attempts>=8 ||
+      reason.includes("Unsupported image source") ||
+      reason.includes("does not meet required resolution") ||
+      reason.includes("invalid size");
+    await saveJob(bucket,stateKeyPath,{
+      ...job,status:terminal?"rejected":"submitted",assetUrl,
+      importAttempts:attempts,reason,updatedAt:now(),
+    });
+    console.error("CAN photo import attempt",{
+      template,role,stage,attempts,terminal,reason,
+    });
+    return terminal?"rejected":"pending";
   }
 }
+
 export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promise<PhotoCronResult>{
   const result:PhotoCronResult={status:"disabled",scanned:0,submitted:0,
     uploaded:0,inProgress:0,rejected:0};
