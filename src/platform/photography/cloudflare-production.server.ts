@@ -694,7 +694,27 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
          (heroJob?.status!=="submitted" || !heroJob.requestId))
         heroJob=historical;
     }
-    return Response.json({template:t,generated:ready.length,total:12,ready,
+    const masters=new Set(keys.map(({template,role})=>keyFor(template,role)));
+    const stored=await bucket.list({prefix:"school-template-previews/v3/",limit:250});
+    const readyAll=stored.objects.filter(item=>masters.has(item.key)).length;
+    const tracked=await bucket.list({prefix:jobPrefix,limit:250});
+    let submittedAll=0,rejectedAll=0;
+    for(const item of tracked.objects){
+      const parts=item.key.split("/");
+      if(parts.length!==4||parts[1]!=="v1"||!templateSet.has(parts[2])||
+        !roleSet.has(parts[3].replace(/\\.json$/,"")))continue;
+      const job=await getJob(bucket,item.key);
+      if(job?.status==="submitted"||job?.status==="reserved")submittedAll++;
+      if(job?.status==="rejected")rejectedAll++;
+    }
+    const pilot=await getJob(bucket,stateKey("summit","hero"));
+    if(pilot && !readyAll && pilot.status==="submitted")submittedAll++;
+    return Response.json({
+      campaign:{ready:readyAll,target:84,inFlight:submittedAll,
+        rejected:rejectedAll,newSubmissionsEnabled:
+          env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true" &&
+          env.CAN_TEMPLATE_PHOTOGRAPHY_BULK==="true"},
+      template:t,generated:ready.length,total:12,ready,
       heroStatus:heroReady?"completed":heroJob?.status??"unstarted",
       heroError:heroReady?undefined:(
         heroJob?.status==="rejected" ||
