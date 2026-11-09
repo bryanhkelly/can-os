@@ -423,13 +423,24 @@ export async function readBoundTemplatePhotoStatus(request:Request,env:PhotoWork
     for(const role of templatePhotographyRoles)
       if(await bucket.head(keyFor(t,role)))ready.push(role);
     // Safe, public operational signal without request IDs, secrets or prompts.
-    const heroJob=await getJob(bucket,stateKey(t,"hero"));
+    const heroReady=ready.includes("hero");
+    // A legacy Summit job may have uploaded a valid hero while the newer
+    // isolated pilot record still shows rejected. R2 availability wins.
+    let heroJob=await getJob(bucket,stateKey(t,"hero"));
+    if(!heroReady && t==="summit"){
+      const historical=await getJob(bucket,"school-template-production/v1/summit/hero.json");
+      if(historical?.requestId &&
+         (heroJob?.status!=="submitted" || !heroJob.requestId))
+        heroJob=historical;
+    }
     return Response.json({template:t,generated:ready.length,total:12,ready,
-      heroStatus:heroJob?.status??"unstarted",
-      heroError:heroJob?.status==="rejected" ||
+      heroStatus:heroReady?"completed":heroJob?.status??"unstarted",
+      heroError:heroReady?undefined:(
+        heroJob?.status==="rejected" ||
         (heroJob?.status==="submitted"&&heroJob.importAttempts)
-          ?heroJob.reason:undefined,
+          ?heroJob.reason:undefined),
       heroImportAttempts:heroJob?.importAttempts??0,
+      newSubmissionsEnabled:env.CAN_TEMPLATE_PHOTOGRAPHY_SUBMIT==="true",
       active:env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE==="true"},{headers:{
       "Cache-Control":"public, max-age=30","X-Content-Type-Options":"nosniff",
     }});
