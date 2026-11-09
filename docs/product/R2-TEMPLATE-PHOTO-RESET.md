@@ -89,3 +89,27 @@ submission until the `completed` marker and 84-photo readiness checks are
 verified. Resetting the active v3 source makes demo preview images temporarily
 unavailable until the new library is populated; published school-owned media
 is unaffected.
+
+## November 9 follow-up: automatic verification and fresh image cache
+
+The GitHub workflow `.github/workflows/template-photo-pipeline.yml` now runs
+on changes to photography production code and performs a read-only live audit
+after the tests/build. It checks the public Cloudflare status on a bounded
+retry schedule and fails immediately if the reset is blocked. Once reset is
+marked complete it verifies all seven template inventories are empty, that
+`copied === removed`, and new fal.ai submissions are still disabled.
+
+The next Summit generation job uses the **new** private state key
+`school-template-production/pilot-summit-20261109/hero.json`; the old
+November 8 pilot state is archived under the reset's old-prefix scope.
+
+Private fictional website previews now always use the v3 master route with
+a `?v=20261109` revision parameter. This creates new browser/cache keys so
+the previous 900-second image cache cannot masquerade as the new batch.
+Responsive `srcset` URLs retain that revision and append the appropriate
+`&w=` parameter. Netlify and Cloudflare default to **v3 only**; older v1/v2
+image fallbacks must not be used to make the clean campaign appear complete.
+
+Commit-time tests and configuration are not evidence of a production R2
+delete, and the reset remains incomplete until the live status shows
+`photoReset.phase: "completed"` on all seven template status responses.
