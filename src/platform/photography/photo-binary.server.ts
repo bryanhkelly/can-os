@@ -62,3 +62,18 @@ export function verifyPhotoBytes(bytes:ArrayBuffer,minimum:{width:number;height:
     throw Error("Generated photo does not meet required resolution");
   return {bytes,...metadata};
 }
+
+/**
+ * Original media must match its intended design placement. Pixel-size checks
+ * alone would wrongly accept a 4096x4096 square for a 16:9 hero.
+ * Image generators may round their output sizes by a few pixels.
+ */
+export function verifyPhotoAspectRatio(
+  photo:Pick<VerifiedPhoto,"width"|"height">,
+  expected:"16:9"|"3:2"|"4:3"|"4:5",
+):void{
+  const targets={"16:9":16/9,"3:2":3/2,"4:3":4/3,"4:5":4/5};
+  const ratio=photo.width/photo.height,target=targets[expected];
+  if(!Number.isFinite(ratio)||Math.abs(ratio-target)/target>0.04)
+    throw Error("Generated photo does not match required aspect ratio");
+}
