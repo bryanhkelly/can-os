@@ -486,8 +486,8 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
   const result:PhotoCronResult={status:"disabled",scanned:0,submitted:0,
     uploaded:0,inProgress:0,rejected:0};
   if(env.CAN_TEMPLATE_PHOTOGRAPHY_GENERATE!=="true")return result;
-  if(!env.TEMPLATE_PHOTO_BUCKET||!env.FAL_KEY)
-    throw Error("Missing photography production binding or key");
+  if(!env.TEMPLATE_PHOTO_BUCKET)
+    throw Error("Missing template photography R2 bucket binding");
   const bucket=env.TEMPLATE_PHOTO_BUCKET;
   // A bounded archival reset must complete before existing result imports or
   // any paid new job submissions. Reset is one-time and idempotent in R2.
@@ -499,6 +499,7 @@ export async function runBoundTemplatePhotoProduction(env:PhotoWorkerEnv):Promis
     });
     if(state.phase!=="completed")return result;
   }
+  if(!env.FAL_KEY)throw Error("Missing FAL_KEY for active photography ingestion");
   const falKey=normalizeFalKey(env.FAL_KEY);
   result.status="active";
   // Prove the native binding can write and read before attempting a media PUT.
