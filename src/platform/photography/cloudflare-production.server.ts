@@ -297,7 +297,8 @@ async function completePhoto(bucket:TemplatePhotoBucket,
 const falHistoryKey="school-template-production/v1/fal-history-recovery.json";
 type FalHistoryDiagnostic={
   checkedAt:string;state:"running"|"imported"|"no-match"|"error";
-  matching:number;uploaded:number;reason?:string;nextCheckAt?:string;
+  matching:number;uploaded:number;archived?:number;
+  reason?:string;nextCheckAt?:string;
 };
 const allowedHistoryStart="2026-11-08T00:00:00Z";
 async function readHistoryDiagnostic(bucket:TemplatePhotoBucket):Promise<FalHistoryDiagnostic|null>{
@@ -327,13 +328,11 @@ function extractHistoryImage(output:unknown):string|null{
 }
 async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
   falKey:string):Promise<{uploaded:number;matched:number}>{
-  if(await bucket.head(keyFor("summit","hero")) &&
-     await bucket.head(keyFor("community","hero")))return {uploaded:0,matched:0};
   const previous=await readHistoryDiagnostic(bucket);
   if(previous?.nextCheckAt&&Date.parse(previous.nextCheckAt)>Date.now())
     return {uploaded:0,matched:0};
   const base:FalHistoryDiagnostic={
-    state:"running",checkedAt:now(),matching:0,uploaded:0,
+    state:"running",checkedAt:now(),matching:0,uploaded:0,archived:0,
   };
   await writeHistoryDiagnostic(bucket,base);
   let diagnostic:FalHistoryDiagnostic={...base,state:"no-match"};
@@ -355,7 +354,7 @@ async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
     const tried=new Set<string>();
     let checked=0;
     for(const request of json.items){
-      if(checked>=6 || diagnostic.uploaded>=2)break;
+      if(checked>=6)break;
       if(!request||typeof request!=="object")continue;
       const item=request as {
         request_id?:unknown;endpoint_id?:unknown;status_code?:unknown;
@@ -372,27 +371,42 @@ async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
       const source=extractHistoryImage(item.json_output);
       if(!source)continue;
       diagnostic.matching++;
-      if(await bucket.head(keyFor(template,"hero")))continue;
+      // Keep all already-paid outputs, including both Summit alternatives.
+      // The first valid photo is mapped to hero; other variants are retained
+      // in a private R2 archive without overwriting the selected photograph.
+      const archiveKey=`school-template-previews/v3/_archive/${template}/${requestId}.jpg`;
+      const fileKey=keyFor(template,"hero");
+      if(await bucket.head(archiveKey) && await bucket.head(fileKey))continue;
       checked++;
       try{
         const brief=schoolPhotographyBrief(template,"hero");
         const bytes=await inspectFile(source,brief.minimum);
-        const fileKey=keyFor(template,"hero");
-        if(!await bucket.head(fileKey))
+        if(!await bucket.head(archiveKey)){
+          await bucket.put(archiveKey,bytes,{
+            onlyIf:{etagDoesNotMatch:"*"},
+            httpMetadata:{contentType:"image/jpeg"},
+          });
+          diagnostic.archived=(diagnostic.archived??0)+1;
+        }
+        const archive=await bucket.head(archiveKey);
+        if(!archive||archive.size!==bytes.byteLength)
+          throw Error("R2 archive verification failed");
+        if(!await bucket.head(fileKey)){
           await bucket.put(fileKey,bytes,{
             onlyIf:{etagDoesNotMatch:"*"},
             httpMetadata:{contentType:"image/jpeg"},
           });
-        const head=await bucket.head(fileKey);
-        if(!head||head.size!==bytes.byteLength)
-          throw Error("R2 file verification failed");
-        await saveJob(bucket,stateKey(template,"hero"),{
-          status:"completed",requestId,updatedAt:now(),
-        });
-        diagnostic.uploaded++;
-        diagnostic.state="imported";
-        console.info("CAN prior fal image imported to R2",{template,role:"hero",
-          bytes:bytes.byteLength});
+          const head=await bucket.head(fileKey);
+          if(!head||head.size!==bytes.byteLength)
+            throw Error("R2 file verification failed");
+          await saveJob(bucket,stateKey(template,"hero"),{
+            status:"completed",requestId,updatedAt:now(),
+          });
+          diagnostic.uploaded++;
+          diagnostic.state="imported";
+        }
+        console.info("CAN completed fal media copied to R2",{template,
+          role:"hero",bytes:bytes.byteLength});
       }catch(error){
         // Continue to the other already-paid Summit request. Never re-generate.
         diagnostic.reason=safeError(error);
@@ -400,7 +414,11 @@ async function importAlreadyGeneratedFalHistory(bucket:TemplatePhotoBucket,
           reason:diagnostic.reason});
       }
     }
-    if(diagnostic.uploaded===0&&diagnostic.matching>0){
+    if(await bucket.head(keyFor("summit","hero")) ||
+       await bucket.head(keyFor("community","hero"))){
+      diagnostic.state="imported";
+      if(!diagnostic.uploaded)diagnostic.reason=undefined;
+    }else if(diagnostic.uploaded===0&&diagnostic.matching>0){
       diagnostic.state="error";
       diagnostic.reason??="Completed media is not yet available for import";
     }
