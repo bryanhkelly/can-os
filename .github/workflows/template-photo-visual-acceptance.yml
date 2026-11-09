@@ -1,0 +1,43 @@
+name: CAN OS — seven-template photographic visual acceptance
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/capture-template-photo-visuals.mjs"
+      - ".github/workflows/template-photo-visual-acceptance.yml"
+      - "src/domain/public-site-html.ts"
+      - "src/domain/template-photo-responsive.ts"
+      - "src/domain/public-site-templates.ts"
+      - "wrangler.jsonc"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: photo-visual-acceptance
+  cancel-in-progress: true
+
+jobs:
+  image-layouts:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Install Chromium for real responsive browser rendering
+        run: node node_modules/playwright/cli.js install chromium --with-deps
+      - name: Capture seven fictional school templates using live R2 media
+        run: node --import tsx scripts/capture-template-photo-visuals.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: can-os-photo-visual-acceptance
+          path: artifacts/template-photo-visuals/
+          if-no-files-found: warn
+          retention-days: 30
