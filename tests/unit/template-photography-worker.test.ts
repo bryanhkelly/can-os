@@ -1,6 +1,7 @@
 import {describe,expect,it} from "vitest";
 import {jpegDimensions} from "@/platform/photography/scheduled-production.server";
 import {normalizeFalKey} from "@/platform/photography/fal-generation.server";
+import {canAdoptCompletedCommunityHero} from "@/platform/photography/cloudflare-production.server";
 import {templatePhotographyRoles} from "@/domain/template-photography-production";
 import {siteTemplateIds} from "@/domain/site-theme";
 
@@ -11,6 +12,28 @@ describe("4K template photography import checks",()=>{
     expect(normalizeFalKey(" id:\u200Bsecret ")).toBe("id:secret");
     expect(()=>normalizeFalKey("bad\x00key")).toThrow(/invalid HTTP header characters/);
     expect(()=>normalizeFalKey(" \n ")).toThrow(/empty after whitespace normalization/);
+  });
+
+  it("reuses the already-paid Community hero only when it cannot overwrite another request",()=>{
+    expect(canAdoptCompletedCommunityHero(null)).toBe(true);
+    expect(canAdoptCompletedCommunityHero({
+      status:"rejected",updatedAt:"2026-11-08T19:25:00.000Z",
+      reason:"FAL_KEY contains invalid HTTP header characters",
+    })).toBe(true);
+    expect(canAdoptCompletedCommunityHero({
+      status:"reserved",updatedAt:"2026-11-08T19:25:00.000Z",
+    })).toBe(true);
+    expect(canAdoptCompletedCommunityHero({
+      status:"submitted",updatedAt:"2026-11-08T22:40:00.000Z",
+      requestId:"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    })).toBe(false);
+    expect(canAdoptCompletedCommunityHero({
+      status:"rejected",updatedAt:"2026-11-08T22:40:00.000Z",
+      requestId:"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+    })).toBe(false);
+    expect(canAdoptCompletedCommunityHero({
+      status:"completed",updatedAt:"2026-11-08T22:40:00.000Z",
+    })).toBe(false);
   });
 
   it("requires a well-formed JPEG with an actual SOF marker",()=>{
