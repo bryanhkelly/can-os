@@ -122,8 +122,9 @@ describe("one-time template R2 photo cleanup",()=>{
         return result;
       },
     };
-    await expect(advanceTemplatePhotoReset(badBucket))
-      .rejects.toThrow(/archive size verification failed/);
+    const status=await advanceTemplatePhotoReset(badBucket);
+    expect(status.phase).toBe("blocked");
+    expect(status.reason).toMatch(/archive size verification failed/);
     expect(data.has(key)).toBe(true);
   });
 });
