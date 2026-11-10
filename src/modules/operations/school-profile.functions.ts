@@ -10,6 +10,7 @@ import { draftSiteContactSchema, readSitePhysicalAddress } from "@/domain/site-s
 import { db } from "@/db/client";
 import { enrollments, organizations, programs, sitePublications, sites } from "@/db/schema";
 import { readSchoolBrand } from "@/modules/sites/school-brand.server";
+import { publicSiteHost } from "@/domain/public-site-address";
 
 /**
  * Shared school record. Every active member of the exact school reads the same
@@ -33,7 +34,7 @@ async function readSchoolProfile(actor: AccessContext, siteId: string) {
       id: programs.id, name: programs.name, type: programs.type,
       status: programs.status, gradeRange: programs.gradeRange,
     }).from(programs).where(eq(programs.siteId, site.id)),
-    db.select({ status: sitePublications.status }).from(sitePublications)
+    db.select({ status: sitePublications.status, slug: sitePublications.slug }).from(sitePublications)
       .where(eq(sitePublications.siteId, site.id)).limit(1),
     readSchoolBrand(site.id),
   ]);
@@ -71,6 +72,9 @@ async function readSchoolProfile(actor: AccessContext, siteId: string) {
     })),
     publication: {
       status: publication?.status ?? "unconfigured" as const,
+      // An approved catalog is not a verified or externally reachable website.
+      defaultUrl: publication?.slug ? `https://${publicSiteHost(publication.slug)}` : null,
+      hostingConfigured: process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
       url: publication?.status === "published" ? brand?.websiteUrl ?? null : null,
     },
     viewer: {

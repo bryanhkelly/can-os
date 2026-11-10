@@ -45,14 +45,15 @@ describe("School profile", () => {
     expect(html).toContain('src="data:image/png;base64,aGVsbG8="');
   });
 
-  it("shows the published website to members without publisher permissions", () => {
+  it("shows the reserved default website without falsely claiming public reachability", () => {
     const html = render({ site: { ...site,
-      publication: { status: "published", url: "https://valorschool.can.school" },
+      publication: { status: "published", url: "https://valorschool.can.school", defaultUrl: "https://valorschool.can-os.com", hostingConfigured: false },
       viewer: { canManageSchool: false, canPublish: false, canOpenSiteToday: false },
     } });
-    expect(html).toContain('href="https://valorschool.can.school"');
-    expect(html).toContain('rel="noopener noreferrer"');
-    expect(html).not.toContain("Manage website");
+    expect(html).toContain("https://valorschool.can-os.com");
+    expect(html).toContain("Content approved · public reachability must be verified");
+    expect(html).not.toContain('href="https://valorschool.can.school"');
+    expect(html).not.toContain("Manage website & domains");
   });
 
   it("does not invent a website address before publication", () => {

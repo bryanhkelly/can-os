@@ -12,6 +12,7 @@ interface DemoEnvironment extends PhotoWorkerEnv {
   ACCESS_REQUEST_LIMIT: RateLimiter;
   ACCESS_VERIFY_LIMIT: RateLimiter;
   CAN_PUBLIC_SITE_DOMAIN?: string;
+  CAN_PUBLIC_SITE_HOSTING_ENABLED?: string;
   DATABASE_URL?: string;
 }
 
@@ -37,11 +38,27 @@ export default {
   async fetch(request: Request, env: DemoEnvironment): Promise<Response> {
     const url = new URL(request.url);
     const host = request.headers.get("host");
+    // Host-based tenant routing is enabled only after wildcard DNS/TLS and
+    // the Cloudflare route have been separately provisioned. Never expose an
+    // application route or select a Site from a query string on tenant hosts.
     const decision = classifyPublicSiteRequest(
-      request.url, request.method, false, publicSiteDomain(env.CAN_PUBLIC_SITE_DOMAIN),
+      request.url, request.method, env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
+      publicSiteDomain(env.CAN_PUBLIC_SITE_DOMAIN),
     );
-    if ((host && host.toLowerCase() !== url.host.toLowerCase()) || decision.kind !== "platform") {
+    if ((host && host.toLowerCase() !== url.host.toLowerCase()) || decision.kind === "deny") {
       return new Response("Not found", { status: 404, headers: { "Cache-Control": "no-store" } });
+    }
+    let routedRequest = request;
+    if (decision.kind === "site" && decision.rewrite) {
+      const target = new URL(request.url);
+      if (request.method === "POST") {
+        target.pathname = url.pathname === "/apply"
+          ? "/published-site/family-start" : "/published-site/inquiry";
+      } else {
+        target.pathname = url.pathname === "/"
+          ? "/published-site" : "/published-site" + url.pathname;
+      }
+      routedRequest = new Request(target, request);
     }
 
     // Direct R2 bindings avoid S3 signed requests for production template
@@ -74,7 +91,7 @@ export default {
     // Workerd disallows WebSocket I/O from a pool created in a different
     // request. This encompasses SSR, server functions, and their queries.
     const response = await withRequestDatabase(
-      async () => await handler.fetch(request),
+      async () => await handler.fetch(routedRequest),
       env.DATABASE_URL ?? process.env.DATABASE_URL,
     );
     const headers = new Headers(response.headers);
