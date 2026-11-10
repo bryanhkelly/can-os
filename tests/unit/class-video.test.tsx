@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { classVideoFileSchema, classVideoKey, classVideoKeyPattern, hasVideoSignature, resolveClassVideo, videoUploadPolicy } from "@/domain/class-video";
 
 describe("linked class video", () => {
@@ -39,6 +40,34 @@ describe("linked class video", () => {
     const privateMarkup = renderToStaticMarkup(<ClassVideoPlayer title="Private lesson" loadUrl={async () => "https://private.test/movie"}/>);
     expect(privateMarkup).toContain("Play video");
     expect(privateMarkup).not.toContain("private.test");
+  });
+});
+
+describe("unified video source authoring", () => {
+  const noop = () => {};
+  function composer(kind: "link" | "video", url: string, lessonId = "") {
+    return renderToStaticMarkup(<ClassSupplementForm
+      title="Act 1 introduction" url={url} kind={kind} lessonId={lessonId}
+      lessons={[{ id: "lesson-1", title: "Act 1" }]} busy={false}
+      onTitleChange={noop} onUrlChange={noop} onKindChange={noop}
+      onLessonChange={noop} onSubmit={noop}
+      sectionId="10000000-0000-4000-8000-000000000001" uploadsEnabled />);
+  }
+  it("offers both embedded provider links and private R2 uploads for class videos", () => {
+    const markup = composer("video", "https://youtu.be/abcdefghijk");
+    expect(markup).toContain("YouTube, Vimeo or video link");
+    expect(markup).toContain("Upload video to CAN (R2)");
+    expect(markup).toContain("Recognized video source");
+  });
+  it("warns about unrecognized video sources before submission", () => {
+    const markup = composer("video", "https://example.com/page");
+    expect(markup).toContain("some private videos cannot be played");
+    expect(markup).not.toContain("Recognized video source");
+  });
+  it("keeps non-video class resources available", () => {
+    const markup = composer("link", "https://example.com/reading");
+    expect(markup).toContain("Link or website");
+    expect(markup).toContain("Entire class");
   });
 });
 
