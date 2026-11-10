@@ -33,7 +33,7 @@ async function readSchoolProfile(actor: AccessContext, siteId: string) {
       id: programs.id, name: programs.name, type: programs.type,
       status: programs.status, gradeRange: programs.gradeRange,
     }).from(programs).where(eq(programs.siteId, site.id)),
-    db.select({ status: sitePublications.status }).from(sitePublications)
+    db.select({ status: sitePublications.status, slug: sitePublications.slug }).from(sitePublications)
       .where(eq(sitePublications.siteId, site.id)).limit(1),
     readSchoolBrand(site.id),
   ]);
@@ -71,6 +71,9 @@ async function readSchoolProfile(actor: AccessContext, siteId: string) {
     })),
     publication: {
       status: publication?.status ?? "unconfigured" as const,
+      // An approved catalog is not a verified or externally reachable website.
+      defaultUrl: publication?.slug ? `https://${(await import("@/domain/public-site-address")).publicSiteHost(publication.slug)}` : null,
+      hostingConfigured: process.env.CAN_PUBLIC_SITE_HOSTING_ENABLED === "true",
       url: publication?.status === "published" ? brand?.websiteUrl ?? null : null,
     },
     viewer: {
