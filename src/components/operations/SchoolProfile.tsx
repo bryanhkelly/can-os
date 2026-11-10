@@ -134,9 +134,14 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
       </div>
       <dl className="mt-3 divide-y border bg-card px-4">
         <Fact term="School name">{site.name}</Fact>
-        <Fact term="School website">{site.publication.url
-          ? <a href={site.publication.url} target="_blank" rel="noopener noreferrer" className="break-all underline">{site.publication.url}</a>
-          : <span className="text-muted-foreground">Website not published</span>}</Fact>
+        <Fact term="Default website address">{site.publication.defaultUrl
+          ? <span className="break-all">{site.publication.defaultUrl}<span className="block text-xs text-muted-foreground">
+              {site.publication.status === "published"
+                ? "Content approved · public reachability must be verified"
+                : "Reserved · not yet published"}
+            </span></span>
+          : <span className="text-muted-foreground">Website not published · no address reserved</span>}</Fact>
+        <Fact term="Custom domain"><span className="text-muted-foreground">Not connected</span></Fact>
         {site.organization.name && <Fact term="Organization">{site.organization.name}</Fact>}
         <Fact term="Address">{address
           ? <address className="not-italic">{formatAddress(address).map(line => <span key={line} className="block">{line}</span>)}</address>
@@ -176,12 +181,12 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
         {canManageSchool && <ManageLink title="School years" description="Terms, calendars, holidays and instructional schedules.">
           <Link to="/operations/school-years" search={{ siteId: site.id }} className={linkClass}>View school years</Link>
         </ManageLink>}
-        <ManageLink title="Public website" description={canPublish
+        <ManageLink title="Website & Domain" description={canPublish
           ? "What families see before they apply."
           : "What families see before they apply. A site publisher manages it."}>
           <div className="flex items-center gap-3">
             <StatusBadge tone={publicationTones[publication] ?? "neutral"}>{publication === "unconfigured" ? "Not set up" : label(publication)}</StatusBadge>
-            {canPublish && <Link to="/sites/$siteId/publish" params={{ siteId: site.id }} className={linkClass}>Manage website</Link>}
+            {canPublish && <Link to="/sites/$siteId/publish" params={{ siteId: site.id }} className={linkClass}>Manage website & domains</Link>}
           </div>
         </ManageLink>
         {canPublish && <ManageLink title="Public address and contact" description="Approve the address and contact details shown publicly.">
