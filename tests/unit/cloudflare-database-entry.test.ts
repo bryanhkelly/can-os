@@ -5,6 +5,7 @@ const calls = vi.hoisted(() => ({
   handlerCalls: 0,
   limiterCalls: 0,
   routedPaths: [] as string[],
+  routedSearches: [] as string[],
 }));
 
 vi.mock("@tanstack/react-start/server-entry", () => ({
@@ -12,6 +13,7 @@ vi.mock("@tanstack/react-start/server-entry", () => ({
     fetch: vi.fn(async (request: Request) => {
       calls.handlerCalls++;
       calls.routedPaths.push(new URL(request.url).pathname);
+      calls.routedSearches.push(new URL(request.url).search);
       return new Response("CAN OS", { status: 200, headers: { "Cache-Control": "private, no-store" } });
     }),
   },
@@ -38,6 +40,7 @@ describe("Cloudflare database scope at the Worker entry", () => {
     calls.handlerCalls = 0;
     calls.limiterCalls = 0;
     calls.routedPaths.length = 0;
+    calls.routedSearches.length = 0;
   });
 
   it("wraps SSR reads in the request-bound database scope", async () => {
@@ -76,6 +79,18 @@ describe("Cloudflare database scope at the Worker entry", () => {
       "/published-site", "/published-site/about",
       "/published-site/inquiry", "/published-site/family-start",
     ]);
+  });
+
+  it("keeps attribution queries on public pages and rejects query-selected schools", async () => {
+    const enabled = { ...env, CAN_PUBLIC_SITE_HOSTING_ENABLED: "true" };
+    expect((await worker.fetch(new Request(
+      "https://valorschool.can-os.com/?utm_source=chatgpt.com",
+    ), enabled)).status).toBe(200);
+    expect(calls.routedPaths).toEqual(["/published-site"]);
+    expect(calls.routedSearches).toEqual(["?utm_source=chatgpt.com"]);
+    expect((await worker.fetch(new Request(
+      "https://valorschool.can-os.com/?site=other-school",
+    ), enabled)).status).toBe(404);
   });
 
   it("denies private app routes and query-selected tenants at the edge", async () => {
