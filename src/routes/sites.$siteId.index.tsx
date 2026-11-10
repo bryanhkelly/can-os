@@ -1,7 +1,7 @@
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
-import { CalendarDays, ClipboardList, School, Users } from "lucide-react";
+import { CalendarDays, ClipboardList, School, Users, Globe } from "lucide-react";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 
@@ -70,12 +70,11 @@ function SiteTodayPage() {
     shortcuts={<>
       <DashboardShortcut title="School operations" description="Authorized actions and readiness" icon={<ClipboardList className="size-5" />}><Link to="/home" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
       <DashboardShortcut title="Admissions" description="Applications and enrollment" icon={<Users className="size-5" />}><Link to="/admissions" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
-      <DashboardShortcut title="School launches" description="Review program configuration" icon={<School className="size-5" />}><Link to="/launch/school" search={{siteId:data.site.id,programId:undefined}} /></DashboardShortcut>
+      <DashboardShortcut title="Website & domain" description="Default address, custom domain and publication" icon={<Globe className="size-5" />}><Link to="/sites/$siteId/profile" params={{siteId:data.site.id}} /></DashboardShortcut>
       <DashboardShortcut title="Calendar" description={`Dates in ${data.site.timezone}`} icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:data.localDate}} /></DashboardShortcut>
     </>}
     rail={<DashboardCalendar date={data.localDate} timezone={data.site.timezone} />}
-    actions={<Link className={secondaryActionClassName} to="/sites/$siteId/profile"
-      params={{siteId:data.site.id}}>School profile</Link>}
+    actions={<div className="flex flex-wrap items-center gap-2"><Link className={secondaryActionClassName} to="/sites/$siteId/profile" params={{siteId:data.site.id}}>School profile</Link><Link className={secondaryActionClassName} to="/sites/$siteId/publish" params={{siteId:data.site.id}}>Website & domain</Link></div>}
     priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
