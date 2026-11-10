@@ -4,6 +4,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { curriculumOverlays, curriculumResources, programs } from "@/db/schema";
 import { assertPublisherLessonReference } from "@/domain/publisher-course-references";
+import { resolveClassVideo } from "@/domain/class-video";
 import { AuthorizationError } from "@/domain/command-context";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import { authorizeClass, classActor } from "./class-access.server";
@@ -13,6 +14,9 @@ const httpsUrl=z.string().url().max(2048).refine(value=>{
  try { const u=new URL(value); return u.protocol==="https:"&&!u.username&&!u.password; }
  catch { return false; }
 },"Use an HTTPS resource link without embedded credentials.");
+const videoSupplementUrl = httpsUrl.refine(value => Boolean(resolveClassVideo(value)),
+ "Videos must be a supported YouTube, Vimeo, or direct HTTPS MP4/WebM link.");
+const supplementUrl = (kind: string, url: string) => kind === "video" ? videoSupplementUrl.parse(url) : httpsUrl.parse(url);
 export const addClassSupplement = createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({
    sectionId:z.string().uuid(),
@@ -22,6 +26,7 @@ export const addClassSupplement = createServerFn({method:"POST"})
    url:httpsUrl,
  }).strict().parse(value))
  .handler(async({data})=>{
+   supplementUrl(data.kind, data.url);
    const actor=await classActor();
    if(actor.role!=="teacher")throw new AuthorizationError("assigned teacher supplement");
    return db.transaction(async tx=>{
@@ -75,6 +80,7 @@ export const manageClassSupplement=createServerFn({method:"POST"})
    url:httpsUrl}).strict(),
  ]).parse(value))
  .handler(async({data})=>{
+  if(data.action==="replace")supplementUrl(data.kind,data.url);
   const actor=await classActor();
   if(actor.role!=="teacher"||!actor.actorPersonId)throw new AuthorizationError("assigned teacher supplement");
   return db.transaction(async tx=>{
