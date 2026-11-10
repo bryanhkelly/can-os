@@ -42,6 +42,29 @@ describe("CAN OS partner hostname router", () => {
       expect(classify("https://vineyard.can-os.com" + bad)).toEqual({kind:"deny"});
     }
   });
+  it("accepts normal school marketing URLs without trusting query parameters as a tenant identity", () => {
+    const publicHome = "https://valorschool.can-os.com/?utm_source=chatgpt.com&utm_medium=referral";
+    expect(classify(publicHome)).toEqual({kind:"site",slug:"valorschool",rewrite:true});
+    expect(classify("https://valorschool.can-os.com/academics?utm_campaign=open-house"))
+      .toEqual({kind:"site",slug:"valorschool",rewrite:true});
+    expect(slugForPublicSiteOrigin(new Request(
+      "https://valorschool.can-os.com/published-site?utm_source=chatgpt.com",
+    ), true)).toBe("valorschool");
+    for (const unsafe of [
+      "/?site=another-school", "/?siteId=another-school", "/?preview=1",
+      "/?utm_source=one&utm_source=two", "/?utm_source=https://attacker.test",
+      "/?utm_source=" + "x".repeat(200), "/robots.txt?utm_source=chatgpt.com",
+      "/media/00000000-0000-4000-8000-000000000000?utm_source=chatgpt.com",
+    ]) {
+      expect(classify("https://valorschool.can-os.com"+unsafe)).toEqual({kind:"deny"});
+    }
+    expect(slugForPublicSiteOrigin(new Request(
+      "https://valorschool.can-os.com/published-site?site=another-school",
+    ), true)).toBeNull();
+    expect(classify("https://valorschool.can-os.com/apply?utm_source=chatgpt.com", "POST"))
+      .toEqual({kind:"deny"});
+  });
+
   it("uses the configured root domain for tenant isolation", () => {
     expect(classifyPublicSiteRequest("https://vineyard.schools.example.org/", "GET", true, "schools.example.org"))
       .toEqual({ kind: "site", slug: "vineyard", rewrite: true });
