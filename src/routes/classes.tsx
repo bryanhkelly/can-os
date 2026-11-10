@@ -5,7 +5,6 @@ import { ClassroomLessonTabs } from "@/components/learning/ClassroomLessonTabs";
 import { PrivateLessonNotes } from "@/components/learning/PrivateLessonNotes";
 import { ClassroomMediaStage, type ClassroomMeetings } from "@/components/learning/ClassroomMediaStage";
 import { ClassVideoPlayer, ClassVideoPlaceholder } from "@/components/learning/ClassVideoPlayer";
-import { ClassVideoUploadForm } from "@/components/learning/ClassVideoUploadForm";
 import { resolveClassVideo } from "@/domain/class-video";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { CommonCartridgeStaticLesson } from "@/components/learning/CommonCartridgeStaticLesson";
@@ -90,7 +89,6 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   const [body, setBody] = useState("");
   const [resourceTitle,setResourceTitle]=useState("");
   const [resourceUrl,setResourceUrl]=useState("");
-  const [resourceAttempted,setResourceAttempted]=useState(false);
   const [resourceKind,setResourceKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
   const [resourceLesson,setResourceLesson]=useState("");
   const [editingResource,setEditingResource]=useState<string|null>(null);
@@ -328,32 +326,18 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
             </li>)}</ul>
             {data.role === "teacher" && <Link to="/teacher/discussions" search={{ section: data.section.id, lesson: lesson.id }} className="text-sm underline">Start a discussion from this lesson</Link>}
           </section> : undefined}/>
-        {data.role==="teacher"&&<form noValidate className="mt-5 grid gap-3 rounded-lg border p-4" aria-label="Add resource to this lesson"
-          onSubmit={event=>{event.preventDefault();setResourceAttempted(true);
-            let validHttps=false;try{validHttps=new URL(resourceUrl).protocol==="https:";}catch{/* invalid URL */}
-            if(resourceTitle.trim().length<3||!validHttps)return;
-            void run(async()=>{
-            await addClassSupplement({data:{sectionId:data.section.id,lessonId:lesson.id,
-              title:resourceTitle.trim(),url:resourceUrl.trim(),kind:resourceKind}});
-            setResourceTitle("");setResourceUrl("");setResourceAttempted(false);
-          },"Teacher supplement attached to this lesson.");}}>
-          <h3 className="font-semibold text-sm">Add resource to this lesson</h3>
-          <Field label="Resource title" className="text-xs" required error={resourceAttempted&&resourceTitle.trim().length<3?"Enter a resource title with at least 3 characters.":undefined}>
-            <Input minLength={3} maxLength={200} value={resourceTitle} onChange={e=>setResourceTitle(e.target.value)}/>
-          </Field>
-          <Field label="HTTPS resource link" className="text-xs" required
-            error={resourceAttempted&&(()=>{try{return new URL(resourceUrl).protocol!=="https:";}catch{return true;}})()?"Enter a valid HTTPS resource URL.":undefined}>
-            <Input type="url" value={resourceUrl} onChange={e=>setResourceUrl(e.target.value)}/>
-          </Field>
-          <Field label="Resource format" className="text-xs"><Select value={resourceKind}
-           onChange={e=>setResourceKind(e.target.value as typeof resourceKind)}>
-           {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
-          </Select></Field>
-          <Button type="submit" variant="outline" disabled={busy} className="justify-self-start">Add lesson resource</Button>
-          <p className="text-xs text-muted-foreground">Only teacher-owned supplementary resources can be replaced or retired here. Publisher content is immutable.</p>
-        </form>}
-        {data.role === "teacher" && <ClassVideoUploadForm key={lesson.id} sectionId={data.section.id}
-          lessons={lessons} lessonId={lesson.id} enabled={data.videoUploadsEnabled}/>}
+        {data.role === "teacher" && <ClassSupplementForm key={lesson.id} title={resourceTitle} url={resourceUrl}
+          kind={resourceKind} lessonId={lesson.id} lessons={lessons} busy={busy}
+          sectionId={data.section.id} uploadsEnabled={data.videoUploadsEnabled}
+          onTitleChange={setResourceTitle} onUrlChange={setResourceUrl}
+          onKindChange={setResourceKind} onLessonChange={setResourceLesson}
+          onSubmit={() => void run(async () => {
+            await addClassSupplement({ data: {
+              sectionId: data.section.id, lessonId: lesson.id,
+              title: resourceTitle.trim(), url: resourceUrl.trim(), kind: resourceKind,
+            } });
+            setResourceTitle(""); setResourceUrl("");
+          }, "Teacher resource attached to this lesson.")} />}
         {relatedWork.length > 0 && <section className="mt-6 space-y-3 rounded-lg border p-4" aria-label="Assignments for this lesson">
           <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
           <ul className="divide-y">{relatedWork.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
@@ -426,6 +410,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     {tab === "files" && <WorkspacePanel title="Class files and resources" description="Links and verified private documents from the published course version.">
       {data.role==="teacher" && <ClassSupplementForm title={resourceTitle} url={resourceUrl}
         kind={resourceKind} lessonId={resourceLesson} lessons={lessons} busy={busy}
+         sectionId={data.section.id} uploadsEnabled={data.videoUploadsEnabled}
         onTitleChange={setResourceTitle} onUrlChange={setResourceUrl}
         onKindChange={setResourceKind} onLessonChange={setResourceLesson}
         onSubmit={()=>void run(async()=>{
