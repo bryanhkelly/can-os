@@ -49,6 +49,31 @@ describe("seven Site-specific family brand kits",()=>{
   }
  });
 
+ it("uses the matching R2 hero only for private previews, never live invitations",()=>{
+  for(const templateId of siteTemplateIds){
+   const preview=renderFamilyBrandPage(context(templateId),"landing",{...params,preview:true});
+   expect(preview).toContain(`/template-photo/${templateId}/hero?v=20261109`);
+   expect(preview).toContain("Illustrative school-template photography");
+   const survey=renderFamilyBrandPage(context(templateId),"survey",{...params,preview:true});
+   expect(survey).toContain(`/template-photo/${templateId}/hero?v=20261109`);
+   const live=renderFamilyBrandPage(context(templateId),"landing",params);
+   expect(live).not.toContain("/template-photo/");
+  }
+ });
+
+ it("only shows a school-uploaded image when rights and child privacy are approved",()=>{
+  const image={dataUrl:"data:image/png;base64,AA==",altText:"The school library",
+    rightsConfirmed:true,childImageConsent:"no_identifiable_children" as const};
+  const approved={...context("modern"),branding:{...context("modern").branding,heroImage:image}};
+  expect(renderFamilyBrandPage(approved,"landing",params)).toContain('alt="The school library"');
+  expect(renderFamilyBrandPage(approved,"landing",params)).toContain('src="data:image/png;base64,AA=="');
+  const unapproved={...approved,branding:{...approved.branding,
+    heroImage:{...image,rightsConfirmed:false}}};
+  expect(renderFamilyBrandPage(unapproved,"landing",params)).not.toContain('src="data:image/png');
+  expect(renderFamilyBrandPage(unapproved,"landing",{...params,preview:true}))
+    .toContain("/template-photo/modern/hero");
+ });
+
  it("generates 21 branded HTML emails with text fallbacks and fixed planning claims",()=>{
   const bodies=new Set<string>();
   for(const templateId of siteTemplateIds){
