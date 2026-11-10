@@ -188,8 +188,6 @@ export const getSiteToday = createServerFn({ method: "GET" })
       site, asOf: now.toISOString(), localDate: dayText,
       canOpenOnsiteDay:actor.role==="site_leader",
       viewerPersonId:actor.actorPersonId,
-    // School profile reads the same registrar-authority configuration; site leaders use Site Today alone.
-    viewerCanOpenSchoolProfile:hasRegistrarAuthority(actor.role),
       schoolDay:snapshot.operational,
       programs: scopedPrograms,
       schoolOpenings,

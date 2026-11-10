@@ -7,6 +7,7 @@ export type ClassAssessmentEvidenceItem = {
   score: string | number | null;
   pointsPossible: string | number | null;
   status: string;
+  curriculumVersionMismatch?: boolean;
 };
 
 export function ClassAssessmentEvidence({
@@ -24,7 +25,7 @@ export function ClassAssessmentEvidence({
     </p>
     {!isTeacher && items.length > 0 && <ul className="mt-3 divide-y text-sm">
       {items.map(item => <li key={item.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
-        <span>{item.title}</span>
+        <span>{item.title}{item.curriculumVersionMismatch && <span className="ml-2 text-xs text-muted-foreground">Lesson link needs review</span>}</span>
         <span className="text-muted-foreground">
           {item.score !== null && item.pointsPossible !== null
             ? `Reviewed: ${item.score} / ${item.pointsPossible} points`

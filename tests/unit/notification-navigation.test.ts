@@ -103,7 +103,7 @@ describe("authorized notification destinations",()=>{
     state.role="teacher";
     notification("study_group","group");
     state.rows.study_groups=[{id:"group",facilitator:"actor"}];
-    expect((await getNotifications())[0]?.href).toBe("/groups?group=group");
+    expect((await getNotifications())[0]?.href).toBe("/groups/group");
   });
   it("deep-links a guardian course approval review to its workspace",async()=>{
     notification("action","request","course_registration_guardian_review");
@@ -128,7 +128,7 @@ describe("authorized notification destinations",()=>{
     state.rows.study_groups=[{id:"group",facilitator:"teacher",siteId:"school",
       programId:"program",sectionId:"section"}];
     expect((await getNotifications())[0]?.href)
-      .toBe("/student/study-groups?group=group");
+      .toBe("/groups/group");
   });
   it("opens an invitation to a program-wide interest group",async()=>{
     state.role="student";
@@ -136,6 +136,22 @@ describe("authorized notification destinations",()=>{
     state.rows.study_groups=[{id:"interest-group",facilitator:"teacher",siteId:"school",
       programId:null,sectionId:null}];
     expect((await getNotifications())[0]?.href)
-      .toBe("/student/study-groups?group=interest-group");
+      .toBe("/groups/interest-group");
+  });
+  it("opens an event invitation only for a current calendar participant",async()=>{
+    state.role="student";
+    notification("calendar_event","event","calendar_event_invitation");
+    state.rows.calendar_events=[{id:"event",startsAt:new Date("2030-01-15T18:00:00Z"),
+      timezone:"America/Los_Angeles"}];
+    state.rows.calendar_event_participants=[{calendarEventId:"event"}];
+    expect((await getNotifications())[0]?.href)
+      .toBe("/calendar?date=2030-01-15&event=event");
+  });
+  it("hides event invitations after participant access is lost",async()=>{
+    state.role="student";
+    notification("calendar_event","event","calendar_event_invitation");
+    state.rows.calendar_events=[{id:"event",startsAt:new Date("2030-01-15T18:00:00Z"),
+      timezone:"America/Los_Angeles"}];
+    expect(await getNotifications()).toEqual([]);
   });
 });

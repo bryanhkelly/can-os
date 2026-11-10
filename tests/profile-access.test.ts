@@ -1,7 +1,17 @@
 import {describe,expect,it} from "vitest";
-import {assertCredentialVerification,assertProfileRead} from "../src/domain/profile-access";
+import {assertCredentialVerification,assertProfileRead,profileModules} from "../src/domain/profile-access";
+import {roleCapabilities} from "../src/domain/access-context";
 const ctx=(person:string|null,caps:string[])=>({actorPersonId:person,capabilities:new Set(caps),scope:{}});
 describe("profile resource permissions",()=>{
+ it.each(Object.keys(roleCapabilities))("allows %s to manage only its own photo and granted modules",role=>{
+  const context={...ctx("self",[...roleCapabilities[role]!]),role};
+  expect(profileModules(context,"self").photo).toBe(true);
+  expect(profileModules(context,"other")).toEqual({photo:false,personal:false,professional:false,qualifications:false});
+ });
+ it("does not infer editing authority from a role without its capability",()=>{
+  expect(profileModules({...ctx("self",[]),role:"teacher"},"self").professional).toBe(false);
+  expect(profileModules({...ctx("self",[]),role:"student"},"self").personal).toBe(false);
+ });
  it("allows own education and denies self verification",()=>{
   expect(()=>assertProfileRead(ctx("a",[]),"a","education")).not.toThrow();
   expect(()=>assertProfileRead(ctx("a",[]),"a","evidence")).toThrow();

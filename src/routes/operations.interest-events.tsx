@@ -203,7 +203,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       rows={events} rowKey={event=>event.id} empty={<EmptyState title="No interest events yet"/>}
       columns={[
         {id:"event",title:"Event",render:event=><Link to="/operations/interest-events/$eventId" params={{eventId:event.id}} search={selection} className="font-semibold underline">{event.title}</Link>},
-        {id:"program",title:"Program",render:event=>event.programName},
+        {id:"program",title:"Program",render:event=><Link to="/launch/school" search={{programId:event.programId}} className="underline">{event.programName}</Link>},
         {id:"starts",title:"Starts",render:event=>new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",timeZone:event.timezone}).format(new Date(event.startsAt))},
         {id:"rsvps",title:"RSVPs",render:event=>event.registrations.length},
       ]}/>}
@@ -214,7 +214,7 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{event.title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{event.siteName} · {event.programName} · {event.visibility.replace("_", " ")}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{event.siteName} · <Link to="/launch/school" search={{programId:event.programId}} className="underline">{event.programName}</Link> · {event.visibility.replace("_", " ")}</p>
             <p className="mt-1 text-sm">{new Intl.DateTimeFormat("en-US", {
               dateStyle: "medium", timeStyle: "short", timeZone: event.timezone,
             }).format(new Date(event.startsAt))} ({event.timezone})</p>

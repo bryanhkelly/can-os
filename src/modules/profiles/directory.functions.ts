@@ -6,6 +6,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { studentAcademicTimeline } from "@/domain/student-academic-timeline";
 import { personDisplayName } from "@/domain/person-name";
+import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 
 /**
  * Staff directory authorization: teacher, registrar, specialist and counselor,
@@ -300,6 +301,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
       await Promise.all([
         db
           .select({
+            personId: s.people.id,
             firstName: s.people.legalFirstName,
             lastName: s.people.legalLastName,
             preferredName: s.people.preferredName,
@@ -307,11 +309,12 @@ export const getStudent360 = createServerFn({ method: "GET" })
           })
           .from(s.guardianRelationships)
           .innerJoin(s.people, eq(s.people.id, s.guardianRelationships.guardianPersonId))
-          .where(eq(s.guardianRelationships.studentPersonId, profile.personId)),
+          .where(and(eq(s.people.active, true), guardianRelationshipPredicate({studentPersonId: profile.personId, access: "academic"}))),
         sectionIds.length
           ? db
               .select({
                 sectionId: s.sectionTeachers.sectionId,
+                personId: s.people.id,
                 firstName: s.people.legalFirstName,
                 lastName: s.people.legalLastName,
                 preferredName: s.people.preferredName,
@@ -432,11 +435,14 @@ export const getStudent360 = createServerFn({ method: "GET" })
     for (const grade of gradeRows) {
       if (!latestGradeBySection.has(grade.sectionId)) latestGradeBySection.set(grade.sectionId, grade);
     }
-    const teachersBySection = new Map<string, string[]>();
+    const teachersBySection = new Map<string, { personId: string; name: string }[]>();
     for (const row of teacherRows) {
-      const names = teachersBySection.get(row.sectionId) ?? [];
-      names.push(personDisplayName({ legalFirstName: row.firstName, legalLastName: row.lastName, preferredName: row.preferredName }));
-      teachersBySection.set(row.sectionId, names);
+      const teachers = teachersBySection.get(row.sectionId) ?? [];
+      teachers.push({
+        personId: row.personId,
+        name: personDisplayName({ legalFirstName: row.firstName, legalLastName: row.lastName, preferredName: row.preferredName }),
+      });
+      teachersBySection.set(row.sectionId, teachers);
     }
 
     return {
@@ -451,13 +457,15 @@ export const getStudent360 = createServerFn({ method: "GET" })
         grades:gradeRows,attendance:attendanceRows,actions:actionRows,
       }),
       guardians: guardianRows.map((row) => ({
+        personId: row.personId,
         name: personDisplayName({ legalFirstName: row.firstName, legalLastName: row.lastName, preferredName: row.preferredName }),
         relationshipLabel: row.relationshipLabel,
       })),
       sections: visibleSections.map((row) => ({
         sectionId: row.sectionId,
         title: row.sectionTitle,
-        teacherNames: teachersBySection.get(row.sectionId) ?? [],
+        teachers: teachersBySection.get(row.sectionId) ?? [],
+        teacherNames: (teachersBySection.get(row.sectionId) ?? []).map(teacher => teacher.name),
       })),
       academics: {
         sections: visibleSections.map((row) => {

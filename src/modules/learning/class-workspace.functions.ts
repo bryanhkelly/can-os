@@ -73,7 +73,7 @@ export const getClassWorkspace = createServerFn({ method: "GET" })
         eq(s.submissions.studentProfileId,studentProfileId),
       )).orderBy(desc(s.submissions.attemptNumber))
       :[];
-    const assessmentEvidence=buildClassAssessmentEvidence(assessmentRows,attemptRows);
+    const assessmentEvidence=buildClassAssessmentEvidence(assessmentRows,attemptRows,section.versionId);
     const activeProgramMembership=alias(s.enrollments,"workspace_active_program_enrollment");
     const roster = actor.role === "teacher" ? await db.select({ profileId: s.studentProfiles.id, personId: s.people.id,
       firstName: s.people.legalFirstName, lastName: s.people.legalLastName, preferredName: s.people.preferredName })

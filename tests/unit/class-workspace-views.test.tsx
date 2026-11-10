@@ -300,7 +300,7 @@ describe("published class workspace", () => {
   it("retains the selected child in parent class and assignment links", () => {
     const html = renderToStaticMarkup(<ClassWorkspace data={{ ...workspace, role: "guardian", roster: [] }} tab="lessons"/>);
     expect(html).toContain('href="/classes?section=english&amp;student=child&amp;tab=lessons&amp;lesson=evidence"');
-    expect(html).toContain('href="/guardian/academics?student=child&amp;section=english"');
+    expect(html).toContain('href="/guardian/students?student=child&amp;section=english"');
     expect(html).not.toContain("/teacher/gradebook");
     expect(html).not.toContain("Roster");
   });

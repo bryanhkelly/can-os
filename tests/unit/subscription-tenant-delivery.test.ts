@@ -35,6 +35,7 @@ vi.mock("@/platform/subscriptions/policy",()=>({
   getSubscriptionPolicy:()=>({
     load:async()=>({organizationId:state.organizationId}),
     organizationId:(context:{organizationId:string|null})=>context.organizationId,
+    siteId:()=>"canonical-school",
     authorize:async()=>true,conditionHolds:async()=>true,
     content:()=>({title:"Reminder"}),
   }),
@@ -85,6 +86,7 @@ describe("subscription canonical tenant transport safety",()=>{
     expect(await processQueuedSubscriptionDeliveries()).toBe(1);
     expect(state.emailRecipients).toHaveBeenCalledWith(["person"],"school");
     expect(state.email).toHaveBeenCalledOnce();
+    expect(state.email).toHaveBeenCalledWith(expect.objectContaining({ siteId: "canonical-school" }), "delivery");
     expect(state.writes).toContainEqual(expect.objectContaining({status:"delivered",attempts:1}));
   });
 });

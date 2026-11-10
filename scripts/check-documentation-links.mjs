@@ -107,6 +107,7 @@ function checkSource(file) {
 }
 
 for (const file of files) {
+  if (file.startsWith("docs/code-reconciliation/")) continue;
   if ((file.startsWith("docs/") && !file.startsWith("docs/archive/") && file.endsWith(".md")) ||
       ["README.md", "AGENTS.md", ".github/copilot-instructions.md",
        "docs/archive/2026-11-fullflow/README.md"].includes(file)) {

@@ -1,4 +1,5 @@
 import { addCalendarDays as shiftDay, calendarWeekday as weekday, dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { isSectionMeetingPeriodType } from "./schedule-period-types";
 
 /**
  * GF4: calendar-and-schedule-derived attendance expectations.
@@ -133,7 +134,7 @@ export function summarizeExpectedOnsiteAttendance(input: {
     [d.academicCalendarId + ":" + d.calendarDate, d]));
   const periodsBySchedule = new Map<string, Set<number>>();
   for (const period of input.periods) {
-    if (period.type !== "instruction") continue;
+    if (!isSectionMeetingPeriodType(period.type)) continue;
     if (!periodsBySchedule.has(period.scheduleTemplateId))
       periodsBySchedule.set(period.scheduleTemplateId, new Set());
     periodsBySchedule.get(period.scheduleTemplateId)!.add(period.dayOfWeek);

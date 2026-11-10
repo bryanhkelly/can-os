@@ -35,7 +35,7 @@ export const SchoolSiteDirectory: Story = { render: () => <div className="bg-bac
 
 export const ApplicantRecord: Story = { render: () => <div className="bg-background p-5 sm:p-8">
   <RecordLayout
-    header={<RecordHeader eyebrow="Admissions / APP-2026-1042" title="Avery Kelly" subtitle="Valor Academy · Grade 9 · Application submitted October 29" status={<StatusBadge tone="attention">Review required</StatusBadge>}
+    header={<RecordHeader eyebrow="Admissions / APP-2026-1042" title="Avery Kelly" focusOnMount subtitle="Valor Academy · Grade 9 · Application submitted October 29" leading={<span role="img" aria-label="Avery Kelly: no profile photo" className="flex size-16 items-center justify-center border bg-muted">AK</span>} status={<StatusBadge tone="attention">Review required</StatusBadge>}
       actions={<Button variant="outline">Review evidence</Button>} breadcrumbs={<a href="#applications" className="underline">← Applications</a>} />}
     navigation={<><a href="#overview" aria-current="page" className="border-b-2 border-primary px-3 py-2 text-sm font-semibold text-primary">Overview</a>
       <a href="#documents" className="px-3 py-2 text-sm text-muted-foreground">Documents</a>
@@ -44,4 +44,14 @@ export const ApplicantRecord: Story = { render: () => <div className="bg-backgro
     rail={<DashboardPanel title="Next action"><p className="text-xs text-muted-foreground">Guardian evidence requires authorized registrar review.</p></DashboardPanel>}
     activity={<><h2 className="text-sm font-semibold">Activity</h2><p className="mt-2 text-xs text-muted-foreground">Submission and review history from canonical events.</p></>}
   />
-</div> };
+</div>,
+  play: async ({ canvas }) => {
+    const heading = canvas.getByRole("heading", { name: "Avery Kelly" });
+    const eyebrow = canvas.getByText("Admissions / APP-2026-1042");
+    const portrait = canvas.getByRole("img", { name: "Avery Kelly: no profile photo" });
+    await expect(heading.getBoundingClientRect().left).toBe(eyebrow.getBoundingClientRect().left);
+    await expect(heading).toHaveFocus();
+    await expect(portrait).toHaveStyle({ borderRadius: "0px" });
+    await expect(portrait.getBoundingClientRect().width).toBe(portrait.getBoundingClientRect().height);
+  },
+};

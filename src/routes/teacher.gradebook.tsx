@@ -1,7 +1,8 @@
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { GradebookScoringEditor } from "@/components/learning/GradebookScoringEditor";
-import { GradebookAssessmentComposer } from "@/components/learning/GradebookAssessmentComposer";
+import { GradebookAssessmentComposer, emptyAssessmentContentInput } from "@/components/learning/GradebookAssessmentComposer";
+import { AssessmentResourcesManager } from "@/components/learning/AssessmentResourcesManager";
 import { GradebookReviewedFeedback } from "@/components/learning/GradebookReviewedFeedback";
 import { GradebookAssessmentHeader } from "@/components/learning/GradebookAssessmentHeader";
 import { nextGradebookCell } from "@/components/learning/gradebook-grid-navigation";
@@ -22,6 +23,7 @@ import {
 } from "@/modules/learning/gradebook.functions";
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
+import { parseAssignmentContentDraft } from "@/domain/assignment-content";
 import { QueryState, WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -101,6 +103,7 @@ function TeacherGradebookPage() {
  const gridRef = useRef<HTMLDivElement | null>(null);
  const [title, setTitle] = useState("");
  const [instructions, setInstructions] = useState("");
+ const [contentDraft, setContentDraft] = useState(emptyAssessmentContentInput);
  const [newRubric, setNewRubric] = useState<Array<{id:string;label:string;maxPoints:string;description:string}>>([]);
  const rubricSequence=useRef(0);
  const [points, setPoints] = useState("");
@@ -231,6 +234,7 @@ function TeacherGradebookPage() {
   try { validateAssessmentRubric(rubricCriteria,pointsValue); }
   catch(cause){setNotice(mutationErrorMessage(cause, "Invalid scoring rubric."));return;}
   setNotice("");
+  const assignmentContent = parseAssignmentContentDraft(contentDraft);
   await mutation.run(async()=>{
    const result = await createAssessment({ data: {
     sectionId: selected,
@@ -241,6 +245,7 @@ function TeacherGradebookPage() {
     rubricCriteria,
     assignmentKind,
     publishNow,
+    ...(assignmentContent?{assignmentContent}:{}),
     ...(curriculumLessonId?{curriculumLessonId}:{}),
     ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
     ...(releaseAt?{availableAt:new Date(releaseAt).toISOString()}:{}),
@@ -248,6 +253,7 @@ function TeacherGradebookPage() {
    } });
    setTitle("");
    setInstructions("");
+   setContentDraft(emptyAssessmentContentInput);
    setNewRubric([]);
    setPoints("");
    setMaxAttempts("");
@@ -344,13 +350,16 @@ function TeacherGradebookPage() {
       releaseAt={releaseAt} closeAt={closeAt} assignmentKind={assignmentKind}
       curriculumLessonId={curriculumLessonId} maxAttempts={maxAttempts} instructions={instructions}
       newRubric={newRubric} publishConfirmed={publishConfirmed} busy={busy}
-      lessonContext={search.lesson} lessons={gradebook.curriculumLessons}
+      lessonContext={search.lesson} lessons={gradebook.curriculumLessons} content={contentDraft}
       onTitleChange={setTitle} onPointsChange={setPoints} onDueChange={setDue}
       onReleaseChange={setReleaseAt} onCloseChange={setCloseAt}
       onKindChange={setAssignmentKind} onLessonChange={setCurriculumLessonId}
       onAttemptsChange={setMaxAttempts} onInstructionsChange={setInstructions}
       onRubricChange={setNewRubric} onPublishConfirmedChange={setPublishConfirmed}
-      onSubmit={publish=>void submitAssessment(publish)} />
+      onSubmit={publish=>void submitAssessment(publish)} onContentChange={setContentDraft} />
+    {search.assessment&&gradebook.assessments.some(item=>item.id===search.assessment)&&
+     <AssessmentResourcesManager assessmentId={search.assessment}
+      assessmentTitle={gradebook.assessments.find(item=>item.id===search.assessment)?.title??""} />}
 
     {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
     {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto rounded-xl border bg-card">

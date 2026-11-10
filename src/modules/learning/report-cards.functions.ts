@@ -1,3 +1,4 @@
+import { buildSectionGradeEvidence, readSectionGradeEvidence } from "@/domain/section-grade-evidence";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { personDisplayName, personLegalName } from "@/domain/person-name";
 import {
@@ -130,6 +131,9 @@ async function finalizedGradeRows(
       sectionGradeId: s.sectionGrades.id,
       sectionId: s.sectionGrades.sectionId,
       sectionTitle: s.sections.title,
+      courseTemplateVersionId:s.courseTemplateVersions.id,
+      courseTemplateVersion:s.courseTemplateVersions.version,
+      metadata:s.sectionGrades.metadata,
       subject:s.courseTemplates.subject,
       sectionMetadata:s.sections.metadata,
       gradingPeriodId: s.sectionGrades.gradingPeriodId,
@@ -183,7 +187,7 @@ async function finalizedGradeRows(
     .from(s.gradeScales).where(inArray(s.gradeScales.id,scaleIds)):[];
   const scalesById=new Map(scaleRows.map(scale=>[scale.id,scale.configuration] as const));
   return rows.map((row) => {
-    const { sectionMetadata, gradeScaleId, ...rest } = row;
+    const { sectionMetadata, gradeScaleId, metadata, ...rest } = row;
     const configuration=gradeScaleId?scalesById.get(gradeScaleId):null;
     if(gradeScaleId&&!configuration)throw new Error("Finalized grade scale is unavailable");
     const passes=isPassingGrade(row.letterGrade,configuration);
@@ -191,6 +195,7 @@ async function finalizedGradeRows(
     const terminalPeriod=row.gradingPeriodSequence===lastPeriod.get(row.termId);
     return {
       ...rest,
+      gradeEvidence:readSectionGradeEvidence(metadata?.gradeEvidence),
       finalizedAt: row.finalizedAt?.toISOString() ?? null,
       creditConfigured:creditUnits!==null,
       terminalPeriod,
@@ -318,13 +323,16 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
 
       const graded = await tx
         .select({
+          id: s.submissions.id,
           assessmentId: s.submissions.assessmentId,
+          title: s.assessments.title,
           studentProfileId: s.submissions.studentProfileId,
           attemptNumber: s.submissions.attemptNumber,
           score: s.submissions.score,
           status: s.submissions.status,
         })
         .from(s.submissions)
+        .innerJoin(s.assessments,eq(s.assessments.id,s.submissions.assessmentId))
         .where(
           and(
             inArray(s.submissions.assessmentId, assessmentIds),
@@ -366,6 +374,7 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           id: s.sectionGrades.id,
           studentProfileId: s.sectionGrades.studentProfileId,
           status: s.sectionGrades.status,
+          metadata: s.sectionGrades.metadata,
         })
         .from(s.sectionGrades)
         .where(
@@ -423,6 +432,13 @@ export const finalizeSectionGrades = createServerFn({ method: "POST" })
           gradeScaleId: period.gradeScaleId,
           finalizedByPersonId: actorPersonId,
           finalizedAt: now,
+          metadata: {
+            ...(prior?.metadata ?? {}),
+            gradeEvidence: buildSectionGradeEvidence(
+              graded.filter(row => row.studentProfileId === studentProfileId),
+              pointsByAssessment,
+            ),
+          },
           updatedAt: now,
         };
         let gradeId: string;

@@ -41,7 +41,7 @@
     "/teacher/gradebook",
     "/teacher/missing-work",
     "/teacher/discussions",
-    "/guardian/academics",
+    "/guardian/students",
     "/guardian/attendance",
     "/guardian/admission-offers",
     "/classes",
@@ -65,7 +65,7 @@
     },
     {
       "persona": "guardian",
-      "destination": "/guardian/academics"
+      "destination": "/guardian/students"
     },
     {
       "persona": "teacher",

@@ -785,7 +785,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
         .toBeGreaterThanOrEqual(1);
 
       await goto(guardian.page, 
-        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+        `/guardian/students?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
       await expect(guardian.page.getByText("Grade: 9 / 10")).toBeVisible();
       await guardian.page
@@ -870,7 +870,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       expect(Number(latest.score)).toBe(10);
 
       await goto(guardian.page,
-        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+        `/guardian/students?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
       await expect(guardian.page.getByText("Grade: 10 / 10")).toBeVisible();
     });
@@ -971,7 +971,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // graded work even when supplied the precise student/Section/assessment IDs.
       await goto(
         unrelatedGuardian.page,
-        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+        `/guardian/students?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
       await expect(unrelatedGuardian.page.getByText(
         "No students with academic-viewing permission were found at your school.",
@@ -1003,7 +1003,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       // other navigation, then reload that exact route to catch stale-cache leaks.
       await goto(
         unrelatedGuardian.page,
-        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+        `/guardian/students?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
       await unrelatedGuardian.page.reload();
       await waitForAppHydration(unrelatedGuardian.page);
@@ -1023,7 +1023,7 @@ test("persistent multi-role FullFlow journey", async ({ browser }) => {
       );
       await goto(
         guardian.page,
-        `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
+        `/guardian/students?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${fixture.assessmentId}`,
       );
       await expect(guardian.page.getByText("Grade: 10 / 10")).toHaveCount(0);
       await expect(

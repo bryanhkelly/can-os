@@ -37,7 +37,10 @@ function FamilyJoinPage(){
  const [status,setStatus]=useState("Confirm your email to continue your school application.");
  useEffect(()=>{
    const code=new URLSearchParams(window.location.hash.slice(1)).get("token");
-   setToken(code);window.history.replaceState(null,"","/family/join");
+   // Strict Mode may replay this effect after the first pass has removed the
+   // fragment. Preserve the token captured by that first pass.
+   if(code)setToken(code);
+   window.history.replaceState(null,"","/family/join");
    setReady(true);
  },[]);
  async function verify(){

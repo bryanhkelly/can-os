@@ -15,6 +15,7 @@ const assessment = { id: "assessment-1", title: "First investigation", instructi
 const readyEvidence = {
   sectionActive: true,
   courseVersionPublished: true,
+  courseVersionId:"version-1",
   curriculumAccess:{available:true,reason:null},
   curriculum,
   qualifiedTeacher: true,
@@ -96,6 +97,12 @@ describe("first classroom fallback boundaries", () => {
       publishedAssessments: [{ ...assessment, curriculumLessonId: "later" }] });
     expect(result.firstWeek.assessment).toBeNull();
     expect(result.blockers).toContainEqual(expect.objectContaining({ key: "missing_assessment" }));
+  });
+  it("blocks a first assignment pinned to a different course version",()=>{
+    const result=buildFirstClassroom("section-1",{...readyEvidence,
+      publishedAssessments:[{...assessment,publisherCourseVersionId:"version-old"}],
+    });
+    expect(result.blockers.map(item=>item.key)).toContain("assessment_curriculum_mismatch");
   });
   it("finds genuinely unlinked work after unrelated work", () => {
     const result = buildFirstClassroom("section-1", { ...readyEvidence,

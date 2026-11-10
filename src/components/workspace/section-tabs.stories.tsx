@@ -5,9 +5,9 @@ import { DetailNavigation, SectionTab } from "./workspace-panel";
 
 const tabs = [["overview", "Overview"], ["calendar", "Calendar"], ["announcements", "Announcements"]] as const;
 
-function RecordTabs({ tab }: { tab: string }) {
+function RecordTabs({ tab, variant = "default" }: { tab: string; variant?: "default" | "record" }) {
   return <div className="bg-background p-5 sm:p-8">
-    <DetailNavigation label="School sections">{tabs.map(([value, label]) => <SectionTab key={value} current={tab === value}
+    <DetailNavigation label="School sections" variant={variant}>{tabs.map(([value, label]) => <SectionTab key={value} current={tab === value}
       link={{ to: "/student/my-school", search: value === "overview" ? {} : { tab: value } }}>{label}</SectionTab>)}</DetailNavigation>
   </div>;
 }
@@ -40,5 +40,20 @@ export const ScopedLocation: Story = {
     const current = canvas.getAllByRole("link").filter(link => link.getAttribute("aria-current") === "page");
     await expect(current).toHaveLength(1);
     await expect(current[0]).toHaveTextContent("Overview");
+  },
+};
+
+export const RecordSections: Story = {
+  args: { tab: "calendar", variant: "record" },
+  decorators: [withLocation("/student/my-school?tab=calendar")],
+  play: async ({ canvas }) => {
+    const links = canvas.getAllByRole("link");
+    const current = links.filter(link => link.getAttribute("aria-current") === "page");
+    await expect(current).toHaveLength(1);
+    await expect(current[0]).toHaveTextContent("Calendar");
+    await expect(current[0]).toHaveStyle({ borderBottomWidth: "2px", borderRadius: "0px" });
+    for (const link of links) await expect(link.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+    links[0]!.focus();
+    await expect(links[0]).toHaveFocus();
   },
 };

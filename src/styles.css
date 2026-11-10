@@ -385,6 +385,7 @@
   text-transform:uppercase; color:var(--eyebrow-color); }
 .can-page-title { font-family:var(--font-serif); font-weight:400; font-size:clamp(1.75rem,2.1vw,2.5rem);
   line-height:1.15; letter-spacing:-.01em; color:var(--foreground); text-wrap:balance; }
+.can-page-title[data-variant="record"] { font-size:var(--text-2xl); line-height:1.25; letter-spacing:0; }
 
 /* Shell: sidebar brand block and top bar share --topbar-height. */
 .can-shell { min-height:100vh; }

@@ -1,5 +1,8 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { PageFrame } from "@/components/workspace/page-frame";
+import { RecordLayout } from "@/components/workspace/record-layout";
+import { WorkspacePanel } from "@/components/workspace/workspace-panel";
 const state=vi.hoisted(()=>({slots:[] as unknown[],cursor:0,events:[] as string[],submit:vi.fn()}));
 vi.mock("react",async original=>({...await original<typeof import("react")>(),
   useEffect:()=>{},useCallback:<T,>(callback:T)=>callback,
@@ -16,16 +19,18 @@ vi.mock("react",async original=>({...await original<typeof import("react")>(),
 }));
 vi.mock("@tanstack/react-router",()=>({
   Link:()=>null,useRouter:()=>({invalidate:async()=>{state.events.push("reload");}}),
-  createFileRoute:()=> (options:unknown)=>({options,useSearch:()=>({assessment:"worksheet",section:"section"}),
-    useLoaderData:()=>({ok:true,data:{connected:true,assignments:[{
+  createFileRoute:()=> (options:unknown)=>({options,useSearch:()=>({filter:"all",section:"section"}),
+    useLoaderData:()=>({ok:true,data:{connected:true,assignment:{
       assessmentId:"worksheet",sectionId:"section",title:"Completed worksheet",course:"Math",status:"assigned",assessmentStatus:"published",
       responseText:"",dueAt:null,score:null,pointsPossible:"10",canEdit:true,
-      workAvailability:{actionable:true,reason:null},metadata:{maxAttempts:null,criteria:[]},attempts:[],
-    }]}}),
+      workAvailability:{actionable:true,reason:null},metadata:{maxAttempts:null,criteria:[],assignmentKind:"homework"},attempts:[],
+      submissionId:null,submittedAt:null,availableAt:null,instructions:null,timeZone:"UTC",timeliness:"on_time",
+      feedbackText:null,revisionFeedbackText:null,revisionFeedbackSubmissionId:null,
+    },instructorNames:[]}}),
   }),
 }));
 vi.mock("@/modules/student-experience/assignments.functions",()=>({
-  getAssignments:vi.fn(),saveAssignmentDraft:async()=>{state.events.push("save draft");return {saved:true};},
+  getAssignments:vi.fn(),getAssignmentDetail:vi.fn(),saveAssignmentDraft:async()=>{state.events.push("save draft");return {saved:true};},
   saveAssignmentResponse:state.submit,
 }));
 vi.mock("@/modules/learning/submission-attachments.functions",()=>({
@@ -44,17 +49,21 @@ vi.mock("@/components/shell/WorkspaceSession",()=>({
 }));
 import {defaultStudentDisplayPreferences} from "@/domain/student-display-preferences";
 vi.mock("@/lib/use-hydrated",()=>({useHydrated:()=>true}));
-import {Route} from "@/routes/student.assignments";
+import {Route} from "@/routes/student.assignments_.$assessmentId";
 type Props={children?:ReactNode;type?:string;disabled?:boolean;onChange?:(event:unknown)=>void;onClick?:()=>Promise<void>};
 function nodes(node:ReactNode):ReactElement<Props>[] {
   if(Array.isArray(node))return node.flatMap(nodes);
   if(!isValidElement<Props>(node))return [];
+  if(typeof node.type==="function") {
+    const renderComponent=node.type as (props:unknown)=>ReactNode;
+    return nodes(renderComponent(node.props));
+  }
   return [node,...nodes(node.props.children)];
 }
 function render(){
   state.cursor=0;
   const page=(Route.options.component as ()=>ReactElement<{data:unknown}>)();
-  return nodes((page.type as (props:unknown)=>ReactElement)(page.props));
+  return nodes(page);
 }
 beforeEach(()=>{
   state.slots=[];state.events=[];vi.clearAllMocks();

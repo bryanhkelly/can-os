@@ -18,7 +18,7 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
   const busy=mutation.pending||mutation.refreshFailed;
   const [savedResponse, setSavedResponse] = useState<string | null>(null);
   return <article id={"grade-action-"+item.id} className={"rounded-xl border p-4"+(selected?" ring-2 ring-primary":"")}>
-    <p className="font-semibold">{item.studentName} · {item.assessmentTitle}</p>
+    <p className="font-semibold"><Link to="/teacher/gradebook" search={{ section: item.sectionId, assessment: item.assessmentId, student: item.studentProfileId }} className="underline">{item.studentName} · {item.assessmentTitle}</Link></p>
     <p className="mt-2 text-xs font-semibold text-muted-foreground">Released attempt {item.attemptNumber}</p>
     <div className="mt-2 rounded-lg border bg-muted/40 p-3 text-sm">
       <p className="font-semibold">Grade being discussed: {item.score ?? "Not scored"}{item.score === null ? "" : " / " + item.pointsPossible}</p>
@@ -31,8 +31,6 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
       <summary className="cursor-pointer text-sm font-semibold">Review original submitted work and attachments · attempt {item.attemptNumber}</summary>
       <div className="mt-3"><SubmissionEvidence submissionId={item.submissionId} historical/></div>
     </details>
-    <Link to="/teacher/gradebook" search={{ section: item.sectionId, assessment: item.assessmentId, student: item.studentProfileId }}
-      className="mt-3 inline-block text-sm underline">Open current class gradebook</Link>
     {(item.status === "resolved" || savedResponse !== null)
       ? <p className="mt-3 whitespace-pre-wrap text-sm" role="status">School response: {savedResponse ?? item.resolutionNote}</p>
       : <form noValidate className="mt-3 space-y-3" onSubmit={async event => {

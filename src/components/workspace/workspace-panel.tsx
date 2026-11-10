@@ -16,8 +16,12 @@ export function WorkspacePanel({ title, description, actions, children, classNam
   </section>;
 }
 
-export function DetailNavigation({ label, children }: { label: string; children: ReactNode }) {
-  return <nav aria-label={label} className="my-6 flex flex-wrap gap-2 rounded-xl border bg-card p-2 text-sm [&_a]:rounded-lg [&_a]:px-4 [&_a]:py-2 [&_a:hover]:bg-muted [&_a[aria-current=page]]:bg-foreground [&_a[aria-current=page]]:text-background">{children}</nav>;
+export function DetailNavigation({ label, children, variant = "default" }: { label: string; children: ReactNode; variant?: "default" | "record" }) {
+  return <nav aria-label={label} className={cn(
+    variant === "record"
+      ? "flex min-w-0 flex-wrap gap-1 border-b border-border text-sm [&_a]:inline-flex [&_a]:min-h-11 [&_a]:min-w-0 [&_a]:items-center [&_a]:wrap-break-word [&_a]:border-b-2 [&_a]:border-transparent [&_a]:px-3 [&_a]:py-2 [&_a]:text-muted-foreground [&_a:hover]:text-foreground [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-ring [&_a[aria-current=page]]:border-primary [&_a[aria-current=page]]:font-semibold [&_a[aria-current=page]]:text-primary"
+      : "my-6 flex flex-wrap gap-2 rounded-xl border bg-card p-2 text-sm [&_a]:rounded-lg [&_a]:px-4 [&_a]:py-2 [&_a:hover]:bg-muted [&_a[aria-current=page]]:bg-foreground [&_a[aria-current=page]]:text-background",
+  )}>{children}</nav>;
 }
 
 export interface SectionTabProps<TRouter extends RegisteredRouter = RegisteredRouter, TOptions = unknown> {

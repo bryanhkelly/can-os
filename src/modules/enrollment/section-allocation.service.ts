@@ -10,6 +10,7 @@ import { canAddStudentToSection } from "@/domain/section-registration-window";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { findSectionScheduleConflicts } from "@/modules/academic-time/section-schedule-service";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentSchoolJurisdictionForEnrollment } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { getSectionRegistrationPolicy } from "@/modules/learning/section-registration-policy-service";
 import { emitEvent,notifyMany,writeAudit } from "@/platform/mutation";
 import { and,eq,inArray,sql } from "drizzle-orm";
@@ -50,6 +51,8 @@ export async function activateSectionEnrollment(tx:EnrollmentTransaction,input:S
   .where(and(eq(s.sections.id,sectionId),eq(s.sections.active,true)))
   .limit(1).for("update");
  if(!section)throw new Error("Section not active");
+ if(section.siteId)
+  await requireCurrentSchoolJurisdictionForEnrollment(tx,section.programId,{});
  if(section.curriculumStatus!=="published")
   throw new DomainError("COURSE_CONTENT_REQUIRED", "Publish the instructional course version before placing students in this class");
  requireAccessibleFirstLesson(section.curriculum);

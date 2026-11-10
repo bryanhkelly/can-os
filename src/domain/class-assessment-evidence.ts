@@ -11,6 +11,7 @@ export type AssessmentAttempt = {
 };
 export type ClassAssessmentEvidence = {
  id:string; title:string; unitId:string|null; curriculumLessonId:string|null; pointsPossible:number|null;
+ curriculumVersionMismatch:boolean;
  attemptNumber:number|null; status:"not_submitted"|"submitted"|"graded"|"returned"|"draft";
  score:number|null;
 };
@@ -21,7 +22,7 @@ function safePoints(value:string|null){
  return Number.isFinite(parsed)&&parsed>=0?parsed:null;
 }
 export function buildClassAssessmentEvidence(
- assessments:ClassAssessment[], attempts:AssessmentAttempt[],
+ assessments:ClassAssessment[], attempts:AssessmentAttempt[], courseVersionId?:string,
 ):ClassAssessmentEvidence[]{
  const latest=new Map<string,AssessmentAttempt>();
  for(const attempt of attempts){
@@ -39,10 +40,14 @@ export function buildClassAssessmentEvidence(
    const score=(status==="graded"||status==="returned")?safePoints(attempt?.score??null):null;
    const unit=assessment.metadata.unitId;
    const lesson=assessment.metadata.curriculumLessonId;
+  const assignedVersion=assessment.metadata.publisherCourseVersionId;
+  const curriculumVersionMismatch=typeof assignedVersion==="string"&&Boolean(courseVersionId)&&
+   assignedVersion!==courseVersionId;
    return {
     id:assessment.id,title:assessment.title,
     unitId:typeof unit==="string"&&unitIdPattern.test(unit)?unit:null,
-    curriculumLessonId:typeof lesson==="string"&&unitIdPattern.test(lesson)?lesson:null,
+   curriculumLessonId:!curriculumVersionMismatch&&typeof lesson==="string"&&unitIdPattern.test(lesson)?lesson:null,
+   curriculumVersionMismatch,
     pointsPossible:safePoints(assessment.pointsPossible),
     attemptNumber:attempt?.attemptNumber??null,
     status,score,

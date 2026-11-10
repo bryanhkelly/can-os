@@ -7,6 +7,7 @@ import { readClassContent } from "@/domain/class-content";
 import { summarizeCurriculumJourney, type JourneyClassEvidence } from "@/domain/curriculum-journey-readiness";
 import type { Actor } from "@/modules/identity/actors.server";
 import { readMarketplace } from "./curriculum-marketplace.server";
+import { readFirstClassrooms } from "./first-classroom.server";
 
 /**
  * Read-only school-scoped operational evidence. This deliberately cannot
@@ -30,6 +31,7 @@ export async function readCurriculumJourneyReadiness(actor:Actor,programId:strin
   curriculum:courseTemplateVersions.curriculum})
    .from(courseTemplateVersions)
    .where(inArray(courseTemplateVersions.id,[...new Set(relevant.map(s=>s.courseVersionId))]));
+ const firstClassrooms=await readFirstClassrooms(sectionIds);
  const teacherRows=await db.select({sectionId:sectionTeachers.sectionId,personId:sectionTeachers.personId})
    .from(sectionTeachers).where(inArray(sectionTeachers.sectionId,sectionIds));
  const enrollmentRows=await db.select({sectionId:enrollments.sectionId,
@@ -57,6 +59,7 @@ export async function readCurriculumJourneyReadiness(actor:Actor,programId:strin
    submittedAttemptCount:responseRows.filter(r=>ids.has(r.assessmentId) &&
     ["submitted","graded","returned"].includes(r.status)).length,
    gradedAttemptCount:responseRows.filter(r=>ids.has(r.assessmentId)&&r.status==="graded").length,
+  firstClassroom:firstClassrooms.find(item=>item.sectionId===section.id),
   };
  });
  const evidence={installedPacks:new Set(entitled.map(p=>p.id)).size,

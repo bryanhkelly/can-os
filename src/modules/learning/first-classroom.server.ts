@@ -45,6 +45,9 @@ export async function readFirstClassrooms(
       status: assessments.status,
       availableAt: assessments.availableAt,
       closesAt: assessments.closesAt,
+      publisherCourseVersionId: sql<string | null>`case
+        when jsonb_typeof(${assessments.metadata}->'publisherCourseVersionId') = 'string'
+        then ${assessments.metadata}->>'publisherCourseVersionId' end`,
       curriculumLessonId: sql<string | null>`case
         when jsonb_typeof(${assessments.metadata}->'curriculumLessonId') = 'string'
         then ${assessments.metadata}->>'curriculumLessonId' end`,
@@ -84,6 +87,7 @@ export async function readFirstClassrooms(
   return rows.map(row => buildFirstClassroom(row.id, {
     sectionActive: row.active,
     courseVersionPublished: row.versionStatus === "published",
+    courseVersionId:row.versionId,
     curriculumAccess:delivery.find(([id])=>id===row.id)?.[1] ?? {
       available:false,reason:"Current curriculum delivery access could not be verified.",
     },

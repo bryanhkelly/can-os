@@ -61,15 +61,27 @@ ON CONFLICT(id) DO NOTHING;
 INSERT INTO notifications(id,recipient_person_id,type,status,title,body,resource_type,resource_id) VALUES
 ('f7000000-0000-4000-8000-000000000041','f3000000-0000-4000-8000-000000000007','missing_assignment','unread','Revise your personal essay is missing','Jordan has a missing assignment that may need follow-up.','submission',null)
 ON CONFLICT(id) DO NOTHING;
--- Program launch: definition + one in-progress launch so the wizard shows both panels.
+-- Program launch fixture: definition + one in-progress launch so the wizard
+-- shows both panels. Valor is a fully operating school and must never carry a
+-- launching Program; this fixture lives in a separate Barton demo tenant
+-- (mirroring the prod demo-barton school used for launch demonstrations).
+INSERT INTO organizations(id,type,name,slug,metadata) VALUES
+('f7000000-0000-4000-8000-000000000060','christian_school','Barton Demo School','demo-barton','{"synthetic":true,"fixture":"new-experiences-v1"}'::jsonb)
+ON CONFLICT(id) DO NOTHING;
+INSERT INTO sites(id,organization_id,name,slug,timezone,metadata) VALUES
+('f7000000-0000-4000-8000-000000000061','f7000000-0000-4000-8000-000000000060','Barton Demo School','demo-barton','America/Los_Angeles','{"synthetic":true}'::jsonb)
+ON CONFLICT(id) DO NOTHING;
+INSERT INTO people(id,legal_first_name,legal_last_name,preferred_name,metadata) VALUES
+('f7000000-0000-4000-8000-000000000062','Bailey','Example','Bailey','{"synthetic":true,"role":"site_admin","fixture":"new-experiences-v1"}'::jsonb)
+ON CONFLICT(id) DO NOTHING;
 INSERT INTO journey_definitions(id,key,version,owning_organization_id,audience,title,active,configuration) VALUES
-('f7000000-0000-4000-8000-000000000050','program-launch','1','f1000000-0000-4000-8000-000000000002','operations','Program Launch',true,'{"requirements":[{"key":"staffing","title":"Required staff and role assignments complete","blocking":true,"owner":"partner"},{"key":"facility","title":"Facility and onsite readiness verified","blocking":true,"owner":"partner"},{"key":"teacher-readiness","title":"Teacher readiness and section provisioning complete","blocking":true,"owner":"can"},{"key":"orientation","title":"Orientation and calendar events scheduled","blocking":false,"owner":"partner"}]}'::jsonb)
+('f7000000-0000-4000-8000-000000000050','program-launch','1','f7000000-0000-4000-8000-000000000060','operations','Program Launch',true,'{"requirements":[{"key":"staffing","title":"Required staff and role assignments complete","blocking":true,"owner":"partner"},{"key":"facility","title":"Facility and onsite readiness verified","blocking":true,"owner":"partner"},{"key":"teacher-readiness","title":"Teacher readiness and section provisioning complete","blocking":true,"owner":"can"},{"key":"orientation","title":"Orientation and calendar events scheduled","blocking":false,"owner":"partner"}]}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO programs(id,organization_id,site_id,jurisdiction_id,type,status,name,slug,grade_range,delivery_model,host_organization_id,academic_provider_organization_id,credit_issuing_organization_id,metadata) VALUES
-('f7000000-0000-4000-8000-000000000051','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000001','microschool','launching','Synthetic Microschool Pilot','synthetic-microschool','{"min":"6","max":"8"}'::jsonb,'{"onsite":true,"asynchronous":true}'::jsonb,'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002','{"synthetic":true}'::jsonb)
+('f7000000-0000-4000-8000-000000000051','f7000000-0000-4000-8000-000000000060','f7000000-0000-4000-8000-000000000061','f1000000-0000-4000-8000-000000000001','microschool','launching','Barton Microschool Pilot','barton-microschool','{"min":"6","max":"8"}'::jsonb,'{"onsite":true,"asynchronous":true}'::jsonb,'f7000000-0000-4000-8000-000000000060','f7000000-0000-4000-8000-000000000060','f7000000-0000-4000-8000-000000000060','{"synthetic":true}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO journeys(id,type,status,participant_type,participant_id,organization_id,site_id,program_id,owner_person_id,journey_definition_id,definition_version,started_at,metadata) VALUES
-('f7000000-0000-4000-8000-000000000052','program-launch','in_progress','program','f7000000-0000-4000-8000-000000000051','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003','f7000000-0000-4000-8000-000000000051','f7000000-0000-4000-8000-000000000001','f7000000-0000-4000-8000-000000000050','1',now() - interval '3 days','{"synthetic":true}'::jsonb)
+('f7000000-0000-4000-8000-000000000052','program-launch','in_progress','program','f7000000-0000-4000-8000-000000000051','f7000000-0000-4000-8000-000000000060','f7000000-0000-4000-8000-000000000061','f7000000-0000-4000-8000-000000000051','f7000000-0000-4000-8000-000000000062','f7000000-0000-4000-8000-000000000050','1',now() - interval '3 days','{"synthetic":true}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO journey_requirements(id,journey_id,key,title,status,blocking,completed_at) VALUES
 ('f7000000-0000-4000-8000-000000000053','f7000000-0000-4000-8000-000000000052','staffing','Required staff and role assignments complete','complete',true,now() - interval '1 day'),

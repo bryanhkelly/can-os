@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { QueryState } from "@/components/workspace";
+import { QueryState, WorkspacePanel } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
@@ -28,9 +28,8 @@ export function StudentProfileSetup() {
     return () => { active = false; };
   }, [revision]);
 
-  return <section className="mt-6 rounded-xl border bg-card p-5">
-    <h2 className="font-serif text-2xl">Set up your student profile</h2>
-    <p className="mt-2 text-sm">This quick setup is optional. Your preferred name may appear to your school. Pronouns and interests are private to you here. You can skip this and use your learning workspace.</p>
+  return <WorkspacePanel title="Student details" description="Optional personal preferences">
+    <p className="text-sm text-muted-foreground">Your preferred name may appear to your school. Pronouns and interests are private to you here.</p>
     <QueryState loading={!snapshot && !error ? "Loading student profile..." : undefined}
       error={error || undefined} onRetry={() => {
         setSnapshot(null);
@@ -40,7 +39,7 @@ export function StudentProfileSetup() {
       {snapshot && <StudentProfileEditor snapshot={snapshot}
         changed={async () => setSnapshot(await getStudentSelfProfile())} />}
     </QueryState>
-  </section>;
+  </WorkspacePanel>;
 }
 
 export function StudentProfileEditor({ snapshot, changed, fields, onFieldsChange, embedded = false, onSaved, onBusyChange,

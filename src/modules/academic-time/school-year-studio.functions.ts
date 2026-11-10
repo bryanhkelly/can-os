@@ -12,6 +12,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { ensureStandardGradeScale } from "./standard-grade-scale.server";
 import { getRequest } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
+import { SCHEDULE_PERIOD_TYPES } from "@/domain/schedule-period-types";
 import { z } from "zod";
 import { activateSchoolYear,createAcademicCalendar,createGradingPeriod,createScheduleTemplate,createSchoolYear,createTerm,setAcademicCalendarDay,prepareSchoolYearBasics,populateSchoolYearInstructionalDays } from "./school-year-service";
 
@@ -160,7 +161,7 @@ export const replaceStudioSchedulePeriods=createServerFn({method:"POST"})
   label:z.string().trim().min(1).max(80),
   startsAtLocal:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
   endsAtLocal:z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/),
-  type:z.enum(["instruction","break","lunch","chapel","advisory"]),
+  type:z.enum(SCHEDULE_PERIOD_TYPES),
  })).min(1).max(80)}).parse(v))
  .handler(async({data})=>{
   const actor=await operator();

@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName, personLegalName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, inArray, or, isNull, desc } from "drizzle-orm";
+import { and, asc, count, eq, inArray, or, isNull, desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
@@ -140,6 +140,20 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
         s.studyGroupSessionAttendance.sessionId, sessions.map(session => session.id),
       )) : [];
 
+  // Member counts and facilitator names are public within the group's
+  // program scope; they never expose the teacher-only roster identities.
+  const [memberCountRows, facilitatorRows] = await Promise.all([
+    db.select({ groupId: s.studyGroupMemberships.groupId, memberCount: count() })
+      .from(s.studyGroupMemberships)
+      .where(and(inArray(s.studyGroupMemberships.groupId, ids),
+        eq(s.studyGroupMemberships.status, "approved")))
+      .groupBy(s.studyGroupMemberships.groupId),
+    db.select({ id: s.people.id, preferredName: s.people.preferredName,
+      legalFirstName: s.people.legalFirstName, legalLastName: s.people.legalLastName })
+      .from(s.people)
+      .where(inArray(s.people.id, [...new Set(allowed.map(g => g.facilitatorPersonId))])),
+  ]);
+
   const pendingStudentIds = pendingMembers.map(x => x.studentPersonId);
   const [guardianRows, consentActions, consentEvidence] = pendingMembers.length
     ? await Promise.all([
@@ -203,10 +217,10 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
         timezone: g.timezone,
         kind: g.kind,
         maxMembers: g.maxMembers,
+        facilitatorName: personDisplayName(
+          facilitatorRows.find(person => person.id === g.facilitatorPersonId) ?? {}),
+        memberCount: memberCountRows.find(row => row.groupId === g.id)?.memberCount ?? 0,
         membershipStatus: own?.status ?? null,
-        approvedCount: actor.role === "teacher"
-          ? roster.filter(m => m.groupId === g.id).length
-          : 0,
         sessions: groupSessions,
         posts: mayReadSessions ? posts.filter(post => post.groupId === g.id)
           .map(post => ({ id: post.id, authorPersonId: post.authorPersonId,

@@ -41,7 +41,7 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
  const [account]=await db.select({id:accessAccounts.id}).from(accessAccounts)
   .where(and(eq(accessAccounts.emailNormalized,email),eq(accessAccounts.disabled,false))).limit(1);
  if(!account || email.endsWith(".invalid"))return "ineligible";
- const memberships=await db.select({role:accountPersonGrants.role}).from(accountPersonGrants)
+ const memberships=await db.select({role:accountPersonGrants.role,siteId:accountPersonGrants.siteId}).from(accountPersonGrants)
   .innerJoin(people,eq(people.id,accountPersonGrants.personId))
   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
    eq(people.active,true)));
@@ -73,7 +73,9 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
   const safeReturnTo=safeAccessReturnTo(returnTo);
   if(safeReturnTo)accessUrl.searchParams.set("returnTo",safeReturnTo);
   accessUrl.hash="token="+encodeURIComponent(issued);
-  await sender({to:email,accessUrl:accessUrl.toString()});
+  const schoolIds=new Set(memberships.map(grant=>grant.siteId));
+  const siteId=schoolIds.size===1&&!pendingInvitations.length?memberships[0]?.siteId:null;
+  await sender({to:email,accessUrl:accessUrl.toString(),...(siteId?{siteId}:{})});
  }catch(error){
   // Preserve the issued challenge and cooldown on delivery failure; a rapid retry
   // must not turn a mail-provider outage into unbounded request generation.

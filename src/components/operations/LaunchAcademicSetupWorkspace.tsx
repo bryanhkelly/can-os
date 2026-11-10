@@ -13,6 +13,7 @@ import { LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell"
 import { schoolLaunchSteps } from "@/domain/launch-studio";
 import { ProgramSiteAuthorizationPanel } from "@/components/operations/ProgramSiteAuthorizationPanel";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
+import { SchoolJurisdictionReviewPanel } from "@/components/operations/SchoolJurisdictionReviewPanel";
 import { LocalSiteDelegationPanel } from "@/components/operations/LocalSiteDelegationPanel";
 import { SectionFacilitatorPanel } from "@/components/operations/SectionFacilitatorPanel";
 import {SectionLifecycleWorkspace} from "@/components/operations/SectionLifecycleManager";
@@ -68,8 +69,8 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
    setNotice(message);
   }catch(e){setError(mutationErrorMessage(e, "Unable to save launch setup"));}
  }
- return <LaunchStudioShell focused={hubMode} role="School setup" subject={data.program.name} title="Prepare your classrooms."
-  description="Prepare the school year, published curriculum and responsible Section staffing."
+ return <LaunchStudioShell focused={hubMode} role="School setup" subject={data.program.name} title="Choose curriculum and prepare instruction."
+  description="Browse published courses, plan the school year and assign responsible instructors."
   steps={schoolLaunchSteps.map(id=>({id,title:{welcome:"Welcome",school:"School details",academics:"Academics",website:"School website",families:"Families & staff",readiness:"Readiness review",next:"What's next"}[id]}))}
   currentId="academics" onStepChange={id=>{
     const step=schoolLaunchSteps.find(item=>item===id);
@@ -83,6 +84,11 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
   {mutation.refreshError&&<Button type="button" variant="outline" className="mt-3"
    disabled={mutation.isSubmitting} onClick={()=>void retryRefresh()}>Retry saved setup refresh</Button>}
   {notice&&<WorkspaceNotice tone="success" className="mt-5">{notice}</WorkspaceNotice>}
+  <section className="mt-6 border bg-card p-5" aria-label="Curriculum selection">
+   <h2 className="font-serif text-2xl">Choose curriculum</h2>
+   <p className="mt-2 text-sm text-muted-foreground">Browse published courses and adopt the releases your program will teach.</p>
+   <Button asChild className="mt-4"><Link to="/operations/curriculum-marketplace" search={{programId:data.program.id}}>Browse curriculum</Link></Button>
+  </section>
   <div className="mt-7 grid gap-3 sm:grid-cols-3">
    <StatCard label="School years" value={data.years.length}/>
    <StatCard label="Published course versions" value={data.catalog.length}/>
@@ -99,6 +105,7 @@ export function LaunchAcademicSetupWorkspace({data,hubMode=false}:{data:Snapshot
      </Link>
     </Button>
   </section>
+  {data.program.siteId&&<SchoolJurisdictionReviewPanel programId={data.program.id}/>}
   <ProgramSiteAuthorizationPanel key={data.program.id} programId={data.program.id}/>
   {(!data.academicAuthority.teacherAssignment||!data.academicAuthority.creditConfiguration)&&
    <p role="status" className="mt-4 rounded-lg border border-warning/40 p-4 text-sm">

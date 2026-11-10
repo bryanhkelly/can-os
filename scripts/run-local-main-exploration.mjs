@@ -21,9 +21,9 @@ const accounts = {
   site_admin: "admin.demo@valorschool.demo",
 };
 const routes = {
-  student: ["/student/courses", "/student/assignments", "/student/discussions", "/student/study-groups", "/student/study-groups/new", "/student/my-school", "/student/support", "/calendar", "/messages"],
+  student: ["/student/courses", "/student/assignments", "/student/discussions", "/groups", "/groups/new", "/student/my-school", "/student/support", "/calendar", "/messages"],
   parent: ["/guardian/academics", "/guardian/attendance", "/guardian/admission-offers", "/guardian/study-group-consent", "/guardian/field-trips", "/messages"],
-  teacher: ["/classes", "/teacher/gradebook", "/teacher/discussions", "/teacher/study-groups", "/teacher/missing-work", "/calendar", "/messages"],
+  teacher: ["/classes", "/teacher/gradebook", "/teacher/discussions", "/groups", "/teacher/missing-work", "/calendar", "/messages"],
   room_admin: ["/staff/attendance", "/safeguarding", "/admin", "/messages"],
   site_admin: ["/launch/school?siteId=f1000000-0000-4000-8000-000000000003", "/admissions", "/admissions/intake", "/staff/students", "/operations/field-trips", "/sites/f1000000-0000-4000-8000-000000000003/publish", "/site-website", "/safeguarding"],
 };
@@ -59,9 +59,9 @@ async function mutations(page, role) {
       const events = readFileSync(journal, "utf8").trim().split("\n").map(JSON.parse);
       const created = events.find(event => event.scenario === "create-study-group" && event.detail?.groupUrl);
       if (!created) throw new Error("No recorded newly created group is available.");
-      const groupId = new URL(created.detail.groupUrl).searchParams.get("group");
-      await page.goto(`/student/study-groups?group=${groupId}`, { waitUntil: "networkidle" });
-      await page.getByText("Membership: approved", { exact: true }).first().waitFor();
+      const groupId = new URL(created.detail.groupUrl).pathname.split("/").pop();
+      await page.goto(`/groups/${groupId}`, { waitUntil: "networkidle" });
+      await page.getByText("approved", { exact: false }).first().waitFor();
       await page.getByRole("button", { name: "RSVP maybe", exact: true }).click();
       await page.getByRole("button", { name: "RSVP going", exact: true }).click();
       const message = `${marker}: I will join the algebra practice session. I think subtracting 3 first is clearest, but I want to compare your method respectfully. Synthetic study-group post; no authentic student data.`;
@@ -75,7 +75,7 @@ async function mutations(page, role) {
   }
   if (role === "student" && selected("create-study-group")) {
     await scenario(page, role, "create-study-group", async () => {
-      await page.goto("/student/study-groups/new", { waitUntil: "networkidle" });
+      await page.goto("/groups/new", { waitUntil: "networkidle" });
       await page.getByLabel("Group name", { exact: false }).fill(`${marker} Algebra collaboration`);
       await page.getByLabel("What will you study together?", { exact: false }).fill(`${marker}: synthetic classmates will compare algebra solutions respectfully. No authentic student information.`);
       await page.getByRole("button", { name: "Create study group", exact: true }).click();
@@ -84,7 +84,7 @@ async function mutations(page, role) {
       if (!await invite.count()) throw new Error("No explicitly synthetic classmate is available; no invitation sent.");
       await invite.check();
       await page.getByRole("button", { name: "Create study group", exact: true }).click();
-      await page.waitForURL(url => url.pathname === "/student/study-groups", { timeout: 20000 });
+      await page.waitForURL(url => /^\/groups\/[^/]+$/.test(url.pathname), { timeout: 20000 });
       await page.getByText(`${marker} Algebra collaboration`, { exact: true }).first().waitFor();
       return { validation: "Missing invitee rejected", groupUrl: page.url(), membership: "Guardian and facilitator approvals remain required" };
     });
@@ -261,26 +261,26 @@ async function mutations(page, role) {
       const events = readFileSync(journal, "utf8").trim().split("\n").map(JSON.parse);
       const created = events.find(event => event.scenario === "create-study-group" && event.detail?.groupUrl);
       if (!created) throw new Error("No recorded newly created group is available.");
-      const groupId = new URL(created.detail.groupUrl).searchParams.get("group");
-      await page.goto(`/teacher/study-groups?group=${groupId}`, { waitUntil: "networkidle" });
-      const queue = page.locator("section").filter({ has: page.getByRole("heading", { name: "Membership requests", exact: true }) });
-      const row = queue.locator("div.flex.items-center").filter({ hasText: /^Jordan\s*·/ });
+      const groupId = new URL(created.detail.groupUrl).pathname.split("/").pop();
+      await page.goto(`/groups/${groupId}`, { waitUntil: "networkidle" });
+      const queue = page.locator("section").filter({ has: page.getByRole("heading", { name: "Pending requests", exact: true }) });
+      const row = queue.locator("div").filter({ hasText: /^Jordan/ });
       const approvalAvailable = await row.count() > 0;
       if (approvalAvailable) {
         await row.getByRole("button", { name: "Approve", exact: true }).click();
-        await page.getByText("Study group change saved.", { exact: true }).waitFor();
+        await page.getByText("Membership approved.", { exact: true }).waitFor();
       }
-      const session = page.getByRole("link", { name: `${marker} Algebra practice session`, exact: true });
+      const session = page.getByText(`${marker} Algebra practice session`, { exact: true });
       if (await session.count()) {
         return { groupId, approvalAvailable, session: "Existing synthetic session verified; no duplicate scheduled", reviewQueue: await queue.innerText() };
       }
-      await page.getByLabel("Choose study group").selectOption(groupId);
-      await page.getByLabel("Session title", { exact: true }).fill(`${marker} Algebra practice session`);
-      await page.getByLabel("Agenda", { exact: true }).fill(`${marker}: Compare solution methods and practice respectful peer feedback. Synthetic future session; no attendance is claimed.`);
-      await page.getByLabel("Starts at", { exact: false }).fill("2026-11-10T15:00");
-      await page.getByLabel("Ends at", { exact: false }).fill("2026-11-10T16:00");
-      await page.getByRole("button", { name: "Schedule", exact: true }).click();
-      await page.getByRole("link", { name: `${marker} Algebra practice session`, exact: true }).waitFor({ timeout: 20000 });
+      await page.getByRole("button", { name: "Schedule session", exact: true }).click();
+      await page.getByLabel("Session title", { exact: false }).fill(`${marker} Algebra practice session`);
+      await page.getByLabel("Agenda", { exact: false }).fill(`${marker}: Compare solution methods and practice respectful peer feedback. Synthetic future session; no attendance is claimed.`);
+      await page.getByLabel("Start", { exact: false }).fill("2026-11-10T15:00");
+      await page.getByLabel("End", { exact: false }).fill("2026-11-10T16:00");
+      await page.getByRole("button", { name: "Schedule session", exact: true }).last().click();
+      await page.getByText(`${marker} Algebra practice session`, { exact: true }).waitFor({ timeout: 20000 });
       return { groupId, approvalAvailable, approvalClicked: approvalAvailable, session: "Future synthetic session scheduled; no attendance recorded", reviewQueue: await queue.innerText() };
     });
   }

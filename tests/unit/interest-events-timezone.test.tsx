@@ -29,4 +29,13 @@ describe("interest event timezone", () => {
     expect(html).toContain('value="2026-11-11T01:00"');
     expect(html).not.toContain("America/Los_Angeles");
   });
+  it("links an event's program name to that program workspace", () => {
+    const html = renderToStaticMarkup(<InterestEventsWorkspace data={{
+      programs: [{ id: "program", name: "East School", siteId: "school", timezone: "America/New_York" }],
+      events: [{ id: "event", programId: "program", programName: "East School", siteName: "East School",
+        title: "Open house", description: "", kind: "open_house", location: "", visibility: "public",
+        startsAt: "2026-11-11T18:00:00Z", endsAt: "2026-11-11T19:00:00Z", timezone: "America/New_York", registrations: [] }],
+    }} />);
+    expect(html).toContain('href="/launch/school">East School</a>');
+  });
 });

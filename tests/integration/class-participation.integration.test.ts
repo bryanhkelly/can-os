@@ -294,7 +294,7 @@ integration("class participation cross-workspace flow", () => {
       await communication.startAssignmentConversation({ data: message });
       await expect(communication.startAssignmentConversation({ data: { ...message, body: "Changed content" } })).rejects.toThrow(/different content/);
       expect(await tx.select().from(s.communicationMessages).where(eq(s.communicationMessages.threadId, conversation.threadId))).toHaveLength(1);
-      expect((await messaging.getThread({ data: { threadId: conversation.threadId } })).thread.contextHref).toContain("/guardian/academics?");
+      expect((await messaging.getThread({ data: { threadId: conversation.threadId } })).thread.contextHref).toContain("/guardian/students?");
       act("teacher", teacher.id);
       await messaging.replyToThread({ data: { threadId: conversation.threadId, body: "Please review my annotation." } });
       const prompt = await discussions.createCourseDiscussion({ data: { sectionId: section.id, subject: "Discuss evidence", prompt: "What supports the claim?" } });

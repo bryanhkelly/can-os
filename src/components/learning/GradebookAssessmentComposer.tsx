@@ -12,25 +12,32 @@ import { Textarea } from "@/components/ui/textarea";
 type Lesson = Awaited<ReturnType<typeof getGradebook>>["curriculumLessons"][number];
 export type AssessmentCriterionInput = {id:string;label:string;maxPoints:string;description:string};
 export type AssignmentKind = "homework"|"classwork"|"quiz"|"test"|"project"|"discussion";
+export type AssessmentContentInput = {
+  description:string;overview:string;prompt:string;objectives:string;steps:string;formatNote:string;
+};
+export const emptyAssessmentContentInput:AssessmentContentInput = {
+  description:"",overview:"",prompt:"",objectives:"",steps:"",formatNote:"",
+};
 
 export function GradebookAssessmentComposer({
   title,points,due,releaseAt,closeAt,assignmentKind,curriculumLessonId,maxAttempts,instructions,
-  newRubric,publishConfirmed,busy,lessonContext,lessons,
+  newRubric,publishConfirmed,busy,lessonContext,lessons,content,
   onTitleChange,onPointsChange,onDueChange,onReleaseChange,onCloseChange,onKindChange,onLessonChange,
-  onAttemptsChange,onInstructionsChange,onRubricChange,onPublishConfirmedChange,onSubmit,
+  onAttemptsChange,onInstructionsChange,onRubricChange,onPublishConfirmedChange,onSubmit,onContentChange,
 }: {
   title:string;points:string;due:string;releaseAt:string;closeAt:string;
   assignmentKind:AssignmentKind;curriculumLessonId:string;maxAttempts:string;instructions:string;
   newRubric:AssessmentCriterionInput[];publishConfirmed:boolean;busy:boolean;
-  lessonContext?:string;lessons:readonly Lesson[];
+  lessonContext?:string;lessons:readonly Lesson[];content:AssessmentContentInput;
   onTitleChange:(v:string)=>void;onPointsChange:(v:string)=>void;onDueChange:(v:string)=>void;
   onReleaseChange:(v:string)=>void;onCloseChange:(v:string)=>void;onKindChange:(v:AssignmentKind)=>void;
   onLessonChange:(v:string)=>void;onAttemptsChange:(v:string)=>void;onInstructionsChange:(v:string)=>void;
   onRubricChange:(v:AssessmentCriterionInput[])=>void;onPublishConfirmedChange:(v:boolean)=>void;
-  onSubmit:(publish:boolean)=>void;
+  onSubmit:(publish:boolean)=>void;onContentChange:(v:AssessmentContentInput)=>void;
 }) {
   const updateCriterion=(id:string,patch:Partial<AssessmentCriterionInput>)=>
     onRubricChange(newRubric.map(row=>row.id===id?{...row,...patch}:row));
+  const updateContent=(patch:Partial<AssessmentContentInput>)=>onContentChange({...content,...patch});
   const submit=(event:FormEvent<HTMLFormElement>)=>event.preventDefault();
   return <details className="mt-8 rounded-xl border bg-card p-5" open={lessonContext?true:undefined}>
     <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
@@ -72,6 +79,30 @@ export function GradebookAssessmentComposer({
         <Textarea className="min-h-32" rows={5} maxLength={20000}
           value={instructions} onChange={e=>onInstructionsChange(e.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources."/>
       </Field>
+      <fieldset className="mt-4 rounded-lg border p-4">
+        <legend className="px-1 text-sm font-semibold">Assignment page sections (optional)</legend>
+        <p className="mb-3 text-xs text-muted-foreground">These optional sections give the student assignment page its structured layout. Anything left blank is simply omitted; plain instructions above always remain visible.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Short description" description="One sentence shown under the assignment title.">
+            <Input value={content.description} maxLength={2000} onChange={e=>updateContent({description:e.target.value})}/>
+          </Field>
+          <Field label="Essential question or prompt" description="Shown as a highlighted pull quote.">
+            <Input value={content.prompt} maxLength={2000} onChange={e=>updateContent({prompt:e.target.value})}/>
+          </Field>
+        </div>
+        <Field className="mt-4" label="Overview paragraphs" description="Separate paragraphs with a blank line.">
+          <Textarea rows={4} maxLength={20000} value={content.overview} onChange={e=>updateContent({overview:e.target.value})}/>
+        </Field>
+        <Field className="mt-4" label="Learning objectives" description="One objective per line (up to 12).">
+          <Textarea rows={3} maxLength={20000} value={content.objectives} onChange={e=>updateContent({objectives:e.target.value})}/>
+        </Field>
+        <Field className="mt-4" label="Steps — what students will do" description={'One step per line as "Step title | details", for example "Review the play. | Revisit three key scenes." (up to 12).'}>
+          <Textarea rows={4} maxLength={20000} value={content.steps} onChange={e=>updateContent({steps:e.target.value})}/>
+        </Field>
+        <Field className="mt-4" label="Format note" description="Formatting or submission format reminder shown under the steps.">
+          <Input value={content.formatNote} maxLength={2000} onChange={e=>updateContent({formatNote:e.target.value})}/>
+        </Field>
+      </fieldset>
       <fieldset className="mt-4 rounded-lg border p-4">
         <legend className="px-1 text-sm font-semibold">Scoring rubric (optional)</legend>
         <p className="mb-3 text-xs text-muted-foreground">Add criteria for graded projects, tests, discussions or other work. Criterion points must sum to the assignment's points possible.</p>

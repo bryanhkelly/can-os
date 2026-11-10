@@ -50,7 +50,13 @@ export async function applyNotificationPolicy<C>(
   policy: NotificationPolicy<C>,
   context: C,
 ): Promise<string[]> {
-  const plans = policy.plans(context, event);
+  const seen = new Set<string>();
+  const plans = policy.plans(context, event).filter(plan => {
+    const key = JSON.stringify([plan.recipientPersonId, plan.type, plan.resourceType ?? null, plan.resourceId ?? null]);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   if (!plans.length) return [];
   return notifyMany(
     tx,

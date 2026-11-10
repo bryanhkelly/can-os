@@ -1,6 +1,7 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { alias } from "drizzle-orm/pg-core";
 import { and, desc, eq, gt, gte, inArray, isNull, lte, notExists, or, sql } from "drizzle-orm";
+import { SECTION_MEETING_PERIOD_TYPES } from "@/domain/schedule-period-types";
 import { db } from "@/db/client";
 import { academicCalendarDays, academicCalendars, documents, programs, scheduleTemplatePeriods,
   scheduleTemplates, schoolYears, sections, sites, terms, people, roleAssignments, programResponsibilityAssignments, deliveryArrangements } from "@/db/schema";
@@ -50,7 +51,7 @@ export async function scheduledRoomBlocks(tx: Reader, input: Pick<BlockInput,"pr
       or(eq(scheduleTemplates.programId, input.programId), isNull(scheduleTemplates.programId)),
       eq(scheduleTemplates.active, true), lte(scheduleTemplates.effectiveFrom, input.date),
       or(isNull(scheduleTemplates.effectiveThrough), gte(scheduleTemplates.effectiveThrough, input.date)),
-      ...(input.periodId ? [eq(scheduleTemplatePeriods.id, input.periodId)] : []), eq(scheduleTemplatePeriods.type, "instruction"),
+      ...(input.periodId ? [eq(scheduleTemplatePeriods.id, input.periodId)] : []), inArray(scheduleTemplatePeriods.type, [...SECTION_MEETING_PERIOD_TYPES]),
       eq(scheduleTemplatePeriods.dayOfWeek, new Date(input.date + "T12:00:00Z").getUTCDay()),
       notExists(tx.select({id:newerCalendar.id}).from(newerCalendar).where(and(
         eq(newerCalendar.schoolYearId,schoolYears.id),eq(newerCalendar.siteId,school.siteId),

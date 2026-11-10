@@ -12,6 +12,7 @@ scheduleTemplates,scheduleTemplatePeriods,courseTemplateVersions,
 terms
 } from "@/db/schema";
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
+import { SECTION_MEETING_PERIOD_TYPES } from "@/domain/schedule-period-types";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { verifiedSectionCreditUnits } from "@/domain/section-credit-policy";
@@ -217,9 +218,9 @@ export const provisionLaunchSection=createServerFn({method:"POST"})
     if(!template||!template.active||template.schoolYearId!==term.schoolYearId||template.siteId!==program.siteId||
       (template.programId!==null&&template.programId!==program.id))throw new Error("Choose an active schedule for this school and selected year");
     const periods=await tx.select({dayOfWeek:scheduleTemplatePeriods.dayOfWeek,startsAtLocal:scheduleTemplatePeriods.startsAtLocal,endsAtLocal:scheduleTemplatePeriods.endsAtLocal})
-     .from(scheduleTemplatePeriods).where(and(eq(scheduleTemplatePeriods.scheduleTemplateId,data.scheduleTemplateId),eq(scheduleTemplatePeriods.type,"instruction")));
+     .from(scheduleTemplatePeriods).where(and(eq(scheduleTemplatePeriods.scheduleTemplateId,data.scheduleTemplateId),inArray(scheduleTemplatePeriods.type,[...SECTION_MEETING_PERIOD_TYPES])));
     if(!periods.some(period=>period.dayOfWeek>=0&&period.dayOfWeek<=6&&period.startsAtLocal<period.endsAtLocal))
-     throw new Error("Choose a schedule containing at least one valid instructional period");
+     throw new Error("Choose a schedule containing at least one valid meeting period");
    }
    const [created]=await tx.insert(sections).values({
     programId:program.id,siteId:program.siteId,termId:data.termId,

@@ -10,6 +10,7 @@ import { emitEvent, notifyMany } from "@/platform/mutation";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { recordAudit, type Actor } from "@/modules/identity/actors.server";
+import { dateTimeInputValue, formatTimestamp } from "./timezone";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -21,6 +22,8 @@ export type CalendarEventRevision =
 const STAFF_MANAGE_ROLES = ["registrar", "teacher"] as const;
 
 function validateTimes(startsAt: string, endsAt: string | null | undefined) {
+  dateTimeInputValue(startsAt, "UTC");
+  if (endsAt) dateTimeInputValue(endsAt, "UTC");
   const start = new Date(startsAt);
   if (!Number.isFinite(start.getTime())) throw new Error("A valid start time is required");
   const end = endsAt ? new Date(endsAt) : null;
@@ -95,6 +98,7 @@ async function notifyPersonParticipants(
   eventId: string,
   title: string,
   body: string,
+  domainEventId: string,
 ) {
   const participants = await tx
     .select({ participantId: calendarEventParticipants.participantId })
@@ -103,9 +107,9 @@ async function notifyPersonParticipants(
       eq(calendarEventParticipants.calendarEventId, eventId),
       eq(calendarEventParticipants.participantType, "person"),
     ));
-  const recipients = participants
+  const recipients = [...new Set(participants
     .map((row) => row.participantId)
-    .filter((personId) => personId !== actor.actorPersonId);
+    .filter((personId) => personId !== actor.actorPersonId))];
   if (!recipients.length) return;
   // status relies on the column default ("unread"), matching the prior inline insert.
   await notifyMany(
@@ -117,6 +121,7 @@ async function notifyPersonParticipants(
       body,
       resourceType: "calendar_event",
       resourceId: eventId,
+      eventId: domainEventId,
     })),
   );
 }
@@ -206,15 +211,14 @@ export async function reviseCalendarEventForActor(actor: Actor, input: CalendarE
       : `Event updated: ${before.title}`;
     const noticeBody =
       input.action === "cancel" ? `"${before.title}" will no longer take place.`
-      : input.action === "reschedule" ? `New start time: ${times!.start.toISOString()}`
+      : input.action === "reschedule" ? `New start time: ${formatTimestamp(times!.start, event.timezone)} (${event.timezone})`
       : `"${before.title}" was updated.`;
-    await notifyPersonParticipants(tx, actor, event.id, noticeTitle, noticeBody);
 
     const eventType =
       input.action === "cancel" ? EventTypes.CalendarEventCancelled
       : input.action === "reschedule" ? EventTypes.CalendarEventRescheduled
       : EventTypes.CalendarEventUpdated;
-    await emitEvent(tx, {
+    const domainEventId = await emitEvent(tx, {
       eventType,
       aggregateType: "calendar_event",
       aggregateId: event.id,
@@ -235,6 +239,7 @@ export async function reviseCalendarEventForActor(actor: Actor, input: CalendarE
                 : {},
       },
     });
+      await notifyPersonParticipants(tx, actor, event.id, noticeTitle, noticeBody, domainEventId);
     await recordAudit(tx, actor, {
       action: `calendar.event.${input.action}`,
       resourceType: "calendar_event",

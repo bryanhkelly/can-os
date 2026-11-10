@@ -38,7 +38,7 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow, s
             </Link>}
         </article>;})}</div></section>)}</div>
       <p className="mt-6 text-xs leading-5 text-muted-foreground">These are independent workstreams. Website publication, promotion and family interest do not authorize school opening.</p>
-    </> : <>{statuses?.[module] && <div className="mt-5"><ModuleStatus status={statuses[module]!}/></div>}{isPlannedSchoolHubModule(module)
+    </> : <>{statuses?.[module] && !(module==="academics"&&statuses.academics?.state==="Not Started") && <div className="mt-5"><ModuleStatus status={statuses[module]!}/></div>}{isPlannedSchoolHubModule(module)
       ? <SchoolModuleHome module={module} siteId={site.id}/>
       : workflow ?? <p role="alert" className="mt-6 border p-5">This module has no configured workflow. Contact CAN support rather than opening an unrelated setup page.</p>}</>}
     <section id="launch-help" className="mt-8 border-t pt-5 text-sm text-muted-foreground">Need help? Contact your CAN school support team about setup or independent review.</section>

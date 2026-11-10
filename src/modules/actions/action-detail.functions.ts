@@ -19,10 +19,13 @@ export const getActionDetail = createServerFn({ method: "GET" })
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     return db.transaction(async tx => {
       const [action] = await tx.select().from(s.actions).where(eq(s.actions.id, data.actionId)).limit(1);
-      if (!action || !action.organizationId || !actor.scope.organizationIds?.includes(action.organizationId) ||
+      if (!action) throw new AuthorizationError("Action detail scope");
+      const delegatedAcademic = actor.role === "teacher" && action.type === "academic_intervention" &&
+        action.subjectType === "student_profile" && action.sectionId !== null;
+      if (!delegatedAcademic && (!action.organizationId || !actor.scope.organizationIds?.includes(action.organizationId) ||
           (action.siteId !== null && !actor.scope.siteIds?.includes(action.siteId)) ||
           (action.programId && !actor.scope.programIds?.includes(action.programId)) ||
-          (action.sectionId && actor.scope.sectionIds !== undefined && !actor.scope.sectionIds.includes(action.sectionId))) {
+          (action.sectionId && actor.scope.sectionIds !== undefined && !actor.scope.sectionIds.includes(action.sectionId)))) {
         throw new AuthorizationError("Action detail scope");
       }
       if (action.type === "support_referral") {
@@ -40,6 +43,8 @@ export const getActionDetail = createServerFn({ method: "GET" })
         resolvedAt: action.resolvedAt?.toISOString() ?? null,
         resolutionNote: action.resolutionNote,
         siteId: action.siteId, programId: action.programId,
+        sectionId: action.sectionId,
+        canReviewClass: actor.role === "teacher" && action.type === "academic_intervention" && action.sectionId !== null,
         canManageOperations: hasRegistrarAuthority(actor.role) && action.siteId !== null,
         workspaceHome: "/home" as const,
       };

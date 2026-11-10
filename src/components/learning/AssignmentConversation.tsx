@@ -7,6 +7,11 @@ import { Button } from "@/components/ui/button";
 import { startAssignmentConversation } from "@/modules/learning/class-communication.functions";
 
 export function AssignmentConversation({ assessmentId, studentPersonId }: { assessmentId: string; studentPersonId?: string }) {
+  return <AssignmentConversationForm key={`${assessmentId}:${studentPersonId ?? "self"}`}
+    assessmentId={assessmentId} studentPersonId={studentPersonId} />;
+}
+
+function AssignmentConversationForm({ assessmentId, studentPersonId }: { assessmentId: string; studentPersonId?: string }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -14,6 +19,7 @@ export function AssignmentConversation({ assessmentId, studentPersonId }: { asse
   const [threadId, setThreadId] = useState("");
   const requestId = useRef<string | null>(null);
   async function send() {
+    if (busy) return;
     if (!body.trim()) { setValidationError(true); return; }
     setValidationError(false);
     setBusy(true); setError("");

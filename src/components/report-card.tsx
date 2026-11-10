@@ -1,7 +1,11 @@
 import { summarizeRecordedTranscriptCredits } from "@/domain/recorded-credit-summary";
+import type { SectionGradeEvidence } from "@/domain/section-grade-evidence";
 
 export type ReportCardGrade = {
   sectionId?: string;
+  courseTemplateVersionId?: string;
+  courseTemplateVersion?: number;
+  gradeEvidence?: SectionGradeEvidence | null;
   termId?: string;
   creditIssuingOrganizationId?: string;
   subject?: string | null;
@@ -106,6 +110,9 @@ export function TranscriptView({
                   <li key={row.sectionGradeId} className="flex flex-wrap items-center justify-between gap-3 py-3">
                     <div>
                       <p className="text-sm font-semibold">{row.sectionTitle}</p>
+                      {row.courseTemplateVersion !== undefined && (
+                        <p className="text-xs text-muted-foreground">Course release v{row.courseTemplateVersion}</p>
+                      )}
                       {row.creditIssuingOrganization && (
                         <p className="text-xs text-muted-foreground">Academic record issuer: {row.creditIssuingOrganization}</p>
                       )}
@@ -118,6 +125,18 @@ export function TranscriptView({
                   </li>
                 ))}
               </ul>
+                {termRows.some(row => row.gradeEvidence?.assessments.length) && (
+                  <details className="mt-3 border-t pt-3 text-xs">
+                    <summary className="cursor-pointer underline">Grade source assessments</summary>
+                    <ul className="mt-2 space-y-2">
+                      {termRows.flatMap(row => (row.gradeEvidence?.assessments ?? []).map(item => (
+                        <li key={`${row.sectionGradeId}:${item.submissionId}`}>
+                          {row.sectionTitle}: {item.title} · Attempt {item.attemptNumber} · {item.score}/{item.pointsPossible} points
+                        </li>
+                      )))}
+                    </ul>
+                  </details>
+                )}
             </div>
           ))}
         </section>

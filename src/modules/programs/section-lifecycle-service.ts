@@ -19,6 +19,7 @@ import { and,eq,inArray,sql } from "drizzle-orm";
 import { currentCapacityReservationFilter } from "@/modules/staffing/reservation-policy";
 import { assignLaunchInstructor } from "@/modules/staffing/launch-staffing.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
+import { requireCurrentSchoolJurisdictionForEnrollment } from "./school-jurisdiction-opening-gate.server";
 
 import { EventTypes, type EventType } from "@/domain/event-types";
 import { personDisplayName } from "@/domain/person-name";
@@ -308,6 +309,8 @@ export async function transferSectionEnrollment(context: LifecycleContext,input:
     if(source.id===destination.id)throw new Error("Source and destination must differ");
     if(!destination.active||source.programId!==destination.programId||source.termId!==destination.termId)
       throw new Error("Transfer requires an active section in the same program and academic term");
+    if(destination.siteId)
+      await requireCurrentSchoolJurisdictionForEnrollment(tx,destination.programId,{});
     const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
       eq(enrollments.studentProfileId,sourceEnrollment.studentProfileId),
       eq(enrollments.sectionId,destination.id),eq(enrollments.status,"active"))).limit(1);
@@ -339,6 +342,8 @@ export async function promoteSectionWaitlist(context: LifecycleContext, actionId
    if(item.status==="in_progress" && (!item.dueAt||item.dueAt<=new Date()))throw new Error("Waitlist offer expired");
    const section=await authorizedSection(tx,context,item.sectionId);
    if(!section.active)throw new Error("Section closed");
+  if(section.siteId)
+   await requireCurrentSchoolJurisdictionForEnrollment(tx,section.programId,{});
    const [existing]=await tx.select({id:enrollments.id}).from(enrollments).where(and(
      eq(enrollments.studentProfileId,item.subjectId),eq(enrollments.sectionId,section.id),eq(enrollments.status,"active"))).limit(1);
    if(existing)throw new Error("Student already enrolled");

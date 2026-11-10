@@ -55,7 +55,10 @@ function RoomUpcomingEvents({ date, timezone }: { date: string; timezone: string
       const unique = new Map<string, CalendarFeedItem>();
       for (const item of results.flatMap(result => result.items)) {
         const localDate = dateKeyInTimezone(item.startsAt, timezone);
-        if ((item.source === "site" || item.source === "section") && localDate >= date &&
+        // Recurring class and chapel times live on the full calendar; this
+        // list stays reserved for distinct school and room events.
+        if ((item.source === "site" || item.source === "section") && item.type !== "class_time" &&
+            item.type !== "chapel" && localDate >= date &&
             localDate < addCalendarDays(date, 7)) unique.set(item.id, item);
       }
       return [...unique.values()].sort((left, right) => left.startsAt.localeCompare(right.startsAt)).slice(0, 8);

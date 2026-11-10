@@ -20,7 +20,7 @@ vi.mock("react",async original=>({...await original<typeof import("react")>(),
   },
 }));
 vi.mock("@tanstack/react-router",()=>({
-  createFileRoute:()=>(options:unknown)=>({options,useLoaderData:()=>({ok:true,data:state.data}),useSearch:()=>({})}),
+  createFileRoute:()=>(options:unknown)=>({options,useLoaderData:()=>({ok:true,data:state.data}),useSearch:()=>({}),useParams:()=>({groupId:"group"})}),
   useRouter:()=>({invalidate:async()=>{}}),Link:()=>null,
 }));
 vi.mock("@/lib/mutation-feedback",()=>({useMutationFeedback:()=>({
@@ -55,12 +55,13 @@ vi.mock("@/modules/study-groups/study-group-queries.functions",()=>({
   listFacilitatorGroupScopes:vi.fn(),listStudyGroupReviewQueue:vi.fn(),listStudyGroupReports:vi.fn(),
 }));
 vi.mock("@/modules/study-groups/facilitator-query.functions",()=>({getFacilitatorStudyGroups:vi.fn()}));
-import { Route as Trips } from "@/routes/operations.field-trips";
-import { Route as Groups } from "@/routes/groups";
-import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
+import { FieldTripOperationsView } from "@/routes/operations.field-trips";
+import { Route as GroupDetail } from "@/routes/groups_.$groupId";
 
 type Props={
-  children?:ReactNode;type?:string;value?:string;
+  children?:ReactNode;type?:string;value?:string;label?:string;title?:string;
+  role?:string;id?:string;hidden?:boolean;"aria-selected"?:boolean;
+  main?:ReactNode;rail?:ReactNode;header?:ReactNode;actions?:ReactNode;
   onChange?:(event:{target:{value:string}})=>void;
   onSubmit?:(event:{preventDefault:()=>void})=>void;
   onClick?:()=>unknown;
@@ -70,9 +71,11 @@ type Props={
 function nodes(node:ReactNode):ReactElement<Props>[] {
   if(Array.isArray(node))return node.flatMap(nodes);
   if(!isValidElement<Props>(node))return [];
-  if(typeof node.type==="function"&&["TeacherGroupControls","LocalDateTimeField","SiteProgramFields"].includes(node.type.name))
+  if(typeof node.type==="function"&&["TeacherGroupControls","LocalDateTimeField","SiteProgramFields",
+    "SessionsPanel","StudentMembershipPanel","DiscussionPanel","ResourcesPanel","MembersPanel","ReportsPanel"].includes(node.type.name))
     return nodes((node.type as (props:Props)=>ReactNode)(node.props));
-  return [node,...nodes(node.props.children)];
+  return [node,...nodes(node.props.children),...nodes(node.props.main),
+    ...nodes(node.props.rail),...nodes(node.props.header),...nodes(node.props.actions)];
 }
 function text(node:ReactNode):string {
   if(Array.isArray(node))return node.map(text).join("");
@@ -84,8 +87,13 @@ function render(route:{options:{component?:unknown}}){
   const page=(route.options.component as ()=>ReactElement<Props>)();
   return nodes((page.type as (props:Props)=>ReactNode)(page.props));
 }
+function renderTripForm(){
+  state.cursor=0;
+  return nodes(FieldTripOperationsView({data:state.data as Parameters<typeof FieldTripOperationsView>[0]["data"],mode:"create"}));
+}
 function changeLabel(controls:ReactElement<Props>[],label:string,value:string){
-  const field=controls.find(node=>(node.type==="label"||node.type===Label)&&text(node.props.children).startsWith(label));
+  const field=controls.find(node=>((node.type==="label"||node.type===Label)&&text(node.props.children).startsWith(label))||
+    (typeof node.props.label==="string"&&node.props.label.startsWith(label)));
   const input=field&&nodes(field.props.children).find(node=>node.type==="input"||node.type==="select"||node.type===Input||node.type===Select);
   if(!input?.props.onChange)throw new Error(`Missing input ${label}`);
   input.props.onChange({target:{value}});
@@ -98,18 +106,21 @@ function submit(controls:ReactElement<Props>[]){
   return state.completed;
 }
 const timezone="America/Los_Angeles";
+const availability={enabled:true,writesEnabled:true,membershipEnabled:true,creationEnabled:true,contentEnabled:true,moderationEnabled:true};
 const group={id:"group",title:"Study group",timezone,description:"Study together",kind:"course",
-  sessions:[],posts:[],reports:[],roster:[],pendingMembers:[],approvedCount:0};
+  maxMembers:20,memberCount:0,facilitatorName:"Dr. Thorne",membershipStatus:null,
+  sessions:[],posts:[],reports:[],roster:[],pendingMembers:[]};
+const detailData=(groups:unknown[])=>({availability,workspace:{role:"teacher",hasEnrollmentGuardian:null,sections:[],groups}});
 beforeEach(()=>{state.slots=[];state.cursor=0;state.failure=null;vi.clearAllMocks();});
 
 describe("site-local scheduling forms",()=>{
   it("submits trip wall time in the selected school's timezone, not the viewer's",async()=>{
     state.data={sites:[{id:"school",name:"School",timezone}],programs:[],trips:[]};
-    let controls=render(Trips);
+    let controls=renderTripForm();
     changeLabel(controls,"Departure","2027-01-15T09:30");
     changeLabel(controls,"Return","2027-01-15T14:00");
     changeLabel(controls,"Permission deadline","2027-01-14T16:00");
-    controls=render(Trips);
+    controls=renderTripForm();
     expect(controls.some(node=>(node.type==="label"||node.type===Label)&&text(node.props.children).includes(timezone))).toBe(true);
     await submit(controls);
     expect(state.propose).toHaveBeenCalledWith({data:expect.objectContaining({
@@ -120,77 +131,84 @@ describe("site-local scheduling forms",()=>{
   it.each(["2027-03-14T02:30","2027-11-07T01:30","2027-02-30T09:30"])(
     "does not submit invalid, nonexistent or ambiguous trip time %s",async value=>{
       state.data={sites:[{id:"school",name:"School",timezone}],programs:[],trips:[]};
-      const controls=render(Trips);
+      const controls=renderTripForm();
       changeLabel(controls,"Departure",value);
       changeLabel(controls,"Return","2027-11-07T14:00");
       changeLabel(controls,"Permission deadline","2027-01-14T16:00");
-      await submit(render(Trips));
+      await submit(renderTripForm());
       expect(state.propose).not.toHaveBeenCalled();
       expect(state.failure).toMatchObject({code:"VALIDATION_FAILED"});
     });
-  it("creates and reschedules shared-workspace sessions in the group's timezone",async()=>{
-    state.data={role:"teacher",sections:[],groups:[{...group,sessions:[{
-      id:"session",title:"Future session",startsAt:"2030-01-15T17:30:00Z",endsAt:"2030-01-15T18:30:00Z",cancelled:false,attendance:[],
-    }]}]};
-    let controls=render(Groups);
+  it("creates and reschedules group sessions in the group's timezone from the detail page",async()=>{
+    state.data=detailData([{...group,sessions:[{
+      id:"session",title:"Future session",startsAt:"2030-01-15T17:30:00Z",endsAt:"2030-01-15T18:30:00Z",
+      cancelled:false,attendance:[],rsvp:null,attended:null,agenda:"",location:"",
+    }]}]);
+    let controls=render(GroupDetail);
     const toggle=controls.find(node=>node.type==="button"&&text(node.props.children)==="Schedule session");
     toggle?.props.onClick?.();
-    controls=render(Groups);
+    controls=render(GroupDetail);
+    changeLabel(controls,"Session title","Deep work hour");
     changeLabel(controls,"Start","2030-01-15T09:30");
     changeLabel(controls,"End","2030-01-15T10:30");
-    await submit(render(Groups));
+    await submit(render(GroupDetail));
     expect(state.schedule).toHaveBeenCalledWith({data:expect.objectContaining({
-      startsAt:"2030-01-15T17:30:00.000Z",endsAt:"2030-01-15T18:30:00.000Z",
+      groupId:"group",startsAt:"2030-01-15T17:30:00.000Z",endsAt:"2030-01-15T18:30:00.000Z",
     })});
-    controls=render(Groups);
-    const edit=controls.find(node=>node.type==="div"&&text(node.props.children).startsWith("Change Future session"));
-    if(!edit)throw new Error("Missing reschedule controls");
-    expect(nodes(edit).find(node=>node.type==="input")?.props.value).toBe("2030-01-15T09:30");
-    changeLabel(nodes(edit),"Start","2030-01-15T11:00");
-    controls=render(Groups);
-    controls.find(node=>node.type==="button"&&text(node.props.children)==="Save time")?.props.onClick?.();
+    controls=render(GroupDetail);
+    controls.find(node=>node.type==="button"&&text(node.props.children)==="Reschedule")?.props.onClick?.();
+    controls=render(GroupDetail);
+    expect(controls.find(node=>(node.type==="input"||node.type===Input)&&node.props.value==="2030-01-15T09:30")).toBeDefined();
+    changeLabel(controls,"New start","2030-01-15T11:00");
+    controls=render(GroupDetail);
+    controls.find(node=>node.props.onConfirm)?.props.onConfirm?.();
     await state.completed;
     expect(state.revise).toHaveBeenCalledWith({data:expect.objectContaining({startsAt:"2030-01-15T19:00:00.000Z"})});
   });
-  it("schedules from the teacher workspace using the selected group timezone",async()=>{
-    state.data={enabled:true,writesEnabled:true,membershipEnabled:true,creationEnabled:true,moderationEnabled:true,
-      queue:[],reports:[],groups:[group],scopes:[]};
-    let controls=render(TeacherGroups);
-    controls.find(node=>node.type==="select")?.props.onChange?.({target:{value:"group"}});
-    changeLabel(controls,"Starts at","2027-07-15T09:30");
-    changeLabel(controls,"Ends at","2027-07-15T10:30");
-    controls=render(TeacherGroups);
-    controls.find(node=>node.type==="button"&&text(node.props.children)==="Schedule")?.props.onClick?.();
-    await state.completed;
-    expect(state.schedule).toHaveBeenCalledWith({data:expect.objectContaining({
-      startsAt:"2027-07-15T16:30:00.000Z",endsAt:"2027-07-15T17:30:00.000Z",
-    })});
+  it("switches the study group detail tab and exposes its selected panel",()=>{
+    state.data=detailData([{...group,posts:[{id:"post",body:"A study question",createdAt:"2030-01-01T18:00:00Z"}]}]);
+    let controls=render(GroupDetail);
+    const overviewTab=controls.find(node=>node.props.id==="group-tab-overview");
+    expect(overviewTab?.props["aria-selected"]).toBe(true);
+    expect(controls.find(node=>node.props.id==="group-panel-overview")?.props.hidden).toBe(false);
+    controls.find(node=>node.props.id==="group-tab-discussion")?.props.onClick?.();
+    controls=render(GroupDetail);
+    expect(controls.find(node=>node.props.id==="group-tab-discussion")?.props["aria-selected"]).toBe(true);
+    expect(controls.find(node=>node.props.id==="group-panel-discussion")?.props.hidden).toBe(false);
+    expect(controls.find(node=>node.props.id==="group-panel-overview")?.props.hidden).toBe(true);
+  });
+  it("shows an honest empty state for group resources without a canonical resource source",()=>{
+    state.data=detailData([{...group}]);
+    let controls=render(GroupDetail);
+    controls.find(node=>node.props.id==="group-tab-resources")?.props.onClick?.();
+    controls=render(GroupDetail);
+    expect(controls.find(node=>node.props.id==="group-panel-resources")?.props.hidden).toBe(false);
+    expect(controls.some(node=>node.props.title==="Shared learning resources")).toBe(true);
   });
   it("cancels the reschedule dialog without commands and saves local inputs only on confirmation",async()=>{
-    state.data={enabled:true,writesEnabled:true,membershipEnabled:true,creationEnabled:true,moderationEnabled:true,
-      queue:[],reports:[],groups:[{...group,sessions:[{id:"session",title:"Review",startsAt:"2027-01-15T17:30:00Z",
-        endsAt:"2027-01-15T18:30:00Z",cancelled:false}]}],scopes:[]};
-    let controls=render(TeacherGroups);
+    state.data=detailData([{...group,sessions:[{id:"session",title:"Review",startsAt:"2027-01-15T17:30:00Z",
+      endsAt:"2027-01-15T18:30:00Z",cancelled:false,attendance:[],rsvp:null,attended:null,agenda:"",location:""}]}]);
+    let controls=render(GroupDetail);
     controls.find(node=>node.type==="button"&&text(node.props.children)==="Reschedule")?.props.onClick?.();
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     const dialog=()=>controls.find(node=>node.props.onConfirm);
     expect(controls.find(node=>(node.type==="input"||node.type===Input)&&node.props.value==="2027-01-15T09:30")).toBeDefined();
     dialog()?.props.onClose?.();
     expect(state.revise).not.toHaveBeenCalled();
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     controls.find(node=>node.type==="button"&&text(node.props.children)==="Reschedule")?.props.onClick?.();
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     changeLabel(controls,"New start","2027-03-14T02:30");
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     dialog()?.props.onConfirm?.();
     await state.completed;
     expect(state.revise).not.toHaveBeenCalled();
     expect(state.failure).toMatchObject({code:"VALIDATION_FAILED"});
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     changeLabel(controls,"New start","2027-01-15T11:00");
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     changeLabel(controls,"New end","2027-01-15T12:00");
-    controls=render(TeacherGroups);
+    controls=render(GroupDetail);
     dialog()?.props.onConfirm?.();
     await state.completed;
     expect(state.revise).toHaveBeenCalledWith({data:{sessionId:"session",action:"reschedule",

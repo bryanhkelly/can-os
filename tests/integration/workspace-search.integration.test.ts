@@ -83,7 +83,7 @@ describe("canonical workspace search", () => {
     };
     const result = await searchWorkspace({ data: { query: suffix } });
     expect(result.students).toEqual([expect.objectContaining({
-      id: `student-${student!.id}`, label: `Alex ${suffix}`, to: `/guardian/academics?student=${student!.id}`,
+      id: `student-${student!.id}`, label: `Alex ${suffix}`, to: `/guardian/students?student=${student!.id}`,
     })]);
     const photoKey = `profiles/${student!.id}/${crypto.randomUUID()}`;
     const [photo] = await db.insert(s.documents).values({

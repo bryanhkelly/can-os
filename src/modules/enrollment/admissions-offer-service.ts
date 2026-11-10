@@ -14,6 +14,7 @@ import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { assertFamilyApplicationOfferYear } from "@/domain/family-application-handoff";
 import { requireSectionForChurchHostedActivation } from "@/domain/accepted-offer-placement";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentSchoolJurisdictionForEnrollment } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { activateSectionEnrollment } from "./section-allocation.service";
 import { isVerifiedEnrollmentGuardian } from "@/domain/guardian-offer-visibility";
 import { rolesAllow } from "@/domain/school-roles";
@@ -252,6 +253,8 @@ export async function activateOfferedEnrollmentCommand(context:AccessContext,off
     .from(programs).where(eq(programs.id,offer!.programId)).limit(1);
   if(!programSite||programSite.organizationId!==organizationId)
     throw new Error("Enrollment program must belong to the offer's organization");
+  if(programSite.siteId)
+    await requireCurrentSchoolJurisdictionForEnrollment(tx,offer!.programId,{});
   if(transferOrigin){
     if(!programSite.siteId||!transferOrigin.siteId||
        transferOrigin.siteId===programSite.siteId)

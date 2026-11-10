@@ -59,7 +59,7 @@ INSERT INTO interest_events (
   'Synthetic family information session',
   'Synthetic, invitation-only event for route verification',
   'information_session',
-  'Synthetic Bay Campus',
+  'Valor School',
   'invitation_only',
   'published',
   'f7000000-0000-4000-8000-000000000001'

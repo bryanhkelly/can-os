@@ -6,6 +6,7 @@ import { Route as StudentExperiences } from "@/routes/student.experiences";
 import { FamilyHomeView } from "@/components/home/GuardianHome";
 import { Route as GuardianAttendance } from "@/routes/guardian.attendance";
 import { Student360View } from "@/routes/staff.students.$personId";
+import { PersonProfile } from "@/routes/profiles";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import { WorkspaceShell } from "@/components/workspace";
 import { getCourseRegistration } from "@/modules/learning/course-registration.functions";
@@ -33,6 +34,9 @@ vi.mock("@/modules/student-experience/assignments.functions", () => ({ getAssign
 vi.mock("@/modules/family/family-home.functions", () => ({ getFamilyHome: vi.fn(), getGuardianNeedsYou: vi.fn() }));
 vi.mock("@/modules/enrollment/guardian-admission-offers.functions", () => ({ getGuardianAdmissionOffers: vi.fn() }));
 vi.mock("@/modules/profiles/directory.functions", () => ({ getStudent360: vi.fn() }));
+vi.mock("@/modules/profiles/person-profile.functions", () => ({
+  getPersonProfile: vi.fn(), getProfilePhoto: vi.fn(), beginProfilePhotoUpload: vi.fn(), finishProfilePhotoUpload: vi.fn(), removeProfilePhoto: vi.fn(),
+}));
 vi.mock("@/modules/attendance/onsite-attendance-workflow.functions", () => ({
   listGuardianEffectiveAbsences: vi.fn(), submitEffectiveAttendanceExcuse: vi.fn(),
 }));
@@ -158,7 +162,7 @@ describe("family and student profiles", () => {
     }];
     const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error=""/>);
     expect(html).toContain("3 overdue assignments need follow-through.");
-    expect(html).toContain('href="/guardian/academics?student=child-person"');
+    expect(html).toContain('href="/guardian/students?student=child-person"');
     expect(html).toContain('href="/guardian/attendance?student=child-person"');
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
     expect(html).not.toContain("student=child-profile");
@@ -201,7 +205,7 @@ describe("family and student profiles", () => {
     expect(html).toContain("can-dashboard-hero");
     expect(html).toContain('aria-label="Dashboard shortcuts"');
     expect(html).toContain('href="/home?action=consent-1"');
-    expect(html).toContain('href="/guardian/academics?student=child-person"');
+    expect(html).toContain('href="/guardian/students?student=child-person"');
     expect(html).not.toContain("Casey Sample");
     expect(html).toContain("focus-visible:outline-2");
   });
@@ -253,14 +257,16 @@ describe("family and student profiles", () => {
   });
   const profile: ComponentProps<typeof Student360View>["profile"] = {
     viewerRole: "registrar",
-    identity: { personId: "student-person", name: "Jordan Sample", gradeLevel: "9" }, guardians: [],
-    sections: [{ sectionId: "english", title: "English", teacherNames: ["Avery Sample"] }],
+    identity: { personId: "student-person", name: "Jordan Sample", gradeLevel: "9" }, guardians: [], timeline: [],
+    sections: [{ sectionId: "english", title: "English", teachers: [{ personId: "teacher-person", name: "Avery Sample" }], teacherNames: ["Avery Sample"] }],
     academics: { openMissingWorkCount: 0, sections: [{ sectionId: "english", title: "English", letterGrade: "F", percentage: "0", finalizedAt: "2030-01-01" }] },
     attendance: { absenceCount: 0, tardyCount: 0, recentEvents: [] }, openActions: [], insights: [], supportReferrals: [],
   };
   it("keeps profile tabs URL-backed and renders zero finalized grades", () => {
     const html = renderToStaticMarkup(<Student360View profile={profile} tab="academics"/>);
     expect(html).toContain('href="/staff/students/student-person?tab=academics" aria-current="page"');
+    expect(html).toContain('href="/classes?section=english" class="underline underline-offset-4">English</a>');
+    expect(html).toContain('href="/profiles?person=teacher-person" class="underline underline-offset-2">Avery Sample</a>');
     expect(html).toContain("Finalized grade: F · 0%");
     expect(html).toContain("Avery Sample");
     expect(html).not.toContain("No finalized grade yet");
@@ -270,6 +276,52 @@ describe("family and student profiles", () => {
     const html = renderToStaticMarkup(<Student360View profile={profile} tab="relationships"/>);
     expect(html).toContain("No guardians on record.");
     expect(html).not.toContain("Finalized grade:");
+  });
+  it("bounds overview previews and keeps sensitive support details off the identity view", () => {
+    const sections = Array.from({length:5}, (_, index) => ({
+      sectionId:`class-${index}`, title:`Class ${index}`, teachers:[], teacherNames:[],
+    }));
+    const html = renderToStaticMarkup(<Student360View profile={{...profile, sections,
+      academics:{...profile.academics,sections:sections.map(section => ({...section,letterGrade:null,percentage:null,finalizedAt:null}))},
+      openActions:[{id:"private",type:"support_referral",title:"Sensitive support detail",status:"open",priority:"high",dueAt:null}],
+    }}/>);
+    expect(html).toContain("Class 2");
+    expect(html).not.toContain("Class 3");
+    expect(html).toContain("View all 5 classes");
+    expect(html).not.toContain("Sensitive support detail");
+    expect(html).toContain('href="/staff/students/student-person?tab=support"');
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    const photoState = html.search(/aria-label="Jordan Sample: (?:loading photo|photo unavailable|no profile photo)"/);
+    expect(photoState).toBeGreaterThan(html.indexOf("<h1"));
+  });
+  const personProfile: ComponentProps<typeof PersonProfile>["profile"] = {
+    personId: "teacher-person", name: "Alex Example", kind: "Teacher", viewerRole: "student", isSelf: false,
+    modules: {photo:false,personal:false,professional:false,qualifications:false},
+    sections:Array.from({length:5}, (_, index) => ({id:`section-${index}`,title:`Connection ${index}`})),
+  };
+  it.each(["edit","background","qualifications"] as const)("ignores a forged %s tab on another person's profile", tab => {
+    const html = renderToStaticMarkup(<PersonProfile profile={personProfile} tab={tab}/>);
+    expect(html).not.toContain('type="file"');
+    expect(html).not.toContain("Qualification evidence");
+    expect(html).not.toContain("Professional background");
+    expect(html).toContain("Connection 2");
+    expect(html).not.toContain("Connection 3");
+    expect(html.match(/aria-current="page"/g)).toHaveLength(1);
+    expect(html).toContain('href="/classes?section=section-0"');
+  });
+  it("shows all authorized connections only on their own tab", () => {
+    const html = renderToStaticMarkup(<PersonProfile profile={personProfile} tab="connections"/>);
+    expect(html).toContain("Connection 4");
+    expect(html.match(/<main/g)).toHaveLength(1);
+    expect(html).not.toContain("Edit profile");
+  });
+  it.each(["Guardian","Counselor","Site Admin","Network Admin"])("gives %s the same self photo editor without academic editing", kind => {
+    const html = renderToStaticMarkup(<PersonProfile tab="edit" profile={{...personProfile,kind,isSelf:true,
+      viewerRole:kind.toLowerCase().replaceAll(" ","_"),modules:{...personProfile.modules,photo:true}}}/>);
+    expect(html).toContain('type="file"');
+    expect(html).toContain("Remove picture");
+    expect(html).not.toContain("Professional background");
+    expect(html).not.toContain("Qualification evidence");
   });
   it.each(["teacher","specialist","counselor","registrar"] as const)("opens the exact support records available to %s",viewerRole=>{
     const html=renderToStaticMarkup(<Student360View tab="support" profile={{

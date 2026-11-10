@@ -52,7 +52,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  return <WorkspaceShell width="standard" eyebrow="Course registration" title="Choose your classes." subtitle="Review your school’s available classes and request a schedule change. A registrar reviews each request before enrollment changes. Drops and withdrawals have different deadlines and academic consequences." breadcrumbs={<>
    {role==="student"&&<Link to="/student/courses" className="text-xs font-semibold underline">My classes</Link>}
    <Link to="/home" search={{siteId:undefined,programId:undefined}} className="text-xs text-muted-foreground hover:underline">Back to workspace</Link>
-   {role==="student"&&<Link to="/student/study-groups" className="text-xs font-semibold underline underline-offset-4">Study groups</Link>}
+   {role==="student"&&<Link to="/groups" className="text-xs font-semibold underline underline-offset-4">Study groups</Link>}
   </>} className="pb-20">
   <div className="mt-6 flex flex-wrap items-center gap-3">
    <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">Signed in as {hasRegistrarAuthority(role)?"School Registrar":"Student"}</span>
@@ -125,7 +125,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     <Link to="/student/discussions" search={{section:course.id}} className="underline">Class discussion</Link>
     <Link to="/calendar" search={{section:course.id}} className="underline">Class schedule</Link>
     <Link to="/student/report-card" className="underline">Published report card</Link>
-    <Link to="/student/study-groups" className="underline">Study groups</Link>
+    <Link to="/groups" className="underline">Study groups</Link>
     <Link to="/student/courses" search={{view:"catalog",section:course.id}} className="underline">Registration and change deadlines</Link>
    </nav>
   </WorkspacePanel>:undefined;

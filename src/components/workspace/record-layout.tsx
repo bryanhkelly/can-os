@@ -1,13 +1,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import { PageEyebrow, PageTitle } from "./page-frame";
+import { DetailNavigation } from "./workspace-panel";
 
 /** Route-stable, entity-first record view. The route owns the data and permissions. */
-export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadcrumbs, className,
+export function RecordHeader({ eyebrow, title, subtitle, leading, status, actions, breadcrumbs, className,
   focusOnMount = false }: {
   eyebrow?: string;
   title: string;
   subtitle?: React.ReactNode;
+  leading?: React.ReactNode;
   status?: React.ReactNode;
   actions?: React.ReactNode;
   breadcrumbs?: React.ReactNode;
@@ -21,12 +23,15 @@ export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadc
   return <header className={cn("min-w-0 border-b border-border pb-5", className)}>
     {breadcrumbs && <nav aria-label="Breadcrumb" className="mb-4 text-xs text-muted-foreground">{breadcrumbs}</nav>}
     {eyebrow && <PageEyebrow className="mb-2">{eyebrow}</PageEyebrow>}
-    <div className="flex flex-wrap items-start justify-between gap-4">
-      <div className="min-w-0">
-        <PageTitle ref={titleRef} tabIndex={focusOnMount ? -1 : undefined}>{title}</PageTitle>
-        {subtitle && <div className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</div>}
+    <div className="grid min-w-0 items-start gap-4 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0 wrap-break-word">
+          <PageTitle ref={titleRef} data-variant="record" tabIndex={focusOnMount ? -1 : undefined}>{title}</PageTitle>
+          {subtitle && <div className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</div>}
+        </div>
+        {leading && <div className="shrink-0">{leading}</div>}
       </div>
-      <div className="flex flex-wrap items-center gap-2">{status}{actions}</div>
+      {(status || actions) && <div className="flex min-w-0 flex-wrap items-center gap-2">{status}{actions}</div>}
     </div>
   </header>;
 }
@@ -41,7 +46,7 @@ export function RecordLayout({ header, navigation, main, rail, activity, classNa
 }) {
   return <div className={cn("min-w-0 space-y-5", className)}>
     {header}
-    {navigation && <nav aria-label="Record sections" className="flex flex-wrap gap-1 border-b border-border pb-2">{navigation}</nav>}
+    {navigation && <DetailNavigation label="Record sections" variant="record">{navigation}</DetailNavigation>}
     <div className={cn("grid min-w-0 items-start gap-5", rail && "xl:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0 space-y-5">{main}</div>
       {rail && <aside aria-label="Related record context" className="min-w-0 space-y-4">{rail}</aside>}

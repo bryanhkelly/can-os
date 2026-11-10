@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { searchWorkspace, type SearchHit } from "@/modules/search/global-search.functions";
-import { getWorkspaceLinks } from "./workspace-navigation.registry";
-import { useNavigate } from "@tanstack/react-router";
+import { getWorkspaceLinks, workspaceDestination } from "./workspace-navigation.registry";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useWorkspaceSession } from "./WorkspaceSession";
 import { filterDestinations, openPaletteEvent, type PaletteGroup } from "@/lib/workspace-search";
 import { WorkspaceSearchDialog, type SearchDestination } from "./WorkspaceSearchDialog";
 
 const GROUP_ORDER = [
-  { key: "courses", label: "Course" },
+  { key: "courses", label: "Class" },
   { key: "assignments", label: "Assignment" },
   { key: "students", label: "Student" },
   { key: "messages", label: "Message" },
+  { key: "actions", label: "Action" },
 ] as const;
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
+  const search = useLocation({ select: location => location.searchStr });
   const { session } = useWorkspaceSession();
   const activeRole = session?.authenticated ? session.role : null;
+  const activeGrantId = session?.authenticated ? session.activeGrantId : null;
   const [query, setQuery] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [hitsGrantId, setHitsGrantId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [searchFailed, setSearchFailed] = useState(false);
   const [searchAttempt, setSearchAttempt] = useState(0);
@@ -44,16 +48,17 @@ export function CommandPalette() {
 
   const destinations = useMemo(() => {
     const authorized = activeRole ? (getWorkspaceLinks(activeRole) ?? []) : [];
-    return filterDestinations(query, authorized.map(item => ({ to: item.path, label: item.title }))).slice(0, 6);
-  }, [query, activeRole]);
+    return filterDestinations(query, authorized.map(item => ({ to: workspaceDestination(item.path, search), label: item.title }))).slice(0, 6);
+  }, [query, activeRole, search]);
 
   useEffect(() => {
-    if (!open || query.trim().length < 2) return;
+    if (!open || !activeGrantId || query.trim().length < 2) return;
     let canceled = false;
     const timer = window.setTimeout(() => {
       searchWorkspace({ data: { query: query.trim() } }).then(result => {
         if (canceled) return;
-        setHits(GROUP_ORDER.flatMap(group => result[group.key].map(hit => ({
+        setHitsGrantId(activeGrantId);
+        setHits(GROUP_ORDER.flatMap(group => (result[group.key] ?? []).map(hit => ({
           ...hit, sub: `${group.label} · ${hit.sub}`,
         }))));
         setSearching(false);
@@ -63,14 +68,14 @@ export function CommandPalette() {
       });
     }, 200);
     return () => { canceled = true; window.clearTimeout(timer); };
-  }, [query, open, searchAttempt]);
+  }, [query, open, searchAttempt, activeGrantId]);
 
   const groups = useMemo<PaletteGroup<SearchDestination>[]>(() => [
     { label: "Pages", items: destinations.map(link => ({
       id: `nav-${link.to}`, label: link.label, sub: "Go to page", to: link.to,
     })) },
-    { label: "Results", items: hits },
-  ], [destinations, hits]);
+    { label: "Results", items: hitsGrantId === activeGrantId ? hits : [] },
+  ], [destinations, hits, hitsGrantId, activeGrantId]);
 
   return <WorkspaceSearchDialog open={open} onClose={() => setOpen(false)} query={query}
     onQueryChange={value => {

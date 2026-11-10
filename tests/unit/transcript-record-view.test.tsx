@@ -20,6 +20,18 @@ const row = (overrides:Partial<ReportCardGrade>={}):ReportCardGrade => ({
 });
 
 describe("transcript rendering",()=>{
+  it("shows course release and contributing assessment provenance",()=>{
+    const html=renderToStaticMarkup(<TranscriptView rows={[row({
+      courseTemplateVersion:2,
+      gradeEvidence:{method:"graded-assessment-points-ratio",assessments:[{
+        assessmentId:"assessment-1",title:"Midterm",submissionId:"submission-1",
+        attemptNumber:1,score:"42",pointsPossible:50,
+      }]},
+    })]} issuances={[]}/>);
+    expect(html).toContain("Course release v2");
+    expect(html).toContain("Grade source assessments");
+    expect(html).toContain("Midterm · Attempt 1 · 42/50 points");
+  });
   it("keeps a graded class on the official record when credit units are missing",()=>{
     const html=renderToStaticMarkup(<TranscriptView rows={[
       row(),

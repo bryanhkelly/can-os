@@ -34,6 +34,37 @@ const context: AssignmentMissingContext = {
 };
 
 describe("assignmentMissingPolicy.plans", () => {
+  it.each(["submitted", "graded", "returned"])("does not project stale missing-work events after work is %s", async status => {
+    let queries = 0;
+    const tx = {
+      select: () => {
+        queries += 1;
+        const query = {
+          from: () => query, innerJoin: () => query, where: () => query,
+          limit: async () => [{ submissionId: "sub-1", submissionStatus: status, timeliness: "missing" }],
+        };
+        return query;
+      },
+    };
+    expect(await assignmentMissingPolicy.load(tx as unknown as Parameters<typeof assignmentMissingPolicy.load>[0], event)).toBeNull();
+    expect(queries).toBe(1);
+  });
+
+  it("loads notices for currently assigned work marked missing by the detector", async () => {
+    const tx = {
+      select: () => {
+        const query = {
+          from: () => query, innerJoin: () => query, where: () => query,
+          limit: async () => [{ submissionId: "sub-1", submissionStatus: "assigned", timeliness: "missing" }],
+          then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve([]).then(resolve),
+        };
+        return query;
+      },
+    };
+    expect(await assignmentMissingPolicy.load(tx as unknown as Parameters<typeof assignmentMissingPolicy.load>[0], event))
+      .toMatchObject({ submissionId: "sub-1", guardianPersonIds: [], teacherPersonIds: [] });
+  });
+
   it("notifies student, guardians, and teachers with role-appropriate copy", () => {
     const plans = assignmentMissingPolicy.plans(context, event);
     expect(plans).toHaveLength(4);
@@ -120,6 +151,26 @@ describe("applyNotificationPolicy", () => {
     );
     expect(ids).toEqual([]);
     expect(calls).toHaveLength(0);
+  });
+
+  it("deduplicates overlapping recipient roles without combining unrelated notices", async () => {
+    const { tx, calls } = makeFakeTx();
+    const plan = { recipientPersonId: "person-1", type: "follow_up", title: "Review work", resourceType: "action", resourceId: "action-1" };
+    const ids = await applyNotificationPolicy(
+      tx as Parameters<typeof applyNotificationPolicy>[0], event,
+      { eventType: event.eventType, load: async () => ({}), plans: () => [
+        plan, { ...plan, body: "Repeated through a second relationship" },
+        { ...plan, recipientPersonId: "person-2" },
+        { ...plan, resourceId: "action-2" },
+        { ...plan, type: "follow_up_resolved" },
+      ] }, {},
+    );
+    expect(ids).toHaveLength(4);
+    const rows = calls[0].values as Array<Record<string, unknown>>;
+    expect(rows.filter(row => row.recipientPersonId === "person-1" && row.type === "follow_up" && row.resourceId === "action-1"))
+      .toHaveLength(1);
+    expect(rows[0]?.body).toBeNull();
+    expect(rows.every(row => row.eventId === event.id)).toBe(true);
   });
 });
 

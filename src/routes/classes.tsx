@@ -210,7 +210,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     </div>;
   }
   const classwork = data.role === "teacher" ? <Link to="/teacher/gradebook" search={{ section: data.section.id }} className="underline">Gradebook and submission review</Link> :
-    data.role === "guardian" ? <Link to="/guardian/academics" search={{ student: search.student, section: data.section.id }} className="underline">Assignments and released feedback</Link> :
+    data.role === "guardian" ? <Link to="/guardian/students" search={{ student: search.student, section: data.section.id }} className="underline">Assignments and released feedback</Link> :
       <Link to="/student/assignments" search={{ section: data.section.id }} className="underline">Class assignments and feedback</Link>;
   const recorded = mainVideoResource?.url ? <ClassVideoPlayer key={mainVideoResource.id} title={mainVideoResource.title}
     url={mainVideoResource.url} resourceId={mainVideoResource.id} declaredVideo={false} presentation="classroom"/> :
@@ -230,7 +230,9 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       className="inline-flex justify-center border bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground">Continue lesson →</Link> : classwork;
   const stepTitle = data.role === "student" && nextWork ? nextWork.title : "Review your classwork";
   const stepDetail = data.role === "student" && nextWork ?
-    "Open the assignment for instructions, your response, and released teacher feedback." :
+    nextWork.status === "returned" ? "Your teacher requested a revision. Review the released feedback before resubmitting." :
+    nextWork.status === "draft" ? "Continue the saved response for this published assignment." :
+    "This published assignment has no submitted response yet." :
     lessons.length > 0 ? "Continue published lessons or review your assignments. Video playback does not mark a lesson complete." :
     "Your teacher's assignments remain available while the published lesson sequence is being prepared.";
   return <ClassroomWorkspace title={data.section.title}

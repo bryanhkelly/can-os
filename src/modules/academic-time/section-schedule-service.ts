@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { scheduleTemplatePeriods, sections } from "@/db/schema";
+import { SECTION_MEETING_PERIOD_TYPES } from "@/domain/schedule-period-types";
 
 export type MeetingPeriod = {
   dayOfWeek: number;
@@ -30,7 +31,7 @@ export async function getSectionMeetingPattern(
     .from(scheduleTemplatePeriods)
     .where(and(
       eq(scheduleTemplatePeriods.scheduleTemplateId, section.scheduleTemplateId),
-      eq(scheduleTemplatePeriods.type, "instruction"),
+      inArray(scheduleTemplatePeriods.type, [...SECTION_MEETING_PERIOD_TYPES]),
     ));
 }
 

@@ -1,3 +1,5 @@
+import type { FirstClassroom } from "@/domain/first-classroom";
+
 /**
  * Read-only operational evidence, not an end-to-end test result.
  * Counts come from real scoped tables and are never treated as academic credit.
@@ -6,6 +8,7 @@ export type JourneyClassEvidence = {
  id:string;title:string;code:string;courseVersionId:string;
  publishedLessonCount:number;teacherCount:number;studentCount:number;
  assignedAssessmentCount:number;submittedAttemptCount:number;gradedAttemptCount:number;
+ firstClassroom?:Pick<FirstClassroom,"ready"|"blockers">;
 };
 export type JourneyEvidence = {
  installedPacks:number;adoptedPacks:number;adoptedCourseVersions:number;

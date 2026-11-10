@@ -21,10 +21,11 @@ export type LaunchSiteAddressDraft = {
   postalCode: string; country: string; county: string;
 };
 
-export function LaunchHostAndProviderFields({ options, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
+export function LaunchHostAndProviderFields({ options, jurisdictionResearch, jurisdictionResearchUnavailable, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }: {
   options: NonNullable<Awaited<ReturnType<typeof listLaunchOptions>>>;
   jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
   jurisdictionResearch: Record<string,LaunchResearch>;
+  jurisdictionResearchUnavailable?:boolean;
   hostOrganizationId: string; setHostOrganizationId: (value: string) => void;
   siteId: string; setSiteId: (value: string) => void;
   setCreatedSiteDraft: (value: SavedLaunchSiteDraft | null) => void;
@@ -152,6 +153,15 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, hos
                       ))}
                     </Select>
                   </Field>
+                  {jurisdictionId&&<p role="status" className="border-l-2 border-primary/40 bg-muted/40 p-3 text-sm">
+                    {jurisdictionResearchUnavailable
+                      ? "Jurisdiction review status is unavailable. You can continue planning, but this does not authorize opening or enrollment."
+                      : jurisdictionResearch[jurisdictionId]?.guidanceStatus==="verified_guidance"
+                        ? "Current jurisdiction guidance is verified. School-specific review and opening authorization are still required."
+                        : jurisdictionResearch[jurisdictionId]?.reviewStatus==="in_review"
+                          ? "General jurisdiction guidance is under CAN review. You can continue planning; this is not a school-specific decision or authorization to open."
+                          : "Review needed. You can continue planning while CAN evaluates this jurisdiction and academic model. Authorization is required before operations begin."}
+                  </p>}
                   <LaunchFieldHelp label="Why we ask for your state or region">School requirements depend on where students meet. Choosing a state records your plans; it is not legal approval to open.</LaunchFieldHelp>
                   {selectedSite&&!siteJurisdictionId&&!jurisdictionIssue&&
                     <p role="status" className="text-sm text-muted-foreground">We couldn't match your address to a supported state. Confirm the address and country, or ask CAN to review support for your location.</p>}

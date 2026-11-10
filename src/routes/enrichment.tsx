@@ -21,7 +21,11 @@ function PublicEnrichment() {
       {items.length === 0 && <p className="text-sm text-muted-foreground">No programs are currently open for registration.</p>}
       {items.map(item => <article key={item.seasonId} className="rounded-xl border bg-card p-5">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.siteName}</p>
-        <h2 className="mt-1 text-lg font-semibold">{item.name}</h2>
+        <h2 className="mt-1 text-lg font-semibold">
+          <Link to="/enrichment/$seasonId" params={{ seasonId: item.seasonId }} className="hover:underline">
+            {item.name}
+          </Link>
+        </h2>
         <p className="mt-2 text-sm text-muted-foreground">{item.seasonName} · {item.startsOn} to {item.endsOn}</p>
         {item.firstMeeting && item.meetingTimezone && <p className="mt-1 text-sm text-muted-foreground">
           First session: {new Intl.DateTimeFormat("en-US",{dateStyle:"medium",
@@ -36,7 +40,8 @@ function PublicEnrichment() {
               item.seatsRemaining === null ? "Seats available" :
               `${item.seatsRemaining} seats remaining`)}
         </p>
-        <Link to="/guardian/enrichment" className="mt-4 inline-block rounded-lg border px-3 py-2 text-sm font-semibold">
+        <Link to="/enrichment/$seasonId" params={{ seasonId: item.seasonId }}
+          className="mt-4 inline-block rounded-lg border px-3 py-2 text-sm font-semibold">
           View details and register
         </Link>
       </article>)}

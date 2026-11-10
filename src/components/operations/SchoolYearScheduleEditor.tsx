@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { replaceStudioSchedulePeriods, type getSchoolYearStudio } from "@/modules/academic-time/school-year-studio.functions";
+import { SCHEDULE_PERIOD_TYPES, type SchedulePeriodType } from "@/domain/schedule-period-types";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -14,7 +15,7 @@ export function SchoolYearScheduleEditor({schedule,busy,run}:{
  const [periods,setPeriods]=useState(schedule.periods.map(p=>({
   dayOfWeek:p.dayOfWeek,sequence:p.sequence,label:p.label,
   startsAtLocal:p.startsAtLocal.slice(0,5),endsAtLocal:p.endsAtLocal.slice(0,5),
-  type:p.type as "instruction"|"break"|"lunch"|"chapel"|"advisory",
+  type:p.type as SchedulePeriodType,
  })));
  function change(index:number,key:keyof (typeof periods)[number],value:string|number){
   setPeriods(items=>items.map((p,i)=>i===index?{...p,[key]:value}:p));
@@ -42,7 +43,7 @@ export function SchoolYearScheduleEditor({schedule,busy,run}:{
    </Field>
    <Field label="Type" className="w-32">
     <Select value={p.type} onChange={e=>change(i,"type",e.target.value)}>
-    {["instruction","break","lunch","chapel","advisory"].map(t=><option key={t} value={t}>{t}</option>)}
+    {SCHEDULE_PERIOD_TYPES.map(t=><option key={t} value={t}>{t}</option>)}
     </Select>
    </Field>
    <Button type="button" variant="ghost" size="sm" aria-label={`Remove period ${i+1}`} onClick={()=>setPeriods(rows=>rows.filter((_,n)=>n!==i))}>Remove</Button>

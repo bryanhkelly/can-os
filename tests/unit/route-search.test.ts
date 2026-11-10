@@ -12,8 +12,7 @@ import { Route as OperationsIndex } from "@/routes/home";
 import { Route as Insights } from "@/routes/operations.insights";
 import { Route as Website } from "@/routes/site-website";
 import { Route as Groups } from "@/routes/groups";
-import { Route as StudentGroups } from "@/routes/student.study-groups";
-import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
+import { Route as GroupDetail } from "@/routes/groups_.$groupId";
 import { Route as Admin } from "@/routes/admin";
 import { Route as Apply } from "@/routes/launch.family";
 import { Route as Attendance } from "@/routes/staff.attendance";
@@ -33,7 +32,7 @@ const siteProgramRoutes = [
   ["capacity", Capacity], ["family readiness", Families], ["admissions", Admissions], ["intake", Intake],
   ["operations layout", Operations], ["operations index", OperationsIndex], ["insights", Insights], ["website", Website],
 ] as const;
-const groupRoutes = [["student groups", StudentGroups], ["teacher groups", TeacherGroups]] as const;
+const groupRoutes = [["group detail", GroupDetail]] as const;
 const allRoutes = [...siteProgramRoutes, ...groupRoutes, ["groups", Groups], ["admin", Admin],
   ["guardian apply", Apply], ["attendance", Attendance], ["curriculum", Curriculum], ["marketplace", Marketplace]] as const;
 
@@ -93,10 +92,10 @@ describe("composed route search contracts", () => {
     expect(parse(route, { siteId: "school" }).siteId).toBe("school");
     expect(parse(route, { programId: "program" }).programId).toBe("program");
   });
-  it.each(groupRoutes)("%s retains both independent group and session selections", (_name, route) => {
-    expect(parse(route, params("group=group&session=session"))).toEqual({ group: "group", session: "session" });
+  it.each(groupRoutes)("%s retains the independent session selection", (_name, route) => {
+    expect(parse(route, params("group=group&session=session"))).toEqual({ session: "session" });
     expect(parse(route, { session: "session" }).session).toBe("session");
-    expect(parse(route, { group: "group", session: ["bad"] })).toEqual({ group: "group", session: undefined });
+    expect(parse(route, { session: ["bad"] })).toEqual({ session: undefined });
   });
   it("does not add session selection to the group-only workspace", () => {
     expect(parse(Groups, { group: "group", session: "session" })).toEqual({ group: "group" });
@@ -138,8 +137,7 @@ describe("composed route search contracts", () => {
     ["insights", Insights, ["siteId", "programId", "insight"]],
     ["website", Website, ["siteId", "programId", "returnGrantId"]],
     ["groups", Groups, ["group"]],
-    ["student groups", StudentGroups, ["group", "session"]],
-    ["teacher groups", TeacherGroups, ["group", "session"]],
+    ["group detail", GroupDetail, ["session"]],
     ["admin", Admin, ["siteId", "inviteRole"]],
     ["apply", Apply, ["programId", "application", "familyStart"]],
     ["attendance", Attendance, ["programId", "student", "date"]],

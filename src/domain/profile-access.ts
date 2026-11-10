@@ -8,6 +8,15 @@ export type ResolvedProfileAccess = {
   authorizedRelationship: boolean;
   permittedFields: ReadonlySet<ProfileField>;
 };
+export function profileModules(context: CommandContext & { role: string }, targetPersonId: string) {
+  const isSelf = context.actorPersonId === targetPersonId;
+  return {
+    photo: isSelf,
+    personal: isSelf && context.role === "student" && context.capabilities.has("profiles.self_profile.manage"),
+    professional: isSelf && context.role === "teacher" && context.capabilities.has("profiles.professional_profile.manage"),
+    qualifications: isSelf && context.capabilities.has("profiles.credentials.submit"),
+  };
+}
 export function assertProfileRead(context: CommandContext,targetPersonId: string,field: ProfileField,resolved?: ResolvedProfileAccess):void {
   if(!context.actorPersonId) throw new AuthorizationError("authenticated profile access");
   if(context.actorPersonId===targetPersonId && (field==="directory"||field==="education"||field==="credential")) return;

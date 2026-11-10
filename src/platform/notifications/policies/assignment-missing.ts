@@ -47,6 +47,8 @@ export const assignmentMissingPolicy: NotificationPolicy<AssignmentMissingContex
     const [record] = await tx
       .select({
         submissionId: submissions.id,
+        submissionStatus: submissions.status,
+        timeliness: submissions.timeliness,
         assessmentId: assessments.id,
         assessmentTitle: assessments.title,
         sectionId: assessments.sectionId,
@@ -70,7 +72,7 @@ export const assignmentMissingPolicy: NotificationPolicy<AssignmentMissingContex
       .where(eq(submissions.id, event.aggregateId))
       .limit(1);
 
-    if (!record) return null;
+    if (!record || record.submissionStatus !== "assigned" || record.timeliness !== "missing") return null;
 
     const guardians = await tx
       .select({ personId: guardianRelationships.guardianPersonId })

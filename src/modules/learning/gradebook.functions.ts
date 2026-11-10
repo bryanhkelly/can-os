@@ -11,6 +11,7 @@ import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
 import { assertPublisherLessonReference,publisherLessonChoices } from "@/domain/publisher-course-references";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
+import { readAssignmentContent, ASSIGNMENT_CONTENT_LIMITS } from "@/domain/assignment-content";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
@@ -341,6 +342,17 @@ export const createAssessment = createServerFn({ method: "POST" })
   }).strict()).max(20).optional(),
   pointsPossible: z.number().finite().min(1).max(1000),
   assignmentKind:z.enum(["homework","classwork","quiz","test","project","discussion"]).optional().default("classwork"),
+  assignmentContent: z.object({
+   description: z.string().trim().max(ASSIGNMENT_CONTENT_LIMITS.text).optional(),
+   overview: z.array(z.string().trim().min(1).max(ASSIGNMENT_CONTENT_LIMITS.text)).max(ASSIGNMENT_CONTENT_LIMITS.listItems).optional(),
+   prompt: z.string().trim().max(ASSIGNMENT_CONTENT_LIMITS.text).optional(),
+   objectives: z.array(z.string().trim().min(1).max(ASSIGNMENT_CONTENT_LIMITS.text)).max(ASSIGNMENT_CONTENT_LIMITS.listItems).optional(),
+   steps: z.array(z.object({
+    title: z.string().trim().min(1).max(ASSIGNMENT_CONTENT_LIMITS.text),
+    detail: z.string().trim().max(ASSIGNMENT_CONTENT_LIMITS.text),
+   }).strict()).max(ASSIGNMENT_CONTENT_LIMITS.listItems).optional(),
+   formatNote: z.string().trim().max(ASSIGNMENT_CONTENT_LIMITS.text).optional(),
+  }).strict().optional(),
   curriculumLessonId:z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/).optional(),
   dueAt: z.string().refine(v => !Number.isNaN(new Date(v).getTime()), "dueAt must be an ISO date").optional(),
   availableAt: z.string().datetime({offset:true}).optional(),
@@ -352,6 +364,8 @@ export const createAssessment = createServerFn({ method: "POST" })
   const context = await teacherActor(data.sectionId);
   assertCapability(context, "assignments:create");
   const rubricCriteria = validateAssessmentRubric(data.rubricCriteria ?? [], data.pointsPossible);
+  // Normalize through the shared reader so stored metadata always matches what readers accept.
+  const assignmentContent = readAssignmentContent(data.assignmentContent);
   const dueAt = data.dueAt ? new Date(data.dueAt) : null;
   const availableAt = data.availableAt ? new Date(data.availableAt) : data.publishNow ? new Date() : null;
   const closesAt = data.closesAt ? new Date(data.closesAt) : null;
@@ -384,6 +398,7 @@ export const createAssessment = createServerFn({ method: "POST" })
     metadata:{...(data.rubric?{rubric:data.rubric}:{}),
       ...(rubricCriteria.length?{rubricCriteria,rubricVersion:1}:{}),
       assignmentKind:data.assignmentKind,
+      ...(assignmentContent?{assignmentContent}:{}),
       ...(data.maxAttempts!==undefined?{maxAttempts:data.maxAttempts}:{}),
       publisherCourseVersionId:teachingSection.versionId,
       ...(data.curriculumLessonId?{curriculumLessonTitle:publisherLessonChoices(

@@ -3,12 +3,14 @@ import {resolveGuardianChild} from "@/domain/guardian-child-context";
 import { useEffect, useState } from "react";
 import { getGuardianAssignments, getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
 import { guardianAssignmentSummary, guardianWorkNeedsAction } from "@/domain/guardian-academics";
-import { WorkspaceShell, WorkspacePanel, StatusBadge, StatCard } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, StatCard, DirectoryTable } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { LayoutGrid, List } from "lucide-react";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { GuardianGradeResponseHistory } from "@/components/learning/GuardianGradeResponse";
 
-export const Route = createFileRoute("/guardian/academics")({
+export const Route = createFileRoute("/guardian/students")({
  validateSearch:(search:Record<string,unknown>):{student?:string;section?:string;assessment?:string;submission?:string}=>({
   student:typeof search.student==="string"?search.student:undefined,
   section:typeof search.section==="string"?search.section:undefined,
@@ -27,6 +29,7 @@ function GuardianAcademicsPage() {
  const [students, setStudents] = useState<Student[]>([]);
  const [selected, setSelected] = useState("");
  const [assignments, setAssignments] = useState<Assignment[]>([]);
+ const [view, setView] = useState<"cards" | "list">("cards");
  const [loading, setLoading] = useState(true);
  const [loadingStudents, setLoadingStudents] = useState(true);
  const [error, setError] = useState("");
@@ -86,24 +89,40 @@ function GuardianAcademicsPage() {
     </div>
    </div>}
    {!loading && !loadingStudents && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
-   {(section||assessment)&&<Link to="/guardian/academics" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
+   {(section||assessment)&&<Link to="/guardian/students" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
    {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5 rounded-xl border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Assignment summary">
     <StatCard label="Unfinished work" value={summary.needsAction}/>
     <StatCard label="Overdue" value={summary.overdue}/>
     <StatCard label="Grades released" value={summary.releasedGrades}/>
    </div>}
-   {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-4">
+   {!loading && !loadingStudents && !error && assignments.length > 0 && !assessment && <div className="mt-6 flex justify-end">
+    <div role="group" aria-label="Assignments view" className="flex gap-1">
+     <Button type="button" size="icon" variant={view === "list" ? "secondary" : "ghost"} aria-pressed={view === "list"}
+      aria-label="List view" title="List view" onClick={() => setView("list")}><List aria-hidden="true"/></Button>
+     <Button type="button" size="icon" variant={view === "cards" ? "secondary" : "ghost"} aria-pressed={view === "cards"}
+      aria-label="Cards view" title="Cards view" onClick={() => setView("cards")}><LayoutGrid aria-hidden="true"/></Button>
+    </div>
+   </div>}
+   {!loading && !loadingStudents && !error && assignments.length > 0 && !assessment && view === "list" && <DirectoryTable
+    label="Assignments" caption="Assignments for this child." rows={visible} rowKey={item => item.assessmentId}
+    columns={[
+     { id: "assignment", title: "Assignment", render: item => <><p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:item.sectionId,student:selected}} className="underline">{item.course}</Link></p><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="font-semibold underline">{item.title}</Link></> },
+     { id: "due", title: "Due", render: item => item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set" },
+     { id: "status", title: "Status", render: item => <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge> },
+     { id: "grade", title: "Grade", render: item => item.score !== null ? `${item.score} / ${item.pointsPossible}` : "—" },
+    ]}/>}
+   {!loading && !loadingStudents && !error && assignments.length > 0 && (!assessment && view === "cards" || assessment) && <div className="mt-8 grid gap-4">
     {visible.map(item => <section key={item.assessmentId} className="rounded-xl border bg-card p-5">
      <div className="flex flex-wrap items-start justify-between gap-3">
-      <div><p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:item.sectionId,student:selected}} className="underline">{item.course}</Link></p><h2 className="mt-1 text-lg font-semibold"><Link to="/guardian/academics" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="underline">{item.title}</Link></h2></div>
+      <div><p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:item.sectionId,student:selected}} className="underline">{item.course}</Link></p><h2 className="mt-1 text-lg font-semibold"><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="underline">{item.title}</Link></h2></div>
       <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge>
      </div>
      <p className="mt-3 text-sm text-muted-foreground">Due: {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p>
      {item.revisionLimitReached && <div className="mt-3 rounded-lg border p-3 text-sm" role="status">
       <p className="font-semibold">No revision attempts remain for this assignment.</p>
       <p className="mt-1">The teacher's returned feedback is still available, but the student cannot submit another attempt under the current limit. Review the feedback and ask the school about next steps.</p>
-      {!assessment && <Link to="/guardian/academics" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}}
+      {!assessment && <Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}}
        className="mt-2 inline-block font-semibold underline">Open feedback and school conversation</Link>}
      </div>}
      {!item.revisionLimitReached && guardianWorkNeedsAction(item.status) &&

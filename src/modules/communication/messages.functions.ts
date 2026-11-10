@@ -7,7 +7,7 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { listOnsiteContactRelationships } from "./onsite-contact-relationships.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,desc,eq,inArray,isNotNull,isNull,or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
@@ -40,7 +40,7 @@ export const startThreadInputSchema = z.object({
 
 const threadIdSchema = z.string().uuid();
 
-type ThreadContact = { personId: string; name: string; label: string };
+export type ThreadContact = { personId: string; name: string; label: string };
 
 type Db = typeof import("@/db/client").db;
 type Schema = typeof import("@/db/schema");
@@ -74,11 +74,11 @@ async function fetchDisplayNames(
  * Never a directory: every entry traces to a verified guardian/student/
  * teacher/enrollment relationship. Unknown roles fail closed to no contacts.
  */
-async function listAllowedThreadContacts(
+export const listAllowedThreadContacts = createServerOnlyFn(async (
   db: Db,
   s: Schema,
   context: MessagingContext,
-): Promise<ThreadContact[]> {
+): Promise<ThreadContact[]> => {
   const role = context.role ?? "";
   const actorPersonId = requireActorPerson(context.actorPersonId);
   const siteIds = role === "room_facilitator" || role === "site_staff" || role === "site_leader"
@@ -336,7 +336,7 @@ async function listAllowedThreadContacts(
   }
 
   return contactsFromRelationships(db, s, relationships);
-}
+});
 
 async function contactsFromRelationships(db: Db, s: Schema, relationships: Map<string, Set<string>>) {
   if (!relationships.size) return [];

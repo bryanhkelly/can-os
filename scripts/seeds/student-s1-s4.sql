@@ -7,13 +7,13 @@ INSERT INTO jurisdictions(id,code,name,region_code) VALUES
 ('f1000000-0000-4000-8000-000000000001','SYNTH-CA-2026','Synthetic California','CA')
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO organizations(id,type,name,slug,metadata) VALUES
-('f1000000-0000-4000-8000-000000000002','christian_school','CAN Synthetic Demonstration School','can-synthetic-demo', '{"synthetic":true,"release":"student-s1-s4"}'::jsonb)
+('f1000000-0000-4000-8000-000000000002','christian_school','Valor School','can-synthetic-demo', '{"synthetic":true,"release":"student-s1-s4"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO sites(id,organization_id,name,slug,timezone,metadata) VALUES
-('f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000002','Synthetic Bay Campus','synthetic-bay','America/Los_Angeles','{"synthetic":true}'::jsonb)
+('f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000002','Valor School','valorschool','America/Los_Angeles','{"synthetic":true}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO programs(id,organization_id,site_id,jurisdiction_id,type,status,name,slug,grade_range,delivery_model,host_organization_id,academic_provider_organization_id,credit_issuing_organization_id,metadata) VALUES
-('f1000000-0000-4000-8000-000000000004','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000001','high_school_extension','active','Synthetic Hybrid High School','synthetic-hybrid','{"min":"9","max":"12"}'::jsonb,'{"onsite":true,"asynchronous":true,"liveOnline":true}'::jsonb,'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002','{"synthetic":true}'::jsonb)
+('f1000000-0000-4000-8000-000000000004','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000003','f1000000-0000-4000-8000-000000000001','high_school_extension','active','Valor Hybrid High School','synthetic-hybrid','{"min":"9","max":"12"}'::jsonb,'{"onsite":true,"asynchronous":true,"liveOnline":true}'::jsonb,'f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002','{"synthetic":true}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
 INSERT INTO people(id,legal_first_name,legal_last_name,preferred_name,metadata) VALUES
 ('f1000000-0000-4000-8000-000000000005','Jordan','Example','Jordan','{"synthetic":true}'::jsonb),

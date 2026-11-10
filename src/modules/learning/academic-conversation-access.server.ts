@@ -32,5 +32,5 @@ export async function academicConversationHref(thread: {
   const params = new URLSearchParams({ section: assessment.sectionId, assessment: thread.contextId });
   if (actor.role === "teacher") params.set("student", thread.metadata.studentProfileId);
   if (actor.role === "guardian") params.set("student", profile.personId);
-  return (actor.role === "teacher" ? "/teacher/gradebook" : actor.role === "guardian" ? "/guardian/academics" : "/student/assignments") + "?" + params;
+  return (actor.role === "teacher" ? "/teacher/gradebook" : actor.role === "guardian" ? "/guardian/students" : "/student/assignments") + "?" + params;
 }

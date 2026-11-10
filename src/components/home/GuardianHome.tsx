@@ -119,7 +119,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   detail:work.revisionLimitReached?"Revision attempts are exhausted. Review the teacher's feedback and contact the school.":
    work.status==="returned"?"Teacher returned this work for revision.":
    work.status==="draft"?"Student has work in progress to finish.":"Student has an assignment to complete.",
-  href:"/guardian/academics?student="+encodeURIComponent(child.studentPersonId)+
+  href:"/guardian/students?student="+encodeURIComponent(child.studentPersonId)+
    "&section="+encodeURIComponent(work.sectionId)+"&assessment="+encodeURIComponent(work.assessmentId),
   dueAt:work.dueAt,
   timezone:work.timezone,
@@ -131,7 +131,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   eyebrow="Family"
   subtitle="Your children, enrollment steps, and school follow-ups in one place."
   shortcuts={<>
-   <DashboardShortcut title="Children & academics" description="Released grades and schoolwork" icon={<BookOpen className="size-5" />}><Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} /></DashboardShortcut>
+  <DashboardShortcut title="Students" description="Released grades and schoolwork" icon={<BookOpen className="size-5" />}><Link to="/guardian/students" search={{student:selectedChild?.studentPersonId}} /></DashboardShortcut>
    <DashboardShortcut title="Applications & offers" description="Review enrollment next steps" icon={<ClipboardList className="size-5" />}><Link to="/guardian/admission-offers" search={{student:student||undefined}} /></DashboardShortcut>
    <DashboardShortcut title="Calendar" description="Your family's authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
    <DashboardShortcut title="Family inbox" description="Conversations with your school" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
@@ -206,7 +206,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <section aria-label="School responses to your grade questions" className="mt-10">
     <div className="flex flex-wrap items-center justify-between gap-3">
      <h2 className="font-serif text-2xl font-semibold tracking-tight">Your school grade questions</h2>
-     <Link to="/guardian/academics" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Academic progress</Link>
+     <Link to="/guardian/students" search={{student:selectedChild?.studentPersonId}} className="inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Academic progress</Link>
     </div>
     <p className="mt-2 text-sm text-muted-foreground">Questions you sent about released grades, and your school's responses. Pending questions are awaiting school action, not another family task.</p>
     {gradeFollowUpsWarning&&<p className="mt-3 rounded-lg border p-3 text-sm" role="status">{gradeFollowUpsWarning}</p>}
@@ -219,7 +219,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
       </div>
       <p className="mt-2 text-sm text-muted-foreground">Your question: {question.question}</p>
       {question.status==="resolved"&&question.resolutionNote&&<p className="mt-3 whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm">School response: {question.resolutionNote}</p>}
-      <Link to="/guardian/academics"
+      <Link to="/guardian/students"
        search={{student:question.studentPersonId,section:question.sectionId,assessment:question.assessmentId,submission:question.submissionId}}
        className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">View grade and school follow-up</Link>
      </article>)}
@@ -271,7 +271,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        <div className="flex items-start gap-3">
         <PersonMark name={`${child.displayName} ${child.lastName}`}/>
         <div>
-        <h3 className="text-lg font-semibold"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="hover:underline focus-visible:outline-2">{child.displayName} {child.lastName}</Link></h3>
+        <h3 className="text-lg font-semibold"><Link to="/guardian/students" search={{student:child.studentPersonId}} className="hover:underline focus-visible:outline-2">{child.displayName} {child.lastName}</Link></h3>
         <p className="mt-1 text-xs text-muted-foreground">{child.awaitingSections ? "Program enrollment active; classes not assigned yet" : `${child.sectionCount} active ${child.sectionCount === 1 ? "class" : "classes"}`}</p>
         </div>
        </div>
@@ -280,21 +280,21 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
        </StatusBadge>
       </div>
       <dl className="mt-4 grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
-       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Overdue</Link></dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/students" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Overdue</Link></dt><dd className="text-lg font-semibold">{child.missingCount}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Absences</Link></dt><dd className="text-lg font-semibold">{child.unexcusedAbsences}</dd></div>
        <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Tardies</Link></dt><dd className="text-lg font-semibold">{child.unexcusedTardies}</dd></div>
-       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/academics" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Intl.DateTimeFormat("en-US",{dateStyle:"medium",...(child.nextDueTimezone?{timeZone:child.nextDueTimezone}:{})}).format(new Date(child.nextDueAt)) : "—"}</dd></div>
+       <div className="rounded-lg bg-muted p-2"><dt className="text-xs text-muted-foreground"><Link to="/guardian/students" search={{student:child.studentPersonId}} className="underline focus-visible:outline-2">Next due</Link></dt><dd className="text-sm font-semibold">{child.nextDueAt ? new Intl.DateTimeFormat("en-US",{dateStyle:"medium",...(child.nextDueTimezone?{timeZone:child.nextDueTimezone}:{})}).format(new Date(child.nextDueAt)) : "—"}</dd></div>
       </dl>
       <p className="mt-4 text-sm text-muted-foreground">{child.missingCount>0?`${plural(child.missingCount,"overdue assignment")} ${agree(child.missingCount,"needs","need")} follow-through.`:child.workNeedsAttentionCount>0?`${plural(child.workNeedsAttentionCount,"assignment")} to complete or revise.`:child.unexcusedAbsences>0||child.unexcusedTardies>0?"Unexcused attendance marks remain. Check Attendance for the school's review status.":child.awaitingSections?"Your school is arranging class placement.":"No overdue unfinished work or unexcused attendance cases in this summary."}</p>
       {child.workToReview.length>0&&<div className="mt-4 rounded-lg border p-3">
        <p className="text-sm font-semibold">Schoolwork to review · {child.workNeedsAttentionCount}</p>
        <ul className="mt-2 space-y-2">{child.workToReview.map(work=><li key={work.assessmentId} className="text-sm">
-        <Link to="/guardian/academics" search={{student:child.studentPersonId,section:work.sectionId,assessment:work.assessmentId}} className="font-semibold underline focus-visible:outline-2">{work.title}</Link>
+        <Link to="/guardian/students" search={{student:child.studentPersonId,section:work.sectionId,assessment:work.assessmentId}} className="font-semibold underline focus-visible:outline-2">{work.title}</Link>
         <span className="ml-2 text-xs text-muted-foreground">{work.revisionLimitReached?"School follow-up needed · no revision attempts remain":work.status==="returned"?"Revision requested":work.status==="draft"?"Draft in progress":"Not submitted"}</span>
        </li>)}</ul>
       </div>}
       <nav className="mt-4 flex flex-wrap gap-2 text-sm" aria-label={`${child.displayName} links`}>
-       <Link to="/guardian/academics" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center rounded-full border px-3 py-2 hover:bg-muted focus-visible:outline-2">Academics</Link>
+      <Link to="/guardian/students" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center rounded-full border px-3 py-2 hover:bg-muted focus-visible:outline-2">Students</Link>
        <Link to="/guardian/attendance" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center rounded-full border px-3 py-2 hover:bg-muted focus-visible:outline-2">Attendance</Link>
        <Link to="/guardian/attendance" search={{student:child.studentPersonId}} hash="pickup" className="inline-flex min-h-11 items-center rounded-full border px-3 py-2 hover:bg-muted focus-visible:outline-2">Pickup &amp; safety</Link>
        <Link to="/guardian/health" search={{student:child.studentPersonId}} className="inline-flex min-h-11 items-center rounded-full border px-3 py-2 hover:bg-muted focus-visible:outline-2">Health &amp; clearance</Link>

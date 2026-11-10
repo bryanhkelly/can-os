@@ -1,477 +1,372 @@
-import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
-import { useEffect, useState } from "react";
-import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
+import {
+  createFileRoute,
+  Link,
+  redirect,
+  useRouter,
+} from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { dateTimeInputValue, formatTimestamp } from "@/modules/calendar/timezone";
-import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
-import { WorkspaceShell } from "@/components/workspace";
-import { Button } from "@/components/ui/button";
-import { Field, FieldError } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import {groupSessionSelectionSchema} from "@/lib/route-search";
-import { getCanonicalGroupWorkspace } from "@/modules/study-groups/canonical-workspace.functions";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { formatTimestamp } from "@/modules/calendar/timezone";
 import {
-  createCanonicalGroupPost, reportCanonicalGroupPost, resolveCanonicalGroupReport,
-} from "@/modules/study-groups/canonical-moderation.functions";
+  CreateAction,
+  EmptyState,
+  EntityCard,
+  MutationFeedback,
+  StatusBadge,
+  WorkspaceNotice,
+  WorkspacePanel,
+  WorkspaceShell,
+} from "@/components/workspace";
+import { groupSessionSelectionSchema } from "@/lib/route-search";
 import {
-  createFacilitatedGroup, inviteCanonicalGroupMembers, listCanonicalGroupInvitees,
-  requestCanonicalGroupMembership,
-  decideCanonicalGroupMembership, leaveCanonicalGroup,
-} from "@/modules/study-groups/canonical-membership.functions";
-import {
-  createCanonicalGroupSession, reviseCanonicalGroupSession, rsvpCanonicalGroupSession,
-  recordCanonicalGroupAttendance,
-} from "@/modules/study-groups/canonical-sessions.functions";
+  getCanonicalGroupWorkspace,
+  getStudyGroupAvailability,
+} from "@/modules/study-groups/canonical-workspace.functions";
+import { decideCanonicalGroupMembership } from "@/modules/study-groups/canonical-membership.functions";
+import { resolveCanonicalGroupReport } from "@/modules/study-groups/canonical-moderation.functions";
 
-const groupSearchSchema=groupSessionSelectionSchema.pick({group:true});
+const groupSearchSchema = groupSessionSelectionSchema.pick({ group: true });
+const loadGroups = async () => {
+  const availability = await getStudyGroupAvailability();
+  if (!availability.enabled) return { availability, workspace: null };
+  return { availability, workspace: await getCanonicalGroupWorkspace() };
+};
+
 export const Route = createFileRoute("/groups")({
-  validateSearch:(search:Record<string,unknown>):{group?:string}=>groupSearchSchema.parse(search),
-  loader: safeLoader(() => getCanonicalGroupWorkspace(), {
+  validateSearch: (search: Record<string, unknown>): { group?: string } =>
+    groupSearchSchema.parse(search),
+  // Legacy ?group= selection links resolve to the dedicated detail page.
+  beforeLoad: ({ search }) => {
+    if (search.group)
+      throw redirect({
+        to: "/groups/$groupId",
+        params: { groupId: search.group },
+      });
+  },
+  loader: safeLoader(loadGroups, {
     authMessage: "Sign in as a student or teacher to access your study groups.",
   }),
   component: GroupsPage,
 });
-type Workspace = Awaited<ReturnType<typeof getCanonicalGroupWorkspace>>;
+
+type Data = Awaited<ReturnType<typeof loadGroups>>;
+type Workspace = NonNullable<Data["workspace"]>;
 type Group = Workspace["groups"][number];
-type InviteeLoad = {
-  groupId: string;
-  invitees: Awaited<ReturnType<typeof listCanonicalGroupInvitees>>;
-  error: string;
-};
+
+export function groupKindLabel(kind: Group["kind"]): string {
+  return kind === "course" ? "Course group" : "Interest group";
+}
+
+export function nextGroupSession(
+  group: Group,
+): Group["sessions"][number] | null {
+  const now = Date.now();
+  return (
+    group.sessions.find(
+      (session) =>
+        !session.cancelled && new Date(session.startsAt).getTime() > now,
+    ) ?? null
+  );
+}
 
 function GroupsPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure eyebrow="Groups" title="Study groups" outcome={outcome} />;
+  if (!outcome.ok)
+    return (
+      <LoaderFailure eyebrow="Groups" title="Study groups" outcome={outcome} />
+    );
   return <GroupsView data={outcome.data} />;
 }
 
-function GroupsView({ data }: { data: Workspace }) {
+function GroupsView({ data }: { data: Data }) {
   const router = useRouter();
-  const {group:requestedGroup}=Route.useSearch();
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
-  const [sectionId, setSectionId] = useState(data.sections[0]?.id ?? "");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [maxMembers, setMaxMembers] = useState(20);
-  const [sessionGroup, setSessionGroup] = useState("");
-  const [sessionTitle, setSessionTitle] = useState("");
-  const [agenda, setAgenda] = useState("");
-  const [sessionStarts, setSessionStarts] = useState("");
-  const [sessionEnds, setSessionEnds] = useState("");
-  const [reschedules, setReschedules] = useState<Record<string, { start: string; end: string }>>({});
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
-  const [reportingPost, setReportingPost] = useState("");
-  const [reportReason, setReportReason] = useState("");
-  const [createAttempted,setCreateAttempted]=useState(false);
-  const [reportAttempted,setReportAttempted]=useState(false);
-  const [postAttempted,setPostAttempted]=useState<Record<string,boolean>>({});
-  const [inviteGroup, setInviteGroup] = useState("");
-  const [selectedInviteeIds, setSelectedInviteeIds] = useState<string[]>([]);
-  const [inviteeLoad, setInviteeLoad] = useState<InviteeLoad>({
-    groupId: "", invitees: [], error: "",
-  });
-  const invitees = inviteeLoad.groupId === inviteGroup ? inviteeLoad.invitees : [];
-  const inviteesError = inviteeLoad.groupId === inviteGroup ? inviteeLoad.error : "";
-  const inviteesLoading = Boolean(inviteGroup) && inviteeLoad.groupId !== inviteGroup;
-
-  useEffect(() => {
-    let active = true;
-    if (!inviteGroup) return () => { active = false; };
-    listCanonicalGroupInvitees({ data: { groupId: inviteGroup } })
-      .then(result => {
-        if (active) setInviteeLoad({ groupId: inviteGroup, invitees: result, error: "" });
-      })
-      .catch(error => {
-        if (active) setInviteeLoad({
-          groupId: inviteGroup,
-          invitees: [],
-          error: mutationErrorMessage(error, "Unable to load eligible students."),
-        });
-      });
-    return () => { active = false; };
-  }, [inviteGroup]);
-
+  const { availability, workspace } = data;
+  if (!workspace)
+    return (
+      <WorkspaceShell eyebrow="Collaboration" title="Study groups">
+        <WorkspaceNotice>
+          Study groups are currently unavailable.
+        </WorkspaceNotice>
+      </WorkspaceShell>
+    );
+  const canCreate =
+    availability.creationEnabled &&
+    availability.writesEnabled &&
+    (workspace.role === "teacher" || workspace.hasEnrollmentGuardian !== false);
+  const pendingRequests =
+    workspace.role === "teacher"
+      ? workspace.groups.flatMap((group) =>
+          group.pendingMembers.map((member) => ({ group, member })),
+        )
+      : [];
+  const openReports =
+    workspace.role === "teacher"
+      ? workspace.groups.flatMap((group) =>
+          group.reports.map((report) => ({ group, report })),
+        )
+      : [];
   async function run(work: () => Promise<unknown>, message: string) {
     await mutation.run(work, {
       successMessage: message,
       commandErrorMessage: "Unable to save group change.",
     });
   }
-
   return (
-    <WorkspaceShell eyebrow="Collaboration" title="Study groups"
-      subtitle={data.role === "teacher"
-        ? "Create facilitated course groups, review membership and manage the canonical meeting schedule."
-        : "Discover your school's groups, request participation and manage upcoming session RSVPs."}
-      actions={<Link to="/home"
-        className="rounded-lg border px-3 py-2 text-sm">Workspace home</Link>}
+    <WorkspaceShell
+      width="wide"
+      eyebrow="Collaboration"
+      title="Study groups"
+      breadcrumbs={
+        <Link to="/home" className="underline">
+          Workspace home
+        </Link>
+      }
+      subtitle={
+        workspace.role === "teacher"
+          ? "Open a group you facilitate to manage membership, sessions and discussion."
+          : "Learn together across classes and interests. Open a group for sessions, discussion and membership."
+      }
+      actions={
+        canCreate && (
+          <CreateAction>
+            <Link to="/groups/new">Create study group</Link>
+          </CreateAction>
+        )
+      }
     >
-      <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving group change..."/>
-      {data.role === "student" && data.hasEnrollmentGuardian === false &&
-        <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">
-          A linked guardian is required to request study group membership. Ask your school to verify your guardian relationship.
-        </p>}
-      {requestedGroup&&<Link to="/groups" className="mt-4 inline-block text-sm underline">View all study groups</Link>}
-      {requestedGroup&&!data.groups.some(group=>group.id===requestedGroup)&&<p role="alert" className="mt-4 rounded-lg border p-4 text-sm">This group is unavailable in your current workspace.</p>}
-      {data.role === "teacher" && <section className="mt-8 rounded-xl border bg-card p-5">
-        <h2 className="text-lg font-semibold">Create a course group</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Only sections you actively teach can host a group.</p>
-        <form noValidate className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
-          event.preventDefault();
-          setCreateAttempted(true);
-          if(!sectionId||title.trim().length<3||description.trim().length<10||!Number.isInteger(maxMembers)||maxMembers<2||maxMembers>50)return;
-          void run(async () => {
-            await createFacilitatedGroup({ data: { sectionId, title, description, maxMembers } });
-            setTitle(""); setDescription("");
-            setCreateAttempted(false);
-          }, "Study group created.");
-        }}>
-          <Field label="Section" className="text-sm" required error={createAttempted&&!sectionId?"Choose a teaching section.":undefined}>
-            <Select value={sectionId} onChange={event => setSectionId(event.target.value)}>
-              {data.sections.map(section =>
-                <option key={section.id} value={section.id}>{section.title}</option>)}
-            </Select>
-          </Field>
-          <Field label="Group title" className="text-sm" required error={createAttempted&&title.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
-            <Input value={title} onChange={event => setTitle(event.target.value)} minLength={3} maxLength={100}/>
-          </Field>
-          <Field label="Description" className="text-sm sm:col-span-2" required error={createAttempted&&description.trim().length<10?"Enter a description with at least 10 characters.":undefined}>
-            <Textarea value={description} onChange={event => setDescription(event.target.value)} minLength={10} maxLength={2000}/>
-          </Field>
-          <Field label="Capacity" className="text-sm" required error={createAttempted&&(!Number.isInteger(maxMembers)||maxMembers<2||maxMembers>50)?"Choose a whole number from 2 to 50.":undefined}>
-            <Input type="number" min={2} max={50} value={maxMembers} onChange={event => setMaxMembers(Number(event.target.value))}/>
-          </Field>
-          <div className="flex items-end">
-            <Button type="submit" disabled={busy}>Create group</Button>
-          </div>
-        </form>
-        {data.sections.length === 0 && <p className="mt-3 text-sm text-muted-foreground">
-          No active teaching assignments are available.
-        </p>}
-      </section>}
-      <section className="mt-8 space-y-5" aria-label="Available study groups">
-        {data.groups.filter(group=>!requestedGroup||group.id===requestedGroup).map(group => <article key={group.id} className="rounded-xl border bg-card p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold"><Link to="/groups" search={{group:group.id}} className="hover:underline">{group.title}</Link></h2>
-              <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{group.description}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Capacity: {group.maxMembers}
-                {data.role === "student" ? " · " + (group.membershipStatus ?? "Not joined") : ""}
-              </p>
-            </div>
-            {data.role === "student" && (
-              group.membershipStatus === "pending"
-                ? <span className="rounded-full border px-3 py-1 text-xs">Awaiting review</span>
-                : group.membershipStatus === "approved"
-                ? <button disabled={busy} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
-                    onClick={() => void run(
-                      () => leaveCanonicalGroup({ data: { groupId: group.id } }),
-                      "You left the study group.",
-                    )}>Leave group</button>
-                : <button disabled={busy || data.hasEnrollmentGuardian !== true} className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
-                    onClick={() => void run(
-                      () => requestCanonicalGroupMembership({ data: { groupId: group.id } }),
-                      "Membership requested. A guardian and the facilitator must approve.",
-                    )}>Request to join</button>
-            )}
-          </div>
-          {data.role === "teacher" && <TeacherGroupControls
-            group={group} busy={busy} run={run}
-            inviteGroup={inviteGroup} setInviteGroup={setInviteGroup}
-            setInviteeLoad={setInviteeLoad}
-            invitees={invitees} selectedInviteeIds={selectedInviteeIds}
-            setSelectedInviteeIds={setSelectedInviteeIds}
-            inviteesLoading={inviteesLoading} inviteesError={inviteesError}
-            sessionGroup={sessionGroup} setSessionGroup={setSessionGroup}
-            sessionTitle={sessionTitle} setSessionTitle={setSessionTitle}
-            agenda={agenda} setAgenda={setAgenda}
-            sessionStarts={sessionStarts} setSessionStarts={setSessionStarts}
-            sessionEnds={sessionEnds} setSessionEnds={setSessionEnds}
-            reschedules={reschedules} setReschedules={setReschedules}
-          />}
-          {(data.role === "teacher" || group.membershipStatus === "approved") && (
-            <section className="mt-5 space-y-3 border-t pt-4" aria-label={group.title + " discussion"}>
-              <h3 className="text-sm font-semibold">Group discussion</h3>
-              {group.posts.map(post => <div key={post.id} className="rounded-lg border p-3">
-                <p className="text-sm whitespace-pre-wrap">{post.body}</p>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {formatTimestamp(post.createdAt, group.timezone)}
-                </p>
-                {data.role === "student" && <button type="button"
-                  className="mt-2 text-xs underline"
-                  onClick={() => { setReportingPost(reportingPost === post.id ? "" : post.id); setReportReason(""); }}>
-                  Report this post
-                </button>}
-                {data.role === "student" && reportingPost === post.id &&
-                  <form noValidate className="mt-3 flex flex-wrap items-end gap-2"
-                    onSubmit={event => { event.preventDefault();
-                      setReportAttempted(true);if(reportReason.trim().length<5)return;
-                      void run(async () => {
-                        await reportCanonicalGroupPost({ data: {
-                          groupId: group.id, postId: post.id, reason: reportReason,
-                        } });
-                        setReportingPost(""); setReportReason("");setReportAttempted(false);
-                      }, "Your report was sent for facilitator review.");
-                    }}>
-                    <Field label="Why should this post be reviewed?" className="min-w-52 flex-1 text-xs" required error={reportAttempted&&reportReason.trim().length<5?"Enter at least 5 characters explaining the report.":undefined}>
-                      <Input minLength={5} maxLength={1000} value={reportReason} onChange={event => setReportReason(event.target.value)}/>
-                    </Field>
-                    <Button type="submit" variant="outline" disabled={busy}>
-                      Send report
-                    </Button>
-                  </form>}
-              </div>)}
-              {group.posts.length === 0 && <p className="text-xs text-muted-foreground">No posts yet.</p>}
-              <form noValidate className="flex flex-col gap-2" onSubmit={event => {
-                event.preventDefault();
-                const body = drafts[group.id] ?? "";
-                setPostAttempted(current=>({...current,[group.id]:true}));if(!body.trim())return;
-                void run(async () => {
-                  await createCanonicalGroupPost({ data: { groupId: group.id, body } });
-                  setDrafts(previous => ({ ...previous, [group.id]: "" }));
-                  setPostAttempted(current=>({...current,[group.id]:false}));
-                }, "Post shared with your group.");
-              }}>
-                <Field label="New post" className="text-xs" required error={postAttempted[group.id]&&!(drafts[group.id]??"").trim()?"Enter a post before sending.":undefined}>
-                  <Textarea value={drafts[group.id] ?? ""}
-                    onChange={event => setDrafts(previous => ({ ...previous, [group.id]: event.target.value }))}
-                    maxLength={3000}
-                    placeholder="Share a question or a study tip" />
-                </Field>
-                <Button type="submit" disabled={busy} className="w-fit">Post message</Button>
-              </form>
-            </section>
+      <div className="mt-6 space-y-6">
+        <MutationFeedback
+          state={mutation}
+          pendingMessage="Saving group change..."
+        />
+        {workspace.role === "student" &&
+          workspace.hasEnrollmentGuardian === false && (
+            <WorkspaceNotice tone="danger">
+              A linked guardian is required to request study group membership.
+              Ask your school to verify your guardian relationship.
+            </WorkspaceNotice>
           )}
-          {group.sessions.length > 0 && <div className="mt-5 space-y-3 border-t pt-4">
-            <h3 className="text-sm font-semibold">Sessions</h3>
-            {group.sessions.map(session => <div key={session.id} className="rounded-lg border p-3">
-              <p className="text-sm font-semibold">{session.title}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {formatTimestamp(session.startsAt, group.timezone)} ({group.timezone}) · {session.location || "Location to be confirmed"}
-                {session.cancelled ? " · Cancelled" : ""}
+        {workspace.role === "teacher" && (
+          <WorkspacePanel
+            title="Membership requests"
+            description="Approvals require current guardian permission."
+          >
+            {pendingRequests.map(({ group, member }) => (
+              <div
+                key={member.id}
+                className="flex flex-wrap items-center justify-between gap-3 border-b py-3"
+              >
+                <div>
+                  <p className="text-sm font-medium">
+                    {member.studentName} ·{" "}
+                    <Link
+                      to="/groups/$groupId"
+                      params={{ groupId: group.id }}
+                      className="underline"
+                    >
+                      {group.title}
+                    </Link>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {member.guardianReady
+                      ? "Guardian permission recorded"
+                      : "Awaiting guardian permission"}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={busy || !availability.membershipEnabled}
+                    className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
+                    onClick={() =>
+                      void run(
+                        () =>
+                          decideCanonicalGroupMembership({
+                            data: {
+                              groupId: group.id,
+                              studentPersonId: member.studentPersonId,
+                              approve: false,
+                            },
+                          }),
+                        "Membership declined.",
+                      )
+                    }
+                  >
+                    Decline
+                  </button>
+                  <button
+                    disabled={
+                      busy ||
+                      !availability.membershipEnabled ||
+                      !member.guardianReady
+                    }
+                    className="rounded-lg bg-foreground px-3 py-2 text-xs text-background disabled:opacity-50"
+                    onClick={() =>
+                      void run(
+                        () =>
+                          decideCanonicalGroupMembership({
+                            data: {
+                              groupId: group.id,
+                              studentPersonId: member.studentPersonId,
+                              approve: true,
+                            },
+                          }),
+                        "Membership approved.",
+                      )
+                    }
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
+            {pendingRequests.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No pending membership requests.
               </p>
-              {session.agenda && <p className="mt-2 text-sm">{session.agenda}</p>}
-              {data.role === "student" && !session.cancelled &&
-                new Date(session.startsAt) > new Date() &&
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <span className="text-xs">Your RSVP: {session.rsvp ?? "not selected"}</span>
-                  {(["going", "maybe", "declined"] as const).map(value =>
-                    <button key={value} disabled={busy}
-                      className="rounded border px-3 py-1 text-xs disabled:opacity-50"
-                      onClick={() => void run(() => rsvpCanonicalGroupSession({
-                        data: { sessionId: session.id, rsvp: value },
-                      }), "RSVP updated.")}>{value}</button>)}
-                </div>}
-            </div>)}
-          </div>}
-        </article>)}
-        {data.groups.length === 0 && <p className="rounded-xl border p-5 text-sm text-muted-foreground">
-          {data.role === "teacher" ? "You have no facilitated study groups yet." :
-            "There are no available groups for your active program enrollments."}
-        </p>}
-      </section>
+            )}
+          </WorkspacePanel>
+        )}
+        {workspace.role === "teacher" && (
+          <WorkspacePanel
+            title="Content moderation"
+            description="Reported posts across your facilitated groups."
+          >
+            {openReports.map(({ group, report }) => (
+              <div key={report.id} className="border-b py-3">
+                <p className="text-xs font-semibold">
+                  <Link
+                    to="/groups/$groupId"
+                    params={{ groupId: group.id }}
+                    className="underline"
+                  >
+                    {group.title}
+                  </Link>
+                </p>
+                <p className="mt-2 text-sm">Reason: {report.reason}</p>
+                <blockquote className="mt-2 rounded border bg-muted p-3 text-sm whitespace-pre-wrap">
+                  {report.postBody ?? "The reported post is unavailable."}
+                </blockquote>
+                {report.postHidden && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Post already hidden
+                  </p>
+                )}
+                <div className="mt-2 flex gap-2">
+                  <button
+                    disabled={busy || !availability.moderationEnabled}
+                    className="rounded border px-3 py-2 text-xs disabled:opacity-50"
+                    onClick={() =>
+                      void run(
+                        () =>
+                          resolveCanonicalGroupReport({
+                            data: {
+                              reportId: report.id,
+                              hidePost: true,
+                            },
+                          }),
+                        "Reported post hidden.",
+                      )
+                    }
+                  >
+                    Hide and resolve
+                  </button>
+                  <button
+                    disabled={busy || !availability.moderationEnabled}
+                    className="rounded border px-3 py-2 text-xs disabled:opacity-50"
+                    onClick={() =>
+                      void run(
+                        () =>
+                          resolveCanonicalGroupReport({
+                            data: {
+                              reportId: report.id,
+                              hidePost: false,
+                            },
+                          }),
+                        "Report reviewed; content retained.",
+                      )
+                    }
+                  >
+                    Resolve only
+                  </button>
+                </div>
+              </div>
+            ))}
+            {openReports.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No open content reports.
+              </p>
+            )}
+          </WorkspacePanel>
+        )}
+        <section
+          aria-label="Available study groups"
+          className="grid gap-4 md:grid-cols-2"
+        >
+          {workspace.groups.map((group) => {
+            const next = nextGroupSession(group);
+            return (
+              <EntityCard
+                key={group.id}
+                title={group.title}
+                subtitle={`${groupKindLabel(group.kind)} · Facilitated by ${group.facilitatorName}`}
+                status={
+                  workspace.role === "student" ? (
+                    <StatusBadge
+                      tone={
+                        group.membershipStatus === "approved"
+                          ? "success"
+                          : group.membershipStatus === "pending"
+                            ? "attention"
+                            : "neutral"
+                      }
+                    >
+                      {group.membershipStatus ?? "Not joined"}
+                    </StatusBadge>
+                  ) : (
+                    <StatusBadge tone="neutral">Facilitator</StatusBadge>
+                  )
+                }
+                meta={
+                  `${group.memberCount} of ${group.maxMembers} members` +
+                  (next
+                    ? ` · Next session ${formatTimestamp(next.startsAt, group.timezone)}`
+                    : "")
+                }
+                openLabel="Open group"
+                renderLink={({ className, children }) => (
+                  <Link
+                    to="/groups/$groupId"
+                    params={{ groupId: group.id }}
+                    className={className}
+                    aria-label={`Open ${group.title} study group`}
+                  >
+                    {children}
+                  </Link>
+                )}
+              >
+                <p className="line-clamp-3">{group.description}</p>
+              </EntityCard>
+            );
+          })}
+        </section>
+        {workspace.groups.length === 0 && (
+          <EmptyState
+            title={
+              workspace.role === "teacher"
+                ? "You have no facilitated study groups yet."
+                : "There are no available groups for your active program enrollments."
+            }
+            description={
+              workspace.role === "teacher"
+                ? "Create a group for a section you teach to get started."
+                : "Groups require active program enrollment and, for course groups, matching class enrollment. Contact your school if an expected group is missing."
+            }
+          />
+        )}
+      </div>
     </WorkspaceShell>
   );
 }
-
-function TeacherGroupControls({ group, busy, run, sessionGroup, setSessionGroup,
-  inviteGroup, setInviteGroup, invitees, selectedInviteeIds, setSelectedInviteeIds,
-  setInviteeLoad, inviteesLoading, inviteesError,
-  sessionTitle, setSessionTitle, agenda, setAgenda, sessionStarts, setSessionStarts,
-  sessionEnds, setSessionEnds, reschedules, setReschedules,
-}: {
-  group: Group; busy: boolean; run: (work: () => Promise<unknown>, message: string) => Promise<void>;
-  inviteGroup: string; setInviteGroup: (value: string) => void;
-  setInviteeLoad: (value: InviteeLoad) => void;
-  invitees: Awaited<ReturnType<typeof listCanonicalGroupInvitees>>;
-  selectedInviteeIds: string[];
-  setSelectedInviteeIds: (value: string[] | ((previous: string[]) => string[])) => void;
-  inviteesLoading: boolean; inviteesError: string;
-  sessionGroup: string; setSessionGroup: (value: string) => void;
-  sessionTitle: string; setSessionTitle: (value: string) => void;
-  agenda: string; setAgenda: (value: string) => void;
-  sessionStarts: string; setSessionStarts: (value: string) => void;
-  sessionEnds: string; setSessionEnds: (value: string) => void;
-  reschedules: Record<string, { start: string; end: string }>;
-  setReschedules: (value: Record<string, { start: string; end: string }>) => void;
-}) {
-  const [inviteAttempted,setInviteAttempted]=useState(false);
-  const [sessionAttempted,setSessionAttempted]=useState(false);
-  return <div className="mt-5 space-y-4 border-t pt-4">
-    <h3 className="text-sm font-semibold">Membership requests</h3>
-    {group.pendingMembers.map(member => <div key={member.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-      <div><p className="text-sm font-medium">{member.studentName}</p>
-        <p className="text-xs text-muted-foreground">
-          {member.guardianReady ? "Guardian permission recorded" : "Awaiting guardian permission"}
-        </p></div>
-      <div className="flex gap-2">
-        <button disabled={busy} className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
-          onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
-            groupId: group.id, studentPersonId: member.studentPersonId, approve: false,
-          } }), "Membership declined.")}>Decline</button>
-        <button disabled={busy || !member.guardianReady}
-          className="rounded-lg bg-foreground px-3 py-2 text-xs text-background disabled:opacity-50"
-          onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
-            groupId: group.id, studentPersonId: member.studentPersonId, approve: true,
-          } }), "Membership approved.")}>Approve</button>
-      </div>
-    </div>)}
-    {!group.pendingMembers.length && <p className="text-xs text-muted-foreground">No pending memberships.</p>}
-    <button type="button" disabled={busy}
-      className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
-      onClick={() => {
-        setSelectedInviteeIds([]);
-        if (inviteGroup !== group.id) setInviteeLoad({ groupId: "", invitees: [], error: "" });
-        setInviteGroup(inviteGroup === group.id ? "" : group.id);
-      }}>
-      {inviteGroup === group.id ? "Close invitations" : "Invite students"}
-    </button>
-    {inviteGroup === group.id && <form noValidate className="space-y-3 rounded-lg border p-4"
-      onSubmit={event => {
-        event.preventDefault();
-        setInviteAttempted(true);if(!selectedInviteeIds.length)return;
-        void run(async () => {
-          await inviteCanonicalGroupMembers({ data: {
-            groupId: group.id, studentPersonIds: selectedInviteeIds,
-          } });
-          setSelectedInviteeIds([]);
-          setInviteGroup("");
-          setInviteAttempted(false);
-        }, "Invitations sent. Students still need guardian permission and facilitator approval to join.");
-      }}>
-      <p className="text-xs text-muted-foreground">
-        Invitations notify students; they must request membership before joining.
-      </p>
-      {inviteesLoading && <p role="status" className="text-xs text-muted-foreground">Loading eligible students...</p>}
-      {inviteesError && <p role="alert" className="text-xs text-destructive">{inviteesError}</p>}
-      {!inviteesLoading && !inviteesError && invitees.length === 0 &&
-        <p className="text-xs text-muted-foreground">No eligible students are available to invite.</p>}
-      {invitees.map(student => <label key={student.personId} className="flex items-center gap-2 text-sm">
-        <input type="checkbox" disabled={busy} checked={selectedInviteeIds.includes(student.personId)}
-          onChange={event => setSelectedInviteeIds(ids => event.target.checked
-            ? [...ids, student.personId]
-            : ids.filter(id => id !== student.personId))} />
-        {student.firstName} {student.lastName}
-      </label>)}
-      {inviteAttempted&&!selectedInviteeIds.length&&<FieldError>Select at least one student to invite.</FieldError>}
-      <Button type="submit" disabled={busy || inviteesLoading}>
-        {busy ? "Sending invitations..." : "Send invitations"}
-      </Button>
-    </form>}
-    <h3 className="text-sm font-semibold">Content moderation</h3>
-    {group.reports.map(report => <div key={report.id}
-      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-      <p className="text-sm">Report: {report.reason}</p>
-      <div className="flex gap-2">
-        <button type="button" disabled={busy} className="rounded border px-3 py-2 text-xs disabled:opacity-50"
-          onClick={() => void run(() => resolveCanonicalGroupReport({ data: {
-            reportId: report.id, hidePost: false,
-          } }), "Report reviewed; content retained.")}>Retain post</button>
-        <button type="button" disabled={busy}
-          className="rounded border border-amber-500 px-3 py-2 text-xs disabled:opacity-50"
-          onClick={() => void run(() => resolveCanonicalGroupReport({ data: {
-            reportId: report.id, hidePost: true,
-          } }), "Reported post hidden.")}>Hide post</button>
-      </div>
-    </div>)}
-    {!group.reports.length && <p className="text-xs text-muted-foreground">No open content reports.</p>}
-    <h3 className="text-sm font-semibold">Session attendance</h3>
-    {group.sessions.filter(session => !session.cancelled && new Date(session.startsAt) <= new Date())
-      .map(session => <div key={session.id} className="rounded-lg border p-3">
-        <p className="text-sm font-semibold">{session.title}</p>
-        {group.roster.map(student => {
-          const attendance = session.attendance.find(row => row.personId === student.personId);
-          return <div key={student.personId} className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="flex-1 text-xs">{student.studentName}
-              {" · "}{attendance?.attended === true ? "Present" :
-                attendance?.attended === false ? "Absent" : "Not recorded"}</span>
-            {([true, false] as const).map(attended =>
-              <button type="button" key={String(attended)} disabled={busy}
-                className="rounded border px-2 py-1 text-xs disabled:opacity-50"
-                onClick={() => void run(() => recordCanonicalGroupAttendance({ data: {
-                  sessionId: session.id, studentPersonId: student.personId, attended,
-                } }), "Attendance saved.")}>{attended ? "Present" : "Absent"}</button>)}
-          </div>;
-        })}
-        {group.roster.length === 0 &&
-          <p className="mt-2 text-xs text-muted-foreground">No approved students to mark.</p>}
-      </div>)}
-    <button type="button" className="rounded-lg border px-3 py-2 text-xs"
-      onClick={() => setSessionGroup(sessionGroup === group.id ? "" : group.id)}>
-      {sessionGroup === group.id ? "Close scheduler" : "Schedule session"}
-    </button>
-    {sessionGroup === group.id && <form noValidate className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
-      onSubmit={event => {
-        event.preventDefault();
-        setSessionAttempted(true);
-        if(sessionTitle.trim().length<3||!sessionStarts||!sessionEnds||sessionEnds<=sessionStarts)return;
-        void run(async () => {
-          await createCanonicalGroupSession({ data: {
-            groupId: group.id, title: sessionTitle, agenda, startsAt: siteLocalTimeToIso(sessionStarts, group.timezone),
-            endsAt: siteLocalTimeToIso(sessionEnds, group.timezone),
-          } });
-          setSessionTitle(""); setAgenda(""); setSessionStarts(""); setSessionEnds("");
-          setSessionGroup("");
-          setSessionAttempted(false);
-        }, "Session scheduled.");
-      }}>
-      <Field label="Session title" className="text-sm" required error={sessionAttempted&&sessionTitle.trim().length<3?"Enter a session title with at least 3 characters.":undefined}>
-        <Input minLength={3} maxLength={150} value={sessionTitle} onChange={event => setSessionTitle(event.target.value)}/>
-      </Field>
-      <Field label="Agenda" className="text-sm"><Input value={agenda} onChange={event => setAgenda(event.target.value)}/></Field>
-      <Field label={`Start (${group.timezone})`} className="text-sm" required
-        error={sessionAttempted&&!sessionStarts?"Choose a session start time.":undefined}>
-        <Input type="datetime-local" value={sessionStarts} onChange={event => setSessionStarts(event.target.value)}/>
-      </Field>
-      <Field label={`End (${group.timezone})`} className="text-sm" required
-        error={sessionAttempted&&(!sessionEnds||sessionEnds<=sessionStarts)?"Choose an end time later than the start.":undefined}>
-        <Input type="datetime-local" value={sessionEnds} onChange={event => setSessionEnds(event.target.value)}/>
-      </Field>
-      <button disabled={busy}
-        className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
-        Schedule session
-      </button>
-    </form>}
-    {group.sessions.filter(session => !session.cancelled && new Date(session.startsAt) > new Date())
-      .map(session => {
-        const edited = reschedules[session.id] ?? {
-          start: dateTimeInputValue(session.startsAt, group.timezone), end: dateTimeInputValue(session.endsAt, group.timezone),
-        };
-        return <div key={session.id} className="rounded-lg border p-3">
-          <p className="mb-2 text-sm font-semibold">Change {session.title}</p>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs">Start ({group.timezone})
-              <input type="datetime-local" value={edited.start}
-                onChange={event => setReschedules({
-                  ...reschedules, [session.id]: { ...edited, start: event.target.value },
-                })} className="mt-1 block rounded border bg-background p-2" />
-            </label>
-            <label className="text-xs">End ({group.timezone})
-              <input type="datetime-local" value={edited.end}
-                onChange={event => setReschedules({
-                  ...reschedules, [session.id]: { ...edited, end: event.target.value },
-                })} className="mt-1 block rounded border bg-background p-2" />
-            </label>
-            <button type="button" disabled={busy}
-              className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
-              onClick={() => void run(() => reviseCanonicalGroupSession({ data: {
-                sessionId: session.id, action: "reschedule",
-                startsAt: siteLocalTimeToIso(edited.start, group.timezone), endsAt: siteLocalTimeToIso(edited.end, group.timezone),
-              } }), "Session rescheduled.")}>Save time</button>
-            <button type="button" disabled={busy}
-              className="rounded-lg border border-amber-500 px-3 py-2 text-xs disabled:opacity-50"
-              onClick={() => void run(() => reviseCanonicalGroupSession({ data: {
-                sessionId: session.id, action: "cancel",
-              } }), "Session cancelled.")}>Cancel session</button>
-          </div>
-        </div>;
-      })}
-  </div>;
-}
-import { MutationFeedback } from "@/components/workspace/mutation-feedback";

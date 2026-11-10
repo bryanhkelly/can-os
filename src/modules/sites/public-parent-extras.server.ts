@@ -8,6 +8,7 @@ import { readApprovedPublicSitePeople } from "./site-public-people.server";
 import { readApprovedPublicSchoolDay } from "@/modules/academic-time/public-school-day.server";
 import { resolvePublishedFamilyStartDestination } from "@/modules/enrollment/public-family-start.server";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { isSyntheticSandboxMailRuntime } from "@/modules/identity/resend-access-mail.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import {
@@ -214,7 +215,10 @@ export async function readApprovedPublicParentExtras(
     const states: NonNullable<PublicAdmissionsState["programs"]> = [];
     for (const program of programs) {
       let eligible = false;
-      if (!demo) {
+      // Demo tenants may surface verified application starts only inside the
+      // isolated synthetic mail sandbox; development and production keep
+      // their public Apply experience fully suppressed.
+      if (!demo || isSyntheticSandboxMailRuntime()) {
         try {
           await resolvePublishedFamilyStartDestination(
             executor, program.programId, published.slug);

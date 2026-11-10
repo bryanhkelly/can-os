@@ -74,8 +74,8 @@ function SiteTodayPage() {
       <DashboardShortcut title="Calendar" description={`Dates in ${data.site.timezone}`} icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:data.localDate}} /></DashboardShortcut>
     </>}
     rail={<DashboardCalendar date={data.localDate} timezone={data.site.timezone} />}
-    actions={data.viewerCanOpenSchoolProfile?<Link className={secondaryActionClassName} to="/sites/$siteId/profile"
-      params={{siteId:data.site.id}}>School profile</Link>:undefined}
+    actions={<Link className={secondaryActionClassName} to="/sites/$siteId/profile"
+      params={{siteId:data.site.id}}>School profile</Link>}
     priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([

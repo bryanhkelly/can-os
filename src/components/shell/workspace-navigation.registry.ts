@@ -1,5 +1,28 @@
 import { ownedRoutes } from "./route-navigation";
 import { roleCapabilities } from "@/domain/access-context";
+import { optionalSearchUuid } from "@/lib/route-search";
+
+const destinationContextKeys: Record<string, readonly string[]> = {
+  "/home": ["siteId", "programId"],
+  "/launch/school": ["siteId", "programId"],
+  "/operations/curriculum": ["programId"],
+  "/operations/teacher-marketplace": ["programId"],
+  "/classes": ["section"],
+  "/student/courses": ["section"],
+  "/teacher/gradebook": ["section"],
+  "/guardian/students": ["section"],
+  "/calendar": ["section"],
+};
+
+export function workspaceDestination(path: string, currentSearch: string): string {
+  const current = new URLSearchParams(currentSearch);
+  const selection = new URLSearchParams();
+  for (const key of destinationContextKeys[path] ?? []) {
+    const value = optionalSearchUuid.parse(current.get(key) ?? undefined);
+    if (value) selection.set(key, value);
+  }
+  return selection.size ? `${path}?${selection.toString()}` : path;
+}
 
 export interface WorkspaceNavigationItem {
   title: string;
@@ -89,13 +112,13 @@ const roleLinks = {
   can_jurisdiction_reviewer: [],
   student: [
     { title: "Learn", path: "/student/courses", icon: "book" },
-    { title: "My School", path: "/student/my-school", icon: "users" },
+    { title: "School profile", path: "/student/my-school", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
     { title: "Support", path: "/student/support", icon: "support" },
   ],
   guardian: [
-    { title: "Children & academics", path: "/guardian/academics", icon: "book" },
-    { title: "School", path: "/guardian/experiences", icon: "users" },
+    { title: "Students", path: "/guardian/students", icon: "book" },
+    { title: "School profile", path: "/guardian/experiences", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
   ],
   teacher: [

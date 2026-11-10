@@ -77,7 +77,7 @@ function CurriculumCard({ pack, programId, selected }: { pack: Pack; programId: 
       </div>
       <div className="flex flex-1 flex-col gap-3 p-5">
         <p className="text-xs text-muted-foreground">{pack.publisherName} · Version {pack.version}</p>
-        <h3 className="font-serif text-xl font-semibold">{pack.name}</h3>
+        <h3 className="font-serif text-xl font-semibold"><Link to="/operations/curriculum-marketplace" search={{ programId }} hash={`curriculum-pack-${pack.versionId}`} className="underline underline-offset-4">{pack.name}</Link></h3>
         <p className="text-sm text-muted-foreground">{pack.description}</p>
         <p className="text-sm font-medium">{pack.courses.length} {pack.courses.length === 1 ? "course" : "courses"} · {pack.licenseCode}</p>
         {selected && (

@@ -1,21 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { calendarItemDestination, filterCalendarItems } from "@/domain/calendar-view";
+import { calendarEventDetailsDestination, calendarItemDestination, calendarRecordDestination, filterCalendarItems } from "@/domain/calendar-view";
 import { prioritizeFamilyNeeds, familyActionWorkspaceLink } from "@/domain/family-needs";
 import { launchReadiness } from "@/domain/launch-readiness";
 
 describe("calendar view filters", () => {
+  it("opens every activity in calendar details while preserving the current view", () => {
+    expect(calendarEventDetailsDestination("study-session", "2026-11-02", { view: "week", q: "study" })).toEqual({
+      to: "/calendar", search: { view: "week", q: "study", date: "2026-11-02", event: "study-session" },
+    });
+    expect(calendarEventDetailsDestination("assessment:essay", "2026-11-02", { section: "english" })).toEqual({
+      to: "/calendar", search: { section: "english", date: "2026-11-02", event: "assessment:essay" },
+    });
+  });
   it("binds guardian assignment links to an authorized child without guessing between siblings", () => {
     const first = { studentPersonId: "jordan", studentName: "Jordan Student" };
     const second = { studentPersonId: "casey", studentName: "Casey Student" };
     const item = { id: "assessment:essay", source: "assessment" as const,
       sectionId: "english", guardianStudents: [first] };
     expect(calendarItemDestination(item, "guardian")).toEqual({
-      to: "/guardian/academics", search: { student: "jordan", section: "english", assessment: "essay" },
+      to: "/guardian/students", search: { student: "jordan", section: "english", assessment: "essay" },
     });
     const siblings = { ...item, guardianStudents: [first, second] };
     expect(calendarItemDestination(siblings, "guardian")).toBeNull();
     expect(calendarItemDestination(siblings, "guardian", "casey")).toEqual({
-      to: "/guardian/academics", search: { student: "casey", section: "english", assessment: "essay" },
+      to: "/guardian/students", search: { student: "casey", section: "english", assessment: "essay" },
     });
     expect(calendarItemDestination(siblings, "guardian", "unrelated")).toBeNull();
     expect(calendarItemDestination({ ...item, guardianStudents: [] }, "guardian")).toBeNull();
@@ -34,6 +42,40 @@ describe("calendar view filters", () => {
     expect(calendarItemDestination({ ...item, id: "essay" }, "student")).toBeNull();
     expect(calendarItemDestination({ ...item, source: "section" }, "student")).toBeNull();
   });
+  it("links section events and class times to the class workspace for authorized classroom roles only", () => {
+    const classTime = { type: "class_time", source: "section" as const, sectionId: "english" };
+    expect(calendarRecordDestination(classTime, "student")).toEqual({
+      to: "/classes", search: { section: "english" },
+    });
+    expect(calendarRecordDestination({ ...classTime, type: "class_session" }, "teacher")).toEqual({
+      to: "/classes", search: { section: "english" },
+    });
+    expect(calendarRecordDestination({ ...classTime,
+      guardianStudents: [{ studentPersonId: "jordan", studentName: "Jordan Student" }] }, "guardian")).toEqual({
+      to: "/classes", search: { section: "english", student: "jordan" },
+    });
+    expect(calendarRecordDestination({ ...classTime, guardianStudents: [
+      { studentPersonId: "jordan", studentName: "Jordan Student" },
+      { studentPersonId: "casey", studentName: "Casey Student" },
+    ] }, "guardian")).toBeNull();
+    expect(calendarRecordDestination(classTime, "registrar")).toBeNull();
+    expect(calendarRecordDestination(classTime, "room_facilitator")).toBeNull();
+    expect(calendarRecordDestination({ ...classTime, sectionId: null }, "student")).toBeNull();
+  });
+  it("links field trip events to the viewer's field trip workspace", () => {
+    const trip = { type: "field_trip", source: "site" as const,
+      sourceType: "field_trip", sourceId: "museum-trip" };
+    expect(calendarRecordDestination(trip, "registrar")).toEqual({
+      to: "/operations/field-trips/$tripId", params: { tripId: "museum-trip" },
+    });
+    expect(calendarRecordDestination(trip, "guardian")).toEqual({ to: "/guardian/field-trips" });
+    expect(calendarRecordDestination(trip, "student")).toEqual({
+      to: "/student/field-trips", search: { trip: "museum-trip" },
+    });
+    expect(calendarRecordDestination(trip, "teacher")).toBeNull();
+    expect(calendarRecordDestination({ ...trip, sourceId: null }, "registrar")).toBeNull();
+    expect(calendarRecordDestination({ ...trip, sourceType: "site" }, "registrar")).toBeNull();
+  });
   const items = [
     { id: "lesson", source: "section" as const, sectionId: "english" },
     { id: "essay", source: "assessment" as const, sectionId: "english" },
@@ -44,9 +86,13 @@ describe("calendar view filters", () => {
   it("leaves the unfiltered authorized feed intact", () => {
     expect(filterCalendarItems(items, {})).toEqual(items);
   });
-  it("composes exact class and source filters without including school or personal events", () => {
+  it("composes exact class, source, and text filters without including unrelated events", () => {
     expect(filterCalendarItems(items, { section: "english" }).map(item => item.id)).toEqual(["lesson", "essay"]);
     expect(filterCalendarItems(items, { section: "english", source: "assessment" }).map(item => item.id)).toEqual(["essay"]);
+    expect(filterCalendarItems([
+      { id: "study", source: "study_group" as const, title: "Evening study group", description: "Chemistry" },
+      { id: "school", source: "site" as const, title: "School assembly", description: null },
+    ], { q: "CHEM" }).map(item => item.id)).toEqual(["study"]);
     expect(filterCalendarItems(items, { section: "unknown" })).toEqual([]);
   });
 });

@@ -134,7 +134,7 @@ export function FieldTripOperationsView({ data, mode="directory", tripId }: { da
         rows={data.trips} rowKey={trip=>trip.id} empty={<EmptyState title="No field trips yet"/>}
         columns={[
           {id:"trip",title:"Trip",render:trip=><Link to="/operations/field-trips/$tripId" params={{tripId:trip.id}} className="font-semibold underline">{trip.title}</Link>},
-          {id:"site",title:"School",render:trip=>trip.siteName},
+          {id:"site",title:"School",render:trip=><Link to="/sites/$siteId/profile" params={{siteId:trip.siteId}} className="underline">{trip.siteName}</Link>},
           {id:"departure",title:"Departs",render:trip=>formatTimestamp(trip.departsAt,trip.timezone)},
           {id:"status",title:"Status",render:trip=>trip.status},
           {id:"participants",title:"Participants",render:trip=>trip.roster.length},
@@ -162,7 +162,7 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
       <div>
         <h3 className="text-lg font-semibold">{trip.title}</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          {trip.siteName} · {trip.destination}
+          <Link to="/sites/$siteId/profile" params={{siteId:trip.siteId}} className="underline">{trip.siteName}</Link> · {trip.destination}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           Departs {formatTimestamp(trip.departsAt, trip.timezone)} ({trip.timezone}) ·

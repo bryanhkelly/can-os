@@ -38,6 +38,7 @@ import { lockAdmissionsApplication } from "@/domain/admissions-application-lock"
 import { assertApplicationOffersAllowed } from "@/domain/admissions-policy";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
+import { requireCurrentSchoolJurisdictionForEnrollment } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,desc,eq,inArray,isNotNull,isNull,or,sql } from "drizzle-orm";
 
@@ -769,6 +770,9 @@ export async function activateEnrollmentFromApplication(
       .limit(1);
 
     if (existing) return existing.id;
+
+    if(programForYear.siteId)
+      await requireCurrentSchoolJurisdictionForEnrollment(tx,application.programId,{});
 
     if (!journey || journey.status !== "ready") {
       throw new Error("Enrollment Journey must be ready before activation");

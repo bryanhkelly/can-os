@@ -1,9 +1,32 @@
 import { describe, expect, it } from "vitest";
-import { getActiveWorkspacePath, workspaceLinks } from "./workspace-navigation.registry";
+import { getActiveWorkspacePath, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
 import { routeNavigation } from "./route-navigation";
 import { roleCapabilities } from "@/domain/access-context";
 
 describe("generated workspace navigation", () => {
+  const siteId = "00000000-0000-4000-8000-000000000001";
+  const programId = "00000000-0000-4000-8000-000000000002";
+  const section = "00000000-0000-4000-8000-000000000003";
+
+  it("preserves only the destination's supported institutional context", () => {
+    const search = `?siteId=${siteId}&programId=${programId}&section=${section}&action=private&thread=private`;
+    expect(workspaceDestination("/launch/school", search)).toBe(`/launch/school?siteId=${siteId}&programId=${programId}`);
+    expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
+    expect(workspaceDestination("/messages", search)).toBe("/messages");
+  });
+
+  it("keeps class context across learning, grading, and calendar destinations", () => {
+    for (const path of ["/classes", "/student/courses", "/teacher/gradebook", "/guardian/students", "/calendar"]) {
+      expect(workspaceDestination(path, `?section=${section}&assessment=selected&tab=grades`))
+        .toBe(`${path}?section=${section}`);
+    }
+  });
+
+  it("drops malformed context before navigating into strict route validators", () => {
+    expect(workspaceDestination("/classes", "?section=invalid")).toBe("/classes");
+    expect(workspaceDestination("/home", `?siteId=invalid&programId=${programId}`)).toBe(`/home?programId=${programId}`);
+  });
+
   it("gives every verified workspace one Settings link, without adding a new settings state engine", () => {
     for (const links of Object.values(workspaceLinks)) {
       expect(links.filter(item => item.path === "/settings")).toHaveLength(1);

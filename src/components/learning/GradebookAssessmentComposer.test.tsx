@@ -1,15 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { GradebookAssessmentComposer } from "./GradebookAssessmentComposer";
+import { GradebookAssessmentComposer, emptyAssessmentContentInput } from "./GradebookAssessmentComposer";
 
 const noop=()=>{};
 const base={
  title:"Practice quiz",points:"10",due:"",releaseAt:"",closeAt:"",
  assignmentKind:"quiz" as const,curriculumLessonId:"",maxAttempts:"",instructions:"",
- newRubric:[],publishConfirmed:false,busy:false,lessons:[],
+ newRubric:[],publishConfirmed:false,busy:false,lessons:[],content:emptyAssessmentContentInput,
  onTitleChange:noop,onPointsChange:noop,onDueChange:noop,onReleaseChange:noop,onCloseChange:noop,
  onKindChange:noop,onLessonChange:noop,onAttemptsChange:noop,onInstructionsChange:noop,
- onRubricChange:noop,onPublishConfirmedChange:noop,onSubmit:noop,
+ onRubricChange:noop,onPublishConfirmedChange:noop,onSubmit:noop,onContentChange:noop,
 };
 
 describe("GradebookAssessmentComposer",()=>{

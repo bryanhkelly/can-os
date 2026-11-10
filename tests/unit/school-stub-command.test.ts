@@ -18,6 +18,8 @@ const siteId="00000000-0000-4000-8000-000000000002";
 const input={organizationId,name:"New School",slug:"new-school",timezone:"America/New_York",stubOnly:true,planningLocation:{city:"Tampa",state:"FL"}};
 beforeEach(()=>{
   vi.clearAllMocks();state.existing=null;
+  state.provision.mockResolvedValue({slug:"new-school",host:"new-school.example.test",status:"draft"});
+  state.ensure.mockResolvedValue({slug:"new-school",host:"new-school.example.test",status:"draft",created:false});
   state.context={role:"registrar",actorPersonId:"operator",grantSiteId:null,capabilities:new Set(["program.launch.start"]),scope:{organizationIds:[organizationId]}};
   state.insert.mockImplementation(()=>({values:()=>({returning:async()=>[{id:siteId}]})}));
   state.transaction.mockImplementation(async callback=>callback({execute:vi.fn(),insert:state.insert,
@@ -25,16 +27,16 @@ beforeEach(()=>{
   }));
 });
 describe("minimal school stub command",()=>{
-  it("creates only a canonical Site and audit/event, without reserving a website or starting a Program",async()=>{
-    await expect(createLaunchSite({data:input})).resolves.toMatchObject({siteId,replayed:false,publicSiteDraft:null});
+  it("creates a canonical Site and private website draft without starting a Program",async()=>{
+    await expect(createLaunchSite({data:input})).resolves.toMatchObject({siteId,replayed:false,publicSiteDraft:{status:"draft"}});
     expect(state.insert).toHaveBeenCalledOnce();expect(state.audit).toHaveBeenCalledOnce();expect(state.emit).toHaveBeenCalledOnce();
-    expect(state.provision).not.toHaveBeenCalled();expect(state.ensure).not.toHaveBeenCalled();expect(state.startProgram).not.toHaveBeenCalled();
+    expect(state.provision).toHaveBeenCalledOnce();expect(state.ensure).not.toHaveBeenCalled();expect(state.startProgram).not.toHaveBeenCalled();
     expect(state.audit.mock.calls[0][2].after.schoolPlanningLocation).toEqual({city:"Tampa",state:"FL"});
   });
   it("reuses the saved stub after an uncertain response without duplicate writes",async()=>{
     state.existing={id:siteId,...input,address:null,metadata:{schoolPlanningLocation:input.planningLocation}};
-    await expect(createLaunchSite({data:input})).resolves.toMatchObject({siteId,replayed:true,publicSiteDraft:null});
-    expect(state.insert).not.toHaveBeenCalled();expect(state.audit).not.toHaveBeenCalled();expect(state.ensure).not.toHaveBeenCalled();
+    await expect(createLaunchSite({data:input})).resolves.toMatchObject({siteId,replayed:true,publicSiteDraft:{status:"draft"}});
+    expect(state.insert).not.toHaveBeenCalled();expect(state.audit).not.toHaveBeenCalled();expect(state.ensure).toHaveBeenCalledOnce();
   });
   it("refuses a changed planning location instead of adopting a different school",async()=>{
     state.existing={id:siteId,...input,address:null,metadata:{schoolPlanningLocation:{city:"Miami",state:"FL"}}};

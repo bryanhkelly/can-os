@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { StatusBadge } from "@/components/workspace";
 import { useCallback, useEffect, useState } from "react";
 import { TeacherStudentGoalForm } from "./TeacherStudentGoalForm";
 import { TeacherStudentGoalReviewForm } from "./TeacherStudentGoalReviewForm";
@@ -82,7 +83,7 @@ function TeacherFollowUpResolution({ item, onSaved }: { item: QueueItem; onSaved
   </div>;
 }
 
-export function TeacherLearningFollowUpsPanel() {
+export function TeacherLearningFollowUpsPanel({ revision = 0 }: { revision?: number }) {
   const [data, setData] = useState<Awaited<ReturnType<typeof getTeacherLearningFollowUps>> | null>(null);
   const [error, setError] = useState("");
   const load = useCallback(() => {
@@ -90,7 +91,7 @@ export function TeacherLearningFollowUpsPanel() {
       setData(value); setError("");
     }).catch(() => setError("Unable to load your assigned learning follow-ups."));
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, revision]);
 
   return <section className="mt-10" aria-label="My teacher learning follow-ups">
     <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">My learning follow-ups</p>
@@ -105,15 +106,24 @@ export function TeacherLearningFollowUpsPanel() {
       {!data.items.length && <p className="mt-4 text-sm">No open or recently resolved learning follow-ups in your assigned classes.</p>}
       <div className="mt-4 grid gap-3">
         {data.items.map(item => <article className="rounded-xl border p-4" key={item.id}>
-          <p className="text-xs text-muted-foreground">{item.sectionTitle} · {item.status.replaceAll("_", " ")}
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{item.sectionTitle}</span>
+            <StatusBadge tone={item.status === "resolved" ? "success" : item.status === "waiting" ? "attention" : item.status === "in_progress" ? "info" : "neutral"}>
+              <span className="capitalize">{item.status.replaceAll("_", " ")}</span>
+            </StatusBadge>
+            <span>
             {item.dueAt ? ` · due ${new Date(item.dueAt).toLocaleDateString()}` : ""}
-          </p>
+            </span>
+          </div>
           <p className="mt-1 font-semibold"><Link to="/staff/students/$personId"
             params={{ personId: item.studentPersonId }} className="underline">{item.studentName}</Link></p>
           {item.description && <p className="mt-1 text-sm">{item.description}</p>}
           <p className="mt-1 text-xs text-muted-foreground">
             Planned support: {followUpApproachLabels[item.approach as keyof typeof followUpApproachLabels] ?? "Teacher check-in"}
           </p>
+          <nav aria-label={`Related work for ${item.studentName}`} className="mt-3 flex flex-wrap gap-4 text-sm">
+            <Link to="/actions/$actionId" params={{ actionId: item.id }} className="underline">Action details</Link>
+            <Link to="/teacher/gradebook" search={{ section: item.sectionId, student: item.studentProfileId }} className="underline">Review student work</Link>
+          </nav>
           {!item.studentGoal && item.status !== "resolved" &&
             <TeacherStudentGoalForm teacherActionId={item.id} />}
           {item.studentGoal?.status === "resolved" &&

@@ -15,8 +15,7 @@ import { Route as CourseRequests } from "@/routes/operations.course-requests";
 import { Route as CourseApprovals } from "@/routes/guardian.course-approvals";
 import { Route as Offers } from "@/routes/guardian.admission-offers";
 import { Route as Permissions } from "@/routes/guardian.group-permissions";
-import { Route as StudentGroups } from "@/routes/student.study-groups";
-import { Route as TeacherGroups } from "@/routes/teacher.study-groups";
+import { Route as Groups } from "@/routes/groups";
 import { readinessFromSnapshot } from "@/domain/program-readiness";
 import { admissionsNextStep } from "@/components/admissions/AdmissionsApplicantCard";
 import { AdmissionsGuardianActions } from "@/components/admissions/AdmissionsGuardianActions";
@@ -191,7 +190,7 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("English Literature");
     expect(html).not.toContain("Mathematics");
     expect(html).toContain('href="/student/assignments?section=english"');
-    expect(html).toContain('href="/student/study-groups"');
+    expect(html).toContain('href="/groups"');
   });
 
   it("redirects an enrolled course overview to that class's lesson workspace",()=>{
@@ -701,11 +700,16 @@ describe("application contextual navigation",()=>{
     expect(html).toContain("Student: Synthetic Sibling");
   });
 
-  it("uses the same URL for student group titles and Open controls",()=>{
-    successful({enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,creationEnabled:false,sections:[],
-      groups:[{id:"group",title:"English study group",kind:"course",capacity:20,membership:null}]});
-    const html=render(StudentGroups);
-    expect(html.match(/href="\/student\/study-groups\?group=group"/g)).toHaveLength(2);
+  it("links each study group card to its dedicated detail page",()=>{
+    successful({availability:{enabled:true,writesEnabled:true,membershipEnabled:true,contentEnabled:true,creationEnabled:true,moderationEnabled:true},
+      workspace:{role:"student",hasEnrollmentGuardian:true,sections:[],
+        groups:[{id:"group",title:"English study group",description:"Weekly revision circle for the unit essays.",kind:"course",
+          maxMembers:20,memberCount:3,facilitatorName:"Dr. Thorne",membershipStatus:null,timezone:"America/Chicago",
+          sessions:[],posts:[],reports:[],roster:[],pendingMembers:[]}]}});
+    const html=render(Groups);
+    expect(html.match(/href="\/groups\/group"/g)).toHaveLength(1);
+    expect(html).toContain("Facilitated by Dr. Thorne");
+    expect(html).toContain("3 of 20 members");
   });
 });
 
@@ -715,8 +719,8 @@ describe("major-role shared shell adoption",()=>{
   it.each([
     ["guardian enrollment",Offers,[],"Family","Family home"],
     ["student support",Support,{viewerRole:"student",actions:[]},"Student support","Student Today"],
-    ["student groups",StudentGroups,{enabled:true,writesEnabled:false,membershipEnabled:false,contentEnabled:false,creationEnabled:false,sections:[],groups:[]},"Student","Student Today"],
-    ["teacher groups",TeacherGroups,{enabled:false,writesEnabled:false,membershipEnabled:false,creationEnabled:false,moderationEnabled:false,queue:[],reports:[],groups:[],scopes:[]},"Teacher","Teacher Today"],
+    ["student groups",Groups,{availability:{enabled:true,writesEnabled:true,membershipEnabled:true,contentEnabled:true,creationEnabled:true,moderationEnabled:true},workspace:{role:"student",hasEnrollmentGuardian:true,sections:[],groups:[]}},"Collaboration","Workspace home"],
+    ["teacher groups",Groups,{availability:{enabled:true,writesEnabled:true,membershipEnabled:true,contentEnabled:true,creationEnabled:true,moderationEnabled:true},workspace:{role:"teacher",hasEnrollmentGuardian:null,sections:[],groups:[]}},"Collaboration","Workspace home"],
   ] as const)("uses one standard shell and header for %s",(_name,route,data,eyebrow,breadcrumb)=>{
     successful(data);
     const html=render(route);

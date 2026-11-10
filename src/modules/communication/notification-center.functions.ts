@@ -7,6 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
 import {z} from "zod";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 const pickupNotificationTypes=new Set([
  "child_release_verified","child_pickup_denied","child_uncollected_follow_up",
  "pickup_custody_hold_created","pickup_custody_hold_resolved",
@@ -360,6 +361,23 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const permittedGroups=new Set(groupRows.filter(g=>g.facilitator===personId).map(g=>g.id));
  for(const row of memberRows)if(groupRows.some(group=>group.id===row.groupId))permittedGroups.add(row.groupId);
  for(const group of invitedGroups)permittedGroups.add(group.id);
+ const calendarInvitationIds=rows.filter(n=>n.type==="calendar_event_invitation"&&
+  n.resourceType==="calendar_event"&&n.resourceId).map(n=>n.resourceId!);
+ const calendarParticipantRows=calendarInvitationIds.length&&context.role==="student"?await db.select({
+  calendarEventId:s.calendarEventParticipants.calendarEventId,
+ }).from(s.calendarEventParticipants)
+ .where(and(inArray(s.calendarEventParticipants.calendarEventId,calendarInvitationIds),
+  eq(s.calendarEventParticipants.participantType,"person"),
+  eq(s.calendarEventParticipants.participantId,personId))):[];
+ const accessibleCalendarInvitationIds=[...new Set(calendarParticipantRows.map(row=>row.calendarEventId))];
+ const calendarInvitations=accessibleCalendarInvitationIds.length?await db.select({
+  id:s.calendarEvents.id,startsAt:s.scheduledOccurrences.startsAt,timezone:s.scheduledOccurrences.timezone,
+ }).from(s.calendarEvents)
+ .innerJoin(s.scheduledOccurrences,eq(s.scheduledOccurrences.id,s.calendarEvents.scheduledOccurrenceId))
+ .where(inArray(s.calendarEvents.id,accessibleCalendarInvitationIds)):[];
+ const calendarInvitationById=new Map(calendarInvitations.map(event=>[
+  event.id,dateKeyInTimezone(event.startsAt.toISOString(),event.timezone),
+ ]));
  const admissionOfferIds=rows.filter(n=>n.resourceType==="admission_offer"&&n.resourceId).map(n=>n.resourceId as string);
  const admissionOffers=admissionOfferIds.length?await db.select({id:s.admissionOffers.id,applicationId:s.admissionOffers.applicationId,issuedByPersonId:s.admissionOffers.issuedByPersonId,programId:s.admissionOffers.programId,studentProfileId:s.applications.studentProfileId})
   .from(s.admissionOffers).innerJoin(s.applications,eq(s.applications.id,s.admissionOffers.applicationId))
@@ -445,7 +463,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      for(const action of gradeActions)if(permitted.has(action.studentPersonId)&&
        action.metadata.requestedByGuardianPersonId===personId)
        verifiedGradeActions.set(action.id,
-         `/guardian/academics?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}&submission=${encodeURIComponent(action.submissionId)}`);
+         `/guardian/students?student=${encodeURIComponent(action.studentPersonId)}&section=${encodeURIComponent(action.sectionId??"")}&assessment=${encodeURIComponent(action.assessmentId)}&submission=${encodeURIComponent(action.submissionId)}`);
    }else if(hasRegistrarAuthority(context.role)){
      for(const action of gradeActions)if((context.scope.organizationIds??[]).length)
        verifiedGradeActions.set(action.id,`/home?action=${encodeURIComponent(action.id)}`);
@@ -544,6 +562,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    (!!n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)))
   .filter(n=>n.resourceType!=="safeguarding_concern"||
    !!n.resourceId&&permittedSafeguardingIds.has(n.resourceId))
+  .filter(n=>n.type!=="calendar_event_invitation"||
+   n.resourceType==="calendar_event"&&!!n.resourceId&&calendarInvitationById.has(n.resourceId))
   .filter(n=>context.role!=="guardian"||!n.resourceId||
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
@@ -560,6 +580,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  return visible.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
   date:n.createdAt.toISOString(),href:n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
+  n.type==="calendar_event_invitation"&&n.resourceType==="calendar_event"&&n.resourceId&&calendarInvitationById.has(n.resourceId)?
+   `/calendar?date=${encodeURIComponent(calendarInvitationById.get(n.resourceId)!)}&event=${encodeURIComponent(n.resourceId)}`:
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
@@ -586,7 +608,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
      `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
      context.role==="guardian"&&guardianSubmissionById.has(n.resourceId)?
      (()=>{const row=guardianSubmissionById.get(n.resourceId)!;
-       return `/guardian/academics?student=${encodeURIComponent(row.studentPersonId)}&section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.assessmentId)}`;})():null):
+       return `/guardian/students?student=${encodeURIComponent(row.studentPersonId)}&section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.assessmentId)}`;})():null):
    n.resourceType==="action"&&n.resourceId&&gradeActionsById.has(n.resourceId)&&
     verifiedGradeActions.has(n.resourceId)?verifiedGradeActions.get(n.resourceId)!:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
@@ -611,8 +633,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="program_opening_handoff"&&n.resourceId&&handoffSites.get(n.resourceId)?`/sites/${encodeURIComponent(handoffSites.get(n.resourceId)!)}`:
    n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/home#pickup":
    ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/home?action=${encodeURIComponent(n.resourceId)}`:
-   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"?`/groups?group=${encodeURIComponent(n.resourceId)}`:context.role==="student"?`/student/study-groups?group=${encodeURIComponent(n.resourceId)}`:null):
-   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/student/study-groups?group=${encodeURIComponent(groupBySession.get(n.resourceId)!)}&session=${encodeURIComponent(n.resourceId)}`:null}));
+   n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"||context.role==="student"?`/groups/${encodeURIComponent(n.resourceId)}`:null):
+   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/groups/${encodeURIComponent(groupBySession.get(n.resourceId)!)}?session=${encodeURIComponent(n.resourceId)}`:null}));
 });
 export const readNotification=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({id:z.string().uuid()}).parse(data)).handler(async({data})=>{

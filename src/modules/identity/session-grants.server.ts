@@ -1,6 +1,9 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { db, type Database } from "@/db/client";
-import { accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents, people } from "@/db/schema";
+import {
+  accessAccounts, accountPersonGrants, demoSchoolTenants, domainEvents,
+  people, programs, publicFamilyStartRequests,
+} from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { EventTypes } from "@/domain/event-types";
 import { matchesVerifiedExternalSandboxInvitation } from "@/domain/sandbox-external-invitation";
@@ -47,6 +50,46 @@ async function listActiveAccountGrants(accountId: string, reader: GrantReader) {
       eq(people.active, true),
       inArray(accountPersonGrants.role, supportedRoles),
     ));
+}
+
+async function listPublicFamilyStartGrantIds(
+  email: string,
+  grants: Awaited<ReturnType<typeof listActiveAccountGrants>>,
+  reader: GrantReader,
+): Promise<Set<string>> {
+  const candidates = grants.filter(grant =>
+    grant.role === "guardian" && grant.organizationId && grant.siteId);
+  if (!candidates.length) return new Set();
+  const rows = await reader.select({
+    programId: publicFamilyStartRequests.programId,
+    siteId: publicFamilyStartRequests.siteId,
+    programOrganizationId: programs.organizationId,
+    actorPersonId: domainEvents.actorPersonId,
+  }).from(publicFamilyStartRequests)
+    .innerJoin(programs, and(
+      eq(programs.id, publicFamilyStartRequests.programId),
+      eq(programs.siteId, publicFamilyStartRequests.siteId),
+    ))
+    .innerJoin(domainEvents, and(
+      eq(domainEvents.aggregateType, "public_family_start_request"),
+      eq(domainEvents.aggregateId, publicFamilyStartRequests.id),
+      eq(domainEvents.eventType, EventTypes.PublicFamilyStartVerified),
+    ))
+    .where(and(
+      eq(publicFamilyStartRequests.emailNormalized, email),
+      isNotNull(publicFamilyStartRequests.consumedAt),
+      inArray(publicFamilyStartRequests.siteId, candidates.map(grant => grant.siteId!)),
+      inArray(programs.organizationId, candidates.map(grant => grant.organizationId!)),
+    ));
+  const allowed = new Set<string>();
+  for (const grant of candidates) {
+    if (rows.some(row => row.actorPersonId === grant.personId &&
+      row.siteId === grant.siteId &&
+      row.programOrganizationId === grant.organizationId)) {
+      allowed.add(grant.id);
+    }
+  }
+  return allowed;
 }
 
 /** Current, tenant-bound source memberships; no mirrored admin grants are accepted. */
@@ -124,13 +167,16 @@ export async function readSessionGrants(accountId: string, email: string, reader
       .map(row => [row.grantId, row]));
     const accepted = new Map(evidence.filter(row => row.eventType === EventTypes.StaffInvitationAccepted)
       .map(row => [row.grantId, row]));
+    const publicFamilyGrantIds = await listPublicFamilyStartGrantIds(
+      normalizedEmail, syntheticGrants, reader,
+    );
     const grants = ownGrants.filter(grant => {
       const valor = grant.organizationId === LOCAL_DEMO_ADMIN.organizationId;
       const registered = byOrg.get(grant.organizationId ?? "");
       if (!valor && !registered) return true;
       if (valor ? grant.siteId !== LOCAL_DEMO_ADMIN.siteId :
         !registered?.enabled || registered.siteId !== grant.siteId) return false;
-      return matchesVerifiedExternalSandboxInvitation(
+      return publicFamilyGrantIds.has(grant.id) || matchesVerifiedExternalSandboxInvitation(
         grant, issued.get(grant.id), accepted.get(grant.id), normalizedEmail);
     });
     return { grants, demoAccountSwitching: false };

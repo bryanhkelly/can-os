@@ -2,7 +2,7 @@ import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
+import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle, School } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
@@ -13,6 +13,7 @@ import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { StatCard, EmptyState } from "@/components/workspace";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { buildTeacherAttention } from "@/domain/daily-operations";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -35,6 +36,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
  const [activity, setActivity] = useState<Evidence | null>(null);
  const [activityError, setActivityError] = useState("");
  const [gradeQuestions, setGradeQuestions] = useState<TeacherGradeResponseItem[] | null>(null);
+ const [followUpRevision, setFollowUpRevision] = useState(0);
  const onQuestionsChange = useCallback((items: TeacherGradeResponseItem[] | null) => {
   setGradeQuestions(items);
  }, []);
@@ -50,6 +52,8 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
  }, []);
 
  const ready = data.connected;
+ const { session } = useWorkspaceSession();
+ const school = session?.authenticated && session.sites.length === 1 ? session.sites[0] : undefined;
 
  return <DashboardHome
   eyebrow="Your teaching day"
@@ -68,6 +72,9 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
     <DashboardShortcut title="Schedule" description="See today's classes and school events" icon={<CalendarDays className="size-5" />}>
      <Link to="/calendar" search={{ view: "agenda" }} />
     </DashboardShortcut>
+    {school && <DashboardShortcut title="School profile" description={school.name} icon={<School className="size-5" />}>
+     <Link to="/sites/$siteId/profile" params={{ siteId: school.id }} />
+    </DashboardShortcut>}
    </>}
   rail={ready ? <TeacherDaySchedule sections={data.sections} /> : undefined}
   actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/support">Student support →</Link><Link to="/profiles">Professional profile →</Link></>}
@@ -135,7 +142,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
                 · up to {Math.round(student.estimatedActiveMs7d / 60_000)} min estimated active time</p>
               {student.latestEventId && <TeacherLearningFollowUpForm
                 sectionId={student.sectionId} studentProfileId={student.studentProfileId}
-                learningEventId={student.latestEventId} />}
+                learningEventId={student.latestEventId} onCreated={() => setFollowUpRevision(value => value + 1)} />}
             </article>)}
           {!activity.students.some(student => student.observedEvents7d > 0) &&
             <p className="text-sm">No interaction evidence has been collected for these classes yet. This does not mean students have not been learning.</p>}
@@ -144,7 +151,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
       </>}
     </section>
 
-    <TeacherLearningFollowUpsPanel />
+    <TeacherLearningFollowUpsPanel revision={followUpRevision} />
     <TeacherConferencePanel />
    </>}
  </DashboardHome>;

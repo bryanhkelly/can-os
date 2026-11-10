@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName } from "@/domain/person-name";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
@@ -8,7 +8,10 @@ import { EventTypes } from "@/domain/event-types";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { verifiedPrivateDocumentPredicate } from "@/domain/private-document";
 import { matchesEnrollmentDocumentSignature } from "@/domain/enrollment-document-signature";
-import { requireActor, recordAudit, type Actor } from "@/modules/identity/actors.server";
+import { recordAudit, type Actor } from "@/modules/identity/actors.server";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { roleCapabilities } from "@/domain/access-context";
+import { profileModules } from "@/domain/profile-access";
 import { emitEvent } from "@/platform/mutation";
 import { createPrivateUpload, signPrivateObjectUrl, verifyPrivateObject } from "@/platform/storage/r2";
 
@@ -19,7 +22,9 @@ const upload = z.object({
   size: z.number().int().min(16).max(2 * 1024 * 1024),
 });
 async function actor() {
-  return requireActor(["student", "guardian", "teacher", "registrar", "specialist", "counselor", "room_facilitator", "site_leader", "site_staff"]);
+  const viewer = await getCommandContext(getRequest());
+  if (!viewer.actorPersonId || !Object.hasOwn(roleCapabilities, viewer.role)) throw new AuthorizationError("active profile membership");
+  return viewer as Actor;
 }
 async function authorizedProfile(viewer: Actor, personId: string) {
   const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
@@ -37,7 +42,11 @@ async function authorizedProfile(viewer: Actor, personId: string) {
     .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
     .where(and(eq(s.studentProfiles.personId, personId), eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"), scoped));
   let sections = [...teaching, ...enrolled];
+  let guardian = false;
   if (personId !== viewer.actorPersonId) {
+    if (!["student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor", "room_facilitator", "site_leader", "site_staff"].includes(viewer.role)) {
+      throw new AuthorizationError("profile viewer authority");
+    }
     if (!sites.length || !programs.length) throw new AuthorizationError("profile delivery scope");
     if (viewer.role === "student" || viewer.role === "guardian") {
       const own = db.select({ sectionId: s.sections.id }).from(s.studentProfiles)
@@ -65,10 +74,23 @@ async function authorizedProfile(viewer: Actor, personId: string) {
         .where(eq(s.sectionTeachers.personId, viewer.actorPersonId));
       sections = enrolled.filter(section => assigned.some(row => row.id === section.id));
     }
+    if (!sections.length && ["teacher", "registrar", "site_admin", "specialist", "counselor"].includes(viewer.role)) {
+      const related = db.select({ id: s.sections.id, title: s.sections.title }).from(s.guardianRelationships)
+        .innerJoin(s.studentProfiles, eq(s.studentProfiles.personId, s.guardianRelationships.studentPersonId))
+        .innerJoin(s.enrollments, eq(s.enrollments.studentProfileId, s.studentProfiles.id))
+        .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId));
+      const conditions = and(guardianRelationshipPredicate({ guardianPersonId: personId, access: "academic" }),
+        eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"), scoped);
+      sections = viewer.role === "teacher"
+        ? await related.innerJoin(s.sectionTeachers, eq(s.sectionTeachers.sectionId, s.sections.id))
+          .where(and(conditions, eq(s.sectionTeachers.personId, viewer.actorPersonId)))
+        : await related.where(conditions);
+      guardian = sections.length > 0;
+    }
     if (!sections.length) throw new AuthorizationError("current profile relationship");
   }
   return { person, sections: [...new Map(sections.map(section => [section.id, section])).values()],
-    kind: teaching.length ? "Teacher" : enrolled.length ? "Student" : "Member" };
+    kind: guardian ? "Guardian" : teaching.length ? "Teacher" : enrolled.length ? "Student" : "Member" };
 }
 
 export const getPersonProfile = createServerFn({ method: "GET" })
@@ -78,7 +100,8 @@ export const getPersonProfile = createServerFn({ method: "GET" })
     const viewer = await actor(), personId = data.personId ?? viewer.actorPersonId;
     const profile = await authorizedProfile(viewer, personId);
     return { personId, name: personDisplayName({ legalFirstName: profile.person.firstName, legalLastName: profile.person.lastName, preferredName: profile.person.preferredName }),
-      kind: profile.kind, sections: profile.sections, isSelf: personId === viewer.actorPersonId,
+      kind: personId === viewer.actorPersonId ? viewer.role.split("_").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ") : profile.kind,
+      sections: profile.sections, isSelf: personId === viewer.actorPersonId, modules: profileModules(viewer, personId),
       viewerRole: viewer.role };
   });
 
@@ -108,6 +131,26 @@ export const beginProfilePhotoUpload = createServerFn({ method: "POST" })
     const key = `profiles/${viewer.actorPersonId}/${crypto.randomUUID()}`;
     return createPrivateUpload({ key, keyPattern: photoKeyPattern,
       contentType: data.mimeType, contentLength: data.size, minContentLength: 16, maxContentLength: 2 * 1024 * 1024, expiresSeconds: 180 });
+  });
+
+export const removeProfilePhoto = createServerFn({ method: "POST" })
+  .handler(async () => {
+    const viewer = await actor();
+    await authorizedProfile(viewer, viewer.actorPersonId);
+    const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
+    return db.transaction(async tx => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"profile-photo:" + viewer.actorPersonId}))`);
+      const retired = await tx.update(s.documents).set({ expiresAt: new Date(), updatedAt: new Date() })
+        .where(verifiedPrivateDocumentPredicate({
+          subjectType: "person", subjectId: viewer.actorPersonId, category: "profile_photo", sensitivityTier: "standard",
+        })).returning({ id: s.documents.id });
+      if (!retired.length) return { removed: false };
+      await recordAudit(tx, viewer, { action: "profile.photo_removed", resourceType: "person", resourceId: viewer.actorPersonId,
+        after: { retiredDocumentIds: retired.map(document => document.id) } });
+      await emitEvent(tx, { eventType: EventTypes.ProfilePhotoChanged, aggregateType: "person", aggregateId: viewer.actorPersonId,
+        actorPersonId: viewer.actorPersonId, payload: { removed: true, documentIds: retired.map(document => document.id) } });
+      return { removed: true };
+    });
   });
 
 export const finishProfilePhotoUpload = createServerFn({ method: "POST" })

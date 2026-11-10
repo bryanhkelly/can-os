@@ -23,6 +23,7 @@ vi.mock("@/db/client",()=>({db:{transaction:async(fn:(tx:unknown)=>unknown)=>fn(
  },insert:state.writes,update:state.writes,
 })}}));
 import { finalizeSectionGrades } from "@/modules/learning/report-cards.functions";
+import { buildSectionGradeEvidence, readSectionGradeEvidence } from "@/domain/section-grade-evidence";
 const sectionId="11111111-1111-4111-8111-111111111111";
 const periodId="22222222-2222-4222-8222-222222222222";
 beforeEach(()=>{
@@ -43,6 +44,22 @@ const invoke=()=> (finalizeSectionGrades as unknown as (arg:unknown)=>Promise<un
  data:{sectionId,gradingPeriodId:periodId},
 });
 describe("grading-period finalization receipts",()=>{
+ it("records the exact scoreable graded attempts used for a finalized grade",()=>{
+  expect(buildSectionGradeEvidence([
+   {id:"submission-b",assessmentId:"b",title:"Essay",attemptNumber:2,status:"graded",score:"8"},
+   {id:"submission-a",assessmentId:"a",title:"Quiz",attemptNumber:1,status:"graded",score:"9"},
+   {id:"submission-c",assessmentId:"c",title:"Draft",attemptNumber:1,status:"submitted",score:null},
+  ],new Map([["a",10],["b",10],["c",10]]))).toEqual({
+   method:"graded-assessment-points-ratio",
+   assessments:[
+    {assessmentId:"a",title:"Quiz",submissionId:"submission-a",attemptNumber:1,score:"9",pointsPossible:10},
+    {assessmentId:"b",title:"Essay",submissionId:"submission-b",attemptNumber:2,score:"8",pointsPossible:10},
+   ],
+  });
+  expect(readSectionGradeEvidence({method:"unknown",assessments:[]})).toBeNull();
+  expect(readSectionGradeEvidence({method:"graded-assessment-points-ratio",assessments:[{assessmentId:1}]})?.assessments)
+    .toEqual([]);
+ });
  it("previews exact unfinished work without writing grades",async()=>{
   state.rows.push([{id:"no-submission",firstName:"Ada",lastName:"Lovelace",preferredName:null},
     {id:"ungraded",firstName:"Grace",lastName:"Hopper",preferredName:null}]);

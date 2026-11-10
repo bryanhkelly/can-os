@@ -9,6 +9,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,isNull,lte,or,sql } from "drizzle-orm";
 import { z } from "zod";
 import { readRubric,scoreRubric } from "@/modules/learning/rubric";
+import { readAssignmentContent } from "@/domain/assignment-content";
 import { assessmentAttemptLimit, assertAssessmentAttemptAllowed } from "@/domain/assessment-attempt-policy";
 import { assessmentAvailability, assertAssessmentActionable, isStudentAssessmentVisible } from "@/domain/assessment-availability";
 import { writtenSubmissionResponse } from "@/domain/submission-response";
@@ -45,7 +46,7 @@ async function teacherForSubmission(submissionId:string){
  return teacherActor(row.sectionId);
 }
 /** Assignment flows are scoped to an authenticated student and active enrollments. */
-export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
+async function loadStudentAssignments(assessmentId?:string){
  const {context,studentId}=await studentActor();
  if(!context.scope.siteIds?.length)throw new AuthorizationError("site membership");
  if(!process.env.DATABASE_URL)return {connected:false,assignments:[]};
@@ -70,6 +71,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
  .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
  .leftJoin(s.submissions,and(eq(s.submissions.assessmentId,s.assessments.id),eq(s.submissions.studentProfileId,studentId)))
  .where(and(inArray(s.assessments.sectionId,ids),inArray(s.assessments.status,["published","closed"]),
+  ...(assessmentId?[eq(s.assessments.id,assessmentId)]:[]),
   or(isNull(s.assessments.availableAt),lte(s.assessments.availableAt,now))))
  .orderBy(desc(s.assessments.dueAt));
  const visibleRows=rows.filter(row=>isStudentAssessmentVisible({status:row.assessmentStatus,availableAt:row.availableAt},now));
@@ -103,6 +105,7 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
     maxAttempts,
     criteria:readRubric(row.metadata.rubricCriteria),synthetic:row.metadata.synthetic===true,
     assignmentKind:typeof row.metadata.assignmentKind==="string"?row.metadata.assignmentKind:"classwork",
+    content:readAssignmentContent(row.metadata.assignmentContent),
     curriculumLessonId:typeof row.metadata.curriculumLessonId==="string"?row.metadata.curriculumLessonId:null,
     curriculumLessonTitle:typeof row.metadata.curriculumLessonTitle==="string"?row.metadata.curriculumLessonTitle:null},
   rubricResult:row.feedback?.rubricResult??null,
@@ -110,7 +113,26 @@ export const getAssignments=createServerFn({method:"GET"}).handler(async()=>{
   feedbackText:typeof row.feedback?.comment==="string"?row.feedback.comment:"",
   response:undefined,feedback:undefined,
  };})};
-});
+}
+export const getAssignments=createServerFn({method:"GET"}).handler(()=>loadStudentAssignments());
+
+/** One enrolled assignment with section instructor names for the detail page. */
+export const getAssignmentDetail=createServerFn({method:"GET"})
+ .validator((value:unknown)=>z.object({assessmentId:z.string().min(1)}).parse(value))
+ .handler(async({data})=>{
+  const result=await loadStudentAssignments(data.assessmentId);
+  const assignment=result.assignments.find(item=>item.assessmentId===data.assessmentId)??null;
+  if(!result.connected||!assignment)return {connected:result.connected,assignment:null,instructorNames:[]};
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  const teachers=await db.select({
+    first:s.people.legalFirstName,last:s.people.legalLastName,preferred:s.people.preferredName,
+   }).from(s.sectionTeachers)
+   .innerJoin(s.people,eq(s.people.id,s.sectionTeachers.personId))
+   .where(and(eq(s.sectionTeachers.sectionId,assignment.sectionId),eq(s.sectionTeachers.role,"teacher")))
+   .orderBy(s.people.legalLastName).limit(4);
+  return {connected:true,assignment,
+   instructorNames:teachers.map(t=>t.preferred?.trim()||`${t.first} ${t.last}`)};
+ });
 
 export const saveAssignmentResponse=createServerFn({method:"POST"})
  .validator((value:unknown)=>z.object({assessmentId:z.string().min(1),text:z.string()}).parse(value))

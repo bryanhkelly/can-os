@@ -4,6 +4,8 @@
 
 Valor is an ordinary canonical Organization/Site tenant, not a separate workflow engine. Account/person grants no longer carry `is_synthetic`. Historical migrations and optional fixture provenance metadata remain historical evidence, not authorization. Ordinary accounts retain one-time email links via Resend, which is a transport provider, not session authority. Restricted Valor accounts and explicitly provisioned public `.demo` school accounts use the shared-code paths described below.
 
+**Valor is a fully operating demonstration school.** Its single academic Program is `active` with a published, current marketing snapshot, so its public site presents an operating school with applications open. Valor never carries `launching` Programs or in-progress program-launch journeys; school-launch workflows are demonstrated on the separate Barton demo tenant (`demo-barton`, provisioned through the ordinary `/schools/new` bootstrap), which stays mid-launch. Test fixtures mirror this split: the launch-wizard fixture in `scripts/seeds/new-experiences-v1.sql` seeds a Barton fixture tenant, never a launching Program inside Valor.
+
 ## Required boundaries
 
 1. **Account**: durable local user ID with verified email and status. Email is a login credential, not the primary person ID.

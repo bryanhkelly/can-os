@@ -124,6 +124,12 @@ export function assertPreopeningFamilyInterestDestination(input: {
   }
 }
 
+export function preopeningFamilyInvitationText(input:{
+  introduction:string;programName:string;responseUrl:string;
+}):string {
+  return `${input.introduction}\n\n${input.programName} is a school in development and is not yet authorized to open. This invitation is an expression of interest only; it is not an application, enrollment offer or confirmation of academic services.\n\nIf you would like updates from the school, you can request them here: ${input.responseUrl}\n\nThis invitation link expires 30 days after the invitation was created. Only an adult who wants follow-up should submit the form. No child details are requested; receiving this email alone does not opt you in.`;
+}
+
 /** The marketing and operating gates are independent; both are required. */
 export function assertPublishedFamilyInvitationDestination(input: {
   type: ProgramType;

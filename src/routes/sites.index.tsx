@@ -6,7 +6,7 @@ import { EntityCard, WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/sites/")({
   loader: async () => {
-    const outcome = await safeLoader(() => listMySites(), { authMessage: "You do not have access to any school sites." })();
+    const outcome = await safeLoader(() => listMySites(), { authMessage: "You do not have access to any schools." })();
     // The workspace switcher already chose the school; one site in scope means there is nothing to choose.
     const only = outcome.ok && outcome.data.length === 1 ? outcome.data[0] : undefined;
     if (only) throw redirect({ to: "/sites/$siteId/profile", params: { siteId: only.id } });
@@ -19,8 +19,8 @@ function SitesDirectoryPage() {
   const outcome = Route.useLoaderData();
   if (!outcome.ok) return <LoaderFailure eyebrow="Schools" title="All schools" outcome={outcome}/>;
   const sites: Awaited<ReturnType<typeof listMySites>> = outcome.data;
-  return <WorkspaceShell eyebrow="Schools" title="Your school sites"
-    subtitle="Choose a site to review its actual operating decision, programs, schedule, and actions.">
+  return <WorkspaceShell eyebrow="Schools" title="Your schools"
+    subtitle="Choose a school to review its actual operating decision, programs, schedule, and actions.">
     <div className="mt-5 grid gap-4 sm:grid-cols-2">
       {sites.map(site => <EntityCard key={site.id}
         title={site.name}

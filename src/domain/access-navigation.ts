@@ -40,7 +40,7 @@ export function accessLandingPath(role: string, launchSiteId?: string, returnTo?
  if(hasRegistrarAuthority(role)&&launchSiteId&&(!safeReturnTo||genericReturnPaths.has(safeReturnTo)))
   return "/launch/hub/school?siteId="+encodeURIComponent(launchSiteId);
  if(safeReturnTo)return safeReturnTo;
- const home:Record<string,string>={student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/academics",registrar:"/admissions",specialist:"/home",counselor:"/home"};
+ const home:Record<string,string>={student:"/",teacher:"/teacher/missing-work",guardian:"/guardian/students",registrar:"/admissions",specialist:"/home",counselor:"/home"};
  return Object.hasOwn(home,role)?home[role]! : "/access";
 }
 export const accessFormErrors={

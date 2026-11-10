@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -10,8 +11,8 @@ type Approach = TeacherLearningFollowUpInput["approach"];
 type Days = TeacherLearningFollowUpInput["dueInDays"];
 
 /** A deliberate staff action; telemetry alone never generates a referral. */
-export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learningEventId }: {
-  sectionId: string; studentProfileId: string; learningEventId: string;
+export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learningEventId, onCreated }: {
+  sectionId: string; studentProfileId: string; learningEventId: string; onCreated?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [observation, setObservation] = useState("");
@@ -20,6 +21,7 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [created, setCreated] = useState(false);
+  const [actionId, setActionId] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
 
   return <div className="mt-3 text-sm">
@@ -40,6 +42,8 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
             ? "Your follow-up was created and assigned to you in the school's Actions."
             : "An open follow-up already exists for this learning event.");
           setCreated(true);
+          setActionId(result.actionId);
+          onCreated?.();
         } catch {
           setNotice("Unable to save follow-up. Check your permissions and current evidence.");
         } finally { setBusy(false); }
@@ -70,6 +74,7 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
         <Button type="button" variant="ghost" onClick={() => setExpanded(false)} disabled={busy}>Cancel</Button>
       </div>}
       {notice && <p role="status">{notice}</p>}
+      {actionId && <Link to="/actions/$actionId" params={{ actionId }} className="font-semibold underline">Open follow-up Action</Link>}
     </form>}
   </div>;
 }

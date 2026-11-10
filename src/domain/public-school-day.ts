@@ -1,5 +1,6 @@
 import type { PublicSchoolDay } from "./parent-information";
 import { unconfiguredClaim, verifiedPublicClaim } from "./parent-information";
+import { SCHEDULE_PERIOD_TYPES } from "./schedule-period-types";
 
 export type PublicSchoolDayPeriod = {
   dayOfWeek: number;
@@ -173,7 +174,7 @@ export function projectPublicSchoolDay(
     /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(p.startsAtLocal) &&
     /^([01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(p.endsAtLocal) &&
     p.startsAtLocal < p.endsAtLocal &&
-    ["instruction", "chapel", "advisory", "break", "lunch"].includes(p.type));
+    (SCHEDULE_PERIOD_TYPES as readonly string[]).includes(p.type));
   // Do not silently drop malformed/unknown periods from a signed timetable:
   // it could otherwise publish incomplete hours while the source is ambiguous.
   if(periods.length!==schedule.periods.length)return pending();

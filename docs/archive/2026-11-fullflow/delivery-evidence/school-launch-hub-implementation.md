@@ -3,6 +3,9 @@
 The school entry in Launch Studio opens `/launch/hub/school`. Administrators
 explicitly choose a school returned by the existing authorized launch-options
 reader. A missing or unavailable Site never silently falls back to another one.
+For a Site without a Program, School details owns the first-offering form and its
+private draft. After saving, the existing command hands off to Academics, where
+the administrator can browse curriculum and continue academic preparation.
 
 The Hub uses three sections: Establish Your School (Website), Build Your School
 Community (Team, Promote, Recruitment, Events), and Prepare to Open (Academics,
@@ -42,8 +45,9 @@ Conflict, source, image rights/consent and claim-review rules remain in force.
 
 Website opens Website Studio with an exact-Site return to its Hub module. Team
 embeds the ordinary administration workspace with access, invite and directory
-views; successful changes refresh the Hub read. Academics embeds the existing
-Program configuration or academic provisioning workspace in a focused wrapper.
+views; successful changes refresh the Hub read. School details creates the first
+Program when one does not exist. Academics embeds the existing curriculum and
+academic provisioning workspace in a focused wrapper.
 Private Program drafts retain their exact Site context. Multiple Programs require
 an explicit selection. Compliance embeds the existing Journey, service review and
 opening-evidence workspaces. These are presentation wrappers over the same readers
@@ -80,10 +84,19 @@ never expands their grant or appoints an administrator. New public `.demo` schoo
 already create their canonical Site and Site Admin through the bootstrap service;
 their sign-in handoff now enters that exact school's Hub.
 
-The new form navigates directly to the saved Site Hub, with a saved-record link
-if navigation fails. Same-details retries return the canonical Site without
-additional writes; changes require editing the existing record. Planning location
-is distinct from a physical facility address and opening evidence.
+The new form reserves a private website address with the canonical Site and
+navigates directly to Website Studio, with a saved-record link if navigation
+fails. Same-details retries return the canonical Site and existing reservation
+without duplicate writes; changes require editing the existing record. Planning
+location is distinct from a physical facility address and opening evidence.
+Website publication is an independent choice. A Site and private website draft
+can exist before any academic Program or jurisdiction authorization.
+
+Published Site pages show a concise development disclosure until a current
+active Program and jurisdiction opening check can be confirmed. Private Website
+Studio previews omit that public disclosure. Pre-opening family invitations are
+explicitly interest-only and state that the school is not authorized to open;
+application and enrollment commands retain their independent server gates.
 
 ## Verification of the module-connection follow-up
 

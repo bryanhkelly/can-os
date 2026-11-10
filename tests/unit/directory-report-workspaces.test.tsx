@@ -38,6 +38,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/modules/profiles/directory.functions", () => ({
   searchStudents: state.searchStudents, listTeachers: state.listTeachers,
 }));
+vi.mock("@/modules/profiles/person-profile.functions", () => ({ getProfilePhoto: vi.fn() }));
 vi.mock("@/modules/learning/report-cards.functions", () => ({
   getStudentReportCard: vi.fn(), getStudentTranscript: vi.fn(),
 }));

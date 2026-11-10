@@ -16,12 +16,12 @@ vi.mock("@tanstack/react-router", () => ({
 const siteId="00000000-0000-4000-8000-000000000001";
 const options={sites:[{id:siteId,name:"Test School",websiteDraft:null}],schoolSetupAdministrator:true} as unknown as SchoolHubOptions;
 describe("school Launch Hub",()=>{
-  it("orders School Profile, Site Information and Website before community and opening setup",()=>{
+  it("orders School details, Site Information and Website before community and opening setup",()=>{
     const planned={state:"Planned",detail:"Module is on the roadmap",nextAction:"Explore module"} as const;
     const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
       statuses={{promote:planned,recruitment:planned,events:planned}}/>);
     expect((html.match(/Open module/g) ?? []).length).toBe(3);
-    expect(html).toContain("School Profile");
+    expect(html).toContain("School details");
     expect(html).toContain("Site Information");
     expect(html).toContain("Build Website");
     expect(html).toContain(`/launch/hub/school/profile?siteId=${siteId}`);

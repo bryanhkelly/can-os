@@ -154,6 +154,19 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
     {data.journey.classes.map(klass=><div key={klass.id} className="rounded border p-3 text-sm">
      <p className="font-semibold">{klass.code} · {klass.title}</p>
      <p>{klass.publishedLessonCount} lessons · {klass.teacherCount} teachers · {klass.studentCount} students · {klass.assignedAssessmentCount} published assessments · {klass.submittedAttemptCount} submitted responses · {klass.gradedAttemptCount} graded</p>
+      {klass.firstClassroom&&<div className="mt-3">
+      <p className="text-xs font-semibold">First-class readiness: {klass.firstClassroom.ready?"Ready":"Needs attention"}</p>
+      {!klass.firstClassroom.ready&&<ul className="mt-2 space-y-2 text-xs">
+       {klass.firstClassroom.blockers.map(blocker=><li key={blocker.key}>
+        <p>{blocker.message}</p>
+        {blocker.key==="missing_assessment"||blocker.key==="assessment_curriculum_mismatch"?
+        <Link to="/teacher/gradebook" search={{section:klass.id}} className="underline">Review class assignments</Link>:
+        blocker.key==="missing_qualified_teacher"||blocker.key==="missing_students"||blocker.key==="inactive_section"?
+         <Link to="/launch/school/$programId" params={{programId:market.program.id}} className="underline">Open class setup</Link>:
+         <Link to="/operations/curriculum-marketplace" search={{programId:market.program.id}} className="underline">Review curriculum access</Link>}
+       </li>)}
+      </ul>}
+      </div>}
      <p className="mt-1 text-xs text-muted-foreground">For classroom verification, switch to an assigned teacher or enrolled student account before opening the class.</p>
      <Link to="/classes" search={{section:klass.id}} className="text-sm underline">Open class as an authorized member →</Link>
     </div>)}

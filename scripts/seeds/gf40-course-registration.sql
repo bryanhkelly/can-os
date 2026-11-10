@@ -11,3 +11,14 @@ INSERT INTO sections(id,program_id,site_id,course_template_version_id,code,title
 ('f4000000-0000-4000-8000-000000000005','f1000000-0000-4000-8000-000000000004','f1000000-0000-4000-8000-000000000003','f4000000-0000-4000-8000-000000000003','SPAN-S','Spanish I','f1000000-0000-4000-8000-000000000010',true,'{"synthetic":true,"fixture":"gf40","credits":1,"deliveryMode":"live online"}'::jsonb),
 ('f4000000-0000-4000-8000-000000000006','f1000000-0000-4000-8000-000000000004','f1000000-0000-4000-8000-000000000003','f4000000-0000-4000-8000-000000000004','PHOTO-S','Digital Photography','f1000000-0000-4000-8000-000000000010',true,'{"synthetic":true,"fixture":"gf40","credits":1,"deliveryMode":"asynchronous"}'::jsonb)
 ON CONFLICT(id) DO NOTHING;
+
+-- Late-afternoon elective meeting times from the shared synthetic timetable
+-- (class-schedule-times.sql), kept conflict-free against every core period so
+-- registration conflict checks stay green. Idempotent; no-ops when the
+-- timetable seed has not been applied.
+UPDATE sections SET schedule_template_id='f8000000-0000-4000-8000-000000000010'
+WHERE id='f4000000-0000-4000-8000-000000000005' AND schedule_template_id IS NULL
+AND EXISTS (SELECT 1 FROM schedule_templates t WHERE t.id='f8000000-0000-4000-8000-000000000010');
+UPDATE sections SET schedule_template_id='f8000000-0000-4000-8000-000000000009'
+WHERE id='f4000000-0000-4000-8000-000000000006' AND schedule_template_id IS NULL
+AND EXISTS (SELECT 1 FROM schedule_templates t WHERE t.id='f8000000-0000-4000-8000-000000000009');

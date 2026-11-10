@@ -51,7 +51,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
    <Link to="/student/assignments" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Assignments</Link>
    <Link to="/student/courses" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Courses</Link>
    <Link to="/student/support" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Support</Link>
-   <Link to="/student/study-groups" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
+   <Link to="/groups" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Study groups</Link>
    <Link to="/student/my-school" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">School &amp; community</Link>
    <Link to="/profiles" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">My profile</Link>
    <Link to="/student/report-card" className="rounded-lg border px-4 py-2 hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2">Report card</Link>

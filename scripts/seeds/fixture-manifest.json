@@ -205,7 +205,8 @@
       "persona": "registrar",
       "seeds": [
         "gf2-admissions-test.sql",
-        "new-experiences-v1.sql"
+        "new-experiences-v1.sql",
+        "valor-admissions-placement-v1.sql"
       ],
       "recordCounts": {
         "applications": 1,
@@ -332,14 +333,21 @@
       "persona": "staff",
       "seeds": [
         "staff-experiences-v1.sql",
-        "student-calendar-comms-office-hours.sql"
+        "student-calendar-comms-office-hours.sql",
+        "class-schedule-times.sql",
+        "homeroom-chapel.sql"
       ],
       "recordCounts": {
-        "calendar_events": 2
+        "calendar_events": 2,
+        "schedule_templates": 12,
+        "schedule_template_periods": 47,
+        "academic_calendar_days": 90
       },
       "interactions": [
         "browse scheduled events",
-        "open event context"
+        "open event context",
+        "see recurring class times for enrolled and taught sections",
+        "see the daily homeroom meeting and the weekly site chapel gathering"
       ],
       "downstreamRecords": []
     },
@@ -595,6 +603,23 @@
         "submissions": 2
       },
       "interactions": [
+        "filter assignments",
+        "open assignment detail page"
+      ],
+      "downstreamRecords": []
+    },
+    "/student/assignments/$assessmentId": {
+      "persona": "student",
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "gf1-rubric-v4.sql",
+        "gf40-rules-assignments.sql"
+      ],
+      "recordCounts": {
+        "assessments": 2,
+        "submissions": 2
+      },
+      "interactions": [
         "view assignment with rubric",
         "submit response",
         "resubmit after feedback"
@@ -656,6 +681,19 @@
         "conference_slot_registrations"
       ]
     },
+    "/student/field-trips": {
+      "persona": "student",
+      "seeds": [
+        "split-route-detail-fixtures.sql"
+      ],
+      "recordCounts": {
+        "field_trips": 1
+      },
+      "interactions": [
+        "review invited trips with departure details and parent permission status"
+      ],
+      "downstreamRecords": []
+    },
     "/student/my-school": {
       "persona": "student",
       "seeds": [
@@ -704,45 +742,6 @@
       ],
       "downstreamRecords": [
         "student_profiles (preferences)"
-      ]
-    },
-    "/student/study-groups": {
-      "persona": "student",
-      "seeds": [
-        "gf26-study-groups.sql"
-      ],
-      "recordCounts": {
-        "study_groups": 2,
-        "study_group_sessions": 1
-      },
-      "interactions": [
-        "join group",
-        "post message",
-        "RSVP to session",
-        "report content"
-      ],
-      "downstreamRecords": [
-        "study_group_memberships",
-        "study_group_posts",
-        "study_group_reports"
-      ]
-    },
-    "/student/study-groups/new": {
-      "persona": "student",
-      "seeds": [
-        "gf26-study-groups.sql"
-      ],
-      "recordCounts": {
-        "study_groups": 2
-      },
-      "interactions": [
-        "choose class",
-        "invite classmates",
-        "create study group"
-      ],
-      "downstreamRecords": [
-        "study_groups",
-        "study_group_memberships"
       ]
     },
     "/student/support": {
@@ -825,21 +824,6 @@
       "rationale": "Backward-compatible redirect to shared authenticated /notifications",
       "interactions": [
         "redirect to canonical notification center"
-      ],
-      "downstreamRecords": []
-    },
-    "/teacher/study-groups": {
-      "persona": "teacher",
-      "seeds": [
-        "gf26-study-groups.sql"
-      ],
-      "recordCounts": {
-        "study_groups": 2,
-        "study_group_reports": 1
-      },
-      "interactions": [
-        "facilitate group",
-        "review reported content"
       ],
       "downstreamRecords": []
     },
@@ -1092,14 +1076,54 @@
         "study_group_memberships": 1
       },
       "interactions": [
+        "browse available study groups",
+        "open a study group detail page",
+        "review pending membership requests and reports as a facilitator"
+      ],
+      "downstreamRecords": [
+        "study_group_memberships",
+        "audit_events"
+      ]
+    },
+    "/groups/$groupId": {
+      "persona": "student",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 1,
+        "study_group_sessions": 1
+      },
+      "interactions": [
         "request study group membership",
+        "RSVP to a session",
         "post to an approved group discussion",
-        "report a group post"
+        "report a group post",
+        "facilitate membership, sessions, attendance and moderation"
       ],
       "downstreamRecords": [
         "study_group_memberships",
         "study_group_posts",
+        "study_group_reports",
         "audit_events"
+      ]
+    },
+    "/groups/new": {
+      "persona": "student",
+      "seeds": [
+        "gf26-study-groups.sql"
+      ],
+      "recordCounts": {
+        "study_groups": 1
+      },
+      "interactions": [
+        "choose class",
+        "invite classmates",
+        "create study group"
+      ],
+      "downstreamRecords": [
+        "study_groups",
+        "study_group_memberships"
       ]
     },
     "/guardian/group-permissions": {
@@ -1269,6 +1293,17 @@
       ],
       "downstreamRecords": []
     },
+    "/enrichment/$seasonId": {
+      "persona": "public visitor",
+      "fixtureRequired": false,
+      "rationale": "Offering detail reads the same publication-checked catalog as /enrichment. A real synthetic catalog/browser fixture is required after schema convergence; do not seed fictional approved offerings.",
+      "interactions": [
+        "review one publishable extended offering with its enrollment options and seat availability",
+        "confirm unapproved or closed offerings render as unavailable",
+        "open the guardian enrollment journey without revealing student information"
+      ],
+      "downstreamRecords": []
+    },
     "/guardian/enrichment": {
       "persona": "guardian",
       "fixtureRequired": false,
@@ -1332,7 +1367,8 @@
       "persona": "guardian",
       "seeds": [
         "public-family-admissions-v1.sql",
-        "gf2-admissions-test.sql"
+        "gf2-admissions-test.sql",
+        "valor-admissions-placement-v1.sql"
       ],
       "recordCounts": {
         "programs": 1,

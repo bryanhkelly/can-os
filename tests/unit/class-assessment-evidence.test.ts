@@ -40,10 +40,17 @@ describe("class assessment evidence (not course credit or mastery)",()=>{
     curriculumLessonId:"../other-class"}},
    {id:"draft",title:"Private draft",status:"draft",pointsPossible:"10",metadata:{
     curriculumLessonId:"algebra1-equations"}},
-  ],[]);
+  ],[],"version-1");
   expect(evidence).toHaveLength(2);
   expect(evidence[0]).toMatchObject({id:"hw",curriculumLessonId:"algebra1-equations",status:"not_submitted"});
   expect(evidence[1]).toMatchObject({id:"unsafe",curriculumLessonId:null});
+ });
+ it("does not attach a lesson link from a different pinned curriculum release",()=>{
+  const evidence=buildClassAssessmentEvidence([{
+   id:"stale",title:"Stale assignment",status:"published",pointsPossible:"10",metadata:{
+    publisherCourseVersionId:"version-old",curriculumLessonId:"algebra1-equations"},
+  }],[],"version-current");
+  expect(evidence[0]).toMatchObject({curriculumLessonId:null,curriculumVersionMismatch:true});
  });
  it("ignores unsafe metadata unit identifiers and invalid point values",()=>{
   const evidence=buildClassAssessmentEvidence([

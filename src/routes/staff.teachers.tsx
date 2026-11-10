@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ProfilePhoto } from "@/components/profiles/ProfilePhoto";
+import { getProfilePhoto } from "@/modules/profiles/person-profile.functions";
 import { useState } from "react";
 import { listTeachers } from "@/modules/profiles/directory.functions";
 import { DirectoryPage, EmptyState } from "@/components/workspace";
@@ -29,7 +30,7 @@ function StaffTeachersPage() {
             actions={query.trim()?<Button variant="outline" onClick={()=>setQuery("")}>Clear search</Button>:undefined}/>}
           columns={[
             { id: "teacher", title: "Teacher", render: teacher => <>
-              <ProfilePhoto personId={teacher.personId} name={teacher.name}/>
+              <ProfilePhoto personId={teacher.personId} name={teacher.name} readPhoto={getProfilePhoto}/>
               <Link to="/profiles" search={{person:teacher.personId}}
                 className="mt-2 inline-block rounded font-semibold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{teacher.name}</Link>
             </> },

@@ -11,6 +11,7 @@ import {
   listTranscriptIssuanceCandidates,
 } from "@/modules/learning/report-cards.functions";
 import { createAcademicTimeFixture } from "./helpers/academic-time";
+import { createTeachingQualificationFixture } from "./helpers/teaching-qualification";
 import { summarizeRecordedTranscriptCredits } from "@/domain/recorded-credit-summary";
 
 const state = vi.hoisted(() => ({
@@ -31,6 +32,7 @@ vi.mock("@tanstack/react-start", () => ({
 }));
 vi.mock("@tanstack/react-start/server", () => ({
   getRequest: () => new Request("http://localhost"),
+  setResponseHeader: vi.fn(),
 }));
 vi.mock("@/modules/identity/command-context.server", () => ({
   getCommandContext: async () => {
@@ -102,6 +104,7 @@ integration("GF25 report card and transcript", () => {
       studentPersonId: student!.id,
       relationshipLabel: "parent",
       canViewAcademics: true,
+      metadata:{verification:"verified"},
     });
     const [course] = await db.insert(s.courseTemplates).values({
       owningOrganizationId: host!.id,
@@ -126,6 +129,21 @@ integration("GF25 report card and transcript", () => {
     await db.insert(s.sectionTeachers).values({
       sectionId: section!.id,
       personId: teacher!.id,
+    });
+    const [teacherAccount]=await db.insert(s.accessAccounts).values({
+      emailNormalized:`gf25-teacher-${suffix}@example.test`,emailVerifiedAt:new Date(),
+    }).returning();
+    await db.insert(s.accountPersonGrants).values({
+      accountId:teacherAccount!.id,personId:teacher!.id,organizationId:host!.id,
+      siteId:site!.id,role:"teacher",active:true,
+    });
+    await db.insert(s.roleAssignments).values({
+      personId:teacher!.id,organizationId:host!.id,siteId:site!.id,
+      programId:program!.id,roleKey:"teacher",
+    });
+    await createTeachingQualificationFixture(db,{
+      sectionId:section!.id,personId:teacher!.id,verifierPersonId:registrar!.id,
+      issuedAt:new Date("2026-01-01T00:00:00.000Z"),
     });
     await db.insert(s.enrollments).values([profile!, finalizationProfile!].flatMap(studentProfile =>
       (["program", "section"] as const).map(kind => ({
@@ -233,6 +251,18 @@ integration("GF25 report card and transcript", () => {
       status: "finalized",
       percentage: "84.00",
       letterGrade: "B",
+      metadata: {
+        gradeEvidence: {
+          method: "graded-assessment-points-ratio",
+          assessments: [expect.objectContaining({
+            assessmentId: assessment!.id,
+            title: "Quarter assessment",
+            attemptNumber: 1,
+            score: "84.00",
+            pointsPossible: 100,
+          })],
+        },
+      },
     });
     const publishedNotices = await db.select().from(s.notifications).where(and(
       eq(s.notifications.recipientPersonId, finalizationStudent!.id),

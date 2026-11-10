@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPrivateUploadTask, documentUploadPolicy, validateUploadFile } from "@/platform/storage/private-upload";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
-import {QueryState} from "@/components/workspace";
+import {QueryState, StatusBadge, WorkspacePanel} from "@/components/workspace";
+import { ExternalLink, FileText } from "lucide-react";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
@@ -16,15 +17,20 @@ import { beginQualificationUpload, finishQualificationUpload, getQualificationEv
 type Snapshot = Awaited<ReturnType<typeof getQualifications>>;
 type Selection = { personId?: string; programId?: string };
 
-export function Qualifications({ personId, programId, onChanged, onDirtyChange, embedded = false }: Selection & {
+type QualificationProps = Selection & {
   onChanged?: () => Promise<void>; onDirtyChange?: (dirty: boolean) => void; embedded?: boolean;
-}) {
+};
+
+export function Qualifications(props: QualificationProps) {
+  return <QualificationWorkspace key={`${props.personId ?? "self"}:${props.programId ?? "all"}`} {...props}/>;
+}
+
+function QualificationWorkspace({ personId, programId, onChanged, onDirtyChange, embedded = false }: QualificationProps) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
-    setSnapshot(null); setError("");
     getQualifications({ data: { personId, programId } }).then(result => {
       if (active) setSnapshot(result);
     }).catch(cause => {
@@ -32,8 +38,7 @@ export function Qualifications({ personId, programId, onChanged, onDirtyChange, 
     });
     return () => { active = false; };
   }, [personId, programId, revision]);
-  return <section className="mt-6 rounded-xl border bg-card p-5">
-    <h2 className="font-serif text-2xl">{embedded ? "Your qualifications" : "School compliance and qualification evidence"}</h2>
+  return <WorkspacePanel title={embedded ? "Your qualifications" : "Qualification evidence"}>
     {embedded ? <>
       <p className="mt-2 text-sm">Upload the qualifications your school requests. Submitting a file sends it for review, not approval.</p>
       <LaunchFieldHelp label="What qualification review means">
@@ -41,21 +46,22 @@ export function Qualifications({ personId, programId, onChanged, onDirtyChange, 
         Only upload identity documents when specifically requested. Evidence review does not authorize teaching or supervision.
       </LaunchFieldHelp>
     </> : <>
-    <p className="mt-2 text-sm">Private credential records are separate from public profile information.
-      Verification confirms evidence review, not program eligibility or legal authorization to teach.</p>
-    <p className="mt-2 text-sm">Document resumes, degrees, licenses and other qualifications using the shared catalog.
+    <p className="text-sm text-muted-foreground">Evidence is private. Verification does not establish teaching eligibility.</p>
+    <LaunchFieldHelp label="About qualification evidence">
+    <p>Document resumes, degrees, licenses and other qualifications using the shared catalog.
       Each school chooses its required qualifications through program policy; submitting a resume does not verify a degree or license.</p>
-    <p className="mt-2 text-sm">Only upload identity documents such as a driver&apos;s license when your school requests them for an applicable role or requirement. They are private evidence, not general profile information.</p></>}
+    <p>Only upload identity documents such as a driver&apos;s license when your school requests them for an applicable role or requirement. They are private evidence, not general profile information.</p>
+    </LaunchFieldHelp></>}
     <QueryState loading={!snapshot&&!error?"Loading qualification records...":undefined}
       error={error?<>{error} Review requires an independent, explicitly granted credential verifier in the teacher's institution.</>:undefined}
-      onRetry={()=>setRevision(value=>value+1)}>
+      onRetry={()=>{setSnapshot(null);setError("");setRevision(value=>value+1);}}>
     {snapshot && <QualificationRecords key={`${personId ?? "self"}:${revision}`} snapshot={snapshot}
       embedded={embedded} onDirtyChange={onDirtyChange} selection={{ personId, programId }} changed={async () => {
         await onChanged?.();
         setSnapshot(await getQualifications({ data: { personId, programId } }));
       }} />}
     </QueryState>
-  </section>;
+  </WorkspacePanel>;
 }
 
 export function QualificationRecords({ snapshot, selection, changed, onDirtyChange, embedded = false }: {
@@ -128,7 +134,7 @@ function SubmissionForm({ catalog, jurisdictions, uploadsEnabled, busy, submit, 
     setPending(null); setFile(null);
     setSavedSignature(signature);
   }
-  return <form noValidate className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2" onSubmit={event => {
+  return <form noValidate className="grid gap-3 border-b pb-6 sm:grid-cols-2" onSubmit={event => {
     event.preventDefault();setAttempted(true);
     if(!pending&&(!definitionId||!issuerName.trim()||!file))return;
     void submit(async()=>{await upload();setAttempted(false);});
@@ -174,10 +180,10 @@ function Claim({ claim, canReview, selection, busy, run }: {
   const [reviewed, setReviewed] = useState(false);
   const [attempted,setAttempted]=useState(false);
   const expired = claim.expiresAt !== null && new Date(claim.expiresAt) <= new Date();
-  return <article className="rounded-lg border p-4">
+  return <article className="min-w-0 border-b py-5 last:border-b-0">
     <h3 className="font-semibold">{claim.title}</h3>
     <p className="mt-1 text-sm">{claim.issuerName ?? "Issuer not recorded"}{claim.jurisdiction ? ` - ${claim.jurisdiction}` : ""}</p>
-    <p className="mt-1 text-sm">Review status: {claim.status}{expired ? " - expired" : ""}</p>
+    <div className="mt-2"><StatusBadge tone={expired ? "attention" : claim.status === "verified" ? "success" : claim.status === "rejected" || claim.status === "revoked" ? "danger" : "neutral"}>{claim.status}{expired ? " - expired" : ""}</StatusBadge></div>
     <p className="mt-2 text-sm">
       {claim.status === "pending" && !expired
         ? "Next: an independent credential verifier reviews the submitted evidence. Submission alone does not complete school qualification requirements."
@@ -188,10 +194,10 @@ function Claim({ claim, canReview, selection, busy, run }: {
         : "Evidence review is complete. Program qualification policy and staffing coverage are evaluated separately before teaching eligibility is confirmed."}
     </p>
     <p className="mt-1 text-xs text-muted-foreground">Issued: {claim.issuedAt ?? "Not recorded"} | Expires: {claim.expiresAt ?? "Not recorded"}</p>
-    {claim.hasEvidence && <button type="button" disabled={busy} className="mt-3 underline text-sm" onClick={() =>
+    {claim.hasEvidence && <Button variant="outline" disabled={busy} className="mt-3" onClick={() =>
       void run(async () => { const result = await getQualificationEvidence({ data: { ...selection, claimId: claim.id } });
-        setEvidenceUrl(result.url); setReviewed(false); }, "Evidence link ready for 60 seconds.")}>Get private evidence link</button>}
-    {evidenceUrl && <a className="ml-3 text-sm underline" href={evidenceUrl} target="_blank" rel="noreferrer">Open evidence (short-lived link)</a>}
+        setEvidenceUrl(result.url); setReviewed(false); }, "Evidence link ready for 60 seconds.")}><FileText aria-hidden="true"/>Get private evidence link</Button>}
+    {evidenceUrl && <Button asChild variant="ghost" className="mt-3"><a href={evidenceUrl} target="_blank" rel="noreferrer"><ExternalLink aria-hidden="true"/>Open evidence (short-lived link)</a></Button>}
     {canReview && (claim.status === "pending" || claim.status === "verified") && <div className="mt-3 space-y-2">
       <Field label="Review reason" className="text-sm" required
         error={attempted&&reason.trim().length<5?"Enter at least 5 characters explaining this decision.":undefined}>

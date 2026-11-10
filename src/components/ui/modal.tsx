@@ -66,7 +66,7 @@ export function Modal({ open, onClose, label, children, className, initialFocus,
         && event.target === event.currentTarget && isOutside(event, event.currentTarget)) onClose();
       startedOutside.current = false;
     }}
-    className={cn("m-auto w-[calc(100%_-_2rem)] max-w-xl max-h-[85dvh] overflow-y-auto rounded-xl border bg-card p-0 text-foreground shadow-2xl backdrop:bg-foreground/40", className)}>
+    className={cn("m-auto w-[calc(100%_-_2rem)] max-w-xl max-h-[85dvh] overflow-y-auto border bg-card p-0 text-foreground shadow-2xl backdrop:bg-foreground/40", className)}>
     {(open || keepMounted) && children}
   </dialog>;
 }

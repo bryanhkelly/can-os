@@ -34,7 +34,7 @@ export function recommendCourseOption(input: {
 }
 
 export type FirstClassBlocker = {
-  key: "inactive_section" | "curriculum_unavailable" | "missing_lesson" | "missing_assessment" | "missing_qualified_teacher" | "missing_students";
+  key: "inactive_section" | "curriculum_unavailable" | "missing_lesson" | "missing_assessment" | "assessment_curriculum_mismatch" | "missing_qualified_teacher" | "missing_students";
   message: string;
 };
 
@@ -44,12 +44,14 @@ export type FirstClassAssessment = {
   instructions: string | null;
   /** Canonical lesson link recorded at authoring time; null for unlinked work. */
   curriculumLessonId: string | null;
+  publisherCourseVersionId?: string | null;
 };
 
 /** Readiness is derived from actual instructional and membership records, never persisted as a badge. */
 export function buildFirstClassroom(sectionId: string, input: {
   sectionActive: boolean;
   courseVersionPublished: boolean;
+  courseVersionId: string;
   curriculumAccess: { available: boolean; reason: string | null };
   curriculum: Record<string, unknown>;
   qualifiedTeacher: boolean;
@@ -62,7 +64,9 @@ export function buildFirstClassroom(sectionId: string, input: {
   // told to study. Prefer the published assessment explicitly authored for
   // that lesson over an unrelated earlier-created one; unlinked published
   // work for this class remains an acceptable fallback.
-  const submittable = input.publishedAssessments.filter(item => Boolean(item.instructions?.trim()));
+  const versionMatchedAssessments = input.publishedAssessments.filter(item =>
+    !item.publisherCourseVersionId || item.publisherCourseVersionId === input.courseVersionId);
+  const submittable = versionMatchedAssessments.filter(item => Boolean(item.instructions?.trim()));
   const assessment = (lesson ? submittable.find(item => item.curriculumLessonId === lesson.id) : undefined)
     ?? (lesson ? submittable.find(item => item.curriculumLessonId === null) : undefined) ?? null;
   const blockers: FirstClassBlocker[] = [];
@@ -70,7 +74,10 @@ export function buildFirstClassroom(sectionId: string, input: {
   if (!input.curriculumAccess.available) blockers.push({ key: "curriculum_unavailable",
     message: input.curriculumAccess.reason ?? "Current curriculum delivery access is required." });
   if (!lesson && input.curriculumAccess.available) blockers.push({ key: "missing_lesson", message: "Publish a learner-facing lesson with reading, practice or a resource." });
-  if (!assessment && input.curriculumAccess.available) blockers.push({ key: "missing_assessment", message: "Publish available work with student instructions linked to the first lesson, or an unlinked introductory assessment." });
+  if (!assessment && input.curriculumAccess.available) blockers.push(input.publishedAssessments.some(item =>
+    item.publisherCourseVersionId && item.publisherCourseVersionId !== input.courseVersionId)
+    ? { key: "assessment_curriculum_mismatch", message: "Review the opening assignment's curriculum release link before directing students to it." }
+    : { key: "missing_assessment", message: "Publish available work with student instructions linked to the first lesson, or an unlinked introductory assessment." });
   if (!input.qualifiedTeacher) blockers.push({ key: "missing_qualified_teacher", message: "Assign an eligible teacher whose verified qualifications and delivery cover the instructional window." });
   if (input.activeStudentCount < 1) blockers.push({ key: "missing_students", message: "Assign at least one actively enrolled student to this class for the same program and school year." });
   return {

@@ -44,8 +44,8 @@ export const valorReferenceSchool = {
       asynchronous: true,
       onsiteDaysPerWeek: null,
     },
-    availability: "planned",
-    applicationOpen: false,
+    availability: "operating",
+    applicationOpen: true,
   }],
   // Illustrative, explicitly not registration-open; no production Activity or
   // Season state is created from these fictional examples.

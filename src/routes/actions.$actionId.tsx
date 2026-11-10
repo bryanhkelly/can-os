@@ -32,6 +32,11 @@ function ActionDetailPage() {
       {action.description && <p className="mt-5 whitespace-pre-wrap text-sm">{action.description}</p>}
       {action.resolutionNote && <div className="mt-5 border-t pt-5"><h3 className="font-semibold">Resolution</h3><p className="mt-2 whitespace-pre-wrap text-sm">{action.resolutionNote}</p></div>}
       {action.resolvedAt && <p className="mt-3 text-sm text-muted-foreground">Resolved {new Date(action.resolvedAt).toLocaleDateString()}</p>}
+      {action.canReviewClass && action.sectionId && <nav aria-label="Related academic work" className="mt-5 flex flex-wrap gap-4 text-sm font-semibold">
+        <Link to="/classes" search={{ section: action.sectionId }} className="underline">Open class</Link>
+        <Link to="/teacher/gradebook" search={{ section: action.sectionId }} className="underline">Review academic work</Link>
+        <Link to="/calendar" search={{ section: action.sectionId }} className="underline">View class calendar</Link>
+      </nav>}
       {action.canManageOperations && !["resolved", "cancelled"].includes(action.status) &&
         <Link to="/home" search={{ action: action.id, siteId: action.siteId ?? undefined, programId: action.programId ?? undefined }}
           className="mt-5 inline-block text-sm font-semibold underline">Open owning operations workflow</Link>}

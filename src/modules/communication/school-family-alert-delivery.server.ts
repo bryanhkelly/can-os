@@ -161,6 +161,7 @@ export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit
          ok=await sendNotificationEmail({
          to:mail.email,subject:record.title,
          text:record.message??record.title,
+         siteId:record.siteId,
          },id);
        }
      }else if(record.delivery.channel==="sms"){

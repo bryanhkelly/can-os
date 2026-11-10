@@ -94,7 +94,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
 
   await withAuthenticatedPage(browser, fixture.guardianSecret, async guardian => {
     await test.step("guardian sees the same missing assignment in academic progress", async () => {
-      await guardian.page.goto("/guardian/academics");
+      await guardian.page.goto("/guardian/students");
       await expect(
         guardian.page.getByRole("heading", { name: "Academic progress" }),
       ).toBeVisible();
@@ -204,7 +204,7 @@ test("GF1: missing assignment -> guardian notified -> late submit -> graded -> v
 
   await withAuthenticatedPage(browser, fixture.guardianSecret, async guardianAgain => {
     await test.step("guardian sees the posted grade and feedback from canonical data", async () => {
-      await guardianAgain.page.goto("/guardian/academics");
+      await guardianAgain.page.goto("/guardian/students");
       const card = guardianAgain.page.getByRole("heading", { name: fixture.assessmentTitle }).locator("..").locator("..");
       await expect(card.getByText(/Grade:\s*88\s*\/\s*100/)).toBeVisible();
       await expect(card.getByText(/Good recovery/)).toBeVisible();

@@ -260,4 +260,20 @@ WHERE s.code IN('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST') AND s.metadata->>'
 AND jsonb_array_length(v.curriculum->'learning'->'modules'->0->'lessons')>0
 ON CONFLICT(student_profile_id,section_id,course_template_version_id,lesson_id) DO NOTHING;
 
+-- Weekday meeting times from the shared synthetic timetable
+-- (class-schedule-times.sql). Wiring is idempotent, skips operator-assigned
+-- schedules, and no-ops when the timetable seed has not been applied.
+UPDATE sections SET schedule_template_id='f8000000-0000-4000-8000-000000000001'
+WHERE id=md5('can-core-section:CAN-ENG9')::uuid AND schedule_template_id IS NULL
+AND EXISTS (SELECT 1 FROM schedule_templates t WHERE t.id='f8000000-0000-4000-8000-000000000001');
+UPDATE sections SET schedule_template_id='f8000000-0000-4000-8000-000000000002'
+WHERE id=md5('can-core-section:CAN-ALG1')::uuid AND schedule_template_id IS NULL
+AND EXISTS (SELECT 1 FROM schedule_templates t WHERE t.id='f8000000-0000-4000-8000-000000000002');
+UPDATE sections SET schedule_template_id='f8000000-0000-4000-8000-000000000003'
+WHERE id=md5('can-core-section:CAN-BIO')::uuid AND schedule_template_id IS NULL
+AND EXISTS (SELECT 1 FROM schedule_templates t WHERE t.id='f8000000-0000-4000-8000-000000000003');
+UPDATE sections SET schedule_template_id='f8000000-0000-4000-8000-000000000004'
+WHERE id=md5('can-core-section:CAN-USHIST')::uuid AND schedule_template_id IS NULL
+AND EXISTS (SELECT 1 FROM schedule_templates t WHERE t.id='f8000000-0000-4000-8000-000000000004');
+
 COMMIT;

@@ -22,6 +22,7 @@ export async function handleAcademicInterventionEvent(
         studentName: string;
         assessmentTitle: string;
         organizationId: string | null;
+        siteId: string | null;
       }
     | undefined;
 
@@ -36,7 +37,11 @@ export async function handleAcademicInterventionEvent(
     if (event.eventType !== EventTypes.AssignmentBecameMissing) return;
 
     const context = await assignmentMissingPolicy.load(tx, event);
-    if (!context) throw new Error("Missing submission context for domain event");
+    if (!context) {
+      await tx.update(domainEvents).set({ status: "processed", processedAt: new Date() })
+        .where(eq(domainEvents.id, event.id));
+      return;
+    }
 
     const [insight] = await tx.insert(insights).values({
       type: "missing_assignment",
@@ -122,6 +127,7 @@ export async function handleAcademicInterventionEvent(
       studentName: context.studentName,
       assessmentTitle: context.assessmentTitle,
       organizationId: context.organizationId,
+      siteId: context.siteId,
     };
   });
 
@@ -151,6 +157,7 @@ export async function handleAcademicInterventionEvent(
         await sendNotificationEmail({
           to,
           subject: `${assessmentTitle} is missing`,
+          siteId: guardianEmailNotice?.siteId ?? undefined,
           text: `${studentName} has a missing assignment: ${assessmentTitle}. Sign in to CAN OS to review it and follow up.`,
           actionUrl,
         });

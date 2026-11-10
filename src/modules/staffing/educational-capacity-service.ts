@@ -29,6 +29,7 @@ type CommandContext,
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { and,eq,gte,inArray,isNull,lte,or,sql } from "drizzle-orm";
+import { isSectionMeetingPeriodType, SECTION_MEETING_PERIOD_TYPES } from "@/domain/schedule-period-types";
 import { currentCapacityReservationFilter, isCurrentCapacityReservation } from "./reservation-policy";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
 import { recurringSchedulesConflict } from "@/domain/recurring-schedule-conflict";
@@ -241,7 +242,7 @@ async function hasScheduleConflict(
   demand: NonNullable<Awaited<ReturnType<typeof loadDemandContext>>>,
 ) {
   const targetPeriods = (await loadSectionPeriods(executor, demand.scheduleTemplateId))
-    .filter(period => period.type === "instruction");
+    .filter(period => isSectionMeetingPeriodType(period.type));
   if (!targetPeriods.length) return false;
 
   const activeArrangements = await executor.select({
@@ -292,7 +293,7 @@ async function hasScheduleConflict(
     endsAtLocal: scheduleTemplatePeriods.endsAtLocal,
   }).from(sections)
     .innerJoin(scheduleTemplatePeriods, eq(scheduleTemplatePeriods.scheduleTemplateId, sections.scheduleTemplateId))
-    .where(and(inArray(sections.id, otherSectionIds), eq(scheduleTemplatePeriods.type, "instruction")));
+    .where(and(inArray(sections.id, otherSectionIds), inArray(scheduleTemplatePeriods.type, [...SECTION_MEETING_PERIOD_TYPES])));
   const periodsBySection = new Map<string, typeof periods>();
   for (const period of periods) {
     const sectionPeriods = periodsBySection.get(period.sectionId) ?? [];

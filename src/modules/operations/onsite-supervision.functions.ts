@@ -6,6 +6,7 @@ import { createServerFn, createServerOnlyFn } from "@tanstack/react-start";
 import { createHash } from "node:crypto";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, inArray, lte, or, isNull, sql } from "drizzle-orm";
+import { SECTION_MEETING_PERIOD_TYPES } from "@/domain/schedule-period-types";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -140,7 +141,7 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
           or(isNull(scheduleTemplates.effectiveThrough),
             gte(scheduleTemplates.effectiveThrough,data.date)),
           eq(scheduleTemplatePeriods.dayOfWeek,day),
-          eq(scheduleTemplatePeriods.type,"instruction"))):Promise.resolve([]),
+          inArray(scheduleTemplatePeriods.type,[...SECTION_MEETING_PERIOD_TYPES]))):Promise.resolve([]),
       db.select({
         sectionId:deliveryArrangements.sectionId,
         facilitatorPersonId:deliveryArrangements.facilitatorPersonId,

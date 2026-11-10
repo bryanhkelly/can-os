@@ -25,6 +25,7 @@ export interface SubscriptionEventPolicy<C = unknown> {
   load(tx: PolicyTx, event: DomainEventRecord): Promise<C | null>;
   /** Canonical source tenant from the loaded aggregate, never event metadata. */
   organizationId(context: C): string | null;
+  siteId?(context: C): string | null;
   /** Subjects the event concerns; subscriptions attach to one of these. */
   subjects(context: C): SubscriptionSubject[];
   authorize(

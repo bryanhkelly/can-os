@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route as StudentGroups } from "@/routes/student.study-groups";
-import { Route as NewStudyGroup } from "@/routes/student.study-groups_.new";
+import { Route as Groups } from "@/routes/groups";
+import { Route as NewStudyGroup } from "@/routes/groups_.new";
 import { Route as SchoolYears } from "@/routes/operations.school-years";
 import { Route as NewSchoolYear } from "@/routes/operations.school-years_.new";
 import { Route as SchoolYearDetail } from "@/routes/operations.school-years_.$yearId";
@@ -22,19 +22,26 @@ vi.mock("@tanstack/react-router", () => ({
   useNavigate: () => vi.fn(),
   useBlocker: vi.fn(),
   useSearch: () => ({}),
+  linkOptions: (options: unknown) => options,
 }));
 vi.mock("@/components/shell/WorkspaceSession", () => ({
   useWorkspaceSession: () => ({ session: { authenticated: true, sites: [{ id: "valor", name: "Valor Christian Academy" }] } }),
 }));
-vi.mock("@/modules/study-groups/canonical-workspace.functions", () => ({ getStudyGroupAvailability: vi.fn() }));
+vi.mock("@/modules/study-groups/canonical-workspace.functions", () => ({
+  getStudyGroupAvailability: vi.fn(), getCanonicalGroupWorkspace: vi.fn(),
+}));
 vi.mock("@/modules/study-groups/canonical-membership.functions", () => ({
   requestCanonicalGroupMembership: vi.fn(), leaveCanonicalGroup: vi.fn(), createStudentStudyGroup: vi.fn(),
+  createFacilitatedGroup: vi.fn(), decideCanonicalGroupMembership: vi.fn(),
 }));
 vi.mock("@/modules/study-groups/study-group-queries.functions", () => ({
   listStudyGroups: vi.fn(), getStudyGroupDetail: vi.fn(), listStudentStudyGroupSections: vi.fn(),
   listStudentStudyGroupClassmates: vi.fn(() => new Promise(() => {})), hasStudentStudyGroupGuardian: vi.fn(),
+  listFacilitatorGroupScopes: vi.fn(),
 }));
-vi.mock("@/modules/study-groups/canonical-moderation.functions", () => ({ createCanonicalGroupPost: vi.fn(), reportCanonicalGroupPost: vi.fn() }));
+vi.mock("@/modules/study-groups/canonical-moderation.functions", () => ({
+  createCanonicalGroupPost: vi.fn(), reportCanonicalGroupPost: vi.fn(), resolveCanonicalGroupReport: vi.fn(),
+}));
 vi.mock("@/modules/study-groups/canonical-sessions.functions", () => ({ rsvpCanonicalGroupSession: vi.fn() }));
 vi.mock("@/modules/academic-time/school-year-studio.functions", () => ({
   getSchoolYearStudio: vi.fn(), createStudioGradeScale: vi.fn(), createStudioYear: vi.fn(), activateStudioYear: vi.fn(),
@@ -43,6 +50,9 @@ vi.mock("@/modules/academic-time/school-year-studio.functions", () => ({
 }));
 vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
   getSchoolExperiences: vi.fn(), bookOfficeHour: vi.fn(), cancelOfficeHour: vi.fn(), rescheduleOfficeHour: vi.fn(),
+}));
+vi.mock("@/modules/operations/school-profile.functions", () => ({
+  getSchoolProfile: vi.fn(), getMySchoolProfile: vi.fn(),
 }));
 vi.mock("@/modules/communication/notification-center.functions", () => ({ readNotification: vi.fn() }));
 vi.mock("@/modules/learning/guardian-academic-queries.functions", () => ({ getGuardianStudents: vi.fn() }));
@@ -55,10 +65,16 @@ function render(route: { options: { component?: unknown } }) {
 const successful = (data: unknown) => { state.data = { ok: true, data }; };
 const createActions = (html: string) => html.match(/data-create-action=""/g)?.length ?? 0;
 
-const groupsData = (overrides: object = {}) => ({
-  enabled: true, writesEnabled: true, membershipEnabled: true, creationEnabled: true, contentEnabled: true,
-  groups: [{ id: "group", title: "Algebra circle", kind: "course", capacity: 20, membership: null, description: "Practice" }],
-  sections: [{ id: "section", title: "Algebra I" }], hasEnrollmentGuardian: true, ...overrides,
+const allAvailability = { enabled: true, writesEnabled: true, membershipEnabled: true, creationEnabled: true, contentEnabled: true, moderationEnabled: true };
+const groupsData = (workspaceOverrides: object = {}, availabilityOverrides: object = {}) => ({
+  availability: { ...allAvailability, ...availabilityOverrides },
+  workspace: {
+    role: "student", hasEnrollmentGuardian: true, sections: [],
+    groups: [{ id: "group", title: "Algebra circle", kind: "course", maxMembers: 20, memberCount: 1,
+      facilitatorName: "Dr. Thorne", membershipStatus: null, description: "Practice",
+      timezone: "America/Denver", sessions: [], posts: [], reports: [], roster: [], pendingMembers: [] }],
+    ...workspaceOverrides,
+  },
 });
 const studio = {
   sites: [{ id: "valor", name: "Valor", organizationId: "org", organizationName: "Valor", timezone: "America/Denver" }],
@@ -79,40 +95,45 @@ beforeEach(() => { state.search = {}; state.params = {}; state.data = null; });
 describe("study groups: directory and dedicated create page", () => {
   it("leads with the directory and one blue create entry point, without an embedded form", () => {
     successful(groupsData());
-    const html = render(StudentGroups);
+    const html = render(Groups);
     expect(createActions(html)).toBe(1);
-    expect(html).toContain('href="/student/study-groups/new"');
+    expect(html).toContain('href="/groups/new"');
     expect(html).toContain("Create study group");
     expect(html).not.toContain("<form");
     expect(html).not.toContain("Invite classmates");
     expect(html).toContain("Algebra circle");
+    expect(html).toContain('href="/groups/group"');
   });
 
   it("omits the create entry point when the student cannot create a group", () => {
     successful(groupsData({ hasEnrollmentGuardian: false }));
-    expect(createActions(render(StudentGroups))).toBe(0);
-    successful(groupsData({ creationEnabled: false }));
-    expect(createActions(render(StudentGroups))).toBe(0);
+    expect(createActions(render(Groups))).toBe(0);
+    successful(groupsData({}, { creationEnabled: false }));
+    expect(createActions(render(Groups))).toBe(0);
   });
 
   it("renders grouped fields with Create and Cancel back to the directory", () => {
-    successful({ available: true, sections: [{ id: "section", title: "Algebra I" }], hasEnrollmentGuardian: true });
+    successful({ availability: allAvailability,
+      workspace: { role: "student", hasEnrollmentGuardian: true, sections: [], groups: [] },
+      studentSections: [{ id: "section", title: "Algebra I" }], scopes: [] });
     const html = render(NewStudyGroup);
     expect(html.match(/<h1/g)).toHaveLength(1);
     expect(html).toContain("Create study group</h1>");
     expect(html).toContain("<form");
     expect(html.match(/data-form-section=""/g)).toHaveLength(2);
     expect(html).toContain("Group name");
-    expect(html).toMatch(/<div data-form-actions=""[^>]*><button type="submit"[^>]*>Create study group<\/button><a href="\/student\/study-groups"[^>]*>Cancel<\/a>/);
-    expect(html).toContain('href="/student/study-groups"');
+    expect(html).toMatch(/<div data-form-actions=""[^>]*><button type="submit"[^>]*>Create study group<\/button><a href="\/groups"[^>]*>Cancel<\/a>/);
+    expect(html).toContain('href="/groups"');
   });
 
   it("explains why creation is unavailable instead of showing a form", () => {
-    successful({ available: true, sections: [{ id: "section", title: "Algebra I" }], hasEnrollmentGuardian: false });
+    successful({ availability: allAvailability,
+      workspace: { role: "student", hasEnrollmentGuardian: false, sections: [], groups: [] },
+      studentSections: [{ id: "section", title: "Algebra I" }], scopes: [] });
     const html = render(NewStudyGroup);
     expect(html).not.toContain("<form");
     expect(html).toContain("A linked guardian is required");
-    successful({ available: false, sections: [], hasEnrollmentGuardian: null });
+    successful({ availability: { ...allAvailability, creationEnabled: false }, workspace: null, studentSections: [], scopes: [] });
     expect(render(NewStudyGroup)).toContain("Creating study groups is unavailable right now.");
   });
 });
@@ -208,9 +229,18 @@ describe("My School is the student's school record", () => {
       id: `notice-${index}`, title: `Notice ${index}`, body: "Body", acknowledged: false,
     })),
   };
+  const site = {
+    id: "valor", name: "Valor Christian Academy", timezone: "America/Denver",
+    organization: { id: "org", name: "Valor Church" },
+    physicalLocation: { value: null, configurationStatus: "missing" },
+    contact: { value: null, configurationStatus: "unconfigured" },
+    publication: { status: "unconfigured" },
+    programs: [],
+    viewer: { canManageSchool: false, canPublish: false, canOpenSiteToday: false },
+  };
 
   it("leads with school identity, section navigation and bounded overview previews", () => {
-    successful(experiences);
+    successful({ site, siteCount: null, experiences });
     const html = render(MySchool);
     expect(html).toContain("Valor Christian Academy</h1>");
     expect(html).not.toContain("School &amp; community");
@@ -224,7 +254,7 @@ describe("My School is the student's school record", () => {
 
   it("shows one full section and keeps Mark as read quiet, not primary", () => {
     state.search = { tab: "announcements" };
-    successful(experiences);
+    successful({ site, siteCount: null, experiences });
     const html = render(MySchool);
     expect(html.match(/Notice \d/g)).toHaveLength(5);
     expect(html).not.toContain("School calendar</h2>");

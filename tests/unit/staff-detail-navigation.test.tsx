@@ -1,17 +1,18 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Route as Groups } from "@/routes/teacher.study-groups";
+import { Route as Groups } from "@/routes/groups";
+import { Route as GroupDetail } from "@/routes/groups_.$groupId";
 import { Route as Action } from "@/routes/actions.$actionId";
 import { Route as MissingWork } from "@/routes/teacher.missing-work";
 import { Route as HealthReview } from "@/routes/operations.health-review";
 import { Route as TransferRecords } from "@/routes/operations.transfer-records";
 import { Route as Transcripts } from "@/routes/admissions.transcripts";
 
-const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,data:null as unknown}));
+const state=vi.hoisted(()=>({search:{} as Record<string,unknown>,params:{} as Record<string,string>,data:null as unknown}));
 vi.mock("@tanstack/react-router",()=>({
   createFileRoute:()=>(options:object)=>({
-    options,useSearch:()=>state.search,useLoaderData:()=>state.data,
+    options,useSearch:()=>state.search,useLoaderData:()=>state.data,useParams:()=>state.params,
   }),
   useRouter:()=>({invalidate:vi.fn()}),
   useLocation:()=>({pathname:"/actions/action-1",searchStr:"",hash:""}),
@@ -30,14 +31,21 @@ vi.mock("@/components/shell/WorkspaceSession",()=>({
 vi.mock("@/modules/study-groups/study-group-queries.functions",() => ({
   listFacilitatorGroupScopes:vi.fn(),listStudyGroupReviewQueue:vi.fn(),listStudyGroupReports:vi.fn(),
 }));
-vi.mock("@/modules/study-groups/canonical-workspace.functions",()=>({getStudyGroupAvailability:vi.fn()}));
+vi.mock("@/modules/study-groups/canonical-workspace.functions",()=>({
+  getStudyGroupAvailability:vi.fn(),getCanonicalGroupWorkspace:vi.fn(),
+}));
 vi.mock("@/modules/study-groups/canonical-membership.functions",()=>({
   createFacilitatedGroup:vi.fn(),decideCanonicalGroupMembership:vi.fn(),
+  requestCanonicalGroupMembership:vi.fn(),leaveCanonicalGroup:vi.fn(),
+  inviteCanonicalGroupMembers:vi.fn(),listCanonicalGroupInvitees:vi.fn(),
 }));
-vi.mock("@/modules/study-groups/canonical-moderation.functions",()=>({resolveCanonicalGroupReport:vi.fn()}));
+vi.mock("@/modules/study-groups/canonical-moderation.functions",()=>({
+  resolveCanonicalGroupReport:vi.fn(),createCanonicalGroupPost:vi.fn(),reportCanonicalGroupPost:vi.fn(),
+}));
 vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({
   createCanonicalGroupSession:vi.fn(),reviseCanonicalGroupSession:vi.fn(),
   listCanonicalGroupAttendance:vi.fn(),recordCanonicalGroupAttendance:vi.fn(),
+  rsvpCanonicalGroupSession:vi.fn(),
 }));
 vi.mock("@/modules/study-groups/facilitator-query.functions",()=>({getFacilitatorStudyGroups:vi.fn()}));
 vi.mock("@/modules/actions/action-detail.functions",()=>({getActionDetail:vi.fn()}));
@@ -61,60 +69,74 @@ function render(route:{options:{component?:unknown}}){
 }
 beforeEach(()=>{
   state.search={};
+  state.params={};
+  const session={id:"session",title:"Essay review",startsAt:"2030-01-01T18:00:00Z",endsAt:"2030-01-01T19:00:00Z",
+    cancelled:false,attendance:[],rsvp:null,attended:null,agenda:"",location:""};
   state.data={ok:true,data:{
-    enabled:true,writesEnabled:true,membershipEnabled:true,creationEnabled:true,moderationEnabled:true,scopes:[],
-    groups:[
-      {id:"english",title:"English group",timezone:"America/Los_Angeles",sessions:[{id:"session",title:"Essay review",startsAt:"2030-01-01T18:00:00Z",endsAt:"2030-01-01T19:00:00Z",cancelled:false}]},
-      {id:"math",title:"Unrelated math group",timezone:"America/Los_Angeles",sessions:[]},
-    ],
-    queue:[
-      {groupId:"english",groupTitle:"English group",personId:"student",personName:"Jordan"},
-      {groupId:"math",groupTitle:"Unrelated math group",personId:"other",personName:"Other student"},
-    ],
-    reports:[
-      {id:"report",groupId:"english",groupTitle:"English group",reason:"Review this post",postBody:"Reported post"},
-      {id:"other-report",groupId:"math",groupTitle:"Unrelated math group",reason:"Other report",postBody:"Unrelated post"},
-    ],
+    availability:{enabled:true,writesEnabled:true,membershipEnabled:true,creationEnabled:true,contentEnabled:true,moderationEnabled:true},
+    workspace:{role:"teacher",hasEnrollmentGuardian:null,sections:[],groups:[
+      {id:"english",title:"English group",description:"Essay revision circle",kind:"course",maxMembers:20,memberCount:2,
+        facilitatorName:"Pat Teacher",membershipStatus:null,timezone:"America/Los_Angeles",
+        sessions:[session],posts:[],roster:[],
+        pendingMembers:[{id:"m-english",studentPersonId:"student",studentName:"Jordan",guardianReady:true}],
+        reports:[{id:"report",postId:"post",reason:"Review this post",postBody:"Reported post",postHidden:false}]},
+      {id:"math",title:"Unrelated math group",description:"Math practice",kind:"course",maxMembers:20,memberCount:1,
+        facilitatorName:"Pat Teacher",membershipStatus:null,timezone:"America/Los_Angeles",
+        sessions:[],posts:[],roster:[],
+        pendingMembers:[{id:"m-math",studentPersonId:"other",studentName:"Other student",guardianReady:false}],
+        reports:[{id:"other-report",postId:"other-post",reason:"Other report",postBody:"Unrelated post",postHidden:false}]},
+    ]},
   }};
 });
 
 describe("facilitator record navigation",()=>{
-  it("links request, moderation, group and session titles to their exact context",()=>{
+  it("links requests, moderation and group cards to the group's detail page",()=>{
     const html=render(Groups);
-    expect(html.match(/href="\/teacher\/study-groups\?group=english"/g)).toHaveLength(3);
-    expect(html).toContain('href="/teacher/study-groups?group=english&amp;session=session"');
+    expect(html.match(/href="\/groups\/english"/g)).toHaveLength(3);
+    expect(html.match(/href="\/groups\/math"/g)).toHaveLength(3);
   });
-  it("selects the requested group across every queue and highlights its requested session",()=>{
-    state.search={group:"english",session:"session"};
-    const html=render(Groups);
+  it("opens the requested group detail and highlights its requested session",()=>{
+    state.params={groupId:"english"};
+    state.search={session:"session"};
+    const html=render(GroupDetail);
     expect(html).toContain("English group");
     expect(html).toContain("Reported post");
     expect(html).toContain('aria-current="true"');
-    expect(html).toContain("All facilitated study groups");
+    expect(html).toContain("All study groups");
     expect(html).not.toContain("Unrelated math group");
     expect(html).not.toContain("Unrelated post");
     expect(html).not.toContain("Other student");
-    expect(html).toMatch(/<option value="english" selected="">/);
   });
   it("does not replace unavailable groups or sessions with another selection",()=>{
-    state.search={group:"missing"};
-    const missingGroup=render(Groups);
-    expect(missingGroup).toContain("This study group is unavailable");
+    state.params={groupId:"missing"};
+    const missingGroup=render(GroupDetail);
+    expect(missingGroup).toContain("This group is unavailable");
     expect(missingGroup).not.toContain("Essay review");
     expect(missingGroup).not.toContain("Unrelated math group");
-    state.search={group:"english",session:"missing"};
-    expect(render(Groups)).toContain("This session is unavailable");
-    expect(render(Groups)).not.toContain('aria-current="true"');
+    state.params={groupId:"english"};
+    state.search={session:"missing"};
+    expect(render(GroupDetail)).toContain("This session is unavailable");
+    expect(render(GroupDetail)).not.toContain('aria-current="true"');
   });
-  it("preserves group/session search parameters and rejects non-string selection values",()=>{
-    const validate=Groups.options.validateSearch;
+  it("preserves the session search parameter and rejects non-string selection values",()=>{
+    const validate=GroupDetail.options.validateSearch;
     if(typeof validate!=="function")throw new Error("Missing search validator");
-    expect(validate({group:"english",session:"session"})).toEqual({group:"english",session:"session"});
-    expect(validate({group:42,session:false})).toEqual({group:undefined,session:undefined});
+    expect(validate({group:"english",session:"session"})).toEqual({session:"session"});
+    expect(validate({session:false})).toEqual({session:undefined});
   });
 });
 
 describe("read-only staff Action detail",()=>{
+  it("connects authorized academic Actions to class work and calendar without resolving them",()=>{
+    state.data={ok:true,data:{id:"follow-up",title:"Review learning",status:"open",priority:"normal",
+      type:"academic_intervention",sectionId:"english",canReviewClass:true,canManageOperations:false,
+      workspaceHome:"/home",dueAt:null,resolvedAt:null,resolutionNote:null}};
+    const html=render(Action);
+    expect(html).toContain('href="/classes?section=english"');
+    expect(html).toContain('href="/teacher/gradebook?section=english"');
+    expect(html).toContain('href="/calendar?section=english"');
+    expect(html).not.toContain("Open owning operations workflow");
+  });
   it("preserves exact transcript-candidate identity even when names are identical",()=>{
     state.search={query:"Jordan"};
     state.data={ok:true,data:{candidates:[

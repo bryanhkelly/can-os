@@ -10,10 +10,10 @@ import { renderPublicSiteHtml } from "@/domain/public-site-html";
 describe("School website prewritten editorial copy and stable originals", () => {
   it("starts with personalized, high-quality editable suggestions without inventing programs or faith details", () => {
     const starter = createSchoolWebsiteStarterContent("Rivermere Academy");
-    expect(starter.heroHeadline).toBe("A school that sees the individual. A community that helps them grow.");
-    expect(starter.welcomeMessage).toContain("Thoughtful academics");
+    expect(starter.heroHeadline).toBe("A place to belong. A future to build.");
+    expect(starter.welcomeMessage).toContain("Purposeful learning");
     expect(starter.localDescription).toContain("Rivermere Academy");
-    expect(starter.schoolVision).toContain("students are challenged");
+    expect(starter.schoolVision).toContain("students are known");
     expect(starter.editorialBaseline?.version).toBe(1);
     expect(starter.editorialBaseline?.fields.localDescription).toBe(starter.localDescription);
     for (const field of ["churchHistory", "denomination", "statementOfFaith",
@@ -68,7 +68,7 @@ describe("School website prewritten editorial copy and stable originals", () => 
       churchHistory: "Our documented history", denomination: "Locally approved denomination",
     });
     const restored = restoreOriginalWebsiteField(content, "heroHeadline");
-    expect(restored.heroHeadline).toBe("A school that sees the individual. A community that helps them grow.");
+    expect(restored.heroHeadline).toBe("A place to belong. A future to build.");
     expect(restored.localDescription).toBe("My own story");
     expect(restored.churchHistory).toBe("Our documented history");
     expect(restored.denomination).toBe("Locally approved denomination");
@@ -98,7 +98,7 @@ describe("School website prewritten editorial copy and stable originals", () => 
       name: "Rivermere Academy", organizationName: "Rivermere Church",
     }, offerings: [], localContent: normalizeSiteLocalContent(starter) };
     const html = renderPublicSiteHtml(page);
-    expect(html).toContain("<h1>A school that sees the individual. A community that helps them grow.</h1>");
+    expect(html).toContain("<h1>A place to belong. A future to build.</h1>");
     expect(html).toContain('<p class="tag">Rivermere Academy</p>');
     expect(html).not.toContain("editorialBaseline");
     expect(html).not.toContain("<script");

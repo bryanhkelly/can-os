@@ -90,6 +90,7 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           channel: row.channel, attempt: row.attempts + 1,
           personId: subscription.subscriberPersonId,
           organizationId,
+          siteId: policy!.siteId?.(context!) ?? null,
           sourceConversationId: subscription.sourceConversationId,
           content: policy!.content(context!, row.kind === "initial" ? "initial" : "reminder"),
         };
@@ -124,6 +125,7 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           if (!await renewLease()) continue;
           ok = await sendNotificationEmail({
             to: email, subject: delivery.content.title,
+            siteId: delivery.siteId ?? undefined,
             text: delivery.content.body ?? delivery.content.title,
           }, id);
           error = "email_provider_failed";

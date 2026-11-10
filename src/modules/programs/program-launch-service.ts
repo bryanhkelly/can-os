@@ -12,6 +12,7 @@ calendarEvents,
 journeyRequirements,
 organizations,
 programs,
+  schoolConfigurationVersions,
 schoolYears,
 sections,
 sectionTeachers,
@@ -30,7 +31,7 @@ import { EventTypes } from "@/domain/event-types";
 import { instantiateJourneyFromDefinition } from "@/modules/journeys/instantiate";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createProjectionIfAbsent } from "@/platform/calendar/projection";
-import { and,eq,inArray,isNull,or,sql } from "drizzle-orm";
+import { and,desc,eq,inArray,isNull,or,sql } from "drizzle-orm";
 import { evaluateSectionReadiness } from "./section-readiness-service";
 import { lockLaunchTeacherClaims } from "@/modules/staffing/launch-staffing.server";
 import { assertOpeningOperator,createOpeningHandoff,listOpeningHandoffs } from "./opening-handoff.server";
@@ -387,6 +388,20 @@ export async function activateProgram(
       if(handoff&&existing.length&&existing[0]?.ownerPersonId!==handoff.recipientPersonId)
         throw new Error("Program already opened with a different handoff recipient");
       return;
+    }
+
+    if (program.siteId && !isExtendedLearningType(program.type)) {
+      const [configuration]=await tx.select({
+        createdAt:schoolConfigurationVersions.createdAt,
+        status:schoolConfigurationVersions.status,
+        approvedAt:schoolConfigurationVersions.approvedAt,
+      }).from(schoolConfigurationVersions).where(
+        eq(schoolConfigurationVersions.programId,program.id),
+      ).orderBy(desc(schoolConfigurationVersions.version)).limit(1);
+      await requireCurrentSchoolJurisdictionForOpening(tx,program.id,{
+        configurationCreatedAt:configuration?.createdAt??null,
+        openingApprovedAt:configuration?.status==="approved"?configuration.approvedAt:null,
+      });
     }
 
     const [journey] = await tx

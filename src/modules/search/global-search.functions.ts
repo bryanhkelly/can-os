@@ -1,10 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
 import { requireActor, actorSiteIds, type Actor } from "@/modules/identity/actors.server";
+import { hasRegistrarAuthority } from "@/domain/school-roles";
 
 export type SearchHit = {
   id: string;
@@ -19,6 +21,7 @@ export type WorkspaceSearchResults = {
   assignments: SearchHit[];
   students: SearchHit[];
   messages: SearchHit[];
+  actions: SearchHit[];
 };
 
 const EMPTY: WorkspaceSearchResults = {
@@ -27,9 +30,10 @@ const EMPTY: WorkspaceSearchResults = {
   assignments: [],
   students: [],
   messages: [],
+  actions: [],
 };
 
-const ALL_ROLES = ["student", "teacher", "guardian", "registrar", "specialist", "counselor"] as const;
+const ALL_ROLES = ["student", "teacher", "guardian", "registrar", "site_admin", "specialist", "counselor"] as const;
 
 function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, "");
@@ -143,9 +147,12 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
       dueAt: s.assessments.dueAt,
       sectionTitle: s.sections.title,
       sectionId: s.sections.id,
+      timezone: s.schoolYears.timezone,
     })
     .from(s.assessments)
     .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
+    .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
+    .innerJoin(s.schoolYears, eq(s.schoolYears.id, s.terms.schoolYearId))
     .innerJoin(scopeJoin.from, scopeJoin.on)
     .$dynamic();
 
@@ -175,7 +182,7 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
   return rows.map((row) => ({
     id: `assignment-${row.id}`,
     label: row.title,
-    sub: row.dueAt ? `${row.sectionTitle} · due ${day(row.dueAt)}` : row.sectionTitle,
+    sub: row.dueAt ? `${row.sectionTitle} · due ${dateKeyInTimezone(row.dueAt, row.timezone)}` : row.sectionTitle,
     to: actor.role === "student"
       ? `/student/assignments?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`
       : `/teacher/gradebook?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`,
@@ -290,7 +297,7 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
       sub: row.gradeLevel ? `Grade ${row.gradeLevel}` : "Student",
       to:
         actor.role === "guardian"
-          ? `/guardian/academics?student=${encodeURIComponent(row.personId)}`
+          ? `/guardian/students?student=${encodeURIComponent(row.personId)}`
           : `/staff/students/${row.personId}`,
     });
     if (hits.length >= 5) break;
@@ -298,31 +305,43 @@ async function searchStudents(actor: Actor, like: string): Promise<SearchHit[]> 
   return hits;
 }
 
-async function searchMessages(actor: Actor, like: string): Promise<SearchHit[]> {
-  const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
-  const rows = await db
-    .select({
-      id: s.communicationThreads.id,
-      subject: s.communicationThreads.subject,
-      lastMessageAt: s.communicationThreads.lastMessageAt,
-    })
-    .from(s.communicationThreads)
-    .innerJoin(
-      s.communicationParticipants,
-      and(
-        eq(s.communicationParticipants.threadId, s.communicationThreads.id),
-        eq(s.communicationParticipants.participantId, actor.actorPersonId),
-      ),
-    )
-    .where(ilike(s.communicationThreads.subject, like))
-    .orderBy(desc(s.communicationThreads.lastMessageAt))
-    .limit(5);
+async function searchMessages(term: string): Promise<SearchHit[]> {
+  const { listMyThreads } = await import("@/modules/communication/messages.functions");
+  const { threads } = await listMyThreads();
+  const rows = threads.filter(thread => thread.subject.toLowerCase().includes(term.toLowerCase())).slice(0, 5);
   return rows.map((row) => ({
     id: `thread-${row.id}`,
     label: row.subject,
-    sub: row.lastMessageAt ? `Last message ${day(row.lastMessageAt)}` : "Thread",
+    sub: row.lastMessageAt ? `Last message ${day(new Date(row.lastMessageAt))}` : "Conversation",
     to: `/messages?thread=${encodeURIComponent(row.id)}`,
   }));
+}
+
+async function searchActions(actor: Actor, term: string): Promise<SearchHit[]> {
+  const query = term.toLowerCase();
+  if (actor.role === "teacher") {
+    const { getTeacherLearningFollowUps } = await import("@/modules/learning/teacher-followup-resolution.functions");
+    const { items } = await getTeacherLearningFollowUps();
+    return items.filter(item => `${item.title} ${item.studentName} ${item.sectionTitle}`.toLowerCase().includes(query))
+      .slice(0, 5).map(item => ({
+        id: `action-${item.id}`, label: item.title,
+        sub: `${item.sectionTitle} · ${item.status.replaceAll("_", " ")}`,
+        to: `/actions/${encodeURIComponent(item.id)}`,
+      }));
+  }
+  if (!hasRegistrarAuthority(actor.role)) return [];
+  const { getOperationsActions } = await import("@/modules/operations/action-workspace.functions");
+  const { items } = await getOperationsActions({ data: {} });
+  return items.filter(item => !item.managedBySupport && item.title.toLowerCase().includes(query)).slice(0, 5)
+    .map(item => {
+      const search = new URLSearchParams({ action: item.id });
+      if (item.siteId) search.set("siteId", item.siteId);
+      if (item.programId) search.set("programId", item.programId);
+      return {
+        id: `action-${item.id}`, label: item.title, sub: item.status.replaceAll("_", " "),
+        to: `/home?${search.toString()}`,
+      };
+    });
 }
 
 /**
@@ -341,12 +360,13 @@ export const searchWorkspace = createServerFn({ method: "GET" })
     if (term.length < 2) return EMPTY;
     const like = `%${term}%`;
 
-    const [courses, assignments, students, messages] = await Promise.all([
+    const [courses, assignments, students, messages, actions] = await Promise.all([
       searchCourses(actor, like),
       searchAssignments(actor, like),
       searchStudents(actor, like),
-      searchMessages(actor, like),
+      searchMessages(term),
+      searchActions(actor, term),
     ]);
 
-    return { connected: true, courses, assignments, students, messages };
+    return { connected: true, courses, assignments, students, messages, actions };
   });

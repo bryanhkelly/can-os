@@ -51,8 +51,11 @@ describe("canonical workspace navigation",()=>{
   const paths=(role:string)=>getWorkspaceLinks(role)?.map(item=>item.path)??[];
   expect(paths("student")).toContain("/student/courses");
   expect(paths("student")).toContain("/student/my-school");
+  expect(workspaceLinks.student.find(item=>item.path==="/student/my-school")?.title).toBe("School profile");
   expect(paths("student")).not.toContain("/admissions");
-  expect(paths("guardian")).toContain("/guardian/academics");
+  expect(paths("guardian")).toContain("/guardian/students");
+  expect(workspaceLinks.guardian.find(item=>item.path==="/guardian/students")?.title).toBe("Students");
+  expect(workspaceLinks.guardian.find(item=>item.path==="/guardian/experiences")?.title).toBe("School profile");
   expect(paths("guardian")).not.toContain("/student/assignments");
   expect(paths("teacher")).toContain("/teacher/gradebook");
   expect(paths("registrar")).toContain("/admissions");
@@ -94,7 +97,7 @@ describe("canonical workspace navigation",()=>{
  it("selects explicitly owned nested and cross-workspace destinations without guessing parents",()=>{
   expect(getActiveWorkspacePath(workspaceLinks.student,"/classes")).toBe("/student/courses");
   expect(getActiveWorkspacePath(workspaceLinks.teacher,"/teacher/missing-work")).toBe("/teacher/gradebook");
-  expect(getActiveWorkspacePath(workspaceLinks.guardian,"/guardian/report-cards")).toBe("/guardian/academics");
+  expect(getActiveWorkspacePath(workspaceLinks.guardian,"/guardian/report-cards")).toBe("/guardian/students");
   expect(getActiveWorkspacePath(workspaceLinks.registrar,"/operations/curriculum-marketplace")).toBe("/operations/curriculum");
     expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/sites/school/publish/")).toBe("/sites");
     expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/sites/school/profile")).toBe("/sites");
