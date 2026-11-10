@@ -37,10 +37,10 @@ describe("standalone public site HTML", () => {
       };
       const privateHtml=renderPublicSiteHtml(page,{localPreview:true});
       expect(privateHtml).toContain("/template-photo/");
-      expect(privateHtml).toContain("Illustrative template photography");
+      expect(privateHtml).toContain("Template photography");
       const publicHtml=renderPublicSiteHtml(page);
       expect(publicHtml).not.toContain("/template-photo/");
-      expect(publicHtml).not.toContain("Illustrative template photography");
+      expect(publicHtml).not.toContain("Template photography");
     }
   });
 
@@ -608,7 +608,7 @@ describe("standalone public site HTML", () => {
     const demonstration = renderPublicSiteHtml({ ...page, demonstration: true });
     expect(ordinary).not.toContain('class="demo-banner"');
     expect(demonstration).toContain('class="demo-banner"');
-    expect(demonstration).toContain("Fictional Learning Academy is a fictional demonstration school.");
+    expect(demonstration).toContain("Fictional Learning Academy is fictional.");
     expect(demonstration).not.toContain("Valor is a fictional");
     const hostedDemo = renderPublicSiteHtml({...page, demonstration: true}, {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
@@ -661,6 +661,33 @@ describe("standalone public site HTML", () => {
     const addressOnly = renderPublicSiteHtml(page, { path: "/contact" });
     expect(addressOnly).not.toContain("Published contact information");
   });
+});
+
+it("connects all twelve editorial photo roles to fictional school pages only when library readiness is enabled",()=> {
+  const prior=process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED;
+  process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED="true";
+  try {
+    const page=withIllustrativeLocalPreview({
+      host:"showcase.can-os.com",
+      site:{name:"Showcase Academy",organizationName:"Partner"},
+      offerings:[],demonstration:true,
+    });
+    const all=availablePublicSitePaths(page).map(path=>
+      renderPublicSiteHtml(page,{path})).join("\n");
+    for(const role of ["hero","story_01","story_02","program_01",
+      "program_02","program_03","community_01","community_02",
+      "admissions","portrait_01","portrait_02","portrait_03"]) {
+      expect(all).toContain(`/template-photo/heritage/${role}?v=20261109`);
+    }
+    expect((all.match(/class="demo-banner"/g)??[]).toHaveLength(10);
+    expect(all).not.toContain("Demonstration only");
+    expect(all).not.toContain("Illustrative template photography");
+    expect(all).not.toContain("<form");
+    expect(all).toContain('content="noindex,nofollow"');
+  } finally {
+    if(prior===undefined)delete process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED;
+    else process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED=prior;
+  }
 });
 
 it("uses explicit sample photography only in the fictional private template preview",()=>{
