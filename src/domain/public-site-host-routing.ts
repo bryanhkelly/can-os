@@ -1,4 +1,4 @@
-import { isPublicSiteReadPath } from "./public-site-paths.ts";
+import { isPublicSiteReadPath, isPublicSitePagePath } from "./public-site-paths.ts";
 import { isTemplateDefaultImagePath } from "./template-sample-images.ts";
 import {
   isPublicSiteSlug,
@@ -11,6 +11,29 @@ const platformLabels = [
   "cdn", "mail", "docs", "help", "support", "staging", "demo", "test",
   "internal", "login", "files", "enrichment",
 ];
+
+// Allow ordinary attribution links to a school's public pages without ever
+// selecting a school, enabling a preview, or expanding tenant functionality
+// based on a query string. Public forms and assets remain query-free.
+const trackingKeys = new Set([
+  "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term",
+  "campaign", "ref", "gclid", "fbclid", "msclkid",
+]);
+function allowedPublishedSiteTracking(url: URL, method: string): boolean {
+  if (!url.search) return true;
+  if (method !== "GET" || url.search.length > 1024 || url.searchParams.size > 10) return false;
+  const page = url.pathname === "/published-site" ? "/" :
+    url.pathname.startsWith("/published-site/")
+      ? url.pathname.slice("/published-site".length) : url.pathname;
+  if (!isPublicSitePagePath(page)) return false;
+  const seen = new Set<string>();
+  for (const [name, value] of url.searchParams) {
+    if (!trackingKeys.has(name) || seen.has(name) ||
+        !/^[a-zA-Z0-9_.-]{1,128}$/.test(value)) return false;
+    seen.add(name);
+  }
+  return true;
+}
 
 export type PublicSiteHostDecision =
   | { kind: "platform" }
@@ -47,7 +70,8 @@ export function classifyPublicSiteRequest(
     return { kind: "platform" };
   }
   const slug = slugFromPublicSiteHost(host, domain);
-  if (!slug || !enabled || url.protocol !== "https:" || url.search || url.hash) {
+  if (!slug || !enabled || url.protocol !== "https:" || url.hash ||
+      !allowedPublishedSiteTracking(url, method)) {
     return { kind: "deny" };
   }
   if (method === "GET" && isTemplateDefaultImagePath(url.pathname))
@@ -109,7 +133,8 @@ export function slugForPublicSiteOrigin(
       (url.pathname === "/published-site" || isRewrittenSitePage(url.pathname))) ||
     (request.method === "POST" &&
       (url.pathname === "/published-site/inquiry" || url.pathname === "/published-site/family-start"));
-  if (!routeAllowed || url.protocol !== "https:" || url.search || url.hash)
+  if (!routeAllowed || url.protocol !== "https:" || url.hash ||
+      !allowedPublishedSiteTracking(url, request.method))
     return null;
   return slugFromPublicSiteHost(url.hostname, publicSiteDomain(configuredDomain));
 }
