@@ -60,7 +60,13 @@ jobs:
       - name: School safety and opening unit regressions
         run: npm run test:safety
 
+      # Keep calendar acceptance visible even when unrelated CI steps fail.
+      - name: School-local calendar regression tests
+        run: npx vitest run tests/unit/calendar-timezone.test.ts tests/unit/teacher-calendar-authority.test.ts
+
       - name: Typecheck
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
         run: npm run typecheck
 
       - name: Lint and design-system checks
