@@ -54,6 +54,24 @@ describe("access navigation", () => {
       .toBe("/operations/school-years");
   });
 
+  it("routes operating school administrators to their own school dashboard", () => {
+    expect(accessLandingPath("site_admin", undefined, "/launch", "valor-site"))
+      .toBe("/sites/valor-site");
+    expect(accessLandingPath("registrar", undefined, "/home", "valor-site"))
+      .toBe("/sites/valor-site");
+    expect(accessLandingPath("site_admin", undefined, undefined, "valor-site"))
+      .toBe("/sites/valor-site");
+  });
+
+  it("honors a specific saved page for operating schools", () => {
+    expect(accessLandingPath("site_admin", undefined, "/messages?thread=123", "valor-site"))
+      .toBe("/messages?thread=123");
+  });
+
+  it("never routes a nonadministrator to a school admin dashboard", () => {
+    expect(accessLandingPath("teacher", undefined, "/home", "valor-site")).toBe("/home");
+  });
+
   it("never sends a role without registrar authority to the launcher", () => {
     expect(accessLandingPath("teacher", "new-school-site", "/home")).toBe("/home");
   });

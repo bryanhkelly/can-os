@@ -44,7 +44,8 @@ export const Route=createFileRoute("/access/verify")({
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
     if(nativeForm){
-     const landing=accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo);
+     const landing=accessLandingPath(result.role,"launchSiteId" in result&&typeof result.launchSiteId==="string"?result.launchSiteId:undefined,returnTo,
+      "homeSiteId" in result&&typeof result.homeSiteId==="string"?result.homeSiteId:undefined);
      const headers=new Headers({
       Location:landing,
       "Cache-Control":"no-store","Referrer-Policy":"no-referrer",
@@ -54,7 +55,7 @@ export const Route=createFileRoute("/access/verify")({
      headers.append("Set-Cookie",accessReturnCookieHeader(landing===returnTo?returnTo:undefined,new URL(request.url).protocol==="https:"));
      return new Response(null,{status:303,headers});
     }
-    return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
+    return new Response(JSON.stringify({ok:true,role:result.role,...("launchSiteId" in result && result.launchSiteId ? {launchSiteId:result.launchSiteId} : {}),...("homeSiteId" in result && result.homeSiteId ? {homeSiteId:result.homeSiteId} : {})}),{headers:{"Content-Type":"application/json","Set-Cookie":result.setCookie,"Cache-Control":"no-store","Referrer-Policy":"no-referrer"}});
    }catch(error){
     if(!(error instanceof InvalidAccessCredentialError)&&!(error instanceof AuthorizationError)){
      logAuthenticationUnavailable("verification",error);

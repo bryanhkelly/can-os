@@ -136,7 +136,7 @@ export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string,ret
  return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend,returnTo);
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
-export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
+export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new InvalidAccessCredentialError();
  const hash=hashAccessSecret(rawToken,secretPepper()),now=new Date();
  return db.transaction(async tx=>{
@@ -206,6 +206,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
         .where(and(eq(programs.siteId,candidateLaunchSiteId),eq(programs.status,"active"))).limit(1)
     : [];
   const launchSiteId=existingOpenSchool.length?undefined:candidateLaunchSiteId;
+  const homeSiteId=existingOpenSchool.length?candidateLaunchSiteId:undefined;
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
@@ -222,6 +223,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   });
   return {accountId:account.id,role:activeGrant.role,
    ...(launchSiteId ? {launchSiteId} : {}),
+   ...(homeSiteId ? {homeSiteId} : {}),
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000)};
  });
 }
@@ -229,7 +231,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
 export async function redeemDemoAccess(
  rawEmail:string,
  code:string,
-):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string}> {
+):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
  if(code!==LOCAL_DEMO_ACCESS_CODE) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
  }
@@ -269,6 +271,14 @@ export async function redeemDemoAccess(
    :accountGrants.length===1?accountGrants[0]:undefined;
   if(!grant||(email.endsWith("@valorschool.demo")&&!isApprovedDemoGrant(grant,email)))
    throw new InvalidAccessCredentialError("Invalid demo credentials");
+  // Resolve the authenticated administrator's own operating Site, never a user-supplied ID.
+  const adminSiteId=hasRegistrarAuthority(grant.role)?grant.siteId:undefined;
+  const activeSchool=adminSiteId
+   ?await tx.select({id:programs.id}).from(programs)
+     .where(and(eq(programs.siteId,adminSiteId),eq(programs.status,"active"))).limit(1)
+   :[];
+  const homeSiteId=activeSchool.length?adminSiteId:undefined;
+  const pendingLaunchSiteId=homeSiteId?undefined:launchSiteId;
   const secret=issueOpaqueSecret();
   step="session_creation";
   const [session]=await tx.insert(accessSessions).values({
@@ -289,7 +299,8 @@ export async function redeemDemoAccess(
   return {
    accountId:account.id,
    role:grant.role,
-   ...(launchSiteId ? {launchSiteId} : {}),
+   ...(pendingLaunchSiteId ? {launchSiteId:pendingLaunchSiteId} : {}),
+   ...(homeSiteId ? {homeSiteId} : {}),
    setCookie:sessionCookieHeader(secret,SESSION_LIFETIME_MS/1000),
   };
  });
