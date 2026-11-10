@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteLocalContentVersions, sites } from "@/db/schema";
-import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent } from "@/domain/site-local-content";
+import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps } from "@/domain/site-local-content";
 import type { FamilyBrandContext } from "@/domain/school-brand-family";
 
 /**
@@ -24,8 +24,8 @@ export async function readSiteFamilyBrand(siteId: string): Promise<FamilyBrandCo
     : createSchoolWebsiteStarterContent(site.name);
   return {
     siteName:site.name,
-    // Never return the locally uploaded image in an email or an unlisted
-    // page. Artwork rights/consent and publication are independent gates.
-    branding:{ ...content.branding, heroImage:null },
+    // Include only rights-cleared, consent-reviewed artwork. Family emails
+    // remain image-free; the landing page may use this approved Site image.
+    branding:{ ...content.branding, heroImage:siteLocalImagePublicationGaps(content.branding.heroImage).length ? null : content.branding.heroImage },
   };
 }
