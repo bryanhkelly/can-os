@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseEnv } from "node:util";
+import { prepareTemplateImages } from "./prepare-template-images.mjs";
 import { neon } from "@neondatabase/serverless";
 import { verifyFullFlowNeonBranch } from "./verify-fullflow-neon-branch.mjs";
 import { verifyAdmissionsNeonBranch } from "./verify-admissions-neon-branch.mjs";
@@ -79,6 +80,7 @@ async function main() {
     : "Verified explicitly configured development database. Ordinary UI writes persist in this database.");
   const args = process.argv.slice(2);
   if (args.includes("--check")) return;
+  await prepareTemplateImages();
   const child = spawn(process.execPath, [
     resolve(directory, "node_modules", "vite", "bin", "vite.js"),
     "dev", "--host", "127.0.0.1", ...args,

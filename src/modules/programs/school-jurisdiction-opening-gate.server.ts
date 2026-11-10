@@ -244,8 +244,11 @@ export async function requireCurrentSchoolJurisdictionForOpening(
  */
 export async function requireCurrentSchoolJurisdictionForEnrollment(
   executor:Pick<typeof db,"select">,programId:string,
-  options:{now?:Date;configurationCreatedAt:Date|null;openingApprovedAt?:Date|null},
+  options:{now?:Date;configurationCreatedAt?:Date|null;openingApprovedAt?:Date|null}={},
 ) {
+  const [program]=await executor.select({status:programs.status}).from(programs)
+    .where(eq(programs.id,programId)).limit(1);
+  if(program?.status!=="active")throw new AuthorizationError("active Program before enrollment");
   return requireCurrentSchoolJurisdictionForOpening(executor,programId,{
     ...options,requiredPhases:["before_enrollment"],
   });

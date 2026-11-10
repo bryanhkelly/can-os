@@ -122,6 +122,7 @@ export async function processInterestEventEmailDeliveries(
         description: interestEvents.description,
         location: interestEvents.location,
         siteName: sites.name,
+        siteId: sites.id,
         programName: programs.name,
         startsAt: calendarEvents.startsAt,
         endsAt: calendarEvents.endsAt,
@@ -165,6 +166,7 @@ export async function processInterestEventEmailDeliveries(
       }] : undefined;
       const providerAccepted = await sendNotificationEmail({
         to: record.email,
+        siteId: record.siteId,
         ...content,
         ...(attachments ? { attachments } : {}),
       }, `interest-event:${delivery.id}`);

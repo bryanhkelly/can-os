@@ -608,7 +608,7 @@ describe("standalone public site HTML", () => {
     const demonstration = renderPublicSiteHtml({ ...page, demonstration: true });
     expect(ordinary).not.toContain('class="demo-banner"');
     expect(demonstration).toContain('class="demo-banner"');
-    expect(demonstration).toContain("Fictional Learning Academy is fictional.");
+    expect(demonstration).toContain("Fictional Learning Academy is a fictional demonstration school.");
     expect(demonstration).not.toContain("Valor is a fictional");
     const hostedDemo = renderPublicSiteHtml({...page, demonstration: true}, {
       makeRequestId: () => "00000000-0000-4000-8000-000000000001",
@@ -666,8 +666,10 @@ describe("standalone public site HTML", () => {
 it("uses explicit sample photography only in the fictional private template preview",()=>{
  const page={host:"valorschool.can-os.com",site:{name:"Valor School",organizationName:"School"},offerings:[],demonstration:true};
  const preview=renderPublicSiteHtml(page,{localPreview:true,sampleTemplate:"heritage"});
- expect(preview).toContain("//template-photo/heritage/hero.jpg");
+ expect(preview).toContain("/template-photo/heritage/hero?v=20261109");
  expect(preview).not.toContain("data:image/svg+xml,");
- expect(renderPublicSiteHtml(page,{sampleTemplate:"heritage"})).not.toContain("/school-template-previews/");
+ const publishedDemo=renderPublicSiteHtml(page,{sampleTemplate:"heritage"});
+ expect(publishedDemo).toContain("/school-template-previews/v1/heritage/hero.jpg");
+ expect(publishedDemo).not.toContain("/template-photo/");
  expect(renderPublicSiteHtml({...page,demonstration:false},{localPreview:true,sampleTemplate:"heritage"})).not.toContain("/school-template-previews/");
 });

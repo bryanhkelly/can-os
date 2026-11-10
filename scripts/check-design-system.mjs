@@ -70,3 +70,12 @@ for (const [file, required] of Object.entries(shellContract)) {
     process.exitCode = 1;
   }
 }
+
+// Canonical controls and surfaces must not depend on zero-radius tokens to look square.
+for (const file of ["ui/button.tsx", "ui/choice.tsx", "ui/input.tsx", "ui/select.tsx", "ui/textarea.tsx", "ui/modal.tsx", "ui/table.tsx"]) {
+  const source = readFileSync(join(root, file), "utf8");
+  if (/(?:^|\s)rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=\s|["'])/.test(source)) {
+    console.error(`${file} must not set corner radii; canonical controls and surfaces are square`);
+    process.exitCode = 1;
+  }
+}

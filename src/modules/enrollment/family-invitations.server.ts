@@ -612,6 +612,7 @@ async function sendPreopeningFamilyInterestEmail(programId: string, batchId: str
   });
   const accepted = await sendNotificationEmail({
     to: recipient.email,
+    siteId: school.siteId,
     subject,
     html: message.html,
     text: `${metadata.introduction}\n\n${message.text}\n\nThis invitation link expires 30 days after it was created. Only an adult who wants follow-up should submit the form.`,

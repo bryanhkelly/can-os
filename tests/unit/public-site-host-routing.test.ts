@@ -63,6 +63,25 @@ describe("CAN OS partner hostname router", () => {
     expect(classify("https://vineyard.can-os.com/", "HEAD")).toEqual({ kind: "deny" });
     expect(classify("http://vineyard.can-os.com/")).toEqual({ kind: "deny" });
   });
+  it("serves only exact bundled full-resolution template defaults without rewriting them", () => {
+    for (const template of ["heritage", "community", "modern", "bright", "summit"]) {
+      for (const role of ["hero", "story_01"]) {
+        const url = `https://vineyard.can-os.com/school-template-previews/v1/${template}/${role}.jpg`;
+        expect(classify(url)).toEqual({ kind: "site", slug: "vineyard", rewrite: false });
+        expect(classify(url, "POST")).toEqual({ kind: "deny" });
+        expect(classify(url, "GET", false)).toEqual({ kind: "deny" });
+        expect(classify(url + "?other=1")).toEqual({ kind: "deny" });
+      }
+    }
+    for (const path of ["/school-template-previews/v1/modern/portrait_01.jpg",
+      "/school-template-previews/v1/modern/story_02.jpg",
+      "/school-template-previews/v1/modern/program_01.jpg",
+      "/school-template-previews/v1/modern/hero.jpg/private",
+      "/school-template-previews/v1/modern/other.jpg",
+      "/school-template-previews/v1/modern/hero.js"]) {
+      expect(classify("https://vineyard.can-os.com" + path)).toEqual({ kind: "deny" });
+    }
+  });
   it("fails closed without the explicit hosting switch or for malformed site labels", () => {
     expect(classify("https://vineyard.can-os.com/", "GET", false)).toEqual({ kind: "deny" });
     for (const host of ["a.can-os.com", "two--hyphens.can-os.com", "a.b.can-os.com"]) {

@@ -4,6 +4,7 @@ import {slugFromPublicSiteHost} from "./public-site-address";
 
 export type PublicSchoolSiteMedia=Partial<Record<SchoolSiteMediaSlot,{
   src:string;altText:string;assetId:string;sourceRevision:string;
+  width?:number;height?:number;
 }>>;
 
 /** Pure composition only. Server supplies the exact owned, canonical host.
@@ -24,6 +25,7 @@ export function projectApprovedSchoolSiteMedia(
       altText:photo.altText,
       assetId:assignment.assetId,
       sourceRevision:assignment.sourceRevision,
+      width:photo.width,height:photo.height,
     };
   }
   return result;

@@ -209,8 +209,10 @@ For school administration (Site Admin, registrar) the **School profile** nav ite
 school, and lists schools only when it genuinely spans several. The profile is the
 school's stable record — identity, address, contact, programs with authoritative
 enrollment, and links to the workflows that own each part (school setup, school years,
-website). It edits nothing in place, shows no placeholder figures, and hides links the
-viewer is not granted (website publishing needs its own publisher grant). **Site Today**
+website). Every active school member may open the profile and reads the same facts.
+It edits nothing in place, shows no placeholder figures, and hides management links the
+viewer is not granted (school setup and school years need registrar authority; website
+publishing needs its own publisher grant). **Site Today**
 (`/sites/$siteId`) is the daily operating view: a drill-in from Home, highlighted as Home
 in the sidebar, never a second navigation destination for administration roles.
 
@@ -235,7 +237,7 @@ commands in lists and feeds ("Mark as read", "Book", "Add period") use `outline`
 `ghost`, never the default variant.
 
 **Dedicated create pages.** Creation happens on its own route (for example
-`/operations/school-years/new`, `/student/study-groups/new`), never as a form embedded
+`/operations/school-years/new`, `/groups/new`), never as a form embedded
 above or beside the directory. Use a non-nested TanStack route
 (`<list>_.new.tsx`) so the list layout does not wrap the form. Compose the form from
 `FormSection` (titled `<section>` per group of related fields, two-column field grid

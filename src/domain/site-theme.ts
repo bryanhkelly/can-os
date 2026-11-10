@@ -89,7 +89,7 @@ export function contrastRatio(a: string,b: string): number {
   return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
 }
 
-export function resolveSiteTheme(paletteId?: string, typographyId?: string, headingFontId?: SiteFontId, bodyFontId?: SiteFontId): SiteTheme {
+export function resolveSiteTheme(paletteId?: string, typographyId?: string, headingFontId?: SiteFontId, bodyFontId?: SiteFontId, templateId?: SiteTemplateId): SiteTheme {
   const palette = sitePaletteIds.includes(paletteId as SitePaletteId)
     ? paletteId as SitePaletteId : "signature";
   const typography = siteTypographyIds.includes(typographyId as SiteTypographyId)
@@ -101,7 +101,7 @@ export function resolveSiteTheme(paletteId?: string, typographyId?: string, head
     return resolveSiteTheme("signature","editorial");
   }
   return {paletteId:palette,typographyId:typography,...colors,
-    displayFont:isSiteFontId(headingFontId)?siteFontCatalog[headingFontId].css:type.display,bodyFont:isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body,onDark:"#ffffff"};
+    displayFont:isSiteFontId(headingFontId)?siteFontCatalog[headingFontId].css:templateId === "modern" ? (isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body) : type.display,bodyFont:isSiteFontId(bodyFontId)?siteFontCatalog[bodyFontId].css:type.body,onDark:"#ffffff"};
 }
 
 /** P may suggest but never publish. No network fetch or imported font binary. */

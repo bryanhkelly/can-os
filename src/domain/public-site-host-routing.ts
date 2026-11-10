@@ -1,4 +1,5 @@
 import { isPublicSiteReadPath } from "./public-site-paths.ts";
+import { isTemplateDefaultImagePath } from "./template-sample-images.ts";
 import {
   isPublicSiteSlug,
   publicSiteDomain,
@@ -24,7 +25,7 @@ export function isLocalPreviewHost(hostname: string): boolean {
 /**
  * Source-of-truth edge decision. Do not trust X-Forwarded-Host.
  * Tenant hosts cannot reach SSR workspaces, server functions, admin routes,
- * assets or sign-in endpoints through a different path.
+ * application assets or sign-in endpoints through a different path.
  *
  * The only internal rewrite target is the read-only /published-site server
  * route. It does not load the normal CAN OS root/session shell.
@@ -49,8 +50,10 @@ export function classifyPublicSiteRequest(
   if (!slug || !enabled || url.protocol !== "https:" || url.search || url.hash) {
     return { kind: "deny" };
   }
+  if (method === "GET" && isTemplateDefaultImagePath(url.pathname))
+    return { kind: "site", slug, rewrite: false };
   // The ONLY tenant write is a restricted anonymous admissions-interest intake.
-  // All other POST, RPC, session, dashboard and asset paths are denied.
+  // All other POST, RPC, session, dashboard and application asset paths are denied.
   if (method === "POST" && (url.pathname === "/inquiry" || url.pathname === "/apply"))
     return { kind: "site", slug, rewrite: true };
   if (method === "POST" && (url.pathname === "/published-site/inquiry" ||

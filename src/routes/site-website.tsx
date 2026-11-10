@@ -378,6 +378,8 @@ function LocalWebsiteCopyEditor({
   const [preparingArtwork, setPreparingArtwork] = useState(false);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed || preparingArtwork;
+  const artworkGaps = [content.branding.heroImage, content.branding.logoImage ?? null]
+    .flatMap(siteLocalImagePublicationGaps);
   const [error, setError] = useState("");
   const [draftPreview, setDraftPreview] = useState<{source: SiteLocalContent; rendered: Awaited<ReturnType<typeof previewChurchWebsiteDraft>>} | null>(null);
   const [previewPending, setPreviewPending] = useState(false);
@@ -440,9 +442,7 @@ function LocalWebsiteCopyEditor({
   async function submit() {
     if (busy) return;
     setError("");
-    const heroImage = content.branding.heroImage;
-    if (heroImage && (!heroImage.altText.trim() || !heroImage.rightsConfirmed ||
-      heroImage.childImageConsent === "unconfirmed")) {
+    if (artworkGaps.length) {
       setError("Complete the artwork description, usage rights and child-privacy confirmations before publishing.");
       return;
     }
@@ -475,14 +475,14 @@ function LocalWebsiteCopyEditor({
       commandErrorMessage: "Unable to restore this revision." });
   }
 
-  async function selectArtwork(event: ChangeEvent<HTMLInputElement>) {
+  async function selectArtwork(event: ChangeEvent<HTMLInputElement>, field: "heroImage" | "logoImage" = "heroImage") {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file || busy) return;
     setPreparingArtwork(true); setError("");
     try {
       const dataUrl = await prepareWebsiteArtwork(file);
-      setContent(old => ({ ...old, branding: { ...old.branding, heroImage: {
+      setContent(old => ({ ...old, branding: { ...old.branding, [field]: {
         dataUrl, altText: "", rightsConfirmed: false, childImageConsent: "unconfirmed",
       } } }));
     } catch (caught) {
@@ -561,12 +561,12 @@ function LocalWebsiteCopyEditor({
       Your latest proposed wording includes a protected claim. It is held for review;
       the last published church copy remains unchanged.
     </p>}
-    {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">No school photography is selected. Add approved photos in Photos &amp; artwork. No generated replacement artwork will appear.</p>}
-    {siteLocalImagePublicationGaps(content.branding.heroImage).length > 0 &&
+    {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">Using illustrative template images. No school photography selected.</p>}
+    {artworkGaps.length > 0 &&
       <div role="status" className="mt-3 border p-3 text-sm">
         <p className="font-semibold">Artwork is incomplete. You can save a private draft now.</p>
         <p className="mt-1">This artwork stays private and will not appear in a preview or published page until these items are complete:</p>
-        <ul className="mt-2 list-disc pl-5">{siteLocalImagePublicationGaps(content.branding.heroImage).map(gap =>
+        <ul className="mt-2 list-disc pl-5">{[...new Set(artworkGaps)].map(gap =>
           <li key={gap}>{gap}</li>)}</ul>
       </div>}
     {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
@@ -707,36 +707,39 @@ function LocalWebsiteCopyEditor({
       <p className="text-sm">Gallery images are fictional template samples. They are not photos of your school and are never added to your school media library.</p>
       <fieldset disabled={busy || !data.canPublish} className="space-y-4 border p-4">
         <legend className="px-2 text-sm">Your school-owned artwork</legend>
+        {(["heroImage", "logoImage"] as const).map(field => {
+          const artwork = content.branding[field];
+          return <div key={field} className="space-y-3">
         <Label className="block text-sm">
-          <span className="font-medium">Church or community artwork (optional)</span>
+          <span className="font-medium">{field === "logoImage" ? "School logo (optional)" : "Church or community artwork (optional)"}</span>
           <span className="mt-1 block text-xs text-muted-foreground">
             PNG or JPEG, re-encoded locally to a metadata-free PNG. No remote URLs, embeds or tracking.
           </span>
-          <Input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event)}
+          <Input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event, field)}
             className="mt-2 block w-full text-sm" />
         </Label>
-        {content.branding.heroImage && <div className="space-y-3 rounded-lg bg-muted/40 p-3">
-          <img src={content.branding.heroImage.dataUrl} alt="Selected artwork preview"
-            className="max-h-52 w-full rounded-lg object-cover" />
+        {artwork && <div className="space-y-3 rounded-lg bg-muted/40 p-3">
+          <img src={artwork.dataUrl} alt={field === "logoImage" ? "Selected logo preview" : "Selected artwork preview"}
+            className="h-52 w-full rounded-lg object-contain" />
           <Label className="block text-sm">
             <span className="font-medium">Artwork description for screen readers</span>
-            <Input type="text" maxLength={180} value={content.branding.heroImage.altText}
+            <Input type="text" maxLength={180} value={artwork.altText}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
-                heroImage: old.branding.heroImage ? { ...old.branding.heroImage, altText: event.target.value } : null,
+                [field]: old.branding[field] ? { ...old.branding[field], altText: event.target.value } : null,
               } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
           </Label>
           <Label className="flex items-start gap-2 text-sm">
-            <Checkbox checked={content.branding.heroImage.rightsConfirmed}
+            <Checkbox checked={artwork.rightsConfirmed}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
-                heroImage: old.branding.heroImage ? { ...old.branding.heroImage, rightsConfirmed: event.target.checked } : null,
+                [field]: old.branding[field] ? { ...old.branding[field], rightsConfirmed: event.target.checked } : null,
               } }))} className="mt-1" />
-            <span>I own this image or have documented permission to publish it on this public website.</span>
+            <span>I own this image or have documented permission to publish it on the school website and in school communications.</span>
           </Label>
           <Label className="block text-sm">
             <span className="font-medium">Child privacy and consent</span>
-            <Select value={content.branding.heroImage.childImageConsent}
+            <Select value={artwork.childImageConsent}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
-                heroImage: old.branding.heroImage ? { ...old.branding.heroImage,
+                [field]: old.branding[field] ? { ...old.branding[field],
                   childImageConsent: event.target.value as SiteLocalImageConsent } : null,
               } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm">
               <option value="unconfirmed">Choose a confirmation</option>
@@ -745,9 +748,11 @@ function LocalWebsiteCopyEditor({
             </Select>
           </Label>
           <Button variant="outline" type="button" onClick={() => setContent(old => ({
-            ...old, branding: { ...old.branding, heroImage: null },
-          }))} className="rounded-lg border px-3 py-1 text-xs">Remove artwork</Button>
+            ...old, branding: { ...old.branding, [field]: null },
+          }))} className="rounded-lg border px-3 py-1 text-xs">{field === "logoImage" ? "Remove logo" : "Remove artwork"}</Button>
         </div>}
+        </div>;
+        })}
       </fieldset>
       <details className="border p-4">
         <summary className="cursor-pointer text-sm font-semibold">Import photos from a folder (optional)</summary>

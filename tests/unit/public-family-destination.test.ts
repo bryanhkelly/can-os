@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const state = vi.hoisted(() => ({ rows: [] as unknown[], intakeRows: [{id:"year"}] as unknown[], lock: vi.fn(), authority: vi.fn() }));
+const state = vi.hoisted(() => ({ rows: [] as unknown[], intakeRows: [{id:"year"}] as unknown[], lock: vi.fn(), authority: vi.fn(), jurisdiction: vi.fn() }));
 vi.mock("@/db/client", () => ({ db: {} }));
 vi.mock("@/db/schema", () => Object.fromEntries([
   "admissionSeatPools", "schoolYears", "programs", "programPublications", "publicFamilyStartRequests", "sitePublications", "sites",
@@ -8,6 +8,7 @@ vi.mock("@/domain/access-tokens", () => ({ hashAccessSecret: vi.fn(), issueOpaqu
 vi.mock("@/domain/public-family-start", () => ({ publicFamilyStartInput: {}, verifiedFamilyStartEmail: vi.fn() }));
 vi.mock("@/modules/identity/resend-access-mail.server", () => ({ sendAccessLinkViaResend: vi.fn() }));
 vi.mock("@/modules/programs/program-site-authorization.server", () => ({ requireChurchHostedOperatingServices: state.authority }));
+vi.mock("@/modules/programs/school-jurisdiction-opening-gate.server", () => ({ requireCurrentSchoolJurisdictionForEnrollment: state.jurisdiction }));
 vi.mock("@/platform/mutation", () => ({ emitEvent: vi.fn(), writeAudit: vi.fn() }));
 vi.mock("@/domain/event-types", () => ({ EventTypes: {} }));
 import { resolvePublishedFamilyStartDestination } from "@/modules/enrollment/public-family-start.server";
@@ -32,6 +33,7 @@ beforeEach(() => {
   state.rows = [row];
   state.intakeRows = [{id:"year"}];
   state.authority.mockResolvedValue("authorization");
+  state.jurisdiction.mockResolvedValue(undefined);
 });
 describe("published family application destination", () => {
   it("locks Site publication, Program publication and Program state for the caller transaction", async () => {
@@ -41,6 +43,7 @@ describe("published family application destination", () => {
     });
     expect(state.lock).toHaveBeenCalledWith("share", { of: [sitePublications, programPublications, programs] });
     expect(state.authority).toHaveBeenCalledWith(tx, "program", ["academic_instruction", "school_of_record", "admissions"]);
+    expect(state.jurisdiction).toHaveBeenCalledWith(tx, "program", {});
   });
   it("denies unpublished or withdrawn destinations returned as no eligible row", async () => {
     state.rows = [];
@@ -72,6 +75,11 @@ describe("published family application destination", () => {
     await expect(resolvePublishedFamilyStartDestination(reader(), "program"))
       .rejects.toThrow("no active configured application year");
     expect(state.authority).toHaveBeenCalled();
+  });
+  it("rejects family starts when current jurisdiction enrollment evidence is missing", async () => {
+    state.jurisdiction.mockRejectedValue(new Error("current jurisdiction enrollment evidence"));
+    await expect(resolvePublishedFamilyStartDestination(reader(), "program"))
+      .rejects.toThrow("current jurisdiction enrollment evidence");
   });
   it("retains the current institutional service check after marketing publication", async () => {
     state.authority.mockRejectedValue(new Error("Operating authorization revoked"));

@@ -7,7 +7,8 @@ import { assertPublishedFamilyInvitationDestination } from "@/domain/family-invi
 import { isCurrentAcademicMarketingSnapshot } from "@/domain/academic-program-publication";
 import { isPublicSiteSlug } from "@/domain/public-site-address";
 import { requireChurchHostedOperatingServices } from "@/modules/programs/program-site-authorization.server";
-import { sendAccessLinkViaResend, type AccessEmailSender } from "@/modules/identity/resend-access-mail.server";
+import { requireCurrentSchoolJurisdictionForEnrollment } from "@/modules/programs/school-jurisdiction-opening-gate.server";
+import { isSyntheticSandboxMailRuntime, sendAccessLinkViaResend, type AccessEmailSender } from "@/modules/identity/resend-access-mail.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
 import { EventTypes } from "@/domain/event-types";
@@ -86,6 +87,7 @@ export async function resolvePublishedFamilyStartDestination(
      sql`(${schoolYears.programId} IS NULL OR ${schoolYears.programId} = ${programId})`))
    .limit(1);
  if(!intakeYear)throw new Error("School has no active configured application year");
+ await requireCurrentSchoolJurisdictionForEnrollment(tx,programId,{});
  return {siteId:school.siteId,organizationId:school.organizationId,
    programId:school.programId,programName:school.programName,slug:school.slug};
 }
@@ -123,7 +125,11 @@ export async function requestVerifiedFamilyStart(
  const token=issueOpaqueSecret(),tokenHash=hashAccessSecret(token,pepper);
  const outcome=await db.transaction(async tx=>{
   const {school,contact,evidence}=await prepare(tx);
-  if(await isDemoTenantOrganization(school.organizationId,tx))
+  // Demo tenants never email real families. The only exception is the
+  // isolated synthetic sandbox (test runtime + local file outbox), and even
+  // there only for `.test` recipients the outbox sender itself enforces.
+  if(await isDemoTenantOrganization(school.organizationId,tx) &&
+     !(isSyntheticSandboxMailRuntime() && contact.email.endsWith(".test")))
    throw new DomainError("FORBIDDEN","External family email verification is suppressed for demo schools");
   const email=contact.email;
   // Prevent parallel requests from multiplying messages to the same email.
@@ -155,12 +161,13 @@ export async function requestVerifiedFamilyStart(
     resourceId:entry.id,actorPersonId:null,
     scope:{siteId:school.siteId,programId:school.programId,organizationId:school.organizationId},
     after:{status:"pending_email_verification",...evidence},context:{anonymous:evidence.source==="published_site"}});
-  return {requestId:entry.id,created:true,email};
+  return {requestId:entry.id,created:true,email,siteId:school.siteId};
  });
  if(!outcome.created)return {requestId:outcome.requestId,created:false};
  try {
  await sender({
   to:outcome.email,accessUrl:origin.origin+"/family/join#token="+encodeURIComponent(token),
+  siteId:outcome.siteId,
   ...(options.idempotencyKey?{idempotencyKey:options.idempotencyKey}:{}),
   ...(options.subject?{subject:options.subject}:{}),
   ...(options.introduction?{introduction:options.introduction}:{}),

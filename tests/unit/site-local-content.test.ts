@@ -149,6 +149,24 @@ describe("PUB-18: distributed church website ownership", () => {
     expect(html).not.toContain("<h3>Local traditions</h3>");
   });
 
+  it("publishes a rights-cleared logo in the header and favicon, but rejects unsafe or incomplete logos", () => {
+    const logoImage = { dataUrl: pngDataUrl(), altText: "School logo", rightsConfirmed: true,
+      childImageConsent: "no_identifiable_children" as const };
+    const content = normalizeSiteLocalContent({ ...churchCopy,
+      branding: { ...churchCopy.branding, logoImage } });
+    const html = renderPublicSiteHtml({ host: "school.can-os.com",
+      site: { name: "School", organizationName: "Church" }, offerings: [], localContent: content });
+    expect(html).toContain('class="school-logo"');
+    expect(html).toContain('<link rel="icon" type="image/png" href="data:image/png;base64,');
+    expect(() => normalizeSiteLocalContent({ ...content,
+      branding: { ...content.branding, logoImage: { ...logoImage, rightsConfirmed: false } } })).toThrow(/rights/);
+    expect(() => normalizeSiteLocalContent({ ...content,
+      branding: { ...content.branding, logoImage: { ...logoImage, dataUrl: "data:image/svg+xml,<svg/>" } } })).toThrow(/PNG/);
+    expect(normalizeSiteLocalContent({ ...content,
+      branding: { ...content.branding, logoImage: { ...logoImage, rightsConfirmed: false } } },
+    { allowIncompleteImage: true }).branding.logoImage?.rightsConfirmed).toBe(false);
+  });
+
   it("holds protected institutional claims inside new story prompts", () => {
     const decision = classifySiteLocalContent(normalizeSiteLocalContent({
       ...churchCopy, schoolVision: "Our academy is accredited.",

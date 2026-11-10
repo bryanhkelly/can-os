@@ -1,7 +1,7 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
-import { templateSampleImage } from "./template-sample-images";
+import { templateDefaultImage, templateSampleImage } from "./template-sample-images";
 import { templateResponsiveAttributes,templateHeroPictureSources } from "./template-photo-responsive";
 import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
@@ -144,12 +144,10 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     : "/apply";
   const local = page.localContent ? normalizeSiteLocalContent(page.localContent) : null;
   const theme = local?.branding.theme ?? "classic";
-  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId);
   const sampleTemplate = options?.localPreview && page.demonstration ? options.sampleTemplate : undefined;
   const templateId = resolveSiteTemplateId(sampleTemplate ?? local?.branding.templateId);
-  // Modern keeps its original sans-serif identity until a heading font is explicitly chosen.
-  const displayFont = templateId === "modern" && !local?.branding.headingFontId
-    ? visual.bodyFont : visual.displayFont;
+  const visual = resolveSiteTheme(local?.branding.paletteId, local?.branding.typographyId, local?.branding.headingFontId, local?.branding.bodyFontId, templateId);
+  const displayFont = visual.displayFont;
   const visualCss = `--site-ink:${visual.ink};--site-paper:${visual.canvas};--site-accent:${visual.accent};--site-secondary:${visual.secondary};--site-muted:${visual.muted};--site-display:${displayFont};--site-body:${visual.bodyFont};`;
   const localItems = local ? [
     ["Our story", local.churchHistory],
@@ -163,10 +161,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     ["Spiritual formation", local.spiritualFormation],
   ].filter((item): item is [string, string] => Boolean(item[1]?.trim())) : [];
   const image = local?.branding.heroImage;
-  // Fictional template photography is only for private, authenticated previews.
-  // Approved Site media takes precedence. Published pages never use these assets.
-  // Each photographic slot has its own role; do not repeat the hero or
-  // substitute another template's campus as a multi-page fallback.
+  const logo = local?.branding.logoImage;
   const roleForSlot: Record<keyof PublicSchoolSiteMedia, import("./template-sample-images").TemplatePhotographyRole> = {
     hero:"hero", about:"story_01", academics:"program_01",
     studentLife:"community_01", families:"community_02", campus:"story_02",
@@ -188,30 +183,39 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
           !url.search && !url.hash)return candidate;
       }catch{ /* Invalid photo URL: never treat it as approved. */ }
     }
-    return options?.localPreview ? sampleMedia(slot) : null;
+    if(options?.localPreview)return sampleMedia(slot);
+    const sample=templateDefaultImage(templateId,slot==="hero"?"hero":"story_01");
+    return sample?{...sample,assetId:"template-sample",sourceRevision:"v1"}:null;
   };
   // Cloudflare receives bandwidth-appropriate responsive variants from its
   // private R2-backed Images binding. Netlify and user-owned media are unchanged.
   const responsiveTemplatePhotos=process.env.CAN_TEMPLATE_PHOTO_RESPONSIVE_ENABLED==="true";
   const responsiveAttrs=(source:string,placement:"hero"|"interior"|"mosaic")=>
     templateResponsiveAttributes(source,placement,responsiveTemplatePhotos);
-  const heroPhotoElement=(source:string,altText:string)=>{
+  const heroPhotoElement=(source:string,altText:string,media?:PublicSchoolSiteMedia[keyof PublicSchoolSiteMedia])=>{
     const imageMarkup='<img class="hero-background-image" src="' +
-      escapePublicHtml(source) + '"' + responsiveAttrs(source,"hero") +
+      escapePublicHtml(source) + '"' + mediaImageAttributes(media) + responsiveAttrs(source,"hero") +
       ' alt="' + escapePublicHtml(altText) +
       '" decoding="async" fetchpriority="high"/>';
     const artDirection=templateHeroPictureSources(source,responsiveTemplatePhotos);
     return artDirection?'<picture>'+artDirection+imageMarkup+'</picture>':imageMarkup;
   };
-  const approvedHero=ownedMedia("hero");
-  const heroPhotoSrc=image?.dataUrl ?? approvedHero?.src;
-  const heroPhotoAlt=image?.altText ?? approvedHero?.altText ?? "";
-  const heroHasPhoto=Boolean(image||approvedHero);
-  const showingSamplePhotography=approvedHero?.assetId==="template-sample" && !image;
+  const heroMedia=ownedMedia("hero");
+  const approvedHero=heroMedia?.assetId==="template-sample"?null:heroMedia;
+  const heroPhotoSrc=image?.dataUrl ?? heroMedia?.src;
+  const heroPhotoAlt=image?.altText ?? heroMedia?.altText ?? "";
+  const showingSamplePhotography=heroMedia?.assetId==="template-sample" && !image;
+  const mediaImageAttributes = (media: PublicSchoolSiteMedia[keyof PublicSchoolSiteMedia] | null) => {
+    if (!media) return "";
+    const dimensions = media.width && media.height ? ` width="${media.width}" height="${media.height}"` : "";
+    return dimensions + (media.assetId === "template-sample" && "srcSet" in media && typeof media.srcSet === "string"
+      ? ` srcset="${escapePublicHtml(media.srcSet)}" sizes="(max-width: 720px) calc(100vw - 40px), 1136px"`
+      : "");
+  };
   const campusMosaicImages = (["academics", "studentLife", "campus"] as const).map(slot => {
     const media=ownedMedia(slot);
     return media ? '<img src="' + escapePublicHtml(media.src) +
-      '"' + responsiveAttrs(media.src,"mosaic") +
+      '"' + mediaImageAttributes(media) + responsiveAttrs(media.src,"mosaic") +
       ' alt="' + escapePublicHtml(media.altText) + '" loading="lazy" decoding="async"/>' : "";
   });
   const pageLabels: Record<PublicSitePath, string> = {
@@ -245,8 +249,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <p>${escapePublicHtml(value)}</p>
       </article>`).join("\n")}
     </div>
-    ${demo ? "" : `<p class="availability">Content provided by the local church. Community and faith content comes from the local Site editor.
-    Academic, enrollment, and institutional statements are controlled separately by CAN.</p>`}
+    <p class="availability">Content provided by the local church. Community and faith content comes from the local Site editor.
+    Academic, enrollment, and institutional statements are controlled separately by CAN.</p>
   </section>` : "";
   const academicCards = (page.academicPrograms ?? []).map(program => {
     const modes = [
@@ -349,9 +353,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `/published-site/academics?site=${encodeURIComponent(previewSlug)}#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
       : `/academics#program-inquiry-${encodeURIComponent(firstAcademicProgram.programId)}`
     : null;
-
-  // The public design is only a presentation of the same reviewed Site and
-  // Program projections. No prototype copy or browser-authored scripts ship.
+  // Keep the locally authored copy while using the shared template composition
+  // and current photo delivery path.
   const hero = composePublicSiteHero(templateId, {
     kicker: local?.heroHeadline ? school :
       foundingFamilies ? "Welcoming founding families" : "Welcome to our school",
@@ -377,7 +380,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
       (!availablePaths.includes("/academics") && availablePaths.includes("/contact")
         ? '<a class="hero-text-link" href="/contact">School information →</a>' : ""),
-    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt):"",
+    image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt,image?undefined:heroMedia??undefined):"",
     mosaicImages: campusMosaicImages,
   });
   // The homepage introduces the school; detailed church content belongs on
@@ -683,7 +686,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "The best learning communities make space for individual interests, friendships, and the confidence to participate.");
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero${approvedInterior?" has-image":""}">
-      ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}"${responsiveAttrs(approvedInterior.src,"interior")} alt="${escapePublicHtml(approvedInterior.altText)}" decoding="async"/>` : ""}
+      ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}"${mediaImageAttributes(approvedInterior)}${responsiveAttrs(approvedInterior.src,"interior")} alt="${escapePublicHtml(approvedInterior.altText)}" fetchpriority="high" loading="eager" decoding="async"/>` : ""}
       <p class="tag">${eyebrow}</p><h1>${title}</h1><p class="intro">${summary}</p></div>`;
   // The parent journey uses only pages backed by approved public projections.
   // This navigation is shared by all schools and never fabricates availability.
@@ -696,7 +699,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const exploreSection = exploreLinks.length > 1
     ? `<section class="explore-section editorial-section" aria-labelledby="explore-title">
       <div class="section-heading"><p class="tag">Explore the experience</p>
-      <h2 id="explore-title">Start with what matters to your family</h2>
+      <h2 id="explore-title">Find what matters to your family</h2>
       <p>Explore academics, daily learning, student experiences, and admissions information at your own pace.</p></div>
       <div class="explore-grid">${exploreLinks.map((link, index) =>
         `<a class="explore-link" href="${link.path}"><span class="explore-number">0${index + 1}</span>
@@ -707,7 +710,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const homePage = composePublicSiteHome(templateId, {
     hero,
     vision: local?.schoolVision
-      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping young people discover their strengths—and what they can do with them.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
+      ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping students discover who they are and what they can become.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
     story: homeStory,
     explore: exploreSection,
     academics: programOverview || (demo ? demoAcademicCards : ""),
@@ -771,12 +774,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 ${isLive ? `<link rel="canonical" href="${canonical}"/>` : ""}
 <title>${pageTitle}</title>
 <meta name="description" content="${pageDescription}"/>
+<meta name="theme-color" content="${visual.ink}"/>
+${logo ? `<link rel="icon" type="image/png" href="${escapePublicHtml(logo.dataUrl)}"/>` : ""}
 <meta property="og:type" content="website"/>
 <meta property="og:site_name" content="${school}"/>
 <meta property="og:title" content="${pageTitle}"/>
 <meta property="og:description" content="${pageDescription}"/>
 ${isLive ? `<meta property="og:url" content="${canonical}"/>` : ""}
-<meta name="twitter:card" content="summary"/>
+${approvedHero && !options?.templateGallery && !sampleTemplate ? `<meta property="og:image" content="${escapePublicHtml(approvedHero.src)}"/>
+<meta property="og:image:alt" content="${escapePublicHtml(approvedHero.altText)}"/>` : ""}
+<meta name="twitter:card" content="${approvedHero && !options?.templateGallery && !sampleTemplate ? "summary_large_image" : "summary"}"/>
 <style>
 :root{line-height:1.65}
 body.theme-warm,body.theme-light{color:var(--site-ink);background:var(--site-paper)}
@@ -870,14 +877,15 @@ ${publicSiteTemplateCss}
 @media(max-width:760px){.template-photo-extra{grid-template-columns:1fr}
   .template-photo-extra img{max-width:100%;max-height:380px}}
 ${sevenSchoolCss}
+.school-logo{display:inline-block;width:48px;height:48px;object-fit:contain;vertical-align:middle;margin-right:12px}.brand{overflow-wrap:anywhere}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
-${demo ? `<div class="demo-banner" role="note"><strong>DEMONSTRATION SCHOOL</strong> · ${school} is fictional. All programs, people, activities and admissions experiences on this site are examples—not real educational offerings.</div>` : ""}
+${demo ? `<div class="demo-banner" role="note"><strong>DEMONSTRATION SCHOOL</strong> · ${school} is a fictional demonstration school. All programs, people, activities and admissions experiences on this site are examples—not real educational offerings.</div>` : ""}
 ${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus&&page.operatingStatus!=="authorized" ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"School opening authorization is not currently verified.":"School in development · Not yet open for enrollment."}</strong> Academic plans and opening dates remain subject to review and applicable requirements.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 ${composePublicSiteChrome(templateId, {
-  brand: school,
+  brand: logo ? `<img class="school-logo" src="${escapePublicHtml(logo.dataUrl)}" alt="${escapePublicHtml(logo.altText)}" width="48" height="48" decoding="async"/>${school}` : school,
   monogram: escapePublicHtml(schoolBrandMonogram(page.site.name)),
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,

@@ -14,9 +14,10 @@ export type NotificationEmailMessage = {
   to: string;
   subject: string;
   text: string;
-  /** Only HTML produced by a server-owned, escaped template. Never user HTML. */
+  /** HTML from a server-owned, escaped template; never publisher-supplied markup. */
   html?: string;
   actionUrl?: string;
+  siteId?: string;
   attachments?: { filename: string; content: string; contentType: string }[];
 };
 
@@ -58,6 +59,17 @@ export async function sendNotificationEmail(
     : message.text;
 
   try {
+    const brand = message.siteId
+      ? await import("@/modules/sites/school-brand.server")
+        .then(module => module.readSchoolBrand(message.siteId!))
+        .catch(() => { console.warn("[notification-email] School branding unavailable; using CAN branding"); return null; }) : null;
+    const { renderSchoolEmail, schoolEmailLogoAttachment } = await import("@/domain/school-email");
+    const logoAttachment = schoolEmailLogoAttachment(brand);
+    const attachments = [
+      ...(message.attachments ?? []).map(attachment => ({ filename: attachment.filename,
+        content: attachment.content, content_type: attachment.contentType })),
+      ...(logoAttachment ? [logoAttachment] : []),
+    ];
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       signal: AbortSignal.timeout(20_000),
@@ -71,14 +83,8 @@ export async function sendNotificationEmail(
         to: [message.to],
         subject: message.subject,
         text,
-        ...(message.html ? { html: message.html } : {}),
-        ...(message.attachments?.length ? {
-          attachments: message.attachments.map(attachment => ({
-            filename: attachment.filename,
-            content: attachment.content,
-            content_type: attachment.contentType,
-          })),
-        } : {}),
+        html: message.html ?? renderSchoolEmail({ brand, text, actionUrl }),
+        ...(attachments.length ? { attachments } : {}),
       }),
     });
     if (!response.ok) {

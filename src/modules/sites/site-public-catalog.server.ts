@@ -44,24 +44,24 @@ export async function readPublishedSiteCatalog(slug: string) {
     // Use the same locked transaction sequentially, avoiding concurrent
     // statements on one database connection.
     const offerings = await readEnrichmentCatalog(site.id, tx);
-    const academicPrograms = await readAcademicProgramCatalog(site.id, tx);
-    // Public Program descriptions retain their independent editorial publication
-    // status. An unsupported opening location must not silently hide a planned
-    // academic concept or turn it into an admissions offer.
-    const activePrograms=await tx.select({id:programs.id,type:programs.type})
-      .from(programs).where(and(eq(programs.siteId,site.id),eq(programs.status,"active"))).limit(25);
-    const academicActive=activePrograms.filter(program=>program.type && isAcademicMarketingType(program.type));
-    let operatingStatus:"authorized"|"development"|"review_required"=
-      academicActive.length?"review_required":"development";
-    for(const program of academicActive){
+    const academicCandidates = await readAcademicProgramCatalog(site.id, tx);
+    // Marketing approval and legal operating readiness are separate decisions.
+    // Keep independently reviewed Program copy visible even while the school
+    // is still completing its opening review; admissions and enrollment
+    // commands enforce their own current authority and readiness gates.
+    const academicPrograms = academicCandidates;
+    const activePrograms=await tx.select({id:programs.id,type:programs.type}).from(programs)
+      .where(and(eq(programs.siteId,site.id),eq(programs.status,"active"))).limit(25);
+    const activeAcademicPrograms=activePrograms.filter(item=>isAcademicMarketingType(item.type));
+    let operatingStatus: "authorized"|"development"|"review_required"=
+      activeAcademicPrograms.length?"authorized":"development";
+    for(const program of activeAcademicPrograms){
       try{
         await requireCurrentSchoolJurisdictionForOpening(tx,program.id,{});
-        operatingStatus="authorized";
-        break;
       }catch(error){
-        // A failed authorization is an unverified opening, but a failed DB
-        // query is a server error, NOT evidence that the school is unapproved.
         if(!(error instanceof AuthorizationError))throw error;
+        operatingStatus="review_required";
+        break;
       }
     }
     const locallyPublished = await readCurrentLocalContent(site.id, tx);

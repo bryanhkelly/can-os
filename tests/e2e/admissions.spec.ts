@@ -182,7 +182,7 @@ test("GF2: verified family handoff through separate student learning, feedback a
       await expect(teacher.page.getByText("Grade posted.", { exact: true })).toBeVisible();
       await expectVisibleAfterReload(studentPage, studentPage.getByText(firstFeedback, { exact: true }));
 
-      const guardianAcademics = `/guardian/academics?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${assessmentId}`;
+      const guardianAcademics = `/guardian/students?student=${fixture.studentPersonId}&section=${fixture.sectionId}&assessment=${assessmentId}`;
       await guardian.page.goto(guardianAcademics);
       await expect(guardian.page.getByText(/^Grade: 9(?:\.0{1,2})? \/ 10(?:\.0{1,2})?$/)).toBeVisible();
       await expectVisibleAfterReload(guardian.page, guardian.page.getByText(`Teacher feedback: ${firstFeedback}`, { exact: true }));

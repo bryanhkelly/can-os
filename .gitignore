@@ -11,6 +11,7 @@ coverage/
 storybook-static/
 .eslintcache
 chromatic.log
+public/school-template-previews/v1/*/*-[0-9]*.webp
 
 # Playwright e2e artifacts
 /test-results/

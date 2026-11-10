@@ -3,6 +3,7 @@ import { slugForPublicSiteOrigin } from "@/domain/public-site-host-routing";
 import { publicSiteDomain } from "@/domain/public-site-address";
 import { parsePublicFamilyStart } from "@/domain/public-family-start";
 import { readSmallUrlEncodedBody } from "@/domain/public-admissions-interest";
+import { isSyntheticSandboxMailRuntime } from "@/modules/identity/resend-access-mail.server";
 
 const headers={
  "Cache-Control":"private, no-store","Vary":"Host",
@@ -21,7 +22,14 @@ export const Route=createFileRoute("/published-site/family-start")({
     publicSiteDomain(),
     process.env.CAN_PUBLIC_SITE_LOCAL_PREVIEW_WRITES_ENABLED==="true",
   );
-  if(!slug || request.headers.get("origin")!==new URL(request.url).origin)
+  const origin=request.headers.get("origin");
+  const sameOrigin=origin===new URL(request.url).origin;
+  // Chromium may serialize a same-origin form submission's Origin as `null`
+  // under the no-referrer policy. Permit that opaque origin only in the
+  // isolated synthetic sandbox, whose access mail is a local outbox and
+  // whose demo-family recipient must be a `.test` address.
+  const sandboxOpaqueOrigin=origin==="null"&&isSyntheticSandboxMailRuntime();
+  if(!slug || (!sameOrigin&&!sandboxOpaqueOrigin))
     return new Response("Not found",{status:404,headers:{"Cache-Control":"no-store"}});
   try{
     const {admitPublicAdmissionsInterest}=await import("@/modules/enrollment/public-admissions-interest.server");

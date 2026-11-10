@@ -91,6 +91,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     subtitle={record?`${record.programName} · Last updated ${new Date(record.updatedAt).toLocaleDateString()}`:
      "This application is unavailable in your authorized Site and Program scope."}
     status={record?<StatusBadge>{record.disposition??record.stage}</StatusBadge>:undefined}
+    focusOnMount
     breadcrumbs={<Link to="/admissions/intake" search={{...selected,application:undefined}} className="underline">Admissions pipeline</Link>}/>}
    main={record ? (
     <div className="space-y-5">

@@ -3,7 +3,8 @@ import { cn } from "@/lib/utils";
 import { PageEyebrow, PageTitle } from "./page-frame";
 
 /** Route-stable, entity-first record view. The route owns the data and permissions. */
-export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadcrumbs, className }: {
+export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadcrumbs, className,
+  focusOnMount = false }: {
   eyebrow?: string;
   title: string;
   subtitle?: React.ReactNode;
@@ -11,13 +12,18 @@ export function RecordHeader({ eyebrow, title, subtitle, status, actions, breadc
   actions?: React.ReactNode;
   breadcrumbs?: React.ReactNode;
   className?: string;
+  focusOnMount?: boolean;
 }) {
+  const titleRef = React.useRef<HTMLHeadingElement>(null);
+  React.useEffect(() => {
+    if (focusOnMount) titleRef.current?.focus({ preventScroll: true });
+  }, [focusOnMount, title]);
   return <header className={cn("min-w-0 border-b border-border pb-5", className)}>
     {breadcrumbs && <nav aria-label="Breadcrumb" className="mb-4 text-xs text-muted-foreground">{breadcrumbs}</nav>}
     {eyebrow && <PageEyebrow className="mb-2">{eyebrow}</PageEyebrow>}
     <div className="flex flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <PageTitle>{title}</PageTitle>
+        <PageTitle ref={titleRef} tabIndex={focusOnMount ? -1 : undefined}>{title}</PageTitle>
         {subtitle && <div className="mt-2 text-sm leading-6 text-muted-foreground">{subtitle}</div>}
       </div>
       <div className="flex flex-wrap items-center gap-2">{status}{actions}</div>

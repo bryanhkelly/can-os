@@ -1,4 +1,5 @@
-import type {SiteTemplateId} from "./site-theme";
+import manifest from "./template-sample-assets.json";
+import {siteTemplateIds, type SiteTemplateId} from "./site-theme";
 
 /**
  * Fictional, read-only school-website sample photographs. Never treated as
@@ -17,6 +18,33 @@ export type TemplatePhotographyRole=
  * No additional fal.ai generation is caused by this query parameter.
  */
 export const TEMPLATE_PHOTO_LIBRARY_REVISION="20261109";
+
+/** Local bundled hero/story defaults retained for the public Site renderer. */
+export function templateDefaultImage(template:SiteTemplateId,role:"hero"|"story_01") {
+  const family=template==="bright-futures"?"bright":template;
+  const asset=manifest.files.find(file=>"template" in file && file.template===family &&
+    file.role===role && file.preview_only==="no" && "width" in file && file.width>=1000);
+  if(!asset || !("width" in asset) || !("height" in asset))return null;
+  const {width,height}=asset;
+  if(typeof width!=="number" || typeof height!=="number")return null;
+  const src="/"+asset.key;
+  const variants=manifest.responsive_widths.filter(candidateWidth=>candidateWidth<width)
+    .map(candidateWidth=>({src:src.replace(/\.[^.]+$/,`-${candidateWidth}.webp`),width:candidateWidth}));
+  return {src,altText:"Illustrative template image, not this school's campus or students",
+    width,height,variants,
+    srcSet:[...variants.map(variant=>`${variant.src} ${variant.width}w`),`${src} ${width}w`].join(", ")};
+}
+
+const templateDefaultImagePaths=new Set(siteTemplateIds.flatMap(template=>
+  (["hero","story_01"] as const).flatMap(role=>{
+    const image=templateDefaultImage(template,role);
+    return image?[image.src,...image.variants.map(variant=>variant.src)]:[];
+  }),
+));
+
+export function isTemplateDefaultImagePath(path:string):boolean {
+  return templateDefaultImagePaths.has(path);
+}
 
 export function templateSampleImage(
   template:SiteTemplateId,role:TemplatePhotographyRole,

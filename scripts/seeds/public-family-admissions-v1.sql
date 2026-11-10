@@ -14,7 +14,7 @@ BEGIN;
 -- Published public Site address required by redeemPublicFamilyStart and the
 -- partner website preview/catalog reads.
 INSERT INTO site_publications (site_id, slug, status, published_at)
-VALUES ('f1000000-0000-4000-8000-000000000003','synthetic-bay-campus','published',now())
+VALUES ('f1000000-0000-4000-8000-000000000003','valorschool','published',now())
 ON CONFLICT DO NOTHING;
 
 -- Approved, published Program marketing snapshot for the same Site. Mirrors
@@ -25,10 +25,10 @@ INSERT INTO program_publications
 (program_id, site_id, status, title, summary, grade_range, delivery_model,
  approved_by_person_id, published_at)
 VALUES ('f1000000-0000-4000-8000-000000000004','f1000000-0000-4000-8000-000000000003',
- 'published','Synthetic Hybrid High School',
- 'Synthetic demonstration high school listing for fixture verification only.',
+ 'published','Valor Hybrid High School',
+ 'Valor''s hybrid high school pathway for grades 9 to 12 blends on-site collaboration, live online teaching, and independent study in a connected school community.',
  '{"min":"9","max":"12"}'::jsonb,
- '{"onsite":true,"asynchronous":false,"liveOnline":false,"onsiteDaysPerWeek":5}'::jsonb,
+ '{"onsite":true,"asynchronous":true,"liveOnline":true,"onsiteDaysPerWeek":null}'::jsonb,
  'f1000000-0000-4000-8000-000000000006', now())
 ON CONFLICT DO NOTHING;
 
@@ -75,5 +75,27 @@ ON CONFLICT (id) DO NOTHING;
 UPDATE access_accounts
 SET email_verified_at = COALESCE(email_verified_at, now()), updated_at = now()
 WHERE id = 'fa000000-0000-4000-8000-000000000004' AND disabled = false;
+
+-- Family enrollment Journey definition used by admissions intake when a
+-- registrar begins eligibility review (enrollmentJourneyDefinitionKey falls
+-- back to 'family-enrollment'). Without it, every Valor application fails at
+-- "Begin eligibility review" with "Journey definition not found".
+INSERT INTO journey_definitions
+(id, key, version, owning_organization_id, audience, title, active, configuration)
+VALUES ('fd100000-0000-4000-8000-000000000001','family-enrollment','1',
+ 'f1000000-0000-4000-8000-000000000002','family','Valor family enrollment', true,
+ '{
+   "requirements": [
+     {"key":"school-review","title":"School enrollment review","blocking":true,"owner":"partner"},
+     {"key":"school-consent","title":"School enrollment form","blocking":true,"owner":"family",
+      "enrollmentForm":{
+        "version":"valor-family-v1",
+        "instructions":"Synthetic Valor enrollment form. This is not a real school agreement.",
+        "consent":"I confirm this synthetic Valor enrollment agreement.",
+        "fields":[{"key":"contact_plan","label":"Family contact plan","type":"text","required":true}]
+      }}
+   ]
+ }'::jsonb)
+ON CONFLICT (key, version) DO NOTHING;
 
 COMMIT;

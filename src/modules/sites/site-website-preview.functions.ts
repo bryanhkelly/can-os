@@ -59,6 +59,12 @@ const localContentSchema = z.object({
       rightsConfirmed: z.boolean(),
       childImageConsent: z.enum(siteLocalImageConsentStates),
     }).strict().nullable(),
+    logoImage: z.object({
+      dataUrl: z.string().max(siteLocalImageMaxBase64Length + 32),
+      altText: z.string().max(180),
+      rightsConfirmed: z.boolean(),
+      childImageConsent: z.enum(siteLocalImageConsentStates),
+    }).strict().nullable().optional(),
   }).strict(),
 }).strict();
 
@@ -75,8 +81,10 @@ export const previewChurchWebsiteDraft = createServerFn({ method: "POST" })
     if (data.siteId && actor.grantSiteId !== data.siteId) throw new AuthorizationError("intended church website Site");
     const content = normalizeSiteLocalContent(data.content, { allowIncompleteImage: true });
     // Unapproved artwork stays in the editor but is never projected into a preview page.
-    const safeContent = siteLocalImagePublicationGaps(content.branding.heroImage).length
-      ? { ...content, branding: { ...content.branding, heroImage: null } } : content;
+    const safeContent = { ...content, branding: { ...content.branding,
+      heroImage: siteLocalImagePublicationGaps(content.branding.heroImage).length ? null : content.branding.heroImage,
+      logoImage: siteLocalImagePublicationGaps(content.branding.logoImage ?? null).length ? null : content.branding.logoImage,
+    } };
     const preview = await getPartnerWebsitePreview(actor, safeContent);
     return { previewHtml: preview.previewHtml, previewPages: preview.previewPages };
   });

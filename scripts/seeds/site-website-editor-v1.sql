@@ -44,16 +44,16 @@ ON CONFLICT (id) DO NOTHING;
 -- (published here) public address is required before local copy can be saved,
 -- and the published Program snapshot feeds the read-only academic catalog.
 INSERT INTO site_publications (site_id, slug, status, published_at)
-VALUES ('f1000000-0000-4000-8000-000000000003','synthetic-bay-campus','published',now())
+VALUES ('f1000000-0000-4000-8000-000000000003','valorschool','published',now())
 ON CONFLICT DO NOTHING;
 INSERT INTO program_publications
 (program_id, site_id, status, title, summary, grade_range, delivery_model,
  approved_by_person_id, published_at)
 VALUES ('f1000000-0000-4000-8000-000000000004','f1000000-0000-4000-8000-000000000003',
- 'published','Synthetic Hybrid High School',
- 'Synthetic demonstration high school listing for fixture verification only.',
+ 'published','Valor Hybrid High School',
+ 'Valor''s hybrid high school pathway for grades 9 to 12 blends on-site collaboration, live online teaching, and independent study in a connected school community.',
  '{"min":"9","max":"12"}'::jsonb,
- '{"onsite":true,"asynchronous":false,"liveOnline":false,"onsiteDaysPerWeek":5}'::jsonb,
+ '{"onsite":true,"asynchronous":true,"liveOnline":true,"onsiteDaysPerWeek":null}'::jsonb,
  'f1000000-0000-4000-8000-000000000006', now())
 ON CONFLICT DO NOTHING;
 
@@ -67,7 +67,7 @@ VALUES ('fd000000-0000-4000-8000-000000000014','f1000000-0000-4000-8000-00000000
  1,'published',
  jsonb_build_object(
   'welcomeMessage','Welcome from the Synthetic Bay church family. We are glad you stopped by.',
-  'localDescription','Synthetic Bay Campus is hosted by our demonstration church community. Families gather here through the week for worship, friendship and learning support.',
+  'localDescription','Valor School is hosted by our demonstration church community. Families gather here through the week for worship, friendship and learning support.',
   'denomination','Synthetic Demonstration Fellowship (fictional)',
   'statementOfFaith','We believe in God the Father, in Jesus Christ His Son, and in the Holy Spirit. This synthetic statement exists only to exercise the website editor fixture and describes no real congregation.',
   'spiritualFormation','Our community meets for prayer, Scripture reading and service projects. Children join age-appropriate gatherings alongside their parents.'

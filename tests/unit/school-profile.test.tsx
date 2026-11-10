@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SchoolProfile, type SchoolProfileData } from "@/components/operations/SchoolProfile";
+import { resolveSiteTheme } from "@/domain/site-theme";
 
 const listMySites = vi.fn();
 vi.mock("@tanstack/react-router", async importOriginal => ({
@@ -12,24 +13,53 @@ vi.mock("@tanstack/react-router", async importOriginal => ({
     className={className} aria-label={label}>{children}</a>,
 }));
 vi.mock("@/modules/operations/site-directory.functions", () => ({ listMySites: () => listMySites() }));
+vi.mock("@/components/student/LiveSchoolExperiences", () => ({ LiveSchoolExperiences: () => null }));
 
 const site = {
-  id: "site-1", organizationId: "org-1", name: "Valor School", slug: "valor", timezone: "America/Chicago",
+  id: "site-1", name: "Valor School", timezone: "America/Chicago",
   organization: { id: "org-1", name: "Valor Church" },
   physicalLocation: { value: null, configurationStatus: "missing" },
   contact: { value: { displayName: "Front office", email: "office@valor.example", phone: "" }, configurationStatus: "church_supplied" },
-  publication: { status: "unconfigured", canPublish: true },
+  publication: { status: "unconfigured", url: null },
   programs: [
-    { id: "p1", name: "Upper School", type: "church_hosted_academy", status: "active", gradeRange: { min: "9", max: "12" } },
-    { id: "p2", name: "Middle School", type: "church_hosted_academy", status: "draft", gradeRange: { min: "6", max: "8" } },
+    { id: "p1", name: "Upper School", type: "church_hosted_academy", status: "active", gradeRange: { min: "9", max: "12" }, activeStudents: 12 },
+    { id: "p2", name: "Middle School", type: "church_hosted_academy", status: "draft", gradeRange: { min: "6", max: "8" }, activeStudents: 0 },
   ],
+  viewer: { canManageSchool: true, canPublish: true, canOpenSiteToday: true },
 } as unknown as SchoolProfileData["site"];
 
 const render = (overrides: Partial<SchoolProfileData> = {}) => renderToStaticMarkup(<SchoolProfile data={{
-  site, organizationName: "Valor Church", siteCount: 1, activeStudents: { p1: 12 }, ...overrides,
+  site, siteCount: 1, experiences: null, ...overrides,
 }} />);
 
 describe("School profile", () => {
+  it("uses the published school palette and approved default image", () => {
+    const html = render({ site: { ...site, brand: {
+      name: "Valor School", theme: resolveSiteTheme("heritage"), websiteUrl: null, templateId: "heritage",
+      logo: { src: "data:image/png;base64,aGVsbG8=", altText: "Valor logo" },
+      image: { src: "https://valorschool.can-os.com/media/approved-image", altText: "Valor school community" },
+    } } });
+    expect(html).toContain("background-color:#162b45");
+    expect(html).toContain('alt="Valor school community"');
+    expect(html).toContain('src="https://valorschool.can-os.com/media/approved-image"');
+    expect(html).toContain('src="data:image/png;base64,aGVsbG8="');
+  });
+
+  it("shows the published website to members without publisher permissions", () => {
+    const html = render({ site: { ...site,
+      publication: { status: "published", url: "https://valorschool.can.school" },
+      viewer: { canManageSchool: false, canPublish: false, canOpenSiteToday: false },
+    } });
+    expect(html).toContain('href="https://valorschool.can.school"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).not.toContain("Manage website");
+  });
+
+  it("does not invent a website address before publication", () => {
+    expect(render()).toContain("Website not published");
+    expect(render()).not.toContain("https://valorschool");
+  });
+
   it("preserves the profile while explicitly warning that the directory count is unavailable", () => {
     const html = render({ siteCount: null });
     expect(html).toContain("Valor School");
@@ -46,10 +76,19 @@ describe("School profile", () => {
     expect(html).not.toMatch(/demo/i);
   });
 
-  it("hides the enrollment total when the authoritative count is unavailable", () => {
-    const html = render({ activeStudents: null });
-    expect(html).not.toContain("Active students");
-    expect(html).not.toContain("active student");
+  it("shows every school member the same facts without management affordances", () => {
+    const memberSite = { ...site, viewer: { canManageSchool: false, canPublish: false, canOpenSiteToday: false } } as SchoolProfileData["site"];
+    const html = renderToStaticMarkup(<SchoolProfile data={{ site: memberSite, siteCount: null, experiences: null }} />);
+    expect(html).toContain("Valor School");
+    expect(html).toContain("Valor Church");
+    expect(html).toContain("12 active students");
+    expect(html).toContain("No address recorded");
+    expect(html).toContain("Front office");
+    expect(html).not.toContain("/launch/school");
+    expect(html).not.toContain("Manage this school");
+    expect(html).not.toContain("Open today");
+    expect(html).not.toContain("All schools");
+    expect(html).not.toContain("could not be verified");
   });
 
   it("states missing facts plainly instead of inventing them", () => {
@@ -69,7 +108,7 @@ describe("School profile", () => {
   });
 
   it("hides website management from viewers without a site publisher grant", () => {
-    const html = render({ site: { ...site, publication: { ...site.publication, canPublish: false } } });
+    const html = render({ site: { ...site, viewer: { ...site.viewer, canPublish: false } } });
     expect(html).toContain("Not set up");
     expect(html).toContain("A site publisher manages it.");
     expect(html).not.toContain("/publish");

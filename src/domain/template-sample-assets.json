@@ -1,5 +1,6 @@
 {
   "r2_prefix": "school-template-previews/v1",
+  "responsive_widths": [640, 1024],
   "note": "Illustrative fictional template images; not site-owned approved photographs",
   "total_photos": 60,
   "preview_only_photos": 50,

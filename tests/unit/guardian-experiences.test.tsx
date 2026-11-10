@@ -6,6 +6,7 @@ import { AuthorizationError } from "@/domain/command-context";
 const state = vi.hoisted(() => ({
   routeOptions: null as Record<string, unknown> | null,
   getSchoolExperiences: vi.fn(),
+  getMySchoolProfile: vi.fn(),
   bookOfficeHour: vi.fn(),
   rescheduleOfficeHour: vi.fn(),
   cancelOfficeHour: vi.fn(),
@@ -18,7 +19,11 @@ vi.mock("@tanstack/react-router", () => ({
   },
   useSearch: () => ({}),
   useRouter: () => ({ invalidate: vi.fn() }),
+  linkOptions: (options: unknown) => options,
   Link: ({ to, children, ...props }: { to: string; children: ReactNode }) => <a href={to} {...props}>{children}</a>,
+}));
+vi.mock("@/modules/operations/school-profile.functions", () => ({
+  getSchoolProfile: vi.fn(), getMySchoolProfile: state.getMySchoolProfile,
 }));
 vi.mock("@/modules/student-experience/school-experiences.functions", () => ({
   getSchoolExperiences: state.getSchoolExperiences,
@@ -53,16 +58,17 @@ const guardianData = {
 beforeEach(() => {
   vi.clearAllMocks();
   state.getSchoolExperiences.mockResolvedValue(guardianData);
+  state.getMySchoolProfile.mockResolvedValue(null);
 });
 
 describe("guardian experiences route", () => {
   it("loads the booking surface for a guardian actor", async () => {
     const loader = (GuardianExperiencesRoute.options as { loader: () => Promise<unknown> }).loader;
-    const outcome = await loader() as { ok: boolean; data?: typeof guardianData };
+    const outcome = await loader() as { ok: boolean; data?: { experiences: typeof guardianData } };
     expect(state.getSchoolExperiences).toHaveBeenCalled();
     expect(outcome.ok).toBe(true);
-    expect(outcome.data?.viewerRole).toBe("guardian");
-    expect(outcome.data?.slots).toHaveLength(1);
+    expect(outcome.data?.experiences.viewerRole).toBe("guardian");
+    expect(outcome.data?.experiences.slots).toHaveLength(1);
   });
 
   it("renders an in-page sign-in state instead of throwing for unauthorized actors", async () => {

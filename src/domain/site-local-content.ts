@@ -63,6 +63,7 @@ export type SiteLocalBranding = {
   /** Structural template is versioned with local branding, not Program facts. */
   templateId?: SiteTemplateId;
   heroImage: SiteLocalImage | null;
+  logoImage?: SiteLocalImage | null;
   /** Curated, accessible local identity. Optional for historical revisions. */
   paletteId?: SitePaletteId;
   typographyId?: SiteTypographyId;
@@ -108,11 +109,11 @@ export function createSchoolWebsiteEditorialBaseline(schoolName: string): SiteEd
   return {
     version: 1,
     fields: {
-      heroHeadline: "A school that sees the individual. A community that helps them grow.",
-      welcomeMessage: "Thoughtful academics, personal growth, and the relationships that help young people find their way forward.",
-      localDescription: `At ${name}, we are exploring a learning community where each student is more than a name on a roster. Our vision brings purposeful academic learning together with encouragement, meaningful relationships, and room for students to discover their strengths. We invite families to learn about the idea and help shape what comes next.`,
-      schoolVision: "We envision a place where students are challenged to think deeply, supported as individuals, and encouraged to use their gifts with purpose.",
-      communityOutreach: "A school can be more than a place to learn. We hope to connect families, neighbors, and community partners around shared opportunities to learn, contribute, and belong.",
+      heroHeadline: "A place to belong. A future to build.",
+      welcomeMessage: "Purposeful learning, meaningful relationships, and room to discover what comes next.",
+      localDescription: `At ${name}, we believe young people have strengths worth discovering and potential worth developing. Our hope is to build a learning community shaped by curiosity, connection, and a shared commitment to helping students grow.`,
+      schoolVision: "We envision a learning community where students are known as individuals, encouraged to think deeply, and inspired to use their gifts to serve others.",
+      communityOutreach: "We hope to build meaningful connections with our neighbors, bringing families and community partners together around learning, service, and shared purpose.",
     },
   };
 }
@@ -129,24 +130,9 @@ export function createSchoolWebsiteStarterContent(schoolName: string): SiteLocal
   };
 }
 
-/** Rich fictional copy for explicitly synthetic read-only previews only.
- * This is never used to seed a real school's published institutional claims.
- * The renderer supplies a persistent demonstration disclosure. */
+/** Demo sites use the same reviewed starter rather than fictional school facts. */
 export function createIllustrativeSchoolContent(schoolName: string): SiteLocalContent {
-  const starter = createSchoolWebsiteStarterContent(schoolName);
-  const name = schoolName.trim().slice(0, 80) || "Our School";
-  const fields: SiteEditorialBaseline["fields"] = {
-    heroHeadline: "A school that sees the individual. A community that helps them grow.",
-    welcomeMessage: "A place to think deeply, find your people, and discover what you can become.",
-    localDescription: `At ${name}, every learner brings a story worth knowing. Purposeful academics, creative discovery, and genuine connections come together in a community where questions are welcomed, ideas are taken seriously, and growth is celebrated. Here, education is about more than preparing for the next test. It's about preparing to make a difference.`,
-    schoolVision: "To inspire thoughtful learners who pursue challenging ideas with confidence, care for their neighbors, and recognize their ability to make a meaningful contribution.",
-    communityOutreach: "The community is part of the learning experience. Collaborative projects, creative showcases, and service opportunities help students connect what they discover with the people and places around them.",
-  };
-  return {
-    ...starter,
-    ...fields,
-    editorialBaseline: {version:1,fields},
-  };
+  return createSchoolWebsiteStarterContent(schoolName);
 }
 
 /** Reset precisely one suggested editorial answer. Previously authored,
@@ -303,8 +289,8 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
   if ((branding.headingFontId !== undefined && !isSiteFontId(branding.headingFontId)) ||
       (branding.bodyFontId !== undefined && !isSiteFontId(branding.bodyFontId))) throw new Error("Choose approved school fonts");
   const fontOverrides = { ...(branding.headingFontId ? {headingFontId:branding.headingFontId} : {}), ...(branding.bodyFontId ? {bodyFontId:branding.bodyFontId} : {}) };
-  const image = branding.heroImage;
-  if (image) {
+  const normalizeArtwork = (image: SiteLocalImage | null | undefined): SiteLocalImage | null => {
+    if (!image) return null;
     validateInlinePng(image.dataUrl);
     const altText = normalizeText(image.altText, "welcomeMessage");
     if (altText.length > 180) throw new Error("Describe the website artwork in 180 characters or fewer");
@@ -316,13 +302,12 @@ export function normalizeSiteLocalContent(input: SiteLocalTextContent & {
       rightsConfirmed: image.rightsConfirmed, childImageConsent: image.childImageConsent };
     const gaps = siteLocalImagePublicationGaps(validatedImage);
     if (!options.allowIncompleteImage && gaps.length) throw new Error(gaps[0]);
-    result.branding = {
-      theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides,
-      heroImage: validatedImage,
-    };
-  } else {
-    result.branding = { theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides, heroImage: null };
-  }
+    return validatedImage;
+  };
+  result.branding = { theme: branding.theme, paletteId, typographyId, templateId, ...fontOverrides,
+    heroImage: normalizeArtwork(branding.heroImage),
+    ...(branding.logoImage !== undefined ? { logoImage: normalizeArtwork(branding.logoImage) } : {}),
+  };
   if (input.editorialBaseline) {
     const baseline = input.editorialBaseline;
     if (baseline.version !== 1 || !baseline.fields || typeof baseline.fields !== "object" ||
