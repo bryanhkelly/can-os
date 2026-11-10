@@ -61,7 +61,7 @@ BEGIN
 
   SELECT COUNT(*) INTO orig_items FROM curriculum_pack_items WHERE pack_version_id=old_pack_version;
   IF orig_items<>32 THEN RAISE EXCEPTION 'Expected 32 items in original v2 pack, found %',orig_items; END IF;
-  IF (SELECT COUNT(*) FROM sections WHERE curriculum_adoptions.program_id=program_id AND code IN ('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST') AND active AND metadata->>'synthetic'='true')<>4
+  IF (SELECT COUNT(*) FROM sections WHERE sections.program_id=program_id AND code IN ('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST') AND active AND metadata->>'synthetic'='true')<>4
     THEN RAISE EXCEPTION 'Expected exactly four active synthetic CAN core sections'; END IF;
   IF (SELECT COUNT(*) FROM course_template_versions v JOIN course_templates c ON c.id=v.course_template_id
        WHERE c.owning_organization_id=org_id AND c.code IN('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST')
