@@ -1,4 +1,6 @@
 import { resolveSchoolBrand } from "./school-brand-identity";
+import { templateSampleImage } from "./template-sample-images";
+import { siteLocalImagePublicationGaps } from "./site-local-content";
 import type { SiteLocalBranding } from "./site-local-content";
 import type { SiteTemplateId } from "./site-theme";
 
@@ -73,6 +75,9 @@ function shell(context:FamilyBrandContext,title:string,body:string,preview:boole
   .hero .lead{font-size:clamp(1.1rem,2vw,1.4rem);max-width:46rem}
   .hero-art{min-height:330px;border:2px solid var(--ink);border-radius:var(--radius);display:grid;place-items:center;background:var(--ink);color:var(--paper);padding:36px;text-align:center}
   .hero-art strong{font:700 clamp(2.8rem,7vw,6rem)/1 var(--display);color:var(--accent)}
+  .hero-art.has-photo{padding:0;overflow:hidden;position:relative;min-height:330px;background:var(--ink)}
+  .hero-art.has-photo img{display:block;width:100%;height:100%;min-height:330px;aspect-ratio:4/3;object-fit:cover}
+  .hero-art.has-photo .photo-note{position:absolute;bottom:0;left:0;right:0;background:#121a27d9;color:white;padding:7px 12px;font-size:.72rem;letter-spacing:.01em;text-align:left}
   .hero-art small{display:block;margin-top:20px;letter-spacing:.2em}
   .main{max-width:1130px;margin:auto;padding:20px 6% 75px}
   .panel{background:#ffffff;border:1px solid #00000024;border-radius:var(--radius);padding:clamp(24px,5vw,50px)}
@@ -134,13 +139,22 @@ export type FamilyPageParams={
 export function renderFamilyBrandPage(context:FamilyBrandContext,kind:FamilyBrandPageKind,params:FamilyPageParams):string {
  const {brand,copy}=design(context);
  const intro=context.introduction?.trim().slice(0,600);
+ const approvedImage=context.branding.heroImage && siteLocalImagePublicationGaps(context.branding.heroImage).length===0
+   ? context.branding.heroImage : null;
+ // Fictional R2 photography is permitted only in this authenticated design preview.
+ // Real family invitations never imply that template students/campuses are the school.
+ const photoSrc=approvedImage?.dataUrl ?? (params.preview?templateSampleImage(brand.templateId,"hero"):null);
+ const photoAlt=approvedImage?.altText ?? "Illustrative template photograph, not students or facilities of this school";
+ const heroArt=photoSrc
+   ? `<div class="hero-art has-photo"><img src="${escape(photoSrc)}" alt="${escape(photoAlt)}" decoding="async" fetchpriority="high">${!approvedImage?'<span class="photo-note">Illustrative school-template photography</span>':""}</div>`
+   : `<div class="hero-art" aria-label="${escape(brand.schoolName)} identity"><div><strong>${escape(brand.monogram)}</strong><small>${escape(copy.tagline)}</small></div></div>`;
  const hero=kind==="landing"?`<section class="hero"><div><div class="eyebrow">Family interest · ${escape(copy.eyebrow)}</div><h1>${escape(copy.headline)}</h1>
    <p class="lead">${escape(intro||copy.lead)}</p><a class="button" href="#respond">${kind==="landing"?"Share your perspective":"Take the survey"}</a></div>
-   <div class="hero-art" aria-label="${escape(brand.schoolName)} identity"><div><strong>${escape(brand.monogram)}</strong><small>${escape(copy.tagline)}</small></div></div></section>`:
+   ${heroArt}</section>`:
    `<section class="hero"><div><div class="eyebrow">Three-minute family survey</div><h1>What would make this the right school for your family?</h1>
    <p class="lead">Your answers can help shape an emerging school idea. Tell us what matters most in your child's education; this is not an application.</p>
    <a class="secondary" href="${safeHref(params.landingHref)}">Return to school introduction</a></div>
-   <div class="hero-art"><div><strong>03</strong><small>MINUTES · YOUR VOICE</small></div></div></section>`;
+   ${heroArt}</section>`;
  const learning=`<section class="panel"><span class="eyebrow">How CAN learning works</span>
    <h2>Thoughtful lessons. Real questions. Meaningful connections.</h2><p>${learningCopy}</p>
    <div class="row"><article><strong>01 · Learn</strong><p>Explore structured lessons with room to review and build understanding.</p></article>
