@@ -327,7 +327,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
             {data.role === "teacher" && <Link to="/teacher/discussions" search={{ section: data.section.id, lesson: lesson.id }} className="text-sm underline">Start a discussion from this lesson</Link>}
           </section> : undefined}/>
         {data.role === "teacher" && <ClassSupplementForm key={lesson.id} title={resourceTitle} url={resourceUrl}
-          kind={resourceKind} lessonId={lesson.id} lessons={lessons} busy={busy}
+          kind={resourceKind} lessonId={lesson.id} lessons={lessons} busy={busy} fixedLesson
           sectionId={data.section.id} uploadsEnabled={data.videoUploadsEnabled}
           onTitleChange={setResourceTitle} onUrlChange={setResourceUrl}
           onKindChange={setResourceKind} onLessonChange={setResourceLesson}
