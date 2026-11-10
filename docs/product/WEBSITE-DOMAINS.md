@@ -24,3 +24,20 @@ Optional customer-owned domains require a separate reviewed implementation, and 
 6. Acceptance against an isolated test tenant: unknown domain 404, foreign domain denied, no private apps under public hosts, valid public pages and approved inquiry flows, status transitions, DNS loss, renewal failure, cross-site collision and rollback.
 
 **Release note:** A repository change cannot by itself create Cloudflare DNS, wildcard certificate, or custom hostname enrollment. The Cloudflare worker includes host routing but deployment and DNS/TLS bindings remain external. Domain rollout must remain HOLD until the infrastructure is deployed and validated. This document does not authorize production DNS/TLS changes or assert that Valor is reachable.
+
+## Cloudflare release procedure for the current CAN OS origin
+
+CAN OS administration currently uses `https://can-os.bryanhkelly.workers.dev/access?returnTo=%2F`. Preserve that address; do not assume an `app.can-os.com` origin or place public school websites on the same authentication origin.
+
+For first-level school hostnames, `valorschool.can-os.com` is the canonical intended default, but **not live until the domain is verified and routed**. Unlike `workers.dev`, a `can-os.com` wildcard requires an owned, active Cloudflare zone. Production release is subject to all of the following:
+
+1. Verify control of the authoritative `can-os.com` DNS zone in the intended Cloudflare account. If the domain is not owned/active, choose an owned school-websites domain and update `CAN_PUBLIC_SITE_DOMAIN` deliberately; do not claim or point at an unrelated domain.
+2. Add proxied `*.can-os.com` DNS and verify a suitable certificate covering first-level school subdomains. Bind a wildcard **Worker route** (not a single-host Worker Custom Domain) such as `*.can-os.com/*` to the existing `can-os` Worker. Protect reserved hostnames with more-specific routes if necessary.
+3. Confirm the published Worker bundle includes the hostname-only dispatcher from `src/cloudflare-demo.ts`. Enable the server-visible `CAN_PUBLIC_SITE_HOSTING_ENABLED=true` **only after** DNS, route, certificate, and tenant isolation preflight succeed. Keep `workers_dev=true` for the platform's existing login address.
+4. Check `https://valorschool.can-os.com/`, `/academics`, `/about`, and `/?utm_source=chatgpt.com`: they must render this Site's own reviewed public content over HTTPS. `/access`, `/home`, `/_serverFn`, and `/?site=other-school` must not render private routes or switch tenants.
+5. Independently check a second published school, one draft/unpublished Site, an unknown subdomain, and the application login at `can-os.bryanhkelly.workers.dev`. Use the existing authenticated **Check live website** command and verify each public URL from a separate network before calling it live.
+6. Roll back by disabling public hostname routing if DNS/TLS or cross-tenant checks fail; the `workers.dev` application route must continue to work. Never change database publication status simply to address an infrastructure outage.
+
+Allowlisted marketing query parameters may accompany public **GET page** URLs; they are not tenant selectors, authentication tokens, or invitation state. Local `/published-site?site=...` remains loopback-only and should never be linked as a deployed public school URL.
+
+**Current acceptance:** No verified Cloudflare domain connection or certificate from a connected Cloudflare account is available in this workflow. Do not assert that Valor or any other `*.can-os.com` public hostname is working until the operational steps above are completed.
