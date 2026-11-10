@@ -2,6 +2,7 @@
 -- User-directed demo operation, 2026-11-10. This is not credit or academic approval.
 -- Explicitly preserves old immutable releases, course grades, submissions and lesson progress.
 DO $valor_release$
+#variable_conflict use_variable
 DECLARE
   org_id CONSTANT uuid := 'f1000000-0000-4000-8000-000000000002';
   program_id CONSTANT uuid := 'f1000000-0000-4000-8000-000000000004';
@@ -49,7 +50,7 @@ BEGIN
         JOIN course_templates c ON c.id=v.course_template_id
         WHERE s.program_id=program_id AND s.code IN ('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST')
           AND s.active AND v.status='published' AND v.curriculum#>>'{source,studentRelease}'='synthetic_valor_preview_2026-11')=4
-       AND EXISTS(SELECT 1 FROM curriculum_adoptions WHERE program_id=program_id AND pack_id=pack_id AND pack_version_id=new_pack_version AND status='active')
+       AND EXISTS(SELECT 1 FROM curriculum_adoptions WHERE curriculum_adoptions.program_id=program_id AND curriculum_adoptions.pack_id=pack_id AND pack_version_id=new_pack_version AND status='active')
     THEN
       RAISE NOTICE 'Release already complete: four enhanced published courses, four student-facing sections, and v3 adoption.';
       RETURN;
@@ -60,7 +61,7 @@ BEGIN
 
   SELECT COUNT(*) INTO orig_items FROM curriculum_pack_items WHERE pack_version_id=old_pack_version;
   IF orig_items<>32 THEN RAISE EXCEPTION 'Expected 32 items in original v2 pack, found %',orig_items; END IF;
-  IF (SELECT COUNT(*) FROM sections WHERE program_id=program_id AND code IN ('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST') AND active AND metadata->>'synthetic'='true')<>4
+  IF (SELECT COUNT(*) FROM sections WHERE curriculum_adoptions.program_id=program_id AND code IN ('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST') AND active AND metadata->>'synthetic'='true')<>4
     THEN RAISE EXCEPTION 'Expected exactly four active synthetic CAN core sections'; END IF;
   IF (SELECT COUNT(*) FROM course_template_versions v JOIN course_templates c ON c.id=v.course_template_id
        WHERE c.owning_organization_id=org_id AND c.code IN('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST')
@@ -200,7 +201,7 @@ BEGIN
          'previousPackVersionId',old_pack_version,'releaseReason',release_note,
          'studentPreviewReleasedAt',now(),'notForCredit',true),
       updated_at=now()
-  WHERE program_id=program_id AND organization_id=org_id AND pack_id=pack_id
+  WHERE curriculum_adoptions.program_id=program_id AND curriculum_adoptions.organization_id=org_id AND curriculum_adoptions.pack_id=pack_id
     AND pack_version_id=old_pack_version AND status='active';
   IF NOT FOUND THEN RAISE EXCEPTION 'Expected existing pinned synthetic adoption for v2'; END IF;
   INSERT INTO audit_events(actor_person_id,action,resource_type,resource_id,scope,before,after,context)
@@ -276,7 +277,7 @@ BEGIN
        WHERE s.program_id=program_id AND s.code IN('CAN-ALG1','CAN-BIO','CAN-ENG9','CAN-USHIST')
          AND v.status='published' AND v.curriculum#>>'{source,studentRelease}'='synthetic_valor_preview_2026-11'
          AND s.active)=4
-    AND (SELECT COUNT(*) FROM curriculum_adoptions WHERE program_id=program_id AND pack_version_id=new_pack_version AND status='active')=1
+    AND (SELECT COUNT(*) FROM curriculum_adoptions WHERE curriculum_adoptions.program_id=program_id AND pack_version_id=new_pack_version AND status='active')=1
     AND (SELECT COUNT(*) FROM curriculum_pack_items WHERE pack_version_id=new_pack_version)=32
   THEN RAISE NOTICE 'Valor synthetic student release complete: 4 published courses, 4 switched sections, v3 pack adopted (32 courses), no credit approval or grade changes.';
   ELSE RAISE EXCEPTION 'Valor synthetic release verification failed, rolling back'; END IF;
