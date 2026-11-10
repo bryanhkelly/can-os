@@ -757,7 +757,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <p>Families deserve more than occasional updates. Clear communication, thoughtful guidance, and opportunities to celebrate progress build a stronger connection between school and home.</p>
         <div class="grid"><article class="card"><h3>Stay connected</h3><p>Follow learning milestones, understand upcoming priorities, and know where to turn when questions come up.</p></article>
         <article class="card"><h3>Celebrate growth</h3><p>Recognize the small breakthroughs, new interests, and achievements that make each student's journey distinct.</p></article>
-        <article class="card"><h3>Take part</h3><p>Find meaningful opportunities to contribute to community experiences and share in the life of the school.</p></article></div></section>` : "")) + communityDetailSection,
+        <article class="card"><h3>Take part</h3><p>Find meaningful opportunities to contribute to community experiences and share in the life of the school.</p></article></div></section>` : ""), communityDetailSection),
     "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "The questions that matter most.",
       demo ? "Explore how learning, connection, and family partnership can work together." : "Only reviewed public information appears here."), faqSection),
     "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "Start a conversation about your child's education",
