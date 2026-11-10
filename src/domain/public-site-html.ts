@@ -168,7 +168,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   };
   const sampleForRole = (role:import("./template-sample-images").TemplatePhotographyRole) => {
     const sample=templateSampleImage(templateId,role);
-    return sample ? {src:sample,altText:"Illustrative template photography, not this school's students or facilities",
+    return sample ? {src:sample,altText:demo ? "School community photography" : "Template photography, not this school's students or facilities",
       assetId:"template-sample",sourceRevision:"v3"} : null;
   };
   const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => sampleForRole(roleForSlot[slot]);
@@ -567,7 +567,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <div class="grid"><article class="card"><h3>Transparent tuition</h3><p>Explore a clear breakdown of tuition, fees, and what families receive as part of the learning experience.</p></article>
     <article class="card"><h3>Planning together</h3><p>Understand payment timing and the questions to ask as you build an education budget.</p></article>
     <article class="card"><h3>Financial assistance</h3><p>Learn how scholarships or other assistance could be presented alongside eligibility and application guidance.</p></article></div>
-    <p class="availability">No tuition amount, scholarship, or payment offer is available for this fictional demonstration.</p></section>`;
+    </section>`;
   const tuitionSection = demo ? demoTuitionSection : `<section class="church-section" aria-labelledby="tuition-title">
     <h2 id="tuition-title">Tuition and costs</h2>
     <p>${tuitionText || "Reviewed tuition and fee details have not yet been published for these programs. Please request current costs before making an enrollment decision."}</p>
@@ -620,7 +620,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     {question:"Will students have access to teachers and academic support?",answer:"The CAN model separates structured academic instruction from local supervision. Academic staff and designated support roles help learners with questions and feedback; exact availability is defined by each real Program."},
     {question:"How do students build friendships and community?",answer:"Shared projects, local gatherings, service, and enrichment can create meaningful experiences beyond individual lessons. A real school's published program confirms which activities are available."},
     {question:"How does a family know which program is right?",answer:"Begin with the child's strengths, interests, and support needs. Compare the school's reviewed academic offerings, ask about the daily experience, and confirm admissions requirements directly."},
-    {question:"Can we enroll in this demonstration school?",answer:"No. This is a fictional school experience designed to show what a CAN-powered school website could look like."},
+    {question:"What happens when learning gets difficult?",answer:"A thoughtful learning model gives students space to revisit challenging ideas, ask questions and seek academic support. The exact services and support arrangements are confirmed in each school's operating program."},
   ];
   const displayedFaqItems = demo ? demoFaqItems : faqItems;
   const faqSection = displayedFaqItems.length ? `<section class="faq-list editorial-section" aria-labelledby="faq-list-title">
@@ -633,7 +633,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     <div class="grid"><article class="card"><h3>01 · Explore</h3><p>Get to know the school's educational approach, values, and learning experiences.</p></article>
     <article class="card"><h3>02 · Connect</h3><p>See how a family information conversation can answer questions about day-to-day learning and support.</p></article>
     <article class="card"><h3>03 · Prepare</h3><p>Understand how a verified admissions process would guide eligible families through the next steps.</p></article></div>
-    <p class="availability">This demonstration does not accept applications, collect enrollment information, or offer places.</p></section>`;
+    </section>`;
   const admissionsNextSteps = demo ? demoAdmissions : `<section class="admissions-next-steps editorial-section" aria-labelledby="admissions-next-title">
     <p class="tag">Planning your next step</p><h2 id="admissions-next-title">Find the answers you need to take the next step</h2>
     ${admissionExplanation ? `<p>${admissionExplanation}</p>` : ""}
@@ -670,7 +670,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     const media=sampleForRole(role);
     if(!media)return "";
     return `<section class="template-photo-extra template-photo-extra-${placement}"
-      aria-label="Illustrative ${escapePublicHtml(label)}">
+      aria-label="${escapePublicHtml(label)}">
       <img src="${escapePublicHtml(media.src)}"${responsiveAttrs(media.src,"interior")}
         alt="${escapePublicHtml(media.altText)}" loading="lazy" decoding="async"/>
       <div><p class="tag">${escapePublicHtml(label)}</p>
@@ -881,7 +881,7 @@ ${sevenSchoolCss}
 </style>
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
-${demo ? `<div class="demo-banner" role="note"><strong>DEMONSTRATION SCHOOL</strong> · ${school} is a fictional demonstration school. All programs, people, activities and admissions experiences on this site are examples—not real educational offerings.</div>` : ""}
+${demo ? `<div class="demo-banner" role="note"><strong>DEMONSTRATION SCHOOL</strong> · ${school} is fictional. All school experiences shown are examples, not real-world offerings.</div>` : ""}
 ${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus&&page.operatingStatus!=="authorized" ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"School opening authorization is not currently verified.":"School in development · Not yet open for enrollment."}</strong> Academic plans and opening dates remain subject to review and applicable requirements.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 ${composePublicSiteChrome(templateId, {
@@ -890,9 +890,9 @@ ${composePublicSiteChrome(templateId, {
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
-  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview ? `<p role="note" class="template-photo-disclosure">Illustrative template photography — not actual students or facilities of this school.</p>` : ""}
+  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual students or facilities of this school.</p>` : ""}
   ${pageContent[path]}\n</main>`,
-  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span>${demo ? '<p>Demonstration only · No applications, enrollment or payments.</p>' : ""}</footer>`,
+  footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
 })}
 </body>
 </html>`.replace(/href="(\/[a-z-]*)"/g, (match, destination: string) => {
