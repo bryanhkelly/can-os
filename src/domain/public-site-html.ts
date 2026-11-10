@@ -172,8 +172,11 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       assetId:"template-sample",sourceRevision:"v3"} : null;
   };
   const sampleMedia = (slot:keyof PublicSchoolSiteMedia) => sampleForRole(roleForSlot[slot]);
+  // The full twelve-scene set is enabled for a hosted fictional school only
+  // after the operator verifies all assets and enables the photo-readiness gate.
+  const fullDemoPhotoLibrary = demo && process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED === "true";
   const ownedMedia = (slot:keyof PublicSchoolSiteMedia) => {
-    if(options?.templateGallery || sampleTemplate)return sampleMedia(slot);
+    if(options?.templateGallery || sampleTemplate || fullDemoPhotoLibrary)return sampleMedia(slot);
     const candidate=page.media?.[slot];
     if(candidate) {
       try {
@@ -648,14 +651,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/about":"story_01", "/academics":"program_01",
     "/student-life":"community_01", "/school-day":"program_02",
     "/admissions":"admissions", "/tuition":"story_02",
-    "/families":"community_02", "/faq":"portrait_03", "/contact":"portrait_02",
+    "/families":"community_02", "/faq":"community_02", "/contact":"story_02",
   };
   const interiorMediaSlot:keyof PublicSchoolSiteMedia = path === "/about" ? "about" :
     path === "/student-life" ? "studentLife" : path === "/families" ? "families" :
     path === "/contact" ? "campus" : "academics";
   const interiorRole=interiorRoles[path];
   const siteInterior=ownedMedia(interiorMediaSlot);
-  const approvedInterior = (options?.localPreview || options?.templateGallery) && interiorRole
+  const approvedInterior = (options?.localPreview || options?.templateGallery || fullDemoPhotoLibrary) && interiorRole
     && siteInterior?.assetId === "template-sample"
     ? sampleForRole(interiorRole) : siteInterior;
   // The extra two template photography roles are intentionally mounted only
@@ -663,7 +666,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // the twelve-role readiness gate. Never imply these are real school pupils.
   const includeExtraTemplatePhotoSections=
     process.env.CAN_TEMPLATE_PHOTO_EXTRA_SECTIONS_ENABLED==="true" &&
-    Boolean(options?.templateGallery || options?.localPreview || sampleTemplate);
+    Boolean(options?.templateGallery || options?.localPreview || sampleTemplate || demo);
   const extraTemplatePhotoSection=(role:import("./template-sample-images").TemplatePhotographyRole,
     placement:"creative"|"portrait",label:string,title:string,summary:string)=>{
     if(!includeExtraTemplatePhotoSections)return "";
@@ -684,6 +687,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const studentPortraitSampleSection=extraTemplatePhotoSection("portrait_01","portrait",
     "Student perspective","Every student has a story worth hearing.",
     "The best learning communities make space for individual interests, friendships, and the confidence to participate.");
+  const educatorPortraitSection=extraTemplatePhotoSection("portrait_02","portrait",
+    "Human connection","The people who help learning come alive.",
+    "Listening, encouragement, and thoughtful academic guidance give students room to ask better questions and find their own voice.");
+  const communityDetailSection=extraTemplatePhotoSection("portrait_03","portrait",
+    "The small moments","Growth is personal.",
+    "A question explored, a challenge overcome, a new connection made: families deserve to see the moments that shape a student's journey.");
   const secondaryHero = (eyebrow: string, title: string, summary: string) =>
     `<div class="public-hero compact-hero${approvedInterior?" has-image":""}">
       ${approvedInterior ? `<img class="hero-background-image" src="${escapePublicHtml(approvedInterior.src)}"${mediaImageAttributes(approvedInterior)}${responsiveAttrs(approvedInterior.src,"interior")} alt="${escapePublicHtml(approvedInterior.altText)}" fetchpriority="high" loading="eager" decoding="async"/>` : ""}
@@ -728,7 +737,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
     "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
-      demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection),
+      demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection + educatorPortraitSection),
     "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
       demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection + creativeSampleSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", demo ? "Find your people. Follow your curiosity." : "Student life",
@@ -748,7 +757,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <p>Families deserve more than occasional updates. Clear communication, thoughtful guidance, and opportunities to celebrate progress build a stronger connection between school and home.</p>
         <div class="grid"><article class="card"><h3>Stay connected</h3><p>Follow learning milestones, understand upcoming priorities, and know where to turn when questions come up.</p></article>
         <article class="card"><h3>Celebrate growth</h3><p>Recognize the small breakthroughs, new interests, and achievements that make each student's journey distinct.</p></article>
-        <article class="card"><h3>Take part</h3><p>Find meaningful opportunities to contribute to community experiences and share in the life of the school.</p></article></div></section>` : "")),
+        <article class="card"><h3>Take part</h3><p>Find meaningful opportunities to contribute to community experiences and share in the life of the school.</p></article></div></section>` : "")) + communityDetailSection,
     "/faq": composePublicSiteInterior(templateId, secondaryHero("Common questions", "The questions that matter most.",
       demo ? "Explore how learning, connection, and family partnership can work together." : "Only reviewed public information appears here."), faqSection),
     "/contact": composePublicSiteInterior(templateId, secondaryHero("Get in touch", "Start a conversation about your child's education",
