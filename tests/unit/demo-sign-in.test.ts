@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LOCAL_DEMO_ADMIN } from "@/domain/local-demo-access";
+import { programs } from "@/db/schema";
 import { redeemDemoAccess } from "@/modules/identity/passwordless-access.server";
 import { AccessInfrastructureError } from "@/domain/access-errors";
 
 const state = vi.hoisted(() => ({
   select: vi.fn(), insert: vi.fn(), grants: vi.fn(), audit: vi.fn(),
   bindings: vi.fn(), pending: vi.fn(), accept: vi.fn(),
+  activePrograms: [] as Array<{id:string}>,
 }));
 vi.mock("@/db/client", () => {
   const tx = { select: state.select, insert: state.insert };
@@ -34,14 +36,16 @@ const grant = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  state.activePrograms = [];
   vi.stubEnv("CAN_ACCESS_TOKEN_PEPPER", "demo-sign-in-unit-test-pepper-not-a-secret");
-  state.select.mockReturnValue({
-    from: () => ({
+  state.select.mockImplementation(() => ({
+    from: (table: unknown) => ({
       where: () => ({
-        limit: async () => [{ id: LOCAL_DEMO_ADMIN.accountId, email: LOCAL_DEMO_ADMIN.email }],
+        limit: async () => table === programs ? state.activePrograms
+          : [{ id: LOCAL_DEMO_ADMIN.accountId, email: LOCAL_DEMO_ADMIN.email }],
       }),
     }),
-  });
+  }));
   state.insert.mockReturnValue({
     values: () => ({ returning: async () => [{ id: "session" }] }),
   });
@@ -55,9 +59,11 @@ afterEach(() => vi.unstubAllEnvs());
 describe("shared demo sign-in", () => {
   it("issues a normal audited session for an explicitly registered new-school Site Admin", async () => {
     const email = "admin.demo@newschool.demo";
-    state.select.mockReturnValue({
-      from: () => ({ where: () => ({ limit: async () => [{ id: "new-school-account", email }] }) }),
-    });
+    state.select.mockImplementation(() => ({
+      from: (table: unknown) => ({ where: () => ({
+        limit: async () => table === programs ? state.activePrograms : [{ id: "new-school-account", email }],
+      }) }),
+    }));
     state.grants.mockResolvedValue({
       grants: [{ ...grant, id: "new-school-grant", accountId: "new-school-account", role: "site_admin" }],
       demoAccountSwitching: false, launchSiteId: "new-school-site",
@@ -65,6 +71,21 @@ describe("shared demo sign-in", () => {
     expect(await redeemDemoAccess(email, "000000")).toMatchObject({
       accountId: "new-school-account", role: "site_admin", launchSiteId: "new-school-site",
     });
+  });
+  it("sends Valor's active school administrator to the school dashboard", async () => {
+    state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true,
+      launchSiteId: LOCAL_DEMO_ADMIN.siteId });
+    state.activePrograms = [{ id: "active-valor-program" }];
+    const result = await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000");
+    expect(result).toMatchObject({ homeSiteId: LOCAL_DEMO_ADMIN.siteId });
+    expect(result).not.toHaveProperty("launchSiteId");
+  });
+  it("keeps Valor's administrator in Launch Studio when no academic program is active", async () => {
+    state.grants.mockResolvedValue({ grants: [grant], demoAccountSwitching: true,
+      launchSiteId: LOCAL_DEMO_ADMIN.siteId });
+    const result = await redeemDemoAccess(LOCAL_DEMO_ADMIN.email, "000000");
+    expect(result).toMatchObject({ launchSiteId: LOCAL_DEMO_ADMIN.siteId });
+    expect(result).not.toHaveProperty("homeSiteId");
   });
   it("rejects a .demo email without an explicitly registered grant", async () => {
     state.grants.mockResolvedValue({ grants: [], demoAccountSwitching: false });
