@@ -14,7 +14,7 @@ import { reviseCalendarEventForActor } from "./calendar-events.server";
 import { visibleStudyGroupCalendarEventIds } from "./group-calendar-visibility.server";
 import { activeFacilitatorSectionIds } from "@/modules/operations/site-section-facilitators.server";
 import { SECTION_MEETING_PERIOD_TYPES } from "@/domain/schedule-period-types";
-import { addCalendarDays, dateTimeInputInTimezone, isValidTimeZone } from "./timezone";
+import { addCalendarDays, calendarMonthWindow, dateKeyInTimezone, dateTimeInputInTimezone, isValidTimeZone } from "./timezone";
 import { eligibleStudent, participatingStudent } from "@/modules/study-groups/canonical-membership.server";
 
 const allRoles: readonly ActorRole[] = ["student", "teacher", "guardian", "registrar", "specialist", "counselor"];
@@ -498,9 +498,11 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
           dueAt: schema.assessments.dueAt,
           sectionTitle: schema.sections.title,
           sectionId: schema.sections.id,
+          timezone: schema.sites.timezone,
         })
         .from(schema.assessments)
         .innerJoin(schema.sections, eq(schema.sections.id, schema.assessments.sectionId))
+        .innerJoin(schema.sites, eq(schema.sites.id, schema.sections.siteId))
         .where(and(
           inArray(schema.assessments.sectionId, sectionIds),
           inArray(schema.assessments.status, ["published", "closed"]),
@@ -519,7 +521,7 @@ async function readCalendarWindow(actor: Awaited<ReturnType<typeof requireActor>
           source: "assessment",
           startsAt: row.dueAt.toISOString(),
           endsAt: null,
-          timezone: "America/Los_Angeles",
+          timezone: row.timezone,
           description: row.sectionTitle,
           cancelled: false,
           manageable: false,
@@ -539,11 +541,18 @@ export const getCalendarMonth = createServerFn({ method: "GET" })
       year: z.number().int().min(2000).max(2100),
       month: z.number().int().min(1).max(12),
     }).parse(value))
-  .handler(async ({ data }) => readCalendarWindow(
-    await requireActor(calendarReadRoles),
-    new Date(Date.UTC(data.year, data.month - 1, 1)),
-    new Date(Date.UTC(data.year, data.month, 1)),
-  ));
+  .handler(async ({ data }) => {
+    const window = calendarMonthWindow(data.year, data.month);
+    const result = await readCalendarWindow(
+      await requireActor(calendarReadRoles), window.start, window.end,
+    );
+    // Events belong to their school's local calendar date. Extend the read
+    // window across IANA offsets, then filter the padding in each Site zone.
+    return { ...result, items: result.items.filter(item => {
+      const localDate = dateKeyInTimezone(item.startsAt, item.timezone);
+      return localDate >= window.firstDate && localDate < window.afterLastDate;
+    }) };
+  });
 
 /** Bounded daily windows share the canonical month visibility policy. */
 export const getCalendarRange = createServerFn({ method:"GET" })

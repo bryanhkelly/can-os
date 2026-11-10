@@ -88,6 +88,27 @@ export function dateKeyInTimezone(instant: Instant, timezone: string): string {
   return dateTimeInputValue(instant, timezone).slice(0, 10);
 }
 
+/** A shared month may contain schools with different timezones. Pad UTC
+ * bounds for the extremal IANA offsets (+14 and -12 hours), then filter
+ * each record by its Site-local date. This also handles DST transitions.
+ */
+export function calendarMonthWindow(year: number, month: number): {
+  start: Date; end: Date; firstDate: string; afterLastDate: string;
+} {
+  if (!Number.isInteger(year) || year < 2000 || year > 2100 ||
+      !Number.isInteger(month) || month < 1 || month > 12)
+    throw new DomainError("VALIDATION_FAILED", "Invalid calendar month");
+  const startUtc = Date.UTC(year, month - 1, 1);
+  const nextUtc = Date.UTC(year, month, 1);
+  const padding = 14 * 60 * 60 * 1000;
+  return {
+    start: new Date(startUtc - padding),
+    end: new Date(nextUtc + padding),
+    firstDate: new Date(startUtc).toISOString().slice(0, 10),
+    afterLastDate: new Date(nextUtc).toISOString().slice(0, 10),
+  };
+}
+
 export function todayInTimezone(timezone: string, at: Date = new Date()): string {
   return dateKeyInTimezone(at, timezone);
 }
