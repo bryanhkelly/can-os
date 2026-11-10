@@ -4,12 +4,14 @@ const calls = vi.hoisted(() => ({
   scopedConnections: [] as string[],
   handlerCalls: 0,
   limiterCalls: 0,
+  routedPaths: [] as string[],
 }));
 
 vi.mock("@tanstack/react-start/server-entry", () => ({
   default: {
-    fetch: vi.fn(async () => {
+    fetch: vi.fn(async (request: Request) => {
       calls.handlerCalls++;
+      calls.routedPaths.push(new URL(request.url).pathname);
       return new Response("CAN OS", { status: 200, headers: { "Cache-Control": "private, no-store" } });
     }),
   },
@@ -20,14 +22,6 @@ vi.mock("@/db/client", () => ({
     calls.scopedConnections.push(connectionString ?? "");
     return callback();
   }),
-}));
-
-vi.mock("@/domain/public-site-host-routing", () => ({
-  classifyPublicSiteRequest: () => ({ kind: "platform" }),
-}));
-
-vi.mock("@/domain/public-site-address", () => ({
-  publicSiteDomain: () => null,
 }));
 
 import worker from "@/cloudflare-demo";
@@ -43,6 +37,7 @@ describe("Cloudflare database scope at the Worker entry", () => {
     calls.scopedConnections.length = 0;
     calls.handlerCalls = 0;
     calls.limiterCalls = 0;
+    calls.routedPaths.length = 0;
   });
 
   it("wraps SSR reads in the request-bound database scope", async () => {
@@ -63,6 +58,33 @@ describe("Cloudflare database scope at the Worker entry", () => {
     expect(calls.limiterCalls).toBe(1);
     expect(calls.scopedConnections).toEqual([env.DATABASE_URL]);
     expect(calls.handlerCalls).toBe(1);
+  });
+
+  it("keeps tenant hostnames closed until Cloudflare public hosting is enabled", async () => {
+    const response = await worker.fetch(new Request("https://valorschool.can-os.com/"), env);
+    expect(response.status).toBe(404);
+    expect(calls.handlerCalls).toBe(0);
+  });
+
+  it("routes enabled tenant pages and admissions POST only to standalone handlers", async () => {
+    const enabled = { ...env, CAN_PUBLIC_SITE_HOSTING_ENABLED: "true" };
+    await worker.fetch(new Request("https://valorschool.can-os.com/"), enabled);
+    await worker.fetch(new Request("https://valorschool.can-os.com/about"), enabled);
+    await worker.fetch(new Request("https://valorschool.can-os.com/inquiry", {method:"POST"}), enabled);
+    await worker.fetch(new Request("https://valorschool.can-os.com/apply", {method:"POST"}), enabled);
+    expect(calls.routedPaths).toEqual([
+      "/published-site", "/published-site/about",
+      "/published-site/inquiry", "/published-site/family-start",
+    ]);
+  });
+
+  it("denies private app routes and query-selected tenants at the edge", async () => {
+    const enabled = { ...env, CAN_PUBLIC_SITE_HOSTING_ENABLED: "true" };
+    for (const path of ["/home", "/access", "/_serverFn", "/published-site?site=valorschool"]) {
+      expect((await worker.fetch(new Request("https://valorschool.can-os.com"+path), enabled)).status)
+        .toBe(404);
+    }
+    expect(calls.handlerCalls).toBe(0);
   });
 
   it("rejects host mismatches before accessing the database", async () => {
