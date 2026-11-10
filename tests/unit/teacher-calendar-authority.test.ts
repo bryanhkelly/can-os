@@ -75,8 +75,8 @@ describe("calendar authority for delegated academic teachers",()=>{
    {sectionId:"english",studentPersonId:"jordan",legalFirstName:"Jordan",legalLastName:"Student",preferredName:null},
    {sectionId:"math",studentPersonId:"jordan",legalFirstName:"Jordan",legalLastName:"Student",preferredName:null},
   ],[],[],[
-   {id:"essay",title:"Evidence essay",dueAt:new Date("2026-10-29T12:00:00Z"),sectionTitle:"English",sectionId:"english"},
-   {id:"equations",title:"Equations",dueAt:new Date("2026-10-29T12:00:00Z"),sectionTitle:"Math",sectionId:"math"},
+   {id:"essay",title:"Evidence essay",dueAt:new Date("2026-10-29T12:00:00Z"),sectionTitle:"English",sectionId:"english",timezone:"America/New_York"},
+   {id:"equations",title:"Equations",dueAt:new Date("2026-10-29T12:00:00Z"),sectionTitle:"Math",sectionId:"math",timezone:"America/Los_Angeles"},
   ]];
   const result=await getCalendarMonth({data:{year:2026,month:10}});
   expect(result.items.find(item=>item.id==="assessment:essay")?.guardianStudents).toEqual([
@@ -130,6 +130,17 @@ describe("calendar authority for delegated academic teachers",()=>{
   teachers:[{personId:"teacher-person",name:"Riley Example"}],teacherNames:["Riley Example"],
   }]);
   expect(result.truncated).toBe(false);
+ });
+ it("keeps month-end deadlines on their Site-local dates",async()=>{
+  state.results=[[],[],[
+   {id:"west",title:"West coast deadline",dueAt:new Date("2026-11-01T06:30:00Z"),
+    sectionTitle:"English",sectionId:"delegated-section",timezone:"America/Los_Angeles"},
+   {id:"east",title:"East coast deadline",dueAt:new Date("2026-11-01T06:30:00Z"),
+    sectionTitle:"English",sectionId:"delegated-section",timezone:"America/New_York"},
+  ]];
+  const result=await getCalendarMonth({data:{year:2026,month:10}});
+  expect(result.items.map(item=>item.id)).toEqual(["assessment:west"]);
+  expect(result.items[0]?.timezone).toBe("America/Los_Angeles");
  });
  it("does not swallow a current classroom authority read failure",async()=>{
   state.classes.mockRejectedValue(new Error("delegation unavailable"));
@@ -288,7 +299,7 @@ describe("bounded calendar range",()=>{
  it.each([200,201])("reports deadline truncation at the actual result boundary (%i rows)",async(count)=>{
   state.results=[[],[],Array.from({length:count},(_,index)=>({
    id:`assessment-${index}`,title:`Assignment ${index}`,dueAt:new Date("2026-10-29T12:00:00Z"),
-   sectionTitle:"English",sectionId:"delegated-section",
+   sectionTitle:"English",sectionId:"delegated-section",timezone:"America/New_York",
   }))];
   const invoke=getCalendarRange as unknown as (arg:unknown)=>Promise<{truncated:boolean;items:unknown[]}>;
   const result=await invoke({data:{startsAt:"2026-10-29T00:00:00Z",endsAt:"2026-10-30T00:00:00Z"}});

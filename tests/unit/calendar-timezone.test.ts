@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
 import {
-  addCalendarDays, calendarWeekday, dateKeyInTimezone, dateOnlyDayBoundsInTimezone,
+  addCalendarDays, calendarMonthWindow, calendarWeekday, dateKeyInTimezone, dateOnlyDayBoundsInTimezone,
   dateOnlyDayStartInTimezone, dateTimeInputInTimezone, dateTimeInputValue,
   formatDateOnly, formatTimestamp, isValidDateOnly, isValidTimeZone, localDayBoundsInTimezone,
   todayInTimezone,
 } from "@/modules/calendar/timezone";
 
 describe("calendar timezone conversion", () => {
+  it("includes the first and last school-local days across timezones and DST", () => {
+    const october = calendarMonthWindow(2026, 10);
+    expect(october.start.toISOString()).toBe("2026-09-30T10:00:00.000Z");
+    expect(october.end.toISOString()).toBe("2026-11-01T14:00:00.000Z");
+    expect(october.firstDate).toBe("2026-10-01");
+    expect(october.afterLastDate).toBe("2026-11-01");
+    const californiaLate = "2026-11-01T06:30:00.000Z";
+    expect(dateKeyInTimezone(californiaLate, "America/Los_Angeles")).toBe("2026-10-31");
+    expect(new Date(californiaLate).getTime()).toBeLessThan(october.end.getTime());
+    const earlyPacific = "2026-09-30T10:30:00.000Z";
+    expect(dateKeyInTimezone(earlyPacific, "Pacific/Kiritimati")).toBe("2026-10-01");
+    expect(new Date(earlyPacific).getTime()).toBeGreaterThan(october.start.getTime());
+    const march = calendarMonthWindow(2027, 3);
+    expect(dateKeyInTimezone("2027-04-01T06:30:00.000Z", "America/Los_Angeles"))
+      .toBe("2027-03-31");
+    expect(march.end.toISOString()).toBe("2027-04-01T14:00:00.000Z");
+  });
   it("round-trips event wall time in a non-browser timezone", () => {
     const instant = dateTimeInputInTimezone("2027-01-15T09:30", "America/Los_Angeles");
     expect(instant).toBe("2027-01-15T17:30:00.000Z");
