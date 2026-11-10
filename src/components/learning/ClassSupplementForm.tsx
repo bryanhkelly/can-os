@@ -11,7 +11,7 @@ export type ClassSupplementKind = "link" | "video" | "pdf" | "image" | "audio" |
 /** A single authoring entry point for external video embeds and private R2 recordings. */
 export function ClassSupplementForm({
   title, url, kind, lessonId, lessons, busy, onTitleChange, onUrlChange, onKindChange, onLessonChange, onSubmit,
-  sectionId, uploadsEnabled = false,
+  sectionId, uploadsEnabled = false, fixedLesson = false,
 }: {
   title: string;
   url: string;
@@ -26,6 +26,7 @@ export function ClassSupplementForm({
   onSubmit: ()=>void;
   sectionId?: string;
   uploadsEnabled?: boolean;
+  fixedLesson?: boolean;
 }) {
   const [attempted, setAttempted] = useState(false);
   const [videoSource, setVideoSource] = useState<"link" | "upload">("link");
@@ -86,12 +87,12 @@ export function ClassSupplementForm({
         {url && playable ? "Recognized video source. The lesson will play it inline." :
           "YouTube, Vimeo, MP4 and WebM are supported. The owner must allow embedding; some private videos cannot be played."}
       </p>}
-      <Field label="Attach resource to" className="text-sm">
+      {!fixedLesson && <Field label="Attach resource to" className="text-sm">
         <Select aria-label="Attach resource to" value={lessonId} onChange={event => onLessonChange(event.target.value)}>
           <option value="">Entire class</option>
           {lessons.map(lesson => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
         </Select>
-      </Field>
+      </Field>}
       <Button type="submit" disabled={busy} className="justify-self-start">Add resource</Button>
     </form>}
   </section>;
