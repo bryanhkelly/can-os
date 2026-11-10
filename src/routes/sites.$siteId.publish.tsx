@@ -117,16 +117,17 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     data.academicPrograms.some(program => program.marketing?.catalogEligible);
   const candidate = isPublicSiteSlug(slug)
     ? publicSiteHost(slug, data.publicSiteDomain) : null;
-  return <WorkspaceShell eyebrow="Site publishing" title={data.site.name + " · public site"}
-    subtitle="Reserve and publish your school address. Public hosting depends on separate DNS, TLS and deployment configuration."
+  return <WorkspaceShell eyebrow="Site publishing" title={data.site.name + " · website & domains"}
+    subtitle="Your school has a default CAN OS address; custom domains are optional. A live public site requires verified hosting and publication."
     breadcrumbs={<><Link to="/sites/$siteId/profile" params={{ siteId: data.site.id }} className="underline">School profile</Link><span>/</span><span>Public site</span></>}>
     {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving public site change..."/>
     <section className="mt-6 rounded-xl border bg-card p-5">
-      <h2 className="text-xl font-semibold">Public address</h2>
+      <h2 className="text-xl font-semibold">Default school website</h2>
       <p className="mt-2 text-sm text-muted-foreground">Addresses must be globally unique. Reserving one does not activate DNS, allow public access, or open applications.</p>
       {data.address ? <div className="mt-4 space-y-2">
-        <p className="font-medium">{data.address.host}</p>
+        <p className="font-medium break-all">https://{data.address.host}</p>
+        <p className="text-xs text-muted-foreground">Your reserved CAN OS address stays assigned to this school. A published content record is not evidence that the hostname is reachable.</p>
         <p className="text-sm text-muted-foreground">Recorded status: {data.address.status}. {data.address.publishedAt
           ? "Approved " + new Date(data.address.publishedAt).toLocaleString()
           : "Not published"}. Address changes require separate approval.</p>
@@ -157,6 +158,17 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         <span className="pb-2 text-sm text-muted-foreground">.{data.publicSiteDomain}</span>
         <Button type="submit" disabled={saving}>{saving ? "Reserving…" : "Reserve address"}</Button>
       </form>}
+    </section>
+    <section className="mt-6 rounded-xl border bg-card p-5" aria-label="Custom domain settings">
+      <h2 className="text-xl font-semibold">Custom domain</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Optional. Schools can eventually use an address they own while keeping the CAN OS default address. No custom domain is connected to this school.</p>
+      <div className="mt-4 rounded-lg border bg-muted/30 p-4">
+        <p className="text-sm font-semibold">Not connected</p>
+        <p className="mt-1 text-sm text-muted-foreground">Custom domain activation requires verified domain ownership, tenant-bound hostname routing, TLS certificate issuance and primary-domain redirects. These are not yet enabled in this deployment.</p>
+        <p className="mt-3 text-xs text-muted-foreground">Until these checks are implemented, CAN OS will not accept a custom hostname or describe it as live. Contact the platform administrator to coordinate hosting.</p>
+      </div>
+      <h3 className="mt-5 text-sm font-semibold">Primary website address</h3>
+      <p className="mt-1 text-sm text-muted-foreground">Default CAN OS address (selected). Custom domains become eligible as a primary address only after verification.</p>
     </section>
     <section className="mt-6 rounded-xl border bg-card p-5">
       <h2 className="text-xl font-semibold">Public campus and family contact approval</h2>
