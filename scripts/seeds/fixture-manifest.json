@@ -364,7 +364,7 @@
       ],
       "downstreamRecords": []
     },
-    "/guardian/academics": {
+    "/guardian/students": {
       "persona": "guardian",
       "seeds": [
         "gf1-assignments-v2.sql",
@@ -376,7 +376,8 @@
         "section_grades": 1
       },
       "interactions": [
-        "review child assignments and grades"
+        "select a verified linked child",
+        "review that child's assignments, grades and released teacher feedback"
       ],
       "downstreamRecords": []
     },

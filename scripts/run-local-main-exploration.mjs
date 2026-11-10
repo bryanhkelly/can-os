@@ -22,7 +22,7 @@ const accounts = {
 };
 const routes = {
   student: ["/student/courses", "/student/assignments", "/student/discussions", "/groups", "/groups/new", "/student/my-school", "/student/support", "/calendar", "/messages"],
-  parent: ["/guardian/academics", "/guardian/attendance", "/guardian/admission-offers", "/guardian/study-group-consent", "/guardian/field-trips", "/messages"],
+  parent: ["/guardian/students", "/guardian/attendance", "/guardian/admission-offers", "/guardian/study-group-consent", "/guardian/field-trips", "/messages"],
   teacher: ["/classes", "/teacher/gradebook", "/teacher/discussions", "/groups", "/teacher/missing-work", "/calendar", "/messages"],
   room_admin: ["/staff/attendance", "/safeguarding", "/admin", "/messages"],
   site_admin: ["/launch/school?siteId=f1000000-0000-4000-8000-000000000003", "/admissions", "/admissions/intake", "/staff/students", "/operations/field-trips", "/sites/f1000000-0000-4000-8000-000000000003/publish", "/site-website", "/safeguarding"],
