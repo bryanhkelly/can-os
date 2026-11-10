@@ -17,7 +17,7 @@ const headers={
   "X-Frame-Options":"DENY",
   "Referrer-Policy":"no-referrer",
   "X-Robots-Tag":"noindex, nofollow",
-  "Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
+  "Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
 };
 
 function failure(status:number,reason:string){
