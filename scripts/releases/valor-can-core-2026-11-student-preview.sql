@@ -106,7 +106,7 @@ BEGIN
     -- Algebra I's five previously-published deeper lessons already exist in its new Unit 1
     -- with the same IDs, so they are not copied twice.
     SELECT jsonb_agg(jsonb_set(archive,'{title}',
-         to_jsonb('Prior learning · '||archive->>'title'),false))
+         to_jsonb(('Prior learning · '::text || (archive->>'title'))),false))
       INTO archived
     FROM jsonb_array_elements(target.old_content#>'{learning,modules}') archive
     WHERE archive->>'id'='foundations';
