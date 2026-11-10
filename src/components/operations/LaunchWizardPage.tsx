@@ -56,6 +56,7 @@ export type LaunchWizardData = {
  extendedPlanning: Awaited<ReturnType<typeof listExtendedSeasonPlanning>> | null;
  jurisdictionGuidance: Record<string,{summary:string;publishedAt:string|null}>;
  jurisdictionResearch: Record<string,LaunchJurisdictionResearch>;
+ jurisdictionResearchUnavailable?: boolean;
  authError: string;
 };
 
@@ -229,7 +230,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
     const selectedSite=options?.sites.find(site=>site.id===siteId);
     const jurisdictionIssue=selectedSite&&options
       ? launchSiteJurisdictionIssue(siteJurisdictionLocation(selectedSite.address,selectedSite.planningLocation),options.jurisdictions,jurisdictionId):null;
-    if(jurisdictionIssue){
+    if(jurisdictionIssue?.code==="LAUNCH_LOCATION_MISMATCH"){
       setError(jurisdictionIssue.message);return;
     }
     if(!launchGradeRangeIsOrdered({min:gradeMin,max:gradeMax})){
@@ -374,14 +375,15 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
 
   return (
     <LaunchStudioShell focused={hubMode} role={hubMode ? "Academic Program" : "School setup"} subject={currentProgram?.name ?? "Your school"}
-      title={hubMode ? "Create your first Program." : titles[step]} description="One school, one connected setup. Approvals are reviewed separately."
+      title={hubMode ? "Build your academic program." : titles[step]}
+      description={hubMode ? "Plan grades and how students will learn. Authorization to open comes later." : "One school, one connected setup. Approvals are reviewed separately."}
       steps={schoolLaunchSteps.map(id => ({ id, title: { welcome: "Welcome", school: "School details",
         academics: "Academics", website: "School website", families: "Families & staff",
         readiness: "Readiness review", next: "What's next" }[id],
         disabled: !currentProgram && !["welcome", "school"].includes(id), }))}
       currentId={step} onStepChange={changeStep}
       progress={currentLaunch && readinessAvailable ? launchRequirementProgress(currentLaunch.requirements) : undefined}
-      status={<p>{currentProgram ? nextDescription : "Save draft keeps your school details for later. Save and continue creates your school offering and opens academic setup; it does not approve opening."}</p>}
+      status={<p>{currentProgram ? nextDescription : "Save a draft to finish later. Save and continue creates your first academic Program; jurisdiction and opening approval are separate."}</p>}
       actions={!hubMode && <>
         <Button type="button" variant="outline" disabled={step === "welcome"}
           onClick={() => changeStep(schoolLaunchSteps[schoolLaunchSteps.indexOf(step) - 1]!)}>Back</Button>
@@ -478,14 +480,13 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
             if (event.target instanceof Element && event.target.closest('[aria-pressed]')) setConfigurationTouched(true);
           }}>
         <div className="mt-8 grid gap-6">
-          <p className="text-sm text-muted-foreground">Not ready to continue? Save your school details and come back later.</p>
           <LaunchDraftButton key={data.draftContext} selection={{ audience: "school", context: data.draftContext ?? ":" }}
             initial={data.draft ?? null} disabled={busy || Boolean(created)} buttonLabel="Save draft"
-            successMessage="School details saved as a draft. Nothing was submitted or approved."
-            commandErrorMessage="Unable to save draft. Your information is still on this page."
+            successMessage="Draft saved. You can continue later."
+            commandErrorMessage="Couldn't save the draft. Your details are still on this page."
             onSaved={value => { if (value.audience === "school") draftChanges.markSaved(value.fields); }}
             value={() => ({ audience: "school", fields: draftFields })} />
-          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
+          <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, jurisdictionResearchUnavailable:data.jurisdictionResearchUnavailable, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
           <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
            {extendedPlanning?<ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId}/>:<p role="status" className="mt-3 text-sm">Additional program planning is temporarily unavailable. You can continue setting up your school.</p>}
