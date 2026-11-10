@@ -59,7 +59,7 @@ export async function checkPublishedSiteReachability(input: {
   const url = `https://${input.host}/`;
   if (!input.hostingConfigured) {
     return { status: "hosting_disabled", url, checkedAt: null,
-      diagnostic: "Public tenant hosting is disabled. Configure wildcard DNS, TLS and the Netlify edge rollout flag." };
+      diagnostic: "Public tenant hosting is disabled. Configure wildcard DNS, TLS, the Cloudflare Worker route and the hosting rollout flag." };
   }
   const checkedAt = new Date().toISOString();
   try {
@@ -92,6 +92,6 @@ export async function checkPublishedSiteReachability(input: {
         "HTTPS responded, but the page did not identify this tenant's CAN public site." };
   } catch {
     return { status: "unreachable", url, checkedAt,
-      diagnostic: "HTTPS request failed. Verify wildcard DNS, TLS certificate coverage, Netlify deployment and host routing." };
+      diagnostic: "HTTPS request failed. Verify wildcard DNS, TLS certificate coverage, Worker deployment and public hostname routing." };
   }
 }
