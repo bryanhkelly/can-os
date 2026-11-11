@@ -160,7 +160,7 @@ export const saveSiteBlueprintIdentity = createServerFn({ method: "POST" })
           .from(religiousAffiliationOptions)
           .where(and(eq(religiousAffiliationOptions.code, data.identity.religiousAffiliationCode),
             eq(religiousAffiliationOptions.active, true))).limit(1);
-        if (!option) throw new DomainError("INVALID_INPUT", "Select a listed religious affiliation.");
+        if (!option) throw new DomainError("VALIDATION_FAILED", "Select a listed religious affiliation.");
       }
       const identity = data.identity;
       if (!head) {
@@ -198,7 +198,7 @@ export const addSiteBlueprintTemplate = createServerFn({ method: "POST" })
         .where(and(eq(blueprintCatalogItems.code, data.catalogCode),
           eq(blueprintCatalogItems.status, "available")))
         .orderBy(desc(blueprintCatalogItemVersions.version)).limit(1);
-      if (!source) throw new DomainError("INVALID_INPUT", "This library reference is unavailable.");
+      if (!source) throw new DomainError("VALIDATION_FAILED", "This library reference is unavailable.");
       if (!head) await tx.insert(siteBlueprints).values({
         siteId: site.id, createdByPersonId: actor.actorPersonId!,
         updatedByPersonId: actor.actorPersonId!,
@@ -223,7 +223,7 @@ export const addSiteBlueprintTemplate = createServerFn({ method: "POST" })
           createdByPersonId: actor.actorPersonId!,
         });
       } else {
-        throw new DomainError("INVALID_INPUT", "Unrecognized library reference kind.");
+        throw new DomainError("VALIDATION_FAILED", "Unrecognized library reference kind.");
       }
       const next = await appendBlueprintRevision(tx, actor, {
         siteId: site.id, organizationId: site.organizationId, previousRevision: revision,
