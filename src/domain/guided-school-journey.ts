@@ -13,7 +13,7 @@ export type LaunchJourneyRecord = {
  */
 export function isGuidedAcademicSchool(type: string): boolean {
   return [
-    "church_hosted_academy", "high_school_extension", "full_school",
+    "hosted_academy", "high_school_extension", "full_school",
     "microschool", "hybrid_program", "homeschool_cohort",
   ].includes(type);
 }
