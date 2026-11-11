@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { EventTypes } from "@/domain/event-types";
 import {
   organizations, sites, sitePublications, sitePublicationReleases, siteBlueprints,
   siteBlueprintRevisions, siteBlueprintReviewRequests, siteBlueprintApprovedVersions,
@@ -133,7 +134,7 @@ export const prepareSchoolPlanningProspectus=createServerFn({method:"POST"})
   await writeAudit(tx,actor,{action:"school.prospectus.prepare",entityType:"site_publication_release",
    entityId:created.id,scope:{organizationId:site.organizationId,siteId:site.id},
    after:{revision,mode:"planning_prospectus",blueprintRevision:data.expectedBlueprintRevision,itemCount:items.length}});
-  await emitEvent(tx,{eventType:"SchoolPlanningProspectusPrepared",aggregateType:"SitePublicationRelease",
+  await emitEvent(tx,{eventType:EventTypes.SchoolPlanningProspectusPrepared,aggregateType:"SitePublicationRelease",
    aggregateId:created.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,
    payload:{revision,blueprintRevision:data.expectedBlueprintRevision}});
   return {releaseId:created.id,revision,prospectus};
@@ -161,7 +162,7 @@ export const reviewSchoolPlanningProspectus=createServerFn({method:"POST"})
   if(!newRecord)throw new Error("Prospectus review did not persist");
   await writeAudit(tx,actor,{action:"school.prospectus.review.approve",entityType:"site_publication_release",
     entityId:release.id,scope:{siteId:release.siteId},after:{revision:release.revision}});
-  await emitEvent(tx,{eventType:"SchoolPlanningProspectusReviewed",aggregateType:"SitePublicationRelease",
+  await emitEvent(tx,{eventType:EventTypes.SchoolPlanningProspectusReviewed,aggregateType:"SitePublicationRelease",
     aggregateId:release.id,actorPersonId:actor.actorPersonId,siteId:release.siteId,payload:{revision:release.revision}});
   return {releaseId:release.id,status:"approved" as const};
  });
@@ -200,7 +201,7 @@ export const publishSchoolPlanningProspectus=createServerFn({method:"POST"})
   await writeAudit(tx,actor,{action:"school.prospectus.publish",entityType:"site_publication_release",
     entityId:release.id,scope:{siteId:site.id,organizationId:site.organizationId},
     after:{releaseRevision:release.revision,mode:"planning_prospectus"}});
-  await emitEvent(tx,{eventType:"SchoolPlanningProspectusPublished",aggregateType:"SitePublicationRelease",
+  await emitEvent(tx,{eventType:EventTypes.SchoolPlanningProspectusPublished,aggregateType:"SitePublicationRelease",
     aggregateId:release.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,
     payload:{revision:release.revision}});
   return {releaseId:release.id,status:"published" as const};
