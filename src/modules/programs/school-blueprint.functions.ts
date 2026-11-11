@@ -13,6 +13,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { siteBlueprintIdentitySchema, siteBlueprintItemDraftSchema } from "@/domain/school-blueprint";
+import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -439,7 +440,7 @@ export const updateSchoolBlueprintProgramPlan=createServerFn({method:"POST"})
       throw new DomainError("VALIDATION_FAILED","Choose at least one instructional delivery mode.");
     if(model.onsiteDaysPerWeek>0&&!model.onsite)
       throw new DomainError("VALIDATION_FAILED","Onsite days require onsite instruction.");
-    if(data.gradeRange.min>data.gradeRange.max)
+    if(!launchGradeRangeIsOrdered(data.gradeRange))
       throw new DomainError("VALIDATION_FAILED","Grade range is not ordered.");
     await tx.update(siteProgramPlans).set({
       name:data.name,gradeRange:data.gradeRange,deliveryModel:model,

@@ -115,7 +115,8 @@ export const linkApprovedBlueprintProgram=createServerFn({method:"POST"})
       throw new DomainError("CONFLICT","Select a current Program belonging to this school.");
     const type=blueprintOperationalProgramType(plan.kind);
     if(!type || program.type!==type || program.name!==plan.name ||
-       JSON.stringify(program.gradeRange)!==JSON.stringify(plan.gradeRange))
+       JSON.stringify(program.gradeRange)!==JSON.stringify(plan.gradeRange) ||
+       JSON.stringify(program.deliveryModel)!==JSON.stringify(plan.deliveryModel))
       throw new DomainError("VALIDATION_FAILED",
         "Program type, name and grade range must match the reviewed plan.");
     const {scope,decision}=await currentApproved(tx,site.id,"program",plan.id);
