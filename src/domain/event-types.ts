@@ -1,4 +1,13 @@
 export const EventTypes = {
+  SchoolBlueprintRevisionSaved: "SchoolBlueprintRevisionSaved",
+  SchoolBlueprintReviewRequested: "SchoolBlueprintReviewRequested",
+  SchoolBlueprintScopeReviewed: "SchoolBlueprintScopeReviewed",
+  SchoolBlueprintProgramPrepared: "SchoolBlueprintProgramPrepared",
+  SchoolBlueprintActivityPrepared: "SchoolBlueprintActivityPrepared",
+  SchoolPlanningProspectusPrepared: "SchoolPlanningProspectusPrepared",
+  SchoolPlanningProspectusReviewed: "SchoolPlanningProspectusReviewed",
+  SchoolPlanningProspectusPublished: "SchoolPlanningProspectusPublished",
+  SchoolPlanningInterestReceived: "SchoolPlanningInterestReceived",
   InstructionalTrackDraftCreated: "InstructionalTrackDraftCreated",
   InstructionalTrackDraftSaved: "InstructionalTrackDraftSaved",
   InstructionalTrackSubmitted: "InstructionalTrackSubmitted",
