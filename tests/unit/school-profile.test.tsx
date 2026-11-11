@@ -22,8 +22,8 @@ const site = {
   contact: { value: { displayName: "Front office", email: "office@valor.example", phone: "" }, configurationStatus: "church_supplied" },
   publication: { status: "unconfigured", url: null },
   programs: [
-    { id: "p1", name: "Upper School", type: "church_hosted_academy", status: "active", gradeRange: { min: "9", max: "12" }, activeStudents: 12 },
-    { id: "p2", name: "Middle School", type: "church_hosted_academy", status: "draft", gradeRange: { min: "6", max: "8" }, activeStudents: 0 },
+    { id: "p1", name: "Upper School", type: "hosted_academy", status: "active", gradeRange: { min: "9", max: "12" }, activeStudents: 12 },
+    { id: "p2", name: "Middle School", type: "hosted_academy", status: "draft", gradeRange: { min: "6", max: "8" }, activeStudents: 0 },
   ],
   viewer: { canManageSchool: true, canPublish: true, canOpenSiteToday: true },
 } as unknown as SchoolProfileData["site"];

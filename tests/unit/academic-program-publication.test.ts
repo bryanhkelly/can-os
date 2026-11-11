@@ -49,7 +49,7 @@ describe("academic Program marketing approval", () => {
   it("public projection never asserts readiness or accreditor authority", () => {
     const baseRow = {
       programId: "p", title: "Academy", summary: "A local study cohort",
-      type: "church_hosted_academy" as const,
+      type: "hosted_academy" as const,
       gradeRange: { min: "9", max: "12" },
       deliveryModel: {
         onsite: true, asynchronous: false, liveOnline: true, onsiteDaysPerWeek: 3,
