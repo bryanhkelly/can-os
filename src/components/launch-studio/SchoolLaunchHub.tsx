@@ -8,7 +8,7 @@ import { schoolHubModules, schoolHubSections, isPlannedSchoolHubModule, type Pla
 import type { listLaunchOptions } from "@/modules/programs/launch.functions";
 
 export type SchoolHubOptions = Awaited<ReturnType<typeof listLaunchOptions>>;
-const icons = { profile: School, information: Info, website: Globe, team: Users, promote: Megaphone, recruitment: Mail, events: CalendarDays, academics: BookOpen, compliance: ShieldCheck };
+const icons = { profile: School, information: Info, website: Globe, team: Users, blueprint: BookOpen, promote: Megaphone, recruitment: Mail, events: CalendarDays, academics: BookOpen, compliance: ShieldCheck };
 export function SchoolLaunchHub({ options, siteId, module, statuses, workflow, selectionError }: { statuses?: Partial<Record<SchoolHubModule,SchoolHubStatus>>; workflow?:ReactNode; options: SchoolHubOptions; siteId?: string; module?: SchoolHubModule; selectionError?:string|null }) {
   const site = options.sites.find(item => item.id === siteId);
   if (!site) return <PageFrame width="wide"><PageHeader eyebrow="School preparation" title="Choose your school" subtitle="Open the Launch Hub for an authorized school." />

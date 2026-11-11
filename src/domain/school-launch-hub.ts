@@ -15,6 +15,7 @@ export const schoolHubModules = {
   promote: { title: "Promote Your School", description: "Prepare your media kit, social graphics, captions, flyers and QR codes." },
   recruitment: { title: "Recruit Families", description: "Gather prospective-family interest and plan your follow-up." },
   events: { title: "Interest Events", description: "Bring families together for information sessions, tours and open houses." },
+  blueprint: { title: "School Blueprint", description: "Choose your programs, community experiences, and activities from the CAN reference library." },
   academics: { title: "Prepare Academics", description: "Set grades and a learning model, then choose curriculum.", action: "Start academic setup", step: "academics" },
   compliance: { title: "Opening & Compliance", description: "Prepare evidence and track independent opening reviews.", action: "Review opening requirements", step: "readiness" },
 } as const;
@@ -26,7 +27,9 @@ export function isPlannedSchoolHubModule(module: SchoolHubModule): module is Pla
   return plannedSchoolHubModules.some(planned => planned === module);
 }
 export const schoolHubSections = [
-  { title: "Establish Your School", description: "Set up your school details, site context and website.", modules: ["profile", "information", "website"] },
-  { title: "Build Your School Community", description: "Bring your team and prospective families into the vision.", modules: ["team", "promote", "recruitment", "events"] },
-  { title: "Prepare to Open", description: "Plan academics and complete independent opening requirements.", modules: ["academics", "compliance"] },
+  { title: "1. Establish Your School", description: "Create the local school profile, site and core team.", modules: ["profile", "information", "team"] },
+  { title: "2. Define Your Identity", description: "Design your school's brand and website.", modules: ["website"] },
+  { title: "3. Build Your School", description: "Choose programs and local experiences, then prepare approved academics.", modules: ["blueprint", "academics"] },
+  { title: "4. Promote Your School", description: "Develop outreach and invite interested families.", modules: ["promote", "recruitment", "events"] },
+  { title: "5. Open Your School", description: "Complete the independent opening and compliance requirements.", modules: ["compliance"] },
 ] as const;

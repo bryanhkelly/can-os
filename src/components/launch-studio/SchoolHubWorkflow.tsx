@@ -6,6 +6,7 @@ import { ScopedAdminConsole } from "@/routes/admin";
 import { LaunchWizardPage, type LaunchWizardData } from "@/components/operations/LaunchWizardPage";
 import { LaunchAcademicSetupWorkspace } from "@/components/operations/LaunchAcademicSetupWorkspace";
 import { SchoolOpeningEvidencePanel } from "@/components/operations/SchoolOpeningEvidencePanel";
+import { SchoolBlueprintWorkspace } from "@/components/launch-studio/SchoolBlueprintWorkspace";
 import { LaunchPreparationWorkspace } from "@/components/operations/LaunchPreparationWorkspace";
 import { SchoolProfileConfiguration } from "@/components/launch-studio/SchoolProfileConfiguration";
 import { SiteInformationConfiguration } from "@/components/launch-studio/SiteInformationConfiguration";
@@ -30,6 +31,7 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
   <p className="mt-3 text-sm text-muted-foreground">Edit your school's saved website in Website Studio. Site-owned publishing and independent institutional approvals remain separate.</p>
   {status?.state==="Blocked" || status?.state==="Unavailable" ? <p role="status" className="mt-5 text-sm">{status.detail}</p> : <Button asChild className="mt-5"><Link to={navigation.websitePath} search={{siteId,returnToHub:navigation.context==="launch",returnToSettings:navigation.context==="settings"}}>Open Website &amp; Brand Studio →</Link></Button>}
  </section>;
+ if(module==="blueprint")return <SchoolBlueprintWorkspace key={siteId} siteId={siteId}/>;
  if(module==="team")return <section className="mt-6"><nav className="mb-4 flex flex-wrap gap-4" aria-label="School team views">{(["access","invite","people"] as const).map(mode=><Link key={mode} to={navigation.modulePath} params={{module:"team"}} search={{siteId,teamMode:mode}} className="inline-flex min-h-11 items-center border bg-card px-4 text-sm text-primary">{mode==="access"?"Members & permissions":mode==="invite"?"Invite team member":"People directory"}</Link>)}</nav><ScopedAdminConsole onChanged={()=>router.invalidate()} key={selection.teamMode??"access"} hubMode mode={selection.teamMode??"access"} selection={{siteId}}/></section>;
  if(!data.launches)return <p role="status" className="mt-6 border p-5">Program records are unavailable. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry records</Button></p>;
  const current=data.launches.find(program=>program.id===data.selectedProgramId);
