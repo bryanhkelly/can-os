@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { summarizeFullFlowOperations } from "../../src/domain/full-flow-operational-snapshot";
 import { guidedSchoolJourney } from "../../src/domain/guided-school-journey";
 const program=summarizeFullFlowOperations({
- programs:[{id:"program",name:"K–8 School",status:"active",type:"church_hosted_academy",siteId:"site",
+ programs:[{id:"program",name:"K–8 School",status:"active",type:"hosted_academy",siteId:"site",
  academicProviderOrganizationId:"can",creditIssuingOrganizationId:"can"}],
  sections:[],teacherAssignments:[],adoptions:[],applications:[],enrollments:[],assessments:[],submissions:[],responses:[],
 }).programs[0]!;

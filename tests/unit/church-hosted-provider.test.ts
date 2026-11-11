@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
 
 const church = {
-  programType: "church_hosted_academy" as const,
+  programType: "hosted_academy" as const,
   hostOrganizationId: "church-id",
   hostOrganizationType: "church",
   academicProviderOrganizationId: "can-id",
@@ -41,7 +41,7 @@ describe("church-hosted provider intent", () => {
 describe("church-hosted activation needs independently verified authority", () => {
   it("rejects cross-organization CAN academies while authorization is missing", () => {
     expect(() => assertChurchHostedActivationAuthorization({
-      programType: "church_hosted_academy",
+      programType: "hosted_academy",
       hostOrganizationId: "church",
       hostOrganizationType: "church",
       academicProviderOrganizationId: "can",
@@ -49,7 +49,7 @@ describe("church-hosted activation needs independently verified authority", () =
     })).toThrow(/independently verified/);
   });
   it("does not interfere with a same-organization church school or K-8 extension", () => {
-    for (const programType of ["high_school_extension", "church_hosted_academy"] as const) {
+    for (const programType of ["high_school_extension", "hosted_academy"] as const) {
       expect(() => assertChurchHostedActivationAuthorization({
         programType,
         hostOrganizationId: "host",
@@ -79,7 +79,7 @@ describe("church-hosted activation needs independently verified authority", () =
   });
   it("treats a separately checked authorization as the necessary additional input", () => {
     expect(() => assertChurchHostedActivationAuthorization({
-      programType: "church_hosted_academy",
+      programType: "hosted_academy",
       hostOrganizationId: "church",
       hostOrganizationType: "church",
       academicProviderOrganizationId: "can",

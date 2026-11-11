@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { suggestedLaunchInstitutions } from "../../src/domain/launch-institution-defaults";
 const church = { id: "church", type: "church" };
 const can = { id: "can", type: "can_network" };
-const base = { type: "church_hosted_academy", creditMode: "credit_bearing" as const,
+const base = { type: "hosted_academy", creditMode: "credit_bearing" as const,
   providers: [church, can], issuers: [church, can], selectedProviderId: "" };
 describe("launch institution suggestions", () => {
   it("suggests the single CAN institution and matching issuer for a CAN academy", () => {
