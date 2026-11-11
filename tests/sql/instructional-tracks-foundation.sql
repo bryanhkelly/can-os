@@ -9,7 +9,7 @@ CREATE TABLE course_templates (id uuid PRIMARY KEY);
 CREATE TABLE course_template_versions (id uuid PRIMARY KEY, course_template_id uuid NOT NULL, status text NOT NULL);
 CREATE TABLE curriculum_resources (id uuid PRIMARY KEY);
 CREATE TABLE enrollments (id uuid PRIMARY KEY);
-\ir ../../drizzle/0079_instructional_tracks_and_practice.sql
+\ir ../../drizzle/0081_instructional_tracks_and_practice.sql
 
 CREATE FUNCTION test_id(n integer) RETURNS uuid LANGUAGE sql IMMUTABLE AS $$
   SELECT ('10000000-0000-4000-8000-' || lpad(n::text,12,'0'))::uuid

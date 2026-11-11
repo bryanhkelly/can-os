@@ -2,7 +2,9 @@
 
 Status: draft implementation, not a student-facing or production release.
 
-The database foundation is migration `0079_instructional_tracks_and_practice`.
+The database foundation is migration `0081_instructional_tracks_and_practice`.
+It follows the Site Blueprint foundation (`0079`) and reference library (`0080`).
+Blueprint planning records do not grant academic authority or substitute for an active Program and Section enrollment.
 The server entry points are in `src/modules/learning/instructional-tracks.functions.ts`.
 No production migration, role provisioning, configuration change or deployment has been performed.
 
@@ -117,7 +119,8 @@ npm run typecheck:instructional-tracks
 npm run test:instructional-tracks
 ```
 
-The integration suite uses an isolated PGlite PostgreSQL instance, current Drizzle schema and migration 0079's lifecycle triggers.
+The integration suite builds the pre-Blueprint schema in isolated PGlite PostgreSQL, applies migrations 0079 through 0081 in order,
+and reapplies the reference seed to verify its counts and confirm it creates no operational Programs or Activities.
 It exercises the actual server commands and actual student class-authorization service; only the database binding and
 unused request accessor are replaced. Test grants, recordings and rights evidence are synthetic test infrastructure.
 It is not evidence of Neon migration-chain, signed-in browser or real-content acceptance.

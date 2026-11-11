@@ -4,6 +4,8 @@ import { drizzle } from "drizzle-orm/pglite";
 import { generateDrizzleJson, generateMigration } from "drizzle-kit/api";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import * as s from "../../src/db/schema";
+import * as blueprintTables from "../../src/db/schema/school-blueprint";
+import * as instructionalTables from "../../src/db/schema/instructional-tracks";
 import { eq } from "drizzle-orm";
 import type { Actor } from "../../src/modules/identity/actors.server";
 import { roleCapabilities } from "../../src/domain/access-context";
@@ -83,10 +85,27 @@ const select = (student: Actor, track: typeof trackA, revision = 0, requestId = 
 beforeAll(async () => {
   for (const name of ["AUTHORING", "CHOICE", "PRACTICE", "DELIVERY"]) process.env[`CAN_INSTRUCTIONAL_TRACK_${name}_ENABLED`] = "true";
   pg = new PGlite();
-  const empty = generateDrizzleJson({}); const schema = generateDrizzleJson(s, empty.id);
+  const migrationTables = new Set([...Object.keys(blueprintTables), ...Object.keys(instructionalTables)]);
+  const baseline = Object.fromEntries(Object.entries(s).filter(([name]) => !migrationTables.has(name)));
+  const empty = generateDrizzleJson({});
+  const schema = generateDrizzleJson(baseline, empty.id);
+  const organizationType = schema.enums["public.organization_type"]!;
+  const newHostTypes = new Set(["community_nonprofit", "cultural_organization", "religious_organization", "independent_school", "facility_provider"]);
+  organizationType.values = organizationType.values.filter(value => !newHostTypes.has(value));
   await pg.exec((await generateMigration(empty, schema)).join("\n"));
-  const migration = readFileSync("drizzle/0079_instructional_tracks_and_practice.sql", "utf8");
-  await pg.exec("-- Content is sealed at submission." + migration.split("-- Content is sealed at submission.")[1]);
+  const libraryMigration = "0080_school_blueprint_reference_library";
+  await pg.transaction(async tx => {
+    for (const migration of ["0079_site_blueprint_foundation", libraryMigration, "0081_instructional_tracks_and_practice", libraryMigration]) {
+      await tx.exec(readFileSync(`drizzle/${migration}.sql`, "utf8"));
+    }
+  });
+  const library = await pg.query(`select
+    (select count(*)::int from blueprint_catalog_items) as items,
+    (select count(*)::int from blueprint_catalog_item_versions) as versions,
+    (select count(*)::int from religious_affiliation_options) as affiliations,
+    (select count(*)::int from programs) as programs,
+    (select count(*)::int from activities) as activities`);
+  expect(library.rows).toEqual([{ items: 74, versions: 74, affiliations: 25, programs: 0, activities: 0 }]);
   database = drizzle(pg, { schema: s }); state.database = database;
   await database.insert(s.organizations).values({ id: providerId, type: "can_network", name: "Synthetic academic provider", slug: "synthetic-provider" });
   await database.insert(s.sites).values({ id: siteId, organizationId: providerId, name: "Synthetic site", slug: "site" });
