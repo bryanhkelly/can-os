@@ -6,12 +6,13 @@ import { db } from "@/db/client";
 import {
   sites, siteBlueprints, siteBlueprintRevisions, siteProgramPlans, siteBlueprintItems,
   blueprintCatalogItems, blueprintCatalogItemVersions, religiousAffiliationOptions,
+  siteBlueprintReviewRequests, siteBlueprintApprovedVersions, sitePublicationReleases, sitePublications,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { siteBlueprintIdentitySchema } from "@/domain/school-blueprint";
+import { siteBlueprintIdentitySchema, siteBlueprintItemDraftSchema } from "@/domain/school-blueprint";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -22,6 +23,15 @@ const saveIdentity = selection.extend({
   expectedRevision: expected,
   identity: siteBlueprintIdentitySchema,
 }).strict();
+const createItem = selection.extend({
+  expectedRevision: expected, item: siteBlueprintItemDraftSchema,
+}).strict();
+const editItem = selection.extend({
+  expectedRevision: expected, itemId: uuid,
+  title: z.string().trim().min(2).max(160),
+  summary: z.string().trim().max(4000),
+}).strict();
+const retireItem = selection.extend({expectedRevision: expected,itemId: uuid}).strict();
 const addTemplate = selection.extend({
   expectedRevision: expected,
   catalogCode: z.string().min(5).max(140).regex(/^can\.(program|community|experience|club|activity)\.[a-z0-9_]+$/),
@@ -134,7 +144,7 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getCommandContext(getRequest());
     const site = await requireBlueprintSite(actor, db, data.siteId, "program.read");
-    const [head, plans, catalogRows, affiliations] = await Promise.all([
+    const [head, plans, catalogRows, affiliations, latestApproval, latestReview, latestProspectus, sitePublication] = await Promise.all([
       db.select().from(siteBlueprints).where(eq(siteBlueprints.siteId, site.id)).limit(1),
       loadSitePlans(db, site.id),
       db.select({ item: blueprintCatalogItems, version: blueprintCatalogItemVersions })
@@ -145,6 +155,21 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
       db.select().from(religiousAffiliationOptions)
         .where(eq(religiousAffiliationOptions.active, true))
         .orderBy(asc(religiousAffiliationOptions.sortOrder)),
+      db.select({version:siteBlueprintApprovedVersions.version,
+        sourceRevision:siteBlueprintApprovedVersions.sourceRevision,
+        schoolScopeStatement:siteBlueprintApprovedVersions.schoolScopeStatement})
+        .from(siteBlueprintApprovedVersions).where(eq(siteBlueprintApprovedVersions.siteId,site.id))
+        .orderBy(desc(siteBlueprintApprovedVersions.version)).limit(1),
+      db.select({id:siteBlueprintReviewRequests.id,status:siteBlueprintReviewRequests.status,
+        sourceRevision:siteBlueprintReviewRequests.sourceRevision})
+        .from(siteBlueprintReviewRequests).where(eq(siteBlueprintReviewRequests.siteId,site.id))
+        .orderBy(desc(siteBlueprintReviewRequests.submittedAt)).limit(1),
+      db.select({id:sitePublicationReleases.id,revision:sitePublicationReleases.revision,
+        status:sitePublicationReleases.status,mode:sitePublicationReleases.mode})
+        .from(sitePublicationReleases).where(eq(sitePublicationReleases.siteId,site.id))
+        .orderBy(desc(sitePublicationReleases.revision)).limit(1),
+      db.select({status:sitePublications.status,updatedAt:sitePublications.updatedAt,slug:sitePublications.slug})
+        .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1),
     ]);
     const versions = new Set<string>();
     const catalog = catalogRows.filter(row => {
@@ -165,6 +190,10 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
         culturalContext: safeJsonObject(head[0]?.culturalContext ?? {}),
       },
       catalog, affiliations,
+      latestApproval:latestApproval[0]??null,
+      latestReview:latestReview[0]??null,
+      latestProspectus:latestProspectus[0]??null,
+      sitePublication:sitePublication[0]??null,
       programs: plans.programs.map(p => ({
         id: p.id, catalogVersionId: p.catalogVersionId, name: p.name,
         kind: p.kind, gradeRange: p.gradeRange, status: p.status,
@@ -266,3 +295,83 @@ export const addSiteBlueprintTemplate = createServerFn({ method: "POST" })
       return { changed: true, revision: next };
     });
   });
+
+
+/** Create original community and enrichment ideas without inventing a canonical Activity. */
+export const createCustomSchoolBlueprintItem=createServerFn({method:"POST"})
+.validator((v:unknown)=>createItem.parse(v))
+.handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ const actor=await getCommandContext(getRequest());
+ return db.transaction(async tx=>{
+  const {site,head,revision}=await lockBlueprint(tx,actor,data.siteId,data.expectedRevision);
+  if(!head)await tx.insert(siteBlueprints).values({
+    siteId:site.id,createdByPersonId:actor.actorPersonId!,updatedByPersonId:actor.actorPersonId!,
+  });
+  const [created]=await tx.insert(siteBlueprintItems).values({
+    siteId:site.id,kind:data.item.kind,title:data.item.title,summary:data.item.summary,
+    configuration:data.item.configuration,
+    createdByPersonId:actor.actorPersonId!,
+  }).returning({id:siteBlueprintItems.id});
+  if(!created)throw new Error("Unable to save the proposed experience");
+  const next=await appendBlueprintRevision(tx,actor,{
+    siteId:site.id,organizationId:site.organizationId,previousRevision:revision,
+    identity:{religiousAffiliationCode:head?.religiousAffiliationCode??null,
+      editorialIdentity:head?.editorialIdentity??"community_belonging",
+      culturalContext:head?.culturalContext??{}},
+    change:{operation:"custom_item_created",itemId:created.id},
+  });
+  return {changed:true,itemId:created.id,revision:next};
+ });
+});
+
+export const updateSchoolBlueprintItem=createServerFn({method:"POST"})
+.validator((v:unknown)=>editItem.parse(v))
+.handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ const actor=await getCommandContext(getRequest());
+ return db.transaction(async tx=>{
+  const {site,head,revision}=await lockBlueprint(tx,actor,data.siteId,data.expectedRevision);
+  if(!head)throw new DomainError("CONFLICT","Save the School Blueprint before editing.");
+  const [item]=await tx.select().from(siteBlueprintItems).where(and(
+    eq(siteBlueprintItems.id,data.itemId),eq(siteBlueprintItems.siteId,site.id))).for("update").limit(1);
+  if(!item||item.status==="retired"||item.status==="linked")
+    throw new DomainError("CONFLICT","This proposed experience cannot be edited here.");
+  if(item.title===data.title&&item.summary===data.summary)return {changed:false,revision};
+  await tx.update(siteBlueprintItems).set({
+    title:data.title,summary:data.summary,revision:item.revision+1,updatedAt:new Date(),status:"draft",
+  }).where(eq(siteBlueprintItems.id,item.id));
+  const next=await appendBlueprintRevision(tx,actor,{
+    siteId:site.id,organizationId:site.organizationId,previousRevision:revision,
+    identity:{religiousAffiliationCode:head.religiousAffiliationCode,
+      editorialIdentity:head.editorialIdentity,culturalContext:head.culturalContext},
+    change:{operation:"item_updated",itemId:item.id,previousRevision:item.revision},
+  });
+  return {changed:true,revision:next};
+ });
+});
+
+export const retireSchoolBlueprintItem=createServerFn({method:"POST"})
+.validator((v:unknown)=>retireItem.parse(v))
+.handler(async({data})=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ const actor=await getCommandContext(getRequest());
+ return db.transaction(async tx=>{
+  const {site,head,revision}=await lockBlueprint(tx,actor,data.siteId,data.expectedRevision);
+  if(!head)throw new DomainError("CONFLICT","School Blueprint is not saved.");
+  const [item]=await tx.select().from(siteBlueprintItems).where(and(
+    eq(siteBlueprintItems.id,data.itemId),eq(siteBlueprintItems.siteId,site.id))).for("update").limit(1);
+  if(!item||item.status==="linked")
+    throw new DomainError("CONFLICT","Only unlinked proposed experiences can be removed.");
+  if(item.status==="retired")return {changed:false,revision};
+  await tx.update(siteBlueprintItems).set({status:"retired",revision:item.revision+1,updatedAt:new Date()})
+    .where(eq(siteBlueprintItems.id,item.id));
+  const next=await appendBlueprintRevision(tx,actor,{
+    siteId:site.id,organizationId:site.organizationId,previousRevision:revision,
+    identity:{religiousAffiliationCode:head.religiousAffiliationCode,
+      editorialIdentity:head.editorialIdentity,culturalContext:head.culturalContext},
+    change:{operation:"item_retired",itemId:item.id},
+  });
+  return {changed:true,revision:next};
+ });
+});
