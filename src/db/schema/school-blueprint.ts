@@ -203,6 +203,7 @@ export const siteBlueprintItems=pgTable("site_blueprint_items",{
   createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[
   index("site_blueprint_item_site_kind_idx").on(t.siteId,t.kind,t.status),
+  uniqueIndex("site_blueprint_item_site_pair_uq").on(t.id,t.siteId),
   uniqueIndex("site_blueprint_items_canonical_activity_id_key").on(t.canonicalActivityId),
   uniqueIndex("site_blueprint_items_canonical_field_trip_id_key").on(t.canonicalFieldTripId),
   foreignKey({name:"site_blueprint_item_program_site_fk",columns:[t.programPlanId,t.siteId],

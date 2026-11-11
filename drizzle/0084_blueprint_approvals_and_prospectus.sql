@@ -33,6 +33,9 @@ CREATE TABLE site_blueprint_approval_decisions(
 --> statement-breakpoint
 CREATE INDEX site_blueprint_decision_lookup_idx ON site_blueprint_approval_decisions(subject_kind,subject_id);
 --> statement-breakpoint
+ALTER TABLE site_blueprint_items
+ ADD CONSTRAINT site_blueprint_item_site_pair_uq UNIQUE(id,site_id);
+--> statement-breakpoint
 CREATE TABLE site_concept_item_interests(
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),site_id uuid NOT NULL REFERENCES sites(id) ON DELETE RESTRICT,
  contact_id uuid NOT NULL,program_plan_id uuid,blueprint_item_id uuid,expressed_at timestamptz NOT NULL DEFAULT now(),

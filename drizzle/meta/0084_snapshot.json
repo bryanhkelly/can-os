@@ -30725,6 +30725,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "site_blueprint_item_site_pair_uq": {
+          "name": "site_blueprint_item_site_pair_uq",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {

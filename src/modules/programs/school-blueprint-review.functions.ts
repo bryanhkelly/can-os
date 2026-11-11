@@ -103,7 +103,25 @@ export const getSchoolBlueprintReviewDesk=createServerFn({method:"GET"})
     .where(inArray(siteBlueprintApprovedVersions.siteId,[...new Set(pending.map(x=>x.siteId))]));
   const latest=new Map<string,number>();
   for(const v of versions)latest.set(v.siteId,Math.max(latest.get(v.siteId)??0,v.version));
-  return pending.map(row=>({...row,expectedApprovedVersion:latest.get(row.siteId)??0}));
+  function jsonSafe(value:unknown):string|number|boolean|null|Array<unknown>|Record<string,unknown> {
+    return JSON.parse(JSON.stringify(value)) as string|number|boolean|null|Array<unknown>|Record<string,unknown>;
+  }
+  return pending.map(row=>({
+    ...row,
+    proposalSnapshot: {
+      programs: Array.isArray(row.proposalSnapshot.programs)
+        ? row.proposalSnapshot.programs.map((p:Record<string,unknown>)=>({
+            id:String(p.id??""),name:String(p.name??""),kind:String(p.kind??""),
+            gradeRange:jsonSafe(p.gradeRange??{}),deliveryModel:jsonSafe(p.deliveryModel??{}),
+          })) : [],
+      items: Array.isArray(row.proposalSnapshot.items)
+        ? row.proposalSnapshot.items.map((i:Record<string,unknown>)=>({
+            id:String(i.id??""),title:String(i.title??""),kind:String(i.kind??""),
+            summary:String(i.summary??""),configuration:jsonSafe(i.configuration??{}),
+          })) : [],
+    },
+    expectedApprovedVersion:latest.get(row.siteId)??0,
+  }));
 });
 
 /** CAN approval can be partial; item decisions are complete and independently auditable. */
