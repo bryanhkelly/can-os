@@ -103,9 +103,7 @@ export const getSchoolBlueprintReviewDesk=createServerFn({method:"GET"})
     .where(inArray(siteBlueprintApprovedVersions.siteId,[...new Set(pending.map(x=>x.siteId))]));
   const latest=new Map<string,number>();
   for(const v of versions)latest.set(v.siteId,Math.max(latest.get(v.siteId)??0,v.version));
-  function jsonSafe(value:unknown):string|number|boolean|null|Array<unknown>|Record<string,unknown> {
-    return JSON.parse(JSON.stringify(value)) as string|number|boolean|null|Array<unknown>|Record<string,unknown>;
-  }
+  function jsonSafe(value:unknown):string { return JSON.stringify(value); }
   return pending.map(row=>({
     ...row,
     proposalSnapshot: {
