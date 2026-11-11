@@ -16,11 +16,11 @@ vi.mock("@tanstack/react-router", () => ({
 const siteId="00000000-0000-4000-8000-000000000001";
 const options={sites:[{id:siteId,name:"Test School",websiteDraft:null}],schoolSetupAdministrator:true} as unknown as SchoolHubOptions;
 describe("school Launch Hub",()=>{
-  it("orders School details, Site Information and Website before community and opening setup",()=>{
+  it("orders the five school launch stages and their workstreams",()=>{
     const planned={state:"Planned",detail:"Module is on the roadmap",nextAction:"Explore module"} as const;
     const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId}
       statuses={{promote:planned,recruitment:planned,events:planned}}/>);
-    expect((html.match(/Open module/g) ?? []).length).toBe(3);
+    expect((html.match(/Open module/g) ?? []).length).toBe(4);
     expect(html).toContain("School details");
     expect(html).toContain("Site Information");
     expect(html).toContain("Build Website");
@@ -30,7 +30,9 @@ describe("school Launch Hub",()=>{
     expect(html.indexOf("Site Information")).toBeLessThan(html.indexOf("Build Website"));
     expect(html).toContain(`/launch/website?siteId=${siteId}&amp;returnToHub=true`);
     expect(html).not.toContain(`/launch/hub/school/website?siteId=${siteId}`);
-    expect(html).toContain("Build Your School Community");
+    expect(html).toContain("3. Build Your School");
+    expect(html).toContain("School Blueprint");
+    expect(html).toContain("5. Open Your School");
     expect(html).toContain(`/launch/hub/school/promote?siteId=${siteId}`);
     expect(html).toContain(`/launch/hub/school/recruitment?siteId=${siteId}`);
     expect(html).toContain(`/launch/hub/school/events?siteId=${siteId}`);
@@ -83,7 +85,7 @@ describe("school Launch Hub",()=>{
   it.each(["promote","recruitment","events"] as const)("makes the %s placeholder honest and retains its return scope",module=>{
     const html=renderToStaticMarkup(<SchoolLaunchHub options={options} siteId={siteId} module={module}/>);
     expect(html).toContain(`/launch/hub/school?siteId=${siteId}`);
-    expect(html).toContain(module === "promote" ? "not implemented" : "not enabled");
+    expect(html).toContain(module === "promote" ? "not implemented" : module === "recruitment" ? "not yet enabled" : "not enabled");
     expect(html).toContain("What this module will make possible");
     expect(html).not.toContain("<button");
   });
