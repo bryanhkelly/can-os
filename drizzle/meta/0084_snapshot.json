@@ -33928,6 +33928,33 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "site_blueprint_review_request_scope_uq": {
+          "name": "site_blueprint_review_request_scope_uq",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "source_revision",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -33955,6 +33982,21 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "site_blueprint_review_source_revision_fk": {
+          "name": "site_blueprint_review_source_revision_fk",
+          "tableFrom": "site_blueprint_review_requests",
+          "tableTo": "site_blueprint_revisions",
+          "columnsFrom": [
+            "site_id",
+            "source_revision"
+          ],
+          "columnsTo": [
+            "site_id",
+            "revision"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -34122,6 +34164,23 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "site_blueprint_approved_review_scope_fk": {
+          "name": "site_blueprint_approved_review_scope_fk",
+          "tableFrom": "site_blueprint_approved_versions",
+          "tableTo": "site_blueprint_review_requests",
+          "columnsFrom": [
+            "review_request_id",
+            "site_id",
+            "source_revision"
+          ],
+          "columnsTo": [
+            "id",
+            "site_id",
+            "source_revision"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
