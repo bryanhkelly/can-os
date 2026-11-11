@@ -22583,6 +22583,27 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
+        },
+        "curriculum_pack_version_pack_pair_uq": {
+          "name": "curriculum_pack_version_pack_pair_uq",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "pack_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
         }
       },
       "foreignKeys": {
@@ -25732,6 +25753,27 @@
             }
           ],
           "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "site_local_content_version_site_pair_uq": {
+          "name": "site_local_content_version_site_pair_uq",
+          "columns": [
+            {
+              "expression": "id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "site_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -31240,6 +31282,21 @@
           ],
           "onDelete": "restrict",
           "onUpdate": "no action"
+        },
+        "site_concept_campaign_website_site_fk": {
+          "name": "site_concept_campaign_website_site_fk",
+          "tableFrom": "site_concept_campaigns",
+          "tableTo": "site_local_content_versions",
+          "columnsFrom": [
+            "website_revision_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "id",
+            "site_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -31723,8 +31780,8 @@
           "method": "btree",
           "with": {}
         },
-        "site_curriculum_plans_canonical_adoption_id_key": {
-          "name": "site_curriculum_plans_canonical_adoption_id_key",
+        "site_curriculum_plan_adoption_idx": {
+          "name": "site_curriculum_plan_adoption_idx",
           "columns": [
             {
               "expression": "canonical_adoption_id",
@@ -31733,7 +31790,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -31816,6 +31873,21 @@
           "columnsTo": [
             "id",
             "site_id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "site_curriculum_plan_pack_version_fk": {
+          "name": "site_curriculum_plan_pack_version_fk",
+          "tableFrom": "site_curriculum_plans",
+          "tableTo": "curriculum_pack_versions",
+          "columnsFrom": [
+            "pack_version_id",
+            "pack_id"
+          ],
+          "columnsTo": [
+            "id",
+            "pack_id"
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
@@ -32784,6 +32856,21 @@
             "id"
           ],
           "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "site_publication_release_website_site_fk": {
+          "name": "site_publication_release_website_site_fk",
+          "tableFrom": "site_publication_releases",
+          "tableTo": "site_local_content_versions",
+          "columnsFrom": [
+            "website_revision_id",
+            "site_id"
+          ],
+          "columnsTo": [
+            "id",
+            "site_id"
+          ],
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
