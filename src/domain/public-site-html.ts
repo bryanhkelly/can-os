@@ -416,6 +416,27 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <article class="card"><p class="tag">Create with purpose</p><h3>Design, Arts &amp; Applied Learning</h3><p>Bring imagination into practice through creative expression, collaborative projects, and opportunities to solve meaningful problems.</p></article>
     </div></section>` : "";
   const planned = page.prospectus ? publicProspectusSchema.parse(page.prospectus) : null;
+  const prospectusInterestForm = planned && submissionsEnabled && options?.makeRequestId
+    ? `<form action="${inquiryAction}" method="post" class="inquiry-form">
+      <input type="hidden" name="interestMode" value="planning"/>
+      <input type="hidden" name="requestId" value="${escapePublicHtml(options.makeRequestId())}"/>
+      <h3>Register your family's interest</h3>
+      <p>Receive planning updates. No enrollment commitment or student information is required.</p>
+      <label>First name<input name="firstName" autocomplete="given-name" maxlength="80" required/></label>
+      <label>Last name<input name="lastName" autocomplete="family-name" maxlength="80" required/></label>
+      <label>Email<input type="email" name="email" autocomplete="email" maxlength="254" required/></label>
+      <label>Which opportunity interests you most?
+        <select name="interestSubject">
+          <option value="">The school overall</option>
+          ${planned.items.map(i=>`<option value="${escapePublicHtml(i.sourceKind+":"+i.sourceId)}">${escapePublicHtml(i.title)}</option>`).join("")}
+        </select>
+      </label>
+      <div aria-hidden="true" class="bot-field"><label>Website<input name="website" tabindex="-1" autocomplete="off"/></label></div>
+      <label class="consent"><input type="checkbox" name="contactConsent" value="yes" required/>
+        I agree to receive school planning updates. This is not an enrollment application.
+      </label><button type="submit">Register interest</button>
+    </form>`
+    : planned ? `<p class="availability">Family interest submission is available on the published school website.</p>` : "";
   const prospectusSection = planned ? `<section class="editorial-section" aria-labelledby="prospectus-heading">
     <p class="tag">Planning to open · Proposed school</p>
     <h2 id="prospectus-heading">${escapePublicHtml(planned.heading)}</h2>
@@ -434,7 +455,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     </article>`).join("")}</div>
     <p class="availability">These descriptions are a reviewed planning prospectus,
       not school licensure, accreditation, a promise of opening, or permission to enroll.</p>
-    <a class="text-action" href="/academics">Explore our planned learning experiences →</a>
+    ${prospectusInterestForm}
   </section>` : "";
   const academicSection = (academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
     <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : demoAcademicCards) + prospectusSection;
