@@ -31,6 +31,7 @@ export const curriculumPackVersions = pgTable("curriculum_pack_versions", {
   createdAt: createdAt(), updatedAt: updatedAt(),
 }, table => [
   uniqueIndex("curriculum_pack_version_uq").on(table.packId, table.version),
+  uniqueIndex("curriculum_pack_version_pack_pair_uq").on(table.id, table.packId),
 ]);
 
 export const curriculumPackItems = pgTable("curriculum_pack_items", {

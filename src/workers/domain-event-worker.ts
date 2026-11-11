@@ -48,6 +48,16 @@ registerDomainEventHandler(EventTypes.InsightCreated, handleAcademicPassThroughE
 // Lifecycle facts already have transactional evidence. Pass through to shared
 // subscriptions and complete the outbox; delivery depends on registered consumers.
 for (const eventType of [
+  // Durable instructional authoring and student practice events are presently
+  // retained as auditable outbox facts; downstream notifications are not enabled.
+  EventTypes.InstructionalTrackDraftCreated,
+  EventTypes.InstructionalTrackDraftSaved,
+  EventTypes.InstructionalTrackSubmitted,
+  EventTypes.InstructionalTrackReviewed,
+  EventTypes.InstructionalTrackPublished,
+  EventTypes.InstructionalTrackWithdrawn,
+  EventTypes.StudentInstructionalTrackSelected,
+  EventTypes.StudentPracticeProgressChanged,
   EventTypes.LaunchDraftSaved,
   EventTypes.ApplicationStarted,
   EventTypes.ApplicationAccepted,

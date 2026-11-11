@@ -25,5 +25,6 @@ export const siteLocalContentVersions = pgTable("site_local_content_versions", {
   createdAt: createdAt(),
 }, t => [
   uniqueIndex("site_local_content_site_revision_uq").on(t.siteId, t.revision),
+  uniqueIndex("site_local_content_version_site_pair_uq").on(t.id, t.siteId),
   index("site_local_content_site_status_idx").on(t.siteId, t.status, t.revision),
 ]);

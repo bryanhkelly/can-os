@@ -11,6 +11,11 @@ ALTER TYPE organization_type ADD VALUE IF NOT EXISTS 'independent_school';
 --> statement-breakpoint
 ALTER TYPE organization_type ADD VALUE IF NOT EXISTS 'facility_provider';
 --> statement-breakpoint
+-- Parent keys for composite ownership checks on optional Blueprint references.
+CREATE UNIQUE INDEX site_local_content_version_site_pair_uq ON site_local_content_versions(id,site_id);
+--> statement-breakpoint
+CREATE UNIQUE INDEX curriculum_pack_version_pack_pair_uq ON curriculum_pack_versions(id,pack_id);
+--> statement-breakpoint
 CREATE TABLE religious_affiliation_options (
 code text PRIMARY KEY,label text NOT NULL,group_code text NOT NULL,parent_code text REFERENCES religious_affiliation_options(code),
 classification text NOT NULL DEFAULT 'religious' CHECK(classification IN ('religious','nonsectarian','unaffiliated','interfaith')),
@@ -119,13 +124,16 @@ subject text NOT NULL,pathway text NOT NULL DEFAULT 'core',
 pack_id uuid REFERENCES curriculum_packs(id) ON DELETE RESTRICT,
 pack_version_id uuid REFERENCES curriculum_pack_versions(id) ON DELETE RESTRICT,
 notes text NOT NULL DEFAULT '',status text NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','in_review','ready_to_adopt','linked','retired')),
-canonical_adoption_id uuid UNIQUE REFERENCES curriculum_adoptions(id) ON DELETE RESTRICT,
+canonical_adoption_id uuid REFERENCES curriculum_adoptions(id) ON DELETE RESTRICT,
 created_by_person_id uuid NOT NULL REFERENCES people(id) ON DELETE RESTRICT,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
 CONSTRAINT site_curriculum_plan_program_site_fk FOREIGN KEY(program_plan_id,site_id) REFERENCES site_program_plans(id,site_id),
+CONSTRAINT site_curriculum_plan_pack_version_fk FOREIGN KEY(pack_version_id,pack_id) REFERENCES curriculum_pack_versions(id,pack_id),
 CONSTRAINT site_curriculum_plan_pack_ck CHECK(pack_version_id IS NULL OR pack_id IS NOT NULL),
 CONSTRAINT site_curriculum_plan_link_ck CHECK(status<>'linked' OR canonical_adoption_id IS NOT NULL));
 --> statement-breakpoint
 CREATE INDEX site_curriculum_plan_site_idx ON site_curriculum_plans(site_id,program_plan_id,status);
+--> statement-breakpoint
+CREATE INDEX site_curriculum_plan_adoption_idx ON site_curriculum_plans(canonical_adoption_id);
 --> statement-breakpoint
 CREATE TABLE site_blueprint_items(
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),site_id uuid NOT NULL REFERENCES sites(id) ON DELETE RESTRICT,program_plan_id uuid,
@@ -159,7 +167,8 @@ kind text NOT NULL DEFAULT 'family_introduction' CHECK(kind IN ('family_introduc
 status text NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','approved','sending','completed','cancelled')),
 website_revision_id uuid REFERENCES site_local_content_versions(id) ON DELETE RESTRICT,
 created_by_person_id uuid NOT NULL REFERENCES people(id) ON DELETE RESTRICT,created_at timestamptz NOT NULL DEFAULT now(),updated_at timestamptz NOT NULL DEFAULT now(),
-CONSTRAINT site_concept_campaign_site_pair_uq UNIQUE(id,site_id));
+CONSTRAINT site_concept_campaign_site_pair_uq UNIQUE(id,site_id),
+CONSTRAINT site_concept_campaign_website_site_fk FOREIGN KEY(website_revision_id,site_id) REFERENCES site_local_content_versions(id,site_id));
 --> statement-breakpoint
 CREATE INDEX site_concept_campaign_site_idx ON site_concept_campaigns(site_id,status);
 --> statement-breakpoint
@@ -183,6 +192,7 @@ reviewed_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT,reviewed_at 
 published_by_person_id uuid REFERENCES people(id) ON DELETE RESTRICT,published_at timestamptz,
 created_at timestamptz NOT NULL DEFAULT now(),
 CONSTRAINT site_publication_release_site_revision_uq UNIQUE(site_id,revision),
+CONSTRAINT site_publication_release_website_site_fk FOREIGN KEY(website_revision_id,site_id) REFERENCES site_local_content_versions(id,site_id),
 CONSTRAINT site_publication_release_published_ck CHECK(status<>'published' OR (reviewed_by_person_id IS NOT NULL AND reviewed_at IS NOT NULL AND published_by_person_id IS NOT NULL AND published_at IS NOT NULL)));
 --> statement-breakpoint
 CREATE INDEX site_publication_release_status_idx ON site_publication_releases(site_id,status,revision);
