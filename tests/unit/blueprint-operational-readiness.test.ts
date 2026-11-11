@@ -34,7 +34,7 @@ describe("School Blueprint operational promotion",()=>{
   expect(()=>validateBlueprintEvidenceReview({})).toThrow(/explicitly/);
   expect(()=>validateBlueprintEvidenceReview({facility:{status:"verified"},staffing:{status:"not_required"}}))
     .toThrow(/document evidence/);
-  expect(()=>validateBlueprintEvidenceReview(verified).facility.status).toBe("verified");
+  expect(validateBlueprintEvidenceReview(verified).facility.status).toBe("verified");
  });
  it("does not invent credit-bearing types for unsupported reference programs",()=>{
   expect(blueprintOperationalProgramType("middle_school_6_8")).toBe("hosted_academy");

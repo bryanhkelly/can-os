@@ -23,11 +23,11 @@ describe("school Launch Hub",()=>{
     expect((html.match(/Open module/g) ?? []).length).toBe(4);
     expect(html).toContain("School details");
     expect(html).toContain("Site Information");
-    expect(html).toContain("Build Website");
+    expect(html).toContain("Website &amp; Brand");
     expect(html).toContain(`/launch/hub/school/profile?siteId=${siteId}`);
     expect(html).toContain(`/launch/hub/school/information?siteId=${siteId}`);
     expect(html.indexOf("School Profile")).toBeLessThan(html.indexOf("Site Information"));
-    expect(html.indexOf("Site Information")).toBeLessThan(html.indexOf("Build Website"));
+    expect(html.indexOf("Site Information")).toBeLessThan(html.indexOf("Website &amp; Brand"));
     expect(html).toContain(`/launch/website?siteId=${siteId}&amp;returnToHub=true`);
     expect(html).not.toContain(`/launch/hub/school/website?siteId=${siteId}`);
     expect(html).toContain("3. Build Your School");
