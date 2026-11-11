@@ -94,7 +94,7 @@ export function CANSchoolBlueprintReviewDesk(){
       </label>
      </div>;
     })}</div>
-    <Button disabled={busy||subjects.some(s=>!choices[key(req.id,s.kind,s.id)])||(scope[req.id]?.trim().length??0)<20}
+    <Button variant="outline" disabled={busy||subjects.some(s=>!choices[key(req.id,s.kind,s.id)])||(scope[req.id]?.trim().length??0)<20}
       onClick={()=>void decide(req)}>Record reviewed Blueprint scope</Button>
    </article>;
   })}
@@ -108,7 +108,7 @@ export function CANSchoolBlueprintReviewDesk(){
      <p className="mt-1 text-sm">{release.prospectus.introduction}</p>
      <ul className="mt-2 list-inside list-disc text-sm">{release.prospectus.items.map(x=>
       <li key={x.sourceKind+":"+x.sourceId}>{x.title} · {x.state}</li>)}</ul>
-     <Button className="mt-3" disabled={busy} onClick={()=>void reviewPublic(release.id)}>
+     <Button variant="outline" className="mt-3" disabled={busy} onClick={()=>void reviewPublic(release.id)}>
       Approve parent-facing prospectus
      </Button>
     </article>)}</div>}

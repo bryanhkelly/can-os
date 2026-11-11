@@ -47,7 +47,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
           {tokens.map(([name, color])=><div key={name} className="min-w-0">
             <span aria-hidden="true" className="block h-12 rounded-md border" style={{background:color}}/>
             <span className="mt-1 block text-xs font-medium">{name}</span>
-            <code className="block text-[10px] text-muted-foreground">{color}</code>
+            <code className="block text-xs text-muted-foreground">{color}</code>
           </div>)}
         </div>
       </div>
@@ -77,7 +77,7 @@ export function SchoolBrandPreview({ schoolName, branding, siteId }: Props) {
                 <p className="break-words text-sm font-bold" style={{fontFamily:brand.theme.displayFont}}>
                   {brand.schoolName}
                 </p>
-                <p className="mt-1 text-[10px] font-medium tracking-wider" style={{color:brand.accent}}>
+                <p className="mt-1 text-xs font-medium tracking-wider" style={{color:brand.accent}}>
                   {brand.design.caption}
                 </p>
               </div>

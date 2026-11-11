@@ -679,7 +679,7 @@ it("connects all twelve editorial photo roles to fictional school pages only whe
       "admissions","portrait_01","portrait_02","portrait_03"]) {
       expect(all).toContain(`/template-photo/heritage/${role}?v=20261109`);
     }
-    expect((all.match(/class="demo-banner"/g)??[]).toHaveLength(10);
+    expect((all.match(/class="demo-banner"/g)??[])).toHaveLength(10);
     expect(all).not.toContain("Demonstration only");
     expect(all).not.toContain("Illustrative template photography");
     expect(all).not.toContain("<form");

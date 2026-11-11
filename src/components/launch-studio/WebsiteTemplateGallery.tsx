@@ -5,6 +5,8 @@ import { emptySiteLocalContent } from "@/domain/site-local-content";
 import { publicSitePagePaths, type PublicSitePath } from "@/domain/public-site-paths";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
 const previewLabels: Record<PublicSitePath, string> = {
@@ -85,14 +87,14 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
       fonts and photography are preserved when switching.
     </p>
     <div className="mt-3 flex flex-wrap items-end gap-3">
-      <label className="grid gap-1 text-xs font-semibold">
+      <Label className="grid gap-1 text-xs font-semibold">
         Page to preview
-        <select aria-label="Preview school page" value={previewPage}
+        <Select aria-label="Preview school page" value={previewPage}
           onChange={event => setPreviewPage(event.target.value as PublicSitePath)}
           className="min-h-11 rounded-md border border-input bg-background px-3 py-2 text-sm">
           {publicSitePagePaths.map(path => <option key={path} value={path}>{previewLabels[path]}</option>)}
-        </select>
-      </label>
+        </Select>
+      </Label>
       <div className="flex gap-2" role="group" aria-label="Template preview viewport">
         {(["desktop", "mobile"] as const).map(size => <Button type="button"
           variant="outline" key={size} aria-pressed={viewport === size}
