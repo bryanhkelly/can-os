@@ -182,9 +182,11 @@ export const siteCurriculumPlans=pgTable("site_curriculum_plans",{
   createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[
   index("site_curriculum_plan_site_idx").on(t.siteId,t.programPlanId,t.status),
-  uniqueIndex("site_curriculum_plans_canonical_adoption_id_key").on(t.canonicalAdoptionId),
+  index("site_curriculum_plan_adoption_idx").on(t.canonicalAdoptionId),
   foreignKey({name:"site_curriculum_plan_program_site_fk",columns:[t.programPlanId,t.siteId],
     foreignColumns:[siteProgramPlans.id,siteProgramPlans.siteId]}),
+  foreignKey({name:"site_curriculum_plan_pack_version_fk",columns:[t.packVersionId,t.packId],
+    foreignColumns:[curriculumPackVersions.id,curriculumPackVersions.packId]}),
   check("site_curriculum_plans_status_check",sql.raw("status in ('draft','in_review','ready_to_adopt','linked','retired')")),
   check("site_curriculum_plan_pack_ck",sql.raw("pack_version_id is null or pack_id is not null")),
   check("site_curriculum_plan_link_ck",sql.raw("status<>'linked' or canonical_adoption_id is not null")),
@@ -239,6 +241,8 @@ export const siteConceptCampaigns=pgTable("site_concept_campaigns",{
   createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[
   uniqueIndex("site_concept_campaign_site_pair_uq").on(t.id,t.siteId),
+  foreignKey({name:"site_concept_campaign_website_site_fk",columns:[t.websiteRevisionId,t.siteId],
+    foreignColumns:[siteLocalContentVersions.id,siteLocalContentVersions.siteId]}),
   index("site_concept_campaign_site_idx").on(t.siteId,t.status),
   check("site_concept_campaigns_status_check",sql.raw("status in ('draft','approved','sending','completed','cancelled')")),
   check("site_concept_campaigns_kind_check",sql.raw("kind in ('family_introduction','survey','interest_event')")),
@@ -273,6 +277,8 @@ export const sitePublicationReleases=pgTable("site_publication_releases",{
   publishedAt:timestamp("published_at",{withTimezone:true}),createdAt:createdAt(),
 },t=>[
   uniqueIndex("site_publication_release_site_revision_uq").on(t.siteId,t.revision),
+  foreignKey({name:"site_publication_release_website_site_fk",columns:[t.websiteRevisionId,t.siteId],
+    foreignColumns:[siteLocalContentVersions.id,siteLocalContentVersions.siteId]}),
   index("site_publication_release_status_idx").on(t.siteId,t.status,t.revision),
   check("site_publication_releases_revision_check",sql.raw("revision>0")),
   check("site_publication_releases_status_check",sql.raw("status in ('draft','in_review','approved','published','withdrawn')")),
