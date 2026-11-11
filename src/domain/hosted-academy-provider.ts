@@ -5,7 +5,7 @@ import type { ProgramCreditMode, ProgramType } from "./program-offerings";
  * This is NOT evidence of an agreement, accreditation, school-of-record authority
  * or cross-organization access. Those require separately verified records/grants.
  */
-export function assertChurchHostedProviderIntent(input: {
+export function assertHostedProviderIntent(input: {
   programType: ProgramType;
   hostOrganizationId: string;
   hostOrganizationType: string;
@@ -14,15 +14,15 @@ export function assertChurchHostedProviderIntent(input: {
   creditIssuingOrganizationId: string | null;
   creditMode: ProgramCreditMode;
 }): void {
-  if (input.programType !== "church_hosted_academy" || input.hostOrganizationType !== "church") return;
+  if (input.programType !== "hosted_academy") return;
   // Preserve a same-organization school operation: no independent CAN claim.
   if (input.academicProviderOrganizationId === input.hostOrganizationId) return;
   if (input.academicProviderOrganizationType !== "can_network") {
-    throw new Error("A separate provider for a church-hosted CAN academy must be a CAN network organization");
+    throw new Error("A separate provider for a hosted CAN academy must be a CAN network organization");
   }
   if (input.creditMode !== "credit_bearing" ||
       input.creditIssuingOrganizationId !== input.academicProviderOrganizationId) {
-    throw new Error("Church-hosted CAN instruction must designate the same CAN institution as credit issuer");
+    throw new Error("Hosted CAN instruction must designate the same CAN institution as credit issuer");
   }
 }
 
@@ -31,19 +31,16 @@ export function assertChurchHostedProviderIntent(input: {
  * The caller must load and independently verify the Program-Site authorization
  * against its approved agreement and expiry before supplying an identifier.
  */
-export function assertChurchHostedActivationAuthorization(input: {
+export function assertHostedActivationAuthorization(input: {
   programType: ProgramType;
   hostOrganizationId: string;
   hostOrganizationType: string;
   academicProviderOrganizationId: string;
   verifiedProgramSiteAuthorizationId: string | null;
 }): void {
-  // A church cannot bypass the independent CAN operating agreement by
-  // submitting the same externally provided school as a high-school extension.
-  // Preserve the existing explicit church_hosted_academy gate for other hosts.
-  const requiresAuthorization = input.academicProviderOrganizationId !== input.hostOrganizationId &&
-    (input.programType === "church_hosted_academy" || input.hostOrganizationType === "church");
+  // Host classification never bypasses independent Program-Site authorization.
+  const requiresAuthorization = input.academicProviderOrganizationId !== input.hostOrganizationId;
   if (requiresAuthorization && !input.verifiedProgramSiteAuthorizationId) {
-    throw new Error("Church-hosted CAN Academy activation requires independently verified Program-Site institutional authorization");
+    throw new Error("Hosted Academy activation requires independently verified Program-Site institutional authorization");
   }
 }

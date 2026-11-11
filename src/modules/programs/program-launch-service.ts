@@ -1,7 +1,7 @@
 import { matchesProgramLaunchReplay } from "@/domain/program-launch-replay";
 import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
-import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
+import { assertHostedProviderIntent, assertHostedActivationAuthorization } from "@/domain/hosted-academy-provider";
 import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
@@ -95,7 +95,7 @@ export async function startProgramLaunch(
       : [];
     if (!academicProvider) throw new Error("Academic provider Organization not found");
     if (creditMode === "credit_bearing" && !creditIssuer) throw new Error("Credit issuer Organization not found");
-    assertChurchHostedProviderIntent({
+    assertHostedProviderIntent({
       programType: input.type,
       hostOrganizationId: host.id, hostOrganizationType: host.type,
       academicProviderOrganizationId: academicProvider.id,
@@ -364,14 +364,14 @@ export async function activateProgram(
     const [hostOrganization] = await tx.select({ type: organizations.type })
       .from(organizations).where(eq(organizations.id, hostOrganizationId)).limit(1);
     if (!hostOrganization) throw new Error("Program host organization not found");
-    const crossOrganizationChurch = hostOrganization.type === "church" &&
+    const crossOrganizationProvider =
       program.academicProviderOrganizationId !== hostOrganizationId;
-    const operatingAuthorizationId = crossOrganizationChurch
+    const operatingAuthorizationId = crossOrganizationProvider
       ? await requireCurrentProgramSiteAuthorization(tx, program.id,
           ["academic_instruction", "onsite_supervision",
             ...(program.creditIssuingOrganizationId ? ["school_of_record", "credit_issuance"] as const : [])])
       : null;
-    assertChurchHostedActivationAuthorization({
+    assertHostedActivationAuthorization({
       programType: program.type,
       hostOrganizationId,
       hostOrganizationType: hostOrganization.type,

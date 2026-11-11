@@ -9,8 +9,8 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import {
-  assertChurchCANOperatingIdentity, assertCurrentOperatingAuthorization,
-  assertOperatingAgreementEvidence, normalizeOperatingServices, recommendedChurchOperatingServices,
+  assertHostedAcademyOperatingIdentity, assertCurrentOperatingAuthorization,
+  assertOperatingAgreementEvidence, normalizeOperatingServices, recommendedHostedOperatingServices,
   type OperatingProgramIdentity, type OperatingService,
 } from "@/domain/program-site-operating-policy";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -49,7 +49,7 @@ async function loadOperatingIdentity(
     institutionOrganizationType: institution?.type ?? "",
     creditIssuingOrganizationId: program.creditIssuingOrganizationId,
   };
-  assertChurchCANOperatingIdentity(identity);
+  assertHostedAcademyOperatingIdentity(identity);
   return identity;
 }
 function assertHostRequester(actor: AccessContext, identity: OperatingProgramIdentity) {
@@ -57,7 +57,7 @@ function assertHostRequester(actor: AccessContext, identity: OperatingProgramIde
       !actor.scope.organizationIds?.includes(identity.hostOrganizationId) ||
       !identity.siteId || !actor.scope.siteIds?.includes(identity.siteId) ||
       !actor.scope.programIds?.includes(identity.programId))
-    throw new AuthorizationError("verified church-host registrar for this Program and Site");
+    throw new AuthorizationError("verified host registrar for this Program and Site");
   assertCapability(actor, "program.launch.start");
 }
 function assertIndependentCANReviewer(actor: AccessContext, identity: OperatingProgramIdentity) {
@@ -68,7 +68,7 @@ function assertIndependentCANReviewer(actor: AccessContext, identity: OperatingP
   }, "network.agreements.verify");
 }
 
-/** Church registrar requests a precisely scoped service relationship.
+/** Host registrar requests a precisely scoped service relationship.
  * No staff grants, school-year activation or publication is created.
  */
 export async function requestProgramSiteAuthorization(
@@ -594,7 +594,7 @@ export async function requireCurrentProgramSiteAuthorization(
       if (!(error instanceof AuthorizationError)) throw error;
     }
   }
-  throw new AuthorizationError("current independently verified CAN-church operating authority");
+  throw new AuthorizationError("current independently verified host-CAN operating authority");
 }
 
 /** The host's onsite staff retains original Site/Program grants, but an
@@ -614,7 +614,7 @@ export async function requireChurchHostedOperatingServices(
   const [host] = await tx.select({type: organizations.type})
     .from(organizations).where(eq(organizations.id, hostId)).limit(1);
   if (!host) throw new AuthorizationError("existing school host");
-  if (host.type === "church" && program.institutionOrganizationId !== hostId)
+  if (program.institutionOrganizationId !== hostId)
     return requireCurrentProgramSiteAuthorization(tx,programId,requiredServices);
   return null;
 }
@@ -624,7 +624,7 @@ export async function requireChurchHostedOperatingServices(
  * the actor's verified role / Program / Section relationship checks.
  *
  * Same-organization and non-church Programs keep their existing workflows.
- * Any independently church-owned CAN Program requires BOTH an original
+ * Any independently host-owned CAN Program requires BOTH an original
  * CAN-organization membership and a live, service-specific agreement.
  * Call inside the mutation transaction, after verifying resource scope.
  */
@@ -644,7 +644,7 @@ export async function requireInstitutionalAcademicProgramAuthority(
   const [host] = await tx.select({type: organizations.type})
     .from(organizations).where(eq(organizations.id, hostId)).limit(1);
   if (!host) throw new AuthorizationError("existing Program host");
-  if (host.type !== "church" || program.institutionOrganizationId === hostId)
+  if (program.institutionOrganizationId === hostId)
     return null;
   if (!actor.scope.organizationIds?.includes(program.institutionOrganizationId))
     throw new AuthorizationError("verified CAN institutional Organization membership");
@@ -671,12 +671,12 @@ export async function getHostProgramSiteAuthorization(
   const [host] = await db.select({ type: organizations.type })
     .from(organizations).where(eq(organizations.id,
       program.hostOrganizationId ?? program.organizationId)).limit(1);
-  if (host?.type !== "church" ||
+  if (!host ||
       program.institutionOrganizationId === (program.hostOrganizationId ?? program.organizationId))
     return {
       eligible: false, programId, siteId: program.siteId,
       institutionOrganizationId: program.institutionOrganizationId,
-      recommendedServices: recommendedChurchOperatingServices(program.creditIssuingOrganizationId !== null),
+      recommendedServices: recommendedHostedOperatingServices(program.creditIssuingOrganizationId !== null),
       canIssueCredit: program.creditIssuingOrganizationId !== null,
       authorization: null,
     };
@@ -701,7 +701,7 @@ export async function getHostProgramSiteAuthorization(
   return {
     eligible: true, programId, siteId: identity.siteId,
     institutionOrganizationId: identity.institutionOrganizationId,
-    recommendedServices: recommendedChurchOperatingServices(identity.creditIssuingOrganizationId !== null),
+    recommendedServices: recommendedHostedOperatingServices(identity.creditIssuingOrganizationId !== null),
     canIssueCredit: identity.creditIssuingOrganizationId !== null,
     authorization: record ? {
       ...record,

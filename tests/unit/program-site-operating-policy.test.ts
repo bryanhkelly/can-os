@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  assertChurchCANOperatingIdentity, normalizeOperatingServices,
+  assertHostedAcademyOperatingIdentity, normalizeOperatingServices,
   assertOperatingAgreementEvidence, assertCurrentOperatingAuthorization,
-  recommendedChurchOperatingServices,
+  recommendedHostedOperatingServices,
 } from "@/domain/program-site-operating-policy";
 const now = new Date("2026-10-23T16:00:00Z");
 const identity = {
@@ -30,23 +30,30 @@ const document = {
     hostSignatureVerified: true, institutionSignatureVerified: true,
     authorizedServices: ["academic_instruction", "onsite_supervision"] },
 };
-describe("Church-CAN Program-Site authorization policy", () => {
+describe("Host-CAN Program-Site authorization policy", () => {
+  it("accepts a community nonprofit as the facility host", () => {
+    expect(() => assertHostedAcademyOperatingIdentity({
+      ...identity, hostOrganizationId: "community",
+      hostOrganizationType: "community_nonprofit", siteOrganizationId: "community",
+      programOrganizationId: "community",
+    })).not.toThrow();
+  });
   it("recommends the end-to-end services needed for admissions and classes",()=>{
-    const credit=recommendedChurchOperatingServices(true);
+    const credit=recommendedHostedOperatingServices(true);
     expect(credit).toEqual(expect.arrayContaining([
       "academic_instruction","curriculum","admissions",
       "school_of_record","academic_records","onsite_supervision","credit_issuance",
     ]));
-    const noncredit=recommendedChurchOperatingServices(false);
+    const noncredit=recommendedHostedOperatingServices(false);
     expect(noncredit).toContain("admissions");
     expect(noncredit).toContain("academic_records");
     expect(noncredit).not.toContain("credit_issuance");
   });
   it("requires different legal institutions and correct church site ownership", () => {
-    expect(() => assertChurchCANOperatingIdentity(identity)).not.toThrow();
-    expect(() => assertChurchCANOperatingIdentity({ ...identity, siteOrganizationId: "other-church" })).toThrow();
-    expect(() => assertChurchCANOperatingIdentity({ ...identity, institutionOrganizationId: "church" })).toThrow();
-    expect(() => assertChurchCANOperatingIdentity({
+    expect(() => assertHostedAcademyOperatingIdentity(identity)).not.toThrow();
+    expect(() => assertHostedAcademyOperatingIdentity({ ...identity, siteOrganizationId: "other-church" })).toThrow();
+    expect(() => assertHostedAcademyOperatingIdentity({ ...identity, institutionOrganizationId: "church" })).toThrow();
+    expect(() => assertHostedAcademyOperatingIdentity({
       ...identity, creditIssuingOrganizationId: "unrelated-issuer",
     })).toThrow();
   });
