@@ -3,7 +3,7 @@ import { boolean, check, date, index, integer, jsonb, pgTable, text, timestamp, 
 import { createdAt, id } from "./common";
 import { sites } from "./organizations";
 import { people } from "./identity";
-import { siteConceptContacts, siteProgramPlans, siteBlueprintItems } from "./school-blueprint";
+import { siteConceptContacts, siteProgramPlans, siteBlueprintItems, siteBlueprintRevisions } from "./school-blueprint";
 
 /** Submitted immutable proposal. A review never grants state licensure or school opening. */
 export const siteBlueprintReviewRequests=pgTable("site_blueprint_review_requests",{
@@ -14,6 +14,9 @@ export const siteBlueprintReviewRequests=pgTable("site_blueprint_review_requests
  submittedAt:createdAt(),
 },t=>[
  uniqueIndex("site_blueprint_review_revision_uq").on(t.siteId,t.sourceRevision),
+ uniqueIndex("site_blueprint_review_request_scope_uq").on(t.id,t.siteId,t.sourceRevision),
+ foreignKey({name:"site_blueprint_review_source_revision_fk",columns:[t.siteId,t.sourceRevision],
+   foreignColumns:[siteBlueprintRevisions.siteId,siteBlueprintRevisions.revision]}),
  index("site_blueprint_review_site_idx").on(t.siteId,t.status),
  check("site_blueprint_review_source_positive_ck",sql.raw("source_revision>0")),
  check("site_blueprint_review_status_ck",sql.raw("status in ('submitted','reviewed','withdrawn')")),
@@ -32,6 +35,8 @@ export const siteBlueprintApprovedVersions=pgTable("site_blueprint_approved_vers
  effectiveFrom:date("effective_from"),
 },t=>[
  uniqueIndex("site_blueprint_approved_version_uq").on(t.siteId,t.version),
+ foreignKey({name:"site_blueprint_approved_review_scope_fk",columns:[t.reviewRequestId,t.siteId,t.sourceRevision],
+   foreignColumns:[siteBlueprintReviewRequests.id,siteBlueprintReviewRequests.siteId,siteBlueprintReviewRequests.sourceRevision]}),
  index("site_blueprint_approved_site_idx").on(t.siteId,t.reviewedAt),
  check("site_blueprint_approved_version_positive_ck",sql.raw("version>0 and source_revision>0")),
 ]);
