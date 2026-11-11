@@ -1,0 +1,45 @@
+name: School Blueprint SQL Acceptance
+on:
+  pull_request:
+    paths:
+      - 'drizzle/0079_site_blueprint_foundation.sql'
+      - 'drizzle/0080_school_blueprint_reference_library.sql'
+      - 'src/db/schema/school-blueprint.ts'
+      - 'tests/sql/school-blueprint/**'
+      - '.github/workflows/school-blueprint-schema-validation.yml'
+  workflow_dispatch:
+jobs:
+  schema-acceptance:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test-only
+          POSTGRES_DB: blueprint_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: test-only
+      PGDATABASE: blueprint_ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Establish canonical parent-table signatures on disposable Postgres
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-blueprint/parents.sql
+      - name: Apply Site Blueprint foundation migration
+        run: psql -v ON_ERROR_STOP=1 -f drizzle/0079_site_blueprint_foundation.sql
+      - name: Apply reference library and verify idempotency
+        run: |
+          psql -v ON_ERROR_STOP=1 -f drizzle/0080_school_blueprint_reference_library.sql
+          psql -v ON_ERROR_STOP=1 -f drizzle/0080_school_blueprint_reference_library.sql
+      - name: Verify constraints, scope isolation and seed counts
+        run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-blueprint/acceptance.sql
