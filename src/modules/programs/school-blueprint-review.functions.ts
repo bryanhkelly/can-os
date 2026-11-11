@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { EventTypes } from "@/domain/event-types";
 import {
   organizations, sites, documents, siteBlueprints, siteBlueprintRevisions, siteBlueprintReviewRequests,
   siteBlueprintApprovedVersions, siteBlueprintApprovalDecisions,
@@ -76,7 +77,7 @@ export const submitSchoolBlueprintForReview=createServerFn({method:"POST"})
     await writeAudit(tx,actor,{action:"school.blueprint.review.request",entityType:"site_blueprint_review",
       entityId:created.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{sourceRevision:data.expectedRevision}});
-    await emitEvent(tx,{eventType:"SchoolBlueprintReviewRequested",aggregateType:"SiteBlueprint",
+    await emitEvent(tx,{eventType:EventTypes.SchoolBlueprintReviewRequested,aggregateType:"SiteBlueprint",
       aggregateId:site.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,
       payload:{requestId:created.id,sourceRevision:data.expectedRevision}});
     return {requestId:created.id,created:true};
@@ -196,7 +197,7 @@ export const decideSchoolBlueprintReview=createServerFn({method:"POST"})
     await writeAudit(tx,actor,{action:"school.blueprint.review.decide",entityType:"site_blueprint_approval",
       entityId:approved.id,scope:{siteId:site.id,organizationId:site.organizationId},
       after:{version,sourceRevision:request.sourceRevision,decisionCount:data.decisions.length,diff}});
-    await emitEvent(tx,{eventType:"SchoolBlueprintScopeReviewed",aggregateType:"SiteBlueprint",
+    await emitEvent(tx,{eventType:EventTypes.SchoolBlueprintScopeReviewed,aggregateType:"SiteBlueprint",
       aggregateId:site.id,actorPersonId:actor.actorPersonId,siteId:site.id,organizationId:site.organizationId,
       payload:{approvalVersionId:approved.id,version,diff,canInstitutionId:institutionId,
         requiresProspectusReview:true}});
