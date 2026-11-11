@@ -8,6 +8,7 @@ import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type {PublicSchoolSiteMedia} from "./school-site-media-public";
+import { publicProspectusSchema, type PublicBlueprintProspectus } from "./school-blueprint-approval";
 import { createIllustrativeSchoolContent, normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
 /** Standalone, escaped HTML. No hydration, external scripts or CAN OS shell. */
@@ -21,6 +22,7 @@ export type PublicSitePage = {
   operatingStatus?: "authorized" | "development" | "review_required";
   offerings: PublicOffering[];
   academicPrograms?: PublicAcademicProgram[];
+  prospectus?: PublicBlueprintProspectus | null;
   /** Only institutionally reviewed claims with public display permission are rendered. */
   parentInformation?: PublicParentSchoolProfile;
   /** Locally authored church copy, separately versioned and safety screened. */
@@ -87,6 +89,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
   const hasReviewedPeople = Boolean(page.parentInformation?.people.length);
   const academic = Boolean(page.academicPrograms?.length);
+  const hasProspectus = Boolean(page.prospectus?.items.length);
   const parent = page.parentInformation;
   const tuition = Boolean(academic || (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
     (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value));
@@ -102,7 +105,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
       "/admissions", "/tuition", "/families", "/faq", "/contact"];
   }
   return ["/", ...(hasStory || hasReviewedPeople ? ["/about"] as const : []),
-    ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
+    ...(academic || hasProspectus ? ["/academics"] as const : []),
+    ...(academic ? ["/school-day", "/admissions"] as const : []),
     ...(page.offerings.length || (page.demonstration && hasStory) ? ["/student-life"] as const : []),
     ...(tuition ? ["/tuition"] as const : []),
     ...(services || (page.demonstration && hasStory) ? ["/families"] as const : []),
@@ -411,8 +415,29 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <article class="card"><p class="tag">Investigate boldly</p><h3>Science, Technology &amp; Mathematics</h3><p>Explore the principles behind everyday discoveries through inquiry, careful reasoning, and challenges that reward persistence.</p></article>
       <article class="card"><p class="tag">Create with purpose</p><h3>Design, Arts &amp; Applied Learning</h3><p>Bring imagination into practice through creative expression, collaborative projects, and opportunities to solve meaningful problems.</p></article>
     </div></section>` : "";
-  const academicSection = academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
-    <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : demoAcademicCards;
+  const planned = page.prospectus ? publicProspectusSchema.parse(page.prospectus) : null;
+  const prospectusSection = planned ? `<section class="editorial-section" aria-labelledby="prospectus-heading">
+    <p class="tag">Planning to open · Proposed school</p>
+    <h2 id="prospectus-heading">${escapePublicHtml(planned.heading)}</h2>
+    <p class="intro">${escapePublicHtml(planned.introduction)}</p>
+    <p class="availability">${escapePublicHtml(planned.notice)}</p>
+    <div class="grid">${planned.items.map(item=>`<article class="card">
+      <p class="tag">${item.state==="confirmed"?"CAN-reviewed scope":
+        item.state==="under_review"?"Under review":"Future plans"}</p>
+      <h3>${escapePublicHtml(item.title)}</h3>
+      <p>${escapePublicHtml(item.summary)}</p>
+      <p class="availability">${item.state==="confirmed"
+        ?"Approved by CAN for the stated scope · enrollment and actual availability are separate"
+        :item.state==="under_review"
+          ?"Proposed · under review · not available for enrollment"
+          :"Planned future experience · not available for enrollment"}</p>
+    </article>`).join("")}</div>
+    <p class="availability">These descriptions are a reviewed planning prospectus,
+      not school licensure, accreditation, a promise of opening, or permission to enroll.</p>
+    <a class="text-action" href="/academics">Explore our planned learning experiences →</a>
+  </section>` : "";
+  const academicSection = (academicCards ? `<section aria-labelledby="academic-title" class="editorial-section">
+    <h2 id="academic-title">Academic programs</h2><div class="grid">${academicCards}</div></section>` : demoAcademicCards) + prospectusSection;
   const demoExperiences = demo && !page.offerings.length ? `<div class="demo-experience-grid">
     <article><p class="tag">Innovation &amp; design</p><h3>Robotics &amp; Design Lab</h3><p>Big questions become working ideas as students sketch, build, test, and refine. The real lesson is learning to think like a problem-solver.</p></article>
     <article><p class="tag">Arts &amp; expression</p><h3>The Creative Collective</h3><p>Where writing, photography, visual art, and performance give students new ways to discover their voice and share it with others.</p></article>
@@ -722,9 +747,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping students discover who they are and what they can become.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
     story: homeStory,
     explore: exploreSection,
-    academics: programOverview || (demo ? demoAcademicCards : ""),
+    academics: prospectusSection + (programOverview || (demo ? demoAcademicCards : "")),
     enrichment: page.offerings.length || (demo && local) ? enrichmentSection
-      : !academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
+      : !academicCards && !planned ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
     closing: demo ? `<section class="closing-action"><p class="tag">The possibilities ahead</p>
       <h2>Every student has a story worth discovering.</h2>
       <p>Explore what happens when purposeful instruction and a connected school community give students room to learn, create, and grow.</p>

@@ -1,6 +1,6 @@
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
 import { db } from "@/db/client";
-import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sites } from "@/db/schema";
+import { memberships, organizations, people, programs, programPublications, roleAssignments, sitePublications, sitePublicationReleases, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -313,10 +313,19 @@ export async function changeSitePublicationWithinTransaction(
     const academicListings = needsReadiness ? await readAcademicProgramCatalog(site.id, tx) : [];
     const eligibleCount = enrichmentListings.length + academicListings.length;
     const local = needsReadiness && actor.role === "site_admin" ? await readCurrentLocalContent(site.id, tx) : null;
+    // A separately CAN-reviewed planning prospectus permits a school to publish
+    // its vision without treating proposed Programs as operational offerings.
+    const [reviewedProspectus] = needsReadiness ? await tx.select({id:sitePublicationReleases.id})
+      .from(sitePublicationReleases).where(and(
+        eq(sitePublicationReleases.siteId,site.id),
+        eq(sitePublicationReleases.mode,"planning_prospectus"),
+        eq(sitePublicationReleases.status,"approved"),
+        isNotNull(sitePublicationReleases.reviewedByPersonId),
+      )).limit(1) : [];
     const decision = planSitePublicationTransition({
       current, action: input.action, expectedRevision: input.expectedRevision,
       reason: input.reason, contentReviewed: input.contentReviewed,
-      eligibleOfferingCount: eligibleCount, siteOwnedContentReady: Boolean(local), now: new Date(),
+      eligibleOfferingCount: eligibleCount, siteOwnedContentReady: Boolean(local) || Boolean(reviewedProspectus), now: new Date(),
     });
     if (!decision.changed) {
       return { siteId: site.id, status: decision.status,

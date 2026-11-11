@@ -1,7 +1,7 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { organizations, programs, sitePublications, sites } from "@/db/schema";
+import { organizations, programs, sitePublications, sitePublicationReleases, siteBlueprintApprovedVersions, sites } from "@/db/schema";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType } from "@/domain/academic-program-publication";
@@ -64,6 +64,28 @@ export async function readPublishedSiteCatalog(slug: string) {
         break;
       }
     }
+    // Public planning is an immutable, CAN-reviewed release, never the live
+    // mutable School Blueprint. No pending internal condition notes are loaded.
+    const [latestApprovedScope]=await tx.select({version:siteBlueprintApprovedVersions.version})
+      .from(siteBlueprintApprovedVersions).where(eq(siteBlueprintApprovedVersions.siteId,site.id))
+      .orderBy(desc(siteBlueprintApprovedVersions.version)).limit(1);
+    const [planningRelease]=await tx.select({
+      content:sitePublicationReleases.contentSnapshot,
+      source:sitePublicationReleases.sourceRevisionMap,
+    }).from(sitePublicationReleases).where(and(
+      eq(sitePublicationReleases.siteId,site.id),
+      eq(sitePublicationReleases.mode,"planning_prospectus"),
+      eq(sitePublicationReleases.status,"published"),
+      isNotNull(sitePublicationReleases.publishedAt),
+      isNotNull(sitePublicationReleases.reviewedByPersonId),
+    )).orderBy(desc(sitePublicationReleases.revision)).limit(1);
+    const source=planningRelease?.source as {canApprovalVersion?:number|null}|undefined;
+    // A change to CAN-approved scope invalidates a prospectus that might claim
+    // approval under its previous baseline. Existing approved Program catalog
+    // remains independently readable.
+    const planningCurrent=(source?.canApprovalVersion??null)===(latestApprovedScope?.version??null);
+    const prospectus=planningRelease && planningCurrent && planningRelease.content?.version===1
+      ? planningRelease.content : null;
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
     const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
     const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
@@ -86,6 +108,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       }),
       demonstration: site.metadata?.synthetic === true,
       operatingStatus,
+      prospectus,
       host: publicSiteHost(slug),
       site: { name: site.name, organizationName: site.organizationName },
       academicPrograms:authorizedPrograms,
