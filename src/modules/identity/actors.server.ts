@@ -5,7 +5,7 @@ import { writeAudit,type MutationTx } from "@/platform/mutation";
 import { getRequest } from "@tanstack/react-start/server";
 import { rolesAllow } from "@/domain/school-roles";
 
-export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "site_admin" | "specialist" | "counselor" | "room_facilitator" | "site_leader" | "site_staff" | "safeguarding_responder" | "safeguarding_lead";
+export type ActorRole = "student" | "teacher" | "guardian" | "registrar" | "site_admin" | "specialist" | "counselor" | "room_facilitator" | "site_leader" | "site_staff" | "safeguarding_responder" | "safeguarding_lead" | "academic_content_creator" | "academic_content_reviewer";
 
 export type Actor = AccessContext & { actorPersonId: string };
 

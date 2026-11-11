@@ -1,4 +1,12 @@
 export const EventTypes = {
+  InstructionalTrackDraftCreated: "InstructionalTrackDraftCreated",
+  InstructionalTrackDraftSaved: "InstructionalTrackDraftSaved",
+  InstructionalTrackSubmitted: "InstructionalTrackSubmitted",
+  InstructionalTrackReviewed: "InstructionalTrackReviewed",
+  InstructionalTrackPublished: "InstructionalTrackPublished",
+  InstructionalTrackWithdrawn: "InstructionalTrackWithdrawn",
+  StudentInstructionalTrackSelected: "StudentInstructionalTrackSelected",
+  StudentPracticeProgressChanged: "StudentPracticeProgressChanged",
   LaunchDraftSaved: "LaunchDraftSaved",
   SchoolSetupCompleted: "SchoolSetupCompleted",
   OnsiteRoomPlanReviewed: "OnsiteRoomPlanReviewed",

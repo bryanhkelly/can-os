@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": [
+    "src/modules/learning/instructional-tracks.functions.ts",
+    "tests/unit/instructional-tracks.test.ts",
+    "tests/integration/instructional-tracks.integration.test.ts"
+  ]
+}
