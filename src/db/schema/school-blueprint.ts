@@ -264,6 +264,7 @@ export const siteConceptResponses=pgTable("site_concept_responses",{
 export const sitePublicationReleases=pgTable("site_publication_releases",{
   id:id(),siteId:uuid("site_id").notNull().references(()=>sites.id,{onDelete:"restrict"}),
   revision:integer("revision").notNull(),status:text("status").notNull().default("draft"),
+  mode:text("mode").notNull().default("operational"),
   websiteRevisionId:uuid("website_revision_id").references(()=>siteLocalContentVersions.id,{onDelete:"restrict"}),
   contentSnapshot:jsonb("content_snapshot").$type<Record<string,unknown>>().notNull(),
   sourceRevisionMap:jsonb("source_revision_map").$type<Record<string,unknown>>().notNull().default({}),
@@ -274,6 +275,8 @@ export const sitePublicationReleases=pgTable("site_publication_releases",{
 },t=>[
   uniqueIndex("site_publication_release_site_revision_uq").on(t.siteId,t.revision),
   index("site_publication_release_status_idx").on(t.siteId,t.status,t.revision),
+  index("site_publication_release_mode_idx").on(t.siteId,t.mode,t.status,t.publishedAt),
+  check("site_publication_release_mode_ck",sql.raw("mode in (\x27planning_prospectus\x27,\x27operational\x27)")),
   check("site_publication_releases_revision_check",sql.raw("revision>0")),
   check("site_publication_releases_status_check",sql.raw("status in ('draft','in_review','approved','published','withdrawn')")),
   check("site_publication_release_published_ck",sql.raw("status<>'published' or (reviewed_by_person_id is not null and reviewed_at is not null and published_by_person_id is not null and published_at is not null)")),

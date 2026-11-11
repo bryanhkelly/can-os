@@ -68,3 +68,4 @@ export * from "./finance";
 export * from "./jurisdiction-profiles";
 
 export * from "./school-blueprint";
+export * from "./blueprint-approval";
