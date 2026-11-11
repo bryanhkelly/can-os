@@ -25,6 +25,8 @@ export function SchoolBlueprintPublishingPanel({siteId,workspace,onRefresh}:{
  useEffect(()=>{setSelected(old=>old.length?old.filter(id=>currentKeys.includes(id)):currentKeys);},
  // eslint-disable-next-line react-hooks/exhaustive-deps
  [workspace.revision,siteId]);
+ // Never show an earlier immutable candidate as the preview of an edited Blueprint.
+ useEffect(()=>{setPreview(null);},[siteId,workspace.revision]);
  async function run(task:()=>Promise<void>){
   setBusy(true);setError("");setMessage("");
   try{await task();await onRefresh();}
@@ -52,6 +54,11 @@ export function SchoolBlueprintPublishingPanel({siteId,workspace,onRefresh}:{
     <p className="font-semibold">{workspace.latestProspectus?.mode==="planning_prospectus"
       ?workspace.latestProspectus.status:"Not prepared"}</p></div>
   </div>
+  {workspace.latestApproval && workspace.revision > workspace.latestApproval.sourceRevision &&
+   <p role="status" className="border p-3 text-sm text-muted-foreground">
+     This Blueprint has a newer draft than CAN-approved scope v{workspace.latestApproval.version}.
+     Changes to approved offerings must be reviewed again before they can be advertised as confirmed.
+   </p>}
   {error&&<p role="alert" className="border p-3 text-sm text-destructive">{error}</p>}
   {message&&<p role="status" className="border p-3 text-sm">{message}</p>}
   <div className="flex flex-wrap items-center gap-3">
