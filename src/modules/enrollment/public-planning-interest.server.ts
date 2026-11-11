@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { EventTypes } from "@/domain/event-types";
 import {
   sitePublications, sitePublicationReleases, siteBlueprintApprovedVersions, siteProspectusInterests,
 } from "@/db/schema";
@@ -64,7 +65,7 @@ export async function recordPublicPlanningInterest(slug:string,input:PublicPlann
    subjectKind:subjectKind??null,subjectId:subjectId??null,
    contactConsentAt:new Date(),
   }).onConflictDoNothing().returning({id:siteProspectusInterests.id});
-  if(saved)await emitEvent(tx,{eventType:"SchoolPlanningInterestReceived",
+  if(saved)await emitEvent(tx,{eventType:EventTypes.SchoolPlanningInterestReceived,
    aggregateType:"SitePlanningInterest",aggregateId:saved.id,siteId:site.siteId,
    payload:{subjectKind,subjectId,kind:"adult_interest_only"}});
  });
