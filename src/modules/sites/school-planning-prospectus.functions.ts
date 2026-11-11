@@ -222,5 +222,5 @@ export const getSchoolPlanningProspectusReviewDesk=createServerFn({method:"GET"}
  .where(and(eq(sitePublicationReleases.mode,"planning_prospectus"),
   eq(sitePublicationReleases.status,"draft")))
  .orderBy(desc(sitePublicationReleases.createdAt)).limit(100);
- return rows.map(row=>({...row,prospectus:publicProspectusSchema.parse(row.content)}));
+ return rows.map(row=>({id:row.id,siteId:row.siteId,revision:row.revision,siteName:row.siteName,prospectus:publicProspectusSchema.parse(row.content)}));
 });
