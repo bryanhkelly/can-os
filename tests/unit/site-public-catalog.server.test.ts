@@ -4,6 +4,8 @@ const state = vi.hoisted(() => ({
   rows: [] as Array<{ id: string; name: string; organizationName: string;
     status: string; publishedAt: Date | null; type?: string }>,
   activePrograms: [] as Array<{ id: string; type: string }>,
+  approvedVersions: [] as Array<{version:number}>,
+  planningReleases: [] as Array<{source:{canApprovalVersion:number|null};content:Record<string,unknown>}>, 
   reads: 0,
   enrichmentSiteIds: [] as string[],
   academicPrograms: [] as Array<{ programId: string; name: string }>,
@@ -16,7 +18,13 @@ vi.mock("@/db/client", () => {
     innerJoin() { return this; },
     where() { return this; },
     for() { return this; },
-    limit() { return Promise.resolve(state.reads === 1 ? state.rows : state.activePrograms); },
+    orderBy() { return this; },
+    limit() {
+      const rows = state.reads === 1 ? state.rows
+        : state.reads === 2 ? state.activePrograms
+        : state.reads === 3 ? state.approvedVersions : state.planningReleases;
+      return Promise.resolve(rows);
+    },
   };
   const select = () => {
     state.reads += 1;
@@ -82,6 +90,8 @@ import { readPublishedSiteCatalog } from "@/modules/sites/site-public-catalog.se
 beforeEach(() => {
   state.rows = [];
   state.activePrograms = [];
+  state.approvedVersions = [];
+  state.planningReleases = [];
   state.reads = 0;
   state.enrichmentSiteIds = [];
   state.academicPrograms = [];
@@ -119,6 +129,31 @@ describe("site public catalog read gate", () => {
     expect(result?.offerings).toHaveLength(1);
     expect(result?.offerings[0]?.title).toBe("Art Camp");
     expect(JSON.stringify(result)).not.toMatch(/permissionText|sessionIds|internal-session/);
+  });
+  it("keeps a planning prospectus hidden after CAN approval scope changes", async () => {
+    state.rows = [{
+      id: "site-5", name: "Heritage Academy", organizationName: "Community",
+      status: "published", publishedAt: new Date("2026-11-11T00:00:00Z"),
+    }];
+    state.approvedVersions = [{version: 2}];
+    state.planningReleases = [{
+      source: {canApprovalVersion: 1},
+      content: {
+        version: 1, heading: "Planning our school",
+        introduction: "Explore the programs our community hopes to introduce.",
+        notice: "Proposed school offerings are not an enrollment commitment.",
+        sourceBlueprintRevision: 1, canApprovalVersion: 1,
+        items: [{
+          sourceId: "00000000-0000-4000-8000-000000000001",
+          sourceKind: "program", title: "Grades 6–8 Academy",
+          summary: "Our proposed grades 6 through 8 program.",
+          state: "confirmed", canApprovalVersion: 1,
+        }],
+      },
+    }];
+    const result = await readPublishedSiteCatalog("school");
+    expect(result?.prospectus).toBeNull();
+    expect(result?.site.name).toBe("Heritage Academy");
   });
   it("keeps approved academic marketing visible while independent opening review is pending", async () => {
     state.rows = [{
