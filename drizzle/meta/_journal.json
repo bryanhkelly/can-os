@@ -589,6 +589,13 @@
       "when": 1794365004000,
       "tag": "0083_hosted_academy_generalization",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1794365005000,
+      "tag": "0084_blueprint_approvals_and_prospectus",
+      "breakpoints": true
     }
   ]
 }
