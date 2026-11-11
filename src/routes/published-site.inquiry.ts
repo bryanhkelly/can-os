@@ -54,7 +54,22 @@ export const Route = createFileRoute("/published-site/inquiry")({
 
       let data;
       try {
-        data = parsePublicAdmissionsInterest(await readSmallUrlEncodedBody(request));
+        const params = await readSmallUrlEncodedBody(request);
+        if (params.get("interestMode") === "planning") {
+          const { parsePublicPlanningInterest, recordPublicPlanningInterest } =
+            await import("@/modules/enrollment/public-planning-interest.server");
+          const planning = parsePublicPlanningInterest(params);
+          await recordPublicPlanningInterest(slug, planning);
+          return new Response(`<!doctype html><html lang="en"><head>
+            <meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+            <meta name="robots" content="noindex,nofollow"/><title>Interest registered</title></head>
+            <body style="font-family:system-ui,sans-serif;max-width:42rem;margin:4rem auto;padding:1rem">
+            <h1>Thank you for your interest.</h1>
+            <p>We received your request for school planning updates. This is not an application
+            or a commitment to enroll.</p><p><a href="/">Return to the school</a></p></body></html>`,
+            {status:200,headers:{...commonHeaders,"Content-Type":"text/html; charset=utf-8"}});
+        }
+        data = parsePublicAdmissionsInterest(params);
       } catch {
         return new Response("Please review the information in your request and try again.", {
           status: 400, headers: { ...commonHeaders,
