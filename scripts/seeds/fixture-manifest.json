@@ -364,22 +364,6 @@
       ],
       "downstreamRecords": []
     },
-    "/guardian/academics": {
-      "persona": "guardian",
-      "seeds": [
-        "gf1-assignments-v2.sql",
-        "new-experiences-v1.sql"
-      ],
-      "recordCounts": {
-        "assessments": 1,
-        "submissions": 1,
-        "section_grades": 1
-      },
-      "interactions": [
-        "review child assignments and grades"
-      ],
-      "downstreamRecords": []
-    },
     "/guardian/admission-offers": {
       "persona": "guardian",
       "seeds": [
@@ -2136,6 +2120,22 @@
         "open the same Site and Program configuration used in Launch",
         "retain the dashboard Settings return context",
         "reject an unavailable or mismatched school"
+      ],
+      "downstreamRecords": []
+    },
+    "/guardian/students": {
+      "persona": "guardian",
+      "seeds": [
+        "gf1-assignments-v2.sql",
+        "new-experiences-v1.sql"
+      ],
+      "recordCounts": {
+        "assessments": 1,
+        "submissions": 1,
+        "section_grades": 1
+      },
+      "interactions": [
+        "review child assignments and grades"
       ],
       "downstreamRecords": []
     }
