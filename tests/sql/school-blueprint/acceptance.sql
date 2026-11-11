@@ -10,6 +10,11 @@ DECLARE
   rel_a uuid;
   contact_a uuid;
   campaign_b uuid;
+  website_a uuid;
+  pack_a uuid:=gen_random_uuid();
+  pack_b uuid:=gen_random_uuid();
+  version_a uuid;
+  adoption_a uuid:=gen_random_uuid();
   failed_ok boolean:=false;
 BEGIN
   IF (SELECT count(*) FROM blueprint_catalog_items)<>74 THEN
@@ -29,6 +34,9 @@ BEGIN
   END IF;
   INSERT INTO sites(id) VALUES(site_a),(site_b);
   INSERT INTO people(id) VALUES(person_a);
+  INSERT INTO site_local_content_versions(site_id) VALUES(site_a) RETURNING id INTO website_a;
+  INSERT INTO curriculum_packs(id) VALUES(pack_a),(pack_b);
+  INSERT INTO curriculum_pack_versions(pack_id) VALUES(pack_a) RETURNING id INTO version_a;
   INSERT INTO organizations(id) VALUES(host_a),(host_b);
   INSERT INTO site_blueprints(site_id,created_by_person_id,updated_by_person_id)
     VALUES(site_a,person_a,person_a);
@@ -73,6 +81,33 @@ BEGIN
   EXCEPTION WHEN check_violation THEN failed_ok:=true;
   END;
   IF NOT failed_ok THEN RAISE EXCEPTION 'Unreviewed release could be published';END IF;
+  -- The database, not just the application, must reject cross-Site website revisions.
+  failed_ok:=false;
+  BEGIN
+    INSERT INTO site_concept_campaigns(site_id,name,website_revision_id,created_by_person_id)
+      VALUES(site_b,'Invalid website revision',website_a,person_a);
+  EXCEPTION WHEN foreign_key_violation THEN failed_ok:=true;
+  END;
+  IF NOT failed_ok THEN RAISE EXCEPTION 'Cross-Site campaign website revision allowed'; END IF;
+  failed_ok:=false;
+  BEGIN
+    INSERT INTO site_publication_releases(site_id,revision,website_revision_id,content_snapshot)
+      VALUES(site_b,2,website_a,'{}'::jsonb);
+  EXCEPTION WHEN foreign_key_violation THEN failed_ok:=true;
+  END;
+  IF NOT failed_ok THEN RAISE EXCEPTION 'Cross-Site publication website revision allowed'; END IF;
+  -- The pack version must belong to the selected curriculum pack.
+  failed_ok:=false;
+  BEGIN
+    INSERT INTO site_curriculum_plans(site_id,subject,pack_id,pack_version_id,created_by_person_id)
+      VALUES(site_a,'Science',pack_b,version_a,person_a);
+  EXCEPTION WHEN foreign_key_violation THEN failed_ok:=true;
+  END;
+  IF NOT failed_ok THEN RAISE EXCEPTION 'Mismatched curriculum pack/version allowed'; END IF;
+  -- A shared multi-course adoption must be reusable across subject plans.
+  INSERT INTO curriculum_adoptions(id) VALUES(adoption_a);
+  INSERT INTO site_curriculum_plans(site_id,subject,canonical_adoption_id,created_by_person_id)
+    VALUES(site_a,'Mathematics',adoption_a,person_a),(site_a,'Science',adoption_a,person_a);
   RAISE NOTICE 'School Blueprint catalog, safety and Site scoping checks passed';
 END
 $$;
