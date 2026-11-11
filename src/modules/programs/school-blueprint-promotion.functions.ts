@@ -4,14 +4,14 @@ import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  activities, programs, sites, siteBlueprints, siteBlueprintRevisions, siteProgramPlans,
+  activities, documents, programs, sites, siteBlueprints, siteBlueprintRevisions, siteProgramPlans,
   siteBlueprintItems, siteBlueprintApprovedVersions, siteBlueprintApprovalDecisions,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { assertBlueprintApprovedForPreparation, blueprintOperationalProgramType } from "@/domain/blueprint-operational-readiness";
+import { assertBlueprintApprovedForPreparation, blueprintOperationalProgramType, validateBlueprintEvidenceReview } from "@/domain/blueprint-operational-readiness";
 import type { ApprovedBlueprintSnapshot, BlueprintApprovedDecision } from "@/domain/blueprint-operational-readiness";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -47,6 +47,25 @@ async function currentApproved(tx:Tx,siteId:string,
     .where(and(eq(siteBlueprintApprovalDecisions.approvalVersionId,scope.id),
       eq(siteBlueprintApprovalDecisions.subjectKind,subjectKind),
       eq(siteBlueprintApprovalDecisions.subjectId,subjectId))).limit(1);
+  // Approval evidence can expire after the original CAN decision.
+  // Re-check the verified document at promotion time, under the Site lock.
+  if(decision?.decision==="approved"){
+    const findings=validateBlueprintEvidenceReview(decision.evidence);
+    for(const dimension of ["facility","staffing"] as const){
+      const finding=findings[dimension];
+      if(finding.status!=="verified")continue;
+      const [doc]=await tx.select({
+        subjectType:documents.subjectType,subjectId:documents.subjectId,
+        verifiedAt:documents.verifiedAt,expiresAt:documents.expiresAt,
+      }).from(documents).where(eq(documents.id,finding.documentId!)).limit(1);
+      if(!doc?.verifiedAt || (doc.expiresAt&&doc.expiresAt.getTime()<=Date.now()) ||
+        !((doc.subjectType==="site"&&doc.subjectId===siteId) ||
+          (doc.subjectType==="blueprint_item"&&doc.subjectId===subjectId) ||
+          (doc.subjectType==="blueprint_program"&&doc.subjectId===subjectId)))
+        throw new DomainError("CONFLICT",
+          "Supporting facility or staffing evidence expired or is no longer verified. Request CAN review.");
+    }
+  }
   return {scope,decision};
 }
 async function bumpBlueprint(tx:Tx,actor:AccessContext,site:{id:string;organizationId:string},
