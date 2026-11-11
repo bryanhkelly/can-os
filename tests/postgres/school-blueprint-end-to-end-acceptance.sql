@@ -54,6 +54,28 @@ BEGIN
     VALUES(heritage_site,1,proposal_v1,site_admin);
   INSERT INTO site_blueprint_review_requests(id,site_id,source_revision,proposal_snapshot,submitted_by_person_id)
     VALUES(request1,heritage_site,1,proposal_v1,site_admin);
+  -- PostgreSQL must reject invalid review provenance even if a caller bypasses the application.
+  error_raised=false;
+  BEGIN
+    INSERT INTO site_blueprint_review_requests(site_id,source_revision,proposal_snapshot,submitted_by_person_id)
+      VALUES(valor_site,1,proposal_v1,site_admin);
+  EXCEPTION WHEN foreign_key_violation THEN error_raised=true;
+  END;
+  IF NOT error_raised THEN RAISE EXCEPTION 'Review request without a Site revision was accepted'; END IF;
+  error_raised=false;
+  BEGIN
+    INSERT INTO site_blueprint_approved_versions(site_id,version,review_request_id,source_revision,approved_snapshot,school_scope_statement,reviewed_by_person_id)
+      VALUES(valor_site,99,request1,1,proposal_v1,'Cross-Site approval must never be accepted',can_reviewer);
+  EXCEPTION WHEN foreign_key_violation THEN error_raised=true;
+  END;
+  IF NOT error_raised THEN RAISE EXCEPTION 'Cross-Site CAN approval request reference was accepted'; END IF;
+  error_raised=false;
+  BEGIN
+    INSERT INTO site_blueprint_approved_versions(site_id,version,review_request_id,source_revision,approved_snapshot,school_scope_statement,reviewed_by_person_id)
+      VALUES(heritage_site,99,request1,2,proposal_v1,'Mismatched revision must never be accepted',can_reviewer);
+  EXCEPTION WHEN foreign_key_violation THEN error_raised=true;
+  END;
+  IF NOT error_raised THEN RAISE EXCEPTION 'CAN approval with mismatched review revision was accepted'; END IF;
   INSERT INTO site_blueprint_approved_versions(id,site_id,version,review_request_id,
     source_revision,approved_snapshot,school_scope_statement,reviewed_by_person_id)
     VALUES(approval1,heritage_site,1,request1,1,proposal_v1,
