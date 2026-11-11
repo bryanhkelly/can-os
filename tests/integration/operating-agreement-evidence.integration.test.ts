@@ -61,7 +61,7 @@ async function seedChurchCanProgram(tx: Transaction, suffix: string) {
   }).returning());
   const program = first(await tx.insert(s.programs).values({
     organizationId: church.id, siteId: site.id, jurisdictionId: jurisdiction.id,
-    type: "church_hosted_academy", status: "active", name: "Evidence Academy",
+    type: "hosted_academy", status: "active", name: "Evidence Academy",
     slug: `evidence-${suffix}`, gradeRange: { min: "9", max: "12" },
     deliveryModel: { onsite: true, asynchronous: true, onsiteDaysPerWeek: 2 },
     hostOrganizationId: church.id,
