@@ -11,7 +11,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { schoolBlueprintIdentitySchema } from "@/domain/school-blueprint";
+import { siteBlueprintIdentitySchema } from "@/domain/school-blueprint";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -20,7 +20,7 @@ const selection = z.object({ siteId: uuid }).strict();
 const expected = z.number().int().min(0);
 const saveIdentity = selection.extend({
   expectedRevision: expected,
-  identity: schoolBlueprintIdentitySchema,
+  identity: siteBlueprintIdentitySchema,
 }).strict();
 const addTemplate = selection.extend({
   expectedRevision: expected,
@@ -29,6 +29,18 @@ const addTemplate = selection.extend({
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Reader = Pick<typeof db, "select">;
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+function safeJson(value: unknown): JsonValue {
+  if (value === null || typeof value === "string" || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) return value.map(safeJson);
+  if (typeof value === "object" && value !== null)
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, safeJson(child)]));
+  return null;
+}
+function safeJsonObject(value: Record<string, unknown>): Record<string, JsonValue> {
+  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, safeJson(child)]));
+}
 
 /** Caller-supplied Site IDs are never a grant. Read the Site and recheck the active scope. */
 async function requireBlueprintSite(actor: AccessContext, tx: Reader, siteId: string, capability: string) {
@@ -135,16 +147,24 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
       id: item.id, code: item.code, kind: item.kind, category: item.category,
       name: item.name, summary: item.summary, versionId: version.id,
       version: version.version, gradeRange: version.gradeRange,
-      scheduleSuggestion: version.scheduleSuggestion, requirements: version.configuration.requirements ?? [],
+      // Only reviewed, non-sensitive catalog fields cross the client boundary.
     }));
     return {
       site, revision: head[0]?.currentRevision ?? 0,
       identity: {
         religiousAffiliationCode: head[0]?.religiousAffiliationCode ?? null,
         editorialIdentity: head[0]?.editorialIdentity ?? "community_belonging",
-        culturalContext: head[0]?.culturalContext ?? {},
+        culturalContext: safeJsonObject(head[0]?.culturalContext ?? {}),
       },
-      catalog, affiliations, ...plans,
+      catalog, affiliations,
+      programs: plans.programs.map(p => ({
+        id: p.id, catalogVersionId: p.catalogVersionId, name: p.name,
+        kind: p.kind, gradeRange: p.gradeRange, status: p.status,
+      })),
+      items: plans.items.map(i => ({
+        id: i.id, catalogVersionId: i.catalogVersionId, title: i.title,
+        summary: i.summary, kind: i.kind, status: i.status,
+      })),
     };
   });
 
