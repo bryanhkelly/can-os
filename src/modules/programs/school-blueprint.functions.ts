@@ -26,11 +26,30 @@ const saveIdentity = selection.extend({
 const createItem = selection.extend({
   expectedRevision: expected, item: siteBlueprintItemDraftSchema,
 }).strict();
+const preparation = z.object({
+  facilityPlan:z.string().trim().max(2000).default(""),
+  staffingPlan:z.string().trim().max(2000).default(""),
+  equipment:z.string().trim().max(1500).default(""),
+  facilityEvidenceDocumentId:uuid.nullable().default(null),
+  staffingEvidenceDocumentId:uuid.nullable().default(null),
+}).strict();
 const editItem = selection.extend({
   expectedRevision: expected, itemId: uuid,
   title: z.string().trim().min(2).max(160),
   summary: z.string().trim().max(4000),
+  preparation:preparation.optional(),
 }).strict();
+const editProgram = selection.extend({
+  expectedRevision:expected,planId:uuid,
+  name:z.string().trim().min(2).max(120),
+  gradeRange:z.object({min:z.string().trim().min(1).max(12),
+    max:z.string().trim().min(1).max(12)}).strict(),
+  deliveryModel:z.object({
+    onsite:z.boolean(),asynchronous:z.boolean(),liveOnline:z.boolean(),
+    onsiteDaysPerWeek:z.number().int().min(0).max(7),
+  }).strict(),
+}).strict();
+const retireProgram=selection.extend({expectedRevision:expected,planId:uuid}).strict();
 const retireItem = selection.extend({expectedRevision: expected,itemId: uuid}).strict();
 const addTemplate = selection.extend({
   expectedRevision: expected,
@@ -195,12 +214,16 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
       latestProspectus:latestProspectus[0]??null,
       sitePublication:sitePublication[0]??null,
       programs: plans.programs.map(p => ({
-        id: p.id, catalogVersionId: p.catalogVersionId, name: p.name,
-        kind: p.kind, gradeRange: p.gradeRange, status: p.status,
+        id:p.id,catalogVersionId:p.catalogVersionId,name:p.name,
+        kind:p.kind,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,
+        canonicalProgramId:p.canonicalProgramId,status:p.status,
       })),
       items: plans.items.map(i => ({
-        id: i.id, catalogVersionId: i.catalogVersionId, title: i.title,
-        summary: i.summary, kind: i.kind, status: i.status,
+        id:i.id,catalogVersionId:i.catalogVersionId,title:i.title,
+        summary:i.summary,kind:i.kind,status:i.status,
+        canonicalActivityId:i.canonicalActivityId,
+        preparation:safeJsonObject(
+          (i.configuration.preparation??{}) as Record<string,unknown>),
       })),
     };
   });
@@ -337,9 +360,14 @@ export const updateSchoolBlueprintItem=createServerFn({method:"POST"})
     eq(siteBlueprintItems.id,data.itemId),eq(siteBlueprintItems.siteId,site.id))).for("update").limit(1);
   if(!item||item.status==="retired"||item.status==="linked")
     throw new DomainError("CONFLICT","This proposed experience cannot be edited here.");
-  if(item.title===data.title&&item.summary===data.summary)return {changed:false,revision};
+  const configuration=data.preparation
+    ?{...item.configuration,preparation:data.preparation}:item.configuration;
+  if(item.title===data.title&&item.summary===data.summary&&
+    JSON.stringify(configuration)===JSON.stringify(item.configuration))
+    return {changed:false,revision};
   await tx.update(siteBlueprintItems).set({
-    title:data.title,summary:data.summary,revision:item.revision+1,updatedAt:new Date(),status:"draft",
+    title:data.title,summary:data.summary,configuration,
+    revision:item.revision+1,updatedAt:new Date(),status:"draft",
   }).where(eq(siteBlueprintItems.id,item.id));
   const next=await appendBlueprintRevision(tx,actor,{
     siteId:site.id,organizationId:site.organizationId,previousRevision:revision,
@@ -374,4 +402,65 @@ export const retireSchoolBlueprintItem=createServerFn({method:"POST"})
   });
   return {changed:true,revision:next};
  });
+});
+
+
+/** Local Program changes remain proposals; only the independent CAN desk can review them. */
+export const updateSchoolBlueprintProgramPlan=createServerFn({method:"POST"})
+.validator((v:unknown)=>editProgram.parse(v))
+.handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const actor=await getCommandContext(getRequest());
+  return db.transaction(async tx=>{
+    const {site,head,revision}=await lockBlueprint(tx,actor,data.siteId,data.expectedRevision);
+    if(!head)throw new DomainError("CONFLICT","Save the School Blueprint first.");
+    const [plan]=await tx.select().from(siteProgramPlans).where(and(
+      eq(siteProgramPlans.id,data.planId),eq(siteProgramPlans.siteId,site.id))).for("update").limit(1);
+    if(!plan||plan.status==="retired"||plan.status==="linked")
+      throw new DomainError("CONFLICT","This Program is not an editable proposal.");
+    const model=data.deliveryModel;
+    if(!model.onsite&&!model.asynchronous&&!model.liveOnline)
+      throw new DomainError("VALIDATION_FAILED","Choose at least one instructional delivery mode.");
+    if(model.onsiteDaysPerWeek>0&&!model.onsite)
+      throw new DomainError("VALIDATION_FAILED","Onsite days require onsite instruction.");
+    if(data.gradeRange.min>data.gradeRange.max)
+      throw new DomainError("VALIDATION_FAILED","Grade range is not ordered.");
+    await tx.update(siteProgramPlans).set({
+      name:data.name,gradeRange:data.gradeRange,deliveryModel:model,
+      status:"draft",revision:plan.revision+1,updatedAt:new Date(),
+    }).where(eq(siteProgramPlans.id,plan.id));
+    const next=await appendBlueprintRevision(tx,actor,{
+      siteId:site.id,organizationId:site.organizationId,previousRevision:revision,
+      identity:{religiousAffiliationCode:head.religiousAffiliationCode,
+        editorialIdentity:head.editorialIdentity,culturalContext:head.culturalContext},
+      change:{operation:"program_plan_updated",planId:plan.id,previousRevision:plan.revision},
+    });
+    return {changed:true,revision:next};
+  });
+});
+
+export const retireSchoolBlueprintProgramPlan=createServerFn({method:"POST"})
+.validator((v:unknown)=>retireProgram.parse(v))
+.handler(async({data})=>{
+  setResponseHeader("Cache-Control","private, no-store");
+  const actor=await getCommandContext(getRequest());
+  return db.transaction(async tx=>{
+    const {site,head,revision}=await lockBlueprint(tx,actor,data.siteId,data.expectedRevision);
+    if(!head)throw new DomainError("CONFLICT","School Blueprint is not saved.");
+    const [plan]=await tx.select().from(siteProgramPlans).where(and(
+      eq(siteProgramPlans.id,data.planId),eq(siteProgramPlans.siteId,site.id))).for("update").limit(1);
+    if(!plan||plan.status==="linked")
+      throw new DomainError("CONFLICT","Operational Programs must be managed in their canonical workspace.");
+    if(plan.status==="retired")return {changed:false,revision};
+    await tx.update(siteProgramPlans).set({
+      status:"retired",revision:plan.revision+1,updatedAt:new Date(),
+    }).where(eq(siteProgramPlans.id,plan.id));
+    const next=await appendBlueprintRevision(tx,actor,{
+      siteId:site.id,organizationId:site.organizationId,previousRevision:revision,
+      identity:{religiousAffiliationCode:head.religiousAffiliationCode,
+        editorialIdentity:head.editorialIdentity,culturalContext:head.culturalContext},
+      change:{operation:"program_plan_retired",planId:plan.id},
+    });
+    return {changed:true,revision:next};
+  });
 });
