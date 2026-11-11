@@ -43,3 +43,19 @@ jobs:
           psql -v ON_ERROR_STOP=1 -f drizzle/0080_school_blueprint_reference_library.sql
       - name: Verify constraints, scope isolation and seed counts
         run: psql -v ON_ERROR_STOP=1 -f tests/sql/school-blueprint/acceptance.sql
+
+  type-and-domain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Type-check complete CAN OS schema
+        run: npm run typecheck
+      - name: Lint new Blueprint types and contracts
+        run: npx eslint src/db/schema/school-blueprint.ts src/domain/school-blueprint.ts tests/unit/site-blueprint-foundation.test.ts
+      - name: Run Blueprint domain contract unit tests
+        run: npx vitest run tests/unit/site-blueprint-foundation.test.ts
