@@ -95,8 +95,16 @@ async function appendBlueprintRevision(
     siteId: input.siteId, revision, schemaVersion: 1,
     snapshot: {
       identity: input.identity,
-      programPlanIds: plans.programs.map(p => p.id),
-      itemIds: plans.items.map(i => i.id),
+      programs: plans.programs.map(p => ({
+        id:p.id,siteId:p.siteId,catalogVersionId:p.catalogVersionId,
+        name:p.name,kind:p.kind,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,
+        religiousAffiliationCode:p.religiousAffiliationCode,status:p.status,revision:p.revision,
+      })),
+      items: plans.items.map(i => ({
+        id:i.id,siteId:i.siteId,programPlanId:i.programPlanId,catalogVersionId:i.catalogVersionId,
+        kind:i.kind,title:i.title,summary:i.summary,configuration:i.configuration,
+        status:i.status,revision:i.revision,
+      })),
       change: input.change,
     },
     createdByPersonId: actor.actorPersonId!,
