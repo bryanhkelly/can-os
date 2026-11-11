@@ -26,6 +26,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Generate route tree through the standard application build
+        run: npm run build
       - name: Full TypeScript check with sufficient heap
         run: npm run typecheck
       - name: Lint Blueprint implementation
