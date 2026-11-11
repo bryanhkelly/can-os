@@ -6,7 +6,7 @@ export const programTypes = [
 export type ProgramType = (typeof programTypes)[number];
 export type ProgramCreditMode = "credit_bearing" | "non_credit";
 export const programTypeLabels: Record<ProgramType, string> = {
-  church_hosted_academy: "Church-hosted academy",
+  church_hosted_academy: "Hosted academy",
   high_school_extension: "High school extension",
   full_school: "Full school",
   microschool: "Microschool",

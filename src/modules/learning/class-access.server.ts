@@ -9,10 +9,8 @@ import { requireCurrentTeacherProgramDelegation } from "@/modules/identity/teach
 import { requireTeachingEligibility } from "@/modules/staffing/teaching-eligibility.server";
 export type ClassTransaction = Parameters<Parameters<typeof import("@/db/client").db.transaction>[0]>[0];
 
-/** Church owns its Site, CAN owns academics. A church staff grant must
- * never stand in for CAN teacher authority on a separate academic provider.
- */
-async function isIndependentChurchAcademicProgram(
+/** External academic authority comes from the assigned provider and Program. */
+async function isIndependentAcademicProgram(
   query: Pick<typeof import("@/db/client").db,"select">,
   programId: string,
 ):Promise<boolean>{
@@ -23,12 +21,7 @@ async function isIndependentChurchAcademicProgram(
     academicProviderId:s.programs.academicProviderOrganizationId,
   }).from(s.programs).where(eq(s.programs.id,programId)).limit(1);
   if(!program)throw new AuthorizationError("existing class academic Program");
-  const hostId=program.hostId??program.ownerId;
-  if(hostId===program.academicProviderId)return false;
-  const [host]=await query.select({type:s.organizations.type}).from(s.organizations)
-    .where(eq(s.organizations.id,hostId)).limit(1);
-  if(!host)throw new AuthorizationError("existing church Site host");
-  return host.type==="church";
+  return (program.hostId ?? program.ownerId) !== program.academicProviderId;
 }
 
 
@@ -62,17 +55,15 @@ export async function authorizeClass(actor: Actor, sectionId: string, studentPer
   // host Organization or its unrelated Programs and Sites.
   const institutionalSection=actor.role==="teacher" &&
     actor.scope.sectionIds?.includes(section.id)===true;
-  const churchCANProgram=actor.role==="teacher" &&
-    await isIndependentChurchAcademicProgram(query,section.programId);
+  const sharedProviderProgram=actor.role==="teacher" &&
+    await isIndependentAcademicProgram(query,section.programId);
   if(institutionalSection){
     await requireCurrentTeacherProgramDelegation(query,{
       personId:actor.actorPersonId,programId:section.programId,siteId:section.siteId,
     });
   }
-  if(churchCANProgram){
-    // Church staff may supervise children, but must NOT grade or teach
-    // institution-owned CAN classes on a host-local grant. The teacher must
-    // have a provider-wide original CAN grant and exact delegated Section.
+  if(sharedProviderProgram){
+    // Shared-provider Sections require the provider's grant and an exact Section delegation.
     if(!institutionalSection || actor.grantSiteId!==null)
       throw new AuthorizationError("CAN academic provider teacher assigned to exact Section");
     await requireInstitutionalAcademicProgramAuthority(query,actor,section.programId,[
@@ -150,13 +141,13 @@ export async function accessibleClasses(actor: Actor) {
         ) : scope)).orderBy(s.sections.title);
     const available=[];
     const independentByProgram=new Map<string,boolean>();
-    // A previously signed-in CAN teacher must not retain a stale church
+    // A previously signed-in CAN teacher must not retain a stale host
     // class directory entry after the underlying academic agreement expires
     // or is withdrawn. A Section assignment alone is never a contract.
     for(const row of rows){
       let independent=independentByProgram.get(row.programId);
       if(independent===undefined){
-        independent=await isIndependentChurchAcademicProgram(db,row.programId);
+        independent=await isIndependentAcademicProgram(db,row.programId);
         independentByProgram.set(row.programId,independent);
       }
       const hostLocal=!!row.siteId &&
@@ -225,3 +216,4 @@ export async function accessibleClasses(actor: Actor) {
     studentName: personDisplayName({ preferredName: row.preferredName, legalFirstName: row.firstName, legalLastName: row.lastName }),
   }])).values()];
 }
+

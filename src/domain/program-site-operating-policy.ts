@@ -7,13 +7,13 @@ export const operatingServices = [
 ] as const;
 export type OperatingService = (typeof operatingServices)[number];
 
-/** The normal church-to-CAN classroom pathway uses more than the four
+/** The normal host-to-CAN classroom pathway uses more than the four
  * launch-opening services: admissions requires its own entitlement and
  * grading/transcript workflows need academic records. Do not silently
  * contract credit issuance for a noncredit Program.
  * Local staff permissions and safeguarding reviews remain separate.
  */
-export function recommendedChurchOperatingServices(hasCreditIssuer:boolean): OperatingService[] {
+export function recommendedHostedOperatingServices(hasCreditIssuer:boolean): OperatingService[] {
   const essentials: OperatingService[] = [
     "academic_instruction", "curriculum", "school_of_record",
     "admissions", "academic_records", "onsite_supervision",
@@ -33,15 +33,15 @@ export type OperatingProgramIdentity = {
   institutionOrganizationType: string;
   creditIssuingOrganizationId: string | null;
 };
-export function assertChurchCANOperatingIdentity(value: OperatingProgramIdentity): void {
+export function assertOperatingProgramIdentity(value: OperatingProgramIdentity): void {
   if (!value.siteId || value.siteOrganizationId !== value.hostOrganizationId ||
       value.programOrganizationId !== value.hostOrganizationId ||
-      value.hostOrganizationType !== "church" ||
+      !value.hostOrganizationType ||
       value.institutionOrganizationType !== "can_network" ||
       value.institutionOrganizationId === value.hostOrganizationId ||
       (value.creditIssuingOrganizationId !== null &&
        value.creditIssuingOrganizationId !== value.institutionOrganizationId))
-    throw new AuthorizationError("independently hosted CAN Program and church-owned Site");
+    throw new AuthorizationError("independently hosted CAN Program and host-owned Site");
 }
 export function normalizeOperatingServices(values: readonly string[]): OperatingService[] {
   if (!values.length || values.length > operatingServices.length ||
@@ -111,7 +111,7 @@ export function assertCurrentOperatingAuthorization(
   required: readonly OperatingService[],
   at = new Date(),
 ): void {
-  assertChurchCANOperatingIdentity(identity);
+  assertOperatingProgramIdentity(identity);
   // A helper called without an explicit service must never become a generic
   // cross-organization authorization token for an unrelated operation.
   normalizeOperatingServices(required);
@@ -127,3 +127,4 @@ export function assertCurrentOperatingAuthorization(
       required.some(service => !contracted.includes(service)))
     throw new AuthorizationError("current independently approved Program-Site service entitlement");
 }
+

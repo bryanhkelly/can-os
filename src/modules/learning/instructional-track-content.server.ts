@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { courseTemplates, courseTemplateVersions, curriculumResources, documents, instructionalTrackActivities,
   instructionalTrackActivitySecrets, instructionalTrackLessons, instructionalTracks, instructionalTrackVersions,
-  instructionalTrackWithdrawals, people } from "@/db/schema";
+  instructionalTrackResourceSnapshots, instructionalTrackWithdrawals, people } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { readClassContent } from "@/domain/class-content";
 import { resolveClassVideo } from "@/domain/class-video";
@@ -34,8 +34,23 @@ export async function readTrackBundle(tx: TrackTx, versionId: string, lock: "sha
     .where(inArray(instructionalTrackActivitySecrets.activityId, activities.map(a => a.id))).orderBy(asc(instructionalTrackActivitySecrets.activityId)) : [];
   const resourceIds = [...new Set([version.rightsEvidenceResourceId, ...lessons.flatMap(l => [l.resourceId, l.captionResourceId, l.transcriptResourceId]),
     ...activities.map(a => a.resourceId)].filter((id): id is string => Boolean(id)))];
-  const resources = resourceIds.length ? await tx.select().from(curriculumResources).where(inArray(curriculumResources.id, resourceIds))
+  const currentResources = resourceIds.length ? await tx.select().from(curriculumResources).where(inArray(curriculumResources.id, resourceIds))
     .for("share").orderBy(asc(curriculumResources.id)) : [];
+  const [snapshot] = await tx.select().from(instructionalTrackResourceSnapshots)
+    .where(eq(instructionalTrackResourceSnapshots.trackVersionId, version.id)).limit(1);
+  const resources = snapshot ? snapshot.resources.map(resource => ({
+    ...resource, createdAt: new Date(resource.createdAt), updatedAt: new Date(resource.updatedAt),
+  })) : currentResources;
+  const currentById = new Map(currentResources.map(resource => [resource.id, resource]));
+  // A catalog edit can supply a different title or URL for the next release.
+  // Changes to ownership, visibility, licensing or the verified document binding still block delivery.
+  const currentResourceAuthority = resources.length === resourceIds.length &&
+    resources.every(resource => {
+      const current = currentById.get(resource.id);
+      return !!current && current.ownerOrganizationId === resource.ownerOrganizationId &&
+        current.licenseCode === resource.licenseCode && current.documentId === resource.documentId &&
+        current.metadata.audience === resource.metadata.audience;
+    });
   const documentIds = resources.flatMap(r => r.documentId ? [r.documentId] : []);
   const docs = documentIds.length ? await tx.select().from(documents).where(inArray(documents.id, documentIds))
     .for("share").orderBy(asc(documents.id)) : [];
@@ -46,15 +61,26 @@ export async function readTrackBundle(tx: TrackTx, versionId: string, lock: "sha
     rights: json({ trackTitle: track.title, trackSlug: track.slug, authorPersonId: version.createdByPersonId,
       evidenceResourceId: version.rightsEvidenceResourceId, expiresAt: version.rightsExpiresAt,
       sourceCurriculum: course.curriculum, courseOwnerId: course.ownerId }) });
-  return { version, track, course, lessons, activities, secrets, resources, docs, restrictions, computedManifestHash };
+  return { version, track, course, lessons, activities, secrets, resources, docs, restrictions,
+    currentResourceAuthority, computedManifestHash };
 }
 export type TrackBundle = Awaited<ReturnType<typeof readTrackBundle>>;
+
+export async function sealTrackResources(tx: TrackTx, bundle: TrackBundle) {
+  await tx.insert(instructionalTrackResourceSnapshots).values({
+    trackVersionId: bundle.version.id,
+    resources: bundle.resources.map(resource => ({
+      ...resource, createdAt: resource.createdAt.toISOString(), updatedAt: resource.updatedAt.toISOString(),
+    })),
+  });
+}
 
 /** Whole-manifest structural gate. Academic/rights/accessibility/safety decisions are separate.
  * A role grant, external URL or synthetic profile is never itself content approval.
  */
 export async function assertTrackContentReady(tx: TrackTx, bundle: TrackBundle, now = new Date(), draft = false) {
   const { version, track, course, lessons, activities, secrets, resources, docs } = bundle;
+  if (!bundle.currentResourceAuthority) throw new TrackContentError("Current ownership, license and visibility are required for approved track resources.");
   const [presenter] = await tx.select({ id: people.id }).from(people)
     .where(and(eq(people.id, track.presenterPersonId), eq(people.active, true))).for("share").limit(1);
   if (!presenter || course.status !== "published" || course.ownerId !== track.producerOrganizationId)
