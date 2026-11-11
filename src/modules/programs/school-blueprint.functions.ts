@@ -126,7 +126,7 @@ async function appendBlueprintRevision(
       identity: input.identity,
       programs: plans.programs.map(p => ({
         id:p.id,siteId:p.siteId,catalogVersionId:p.catalogVersionId,
-        name:p.name,kind:p.kind,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,
+        name:p.name,kind:p.kind,gradeRange:p.gradeRange,deliveryModel:safeJsonObject(p.deliveryModel),
         religiousAffiliationCode:p.religiousAffiliationCode,status:p.status,revision:p.revision,
       })),
       items: plans.items.map(i => ({
@@ -231,7 +231,7 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
       sitePublication:sitePublication[0]??null,
       programs: plans.programs.map(p => ({
         id:p.id,catalogVersionId:p.catalogVersionId,name:p.name,
-        kind:p.kind,gradeRange:p.gradeRange,deliveryModel:p.deliveryModel,
+        kind:p.kind,gradeRange:p.gradeRange,deliveryModel:safeJsonObject(p.deliveryModel),
         canonicalProgramId:p.canonicalProgramId,status:p.status,
       })),
       items: plans.items.map(i => ({

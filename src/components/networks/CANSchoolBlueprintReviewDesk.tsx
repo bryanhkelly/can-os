@@ -130,8 +130,8 @@ export function CANSchoolBlueprintReviewDesk(){
     <Button variant="outline" disabled={busy||subjects.some(s=>{
       const k=key(req.id,s.kind,s.id),choice=choices[k];
       return !choice || (choice==="approved" && (
-        !["verified","not_required"].includes(facility[k]) ||
-        !["verified","not_required"].includes(staffing[k]) ||
+        !["verified","not_required"].includes(facility[k]??"") ||
+        !["verified","not_required"].includes(staffing[k]??"") ||
         (facility[k]==="verified"&&!facilityDoc[k]) ||
         (staffing[k]==="verified"&&!staffingDoc[k])));
     })||(scope[req.id]?.trim().length??0)<20}
