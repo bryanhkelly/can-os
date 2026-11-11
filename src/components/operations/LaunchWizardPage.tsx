@@ -81,7 +81,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>(
-    draft?.type ?? (options?.schoolSetupAdministrator && options.organizations[0]?.type !== "church" ? "full_school" : "church_hosted_academy"));
+    draft?.type ?? (options?.schoolSetupAdministrator && options.organizations[0]?.type !== "church" ? "full_school" : "hosted_academy"));
   const [summerCreditBearing, setSummerCreditBearing] = useState(draft?.summerCreditBearing ?? false);
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
   const [name, setName] = useState(draft?.name ?? "");
