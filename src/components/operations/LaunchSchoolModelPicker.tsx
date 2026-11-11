@@ -5,7 +5,7 @@ export type SchoolModelPreset = ProgramType;
 export type ExtendedLearningPreset = Extract<ProgramType, "summer_program" | "summer_enrichment" | "after_school_enrichment">;
 
 const descriptions: Record<ProgramType, string> = {
-  church_hosted_academy: "A school that meets at a partner organization’s site.",
+  hosted_academy: "A school that meets at a partner organization’s site.",
   high_school_extension: "Add high-school grades to an existing school.",
   full_school: "A complete school community.",
   microschool: "A small, focused school community.",

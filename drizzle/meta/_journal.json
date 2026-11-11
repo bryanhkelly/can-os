@@ -582,6 +582,13 @@
       "when": 1794365003000,
       "tag": "0082_instructional_policy_and_command_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1794365004000,
+      "tag": "0083_hosted_academy_generalization",
+      "breakpoints": true
     }
   ]
 }

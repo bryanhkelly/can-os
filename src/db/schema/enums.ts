@@ -16,7 +16,7 @@ export const organizationType = pgEnum("organization_type", [
 ]);
 
 export const programType = pgEnum("program_type", [
-  "church_hosted_academy",
+  "hosted_academy",
   "high_school_extension",
   "full_school",
   "microschool",
