@@ -76,7 +76,7 @@ integration("Church-owned Site with independently authorized CAN academic servic
         const unrelated = contextFor("registrar",hostPerson.id,other.id,null);
         const launch = await startProgramLaunch(host,{
           hostOrganizationId:church.id,siteId:site.id,jurisdictionId:jurisdiction.id,
-          type:"church_hosted_academy",name:"Fellowship CAN Academy",
+          type:"hosted_academy",name:"Fellowship CAN Academy",
           slug:"fellowship-"+suffix,
           gradeRange:{min:"9",max:"12"},
           deliveryModel:{onsite:true,asynchronous:true,onsiteDaysPerWeek:2},
@@ -571,7 +571,7 @@ integration("Program-Site authorization denial, windows, cross-tenant and CAN re
     const unrelated = contextFor("registrar",hostPerson.id,other.id,null);
     const launch = await startProgramLaunch(host,{
       hostOrganizationId:church.id,siteId:site!.id,jurisdictionId:jurisdiction!.id,
-      type:"church_hosted_academy",name:"Guard CAN Academy",
+      type:"hosted_academy",name:"Guard CAN Academy",
       slug:"guard-launch-"+suffix,
       gradeRange:{min:"9",max:"12"},
       deliveryModel:{onsite:true,asynchronous:true,onsiteDaysPerWeek:2},
