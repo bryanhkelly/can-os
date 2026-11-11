@@ -5,7 +5,9 @@ CREATE TABLE site_blueprint_review_requests (
  source_revision integer NOT NULL CHECK(source_revision>0),proposal_snapshot jsonb NOT NULL,
  status text NOT NULL DEFAULT 'submitted' CHECK(status IN ('submitted','reviewed','withdrawn')),
  submitted_by_person_id uuid NOT NULL REFERENCES people(id) ON DELETE RESTRICT,submitted_at timestamptz NOT NULL DEFAULT now(),
- CONSTRAINT site_blueprint_review_revision_uq UNIQUE(site_id,source_revision));
+ CONSTRAINT site_blueprint_review_revision_uq UNIQUE(site_id,source_revision),
+ CONSTRAINT site_blueprint_review_request_scope_uq UNIQUE(id,site_id,source_revision),
+ CONSTRAINT site_blueprint_review_source_revision_fk FOREIGN KEY(site_id,source_revision) REFERENCES site_blueprint_revisions(site_id,revision));
 --> statement-breakpoint
 CREATE INDEX site_blueprint_review_site_idx ON site_blueprint_review_requests(site_id,status);
 --> statement-breakpoint
@@ -15,7 +17,8 @@ CREATE TABLE site_blueprint_approved_versions (
  source_revision integer NOT NULL CHECK(source_revision>0),approved_snapshot jsonb NOT NULL,
  school_scope_statement text NOT NULL,reviewed_by_person_id uuid NOT NULL REFERENCES people(id) ON DELETE RESTRICT,
  reviewed_at timestamptz NOT NULL DEFAULT now(),effective_from date,
- CONSTRAINT site_blueprint_approved_version_uq UNIQUE(site_id,version));
+ CONSTRAINT site_blueprint_approved_version_uq UNIQUE(site_id,version),
+ CONSTRAINT site_blueprint_approved_review_scope_fk FOREIGN KEY(review_request_id,site_id,source_revision) REFERENCES site_blueprint_review_requests(id,site_id,source_revision));
 --> statement-breakpoint
 CREATE INDEX site_blueprint_approved_site_idx ON site_blueprint_approved_versions(site_id,reviewed_at);
 --> statement-breakpoint
