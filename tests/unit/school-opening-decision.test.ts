@@ -265,7 +265,7 @@ describe("opening prerequisites match command gates",()=>{
       satisfied:false,detail:expect.stringContaining("Appoint"),
     });
     arrange();addValidEvidence();state.rows[6]=[];
-    await expect(decideChurchSchoolOpening(actor,command)).rejects.toThrow("church site director");
+    await expect(decideChurchSchoolOpening(actor,command)).rejects.toThrow("host Site director");
     expectNoDecision();
   });
   it("reports all blockers even when evidence fails first",async()=>{
