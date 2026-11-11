@@ -206,3 +206,21 @@ export const publishSchoolPlanningProspectus=createServerFn({method:"POST"})
   return {releaseId:release.id,status:"published" as const};
  });
 });
+
+
+export const getSchoolPlanningProspectusReviewDesk=createServerFn({method:"GET"})
+.handler(async()=>{
+ setResponseHeader("Cache-Control","private, no-store");
+ const actor=await getCommandContext(getRequest());
+ await requireCanProspectusReviewer(actor);
+ const rows=await db.select({
+  id:sitePublicationReleases.id,siteId:sitePublicationReleases.siteId,
+  revision:sitePublicationReleases.revision,content:sitePublicationReleases.contentSnapshot,
+  siteName:sites.name,
+ }).from(sitePublicationReleases)
+ .innerJoin(sites,eq(sites.id,sitePublicationReleases.siteId))
+ .where(and(eq(sitePublicationReleases.mode,"planning_prospectus"),
+  eq(sitePublicationReleases.status,"draft")))
+ .orderBy(desc(sitePublicationReleases.createdAt)).limit(100);
+ return rows.map(row=>({...row,prospectus:publicProspectusSchema.parse(row.content)}));
+});

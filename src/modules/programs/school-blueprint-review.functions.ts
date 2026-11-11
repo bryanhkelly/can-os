@@ -88,7 +88,7 @@ export const getSchoolBlueprintReviewDesk=createServerFn({method:"GET"})
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCommandContext(getRequest());
   await requireCanBlueprintReviewer(actor,db);
-  return db.select({
+  const pending=await db.select({
     id:siteBlueprintReviewRequests.id,siteId:siteBlueprintReviewRequests.siteId,
     sourceRevision:siteBlueprintReviewRequests.sourceRevision,
     proposalSnapshot:siteBlueprintReviewRequests.proposalSnapshot,
@@ -97,6 +97,13 @@ export const getSchoolBlueprintReviewDesk=createServerFn({method:"GET"})
     .innerJoin(sites,eq(sites.id,siteBlueprintReviewRequests.siteId))
     .where(eq(siteBlueprintReviewRequests.status,"submitted"))
     .orderBy(desc(siteBlueprintReviewRequests.submittedAt)).limit(100);
+  if(!pending.length)return [];
+  const versions=await db.select({siteId:siteBlueprintApprovedVersions.siteId,version:siteBlueprintApprovedVersions.version})
+    .from(siteBlueprintApprovedVersions)
+    .where(inArray(siteBlueprintApprovedVersions.siteId,[...new Set(pending.map(x=>x.siteId))]));
+  const latest=new Map<string,number>();
+  for(const v of versions)latest.set(v.siteId,Math.max(latest.get(v.siteId)??0,v.version));
+  return pending.map(row=>({...row,expectedApprovedVersion:latest.get(row.siteId)??0}));
 });
 
 /** CAN approval can be partial; item decisions are complete and independently auditable. */
