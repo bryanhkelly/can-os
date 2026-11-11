@@ -6,6 +6,7 @@ import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { Building2, ClipboardList, CalendarDays, MessageCircle } from "lucide-react";
 import { CANOperatingAuthorizationDesk } from "@/components/networks/CANOperatingAuthorizationDesk";
+import { CANSchoolBlueprintReviewDesk } from "@/components/networks/CANSchoolBlueprintReviewDesk";
 import { ChurchApplicationsDesk } from "@/components/networks/ChurchApplicationsDesk";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { safeLoader } from "@/lib/safe-loader";
@@ -133,6 +134,7 @@ function StewardPanel({ data }: { data: Awaited<ReturnType<typeof listNetworkAgr
         {!data.agreements.length && <li className="text-sm text-muted-foreground">No agreements recorded.</li>}
       </ul>
     </section>
+    <CANSchoolBlueprintReviewDesk/>
     <CANOperatingAuthorizationDesk/>
   </DashboardHome>;
 }
