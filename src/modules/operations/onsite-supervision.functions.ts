@@ -262,7 +262,6 @@ export const loadOnsiteSupervisionPlanForActor=createServerOnlyFn(async (actor:A
     ]);
     const peopleById=new Map(activePeople.map(row=>[row.id,row]));
     const independent = new Set(onsiteSections.filter(row =>
-      site.hostType === "church" &&
       row.academicProviderOrganizationId !== site.organizationId)
       .map(row => row.programId));
     const programBySection = new Map(onsiteSections.map(row => [row.id,row.programId]));

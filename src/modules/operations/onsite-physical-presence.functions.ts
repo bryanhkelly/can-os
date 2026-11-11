@@ -85,7 +85,7 @@ async function currentBlock(date:string,sectionId:string,periodId:string,
     throw new AuthorizationError("complete original Site supervision plan");
   const block=plan.blocks.find(row=>row.sectionId===sectionId && row.periodId===periodId);
   if(!block || !block.requiresSectionDelegation || !block.assignedPlan ||
-     !block.planToken)throw new AuthorizationError("fully planned church/CAN instructional block");
+     !block.planToken)throw new AuthorizationError("fully planned hosted instructional block");
   return block;
 }
 

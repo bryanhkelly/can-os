@@ -5,6 +5,7 @@ Status: draft implementation, not a student-facing or production release.
 The database foundation is migration `0081_instructional_tracks_and_practice`.
 It follows the Site Blueprint foundation (`0079`) and reference library (`0080`).
 Blueprint planning records do not grant academic authority or substitute for an active Program and Section enrollment.
+Migration `0082` adds Program policy history, reviewed resource snapshots and command receipts.
 The server entry points are in `src/modules/learning/instructional-tracks.functions.ts`.
 No production migration, role provisioning, configuration change or deployment has been performed.
 
@@ -16,6 +17,10 @@ No production migration, role provisioning, configuration change or deployment h
 - List eligible tracks for an active Section enrollment; select or switch presenters using an expected selection revision.
 - Resolve the selected lesson's recordings and recommended practice; record formative progress and read retained history.
 - Transactional audit/outbox and request-key replay protection for mutations. Reusing a key with different input is rejected.
+
+Command receipts commit with the mutation and its audit/outbox records. Retrying a recorded request still returns its original result after audit archival.
+Each new presenter choice links to an immutable copy of the Program policy used for that choice.
+Selections that predate migration 0082 have no recorded policy version.
 
 These commands never write Sections, enrollments, assessments, submissions, lesson completion, credits or transcripts.
 An idempotent retry returns the previously committed safe result after rechecking the caller's current authority.
@@ -40,8 +45,8 @@ No host-local invitation flow provisions these roles. No new public demo persona
 Presenter content eligibility is rechecked on student delivery, so a revoked delegation cannot be hidden behind a published profile.
 
 V1 authoring permits provider-owned source courses only. A school adoption is not a third-party derivative-production license.
-Shared-provider delivery currently depends on the existing CAN-host agreement validator; broader non-church agreement support
-must be reconciled with that validator before claiming support for those operating arrangements.
+Church, nonprofit, cultural, religious and independent-school hosts follow the same Program-Site operating agreement workflow.
+The CAN steward reviews shared-provider agreements using the existing institutional authority. Onsite opening retains its independent approval.
 
 ## Deployment and Program gates
 
@@ -79,7 +84,9 @@ All changes and practice writes serialize on that enrollment. Stale selection re
 ## Content and privacy
 
 The complete manifest covers source curriculum, media bindings, resources/documents, practice, private solutions and rights evidence.
-Current dependency snapshots are recomputed for protected reads, preventing a changed resource URL from bypassing review.
+Submission pins the reviewed catalog resource values to the release. Editing a catalog title or URL leaves students on their reviewed resource.
+Delivery still verifies live ownership, licensing, audience and document bindings, and checks the approved manifest against current source and evidence.
+An external URL identifies the approved reference. CAN does not control bytes served by the external publisher.
 All canonical lessons require a primary recording and a caption or transcript resource before submission/publication.
 
 Public placements require provider ownership and `curriculum_resources.metadata.audience = "student"`.
@@ -119,13 +126,13 @@ npm run typecheck:instructional-tracks
 npm run test:instructional-tracks
 ```
 
-The integration suite builds the pre-Blueprint schema in isolated PGlite PostgreSQL, applies migrations 0079 through 0081 in order,
+The integration suite builds the pre-Blueprint schema in isolated PGlite PostgreSQL, applies migrations 0079 through 0082 in order,
 and reapplies the reference seed to verify its counts and confirm it creates no operational Programs or Activities.
 It exercises the actual server commands and actual student class-authorization service; only the database binding and
 unused request accessor are replaced. Test grants, recordings and rights evidence are synthetic test infrastructure.
 It is not evidence of Neon migration-chain, signed-in browser or real-content acceptance.
 
 Remaining before a P0 release: creator/reviewer and student UI, classroom wiring, central upload/finalization, reviewed media fixtures,
-pending-request previews, request-abuse controls, mixed-host contract support, live-Neon concurrency and migration tests,
+pending-request previews, request-abuse controls, live-Neon concurrency and migration tests,
 authenticated multi-role browser journeys, Valor/Barton evidence, and rollout/rollback validation.
 P1 assessment blueprints and shared-provider school-staffing/setup corrections remain separate work.

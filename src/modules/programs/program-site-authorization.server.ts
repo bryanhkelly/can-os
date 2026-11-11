@@ -9,7 +9,7 @@ import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertCANSteward } from "@/domain/network-agreement-policy";
 import {
-  assertHostedAcademyOperatingIdentity, assertCurrentOperatingAuthorization,
+  assertOperatingProgramIdentity, assertCurrentOperatingAuthorization,
   assertOperatingAgreementEvidence, normalizeOperatingServices, recommendedHostedOperatingServices,
   type OperatingProgramIdentity, type OperatingService,
 } from "@/domain/program-site-operating-policy";
@@ -49,7 +49,7 @@ async function loadOperatingIdentity(
     institutionOrganizationType: institution?.type ?? "",
     creditIssuingOrganizationId: program.creditIssuingOrganizationId,
   };
-  assertHostedAcademyOperatingIdentity(identity);
+  assertOperatingProgramIdentity(identity);
   return identity;
 }
 function assertHostRequester(actor: AccessContext, identity: OperatingProgramIdentity) {
@@ -118,7 +118,7 @@ export async function requestProgramSiteAuthorization(
   });
 }
 
-/** Host registrar registers the externally reviewed CAN–church operating
+/** Host registrar registers the externally reviewed CAN–host operating
  * agreement as evidence, making independent steward approval reachable.
  * Contracting parties, the exact Site and the issuer are derived from
  * canonical rows; the client attests only signatures, verifier and services.
@@ -594,7 +594,7 @@ export async function requireCurrentProgramSiteAuthorization(
       if (!(error instanceof AuthorizationError)) throw error;
     }
   }
-  throw new AuthorizationError("current independently verified host-CAN operating authority");
+  throw new AuthorizationError("current independently verified CAN-host operating authority");
 }
 
 /** The host's onsite staff retains original Site/Program grants, but an
@@ -619,12 +619,11 @@ export async function requireChurchHostedOperatingServices(
   return null;
 }
 
-/** Institutional academic writes are not authorized merely because a church
+/** Institutional academic writes are not authorized merely because a host
  * Program names CAN as its provider. This check is intentionally separate from
  * the actor's verified role / Program / Section relationship checks.
  *
- * Same-organization and non-church Programs keep their existing workflows.
- * Any independently host-owned CAN Program requires BOTH an original
+ * A shared-provider Program requires BOTH an original
  * CAN-organization membership and a live, service-specific agreement.
  * Call inside the mutation transaction, after verifying resource scope.
  */
@@ -652,7 +651,7 @@ export async function requireInstitutionalAcademicProgramAuthority(
 }
 
 /** Authenticated, minimal host workspace projection. Never returns other
- * churches' agreement evidence or CAN administrative lists.
+ * hosts' agreement evidence or CAN administrative lists.
  */
 export async function getHostProgramSiteAuthorization(
   actor: AccessContext, programId: string,
@@ -809,3 +808,4 @@ export async function listOperatingAgreementEvidence(
   });
   return { candidates, truncated: rows.length > 100 };
 }
+

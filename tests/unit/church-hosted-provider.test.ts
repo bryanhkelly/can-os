@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { assertHostedProviderIntent, assertHostedActivationAuthorization } from "@/domain/hosted-academy-provider";
+import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
 
 const church = {
-  programType: "hosted_academy" as const,
+  programType: "church_hosted_academy" as const,
   hostOrganizationId: "church-id",
   hostOrganizationType: "church",
   academicProviderOrganizationId: "can-id",
@@ -13,42 +13,35 @@ const church = {
 
 describe("church-hosted provider intent", () => {
   it("allows independent CAN academic and credit issuers for a church-owned site", () => {
-    expect(() => assertHostedProviderIntent(church)).not.toThrow();
+    expect(() => assertChurchHostedProviderIntent(church)).not.toThrow();
   });
   it("denies an unrelated external academic provider", () => {
-    expect(() => assertHostedProviderIntent({
+    expect(() => assertChurchHostedProviderIntent({
       ...church, academicProviderOrganizationType: "christian_school",
     })).toThrow(/must be a CAN network organization/);
   });
   it("denies a different credit issuer", () => {
-    expect(() => assertHostedProviderIntent({
+    expect(() => assertChurchHostedProviderIntent({
       ...church, creditIssuingOrganizationId: "other-organization",
     })).toThrow(/same CAN institution as credit issuer/);
   });
-  it("preserves single-institution church schools and K-8 extensions", () => {
-    expect(() => assertHostedProviderIntent({
+  it("allows schools to provide their own academics and requires a qualified independent provider", () => {
+    expect(() => assertChurchHostedProviderIntent({
       ...church, academicProviderOrganizationId: "church-id",
       academicProviderOrganizationType: "church",
       creditIssuingOrganizationId: "church-id",
     })).not.toThrow();
-    expect(() => assertHostedProviderIntent({
+    expect(() => assertChurchHostedProviderIntent({
       ...church, programType: "high_school_extension",
       academicProviderOrganizationType: "christian_school",
-    })).not.toThrow();
+    })).toThrow(/must be a CAN network organization/);
   });
 });
 
-describe("host-neutral activation needs independently verified authority", () => {
-  it("requires the same authorization for a community nonprofit", () => {
-    expect(() => assertHostedActivationAuthorization({
-      programType: "hosted_academy", hostOrganizationId: "community",
-      hostOrganizationType: "community_nonprofit", academicProviderOrganizationId: "can",
-      verifiedProgramSiteAuthorizationId: null,
-    })).toThrow(/independently verified/);
-  });
+describe("church-hosted activation needs independently verified authority", () => {
   it("rejects cross-organization CAN academies while authorization is missing", () => {
-    expect(() => assertHostedActivationAuthorization({
-      programType: "hosted_academy",
+    expect(() => assertChurchHostedActivationAuthorization({
+      programType: "church_hosted_academy",
       hostOrganizationId: "church",
       hostOrganizationType: "church",
       academicProviderOrganizationId: "can",
@@ -56,8 +49,8 @@ describe("host-neutral activation needs independently verified authority", () =>
     })).toThrow(/independently verified/);
   });
   it("does not interfere with a same-organization church school or K-8 extension", () => {
-    for (const programType of ["high_school_extension", "hosted_academy"] as const) {
-      expect(() => assertHostedActivationAuthorization({
+    for (const programType of ["high_school_extension", "church_hosted_academy"] as const) {
+      expect(() => assertChurchHostedActivationAuthorization({
         programType,
         hostOrganizationId: "host",
         hostOrganizationType: "church",
@@ -67,7 +60,7 @@ describe("host-neutral activation needs independently verified authority", () =>
     }
   });
   it("denies reclassifying a church/CAN program as a high-school extension to evade authorization", () => {
-    expect(() => assertHostedActivationAuthorization({
+    expect(() => assertChurchHostedActivationAuthorization({
       programType: "high_school_extension",
       hostOrganizationId: "church",
       hostOrganizationType: "church",
@@ -75,8 +68,8 @@ describe("host-neutral activation needs independently verified authority", () =>
       verifiedProgramSiteAuthorizationId: null,
     })).toThrow(/independently verified/);
   });
-  it("requires a verified agreement for a non-church school host", () => {
-    expect(() => assertHostedActivationAuthorization({
+  it("requires authorization for a school hosting a separate provider", () => {
+    expect(() => assertChurchHostedActivationAuthorization({
       programType: "high_school_extension",
       hostOrganizationId: "school",
       hostOrganizationType: "christian_school",
@@ -85,8 +78,8 @@ describe("host-neutral activation needs independently verified authority", () =>
     })).toThrow(/independently verified/);
   });
   it("treats a separately checked authorization as the necessary additional input", () => {
-    expect(() => assertHostedActivationAuthorization({
-      programType: "hosted_academy",
+    expect(() => assertChurchHostedActivationAuthorization({
+      programType: "church_hosted_academy",
       hostOrganizationId: "church",
       hostOrganizationType: "church",
       academicProviderOrganizationId: "can",

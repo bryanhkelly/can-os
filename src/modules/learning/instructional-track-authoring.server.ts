@@ -9,7 +9,7 @@ import { assertTrackPublishable, parseStudentPracticeBody, trackReviewCriteria }
 import type { Actor } from "@/modules/identity/actors.server";
 import { requireActiveTrackActor, requireTrackFeature, requireTrackProvider } from "./instructional-track-access.server";
 import { trackCommand } from "./instructional-track-command.server";
-import { assertTrackContentReady, readTrackBundle, trackSolutionSchema } from "./instructional-track-content.server";
+import { assertTrackContentReady, readTrackBundle, sealTrackResources, trackSolutionSchema } from "./instructional-track-content.server";
 
 const uuid = z.string().uuid();
 const key = z.string().min(1).max(100).regex(/^[A-Za-z0-9_-]+$/);
@@ -161,6 +161,7 @@ export async function submitInstructionalTrack(actor: Actor, raw: z.infer<typeof
       scope: { programId: program.id, organizationId: program.academicProviderOrganizationId } }, async () => {
       if (bundle.version.status !== "draft" || input.expectedRevision !== bundle.computedManifestHash) throw new Error("Reload the current draft before submission.");
       await assertTrackContentReady(tx, bundle);
+      await sealTrackResources(tx, bundle);
       await tx.update(instructionalTrackVersions).set({ status: "in_review", manifestHash: bundle.computedManifestHash, updatedAt: new Date() })
         .where(eq(instructionalTrackVersions.id, bundle.version.id));
       return { versionId: bundle.version.id, revision: bundle.computedManifestHash, status: "in_review" };

@@ -88,7 +88,7 @@ export function publicAcademicProgram(row: {
   };
 }): PublicAcademicProgram {
   const labels: Record<ProgramType, string> = {
-    hosted_academy: "Church-hosted academy",
+    church_hosted_academy: "Church-hosted academy",
     high_school_extension: "High school extension",
     full_school: "School program",
     microschool: "Microschool",

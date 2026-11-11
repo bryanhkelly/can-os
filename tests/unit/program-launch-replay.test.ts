@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { matchesProgramLaunchReplay } from "../../src/domain/program-launch-replay";
 const intent = {
-  name: "Grace School", type: "hosted_academy", hostOrganizationId: "church", siteId: "site",
+  name: "Grace School", type: "church_hosted_academy", hostOrganizationId: "church", siteId: "site",
   jurisdictionId: "jurisdiction", academicProviderOrganizationId: "can", creditIssuingOrganizationId: "can",
   creditMode: "credit_bearing", targetOpeningDate: "2027-08-23",
   gradeRange: { min: "K", max: "5" }, deliveryModel: { onsite: true, onsiteDaysPerWeek: 5 },

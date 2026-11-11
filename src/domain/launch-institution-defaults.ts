@@ -9,12 +9,12 @@ export function suggestedLaunchInstitutions(input: {
 }): { providerId?: string; issuerId?: string } {
   const canProviders = input.providers.filter(org => org.type === "can_network");
   const providerId = input.selectedProviderId || (
-    input.type === "hosted_academy" && canProviders.length === 1
+    input.type === "church_hosted_academy" && canProviders.length === 1
       ? canProviders[0]?.id
       : input.providers.length === 1 ? input.providers[0]?.id : undefined
   );
   const issuerId = input.creditMode === "non_credit" ? undefined :
-    input.type === "hosted_academy" && providerId
+    input.type === "church_hosted_academy" && providerId
       ? input.issuers.find(org => org.id === providerId)?.id
       : input.issuers.length === 1 ? input.issuers[0]?.id : undefined;
   return { providerId, issuerId };

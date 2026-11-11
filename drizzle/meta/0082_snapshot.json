@@ -1,5 +1,5 @@
 {
-  "id": "f047b2d5-9a37-44e5-b322-f4149d3c4317",
+  "id": "0a6abef1-ff0d-4e17-9cb6-3af7ebbdfa7d",
   "prevId": "96affc30-3200-4d8e-8b1f-c87a42fb29a8",
   "version": "7",
   "dialect": "postgresql",
@@ -33132,6 +33132,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "policy_version_id": {
+          "name": "policy_version_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "selected_at": {
           "name": "selected_at",
           "type": "timestamp with time zone",
@@ -33275,6 +33281,19 @@
           "tableTo": "people",
           "columnsFrom": [
             "selected_by_person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "student_instructional_selections_policy_version_id_instructional_track_policy_versions_id_fk": {
+          "name": "student_instructional_selections_policy_version_id_instructional_track_policy_versions_id_fk",
+          "tableFrom": "student_instructional_selections",
+          "tableTo": "instructional_track_policy_versions",
+          "columnsFrom": [
+            "policy_version_id"
           ],
           "columnsTo": [
             "id"
@@ -33470,6 +33489,199 @@
           "value": "(\"student_practice_progress\".\"status\" = 'completed') = (\"student_practice_progress\".\"completed_at\" is not null)"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.instructional_track_command_receipts": {
+      "name": "instructional_track_command_receipts",
+      "schema": "",
+      "columns": {
+        "actor_person_id": {
+          "name": "actor_person_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "result": {
+          "name": "result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "instructional_track_command_receipts_actor_person_id_people_id_fk": {
+          "name": "instructional_track_command_receipts_actor_person_id_people_id_fk",
+          "tableFrom": "instructional_track_command_receipts",
+          "tableTo": "people",
+          "columnsFrom": [
+            "actor_person_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "instructional_track_command_receipts_actor_person_id_request_id_pk": {
+          "name": "instructional_track_command_receipts_actor_person_id_request_id_pk",
+          "columns": [
+            "actor_person_id",
+            "request_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.instructional_track_policy_versions": {
+      "name": "instructional_track_policy_versions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "program_id": {
+          "name": "program_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fingerprint": {
+          "name": "fingerprint",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "policy": {
+          "name": "policy",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "instructional_track_policy_fingerprint_uq": {
+          "name": "instructional_track_policy_fingerprint_uq",
+          "columns": [
+            {
+              "expression": "program_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fingerprint",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "instructional_track_policy_versions_program_id_programs_id_fk": {
+          "name": "instructional_track_policy_versions_program_id_programs_id_fk",
+          "tableFrom": "instructional_track_policy_versions",
+          "tableTo": "programs",
+          "columnsFrom": [
+            "program_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.instructional_track_resource_snapshots": {
+      "name": "instructional_track_resource_snapshots",
+      "schema": "",
+      "columns": {
+        "track_version_id": {
+          "name": "track_version_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "resources": {
+          "name": "resources",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "instructional_track_resource_snapshots_track_version_id_instructional_track_versions_id_fk": {
+          "name": "instructional_track_resource_snapshots_track_version_id_instructional_track_versions_id_fk",
+          "tableFrom": "instructional_track_resource_snapshots",
+          "tableTo": "instructional_track_versions",
+          "columnsFrom": [
+            "track_version_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },
@@ -33933,7 +34145,7 @@
       "name": "program_type",
       "schema": "public",
       "values": [
-        "hosted_academy",
+        "church_hosted_academy",
         "high_school_extension",
         "full_school",
         "microschool",

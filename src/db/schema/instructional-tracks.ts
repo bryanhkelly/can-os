@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
 import { courseTemplates, courseTemplateVersions, enrollments } from "./academics";
-import { organizations } from "./organizations";
+import { organizations, programs } from "./organizations";
 import { people } from "./identity";
 import { curriculumResources } from "./curriculum-resources";
 
@@ -142,6 +142,38 @@ export const instructionalTrackWithdrawals = pgTable("instructional_track_withdr
   check("instructional_track_withdrawal_grace_ck", sql`${t.legacyAccessUntil} is null or (${t.kind} = 'routine_retirement' and ${t.legacyAccessUntil} > ${t.effectiveAt})`),
 ]);
 
+export const instructionalTrackPolicyVersions = pgTable("instructional_track_policy_versions", {
+  id: id(),
+  programId: uuid("program_id").notNull().references(() => programs.id, { onDelete: "restrict" }),
+  fingerprint: text("fingerprint").notNull(),
+  policy: jsonb("policy").$type<Record<string, unknown>>().notNull(),
+  createdAt: createdAt(),
+}, t => [
+  uniqueIndex("instructional_track_policy_fingerprint_uq").on(t.programId, t.fingerprint),
+]);
+
+type TrackResourceSnapshot = Omit<typeof curriculumResources.$inferSelect, "createdAt" | "updatedAt"> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const instructionalTrackResourceSnapshots = pgTable("instructional_track_resource_snapshots", {
+  trackVersionId: uuid("track_version_id").primaryKey()
+    .references(() => instructionalTrackVersions.id, { onDelete: "restrict" }),
+  resources: jsonb("resources").$type<TrackResourceSnapshot[]>().notNull(),
+  createdAt: createdAt(),
+});
+
+export const instructionalTrackCommandReceipts = pgTable("instructional_track_command_receipts", {
+  actorPersonId: uuid("actor_person_id").notNull().references(() => people.id, { onDelete: "restrict" }),
+  requestId: uuid("request_id").notNull(),
+  fingerprint: text("fingerprint").notNull(),
+  result: jsonb("result").$type<Record<string, unknown>>().notNull(),
+  createdAt: createdAt(),
+}, t => [
+  primaryKey({ columns: [t.actorPersonId, t.requestId] }),
+]);
+
 export const studentInstructionalSelections = pgTable("student_instructional_selections", {
   id: id(),
   sectionEnrollmentId: uuid("section_enrollment_id").notNull().references(() => enrollments.id, { onDelete: "restrict" }),
@@ -150,6 +182,7 @@ export const studentInstructionalSelections = pgTable("student_instructional_sel
   selectionSource: text("selection_source", { enum: ["student", "guardian", "approved_default", "authorized_assistance"] }).notNull(),
   revision: integer("revision").notNull(),
   requestId: uuid("request_id").notNull(),
+  policyVersionId: uuid("policy_version_id").references(() => instructionalTrackPolicyVersions.id, { onDelete: "restrict" }),
   selectedAt: timestamp("selected_at", { withTimezone: true }).defaultNow().notNull(),
   supersededAt: timestamp("superseded_at", { withTimezone: true }),
   changeReason: text("change_reason"),

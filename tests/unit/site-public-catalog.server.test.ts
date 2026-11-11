@@ -127,7 +127,7 @@ describe("site public catalog read gate", () => {
       type: "high_school_extension",
     }];
     state.academicPrograms = [{ programId: "program-1", name: "High School" }];
-    state.activePrograms = [{ id: "program-1", type: "hosted_academy" }];
+    state.activePrograms = [{ id: "program-1", type: "church_hosted_academy" }];
     state.openingGateFailures = ["program-1"];
 
     const result = await readPublishedSiteCatalog("school");
@@ -147,8 +147,8 @@ describe("site public catalog read gate", () => {
       { programId: "program-2", name: "High School" },
     ];
     state.activePrograms = [
-      { id: "program-1", type: "hosted_academy" },
-      { id: "program-2", type: "hosted_academy" },
+      { id: "program-1", type: "church_hosted_academy" },
+      { id: "program-2", type: "church_hosted_academy" },
     ];
     state.openingGateFailures = ["program-2"];
 

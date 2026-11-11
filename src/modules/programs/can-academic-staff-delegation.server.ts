@@ -36,12 +36,12 @@ async function scopedCANProgram(
     .innerJoin(organizations, eq(organizations.id,programs.organizationId))
     .innerJoin(sites,eq(sites.id,programs.siteId))
     .where(eq(programs.id,programId)).limit(1);
-  if (!row || !row.siteId || row.hostType !== "church" ||
+  if (!row || !row.siteId ||
       row.siteOwnerId !== row.hostId ||
       (row.declaredHostId && row.declaredHostId !== row.hostId) ||
       row.institutionId === row.hostId ||
       row.institutionId !== row.issuerId)
-    throw new AuthorizationError("independently owned CAN-church academic Program");
+    throw new AuthorizationError("independently hosted CAN academic Program");
   const [can] = await tx.select({id:organizations.id,type:organizations.type})
     .from(organizations).where(eq(organizations.id,row.institutionId)).limit(1);
   if(!can)throw new AuthorizationError("existing CAN institution");

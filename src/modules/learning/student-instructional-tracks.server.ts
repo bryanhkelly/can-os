@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { enrollments, guardianRelationships, instructionalTrackActivities, instructionalTracks, instructionalTrackVersions,
+import { enrollments, guardianRelationships, instructionalTrackActivities, instructionalTrackPolicyVersions, instructionalTracks, instructionalTrackVersions,
   people, programs, studentInstructionalSelections, studentPracticeProgress } from "@/db/schema";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertCurrentPracticeSelection, parseStudentPracticeBody } from "@/domain/instructional-tracks";
@@ -14,7 +14,7 @@ import { authorizeClass } from "./class-access.server";
 import { requireCurriculumDeliveryAccess } from "./curriculum-delivery-access.server";
 import { requireActiveTrackActor, requireTrackFeature, type TrackTx } from "./instructional-track-access.server";
 import { assertTrackDeliverable, readTrackBundle, trackPrivateKeyPattern, type TrackBundle } from "./instructional-track-content.server";
-import { trackCommand } from "./instructional-track-command.server";
+import { instructionalFingerprint, trackCommand } from "./instructional-track-command.server";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
 
 const uuid = z.string().uuid();
@@ -118,11 +118,24 @@ export async function selectStudentInstructionalTrack(actor: Actor, raw: z.infer
       if (current && !policy.allowSwitching) throw new AuthorizationError("recorded teacher switching allowed by Program policy");
       const bundle = await readTrackBundle(tx, input.trackVersionId);
       await assertTrackDeliverable(tx, bundle, deliveryContext(context, null));
+      const fingerprint = instructionalFingerprint(policy);
+      await tx.insert(instructionalTrackPolicyVersions).values({
+        programId: context.program.id, fingerprint, policy,
+      }).onConflictDoNothing({
+        target: [instructionalTrackPolicyVersions.programId, instructionalTrackPolicyVersions.fingerprint],
+      });
+      const [policyVersion] = await tx.select({ id: instructionalTrackPolicyVersions.id })
+        .from(instructionalTrackPolicyVersions).where(and(
+          eq(instructionalTrackPolicyVersions.programId, context.program.id),
+          eq(instructionalTrackPolicyVersions.fingerprint, fingerprint),
+        )).limit(1);
+      if (!policyVersion) throw new Error("Unable to record the Program policy for this selection.");
       const now = new Date();
       if (current) await tx.update(studentInstructionalSelections).set({ supersededAt: now }).where(eq(studentInstructionalSelections.id, current.id));
       const [created] = await tx.insert(studentInstructionalSelections).values({ sectionEnrollmentId: context.enrollment.id,
         trackVersionId: bundle.version.id, selectedByPersonId: actor.actorPersonId, selectionSource: actor.role === "guardian" ? "guardian" : "student",
-        revision: (latest?.revision ?? 0) + 1, requestId: input.requestId, selectedAt: now }).returning();
+        revision: (latest?.revision ?? 0) + 1, requestId: input.requestId, selectedAt: now,
+        policyVersionId: policyVersion.id }).returning();
       return { selectionId: created!.id, revision: created!.revision, trackVersionId: created!.trackVersionId };
     });
   });

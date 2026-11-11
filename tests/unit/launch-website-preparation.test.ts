@@ -10,7 +10,7 @@ vi.mock("@/modules/sites/academic-program-catalog.server",()=>({readAcademicProg
 vi.mock("@/modules/sites/site-local-content.server",()=>({readCurrentLocalContent:state.local}));
 vi.mock("@/modules/activities/enrichment-catalog.server",()=>({readEnrichmentCatalog:async()=>[]}));
 import {getLaunchWebsitePreparation} from "../../src/modules/programs/launch-website.functions";
-const school={programId:"program",programName:"Hope School",organizationId:"org",siteId:"site",siteOrganizationId:"org",siteName:"Hope Church",organizationName:"Church",type:"hosted_academy",gradeRange:{min:"K",max:"8"},deliveryModel:{onsite:true,onsiteDaysPerWeek:5},metadata:{targetOpeningDate:"2027-08-23"}};
+const school={programId:"program",programName:"Hope School",organizationId:"org",siteId:"site",siteOrganizationId:"org",siteName:"Hope Church",organizationName:"Church",type:"church_hosted_academy",gradeRange:{min:"K",max:"8"},deliveryModel:{onsite:true,onsiteDaysPerWeek:5},metadata:{targetOpeningDate:"2027-08-23"}};
 beforeEach(()=>{vi.clearAllMocks();state.actor={scope:{programIds:["program"],siteIds:["site"],organizationIds:["org"]}};state.requireActor.mockImplementation(async()=>state.actor);state.rows=[[school],[{slug:"hope-school",status:"draft"}]];state.catalog.mockResolvedValue([]);state.local.mockResolvedValue(null);});
 describe("launch website preparation",()=>{
  it("builds a useful private school draft from saved identity and offered grades",async()=>{

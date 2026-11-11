@@ -13,7 +13,7 @@ const programId="22222222-2222-4222-8222-222222222222";
 const siteId="33333333-3333-4333-8333-333333333333";
 const recipientKey="44444444-4444-4444-8444-444444444444";
 const batchId="55555555-5555-4555-8555-555555555555";
-const school={programId,siteId,programName:"School",organizationId:"org",programOrganizationId:"org",slug:"school",type:"hosted_academy",status:"active"};
+const school={programId,siteId,programName:"School",organizationId:"org",programOrganizationId:"org",slug:"school",type:"church_hosted_academy",status:"active"};
 const batch={contextId:programId,metadata:{kind:"family_invitation_batch",version:1,batchRequestId:batchId,
  siteSlug:"school",siteId,destination:"private_platform",introduction:"Welcome",status:"queued",
  recipients:[{key:recipientKey,firstName:"First",lastName:"Family",email:"parent@example.test",status:"queued",attempts:0}]}};

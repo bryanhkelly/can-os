@@ -26,7 +26,7 @@ vi.mock("@/modules/sites/site-public-provisioning.server", () => ({ ensureExisti
 
 import { startProgramLaunch } from "@/modules/programs/program-launch-service";
 const input = {
-  name: "Grace School", slug: "grace-school", type: "hosted_academy" as const,
+  name: "Grace School", slug: "grace-school", type: "church_hosted_academy" as const,
   hostOrganizationId: "church", siteId: "site", jurisdictionId: "jurisdiction",
   academicProviderOrganizationId: "can", creditIssuingOrganizationId: "can",
   targetOpeningDate: "2027-08-23", gradeRange: { min: "K", max: "5" },

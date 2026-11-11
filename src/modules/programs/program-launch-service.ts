@@ -1,7 +1,7 @@
 import { matchesProgramLaunchReplay } from "@/domain/program-launch-replay";
 import { isLaunchOpeningDate, launchOpeningDate } from "@/domain/launch-opening-date";
 import { db } from "@/db/client";
-import { assertHostedProviderIntent, assertHostedActivationAuthorization } from "@/domain/hosted-academy-provider";
+import { assertChurchHostedProviderIntent, assertChurchHostedActivationAuthorization } from "@/domain/church-hosted-provider";
 import { resolveProgramCreditMode, isExtendedLearningType, type ProgramType, type ProgramCreditMode } from "@/domain/program-offerings";
 import {
 journeys,
@@ -95,7 +95,7 @@ export async function startProgramLaunch(
       : [];
     if (!academicProvider) throw new Error("Academic provider Organization not found");
     if (creditMode === "credit_bearing" && !creditIssuer) throw new Error("Credit issuer Organization not found");
-    assertHostedProviderIntent({
+    assertChurchHostedProviderIntent({
       programType: input.type,
       hostOrganizationId: host.id, hostOrganizationType: host.type,
       academicProviderOrganizationId: academicProvider.id,
@@ -358,20 +358,19 @@ export async function activateProgram(
       throw new Error("Program activation requires the verified organization grant");
     if (program.siteId) assertSiteScope(context, program.siteId);
     // Resolve host identity from the database, not user-submitted program type
-    // or metadata. Church-owned sites cannot switch program type to evade the
+    // or metadata. Hosted sites cannot switch program type to evade the
     // independently approved CAN institutional services agreement.
     const hostOrganizationId = program.hostOrganizationId ?? program.organizationId;
     const [hostOrganization] = await tx.select({ type: organizations.type })
       .from(organizations).where(eq(organizations.id, hostOrganizationId)).limit(1);
     if (!hostOrganization) throw new Error("Program host organization not found");
-    const crossOrganizationProvider =
-      program.academicProviderOrganizationId !== hostOrganizationId;
-    const operatingAuthorizationId = crossOrganizationProvider
+    const sharedProvider = program.academicProviderOrganizationId !== hostOrganizationId;
+    const operatingAuthorizationId = sharedProvider
       ? await requireCurrentProgramSiteAuthorization(tx, program.id,
           ["academic_instruction", "onsite_supervision",
             ...(program.creditIssuingOrganizationId ? ["school_of_record", "credit_issuance"] as const : [])])
       : null;
-    assertHostedActivationAuthorization({
+    assertChurchHostedActivationAuthorization({
       programType: program.type,
       hostOrganizationId,
       hostOrganizationType: hostOrganization.type,
@@ -499,11 +498,10 @@ export async function activateProgram(
       await assertOpeningOperator(program,handoff.recipientPersonId,tx);
     }
     // Operating agreement and staffed academic Sections alone are not legal
-    // permission to open an independent church-hosted CAN school for minors.
+    // permission to open an independently hosted CAN school for minors.
     // The institution must separately authorize the most recent school
     // configuration using independently verified safety/legal/facility evidence.
-    // Same-organization and non-church Programs keep their existing path.
-    if(crossOrganizationChurch && program.deliveryModel.onsite){
+    if(sharedProvider && program.deliveryModel.onsite){
       const {requireCurrentChurchSchoolOpening}=await import(
         "@/modules/operations/school-opening.server");
       await requireCurrentChurchSchoolOpening(tx,programId,new Date(),{
@@ -562,5 +560,3 @@ export async function activateProgram(
     });
   });
 }
-
-

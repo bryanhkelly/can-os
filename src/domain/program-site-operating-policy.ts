@@ -33,7 +33,7 @@ export type OperatingProgramIdentity = {
   institutionOrganizationType: string;
   creditIssuingOrganizationId: string | null;
 };
-export function assertHostedAcademyOperatingIdentity(value: OperatingProgramIdentity): void {
+export function assertOperatingProgramIdentity(value: OperatingProgramIdentity): void {
   if (!value.siteId || value.siteOrganizationId !== value.hostOrganizationId ||
       value.programOrganizationId !== value.hostOrganizationId ||
       !value.hostOrganizationType ||
@@ -111,7 +111,7 @@ export function assertCurrentOperatingAuthorization(
   required: readonly OperatingService[],
   at = new Date(),
 ): void {
-  assertHostedAcademyOperatingIdentity(identity);
+  assertOperatingProgramIdentity(identity);
   // A helper called without an explicit service must never become a generic
   // cross-organization authorization token for an unrelated operation.
   normalizeOperatingServices(required);
@@ -127,3 +127,4 @@ export function assertCurrentOperatingAuthorization(
       required.some(service => !contracted.includes(service)))
     throw new AuthorizationError("current independently approved Program-Site service entitlement");
 }
+

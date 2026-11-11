@@ -16,7 +16,7 @@ import { programs, programPublications, sitePublications } from "@/db/schema";
 
 const row = { siteId: "site", organizationId: "church", programId: "program", programName: "School",
   slug: "school", programOrganizationId: "church", programSiteId: "site",
-  type: "hosted_academy", status: "active",
+  type: "church_hosted_academy", status: "active",
   reviewedTitle:"School", reviewedSummary:"A reviewed academic learning experience for students.",
   reviewedGrades:{min:"K",max:"8"},reviewedDelivery:{onsite:true,asynchronous:false,liveOnline:false,onsiteDaysPerWeek:5},
   currentName:"School",currentGrades:{min:"K",max:"8"},

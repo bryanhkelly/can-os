@@ -9,6 +9,7 @@ import * as instructionalTables from "../../src/db/schema/instructional-tracks";
 import { eq } from "drizzle-orm";
 import type { Actor } from "../../src/modules/identity/actors.server";
 import { roleCapabilities } from "../../src/domain/access-context";
+import { registerOperatingAgreementEvidence, requestProgramSiteAuthorization, reviewProgramSiteAuthorization } from "../../src/modules/programs/program-site-authorization.server";
 import { createInstructionalTrackDraft, readInstructionalTrackDraft, saveInstructionalTrackDraft,
   submitInstructionalTrack, reviewInstructionalTrack, publishInstructionalTrack, withdrawInstructionalTrack } from "../../src/modules/learning/instructional-track-authoring.server";
 import { listStudentInstructionalTracks, selectStudentInstructionalTrack, getSelectedLessonInstruction,
@@ -95,7 +96,13 @@ beforeAll(async () => {
   await pg.exec((await generateMigration(empty, schema)).join("\n"));
   const libraryMigration = "0080_school_blueprint_reference_library";
   await pg.transaction(async tx => {
-    for (const migration of ["0079_site_blueprint_foundation", libraryMigration, "0081_instructional_tracks_and_practice", libraryMigration]) {
+    for (const migration of [
+      "0079_site_blueprint_foundation",
+      libraryMigration,
+      "0081_instructional_tracks_and_practice",
+      "0082_instructional_policy_and_command_receipts",
+      libraryMigration,
+    ]) {
       await tx.exec(readFileSync(`drizzle/${migration}.sql`, "utf8"));
     }
   });
@@ -178,6 +185,12 @@ describe("recorded-instructor workflow against isolated PostgreSQL", () => {
     expect(lesson.practice[0]?.progress).toBeNull(); expect(await academicSnapshot()).toBe(before);
     expect((await database.select().from(s.auditEvents)).length).toBe(4);
     expect((await database.select().from(s.domainEvents)).length).toBe(4);
+    await database.delete(s.auditEvents);
+    expect(await recordStudentPracticeProgress(studentA, progress)).toEqual(result);
+    const [previousPractice] = await database.select().from(s.studentPracticeProgress)
+      .where(eq(s.studentPracticeProgress.trackActivityId, trackA.activityId));
+    expect(previousPractice?.attemptCount).toBe(1);
+    expect((await database.select().from(s.domainEvents)).length).toBe(4);
   });
   it("rejects mismatched enrollment, stale choice and an idempotency key reused with different input", async () => {
     const requestId = request(); const chosen = await select(studentA, trackA, 0, requestId);
@@ -206,6 +219,83 @@ describe("recorded-instructor workflow against isolated PostgreSQL", () => {
         sectionEnrollmentId: id(40), trackVersionId: trackA.versionId, expectedRevision: 0, requestId: request() });
       expect(selected.revision).toBe(1);
     } finally { await database.update(s.programs).set({ metadata: { instructionalTracks: policy } }).where(eq(s.programs.id, programId)); }
+    await select(studentA, trackB, 1);
+    const selections = await database.select({
+      revision: s.studentInstructionalSelections.revision,
+      policy: s.instructionalTrackPolicyVersions.policy,
+    }).from(s.studentInstructionalSelections).innerJoin(s.instructionalTrackPolicyVersions,
+      eq(s.studentInstructionalSelections.policyVersionId, s.instructionalTrackPolicyVersions.id))
+      .orderBy(s.studentInstructionalSelections.revision);
+    expect(selections.map(row => row.policy.selectionPolicy)).toEqual(["guardian", "student"]);
+    await expect(database.update(s.instructionalTrackPolicyVersions).set({ policy: {} })
+      .where(eq(s.instructionalTrackPolicyVersions.programId, programId))).rejects.toThrow();
+  });
+  it("uses the same verified agreement for a community host and provider-authored instruction", async () => {
+    const hostOrganizationId = id(80), hostedSiteId = id(81), hostedProgramId = id(82);
+    const hostedYearId = id(83), hostedTermId = id(84), hostedSectionId = id(85), hostedEnrollmentId = id(86);
+    const host = { ...studentA, role: "registrar", grantSiteId: hostedSiteId,
+      capabilities: new Set(roleCapabilities.registrar),
+      scope: { organizationIds: [hostOrganizationId], siteIds: [hostedSiteId], programIds: [hostedProgramId] } };
+    const steward = { ...reviewer, role: "can_network_steward",
+      capabilities: new Set(roleCapabilities.can_network_steward) };
+    await database.insert(s.organizations).values({
+      id: hostOrganizationId, type: "community_nonprofit", name: "Community host", slug: "community-host",
+    });
+    await database.insert(s.sites).values({
+      id: hostedSiteId, organizationId: hostOrganizationId, name: "Hosted Site", slug: "hosted-site",
+    });
+    await database.insert(s.programs).values({
+      id: hostedProgramId, organizationId: hostOrganizationId, siteId: hostedSiteId, jurisdictionId: id(4),
+      type: "full_school", name: "Hosted Program", slug: "hosted-program", hostOrganizationId,
+      academicProviderOrganizationId: providerId, creditIssuingOrganizationId: providerId,
+      gradeRange: { min: "9", max: "12" }, metadata: { instructionalTracks: policy },
+    });
+    await database.insert(s.schoolYears).values({
+      id: hostedYearId, organizationId: hostOrganizationId, programId: hostedProgramId, siteId: hostedSiteId,
+      key: "hosted-2026", name: "Hosted school year", startsOn: "2026-08-01", endsOn: "2027-07-01", gradeScaleId: id(5),
+    });
+    await database.insert(s.terms).values({
+      id: hostedTermId, schoolYearId: hostedYearId, key: "fall", name: "Fall", sequence: 1,
+      startsOn: "2026-08-01", endsOn: "2026-12-31",
+    });
+    await database.insert(s.sections).values({
+      id: hostedSectionId, programId: hostedProgramId, siteId: hostedSiteId, courseTemplateVersionId: courseVersionId,
+      code: "HOSTED-ALG1", title: "Hosted Algebra I", termId: hostedTermId,
+    });
+    await database.insert(s.enrollments).values([
+      { studentProfileId: id(31), organizationId: hostOrganizationId, programId: hostedProgramId,
+        schoolYearId: hostedYearId, kind: "program", status: "active" },
+      { id: hostedEnrollmentId, studentProfileId: id(31), organizationId: hostOrganizationId, programId: hostedProgramId,
+        schoolYearId: hostedYearId, sectionId: hostedSectionId, kind: "section", status: "active" },
+    ]);
+    const hostedStudent = { ...studentB, grantId: id(87), grantSiteId: hostedSiteId, scope: host.scope };
+    await database.insert(s.accountPersonGrants).values({
+      id: hostedStudent.grantId, accountId: hostedStudent.accountId, personId: hostedStudent.actorPersonId,
+      role: "student", organizationId: hostOrganizationId, siteId: hostedSiteId,
+    });
+    const draft = { programId: hostedProgramId, courseVersionId, requestId: request(),
+      title: "Community-hosted Algebra", slug: "community-algebra" };
+    await expect(createInstructionalTrackDraft(authorA, draft)).rejects.toThrow(/operating authority/);
+    await expect(listStudentInstructionalTracks(hostedStudent, { sectionId: hostedSectionId })).rejects.toThrow(/operating authority/);
+    const services = ["curriculum", "academic_instruction"];
+    const { authorizationId } = await requestProgramSiteAuthorization(host, { programId: hostedProgramId, services });
+    const { documentId } = await registerOperatingAgreementEvidence(host, {
+      programId: hostedProgramId, siteId: hostedSiteId, fileName: "verified-test-agreement.pdf",
+      effectiveThrough: future, expiresAt: future, verifierPersonId: studentB.actorPersonId,
+      hostSignatureVerified: true, institutionSignatureVerified: true, authorizedServices: services,
+    });
+    await expect(createInstructionalTrackDraft(authorA, draft)).rejects.toThrow(/operating authority/);
+    await reviewProgramSiteAuthorization(steward, {
+      authorizationId, decision: "approved", reason: "Both parties and contracted services verified",
+      evidenceDocumentId: documentId, effectiveFrom: new Date(Date.now() - 1000), effectiveThrough: future,
+    });
+    await expect(createInstructionalTrackDraft(authorA, draft)).resolves.toMatchObject({ trackId: expect.any(String) });
+    await selectStudentInstructionalTrack(hostedStudent, {
+      sectionId: hostedSectionId, sectionEnrollmentId: hostedEnrollmentId, trackVersionId: trackA.versionId,
+      expectedRevision: 0, requestId: request(),
+    });
+    const instruction = await getSelectedLessonInstruction(hostedStudent, { sectionId: hostedSectionId, publisherLessonId: "l1" });
+    expect(instruction.recordings[0]?.media.url).toBe("https://media.example.test/A.mp4");
   });
   it("saves incomplete drafts but refuses to submit missing lesson coverage or publish without reviews", async () => {
     const draft = await createInstructionalTrackDraft(authorA, { programId, courseVersionId, requestId: request(), title: "Incomplete test", slug: "incomplete-test" });
@@ -241,13 +331,20 @@ describe("recorded-instructor workflow against isolated PostgreSQL", () => {
       await database.update(s.roleAssignments).set({ capabilities: [...authorA.capabilities] }).where(eq(s.roleAssignments.personId, authorA.actorPersonId));
     }
   });
-  it("invalidates content after a resource change rather than serving an unreviewed URL", async () => {
+  it("pins the reviewed URL across catalog edits and blocks delivery if licensing changes", async () => {
     const chosen = await select(studentA, trackA);
     await database.update(s.curriculumResources).set({ url: "https://media.example.test/changed.mp4" }).where(eq(s.curriculumResources.id, id(62)));
     try {
+      const instruction = await getSelectedLessonInstruction(studentA, { sectionId, publisherLessonId: "l1" });
+      expect(instruction.recordings[0]?.media.url).toBe("https://media.example.test/A.mp4");
+      await expect(database.update(s.instructionalTrackResourceSnapshots).set({ resources: [] })
+        .where(eq(s.instructionalTrackResourceSnapshots.trackVersionId, chosen.trackVersionId))).rejects.toThrow();
+      await database.update(s.curriculumResources).set({ licenseCode: "unverified" }).where(eq(s.curriculumResources.id, id(62)));
       await expect(getSelectedLessonInstruction(studentA, { sectionId, publisherLessonId: "l1" })).rejects.toThrow();
-      expect((await listStudentInstructionalTracks(studentA, { sectionId })).tracks.some(t => t.versionId === chosen.trackVersionId)).toBe(false);
-    } finally { await database.update(s.curriculumResources).set({ url: "https://media.example.test/A.mp4" }).where(eq(s.curriculumResources.id, id(62))); }
+    } finally {
+      await database.update(s.curriculumResources).set({ url: "https://media.example.test/A.mp4", licenseCode: "synthetic_test_fixture" })
+        .where(eq(s.curriculumResources.id, id(62)));
+    }
   });
   it("disables content operations through independent feature flags", async () => {
     process.env.CAN_INSTRUCTIONAL_TRACK_CHOICE_ENABLED = "false";

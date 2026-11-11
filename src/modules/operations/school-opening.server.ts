@@ -40,11 +40,11 @@ export async function schoolIdentity(tx:Reader,programId:string){
     .innerJoin(sites,eq(sites.id,programs.siteId))
     .where(eq(programs.id,programId)).limit(1);
   const siteId=school?.siteId;
-  if(!school || !siteId || school.type!=="church" || !school.delivery.onsite ||
+  if(!school || !siteId || !school.delivery.onsite ||
     school.institutionId===school.organizationId ||
     school.siteOwner!==school.organizationId ||
     (school.hostId && school.hostId!==school.organizationId))
-    throw new AuthorizationError("independent church/CAN onsite school identity");
+    throw new AuthorizationError("independently hosted CAN onsite school identity");
   const [can]=await tx.select({id:organizations.id,type:organizations.type})
     .from(organizations).where(eq(organizations.id,school.institutionId)).limit(1);
   if(can?.type!=="can_network")
@@ -66,7 +66,7 @@ export function verifyChurchEvidenceSubmitter(actor:AccessContext,school:ChurchS
     !actor.scope.organizationIds?.includes(school.organizationId) ||
     !actor.scope.siteIds?.includes(school.siteId) ||
     !actor.scope.programIds?.includes(school.programId))
-    throw new AuthorizationError("verified church registrar for this exact Program and Site");
+    throw new AuthorizationError("verified host registrar for this exact Program and Site");
   assertCapability(actor,"program.launch.start");
 }
 
@@ -174,7 +174,7 @@ async function requireVerifiedChurchSiteDirector(
           sql`${programResponsibilityAssignments.effectiveFrom} <= ${now}`,
           sql`${programResponsibilityAssignments.effectiveThrough} > ${now}`,
         )).limit(1);
-      if(!director)throw new AuthorizationError("active independently appointed church site director");
+      if(!director)throw new AuthorizationError("active independently appointed host Site director");
 
 }
 
@@ -209,7 +209,7 @@ export async function requireCurrentChurchSchoolOpening(
     configuration.approvedAt>now ||
     (school.programStatus!=="active" &&
      !(options.allowPendingActivation && school.programStatus==="launching")))
-    throw new AuthorizationError("currently approved church school configuration");
+    throw new AuthorizationError("currently approved hosted school configuration");
   const jurisdiction=await currentJurisdictionForConfiguration(tx,programId,configuration,now);
   const approvedJurisdiction=configuration.config.jurisdictionOpeningApproval;
   if(!matchesCurrentOpeningJurisdiction(approvedJurisdiction,jurisdiction))
@@ -395,12 +395,12 @@ export async function readChurchSchoolOpening(actor:AccessContext,programId:stri
         :jurisdictionIssue??"CAN must independently review the current school location and model."},
     {id:"evidence",title:"Independent opening evidence",satisfied:evidenceIssue===null,
       detail:evidenceIssue??"All required categories have current independently verified evidence."},
-    {id:"agreement",title:"CAN–church service agreement",satisfied:agreementReady,
+    {id:"agreement",title:"CAN operating agreement with the host",satisfied:agreementReady,
       detail:agreementReady?"Current agreement covers the required school services."
         :"A current independently verified agreement must cover instruction, school of record and onsite supervision."},
-    {id:"director",title:"Church Site director",satisfied:directorReady,
+    {id:"director",title:"Host Site director",satisfied:directorReady,
       detail:directorReady?"A current verified director is appointed to this configuration."
-        :"Appoint a current verified church Site director to this configuration in Site staffing."},
+        :"Appoint a current verified host Site director to this configuration in Site staffing."},
   ];
   const prerequisitesReady=prerequisites.every(item=>item.satisfied);
   const evidenceReady=evidenceIssue===null&&agreementReady;

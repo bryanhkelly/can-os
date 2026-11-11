@@ -81,7 +81,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
   const [error, setError] = useState("");
   const [created, setCreated] = useState<LaunchCreatedResult | null>(null);
   const [type, setType] = useState<(typeof programTypes)[number]>(
-    draft?.type ?? (options?.schoolSetupAdministrator && options.organizations[0]?.type !== "church" ? "full_school" : "hosted_academy"));
+    draft?.type ?? (options?.schoolSetupAdministrator ? "full_school" : "church_hosted_academy"));
   const [summerCreditBearing, setSummerCreditBearing] = useState(draft?.summerCreditBearing ?? false);
   const creditMode = type === "summer_program" && summerCreditBearing ? "credit_bearing" : isExtendedLearningType(type) ? "non_credit" : "credit_bearing";
   const [name, setName] = useState(draft?.name ?? "");
@@ -354,7 +354,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
     : currentSchool?.status==="active"
     ? "This Program is active. Current onsite opening, staffing, supervision, and custody are checked separately in Operations."
     : needsSchoolChoice ? "Your existing schools are saved. Select the exact school above to continue its own preparation, website, and family outreach without creating a duplicate Program."
-    : !currentProgram ? "Save the church Site and academic Program once; return to this same school to continue."
+    : !currentProgram ? "Save the host Site and academic Program once; return to this same school to continue."
     : !currentLaunch ? "This Program has no available pre-opening Journey here. Review the saved academic and school context; do not infer readiness."
     : nextTask
       ? nextTask.description+(needsEvidenceCorrection

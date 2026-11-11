@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { auditEvents } from "@/db/schema";
+import { instructionalTrackCommandReceipts } from "@/db/schema";
 import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 import type { TrackTx } from "./instructional-track-access.server";
 
-function fingerprint(value: unknown): string {
+export function instructionalFingerprint(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value, (_key, item: unknown) =>
     item && typeof item === "object" && !Array.isArray(item) && !(item instanceof Date)
       ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) : item)).digest("hex");
@@ -21,16 +21,19 @@ export async function trackCommand<T extends Record<string, unknown>>(tx: TrackT
   payload: unknown;
 }, apply: () => Promise<T>): Promise<T> {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"instructional-command:" + actor.actorPersonId + ":" + input.requestId}))`);
-  const digest = fingerprint({ action: input.action, payload: input.payload });
-  const [prior] = await tx.select({ after: auditEvents.after }).from(auditEvents).where(and(
-    eq(auditEvents.actorPersonId, actor.actorPersonId),
-    sql`${auditEvents.context}->>'instructionalRequestId' = ${input.requestId}`,
+  const digest = instructionalFingerprint({ action: input.action, scope: input.scope, payload: input.payload });
+  const [prior] = await tx.select().from(instructionalTrackCommandReceipts).where(and(
+    eq(instructionalTrackCommandReceipts.actorPersonId, actor.actorPersonId),
+    eq(instructionalTrackCommandReceipts.requestId, input.requestId),
   )).limit(1);
   if (prior) {
-    if (prior.after?.inputHash !== digest || !prior.after?.result) throw new Error("This request ID was already used for different input.");
-    return prior.after.result as T;
+    if (prior.fingerprint !== digest) throw new Error("This request ID was already used for different input.");
+    return prior.result as T;
   }
   const result = await apply();
+  await tx.insert(instructionalTrackCommandReceipts).values({
+    actorPersonId: actor.actorPersonId, requestId: input.requestId, fingerprint: digest, result,
+  });
   await writeAudit(tx, actor, { action: input.action, entityType: input.entityType, entityId: input.entityId,
     scope: input.scope, after: { inputHash: digest, result }, contextExtras: { instructionalRequestId: input.requestId } });
   await emitEvent(tx, { eventType: input.eventType, aggregateType: input.entityType, aggregateId: input.entityId,
