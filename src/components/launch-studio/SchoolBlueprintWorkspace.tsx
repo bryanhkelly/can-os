@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { BlueprintProgramEditor, BlueprintItemEditor } from "@/components/launch-studio/SchoolBlueprintOfferingEditors";
 import { SchoolBlueprintPublishingPanel } from "@/components/launch-studio/SchoolBlueprintPublishingPanel";
 import { editorialIdentityKeys } from "@/domain/school-blueprint";
 import {
-  getSiteBlueprintWorkspace, saveSiteBlueprintIdentity, addSiteBlueprintTemplate,
+  getSiteBlueprintWorkspace, saveSiteBlueprintIdentity, addSiteBlueprintTemplate, createCustomSchoolBlueprintItem,
 } from "@/modules/programs/school-blueprint.functions";
 
 type Workspace = Awaited<ReturnType<typeof getSiteBlueprintWorkspace>>;
@@ -32,6 +37,9 @@ export function SchoolBlueprintWorkspace({ siteId }: { siteId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [customKind,setCustomKind]=useState<"community"|"experience"|"club"|"activity">("club");
+  const [customName,setCustomName]=useState("");
+  const [customSummary,setCustomSummary]=useState("");
 
   async function refresh() {
     const data = await getSiteBlueprintWorkspace({ data: { siteId } });
@@ -84,6 +92,21 @@ export function SchoolBlueprintWorkspace({ siteId }: { siteId: string }) {
     } catch {
       setError("The Blueprint changed or this reference is unavailable. Refresh before trying again.");
     } finally { setBusy(null); }
+  }
+
+  async function createCustomItem() {
+    if(!workspace||busy)return;
+    setBusy("custom");setError("");setNotice("");
+    try {
+      await createCustomSchoolBlueprintItem({data:{
+        siteId,expectedRevision:workspace.revision,
+        item:{kind:customKind,title:customName,summary:customSummary,configuration:{}},
+      }});
+      await refresh();setCustomName("");setCustomSummary("");
+      setNotice("Custom experience added privately. It is not approved or available for registration.");
+    } catch(e){
+      setError(e instanceof Error?e.message:"The School Blueprint changed. Refresh and retry.");
+    }finally {setBusy(null);}
   }
 
   if (!workspace) return <section className="mt-6 rounded-lg border bg-card p-6" aria-label="School Blueprint">
@@ -153,16 +176,14 @@ export function SchoolBlueprintWorkspace({ siteId }: { siteId: string }) {
         </p>
         {workspace.programs.length + workspace.items.length === 0
           ? <p className="mt-5 border bg-muted p-4 text-sm">Nothing selected yet. Choose an offering from the library below.</p>
-          : <ul className="mt-5 space-y-2">
-            {workspace.programs.map(item => <li key={item.id} className="border p-3">
-              <span className="font-semibold">{item.name}</span>
-              <span className="ml-2 text-xs text-muted-foreground">Program · {item.status}</span>
-            </li>)}
-            {workspace.items.map(item => <li key={item.id} className="border p-3">
-              <span className="font-semibold">{item.title}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{item.kind} · {item.status}</span>
-            </li>)}
-          </ul>}
+          : <div className="mt-5 space-y-3">
+              {workspace.programs.map(item =>
+                <BlueprintProgramEditor key={item.id+":"+workspace.revision} siteId={siteId}
+                  workspace={workspace} program={item} onChanged={refresh}/>)}
+              {workspace.items.map(item =>
+                <BlueprintItemEditor key={item.id+":"+workspace.revision} siteId={siteId}
+                  workspace={workspace} item={item} onChanged={refresh}/>)}
+            </div>}
       </section>
     </div>
 
@@ -192,6 +213,24 @@ export function SchoolBlueprintWorkspace({ siteId }: { siteId: string }) {
           </article>;
         })}
       </div>
+    </section>
+    <section className="border bg-card p-6 space-y-4" aria-label="Create your own school experience">
+      <h3 className="font-serif text-2xl">Create a local experience</h3>
+      <p className="text-sm text-muted-foreground">Add a club, cultural project, enrichment activity or community initiative not found in the CAN library.</p>
+      <div><Label htmlFor="blueprint-custom-kind">Type</Label>
+        <Select id="blueprint-custom-kind" value={customKind}
+          onChange={e=>setCustomKind(e.target.value as typeof customKind)}>
+          <option value="club">Club</option><option value="activity">Activity</option>
+          <option value="experience">Experience</option><option value="community">Community offering</option>
+        </Select></div>
+      <div><Label htmlFor="blueprint-custom-name">Experience name</Label>
+        <Input id="blueprint-custom-name" maxLength={160} value={customName}
+          onChange={e=>setCustomName(e.target.value)} placeholder="Example: Student Photography Collective"/></div>
+      <div><Label htmlFor="blueprint-custom-summary">What you hope to offer</Label>
+        <Textarea id="blueprint-custom-summary" maxLength={4000} value={customSummary}
+          onChange={e=>setCustomSummary(e.target.value)}/></div>
+      <Button variant="outline" disabled={Boolean(busy)||customName.trim().length<2}
+        onClick={()=>void createCustomItem()}>Add to private School Blueprint</Button>
     </section>
     <SchoolBlueprintPublishingPanel siteId={siteId} workspace={workspace} onRefresh={refresh}/>
     <p className="text-xs leading-5 text-muted-foreground">
