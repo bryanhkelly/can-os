@@ -8,6 +8,11 @@ export const organizationType = pgEnum("organization_type", [
   "microschool_operator",
   "consortium",
   "other_partner",
+  "community_nonprofit",
+  "cultural_organization",
+  "religious_organization",
+  "independent_school",
+  "facility_provider",
 ]);
 
 export const programType = pgEnum("program_type", [
