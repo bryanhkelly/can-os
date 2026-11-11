@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { EventTypes } from "@/domain/event-types";
 import {
   sites, programs as canonicalPrograms, siteBlueprints, siteBlueprintRevisions, siteProgramPlans, siteBlueprintItems,
   blueprintCatalogItems, blueprintCatalogItemVersions, religiousAffiliationOptions,
@@ -149,7 +150,7 @@ async function appendBlueprintRevision(
     after: { revision, change: input.change },
   });
   await emitEvent(tx, {
-    eventType: "SchoolBlueprintRevisionSaved", aggregateType: "SiteBlueprint",
+    eventType:EventTypes.SchoolBlueprintRevisionSaved, aggregateType: "SiteBlueprint",
     aggregateId: input.siteId, actorPersonId: actor.actorPersonId!,
     organizationId: input.organizationId, siteId: input.siteId,
     payload: { revision, change: input.change },
