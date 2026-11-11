@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
+import { validateBlueprintEvidenceReview } from "./blueprint-operational-readiness";
 
 /** Private institutional review findings; not legal school authorization. */
 export const blueprintDecisionSchema=z.object({
@@ -14,6 +15,10 @@ export const blueprintDecisionSchema=z.object({
   effectiveFrom:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
   effectiveThrough:z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null),
 }).strict().superRefine((v,ctx)=>{
+  if(v.decision==="approved") {
+    try {validateBlueprintEvidenceReview(v.evidence);}
+    catch(error){ctx.addIssue({code:"custom",message:error instanceof Error?error.message:"Evidence review is required"});}
+  }
   if(v.publicVisibility==="confirmed" && v.decision!=="approved")
     ctx.addIssue({code:"custom",message:"Only CAN-approved scope may be described as confirmed"});
   if(v.decision==="declined" && v.publicVisibility!=="hidden")

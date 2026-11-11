@@ -17,6 +17,10 @@ export function CANSchoolBlueprintReviewDesk(){
  const [prospectuses,setProspectuses]=useState<Awaited<ReturnType<typeof getSchoolPlanningProspectusReviewDesk>>>([]);
  const [choices,setChoices]=useState<Record<string,Choice>>({});
  const [conditions,setConditions]=useState<Record<string,string>>({});
+ const [facility,setFacility]=useState<Record<string,string>>({});
+ const [staffing,setStaffing]=useState<Record<string,string>>({});
+ const [facilityDoc,setFacilityDoc]=useState<Record<string,string>>({});
+ const [staffingDoc,setStaffingDoc]=useState<Record<string,string>>({});
  const [scope,setScope]=useState<Record<string,string>>({});
  const [busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const load=useCallback(async()=>{
@@ -39,7 +43,11 @@ export function CANSchoolBlueprintReviewDesk(){
     const publicVisibility=choice==="approved"?"confirmed":choice==="changes_required"?"under_review":choice==="future"?"future":"hidden";
     return {subjectKind:subject.kind,subjectId:subject.id,decision:choice,publicVisibility,
      publicSummary:null,requiredForOpening:false,
-     conditions:conditions[k]?{reviewerNotes:conditions[k]}:{},evidence:{},effectiveFrom:null,effectiveThrough:null};
+     conditions:conditions[k]?{reviewerNotes:conditions[k]}:{},
+     evidence:choice==="approved"?{
+       facility:{status:facility[k],documentId:facilityDoc[k]||null},
+       staffing:{status:staffing[k],documentId:staffingDoc[k]||null},
+     }:{},effectiveFrom:null,effectiveThrough:null};
    });
    await decideSchoolBlueprintReview({data:{siteId:req.siteId,reviewRequestId:req.id,
      expectedApprovedVersion:req.expectedApprovedVersion,schoolScopeStatement:statement,decisions}});
@@ -88,13 +96,45 @@ export function CANSchoolBlueprintReviewDesk(){
         <option value="declined">Not approved</option>
        </select>
       </label>
+      {choices[k]==="approved" && <div className="mt-3 space-y-3 border-t pt-3">
+       <p className="text-xs font-semibold">Verified readiness evidence (internal CAN review)</p>
+       {(["facility","staffing"] as const).map(dimension=>{
+        const states=dimension==="facility"?facility:staffing;
+        const setStates=dimension==="facility"?setFacility:setStaffing;
+        const docs=dimension==="facility"?facilityDoc:staffingDoc;
+        const setDocs=dimension==="facility"?setFacilityDoc:setStaffingDoc;
+        return <div key={dimension}>
+         <label className="block text-sm">{dimension==="facility"?"Facility / equipment":"Staffing / supervision"} review
+          <select className="mt-1 w-full border bg-background p-2" value={states[k]??""}
+           onChange={e=>setStates(old=>({...old,[k]:e.target.value}))}>
+           <option value="">Select evidence finding…</option>
+           <option value="verified">Verified document</option>
+           <option value="not_required">Not required for this offering</option>
+           <option value="changes_required">Remediation required</option>
+          </select>
+         </label>
+         {states[k]==="verified" && <label className="mt-2 block text-sm">Verified evidence document ID
+          <input className="mt-1 w-full border bg-background p-2" value={docs[k]??""}
+           onChange={e=>setDocs(old=>({...old,[k]:e.target.value.trim()}))}
+           placeholder="Verified Site or Blueprint document UUID"/>
+         </label>}
+        </div>;
+       })}
+      </div>}
       <label className="mt-3 block text-sm">Internal requirements or remediation (not public)
        <textarea className="mt-1 w-full border bg-background p-2" maxLength={2500}
         value={conditions[k]??""} onChange={e=>setConditions(current=>({...current,[k]:e.target.value}))}/>
       </label>
      </div>;
     })}</div>
-    <Button variant="outline" disabled={busy||subjects.some(s=>!choices[key(req.id,s.kind,s.id)])||(scope[req.id]?.trim().length??0)<20}
+    <Button variant="outline" disabled={busy||subjects.some(s=>{
+      const k=key(req.id,s.kind,s.id),choice=choices[k];
+      return !choice || (choice==="approved" && (
+        !["verified","not_required"].includes(facility[k]) ||
+        !["verified","not_required"].includes(staffing[k]) ||
+        (facility[k]==="verified"&&!facilityDoc[k]) ||
+        (staffing[k]==="verified"&&!staffingDoc[k])));
+    })||(scope[req.id]?.trim().length??0)<20}
       onClick={()=>void decide(req)}>Record reviewed Blueprint scope</Button>
    </article>;
   })}

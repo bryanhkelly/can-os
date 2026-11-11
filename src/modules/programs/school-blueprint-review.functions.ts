@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  organizations, sites, siteBlueprints, siteBlueprintRevisions, siteBlueprintReviewRequests,
+  organizations, sites, documents, siteBlueprints, siteBlueprintRevisions, siteBlueprintReviewRequests,
   siteBlueprintApprovedVersions, siteBlueprintApprovalDecisions,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -12,6 +12,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { blueprintReviewSchema, blueprintRevisionDiff } from "@/domain/school-blueprint-approval";
+import { validateBlueprintEvidenceReview } from "@/domain/blueprint-operational-readiness";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit, emitEvent } from "@/platform/mutation";
 
@@ -154,6 +155,27 @@ export const decideSchoolBlueprintReview=createServerFn({method:"POST"})
     if(subjects.size!==decisions.size||data.decisions.length!==decisions.size||
       [...subjects].some(key=>!decisions.has(key)))
       throw new DomainError("VALIDATION_FAILED","Record a review decision for every submitted offering.");
+    // Reviewer evidence must actually belong to this school or this proposed item.
+    // Verified status is not accepted merely because a client supplied a UUID.
+    for(const item of data.decisions){
+      if(item.decision!=="approved")continue;
+      const evidence=validateBlueprintEvidenceReview(item.evidence);
+      for(const dimension of ["facility","staffing"] as const){
+        const record=evidence[dimension];
+        if(record.status!=="verified")continue;
+        const [document]=await tx.select({
+          id:documents.id,subjectType:documents.subjectType,subjectId:documents.subjectId,
+          verifiedAt:documents.verifiedAt,expiresAt:documents.expiresAt,
+        }).from(documents).where(eq(documents.id,record.documentId!)).limit(1);
+        if(!document || !document.verifiedAt ||
+           (document.expiresAt && document.expiresAt.getTime()<=Date.now()) ||
+           !((document.subjectType==="site"&&document.subjectId===site.id) ||
+             (document.subjectType==="blueprint_item"&&document.subjectId===item.subjectId) ||
+             (document.subjectType==="blueprint_program"&&document.subjectId===item.subjectId)))
+          throw new DomainError("VALIDATION_FAILED",
+            "Verified facility/staffing evidence must be a current, independently verified document for this Site or offering.");
+      }
+    }
     const version=(prior?.version??0)+1;
     const [approved]=await tx.insert(siteBlueprintApprovedVersions).values({
       siteId:site.id,version,reviewRequestId:request.id,sourceRevision:request.sourceRevision,
