@@ -39,6 +39,7 @@ export * from "./reminders";
 export * from "./educational-capacity";
 export * from "./section-planning";
 export * from "./learning-participation";
+export * from "./instructional-tracks";
 export * from "./learning-activity";
 
 export * from "./curriculum-marketplace";
@@ -65,3 +66,4 @@ export * from "./curriculum-year-adoptions";
 export * from "./finance";
 
 export * from "./jurisdiction-profiles";
+
