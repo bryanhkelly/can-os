@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { EventTypes } from "@/domain/event-types";
 import {
   activities, documents, programs, sites, siteBlueprints, siteBlueprintRevisions, siteProgramPlans,
   siteBlueprintItems, siteBlueprintApprovedVersions, siteBlueprintApprovalDecisions,
@@ -154,7 +155,7 @@ export const linkApprovedBlueprintProgram=createServerFn({method:"POST"})
       entityType:"site_program_plan",entityId:plan.id,
       scope:{organizationId:site.organizationId,siteId:site.id,programId:program.id},
       after:{canonicalProgramId:program.id,canApprovalVersion:scope.version}});
-    await emitEvent(tx,{eventType:"SchoolBlueprintProgramPrepared",
+    await emitEvent(tx,{eventType:EventTypes.SchoolBlueprintProgramPrepared,
       aggregateType:"SiteBlueprint",aggregateId:site.id,
       actorPersonId:actor.actorPersonId!,siteId:site.id,organizationId:site.organizationId,
       payload:{planId:plan.id,programId:program.id,canApprovalVersion:scope.version}});
@@ -209,7 +210,7 @@ export const prepareApprovedBlueprintActivity=createServerFn({method:"POST"})
       scope:{organizationId:site.organizationId,siteId:site.id,programId:data.programId??null},
       after:{sourceBlueprintItemId:item.id,status:"active",seasonsCreated:0,
         registrationAvailable:false,canApprovalVersion:scope.version}});
-    await emitEvent(tx,{eventType:"SchoolBlueprintActivityPrepared",
+    await emitEvent(tx,{eventType:EventTypes.SchoolBlueprintActivityPrepared,
       aggregateType:"SiteBlueprint",aggregateId:site.id,actorPersonId:actor.actorPersonId!,
       siteId:site.id,organizationId:site.organizationId,
       payload:{itemId:item.id,activityId:activity.id,canApprovalVersion:scope.version}});
