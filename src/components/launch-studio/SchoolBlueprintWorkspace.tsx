@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SchoolBlueprintPublishingPanel } from "@/components/launch-studio/SchoolBlueprintPublishingPanel";
 import { editorialIdentityKeys } from "@/domain/school-blueprint";
 import {
   getSiteBlueprintWorkspace, saveSiteBlueprintIdentity, addSiteBlueprintTemplate,
@@ -192,6 +193,7 @@ export function SchoolBlueprintWorkspace({ siteId }: { siteId: string }) {
         })}
       </div>
     </section>
+    <SchoolBlueprintPublishingPanel siteId={siteId} workspace={workspace} onRefresh={refresh}/>
     <p className="text-xs leading-5 text-muted-foreground">
       Planning is separate from approved curriculum, published school websites, active activities, and school-opening authorization.
     </p>
