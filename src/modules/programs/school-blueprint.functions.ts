@@ -187,7 +187,10 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
         .orderBy(desc(siteBlueprintReviewRequests.submittedAt)).limit(1),
       db.select({id:sitePublicationReleases.id,revision:sitePublicationReleases.revision,
         status:sitePublicationReleases.status,mode:sitePublicationReleases.mode})
-        .from(sitePublicationReleases).where(eq(sitePublicationReleases.siteId,site.id))
+        .from(sitePublicationReleases).where(and(
+          eq(sitePublicationReleases.siteId,site.id),
+          eq(sitePublicationReleases.mode,"planning_prospectus"),
+        ))
         .orderBy(desc(sitePublicationReleases.revision)).limit(1),
       db.select({status:sitePublications.status,updatedAt:sitePublications.updatedAt,slug:sitePublications.slug})
         .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1),
