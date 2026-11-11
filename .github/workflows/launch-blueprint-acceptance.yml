@@ -1,0 +1,34 @@
+name: Launch Studio Blueprint Acceptance
+on:
+  pull_request:
+    paths:
+      - 'src/domain/program-offerings.ts'
+      - 'src/domain/school-launch-hub.ts'
+      - 'src/components/launch-studio/**'
+      - 'src/modules/programs/school-blueprint.functions.ts'
+      - 'src/modules/programs/school-hub.functions.ts'
+      - 'src/modules/programs/school-configuration-loader.ts'
+      - 'src/db/schema/enums.ts'
+      - 'drizzle/0083_hosted_academy_generalization.sql'
+      - 'drizzle/meta/**'
+      - '.github/workflows/launch-blueprint-acceptance.yml'
+  workflow_dispatch:
+jobs:
+  blueprint-and-hosted-academy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --max-old-space-size=6144
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Full TypeScript check with sufficient heap
+        run: npm run typecheck
+      - name: Lint Blueprint implementation
+        run: npx eslint src/modules/programs/school-blueprint.functions.ts src/components/launch-studio/SchoolBlueprintWorkspace.tsx src/domain/school-launch-hub.ts src/components/launch-studio/SchoolLaunchHub.tsx src/components/launch-studio/SchoolHubWorkflow.tsx src/modules/programs/school-hub.functions.ts src/modules/programs/school-configuration-loader.ts src/domain/program-offerings.ts
+      - name: Host-neutral and Blueprint domain regression tests
+        run: npx vitest run tests/unit/school-blueprint-foundation.test.ts tests/unit/church-hosted-provider.test.ts tests/unit/program-site-operating-policy.test.ts tests/unit/launch-institution-defaults.test.ts tests/unit/academic-program-publication.test.ts tests/unit/school-launch-hub.test.tsx
