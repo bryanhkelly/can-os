@@ -27,7 +27,7 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow, s
       <div className="mt-6 border-l-2 border-primary bg-accent p-5 text-sm"><strong>{options.schoolSetupAdministrator ? "You are the Site Administrator." : "Your school preparation workspace."}</strong><p className="mt-1 text-muted-foreground">Manage your authorized school work and delegation. Opening authorization is tracked separately.</p></div>
       <div className="mt-8 space-y-9">{schoolHubSections.map(section => <section key={section.title} aria-label={section.title}>
         <h2 className="font-serif text-3xl">{section.title}</h2><p className="mt-2 text-sm text-muted-foreground">{section.description}</p>
-        <div className={`mt-4 grid gap-4 ${section.modules.length === 4 ? "sm:grid-cols-2 xl:grid-cols-4" : section.modules.length === 3 ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"}`}>{section.modules.map(key => {const item=schoolHubModules[key]; const Icon=icons[key];return <article key={key} className="flex min-h-56 flex-col border bg-card p-6">
+        <div className={`mt-4 grid gap-4 ${section.modules.length === 3 ? "sm:grid-cols-2 xl:grid-cols-3" : "sm:grid-cols-2"}`}>{section.modules.map(key => {const item=schoolHubModules[key]; const Icon=icons[key];return <article key={key} className="flex min-h-56 flex-col border bg-card p-6">
           <Icon aria-hidden="true" className="size-9 border border-primary/20 bg-accent p-2 text-primary" />
           <h3 className="mt-4 text-base font-semibold">{item.title}</h3><p className="mb-6 mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
           {statuses?.[key] && <ModuleStatus status={statuses[key]!}/> }
