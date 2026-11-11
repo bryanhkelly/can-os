@@ -67,7 +67,7 @@ async function seedSchool(tx: Transaction, suffix: string, label: string) {
   }).returning());
   const program = first(await tx.insert(s.programs).values({
     organizationId: org.id, siteId: site.id, jurisdictionId: jurisdiction.id,
-    type: "church_hosted_academy", status: "active", name: `${label} Academy`,
+    type: "hosted_academy", status: "active", name: `${label} Academy`,
     slug: `${label.toLowerCase()}-${suffix}`, gradeRange: { min: "9", max: "12" },
     deliveryModel: { onsite: true, asynchronous: true, onsiteDaysPerWeek: 2 },
     hostOrganizationId: org.id,

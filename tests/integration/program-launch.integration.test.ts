@@ -124,7 +124,7 @@ integration("GF3 host / program launch", () => {
     const scenarios = [
       {
         orgType: "church" as const,
-        programType: "church_hosted_academy" as const,
+        programType: "hosted_academy" as const,
         orgName: "Fellowship Church",
         programName: "CAN Academy",
         gradeRange: { min: "6", max: "12" },
@@ -177,7 +177,7 @@ integration("GF3 host / program launch", () => {
       expect(options.creditIssuingOrganizations.map(org => org.id)).toContain(canOrg.id);
       expect(options.academicProviderOrganizations.map(org => org.id)).not.toContain(unrelatedAcademicOrganization.id);
 
-      if (scenario.programType === "church_hosted_academy") {
+      if (scenario.programType === "hosted_academy") {
         await expect(programsModule.startProgramLaunch(context, {
           hostOrganizationId: host.id, siteId: site.id, jurisdictionId: jurisdiction.id,
           type: scenario.programType, name: "Unauthorized provider",
@@ -221,7 +221,7 @@ integration("GF3 host / program launch", () => {
       expect(launchingProgram.hostOrganizationId).toBe(host.id);
       expect(launchingProgram.academicProviderOrganizationId).toBe(canOrg.id);
 
-      if (scenario.programType === "church_hosted_academy") {
+      if (scenario.programType === "hosted_academy") {
         // Authorization scope must be checked before exposing an unrelated
         // organization's institutional agreement/opening decision.
         await expect(
@@ -504,7 +504,7 @@ integration("GF3 host / program launch", () => {
       expect(extensionProgram.status).toBe("launching");
       expect(extension.journeyId).toBeTruthy();
       if (scenario.orgType === "church") {
-        // Switching a church-owned CAN site from church_hosted_academy to
+        // Switching a church-owned CAN site from hosted_academy to
         // high_school_extension must not bypass institutional authorization.
         await expect(programsModule.activateProgram({
           ...context, scope: {
@@ -538,7 +538,7 @@ integration("GF3 host / program launch", () => {
       expect(siteEvent.status).toBe("processed");
 
       const {listOpeningHandoffs,acknowledgeOpeningHandoff}=await import("@/modules/programs/opening-handoff.server");
-      if (scenario.programType === "church_hosted_academy") {
+      if (scenario.programType === "hosted_academy") {
         if(!operatingAuthorizationId)throw new Error("Missing synthetic operating authorization");
         await operating.revokeProgramSiteAuthorization(launchContext,{
           authorizationId:operatingAuthorizationId,reason:"Withdraw the synthetic operating authorization before activation.",
