@@ -4,9 +4,9 @@ import { and, asc, desc, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  sites, siteBlueprints, siteBlueprintRevisions, siteProgramPlans, siteBlueprintItems,
+  sites, programs as canonicalPrograms, siteBlueprints, siteBlueprintRevisions, siteProgramPlans, siteBlueprintItems,
   blueprintCatalogItems, blueprintCatalogItemVersions, religiousAffiliationOptions,
-  siteBlueprintReviewRequests, siteBlueprintApprovedVersions, sitePublicationReleases, sitePublications,
+  siteBlueprintReviewRequests, siteBlueprintApprovedVersions, siteBlueprintApprovalDecisions, sitePublicationReleases, sitePublications,
 } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -174,7 +174,7 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
       db.select().from(religiousAffiliationOptions)
         .where(eq(religiousAffiliationOptions.active, true))
         .orderBy(asc(religiousAffiliationOptions.sortOrder)),
-      db.select({version:siteBlueprintApprovedVersions.version,
+      db.select({id:siteBlueprintApprovedVersions.id,version:siteBlueprintApprovedVersions.version,
         sourceRevision:siteBlueprintApprovedVersions.sourceRevision,
         schoolScopeStatement:siteBlueprintApprovedVersions.schoolScopeStatement})
         .from(siteBlueprintApprovedVersions).where(eq(siteBlueprintApprovedVersions.siteId,site.id))
@@ -189,6 +189,22 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
         .orderBy(desc(sitePublicationReleases.revision)).limit(1),
       db.select({status:sitePublications.status,updatedAt:sitePublications.updatedAt,slug:sitePublications.slug})
         .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1),
+    ]);
+    const [operationalPrograms, approvedDecisions] = await Promise.all([
+      db.select({
+        id:canonicalPrograms.id,name:canonicalPrograms.name,
+        status:canonicalPrograms.status,type:canonicalPrograms.type,
+      }).from(canonicalPrograms).where(and(
+        eq(canonicalPrograms.siteId,site.id),
+        eq(canonicalPrograms.organizationId,site.organizationId)))
+      .orderBy(asc(canonicalPrograms.name)),
+      latestApproval[0]?.id ? db.select({
+        subjectId:siteBlueprintApprovalDecisions.subjectId,
+        subjectKind:siteBlueprintApprovalDecisions.subjectKind,
+        decision:siteBlueprintApprovalDecisions.decision,
+      }).from(siteBlueprintApprovalDecisions).where(
+        eq(siteBlueprintApprovalDecisions.approvalVersionId,latestApproval[0].id)
+      ) : Promise.resolve([]),
     ]);
     const versions = new Set<string>();
     const catalog = catalogRows.filter(row => {
@@ -208,7 +224,7 @@ export const getSiteBlueprintWorkspace = createServerFn({ method: "GET" })
         editorialIdentity: head[0]?.editorialIdentity ?? "community_belonging",
         culturalContext: safeJsonObject(head[0]?.culturalContext ?? {}),
       },
-      catalog, affiliations,
+      catalog, affiliations, operationalPrograms, approvedDecisions,
       latestApproval:latestApproval[0]??null,
       latestReview:latestReview[0]??null,
       latestProspectus:latestProspectus[0]??null,
