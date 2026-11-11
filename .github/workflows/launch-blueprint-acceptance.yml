@@ -4,6 +4,12 @@ on:
     paths:
       - 'src/domain/program-offerings.ts'
       - 'src/domain/school-blueprint-approval.ts'
+      - 'src/domain/blueprint-operational-readiness.ts'
+      - 'src/modules/programs/school-blueprint-promotion.functions.ts'
+      - 'src/components/launch-studio/SchoolBlueprintOfferingEditors.tsx'
+      - 'tests/unit/school-blueprint-journey-acceptance.test.ts'
+      - 'tests/unit/blueprint-operational-readiness.test.ts'
+      - 'tests/postgres/school-blueprint-end-to-end-acceptance.sql'
       - 'src/modules/programs/school-blueprint-review.functions.ts'
       - 'src/modules/sites/school-planning-prospectus.functions.ts'
       - 'src/modules/enrollment/public-planning-interest.server.ts'
@@ -37,6 +43,6 @@ jobs:
       - name: Full TypeScript check with sufficient heap
         run: npm run typecheck
       - name: Lint Blueprint implementation
-        run: npx eslint src/modules/programs/school-blueprint.functions.ts src/modules/programs/school-blueprint-review.functions.ts src/modules/sites/school-planning-prospectus.functions.ts src/modules/enrollment/public-planning-interest.server.ts src/domain/school-blueprint-approval.ts src/db/schema/blueprint-approval.ts src/components/launch-studio/SchoolBlueprintWorkspace.tsx src/components/launch-studio/SchoolBlueprintPublishingPanel.tsx src/components/networks/CANSchoolBlueprintReviewDesk.tsx src/domain/school-launch-hub.ts src/components/launch-studio/SchoolLaunchHub.tsx src/components/launch-studio/SchoolHubWorkflow.tsx src/modules/programs/school-hub.functions.ts src/modules/programs/school-configuration-loader.ts src/domain/program-offerings.ts
+        run: npx eslint src/modules/programs/school-blueprint.functions.ts src/modules/programs/school-blueprint-promotion.functions.ts src/domain/blueprint-operational-readiness.ts src/components/launch-studio/SchoolBlueprintOfferingEditors.tsx src/modules/programs/school-blueprint-review.functions.ts src/modules/sites/school-planning-prospectus.functions.ts src/modules/enrollment/public-planning-interest.server.ts src/domain/school-blueprint-approval.ts src/db/schema/blueprint-approval.ts src/components/launch-studio/SchoolBlueprintWorkspace.tsx src/components/launch-studio/SchoolBlueprintPublishingPanel.tsx src/components/networks/CANSchoolBlueprintReviewDesk.tsx src/domain/school-launch-hub.ts src/components/launch-studio/SchoolLaunchHub.tsx src/components/launch-studio/SchoolHubWorkflow.tsx src/modules/programs/school-hub.functions.ts src/modules/programs/school-configuration-loader.ts src/domain/program-offerings.ts
       - name: Host-neutral and Blueprint domain regression tests
-        run: npx vitest run tests/unit/school-blueprint-foundation.test.ts tests/unit/church-hosted-provider.test.ts tests/unit/program-site-operating-policy.test.ts tests/unit/launch-institution-defaults.test.ts tests/unit/academic-program-publication.test.ts tests/unit/school-launch-hub.test.tsx
+        run: npx vitest run tests/unit/school-blueprint-foundation.test.ts tests/unit/blueprint-operational-readiness.test.ts tests/unit/school-blueprint-journey-acceptance.test.ts tests/unit/church-hosted-provider.test.ts tests/unit/program-site-operating-policy.test.ts tests/unit/launch-institution-defaults.test.ts tests/unit/academic-program-publication.test.ts tests/unit/school-launch-hub.test.tsx
