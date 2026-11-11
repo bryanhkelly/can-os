@@ -292,6 +292,15 @@
       "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
     },
     {
+      "file": "src/routes/enrichment_.$seasonId.tsx",
+      "route": "/enrichment/$seasonId",
+      "owner": "activities",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
       "file": "src/routes/enrichment-review.tsx",
       "route": "/enrichment-review",
       "owner": "activities",
@@ -328,18 +337,27 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/groups.tsx",
-      "route": "/groups",
+      "file": "src/routes/groups_.$groupId.tsx",
+      "route": "/groups/$groupId",
       "owner": "study-groups",
       "verification": "pending",
       "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     },
     {
-      "file": "src/routes/guardian.academics.tsx",
-      "route": "/guardian/academics",
-      "owner": "family",
+      "file": "src/routes/groups_.new.tsx",
+      "route": "/groups/new",
+      "owner": "study-groups",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/groups.tsx",
+      "route": "/groups",
+      "owner": "study-groups",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -434,6 +452,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.students.tsx",
+      "route": "/guardian/students",
+      "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     },
     {
       "file": "src/routes/guardian.study-group-consent.tsx",
@@ -1093,6 +1120,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/student.assignments_.$assessmentId.tsx",
+      "route": "/student/assignments/$assessmentId",
+      "owner": "student-experience",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
       "file": "src/routes/student.assignments.tsx",
       "route": "/student/assignments",
       "owner": "student-experience",
@@ -1129,6 +1165,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/student.field-trips.tsx",
+      "route": "/student/field-trips",
+      "owner": "field-trips",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
       "file": "src/routes/student.my-school.tsx",
       "route": "/student/my-school",
       "owner": "student-experience",
@@ -1158,24 +1203,6 @@
     {
       "file": "src/routes/student.settings.tsx",
       "route": "/student/settings",
-      "owner": "student-experience",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/student.study-groups_.new.tsx",
-      "route": "/student/study-groups_/new",
-      "owner": "student-experience",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/student.study-groups.tsx",
-      "route": "/student/study-groups",
       "owner": "student-experience",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1239,15 +1266,6 @@
     {
       "file": "src/routes/teacher.notices.tsx",
       "route": "/teacher/notices",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
-      "file": "src/routes/teacher.study-groups.tsx",
-      "route": "/teacher/study-groups",
       "owner": "learning",
       "verification": "pending",
       "roleJourney": "pending",
