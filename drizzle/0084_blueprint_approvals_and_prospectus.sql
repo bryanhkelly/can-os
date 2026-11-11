@@ -51,3 +51,24 @@ ALTER TABLE site_publication_releases ADD CONSTRAINT site_publication_release_mo
  CHECK(mode IN ('planning_prospectus','operational'));
 --> statement-breakpoint
 CREATE INDEX site_publication_release_mode_idx ON site_publication_releases(site_id,mode,status,published_at DESC);
+
+--> statement-breakpoint
+CREATE TABLE site_prospectus_interests(
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ site_id uuid NOT NULL REFERENCES sites(id) ON DELETE RESTRICT,
+ request_id uuid NOT NULL,
+ first_name text NOT NULL,last_name text NOT NULL,
+ email_normalized text NOT NULL,email_digest text NOT NULL,
+ subject_kind text,subject_id uuid,
+ contact_consent_at timestamptz NOT NULL,
+ opted_out_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT site_prospectus_interest_request_uq UNIQUE(site_id,request_id),
+ CONSTRAINT site_prospectus_interest_subject_ck CHECK(
+   (subject_kind IS NULL AND subject_id IS NULL) OR
+   (subject_kind IN ('program','item') AND subject_id IS NOT NULL))
+);
+--> statement-breakpoint
+CREATE INDEX site_prospectus_interest_site_idx ON site_prospectus_interests(site_id,created_at);
+--> statement-breakpoint
+CREATE INDEX site_prospectus_interest_email_idx ON site_prospectus_interests(site_id,email_digest);

@@ -72,3 +72,20 @@ export const siteConceptItemInterests=pgTable("site_concept_item_interests",{
  foreignKey({name:"site_concept_item_blueprint_fk",columns:[t.blueprintItemId,t.siteId],foreignColumns:[siteBlueprintItems.id,siteBlueprintItems.siteId]}),
  check("site_concept_item_exactly_one_ck",sql.raw("(program_plan_id IS NOT NULL) <> (blueprint_item_id IS NOT NULL)")),
 ]);
+
+
+/** Public prospectus interest is Site-scoped and separate from the ten-family introduction cap. */
+export const siteProspectusInterests=pgTable("site_prospectus_interests",{
+ id:id(),siteId:uuid("site_id").notNull().references(()=>sites.id,{onDelete:"restrict"}),
+ requestId:uuid("request_id").notNull(),
+ firstName:text("first_name").notNull(),lastName:text("last_name").notNull(),
+ emailNormalized:text("email_normalized").notNull(),emailDigest:text("email_digest").notNull(),
+ subjectKind:text("subject_kind"),subjectId:uuid("subject_id"),
+ contactConsentAt:timestamp("contact_consent_at",{withTimezone:true}).notNull(),
+ optedOutAt:timestamp("opted_out_at",{withTimezone:true}),createdAt:createdAt(),
+},t=>[
+ uniqueIndex("site_prospectus_interest_request_uq").on(t.siteId,t.requestId),
+ index("site_prospectus_interest_site_idx").on(t.siteId,t.createdAt),
+ index("site_prospectus_interest_email_idx").on(t.siteId,t.emailDigest),
+ check("site_prospectus_interest_subject_ck",sql.raw("(subject_kind IS NULL AND subject_id IS NULL) OR (subject_kind in ('program','item') AND subject_id IS NOT NULL)")),
+]);
