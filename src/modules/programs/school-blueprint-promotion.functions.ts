@@ -12,6 +12,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertBlueprintApprovedForPreparation, blueprintOperationalProgramType } from "@/domain/blueprint-operational-readiness";
+import type { ApprovedBlueprintSnapshot, BlueprintApprovedDecision } from "@/domain/blueprint-operational-readiness";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
 
@@ -119,8 +120,8 @@ export const linkApprovedBlueprintProgram=createServerFn({method:"POST"})
         "Program type, name and grade range must match the reviewed plan.");
     const {scope,decision}=await currentApproved(tx,site.id,"program",plan.id);
     assertBlueprintApprovedForPreparation({
-      kind:"program",current:plan,approvedSnapshot:scope.approvedSnapshot,
-      decision:decision??undefined,
+      kind:"program",current:plan,approvedSnapshot:scope.approvedSnapshot as ApprovedBlueprintSnapshot,
+      decision:decision as BlueprintApprovedDecision|undefined,
     });
     await tx.update(siteProgramPlans).set({
       canonicalProgramId:program.id,status:"linked",revision:plan.revision+1,updatedAt:new Date(),
@@ -166,8 +167,8 @@ export const prepareApprovedBlueprintActivity=createServerFn({method:"POST"})
       throw new DomainError("VALIDATION_FAILED","Selected Program must belong to the same school.");
     const {scope,decision}=await currentApproved(tx,site.id,"item",item.id);
     assertBlueprintApprovedForPreparation({
-      kind:"item",current:item,approvedSnapshot:scope.approvedSnapshot,
-      decision:decision??undefined,
+      kind:"item",current:item,approvedSnapshot:scope.approvedSnapshot as ApprovedBlueprintSnapshot,
+      decision:decision as BlueprintApprovedDecision|undefined,
     });
     const type=item.kind==="club"?"club":item.kind==="community"?"service":"other";
     const [activity]=await tx.insert(activities).values({
