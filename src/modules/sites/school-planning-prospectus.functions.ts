@@ -126,7 +126,7 @@ export const prepareSchoolPlanningProspectus=createServerFn({method:"POST"})
   const revision=(last?.revision??0)+1;
   const [created]=await tx.insert(sitePublicationReleases).values({
     siteId:site.id,revision,status:"draft",mode:"planning_prospectus",
-    contentSnapshot:prospectus,
+    contentSnapshot:JSON.parse(JSON.stringify(prospectus)) as Record<string,unknown>,
     sourceRevisionMap:{blueprintRevision:data.expectedBlueprintRevision,canApprovalVersion:lastApproved?.version??null},
   }).returning({id:sitePublicationReleases.id});
   if(!created)throw new Error("Planning prospectus could not be prepared");

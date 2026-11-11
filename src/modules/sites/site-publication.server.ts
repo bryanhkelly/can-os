@@ -19,7 +19,7 @@ import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public"
 import { planSitePublicationTransition, type SitePublicationAction } from "@/domain/site-publication-transition";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignment-state.server";
-import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 
 import { EventTypes } from "@/domain/event-types";
 type Reader = Pick<typeof db, "select">;

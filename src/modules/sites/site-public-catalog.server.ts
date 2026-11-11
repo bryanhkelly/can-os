@@ -3,6 +3,7 @@ import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, programs, sitePublications, sitePublicationReleases, siteBlueprintApprovedVersions, sites } from "@/db/schema";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
+import { publicProspectusSchema } from "@/domain/school-blueprint-approval";
 import { isSitePubliclyPublished, toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { isAcademicMarketingType } from "@/domain/academic-program-publication";
 import { AuthorizationError } from "@/domain/command-context";
@@ -84,8 +85,9 @@ export async function readPublishedSiteCatalog(slug: string) {
     // approval under its previous baseline. Existing approved Program catalog
     // remains independently readable.
     const planningCurrent=(source?.canApprovalVersion??null)===(latestApprovedScope?.version??null);
-    const prospectus=planningRelease && planningCurrent && planningRelease.content?.version===1
-      ? planningRelease.content : null;
+    const parsedProspectus=planningRelease && planningCurrent
+      ? publicProspectusSchema.safeParse(planningRelease.content) : null;
+    const prospectus=parsedProspectus?.success ? parsedProspectus.data : null;
     const locallyPublished = await readCurrentLocalContent(site.id, tx);
     const approvedPhotos = await readApprovedSchoolSitePhotos(site.id,tx);
     const media = projectApprovedSchoolSiteMedia(site.id,publicSiteHost(slug),approvedPhotos);
