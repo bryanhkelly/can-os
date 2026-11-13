@@ -38,6 +38,7 @@ export const clientErrorMessages: Record<ClientErrorCode, string> = {
   ATTENDANCE_CONFLICT: "The school attendance record changed after this entry was prepared. Refresh and review the conflict before trying again.",
   LAUNCH_LOCATION_UNSUPPORTED: "School setup isn't available for your school's state yet. Ask CAN to add support. Save a draft while you wait; don't choose a different state to continue.",
   LAUNCH_LOCATION_MISMATCH: "The selected state doesn't match your saved school address. Choose the matching state, or correct the school address before continuing.",
+  SITE_LOCATION_AMENDMENT_REQUIRED: "This school's physical address requires an authorized location amendment before it can be changed.",
 };
 
 /** Diagnostic messages stay on the server; clients use the explicit code. */

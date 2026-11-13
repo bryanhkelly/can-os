@@ -13,6 +13,7 @@
     "preview": "node scripts/preview.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:canonical:v301:rollback-check": "node scripts/check-canonical-v301-ddl.mjs",
     "db:migrate:fullflow": "node scripts/migrate-fullflow-neon.mjs",
     "db:review:fullflow": "node scripts/review-fullflow-migrations.mjs",
     "db:seed:test": "node scripts/apply-seed-chain.mjs",
