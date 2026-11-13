@@ -166,6 +166,8 @@ async function main() {
       "sites",
       "site_organization_roles",
       "geographic_areas",
+      "blueprint_reference_items",
+      "blueprint_reference_item_versions",
       "offerings",
       "offering_versions",
       "qualification_program_fit_policies",
@@ -196,6 +198,8 @@ async function main() {
       "sites",
       "site_organization_roles",
       "geographic_areas",
+      "blueprint_reference_items",
+      "blueprint_reference_item_versions",
       "offerings",
       "offering_versions",
       "qualification_program_fit_policies",
@@ -205,6 +209,8 @@ async function main() {
       "program_catalog_geographic_areas_read",
       "program_catalog_site_operators_read",
       "program_catalog_sites_read",
+      "program_catalog_blueprint_reference_items_read",
+      "program_catalog_blueprint_reference_versions_read",
       "program_catalog_offerings_read",
       "program_catalog_offering_versions_read",
       "program_catalog_fit_policies_read",
@@ -818,10 +824,10 @@ async function main() {
       rlsCount.rows[0].table_count !== 10 && "Blueprint forced RLS",
       immutableChildTriggerCount.rows[0].trigger_count !== 3 && "Blueprint child immutability",
       learningRlsCount.rows[0].table_count !== 19 && "learning forced RLS",
-      programCatalogRlsCount.rows[0].table_count !== 9 && "program catalog forced RLS",
-      (programCatalogPolicyCheck.rows[0].policy_count !== 17 ||
-        programCatalogPolicyCheck.rows[0].trusted_owner_policy_count !== 9 ||
-        programCatalogPolicyCheck.rows[0].scoped_catalog_policy_count !== 8) &&
+      programCatalogRlsCount.rows[0].table_count !== 11 && "program catalog forced RLS",
+      (programCatalogPolicyCheck.rows[0].policy_count !== 21 ||
+        programCatalogPolicyCheck.rows[0].trusted_owner_policy_count !== 11 ||
+        programCatalogPolicyCheck.rows[0].scoped_catalog_policy_count !== 10) &&
         "program catalog policy scope",
       (programCatalogFunctionCheck.rows[0].function_count !== 3 ||
         programCatalogFunctionCheck.rows[0].no_public_execute_count !== 3) &&
