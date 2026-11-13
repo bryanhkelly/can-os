@@ -29,6 +29,9 @@ export async function getBlueprintReferenceCatalog(
   if (!context.scope.siteIds?.includes(siteId)) {
     throw new AuthorizationError("Blueprint catalog Site scope");
   }
+  if (process.env.CAN_CANONICAL_CATALOG_ENABLED !== "true") {
+    throw new DomainError("UNAVAILABLE", "Canonical Blueprint catalog is not enabled.");
+  }
   const databaseRole = programCatalogDatabaseRole(context);
 
   return db.transaction(async tx => {
