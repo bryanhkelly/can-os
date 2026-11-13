@@ -281,6 +281,36 @@ export function assertCurrentPracticeSelection(input: {
   }
 }
 
+export type InstructionalTrackSelectionDecision = "reuse" | "create" | "switch_denied";
+
+/**
+ * A policy version change requires a new selection receipt even when the
+ * learner keeps the same presenter. It is not a forbidden presenter switch.
+ */
+export function decideInstructionalTrackSelection(input: {
+  current: { trackVersionId: string; policyVersionId: string } | null;
+  lastTrackVersionId: string | null;
+  requestedTrackVersionId: string;
+  policyVersionId: string;
+  allowSwitching: boolean;
+}): InstructionalTrackSelectionDecision {
+  if (
+    input.current?.trackVersionId === input.requestedTrackVersionId &&
+    input.current.policyVersionId === input.policyVersionId
+  ) {
+    return "reuse";
+  }
+  const previousTrackVersionId = input.current?.trackVersionId ?? input.lastTrackVersionId;
+  if (
+    previousTrackVersionId &&
+    previousTrackVersionId !== input.requestedTrackVersionId &&
+    !input.allowSwitching
+  ) {
+    return "switch_denied";
+  }
+  return "create";
+}
+
 export type StudentPracticeDefinition = {
   instructions: string;
   prompts: { key: string; text: string }[];
