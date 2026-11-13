@@ -19,7 +19,7 @@ import {
   offerings,
   programDeployments,
 } from "@/db/canonical-v301";
-import { executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
+import { blueprintDeploymentCode, executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
 import {
   assertCapability,
   AuthorizationError,
@@ -32,13 +32,6 @@ type ExecutionResult = {
   deploymentIds: string[];
   created: boolean;
 };
-
-function deploymentCode(offeringCode: string, componentId: string, offeringVersionId: string): string {
-  const product = offeringCode.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").slice(0, 40);
-  const componentKey = componentId.replaceAll("-", "").slice(0, 8);
-  const versionKey = offeringVersionId.replaceAll("-", "").slice(0, 8);
-  return `bp-${product || "offering"}-${componentKey}-${versionKey}`;
-}
 
 function deploymentName(configuration: Record<string, unknown>, offeringTitle: string): string {
   const configuredName = configuration.name;
@@ -317,7 +310,12 @@ export async function executeBlueprintConfiguration(
       const [deployment] = await tx.insert(programDeployments).values({
         operationId: operation.id,
         offeringId: intent.offeringId,
-        code: deploymentCode(intent.offeringCode, intent.componentId, intent.offeringVersionId),
+        code: blueprintDeploymentCode(
+          intent.offeringCode,
+          configurationVersion.id,
+          intent.componentId,
+          intent.offeringVersionId,
+        ),
         name: deploymentName(intent.configuration, intent.offeringTitle),
         status: "planning",
       }).returning({ id: programDeployments.id });
