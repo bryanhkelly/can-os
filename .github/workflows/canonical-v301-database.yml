@@ -79,7 +79,7 @@ jobs:
           set -euo pipefail
           psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/canonical/v3.0.1/schema.sql
           psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
-          CREATE ROLE can_v30_ci_app LOGIN NOINHERIT NOBYPASSRLS;
+          CREATE ROLE can_v30_ci_app LOGIN NOINHERIT NOBYPASSRLS PASSWORD 'ci_v301_disposable_only';
           CREATE ROLE can_v30_public_site_reader NOLOGIN NOINHERIT NOBYPASSRLS;
           CREATE ROLE can_v30_program_catalog_11111111111141118111111111111111 LOGIN NOINHERIT NOBYPASSRLS;
           INSERT INTO education_v30.organizations (id, legal_name, display_name)
@@ -110,9 +110,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          PGPASSWORD=ci_v301_disposable_only psql -h 127.0.0.1 -p 5432 -U can_v30_ci_app -d can_v301_ci -X -v ON_ERROR_STOP=1 <<'SQL'
           BEGIN;
-          SET LOCAL ROLE can_v30_ci_app;
           SET LOCAL ROLE can_v30_program_catalog_11111111111141118111111111111111;
           DO $role_test$
           BEGIN
@@ -130,7 +129,6 @@ jobs:
             END IF;
           END $role_test$;
           RESET ROLE;
-          SET LOCAL ROLE can_v30_ci_app;
           SET LOCAL ROLE can_v30_public_site_reader;
           DO $public_test$
           BEGIN
