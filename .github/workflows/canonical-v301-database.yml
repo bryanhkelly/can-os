@@ -106,6 +106,21 @@ jobs:
           psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
             -v application_role=can_v30_ci_app \
             -f database/canonical/v3.0.1/provision-public-site-reader-role.sql
+          # Separate test-only role: prove program-fit evaluations can reuse the
+          # advisory availability calculation without catalog privileges.
+          psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE can_v30_ci_fit NOLOGIN NOINHERIT NOBYPASSRLS;
+          GRANT can_v30_ci_fit TO can_v30_ci_app WITH INHERIT FALSE, SET TRUE;
+          GRANT USAGE ON SCHEMA education_v30 TO can_v30_ci_fit;
+          GRANT EXECUTE ON FUNCTION education_v30.v28_role_has_purpose(text),
+            education_v30.v30_catalog_program_availability(uuid,text) TO can_v30_ci_fit;
+          INSERT INTO education_v30.database_role_organization_bindings (
+            db_role, organization_id, purpose_code, valid_from, status
+          ) VALUES (
+            'can_v30_ci_fit', '11111111-1111-4111-8111-111111111111',
+            'program_fit', clock_timestamp(), 'approved'
+          );
+          SQL
       - name: Verify login-role membership and tenant/public boundaries
         shell: bash
         run: |
@@ -142,6 +157,26 @@ jobs:
               RAISE EXCEPTION 'Public reader can directly read publication bindings';
             END IF;
           END $public_test$;
+          RESET ROLE;
+          SET LOCAL ROLE can_v30_ci_fit;
+          DO $fit_test$
+          DECLARE available bigint;
+          BEGIN
+            IF NOT education_v30.v28_role_has_purpose('program_fit') THEN
+              RAISE EXCEPTION 'Program-fit role binding is missing';
+            END IF;
+            SELECT count(*) INTO available
+              FROM education_v30.v30_catalog_program_availability(
+                '33333333-3333-4333-8333-333333333333', 'onsite'
+              );
+            IF available IS NULL THEN
+              RAISE EXCEPTION 'Program-fit advisory availability did not execute';
+            END IF;
+            IF has_table_privilege(current_user,
+                'education_v30.qualification_program_fit_assessments', 'SELECT') THEN
+              RAISE EXCEPTION 'Program-fit test role can read raw assessments';
+            END IF;
+          END $fit_test$;
           ROLLBACK;
           SQL
       - name: Record database acceptance evidence
