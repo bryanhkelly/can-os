@@ -1,0 +1,81 @@
+name: Canonical v3.0.1 Database Acceptance
+
+# The baseline is an independently installed PostgreSQL schema, not a Drizzle
+# migration. Validate the committed DDL without touching Neon or application DBs.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'database/canonical/v3.0.1/**'
+      - 'scripts/check-canonical-v301-ddl.mjs'
+      - 'scripts/isolated-test-db-guard.mjs'
+      - '.github/workflows/canonical-v301-database.yml'
+  push:
+    branches:
+      - 'integration/canonical-v301-pr279-281'
+    paths:
+      - 'database/canonical/v3.0.1/**'
+      - 'scripts/check-canonical-v301-ddl.mjs'
+      - 'scripts/isolated-test-db-guard.mjs'
+      - '.github/workflows/canonical-v301-database.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canonical-v301-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  canonical-rollback:
+    name: PostgreSQL 18 canonical rollback and role-isolation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: can_v301_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: can_v301_ci_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d can_v301_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      APP_ENV: test
+      NODE_ENV: test
+      CAN_TEST_DB_WRITES_ENABLED: 'true'
+      TEST_DATABASE_URL: postgresql://postgres:can_v301_ci_disposable@127.0.0.1:5432/can_v301_ci
+    steps:
+      - name: Checkout the exact commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify checkout SHA
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Validate canonical DDL, access isolation and transaction rollback
+        run: npm run db:canonical:v301:rollback-check
+      - name: Record database acceptance evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "### Canonical v3.0.1 database acceptance"
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Disposable PostgreSQL 18 service only; no Neon secrets"
+            echo "- The rollback check is not a production migration or app-role deployment approval"
+          } >> "$GITHUB_STEP_SUMMARY"
