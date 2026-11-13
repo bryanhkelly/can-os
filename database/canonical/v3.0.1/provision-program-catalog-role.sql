@@ -149,6 +149,16 @@ SELECT format(
 )
 \gexec
 SELECT format(
+  'GRANT SELECT (id, code, reference_kind, category, status, sort_order) ON education_v30.blueprint_reference_items TO %I',
+  :'program_catalog_role'
+)
+\gexec
+SELECT format(
+  'GRANT SELECT (id, item_id, version_no, title, summary, lifecycle) ON education_v30.blueprint_reference_item_versions TO %I',
+  :'program_catalog_role'
+)
+\gexec
+SELECT format(
   'GRANT SELECT (id, code, title, status) ON education_v30.offerings TO %I',
   :'program_catalog_role'
 )
