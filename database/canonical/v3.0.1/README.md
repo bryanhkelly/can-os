@@ -60,6 +60,18 @@ intentionally excluded from the default Drizzle schema and migration journal;
 the SQL baseline remains authoritative for constraints. Canonical application
 data remains separate from the legacy `public` schema.
 
+The School Launch Academics module also exposes a read-only curated
+Blueprint reference library. This path uses the same Organization-bound
+`program_catalog` role, restricted column grants, and forced RLS to return
+only active/published reference titles, summaries, and categories. The
+`BlueprintReferenceCatalogPanel` does not create Site Blueprint revisions,
+Offerings, Deployments or authorization. The disposable PostgreSQL acceptance
+checks 74 visible curated entries and denies draft versions, private metadata,
+and writes. Launch Studio's legacy editable PR #281 Blueprint workspace is
+not ported here because it depends on incompatible `public` tables and
+migrations; canonical authoring is held behind the existing write-policy
+acceptance gate.
+
 PR #281's initial program-discovery service calls the canonical catalog
 availability function and returns published Offerings with policy-specific
 availability. Results are advisory only: discovery does not establish
