@@ -8,6 +8,7 @@ import {
 } from "../../src/modules/learning/instructional-track-authoring.server";
 import {
   instructionalTrackAssetDownloadSchema,
+  recordFormativePracticeSchema,
 } from "../../src/modules/learning/student-instructional-tracks.server";
 
 describe("instructional track commands", () => {
@@ -32,6 +33,31 @@ describe("instructional track commands", () => {
     expect(() => instructionalTrackAssetDownloadSchema.parse({
       ...request,
       assetVersionId: "../private-object",
+    })).toThrow();
+  });
+
+  it("requires the exact course and instructor for each private practice submission", () => {
+    const request = {
+      requestId: "6a11e2ec-7aa0-4b6f-853e-180e90160614",
+      courseAttemptId: "814910c9-dc18-428a-a400-9b73587cc27e",
+      courseVersionId: "e35ffedc-7c99-4405-a1c3-37a32cc672ba",
+      trackVersionId: "fa9fd6d3-0792-46de-a1e3-bf803179e447",
+      materialId: "d9428888-122b-4b9a-bc4c-9a9b5b31f5d2",
+      expectedRevision: 2,
+      responses: [{ promptKey: "q1", response: "My working" }],
+    };
+    expect(recordFormativePracticeSchema.parse(request)).toEqual(request);
+    expect(() => recordFormativePracticeSchema.parse({
+      ...request,
+      trackVersionId: undefined,
+    })).toThrow();
+    expect(() => recordFormativePracticeSchema.parse({
+      ...request,
+      courseVersionId: undefined,
+    })).toThrow();
+    expect(() => recordFormativePracticeSchema.parse({
+      ...request,
+      responses: [{ promptKey: "q1", response: "My working", answerKey: "private" }],
     })).toThrow();
   });
 
