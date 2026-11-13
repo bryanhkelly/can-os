@@ -10,6 +10,7 @@ on:
     branches:
       - main
       - FullFlow
+      - integration/canonical-v301-pr279-281
 
 jobs:
   verify:
