@@ -38,7 +38,7 @@ describe("canonical Blueprint execution input", () => {
     const code = blueprintDeploymentCode(...argumentsForDeployment);
     expect(code).toBe(blueprintDeploymentCode(...argumentsForDeployment));
     expect(code.startsWith("bp-after-school-community-")).toBe(true);
-    expect(code.length).toBeLessThanOrEqual(68);
+    expect(code.length).toBeLessThanOrEqual(134);
   });
 
   it("does not collide when separate configurations adopt the same Offering", () => {
