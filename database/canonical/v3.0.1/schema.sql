@@ -9711,8 +9711,13 @@ RETURNS TABLE(policy_version_id uuid,provider_support text,regulatory_status tex
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $$
 DECLARE rec record; supported record; law record;
 BEGIN
- IF NOT v28_role_has_purpose('program_catalog') THEN
-  RAISE EXCEPTION 'Program catalog database role is not authorized'; END IF;
+ -- Read-only catalog discovery and program-fit/activation evaluation share
+ -- this advisory calculation. Only explicitly provisioned roles can execute it.
+ IF NOT (v28_role_has_purpose('program_catalog')
+   OR v28_role_has_purpose('program_fit')
+   OR v28_role_has_purpose('qualification_reviewer')
+   OR v28_role_has_purpose('program_activation')) THEN
+  RAISE EXCEPTION 'Database role is not authorized for program availability'; END IF;
  IF target_delivery IS NULL OR target_delivery NOT IN ('remote','onsite','hybrid') THEN
   RAISE EXCEPTION 'Unknown delivery context'; END IF;
  FOR rec IN SELECT v.id,p.owner_organization_id
