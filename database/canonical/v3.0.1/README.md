@@ -60,8 +60,11 @@ intentionally excluded from the default Drizzle schema and migration journal;
 the SQL baseline remains authoritative for constraints. Canonical application
 data remains separate from the legacy `public` schema.
 
-The School Launch Academics module also exposes a read-only curated
-Blueprint reference library. This path uses the same Organization-bound
+The School Launch Academics module can expose a read-only curated
+Blueprint reference library once `CAN_CANONICAL_CATALOG_ENABLED=true`.
+The flag defaults to false until a real canonical Site catalog and restricted
+application database-role provisioning are available; the existing legacy
+Launch Hub must not show a broken canonical workflow. This path uses the same Organization-bound
 `program_catalog` role, restricted column grants, and forced RLS to return
 only active/published reference titles, summaries, and categories. The
 `BlueprintReferenceCatalogPanel` does not create Site Blueprint revisions,
