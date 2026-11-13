@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCurrentPracticeSelection,
   buildTrackManifestUsages,
+  decideInstructionalTrackSelection,
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
@@ -246,5 +247,57 @@ describe("student-safe practice and stale submissions", () => {
         submittedTrackVersionId: "track-b",
       }),
     ).not.toThrow();
+  });
+});
+
+describe("learner instructor transition decisions", () => {
+  const selection = {
+    current: { trackVersionId: "teacher-a", policyVersionId: "policy-1" },
+    lastTrackVersionId: "teacher-a",
+    requestedTrackVersionId: "teacher-a",
+    policyVersionId: "policy-1",
+    allowSwitching: false,
+  };
+
+  it("reuses a current teacher only under the same approved policy version", () => {
+    expect(decideInstructionalTrackSelection(selection)).toBe("reuse");
+    expect(decideInstructionalTrackSelection({
+      ...selection,
+      policyVersionId: "policy-2",
+    })).toBe("create");
+  });
+
+  it("renews the same teacher without requiring presenter-switch permission", () => {
+    expect(decideInstructionalTrackSelection({
+      ...selection,
+      current: null,
+      policyVersionId: "policy-2",
+    })).toBe("create");
+  });
+
+  it("rejects an unauthorized teacher switch, including with only historical selections", () => {
+    expect(decideInstructionalTrackSelection({
+      ...selection,
+      requestedTrackVersionId: "teacher-b",
+    })).toBe("switch_denied");
+    expect(decideInstructionalTrackSelection({
+      ...selection,
+      current: null,
+      requestedTrackVersionId: "teacher-b",
+    })).toBe("switch_denied");
+  });
+
+  it("permits a teacher change only when the policy allows switching", () => {
+    expect(decideInstructionalTrackSelection({
+      ...selection,
+      requestedTrackVersionId: "teacher-b",
+      allowSwitching: true,
+    })).toBe("create");
+    expect(decideInstructionalTrackSelection({
+      ...selection,
+      current: null,
+      lastTrackVersionId: null,
+      requestedTrackVersionId: "teacher-b",
+    })).toBe("create");
   });
 });
