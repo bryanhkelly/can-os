@@ -22,8 +22,8 @@ export function blueprintDeploymentCode(
   offeringVersionId: string,
 ): string {
   const product = offeringCode.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").slice(0, 32);
-  const configurationKey = configurationVersionId.replaceAll("-", "").slice(0, 12);
-  const componentKey = componentId.replaceAll("-", "").slice(0, 8);
-  const versionKey = offeringVersionId.replaceAll("-", "").slice(0, 8);
+  const configurationKey = configurationVersionId.replaceAll("-", "");
+  const componentKey = componentId.replaceAll("-", "");
+  const versionKey = offeringVersionId.replaceAll("-", "");
   return `bp-${product || "offering"}-${configurationKey}-${componentKey}-${versionKey}`;
 }
