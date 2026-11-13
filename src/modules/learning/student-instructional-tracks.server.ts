@@ -41,11 +41,13 @@ import { DomainError } from "@/domain/errors";
 import {
   assertCurrentPracticeSelection,
   buildTrackManifestUsages,
+  decideInstructionalTrackSelection,
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
+  type StudentPracticeDefinition,
 } from "@/domain/instructional-tracks";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
 import {
@@ -74,6 +76,8 @@ export const selectInstructionalTrackSchema = readInstructionalTrackSchema.exten
 export const recordFormativePracticeSchema = z.object({
   requestId: uuidSchema,
   courseAttemptId: uuidSchema,
+  courseVersionId: uuidSchema,
+  trackVersionId: uuidSchema,
   materialId: uuidSchema,
   expectedRevision: z.number().int().min(1),
   responses: z.array(z.object({
@@ -596,8 +600,11 @@ export async function listAvailableInstructionalTracks(
         );
         choices.push(candidate);
       } catch (error) {
-        if (!(error instanceof DomainError)) throw error;
-        blocked.push({ trackVersionId: candidate.trackVersionId, reason: error.code });
+        if (!(error instanceof DomainError) && !(error instanceof AuthorizationError)) throw error;
+        blocked.push({
+          trackVersionId: candidate.trackVersionId,
+          reason: error instanceof DomainError ? error.code : "FORBIDDEN",
+        });
       }
     }
     return { choices, blocked };
@@ -636,6 +643,7 @@ export async function readSelectedInstructionalTrack(
     courseUnitId: string;
     assetVersionId: string | null;
     materialKind: string;
+    practice: StudentPracticeDefinition | null;
   }>;
 }> {
   assertAuthenticated(context, "learner_or_guardian");
@@ -734,6 +742,9 @@ export async function readSelectedInstructionalTrack(
         courseUnitId: material.courseUnitId,
         assetVersionId: material.assetVersionId,
         materialKind: material.materialKind,
+        practice: eligible.policy.practiceEnabled && material.materialKind === "practice"
+          ? parseStudentPracticeDefinition(material.activitySpec)
+          : null,
       })),
     };
   });
@@ -852,7 +863,23 @@ export async function selectInstructionalTrack(
         "student_choice",
         null,
       );
-      if (active?.trackVersionId === input.trackVersionId) {
+      const lastSelection = selections.reduce<(typeof selections)[number] | null>(
+        (latest, selection) => !latest || selection.revision > latest.revision ? selection : latest,
+        null,
+      );
+      const decision = decideInstructionalTrackSelection({
+        current: active
+          ? { trackVersionId: active.trackVersionId, policyVersionId: active.policyVersionId }
+          : null,
+        lastTrackVersionId: lastSelection?.trackVersionId ?? null,
+        requestedTrackVersionId: input.trackVersionId,
+        policyVersionId: eligible.policy.id,
+        allowSwitching: eligible.policy.allowSwitching,
+      });
+      if (decision === "switch_denied") {
+        throw new DomainError("FORBIDDEN", "Current instructional policy does not allow switching.");
+      }
+      if (decision === "reuse" && active) {
         return {
           courseAttemptId: attempt.id,
           selectionId: active.id,
@@ -860,9 +887,6 @@ export async function selectInstructionalTrack(
           revision: currentRevision,
           policyVersionId: eligible.policy.id,
         };
-      }
-      if (selections.length > 0 && !eligible.policy.allowSwitching) {
-        throw new DomainError("FORBIDDEN", "Current instructional policy does not allow switching.");
       }
       const selectedAt = new Date();
       if (active) {
@@ -931,9 +955,9 @@ export async function recordFormativePractice(
         expectedRevision: input.expectedRevision,
         currentRevision: selection.revision,
         currentTrackVersionId: selection.trackVersionId,
-        submittedTrackVersionId: selection.trackVersionId,
+        submittedTrackVersionId: input.trackVersionId,
         currentCourseVersionId: attempt.courseVersionId,
-        submittedCourseVersionId: attempt.courseVersionId,
+        submittedCourseVersionId: input.courseVersionId,
       });
       const eligible = await assertTrackAvailable(
         tx,
