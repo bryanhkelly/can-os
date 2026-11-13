@@ -17,6 +17,19 @@ beforeEach(()=>{
  state.options={sites:[{id:siteId,organizationId:"org",websiteDraft:null}]};state.launches=[];state.programReadFails=false;state.websiteReadFails=false;state.teamReadFails=false;state.content=null;state.grants=[{personId:"admin",active:true}];
 });
 describe("exact-Site Hub reader",()=>{
+ it("keeps canonical catalog widgets behind an explicit rollout switch",async()=>{
+  vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","false");
+  try {
+   const disabled=await getSchoolHubData({data:{siteId,module:"academics"}});
+   expect(disabled.canonicalCatalogEnabled).toBe(false);
+   vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","true");
+   const enabled=await getSchoolHubData({data:{siteId,module:"academics"}});
+   expect(enabled.canonicalCatalogEnabled).toBe(true);
+  } finally {
+   vi.unstubAllEnvs();
+  }
+ });
+
  it("returns real empty preparation without inventing approvals",async()=>{
   const result=await getSchoolHubData({data:{siteId}});
   expect(result.statuses?.website?.state).toBe("Not Started");expect(result.statuses?.team?.detail).toContain("1 active members");expect(result.statuses?.academics?.state).toBe("Not Started");expect(result.statuses?.compliance?.state).toBe("Blocked");
