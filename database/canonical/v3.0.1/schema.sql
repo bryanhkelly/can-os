@@ -10447,6 +10447,7 @@ BEGIN
  'database_role_organization_bindings','sites','site_organization_roles',
  'geographic_areas','offerings','offering_versions',
  'qualification_program_fit_policies','qualification_program_fit_policy_versions',
+ 'blueprint_reference_items','blueprint_reference_item_versions',
  'blueprint_configurations','blueprint_configuration_versions',
  'blueprint_configuration_components','blueprint_configuration_local_experiences',
  'blueprint_configuration_component_references',
@@ -10491,6 +10492,17 @@ CREATE POLICY program_catalog_sites_read ON sites FOR SELECT
      AND r.valid_from<=clock_timestamp()
      AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
      AND v28_role_can_access_org(r.organization_id,'program_catalog')));
+-- Curated Blueprint library is reference-only. Expose published, active
+-- catalog records to a purpose-bound reader without any Blueprint write authority.
+CREATE POLICY program_catalog_blueprint_reference_items_read
+ ON blueprint_reference_items FOR SELECT
+ USING (status='active' AND v28_role_has_purpose('program_catalog'));
+CREATE POLICY program_catalog_blueprint_reference_versions_read
+ ON blueprint_reference_item_versions FOR SELECT
+ USING (lifecycle='published'
+   AND v28_role_has_purpose('program_catalog')
+   AND EXISTS (SELECT 1 FROM blueprint_reference_items i
+     WHERE i.id=blueprint_reference_item_versions.item_id AND i.status='active'));
 CREATE POLICY program_catalog_offerings_read ON offerings FOR SELECT
  USING (status='active' AND v28_role_has_purpose('program_catalog'));
 CREATE POLICY program_catalog_offering_versions_read ON offering_versions FOR SELECT
