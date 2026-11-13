@@ -91,13 +91,17 @@ schemas and temporary roles. The check was invoked with
 using the guarded disposable `TEST_DATABASE_URL` and write gate with
 `APP_ENV=test`.
 
-The psql provisioning file itself was not executed, and the probe simulates
-role assumption with `SET ROLE` rather than opening a separate application
-login connection. Application role selection is now derived from the verified
-single-Organization server context and applied with transaction-local
-`SET LOCAL ROLE`; this server path has unit coverage but is not tested with the
-deployed application credential. Secret provisioning and live Neon role
-lifecycle remain unverified.
+The historical rollback-only probe above used transaction-local role
+simulation. The separate `.github/workflows/canonical-v301-database.yml`
+integration acceptance now installs the committed schema into disposable
+PostgreSQL 18, runs both psql role-provisioning files, and connects using a
+restricted application login to verify permitted Organization access, denied
+cross-Organization access, draft-site isolation, and scoped program-fit
+availability. This workflow still requires a green run at the exact branch
+commit. Production credentials, live Neon role lifecycle, write-capable
+application policies, and end-to-end command execution remain unverified.
+The server derives the catalog role from a verified single-Organization
+session context and uses transaction-local `SET LOCAL ROLE`.
 
 The read-only `evaluateProgramFit` adapter delegates selected-policy status,
 qualification requirements, reviewed fit, and stage preflight to
