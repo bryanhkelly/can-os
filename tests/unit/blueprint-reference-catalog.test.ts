@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { getBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import {
   blueprintReferenceCatalogInputSchema,
   projectBlueprintReferenceCatalog,
@@ -65,5 +66,26 @@ describe("canonical Blueprint reference catalog", () => {
     expect(projectBlueprintReferenceCatalog([first, second]).map(row => row.code)).toEqual([
       "can.club.chess", "can.program.summer_enrichment",
     ]);
+  });
+
+  it("rejects unauthenticated, unprivileged and out-of-scope Site reads before querying", async () => {
+    const siteId = first.itemId;
+    const scoped = {
+      actorPersonId: "00000000-0000-4000-8000-000000000009",
+      capabilities: new Set(["program.launch.start"]),
+      scope: {
+        siteIds: [siteId],
+        organizationIds: ["00000000-0000-4000-8000-000000000010"],
+      },
+    };
+    await expect(getBlueprintReferenceCatalog(
+      { ...scoped, actorPersonId: null }, { siteId },
+    )).rejects.toMatchObject({ name: "AuthorizationError" });
+    await expect(getBlueprintReferenceCatalog(
+      { ...scoped, capabilities: new Set<string>() }, { siteId },
+    )).rejects.toMatchObject({ name: "AuthorizationError" });
+    await expect(getBlueprintReferenceCatalog(
+      { ...scoped, scope: { ...scoped.scope, siteIds: [] } }, { siteId },
+    )).rejects.toMatchObject({ name: "AuthorizationError" });
   });
 });
