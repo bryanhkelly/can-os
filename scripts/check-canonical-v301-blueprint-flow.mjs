@@ -94,17 +94,28 @@ try {
   // Establish the real restricted login boundary before entering purpose roles.
   const login = (await q(`
     SELECT current_user AS db_user, session_user AS login_user,
-      has_table_privilege(current_user,
-        'education_v30.blueprint_configurations', 'SELECT') AS can_read_plans,
-      has_table_privilege(current_user,
-        'education_v30.configuration_reviews', 'INSERT') AS can_approve,
-      has_table_privilege(current_user,
-        'education_v30.canonical_sessions', 'SELECT') AS can_read_sessions,
+      has_schema_privilege(current_user, 'education_v30', 'USAGE') AS schema_usage,
+      (SELECT has_table_privilege(current_user, c.oid, 'SELECT')
+        FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n
+          ON n.oid=c.relnamespace
+        WHERE n.nspname='education_v30'
+          AND c.relname='blueprint_configurations') AS can_read_plans,
+      (SELECT has_table_privilege(current_user, c.oid, 'INSERT')
+        FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n
+          ON n.oid=c.relnamespace
+        WHERE n.nspname='education_v30'
+          AND c.relname='configuration_reviews') AS can_approve,
+      (SELECT has_table_privilege(current_user, c.oid, 'SELECT')
+        FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n
+          ON n.oid=c.relnamespace
+        WHERE n.nspname='education_v30'
+          AND c.relname='canonical_sessions') AS can_read_sessions,
       pg_has_role(current_user, $1, 'SET') AS can_set_author,
       pg_has_role(current_user, $2, 'SET') AS can_set_reviewer
   `, [authorRole, reviewerRole])).rows[0];
-  check(login.db_user === login.login_user && !login.can_read_plans &&
-    !login.can_approve && !login.can_read_sessions &&
+  check(login.db_user === login.login_user && !login.schema_usage &&
+    login.can_read_plans === false &&
+    login.can_approve === false && login.can_read_sessions === false &&
     login.can_set_author && login.can_set_reviewer,
     "The Blueprint test login must be unprivileged and use explicit purpose roles");
   await q("SET LOCAL ROLE " + authorRole);
