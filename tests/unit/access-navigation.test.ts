@@ -75,4 +75,10 @@ describe("access navigation", () => {
   it("never sends a role without registrar authority to the launcher", () => {
     expect(accessLandingPath("teacher", "new-school-site", "/home")).toBe("/home");
   });
+  
+  it("lands independently appointed Blueprint reviewers in their own queue", () => {
+    expect(accessLandingPath("blueprint_reviewer")).toBe("/operations/blueprint-reviews");
+    expect(accessLandingPath("blueprint_reviewer", "site-id"))
+      .toBe("/operations/blueprint-reviews");
+  });
 });
