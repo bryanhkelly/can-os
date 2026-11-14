@@ -7540,7 +7540,7 @@ CREATE TRIGGER standard_withdrawals_append_only BEFORE UPDATE OR DELETE ON versi
 CREATE OR REPLACE FUNCTION v28_suspend_reversed_blueprint_batch() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
- IF NEW.decision IN ('rejected','revoked') THEN
+ IF NEW.decision IN ('denied','withdrawn') THEN
   UPDATE blueprint_execution_batches SET execution_status='suspended'
   WHERE configuration_version_id=NEW.configuration_version_id
    AND execution_status='authorized';
