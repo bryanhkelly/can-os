@@ -78,6 +78,24 @@ FROM unnest(ARRAY[
  'blueprint_configuration_local_experiences','blueprint_configuration_offering_intents',
  'configuration_reviews','blueprint_component_approval_decisions','audit_events']) AS t
 \gexec
+-- A reviewed recipe can only create planning-level deployments for an
+-- Operation with a current operator role belonging to this Organization.
+SELECT format('GRANT SELECT ON education_v30.%I TO %I', t, :'author_role')
+FROM unnest(ARRAY[
+ 'education_operations','education_operation_organization_roles',
+ 'blueprint_execution_batches','blueprint_outputs',
+ 'program_deployments','deployment_offering_adoptions']) AS t
+\gexec
+SELECT format('GRANT INSERT ON education_v30.%I TO %I', t, :'author_role')
+FROM unnest(ARRAY[
+ 'blueprint_execution_batches','blueprint_outputs',
+ 'program_deployments','deployment_offering_adoptions']) AS t
+\gexec
+SELECT format(
+ 'GRANT UPDATE (execution_status,executed_by_person_id,executed_at) ON education_v30.blueprint_execution_batches TO %I',
+ :'author_role')
+\gexec
+
 -- Site authoring requires current, verified operator authority.
 SELECT format('GRANT SELECT (id,status) ON education_v30.sites TO %I', :'author_role')
 \gexec
