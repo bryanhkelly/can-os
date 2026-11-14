@@ -150,19 +150,30 @@ export function CanonicalLearningActivityProvider({
     }catch{pending.current=[];}
     let disposed = false;
     instance.current = tabInstanceId(courseAttemptId);
-    void startCanonicalLearningSession({
-      data: { courseAttemptId, clientInstanceId: instance.current },
-    }).then(result => {
-      if (disposed) return;
-      session.current = result.learningSessionId;
-      pending.current=pruneLearningOutbox(pending.current,result.learningSessionId,new Date());
-      persist();
-      void flush();
-      lastInteraction.current = Date.now();
-      const id = lesson.current;
-      if (id && document.visibilityState === "visible")
-        void postEvent("lesson_opened", id).catch(() => {});
-    }).catch(() => {/* Course remains accessible when tracking is offline. */});
+    // A failed initial session request must not disable evidence for the whole
+    // lesson. Retry during an open, focused tab; the server deduplicates starts.
+    let starting = false;
+    const start = async () => {
+      if (disposed || starting || session.current ||
+          document.visibilityState !== "visible" || !document.hasFocus()) return;
+      starting = true;
+      try {
+        const result = await startCanonicalLearningSession({
+          data: { courseAttemptId, clientInstanceId: instance.current! },
+        });
+        if (disposed) return;
+        session.current = result.learningSessionId;
+        pending.current=pruneLearningOutbox(pending.current,result.learningSessionId,new Date());
+        persist();
+        void flush();
+        lastInteraction.current = Date.now();
+        const id = lesson.current;
+        if (id) void postEvent("lesson_opened",id).catch(() => {});
+      } catch {
+        // Content remains accessible; a future online/focus retry may succeed.
+      } finally { starting = false; }
+    };
+    void start();
 
     const pause = () => {
       needsResume.current = true;
@@ -216,8 +227,12 @@ export function CanonicalLearningActivityProvider({
       void postEvent("engaged_interval", lessonId, null, Math.min(elapsed, 60_000))
         .catch(() => {});
     };
-    const online=()=>{if(!needsResume.current)void flush();};
-    const retry=window.setInterval(()=>{if(!needsResume.current)void flush();},15_000);
+    const online=()=>{
+      if(needsResume.current)return;
+      if(session.current)void flush();
+      else void start();
+    };
+    const retry=window.setInterval(online,15_000);
     window.addEventListener("online",online);
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("blur", pause);
