@@ -18,6 +18,29 @@ describe("canonical v3.0.1 Blueprint authorization contract", () => {
     expect(provisioning).toContain("WITH INHERIT FALSE, SET TRUE");
   });
 
+  it("permits the native database role purposes used by provisioning", () => {
+    const purposeCheck = schema.slice(
+      schema.indexOf("CREATE TABLE database_role_organization_bindings ("),
+      schema.indexOf("CREATE OR REPLACE FUNCTION v28_role_can_access_org")
+    );
+    expect(purposeCheck).toContain("'blueprint_author'");
+    expect(purposeCheck).toContain("'blueprint_reviewer'");
+  });
+
+  it("keeps the reversal trigger executable and the DDL transaction intact", () => {
+    expect(schema).toContain(
+      "FUNCTION v28_suspend_reversed_blueprint_batch() RETURNS trigger"
+    );
+    const trigger = schema.slice(
+      schema.indexOf("FUNCTION v28_suspend_reversed_blueprint_batch()"),
+      schema.indexOf("CREATE TRIGGER blueprint_decision_reversal")
+    );
+    expect(trigger).toContain("AS " + "$" + "$");
+    expect(trigger).toContain("END " + "$" + "$" + ";");
+    expect((schema.match(/^COMMIT;$/gm) ?? []).length).toBe(1);
+    expect(schema.trimEnd().endsWith("COMMIT;")).toBe(true);
+  });
+
   it("forces row security on authoritative draft and review tables", () => {
     expect(schema).toContain("'blueprint_configurations','blueprint_configuration_versions'");
     expect(schema).toContain("'canonical_accounts','canonical_account_grants','canonical_sessions'");
