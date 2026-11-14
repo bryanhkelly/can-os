@@ -32,7 +32,9 @@ async function run() {
         pg_get_functiondef('education_v30.v28_validate_completion()'::regprocedure) AS completion,
         pg_get_functiondef('education_v30.v301_provision_noncredit_knowledge_access(uuid)'::regprocedure) AS provisioning,
         pg_get_functiondef('education_v30.v301_noncredit_attempt_access_trigger()'::regprocedure) AS attempt_trigger,
-        pg_get_functiondef('education_v30.v301_noncredit_admin_access_trigger()'::regprocedure) AS administration_trigger
+        pg_get_functiondef('education_v30.v301_noncredit_admin_access_trigger()'::regprocedure) AS administration_trigger,
+        pg_get_functiondef('education_v30.v301_try_auto_complete_noncredit(uuid)'::regprocedure) AS automatic_completion,
+        pg_get_functiondef('education_v30.v301_lock_noncredit_completion_policy()'::regprocedure) AS policy_lock
     `);
     const defs=definitions[0];
     const requirements=[
@@ -44,6 +46,14 @@ async function run() {
       ["same-course assessment",defs.completion.includes("ca.noncredit_registration_id=NEW.registration_id") &&
         defs.completion.includes("grant_row.access_status='approved'")],
       ["configurable lessons",defs.completion.includes("pol.require_all_lessons")],
+      ["locked completion version",defs.completion.includes("row_registration.completion_policy_id") &&
+        defs.policy_lock.includes("immutable after registration")],
+      ["provider-opted automation",defs.automatic_completion.includes("completion_mode='automatic'") &&
+        defs.automatic_completion.includes("decision_source")],
+      ["verified automatic evidence",defs.automatic_completion.includes("v.verified_by_person_id IS NOT NULL") &&
+        defs.automatic_completion.includes("v.valid_through")],
+      ["course-bound automatic assessment",defs.automatic_completion.includes("ca.noncredit_registration_id=p_registration")],
+      ["optional paired diagnostic",defs.provisioning.includes("baseline_assessment_version_id")],
       ["enrollment-independent grant",defs.provisioning.includes("ca.enrollment_id IS NULL") &&
         defs.provisioning.includes("ON CONFLICT")],
       ["provider publication",defs.provisioning.includes("t.approved_by_person_id IS NOT NULL") &&
@@ -62,6 +72,12 @@ async function run() {
       "v301_noncredit_attempt_assessment_access",
       "v301_noncredit_admin_assessment_access",
       "noncredit_completion_authority",
+      "noncredit_registration_policy_pin",
+      "v301_noncredit_auto_on_participation",
+      "v301_noncredit_auto_on_lesson",
+      "v301_noncredit_auto_on_assessment",
+      "v301_noncredit_auto_on_course",
+      "v301_noncredit_auto_on_evidence",
     ]) requirements.push([trigger,installed.has(trigger)]);
 
     const {rows:rls}=await db.query(`
@@ -75,6 +91,17 @@ async function run() {
     requirements.push(["restricted participant and assessment tables",
       secure.has("noncredit_registrations")&&secure.has("learner_course_attempts") &&
       secure.has("assessment_access_grants")&&secure.has("assessment_attempts")]);
+    const {rows:columns}=await db.query(`
+      SELECT table_name,column_name FROM information_schema.columns
+      WHERE table_schema='education_v30'
+        AND (
+          (table_name='noncredit_registrations' AND column_name='completion_policy_id')
+          OR (table_name='noncredit_completion_policies' AND column_name='completion_mode')
+          OR (table_name='noncredit_completion_decisions' AND column_name='decision_source')
+          OR (table_name='noncredit_training_versions' AND column_name='baseline_assessment_version_id')
+        )
+    `);
+    requirements.push(["versioned noncredit policy and optional baseline columns",columns.length===4]);
     for(const [name,pass] of requirements)console.log((pass?"PASS":"FAIL")+": "+name);
     if(requirements.some(([_,pass])=>!pass))fail("Database acceptance requirements not satisfied");
     console.log("Read-only isolated canonical noncredit schema check passed.");
