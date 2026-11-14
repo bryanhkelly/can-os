@@ -38,6 +38,13 @@ export async function getAvailableOfferings(
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "program.launch.start");
   const input = programDiscoveryInputSchema.parse(rawInput);
+  // Fail closed before attempting purpose-specific PostgreSQL roles. The
+  // canonical catalog must be explicitly provisioned before it can be exposed
+  // through either native Blueprint planning or the legacy School Hub.
+  if (process.env.CAN_CANONICAL_CATALOG_ENABLED !== "true") {
+    throw new DomainError("UNAVAILABLE",
+      "Published program discovery is not yet enabled for this environment.");
+  }
   const databaseRole = programCatalogDatabaseRole(context);
 
   return db.transaction(async (tx) => {

@@ -20,18 +20,21 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   const actor=await getCommandContext(getRequest());assertCapability(actor,"program.read");
   if(!hasRegistrarAuthority(actor.role))throw new AuthorizationError("school launch workspace");
   const options=await listLaunchOptions();
-  if(!data.siteId)return {options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
+  // This flag is an availability signal, not an authorization grant.
+  // Catalog reads still require current Site scope and restricted DB roles.
+  const canonicalCatalogEnabled=process.env.CAN_CANONICAL_CATALOG_ENABLED==="true";
+  if(!data.siteId)return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
   if(!z.string().uuid().safeParse(data.siteId).success)
-    return {options,launches:null,statuses:null,selectedProgramId:null,
+    return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,
       selectionError:"This link contains an invalid school identifier. Select an authorized school."};
   const site=options.sites.find(site=>site.id===data.siteId);
   // An unauthorized or stale Site selector returns the authorized picker.
   if(!site || (actor.grantSiteId && actor.grantSiteId!==site.id))
-    return {options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
+    return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
   // Planned modules are real route destinations. They do not need a database read
   // or a fictional operational workflow just to render their landing page.
   if(data.module==="promote"||data.module==="recruitment"||data.module==="events")
-    return {options,launches:null,selectedProgramId:null,selectionError:null,
+    return {canonicalCatalogEnabled,options,launches:null,selectedProgramId:null,selectionError:null,
       statuses:{[data.module]:plannedHubStatus} as Partial<Record<SchoolHubModule,SchoolHubStatus>>};
   const needsPrograms=!data.module || data.module==="academics" || data.module==="compliance";
   const needsWebsite=!data.module || data.module==="website";
@@ -77,6 +80,6 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   if(!data.module)
     for(const module of ["promote","recruitment","events"] as const)
       statuses[module]=plannedHubStatus;
-  return {options,launches,selectedProgramId,statuses,
+  return {canonicalCatalogEnabled,options,launches,selectedProgramId,statuses,
     selectionError:invalidProgram?"The requested Program is not available at this school. Choose an authorized Program.":null};
  });

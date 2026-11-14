@@ -48,6 +48,7 @@ const base = {
   launches: [],
   selectedProgramId: null,
   statuses: {},
+  canonicalCatalogEnabled: true,
 };
 
 describe("canonical discovery in Launch Studio academics", () => {
@@ -69,6 +70,16 @@ describe("canonical discovery in Launch Studio academics", () => {
     expect(html).toContain(`data-site-id="${siteId}"`);
     expect(html).toContain("Existing Program academics");
     expect(html).not.toContain("Launch academic wizard");
+  });
+
+  it("does not expose an unprovisioned catalog in legacy School Hub", () => {
+    const html = renderToStaticMarkup(
+      <SchoolHubWorkflow module="academics" selection={{ siteId }}
+        data={{ ...base, canonicalCatalogEnabled: false } as never}/>,
+    );
+    expect(html).toContain("Published program discovery is not enabled");
+    expect(html).toContain("Launch academic wizard");
+    expect(html).not.toContain("canonical-discovery");
   });
 
   it("does not mount discovery or a configuration workflow for an unauthorized Site selection", () => {
