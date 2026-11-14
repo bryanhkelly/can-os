@@ -1,4 +1,4 @@
-import { boolean, check, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 import { learnerCourseAttempts, courseVersions } from "./learning";
@@ -20,6 +20,8 @@ export const canonicalLearningSessions = educationV30.table("learning_sessions",
   estimatedActiveMs: integer("estimated_active_ms").notNull().default(0),
 }, t => [
   index("canonical_learning_sessions_attempt_idx").on(t.courseAttemptId, t.startedAt),
+  uniqueIndex("canonical_learning_sessions_id_attempt_uq").on(t.id,t.courseAttemptId),
+  foreignKey({columns:[t.courseAttemptId,t.courseVersionId],foreignColumns:[learnerCourseAttempts.id,learnerCourseAttempts.courseVersionId],name:"canonical_learning_sessions_attempt_version_fk"}),
   uniqueIndex("canonical_learning_sessions_live_idx").on(t.courseAttemptId, t.accessSessionId, t.clientInstanceId).where(sql`${t.endedAt} IS NULL`),
   check("canonical_learning_sessions_duration_chk", sql`${t.estimatedActiveMs} >= 0`),
   check("canonical_learning_sessions_end_chk", sql`(${t.endedAt} IS NULL AND ${t.state} <> 'ended') OR (${t.endedAt} IS NOT NULL AND ${t.state} = 'ended')`),
@@ -40,6 +42,7 @@ export const canonicalLearningEvents = educationV30.table("learning_session_even
   estimatedActiveMs: integer("estimated_active_ms").notNull().default(0),
 }, t => [
   uniqueIndex("canonical_learning_events_dedupe_uq").on(t.learningSessionId, t.clientEventId),
+  foreignKey({columns:[t.learningSessionId,t.courseAttemptId],foreignColumns:[canonicalLearningSessions.id,canonicalLearningSessions.courseAttemptId],name:"canonical_learning_events_session_attempt_fk"}),
   index("canonical_learning_events_attempt_time_idx").on(t.courseAttemptId, t.receivedAt),
   check("canonical_learning_events_duration_chk", sql`${t.estimatedActiveMs} >= 0`),
 ]);
