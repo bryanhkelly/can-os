@@ -95,3 +95,56 @@ CAN_NONCREDIT_SCHEMA_VALIDATION=1 npm run db:canonical:noncredit-schema
 Do not enable `CAN_CANONICAL_ACTIVITY_ENABLED` or
 `CAN_FACILITATED_LEARNING_ENABLED` until scoped runtime DB roles,
 positive/negative learner and host flows, privacy review, and CI are verified.
+
+## Restricted production authentication and current acceptance (November 14, 2026)
+
+**Database permissions (partial, fail-closed):** The Neon `main` database has
+the `can_os_canonical_auth_app` restricted NOINHERIT login. It is allowed to
+`SET ROLE` to the NOLOGIN `can_v30_canonical_auth_reader` and
+`can_v301_credential_learner_reader` roles, which expose session-bound,
+SECURITY DEFINER authentication and private learner wallet projections.
+It has no direct grant to read Person, raw sessions, or credential issuances,
+and no INSERT on the learning session, facilitated room, pairing or playback
+tables. Real role-bound negative checks on Neon `main` passed. Run
+`verify-learning-release-roles.sql` for repeatable owner-side verification.
+
+**Test01 database-backed acceptance passed:** `test-learning-tenant-acceptance.sql`
+creates two independent learner sessions from existing QA organization accounts,
+tests organization and Person isolation, fabricated credentials, revoked and
+idle sessions, unauthorized learning events, pairings and playback. A controlled
+subtransaction rolls back all synthetic session and grant rows.
+`test-learning-valid-room-test01.sql` builds a synthetic published course,
+approved noncredit registration, active course attempt, live classroom and
+successful learner pairing from test01's two named QA organizations. It rejects
+wrong-person participation, a pairing after code expiry and a re-pair to an
+ended room. All synthetic course, room, registration and session rows are
+rolled back after the test. These are **SQL integration tests**, not live
+browser execution.
+
+**Room expiry hardening:** `patch-facilitated-pair-expiry.sql` adds the
+database-layer fifteen-minute code expiry check (using the stored expiry
+timestamp) and eight-hour room age cap. It passed the positive/negative
+test01 transaction and is installed on Neon `main`. This is independent
+of the existing application pairing expiry checks.
+
+**Remaining production blockers:**
+- The learning activity and facilitator modules use `db` through the
+  general `DATABASE_URL`; their statements have not yet been migrated to
+  narrowly scoped per-request database operations. The separate auth login
+  is **not** a blanket replacement for that owner connection.
+- The runtime needs a dedicated restricted `CAN_CANONICAL_AUTH_DATABASE_URL`
+  and strong `CAN_CANONICAL_ACCESS_TOKEN_PEPPER`. An attempt to save these to
+  Netlify was denied with HTTP 403, so the live site's configuration is not
+  confirmed.
+- The latest published `can-os-demo-new` Netlify build was deployed
+  November 5, 2026 (commit `04a93612ef9ae2013695798194641882e9a33446`).
+  It predates this implementation. Authenticated browser tests must target
+  a new build from the approved commit with separate learner, facilitator
+  and foreign-organization test users.
+- GitHub Actions still reports `startup_failure`, so the unit tests, TS
+  compile, build and Playwright tests are not confirmed passed.
+
+**Keep `CAN_CANONICAL_ACTIVITY_ENABLED` and
+`CAN_FACILITATED_LEARNING_ENABLED` disabled** until those blockers are
+resolved. Never connect the new restricted login to `DATABASE_URL` as a
+shortcut to provisioning the missing module-specific access.
