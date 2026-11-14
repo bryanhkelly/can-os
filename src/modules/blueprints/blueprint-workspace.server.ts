@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   blueprintComponents,
@@ -12,6 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 import { z } from "zod";
 
 export const blueprintWorkspaceInputSchema = z.object({
@@ -37,7 +38,9 @@ export async function getCanonicalBlueprintWorkspace(
     throw new DomainError("UNAVAILABLE", "Canonical Blueprint workspace is not enabled.");
   }
 
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
   return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [site] = await tx.select({ id: catalogSites.id, status: catalogSites.status })
       .from(catalogSites).where(eq(catalogSites.id, siteId)).limit(1);
     if (!site || site.status === "closed") {
