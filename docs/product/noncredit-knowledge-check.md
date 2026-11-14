@@ -2,6 +2,42 @@
 
 **Scope:** Phase 1 private organizational learning; reusable for adult, summer, workforce and other authorized noncredit offerings. No new routes, navigation, grading, academic credits, transcript, or credential issuance.
 
+## Pilot acceptance gates
+
+The latest source changes address the previously identified launch blockers:
+
+- **Evidence authority:** `v28_validate_completion()` now counts only independently verified, time-valid evidence and rejects assessment results that are not finalized for the same noncredit registration's Course attempt. The learner readiness calculation also excludes future-dated events.
+- **Automatic assessment authorization:** a published provider-approved noncredit Course attempt provisions its own learner profile and Course-bound assessment grant. If the approved assessment administration opens later, a second trigger provisions eligible attempts. Existing revoked grants are never reopened.
+- **Historical results:** a closed assessment administration no longer prevents personal result retrieval. Historical access never authorizes a new attempt or restarts an expired submission window.
+- **Mobile recovery and retakes:** choices are saved as append-only answer revisions; reload uses the most recent draft per question. Attempt limits and accommodations remain governed by the canonical database. Do not enable production access until interrupted-save, multiple-device and retry boundary tests pass.
+- **Surveys:** campaign-scoped, published, identified learner surveys use verified permission evidence and an existing personal invitation. A campaign must explicitly opt into the `knowledge_check_submitted` trigger to create an in-app invitation after a scored knowledge check. The feedback panel refreshes after submission; feedback is not a knowledge-check result.
+- **Separation:** lesson milestones add only zero-minute self-report activity, while verified attendance minutes are independently assessed; none of this produces grades, credit, transcripts or licenses.
+
+### SQL change ordering for an existing canonical v3.0.1 database
+
+Do not run these migrations against production without a reviewed, isolated acceptance rehearsal. In a disposable branch, apply the applicable patches in this order:
+
+1. `patch-canonical-learner-grant.sql`, if the native learner grant is not already installed
+2. `patch-noncredit-auto-finalization.sql`, if the gated objective noncredit scoring rule is required
+3. `patch-noncredit-lesson-milestones.sql`
+4. `patch-noncredit-evidence-and-result-authority.sql`
+5. `patch-auto-noncredit-assessment-access.sql`
+6. `patch-noncredit-feedback-invitations.sql`
+
+The canonical `schema.sql` incorporates the fresh-install variants. The lesson milestone patch was updated to retain the stricter evidence function even when patches are applied out of order. These patches are committed to GitHub but **not deployed** by this development work.
+
+Run the read-only post-migration gate with an isolated database and:
+
+```bash
+APP_ENV=test TEST_DATABASE_URL="..." node scripts/acceptance/check-noncredit-pilot-readiness.mjs
+npm run typecheck
+npx vitest run tests/unit/noncredit-completion.test.ts tests/unit/noncredit-knowledge-check.test.ts tests/unit/noncredit-phase1-integrity.test.ts tests/unit/learning-questionnaire.test.tsx
+```
+
+Then run a transactionally rolled-back, **restricted-principal** acceptance scenario with two unrelated adult Persons and a provider operator: registration, automatic grant, recorded and presenter-independent lesson milestones, draft save and resume across devices, duplicate submit, retake-limit exhaustion, feedback invitation and submission, verified attendance evidence, completed noncredit decision, cross-learner denial, and historical result access after administration closure.
+
+A GitHub Actions `startup_failure` is not a passing test. Do not claim integrated production readiness until the actual tests complete successfully on the isolated branch and application roles pass RLS isolation.
+
 ## Reusable Phase 1 learner experience
 
 - **Assessment availability is course-participation based**, not dependent on whether a recorded instructor has been selected or any video is available. The shared classroom mounts `NoncreditCourseActivities` for authorized noncredit Course attempts.
