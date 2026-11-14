@@ -17,6 +17,7 @@ import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.s
 import { blueprintEditorialIdentityKeys } from "@/domain/blueprint-configuration";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
+import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
 
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
@@ -45,6 +46,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   const [religiousAffiliationCode, setReligiousAffiliationCode] = useState("");
   const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
   const [selectedReferences, setSelectedReferences] = useState<Record<string, string[]>>({});
+  const [offeringAdoptions, setOfferingAdoptions] = useState<BlueprintOfferingIntent[]>([]);
   const [referenceCatalog, setReferenceCatalog] = useState<BlueprintReferenceCatalogItem[]>([]);
   const [localExperiences, setLocalExperiences] = useState<LocalExperienceDraft[]>([]);
   const [localComponentId, setLocalComponentId] = useState("");
@@ -96,6 +98,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   function chooseTemplate(template: Template) {
     setTemplateId(template.blueprintVersionId);
     setSelectedReferences({});
+    setOfferingAdoptions([]);
     setLocalExperiences([]);
     setSelectedComponents(template.components.filter(component =>
       component.requirementMode === "required"
@@ -125,6 +128,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       setName(result.name);
       setEditorialIdentity(result.identity.editorialIdentity);
       setReligiousAffiliationCode(result.identity.religiousAffiliationCode ?? "");
+      setOfferingAdoptions(result.offeringAdoptions.map(item => ({ ...item, configuration: {} })));
       setSelectedComponents(result.components
         .filter(component => component.selectionStatus === "selected")
         .map(component => component.componentId));
@@ -164,8 +168,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             && !Array.isArray(current.settings) ? current.settings : {},
         };
       }),
-      offeringAdoptions: previous?.offeringAdoptions.filter(intent =>
-        selectedComponents.includes(intent.componentId)) ?? [],
+      offeringAdoptions: offeringAdoptions.filter(intent =>
+        selectedComponents.includes(intent.componentId)),
       localExperiences: localExperiences.filter(item =>
         selectedComponents.includes(item.componentId)),
     };
@@ -355,6 +359,18 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 </div>
               </fieldset>;
             })}
+          {enableReferences && selectedTemplate.components.some(component =>
+            selectedComponents.includes(component.id) && component.kind === "program_model"
+          ) && <BlueprintOfferingAdoptionPicker
+            siteId={siteId}
+            components={selectedTemplate.components
+              .filter(component => component.kind === "program_model" &&
+                selectedComponents.includes(component.id))}
+            selected={offeringAdoptions.filter(intent =>
+              selectedComponents.includes(intent.componentId))}
+            onChange={setOfferingAdoptions}
+            disabled={busy}
+          />}
           {selectedTemplate.components.some(component =>
             selectedComponents.includes(component.id) &&
             ["community", "experience", "club", "activity"].includes(component.kind)
@@ -435,6 +451,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 setTemplateId("");
                 setSelectedComponents([]);
                 setSelectedReferences({});
+                setOfferingAdoptions([]);
                 setLocalExperiences([]);
                 setName("");
                 setMessage(null);
