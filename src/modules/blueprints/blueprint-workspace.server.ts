@@ -9,6 +9,8 @@ import {
   catalogSites,
   siteOrganizationRoles,
   religiousAffiliationOptions,
+  educationOperations,
+  educationOperationOrganizationRoles,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -60,7 +62,7 @@ export async function getCanonicalBlueprintWorkspace(
     )).limit(1);
     if (!operator) throw new AuthorizationError("current Blueprint Site operator relationship");
 
-    const [recipes, configurations, affiliations] = await Promise.all([
+    const [recipes, configurations, affiliations, operations] = await Promise.all([
       tx.select({
         blueprintId: blueprints.id,
         title: blueprints.title,
@@ -84,6 +86,22 @@ export async function getCanonicalBlueprintWorkspace(
       }).from(religiousAffiliationOptions)
         .where(eq(religiousAffiliationOptions.active, true))
         .orderBy(asc(religiousAffiliationOptions.sortOrder)),
+      tx.select({
+        id: educationOperations.id,
+        name: educationOperations.name,
+      }).from(educationOperations)
+        .innerJoin(educationOperationOrganizationRoles,
+          eq(educationOperationOrganizationRoles.operationId, educationOperations.id))
+        .where(and(
+          eq(educationOperationOrganizationRoles.organizationId, operator.organizationId),
+          eq(educationOperationOrganizationRoles.roleCode, "operator"),
+          eq(educationOperationOrganizationRoles.status, "approved"),
+          lte(educationOperationOrganizationRoles.validFrom, now),
+          or(isNull(educationOperationOrganizationRoles.validThrough),
+            gt(educationOperationOrganizationRoles.validThrough, now)),
+          inArray(educationOperations.status, ["planning", "active", "paused"]),
+        ))
+        .orderBy(asc(educationOperations.name)),
     ]);
     const seenRecipes = new Set<string>();
     const templates = recipes.filter(recipe => {
@@ -129,6 +147,7 @@ export async function getCanonicalBlueprintWorkspace(
       canReview: context.capabilities.has("blueprint.review"),
       canExecute: context.capabilities.has("blueprint.execute"),
       affiliations,
+      operations,
       templates: templates.map(template => ({
         ...template,
         components: components
