@@ -28,7 +28,8 @@ function GuardianHealthPage() {
     queryFn: () => getGuardianHealthWorkspace({ data: { studentPersonId: student } }),
     retry: (count, error) => normalizeClientError(error).retryable && count < 1,
   });
-  const data = healthQuery.data as Workspace | undefined;
+  // Never keep displaying cached medical information after the current authorization read fails.
+  const data = healthQuery.isError ? undefined : healthQuery.data as Workspace | undefined;
   const failure = healthQuery.error
     ? normalizeClientError(healthQuery.error, "Unable to verify family access to school health records.")
     : null;
@@ -106,7 +107,7 @@ function GuardianHealthPage() {
           {!child.clearances.length && <p className="mt-3 text-sm">No return-to-school clearance requirement is recorded.</p>}
         </div>
       </div>
-      <GuardianHealthUpdateForm child={child} onSubmitted={async () => {
+      <GuardianHealthUpdateForm key={`${child.studentPersonId}:${child.programId}:${child.lastSchoolReview?.reviewedAt ?? "unreviewed"}`} child={child} onSubmitted={async () => {
         const refreshed = await healthQuery.refetch();
         if (refreshed.isError) throw refreshed.error;
       }}/>
