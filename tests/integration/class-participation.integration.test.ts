@@ -297,6 +297,11 @@ integration("class participation cross-workspace flow", () => {
       expect((await messaging.getThread({ data: { threadId: conversation.threadId } })).thread.contextHref).toContain("/guardian/students?");
       act("teacher", teacher.id);
       await messaging.replyToThread({ data: { threadId: conversation.threadId, body: "Please review my annotation." } });
+      // Re-read as the guardian, simulating a fresh inbox load after delivery.
+      act("guardian", parent.id);
+      const parentConversation = await messaging.getThread({ data: { threadId: conversation.threadId } });
+      expect(parentConversation.messages.some(row => row.body === "Please review my annotation.")).toBe(true);
+      act("teacher", teacher.id);
       const prompt = await discussions.createCourseDiscussion({ data: { sectionId: section.id, subject: "Discuss evidence", prompt: "What supports the claim?" } });
       expect((await teacherDiscussions.getTeacherCourseDiscussions()).threads.some(row => row.id === prompt.id)).toBe(true);
       act("student", student.id);
