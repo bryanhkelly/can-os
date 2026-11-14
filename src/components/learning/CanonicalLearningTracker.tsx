@@ -91,6 +91,7 @@ export function CanonicalLearningActivityProvider({
 
   useEffect(() => {
     alive.current = true;
+    session.current = null;
     let disposed = false;
     instance.current = tabInstanceId(courseAttemptId);
     void startCanonicalLearningSession({
@@ -115,7 +116,7 @@ export function CanonicalLearningActivityProvider({
       }).catch(() => {});
     };
     const resume = () => {
-      if (document.visibilityState !== "visible" || !document.hasFocus()) return;
+      if (!needsResume.current || document.visibilityState !== "visible" || !document.hasFocus()) return;
       void serialize(async () => {
         if (!session.current || !alive.current) return;
         const result = await setCanonicalLearningSessionState({
