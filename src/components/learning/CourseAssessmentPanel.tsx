@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { LearningQuestionnaire } from "./LearningQuestionnaire";
 import {
   beginNoncreditKnowledgeCheckAttempt, getNoncreditKnowledgeCheck,
   submitNoncreditKnowledgeCheckAnswers,
+  saveNoncreditKnowledgeCheckAnswer,
 } from "@/modules/learning/noncredit-assessment.functions";
 
 type KnowledgeCheck = Awaited<ReturnType<typeof getNoncreditKnowledgeCheck>>;
@@ -16,13 +17,15 @@ function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
   const [check,setCheck]=useState<KnowledgeCheck|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
+  const [draftStatus,setDraftStatus]=useState<"idle"|"saving"|"saved"|"failed">("idle");
+  const draftQueue=useRef<Promise<void>>(Promise.resolve());
   const load=useCallback(async()=>{
     const next=await getNoncreditKnowledgeCheck({data:{courseAttemptId}});
     setCheck(next);
   },[courseAttemptId]);
   useEffect(()=>{
     let active=true;
-    setCheck(null);setError("");
+    setCheck(null);setError("");setDraftStatus("idle");
     void getNoncreditKnowledgeCheck({data:{courseAttemptId}})
       .then(next=>{if(active)setCheck(next);})
       .catch(()=>{if(active)setError("No knowledge check is available for this course.");});
@@ -42,6 +45,17 @@ function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
     }finally {setBusy(false);}
   }
 
+  function saveDraft(attemptId:string,questionId:string,optionIds:string[]) {
+    setDraftStatus("saving");
+    // Serialize edits for an attempt; canonical answer revisions persist across sessions.
+    draftQueue.current=draftQueue.current.catch(()=>undefined).then(async()=>{
+      await saveNoncreditKnowledgeCheckAnswer({
+        data:{courseAttemptId,attemptId,questionId,optionIds,requestId:crypto.randomUUID()},
+      });
+      setDraftStatus("saved");
+    }).catch(()=>setDraftStatus("failed"));
+  }
+
   if(error&&!check)return <p role="status" className="border p-3 text-sm">{error}</p>;
   if(!check)return <p role="status" className="text-sm">Loading knowledge check...</p>;
   return <section aria-label="Noncredit knowledge check" className="space-y-4">
@@ -52,14 +66,25 @@ function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
       </p>
     </div>
     {error&&<p role="alert" className="border p-3 text-sm">{error}</p>}
+    <p className="text-xs text-muted-foreground">
+      {check.attemptNo>0?`Attempt ${check.attemptNo} of ${check.attemptLimit}`:
+        `${check.attemptLimit} attempts available`}
+      {check.remainingAttempts>0?` · ${check.remainingAttempts} future attempt(s) available`:
+        " · No further attempts available"}.
+    </p>
     {check.state==="not_started"&&<Button onClick={()=>void begin()} disabled={busy}>
       {busy?"Starting...":"Start knowledge check"}
     </Button>}
     {check.state==="in_progress"&&check.attemptId&&
       <LearningQuestionnaire key={check.attemptId} title="Course knowledge questions"
         questions={check.questions} submitLabel="Submit knowledge check"
+        initialAnswers={check.draftAnswers}
+        onDraftChange={(questionId,answer)=>{
+          saveDraft(check.attemptId!,questionId,answer?.optionIds??[]);
+        }}
         onSubmit={async answers=>{
           setError("");
+          await draftQueue.current;
           await submitNoncreditKnowledgeCheckAnswers({
             data:{courseAttemptId,attemptId:check.attemptId!,
               requestId:crypto.randomUUID(),
@@ -70,6 +95,15 @@ function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
           });
           await load();
         }}/>}
+    {check.state==="in_progress"&&<p className="text-xs text-muted-foreground" role="status">
+      {draftStatus==="saving"?"Saving answers...":
+       draftStatus==="saved"?"Your answers are saved and can be resumed on another device.":
+       draftStatus==="failed"?"An answer could not be saved. You may retry the selection or submit your check.":
+       check.draftAnswers.length>0?"Saved responses restored.":"Answers save as you select them."}
+    </p>}
+    {check.state==="expired"&&<p role="status" className="border p-3 text-sm">
+      This timed knowledge check expired before submission.
+    </p>}
     {check.state==="scored"&&<p role="status" className="border p-3 text-sm">
       Your answers were submitted and automatically scored. Your noncredit result is awaiting provider confirmation.
     </p>}
@@ -86,11 +120,15 @@ function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
       <p className="mt-2 text-muted-foreground">
         A confirmed knowledge-check result is separate from training completion, grades and credit.
       </p>
-      <Button className="mt-3" variant="outline" disabled={busy}
-        onClick={()=>void begin()}>
-        {busy?"Starting...":"Retake, if permitted"}
-      </Button>
+      {check.remainingAttempts>0&&<Button className="mt-3" variant="outline"
+        disabled={busy} onClick={()=>void begin()}>
+        {busy?"Starting...":"Retake knowledge check"}
+      </Button>}
     </div>}
+    {(check.state==="voided"||check.state==="expired")&&check.remainingAttempts>0&&
+      <Button variant="outline" disabled={busy} onClick={()=>void begin()}>
+        {busy?"Starting...":"Start another allowed attempt"}
+      </Button>}
     {check.state==="voided"&&<p role="status" className="border p-3 text-sm">
       This knowledge-check attempt is unavailable.
     </p>}
