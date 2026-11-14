@@ -1,0 +1,47 @@
+# Recorded-instructor RLS acceptance
+
+**Gate:** Do not enable the recorded-instructor route until both the nine-check
+schema readiness query and the restricted two-learner isolation test pass.
+
+The schema and UI are intentionally separate from operating permission. A
+published instructional policy is not permission for one learner to inspect
+another learner's Course attempt, teacher choice, lesson progress, or practice.
+
+## Execute on an isolated test branch only
+
+Seed two learner Course attempts in **the same canonical Section and Course
+version**, with **different approved recorded instructors**. Each must have
+canonical lesson progress, an active selection, a formative practice attempt,
+and saved practice answers. Configure two independently scoped, non-owner test
+database identities that represent the two learners. Their accessible rows must
+match the corresponding Course attempt. Do not use an owner or unrestricted
+application credential for either learner.
+
+Set these environment variables in the isolated test environment:
+
+- `APP_ENV=test` and `TEST_DATABASE_URL` (the isolated database for the
+  read-only schema readiness pass; never the application database)
+- `CAN_INSTRUCTIONAL_LEARNER_A_DATABASE_URL`
+- `CAN_INSTRUCTIONAL_LEARNER_B_DATABASE_URL`
+- `CAN_INSTRUCTIONAL_LEARNER_A_ATTEMPT_ID`
+- `CAN_INSTRUCTIONAL_LEARNER_B_ATTEMPT_ID`
+
+Run `npm run db:canonical:v301:instructional-readiness`.
+
+The command first checks the canonical relationships, immutability, force-RLS
+and presence of application policies. **Only when all nine pass**, it invokes
+`db:canonical:v301:instructional-isolation` to prove that both restricted
+logins can read their own Course attempts, selected presenters, lesson
+progress, and practice records but cannot see the other learner's rows.
+
+The isolation script runs **read-only** and rolls back both connections.
+Success requires separate recorded instructors for the two learners in the
+same Section. This proves database isolation only; release also requires the
+actual application to use verified, scoped identities through its database
+transactions. Merely creating a policy or supplying an app-wide login must
+not count as signoff.
+
+**Current state:** The isolated `test01` branch has the corrected
+same-presenter policy renewal function and passed eight of nine schema checks.
+The remaining application-role RLS policies and two-learner restricted
+acceptance fixtures/logins have not been provisioned. Keep the route disabled.
