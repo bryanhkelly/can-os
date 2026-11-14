@@ -25,7 +25,8 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function currentLearner(tx: Tx, courseAttemptId: string) {
   const { context:actor, sessionId } = await getInstructionalLearnerSession(getRequest());
-  if (!actor.actorPersonId) throw new AuthorizationError("authenticated session");
+  const personId = actor.actorPersonId;
+  if (!personId) throw new AuthorizationError("authenticated session");
   await authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId);
   const [attempt] = await tx.select({
     id: learnerCourseAttempts.id,
@@ -33,20 +34,20 @@ async function currentLearner(tx: Tx, courseAttemptId: string) {
   }).from(learnerCourseAttempts)
     .where(eq(learnerCourseAttempts.id, courseAttemptId)).limit(1);
   if (!attempt) throw new AuthorizationError("current course attempt");
-  return { actor, sessionId, attempt };
+  return { personId, sessionId, attempt };
 }
 async function ownedSession(tx: Tx, input: z.infer<typeof sessionInput>) {
-  const { actor, sessionId, attempt } = await currentLearner(tx, input.courseAttemptId);
+  const { personId, sessionId, attempt } = await currentLearner(tx, input.courseAttemptId);
   const [session] = await tx.select().from(canonicalLearningSessions)
     .where(and(
       eq(canonicalLearningSessions.id, input.learningSessionId),
       eq(canonicalLearningSessions.courseAttemptId, attempt.id),
       eq(canonicalLearningSessions.courseVersionId, attempt.courseVersionId),
-      eq(canonicalLearningSessions.participantPersonId, actor.actorPersonId),
+      eq(canonicalLearningSessions.participantPersonId, personId),
       eq(canonicalLearningSessions.accessSessionId, sessionId),
     )).limit(1).for("update");
   if (!session) throw new AuthorizationError("owned course learning session");
-  return { actor, attempt, session };
+  return { attempt, session };
 }
 function output(session: typeof canonicalLearningSessions.$inferSelect) {
   return {
@@ -63,7 +64,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     return db.transaction(async tx => {
-      const { actor, sessionId, attempt } = await currentLearner(tx, data.courseAttemptId);
+      const { personId, sessionId, attempt } = await currentLearner(tx, data.courseAttemptId);
       const now = new Date();
       const [existing] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId, attempt.id),
@@ -72,7 +73,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
         isNull(canonicalLearningSessions.endedAt),
       )).limit(1).for("update");
       if (existing && !learningSessionIsExpired(existing.startedAt, existing.lastInteractionAt, now)) {
-        if (existing.participantPersonId !== actor.actorPersonId ||
+        if (existing.participantPersonId !== personId ||
             existing.courseVersionId !== attempt.courseVersionId)
           throw new AuthorizationError("current session participant and course version");
         if (existing.state === "paused") {
@@ -92,7 +93,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
       await tx.insert(canonicalLearningSessions).values({
         courseAttemptId: attempt.id, courseVersionId: attempt.courseVersionId,
         accessSessionId: sessionId, clientInstanceId: data.clientInstanceId,
-        participantPersonId: actor.actorPersonId,
+        participantPersonId: personId,
       }).onConflictDoNothing();
       const [created] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId,attempt.id),
@@ -100,7 +101,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
         eq(canonicalLearningSessions.clientInstanceId,data.clientInstanceId),
         isNull(canonicalLearningSessions.endedAt),
       )).limit(1);
-      if (!created || created.participantPersonId !== actor.actorPersonId ||
+      if (!created || created.participantPersonId !== personId ||
           created.courseVersionId !== attempt.courseVersionId)
         throw new AuthorizationError("current learning session");
       return { ...output(created), reused: false };
