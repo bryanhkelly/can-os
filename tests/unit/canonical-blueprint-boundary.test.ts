@@ -61,6 +61,16 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(editor).toContain("saved.revision > detail.revision");
   });
 
+  it("keeps approved plans read-only until the author explicitly starts a revision", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    expect(editor).toContain('detail?.lifecycle === "frozen" && !revisingFrozen');
+    expect(editor).toContain("disabled={editingDisabled}");
+    expect(editor).toContain("Revise submitted Blueprint");
+    expect(editor).toContain("Discard revision edits");
+    expect(editor).toContain('workspace.canExecute && !revisingFrozen');
+    expect(editor).toContain('setRevisingFrozen(false)');
+  });
+
   it("retains isolated, reversible database acceptance", () => {
     const runner = source("scripts/check-canonical-v301-blueprint-flow.mjs");
     expect(runner).toContain('process.env.APP_ENV !== "test"');
