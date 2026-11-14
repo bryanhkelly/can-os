@@ -16,6 +16,7 @@ export const noncreditCompletionPolicies = educationV30.table("noncredit_complet
   policyVersion:integer("policy_version").notNull(),
   minParticipationMinutes:integer("min_participation_minutes").notNull(),
   requireAllLessons:boolean("require_all_lessons").notNull().default(false),
+  completionMode:text("completion_mode").$type<"provider_review"|"automatic">().notNull().default("provider_review"),
   skillsAssessmentRequired:boolean("skills_assessment_required").notNull(),
   minimumAssessmentFraction:numeric("minimum_assessment_fraction",{precision:6,scale:5}),
   effectiveAt:timestamp("effective_at",{withTimezone:true}).notNull(),
@@ -26,6 +27,7 @@ export const noncreditCompletionDecisions = educationV30.table("noncredit_comple
   id:id(),registrationId:uuid("registration_id").notNull(),
   policyId:uuid("policy_id").notNull(),assessmentResultId:uuid("assessment_result_id"),
   outcome:text("outcome").$type<"completed"|"not_yet_completed"|"voided">().notNull(),
+  decisionSource:text("decision_source").$type<"provider"|"automatic">().notNull().default("provider"),
   decidedByPersonId:uuid("decided_by_person_id").notNull(),
   decidedAt:timestamp("decided_at",{withTimezone:true}).notNull().defaultNow(),
   evidenceVersionId:uuid("evidence_version_id"),supersedesId:uuid("supersedes_id"),
@@ -51,4 +53,15 @@ export const assessmentAttemptResults = educationV30.table("assessment_attempt_r
   pointsPossible:numeric("points_possible",{precision:12,scale:4}).notNull(),
   calculatedAt:timestamp("calculated_at",{withTimezone:true}).notNull(),
   supersedesId:uuid("supersedes_id"),
+});
+
+/** Existing canonical v3.0.1 certificate issuance, not a second award ledger. */
+export const noncreditCompletionCertificates = educationV30.table("noncredit_completion_certificates", {
+  id: id(), decisionId: uuid("decision_id").notNull(),
+  issuerOrganizationId: uuid("issuer_organization_id").notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  issuedByPersonId: uuid("issued_by_person_id").notNull(),
+  certificateReference: text("certificate_reference").notNull(),
+  status: text("status").$type<"issued" | "revoked">().notNull().default("issued"),
+  revocationEvidenceId: uuid("revocation_evidence_id"),
 });

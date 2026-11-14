@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateNoncreditCompletion } from "@/domain/noncredit-completion";
 const now=new Date("2026-11-14");
 const policy={trainingVersionId:"t1",effectiveAt:new Date("2026-11-01"),minParticipationMinutes:50,requireAllLessons:false,skillsAssessmentRequired:true,minimumAssessmentFraction:0.8};
-const event={id:"e1",supersedesId:null,eventKind:"lesson_completed" as const,countedMinutes:50,evidenceVersionId:"verified"};
+const event={id:"e1",supersedesId:null,eventKind:"lesson_completed" as const,countedMinutes:50,occurredAt:new Date("2026-11-01"),evidenceVersionId:"verified"};
 const assessment={learnerId:"learner",assessmentVersionId:"a1",resultStatus:"finalized" as const,pointsEarned:4,pointsPossible:5};
 const base={registrationStatus:"active",trainingVersionId:"t1",trainingState:"published",learnerId:"learner",assessmentVersionId:"a1",policy,participation:[event],completedLessonCount:3,totalLessonCount:3,assessment,now};
 describe("noncredit completion policy",()=>{
@@ -29,6 +29,12 @@ describe("noncredit completion policy",()=>{
    expect(evaluateNoncreditCompletion({...base,policy:lessonPolicy,completedLessonCount:3,totalLessonCount:3,
      participation:[{...event,countedMinutes:0,evidenceVersionId:null}]}).eligible).toBe(true);
    expect(evaluateNoncreditCompletion({...base,policy:lessonPolicy,completedLessonCount:0,totalLessonCount:0}).eligible).toBe(false);
+ });
+ it("ignores verified evidence dated after the completion decision",()=>{
+   const result=evaluateNoncreditCompletion({...base,participation:[
+     {...event,occurredAt:new Date("2027-01-01")}]});
+   expect(result.countedMinutes).toBe(0);
+   expect(result.blockers).toContain("participation_incomplete");
  });
  it("supports noncredit courses with no assessment requirement",()=>{
    const noExam={...policy,skillsAssessmentRequired:false,minimumAssessmentFraction:null};

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
 import { clearSessionCookieHeader } from "@/domain/access-tokens";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { listAccountSessions, revokeOwnedAccountSessions } from "@/modules/identity/account-sessions.server";
+import { listAccountSessions, listAccountSessionSignals, revokeOwnedAccountSessions } from "@/modules/identity/account-sessions.server";
 
 const actionSchema = z.discriminatedUnion("kind", [
  z.object({ kind: z.literal("one"), sessionId: z.string().uuid() }).strict(),
@@ -17,7 +17,8 @@ export const Route = createFileRoute("/access/sessions")({
    try {
     const actor = await getCommandContext(request);
     const sessions = await listAccountSessions(actor);
-    return Response.json({ sessions }, { headers: { "Cache-Control": "private, no-store" } });
+    const alerts=await listAccountSessionSignals(actor);
+    return Response.json({sessions,alerts},{headers:{"Cache-Control":"private, no-store"}});
    } catch (error) {
     return Response.json(
      { error: error instanceof AuthorizationError ? "Unauthorized" : "Unable to load sessions" },

@@ -4,7 +4,7 @@ import {useEffect,useState,useSyncExternalStore,type ReactNode} from "react";
 import {openPaletteEvent} from "@/lib/workspace-search";
 import {WorkspaceContextSwitcher} from "./WorkspaceContextSwitcher";
 import {useWorkspaceSession} from "./WorkspaceSession";
-import {getActiveWorkspacePath,getWorkspaceLinks,isFocusedClassroomRoute} from "./workspace-navigation.registry";
+import {getActiveWorkspacePath,getWorkspaceLinks,isFocusedClassroomRoute,resolveWorkspaceInstitutionSelection,type WorkspaceInstitutionSelection} from "./workspace-navigation.registry";
 import {WorkspaceSidebar} from "./WorkspaceSidebar";
 import {WorkspaceTopBar} from "./WorkspaceTopBar";
 import {WorkspaceNavigationPanels} from "./WorkspaceNavigationPanels";
@@ -46,12 +46,41 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const [switcherOpen,setSwitcherOpen]=useState(false);
  const [accountOpen,setAccountOpen]=useState(false);
  const [sidebarExpanded,setSidebarExpanded]=useState(false);
+ const [institutionSelection,setInstitutionSelection]=useState<WorkspaceInstitutionSelection>({});
  const sidebarCollapsed=useSyncExternalStore(subscribeSidebarPreference,readSidebarCollapsed,()=>false);
  const toggleSidebarCollapsed=()=>writeSidebarCollapsed(!sidebarCollapsed);
  const focusedClassroom=isFocusedClassroomRoute(location.pathname,location.searchStr,
   session?.authenticated?session.role:null);
  useEffect(()=>{setTray(null);setMenuOpen(false);setSwitcherOpen(false);setAccountOpen(false)},[location.pathname]);
  const authenticated=session?.authenticated?session:null;
+ // Each grant retains its own navigation selection after hydration; never
+ // persist or reapply another grant's Site or Program, even in a demo account.
+ useEffect(()=>{
+   if(!authenticated) {
+     setInstitutionSelection(previous=>Object.keys(previous).length ? {} : previous);
+     return;
+   }
+   const key="can-os:institution:"+authenticated.activeGrantId;
+   let stored: WorkspaceInstitutionSelection={};
+   try {
+     const raw=window.sessionStorage.getItem(key);
+     if(raw && raw.length<256) {
+       const value=JSON.parse(raw) as Record<string,unknown>;
+       if(value && typeof value==="object" && !Array.isArray(value)) {
+         stored={
+           ...(typeof value.siteId==="string"?{siteId:value.siteId}:{}),
+           ...(typeof value.programId==="string"?{programId:value.programId}:{}),
+         };
+       }
+     }
+   }catch{/* Session storage unavailable. URL and verified grants remain sufficient. */}
+   const next=resolveWorkspaceInstitutionSelection(
+     location.searchStr,stored,authenticated.sites,authenticated.programs,
+   );
+   setInstitutionSelection(previous=>
+     previous.siteId===next.siteId && previous.programId===next.programId ? previous : next);
+   try{window.sessionStorage.setItem(key,JSON.stringify(next));}catch{/* Storage is optional. */}
+ },[authenticated,location.searchStr]);
  const preferences=authenticated?.role==="student"?authenticated.studentPreferences:undefined;
  const grants=authenticated?.grants??[];
  const current=grants.find(g=>g.id===authenticated?.activeGrantId);
@@ -77,7 +106,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  }
  return <div data-density={preferences?.density} data-reduce-motion={preferences?.reduceMotion?"true":undefined}>
  <div data-sidebar={current&&!focusedClassroom&&sidebarCollapsed?"collapsed":undefined} className={current ? focusedClassroom ? `classroom-navigation ${sidebarExpanded ? "classroom-navigation-expanded" : ""}` : "can-shell" : "min-h-screen"}>
- {current&&<WorkspaceSidebar member={current} links={links} activePath={activePath}
+ {current&&<WorkspaceSidebar member={current} links={links} activePath={activePath} institutionSelection={institutionSelection}
   focused={focusedClassroom} expanded={focusedClassroom?sidebarExpanded:!sidebarCollapsed}
   onToggle={focusedClassroom?()=>setSidebarExpanded(value=>!value):toggleSidebarCollapsed}/>}
  <div className="min-w-0"><WorkspaceTopBar member={current} sites={authenticated?.sites??[]} authenticated={Boolean(authenticated)}
@@ -98,7 +127,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  <WorkspaceNavigationPanels member={current} authenticated={Boolean(authenticated)} accountOpen={accountOpen}
   onCloseAccount={()=>setAccountOpen(false)} changing={changing}
   onSignOut={()=>void changeSession(signOut)} menuOpen={menuOpen}
-  onCloseMenu={()=>setMenuOpen(false)} links={links} activePath={activePath}
+  onCloseMenu={()=>setMenuOpen(false)} links={links} activePath={activePath} institutionSelection={institutionSelection}
   tray={tray} onCloseTray={()=>setTray(null)}/>
  </div>;
 }

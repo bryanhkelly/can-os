@@ -1,4 +1,4 @@
-import { and, desc, eq, lte } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -50,11 +50,13 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
       if(!training||training.state!=="published"||
          !actor.scope.organizationIds?.includes(training.providerOrganizationId))
         throw new AuthorizationError("provider-owned noncredit training");
-      const [policy]=await tx.select().from(noncreditCompletionPolicies)
-        .where(and(eq(noncreditCompletionPolicies.trainingVersionId,training.id),
-          lte(noncreditCompletionPolicies.effectiveAt,new Date())))
-        .orderBy(desc(noncreditCompletionPolicies.policyVersion)).limit(1);
-      if(!policy||policy.id!==data.expectedPolicyId)
+      const [policy]=registration.completionPolicyId
+        ?await tx.select().from(noncreditCompletionPolicies)
+          .where(and(
+            eq(noncreditCompletionPolicies.id,registration.completionPolicyId),
+            eq(noncreditCompletionPolicies.trainingVersionId,training.id),
+          )).limit(1):[];
+      if(!policy||policy.id!==data.expectedPolicyId||policy.effectiveAt>new Date())
         throw new AuthorizationError("current noncredit completion policy");
       if(policy.skillsAssessmentRequired&&!data.assessmentResultId)
         throw new AuthorizationError("finalized assessment result");
@@ -67,7 +69,7 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
       const [created]=await tx.insert(noncreditCompletionDecisions).values({
         registrationId:registration.id,policyId:policy.id,
         assessmentResultId:data.assessmentResultId,outcome:"completed",
-        decidedByPersonId:actor.actorPersonId,supersedesId:latest?.id??null,
+        decisionSource:"provider",decidedByPersonId:actor.actorPersonId,supersedesId:latest?.id??null,
       }).returning({id:noncreditCompletionDecisions.id});
       if(!created)throw new Error("Unable to save the noncredit completion decision");
       const payload={courseAttemptId:attempt.id,registrationId:registration.id,

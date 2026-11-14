@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
 import {
   assessmentAccess, assessmentExecutionAttempts, assessmentExecutionResults,
@@ -8,8 +8,8 @@ import {
   noncreditRegistrations, noncreditTrainingVersions, surveyCampaigns,
   surveyDefinitions, surveyQuestions, surveyResponses, surveyVersions,
 } from "@/db/canonical-v301";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
-import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { requireCanonicalLabProvider } from "./canonical-capability-lab-access.server";
+import { selectNoncreditLabAssessmentEvidence } from "@/domain/canonical-capability-lab";
 
 /**
  * Read-only, organization-scoped index for the native canonical provider lab.
@@ -18,13 +18,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
  */
 export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handler(async () => {
   setResponseHeader("Cache-Control", "private, no-store");
-  const actor = await getCanonicalCommandContext(getRequest());
-  if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? ""))
-    throw new AuthorizationError("canonical provider staff");
-  assertCapability(actor, "noncredit.assessment.provision");
-  const orgIds = actor.scope.organizationIds ?? [];
-  if (orgIds.length !== 1) throw new AuthorizationError("single provider organization");
-  const organizationId = orgIds[0]!;
+  const { actor, organizationId } = await requireCanonicalLabProvider();
 
   const trainings = await db.select({
     id: noncreditTrainingVersions.id,
@@ -41,6 +35,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
     courseStatus: learnerCourseAttempts.status,
     registrationId: noncreditRegistrations.id,
     registrationStatus: noncreditRegistrations.status,
+    completionPolicyId: noncreditRegistrations.completionPolicyId,
     trainingVersionId: noncreditTrainingVersions.id,
     trainingTitle: noncreditTrainingVersions.title,
   }).from(learnerCourseAttempts)
@@ -62,6 +57,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
     ? await db.select({
       id: assessmentAccess.id, courseAttemptId: assessmentAccess.courseAttemptId,
       status: assessmentAccess.accessStatus,
+      validFrom: assessmentAccess.validFrom, validThrough: assessmentAccess.validThrough,
     }).from(assessmentAccess).where(inArray(assessmentAccess.courseAttemptId, courseIds))
     : [];
   const grantIds = grants.map(row => row.id);
@@ -83,6 +79,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
       status: assessmentExecutionResults.resultStatus,
       revision: assessmentExecutionResults.resultRevision,
       outcome: assessmentExecutionResults.outcome,
+      supersedesId: assessmentExecutionResults.supersedesId,
     }).from(assessmentExecutionResults)
       .where(inArray(assessmentExecutionResults.attemptId, assessmentAttemptIds))
       .orderBy(desc(assessmentExecutionResults.resultRevision))
@@ -104,29 +101,32 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
       id: noncreditCompletionDecisions.id,
       registrationId: noncreditCompletionDecisions.registrationId,
       outcome: noncreditCompletionDecisions.outcome,
+      supersedesId: noncreditCompletionDecisions.supersedesId,
       decidedAt: noncreditCompletionDecisions.decidedAt,
     }).from(noncreditCompletionDecisions)
       .where(inArray(noncreditCompletionDecisions.registrationId, registrationIds))
       .orderBy(desc(noncreditCompletionDecisions.decidedAt))
     : [];
   const now = new Date();
+  const supersededDecisions = new Set(decisions.flatMap(item =>
+    item.supersedesId ? [item.supersedesId] : []));
   const attempts = participation.map(row => {
-    const grant = grants.find(item => item.courseAttemptId === row.courseAttemptId);
-    const attempt = assessmentAttempts.find(item => item.grantId === grant?.id);
-    const finalized = results.find(item =>
-      item.attemptId === attempt?.id && item.status === "finalized");
+    const evidence = selectNoncreditLabAssessmentEvidence(
+      grants.filter(item => item.courseAttemptId === row.courseAttemptId),
+      assessmentAttempts,
+      results,
+      now,
+    );
     const policy = policies.find(item =>
-      item.trainingVersionId === row.trainingVersionId && item.effectiveAt <= now);
-    const decision = decisions.find(item => item.registrationId === row.registrationId);
+      item.id === row.completionPolicyId && item.trainingVersionId === row.trainingVersionId);
+    const decision = decisions.find(item =>
+      item.registrationId === row.registrationId && !supersededDecisions.has(item.id));
     const training = trainings.find(item => item.id === row.trainingVersionId);
     return {
       ...row,
+      trainingState: training?.state ?? "unavailable",
       assessmentVersionId: training?.assessmentVersionId ?? null,
-      assessmentGrantStatus: grant?.status ?? null,
-      assessmentAttemptId: attempt?.id ?? null,
-      assessmentAttemptState: attempt?.state ?? null,
-      finalizedResultId: finalized?.id ?? null,
-      finalizedOutcome: finalized?.outcome ?? null,
+      ...evidence,
       policyId: policy?.id ?? null,
       policyVersion: policy?.version ?? null,
       policyMinMinutes: policy?.minMinutes ?? null,
@@ -163,6 +163,8 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
 
   return {
     organizationId,
+    draftAuthoringEnabled: process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED === "true",
+    surveyPublicationEnabled: process.env.CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED === "true",
     role: actor.role,
     trainings,
     attempts,

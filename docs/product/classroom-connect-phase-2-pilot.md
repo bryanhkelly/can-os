@@ -1,10 +1,28 @@
 # CAN OS Classroom Connect
 
 **Product capability specification and Phase 2 pilot plan**  
-**Status:** Proposed design, not an assertion of implemented functionality  
+**Status:** Product target and pilot requirements; partial canonical foundation merged into `main`, not production-enabled  
 **Date:** November 13, 2026  
 **Primary use case:** COGIC Phase 2 four-week training pilot  
 **Broader applicability:** Churches, microschools, community learning centers, afterschool and summer programs, adult/workforce education, and grades 6–12
+
+---
+
+## Implementation reconciliation with canonical `main` (November 14, 2026)
+
+This document defines the **target product experience**. It is not a claim that every P0 requirement is implemented or production-enabled. PR #293 has since merged the canonical foundation into `main`:
+
+- `education_v30.facilitated_learning_sessions` records authorized Site, Deployment, Course version, host organization and facilitator. It is the authoritative shared-room identity, not a second public-schema `classroom_sessions` table.
+- `education_v30.facilitated_learning_participants` pairs a verified learner's existing `learner_course_attempts` record with a room. It is not attendance, an additional enrollment, or course completion.
+- `education_v30.facilitated_learning_playback` records validated facilitator actions without mutating learner course progress. Approved private recordings use the existing rights checks.
+- `education_v30.learning_sessions` and `learning_session_events` are separate learner evidence, not login sessions and not a substitute for the room model. Existing noncredit participation and completion rules remain authoritative.
+- The pairing service already has a short-lived ten-character, HMAC-digested code, per-Person rate limit, 15-minute pairing window, and bounded room age. Do not add PR #291's six-character code / per-token failure counter or its `drizzle/0079` / `0080` duplicate tables.
+- The `/canonical/lab/facilitated` host workspace and `FacilitatedLearnerPairing` component are the integration points for the classroom QR / learner join UX. Preserve native canonical authentication, per-Course authorization and the 6.1 right-angle design system.
+- `CAN_CANONICAL_ACTIVITY_ENABLED` and `CAN_FACILITATED_LEARNING_ENABLED` remain **off by default**. Current source / schema acceptance does not replace restricted runtime DB-role, signed-in Playwright and end-to-end tests. Do not turn on either flag during this PR.
+
+**Implementation boundary:** The PR #291 branch should become an incremental, UI-first integration on top of `main`: QR/projector pairing and typed join entry; **no new database tables or independent join server**. Facilitator activity release, learner response persistence, evidenced attendance, consent/fallback workflows and four-week reporting remain future workstreams with separate acceptance gates.
+
+**Pre-release acceptance:** Verify a real current-commit preview against dedicated test learner/facilitator/cross-site accounts. The primary successful path is authorized Site → active Deployment → published Course → active Course attempt → 15-minute pairing code → learner's explicit pairing → playback. Negative paths must reject foreign learners, withdrawn/expired registration, stale/revoked codes, role bypass and cross-Site access. Manual/QR joining must not generate attendance, watch time, grades or completion.
 
 ---
 

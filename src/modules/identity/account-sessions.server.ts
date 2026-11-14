@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessSessions } from "@/db/schema";
+import { accessSessions, accessSessionSignals } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { sessionIdleCutoff } from "@/domain/access-tokens";
@@ -19,8 +19,12 @@ export async function listAccountSessions(actor: AccessContext) {
  const rows = await db.select({
   id: accessSessions.id,
   createdAt: accessSessions.createdAt,
-  lastActivityAt: accessSessions.updatedAt,
-  expiresAt: accessSessions.expiresAt,
+  lastActivityAt:accessSessions.lastActivityAt,
+  expiresAt:accessSessions.expiresAt,
+  sharedDevice:accessSessions.sharedDevice,
+  deviceCategory:accessSessions.deviceCategory,
+  browserFamily:accessSessions.browserFamily,
+  osFamily:accessSessions.osFamily,
  }).from(accessSessions)
   .where(and(
    eq(accessSessions.accountId, actor.sessionAccountId ?? actor.accountId),
@@ -35,7 +39,9 @@ export async function listAccountSessions(actor: AccessContext) {
   current: row.id === actor.sessionId,
   createdAt: row.createdAt.toISOString(),
   lastActivityAt: row.lastActivityAt.toISOString(),
-  expiresAt: row.expiresAt.toISOString(),
+  expiresAt:row.expiresAt.toISOString(),
+  sharedDevice:row.sharedDevice,
+  deviceCategory:row.deviceCategory,browserFamily:row.browserFamily,osFamily:row.osFamily,
  }));
 }
 
@@ -82,4 +88,15 @@ export async function revokeOwnedAccountSessions(
    currentRevoked: changed.some(row => row.id === actor.sessionId),
   };
  });
+}
+
+/** Bounded account-own security observations. No IPs, credentials or client IDs. */
+export async function listAccountSessionSignals(actor:AccessContext){
+ if(!actor.accountId||!actor.sessionId||!actor.actorPersonId)
+  throw new AuthorizationError("authenticated account session");
+ const owner=actor.sessionAccountId??actor.accountId;
+ const rows=await db.select({signal:accessSessionSignals.signal,occurredAt:accessSessionSignals.occurredAt})
+  .from(accessSessionSignals).where(eq(accessSessionSignals.accountId,owner))
+  .orderBy(desc(accessSessionSignals.occurredAt)).limit(10);
+ return rows.map(row=>({signal:row.signal,occurredAt:row.occurredAt.toISOString()}));
 }

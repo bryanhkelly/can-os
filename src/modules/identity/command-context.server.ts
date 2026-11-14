@@ -33,12 +33,15 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  const [session]=await db.select({
   id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
   email:accessAccounts.emailNormalized,
+  sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
   .where(and(eq(accessSessions.secretHash,digest),isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
    gt(accessSessions.updatedAt,sessionIdleCutoff(now)),eq(accessAccounts.disabled,false)))
   .limit(1);
  if(!session) return rejectSession(request,"session_not_current");
+ if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
+  return rejectSession(request,"session_not_current");
  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
  const activeGrant=grants.find(grant=>grant.id===session.activeGrantId);
  if(!activeGrant)return rejectSession(request,"membership_unavailable");

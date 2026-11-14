@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
+import { Pool } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import {
   canonicalAuthReaderDatabaseRole,
   canonicalSessionCookie,
   canonicalSessionRowSchema,
+  type CanonicalSessionRow,
   projectCanonicalCommandContext,
 } from "@/domain/canonical-access";
 
@@ -13,7 +14,7 @@ import {
  * A completely native v3.0.1 session. No account, Person, Site, grant or
  * Organization is read from public-schema identity records.
  */
-export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+export function canonicalSessionDigestFromRequest(request: Request): string {
   const cookie = request.headers.get("cookie") ?? "";
   const raw = cookie.split(";").map(item => item.trim())
     .find(item => item.startsWith(canonicalSessionCookie + "="))
@@ -25,21 +26,47 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   if (!pepper || pepper.length < 32) {
     throw new AuthorizationError("canonical session configuration");
   }
-  const digest = createHash("sha256")
+  return createHash("sha256")
     .update(pepper).update(":").update(raw).digest("hex");
+}
 
-  const records = await db.transaction(async tx => {
-    // Purpose-specific role may only EXECUTE the SECURE, read-only session
-    // projection. It receives no SELECT on raw secret hashes or grants.
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`));
-    const result = await tx.execute(sql`
-      SELECT account_id, session_id, grant_id, person_id,
-        role_code, organization_id, site_id
-      FROM education_v30.v301_canonical_session_context(${digest}::text)
-    `);
-    return result.rows;
-  });
+export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
+  const digest = canonicalSessionDigestFromRequest(request);
+  // Dedicated restricted login: never switch roles from the app's broad
+  // DATABASE_URL connection. This connection has no raw identity-table reads.
+  const connectionString = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
+  if (!canonicalRestrictedAuthUrlValid(connectionString, process.env.DATABASE_URL))
+    throw new AuthorizationError("dedicated restricted canonical session reader configuration");
+  const pool = new Pool({ connectionString, max: 1 });
+  let client: Awaited<ReturnType<Pool["connect"]>> | undefined;
+  let records: Array<Record<string, unknown>> = [];
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN READ ONLY");
+    await client.query(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`);
+    const result = await client.query(
+      `SELECT account_id, session_id, grant_id, person_id,
+              role_code, organization_id, site_id
+         FROM education_v30.v301_canonical_session_context($1::text)`,
+      [digest],
+    );
+    records = result.rows;
+    await client.query("COMMIT");
+  } catch {
+    if (client) {
+      try { await client.query("ROLLBACK"); } catch { /* Preserve original denial. */ }
+    }
+    throw new AuthorizationError("canonical session reader unavailable");
+  } finally {
+    client?.release();
+    await pool.end();
+  }
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
-  return projectCanonicalCommandContext(canonicalSessionRowSchema.parse(records[0]));
+  return canonicalSessionRowSchema.parse(records[0]);
+}
+
+/** Public command contexts never expose the database session id. */
+export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+  return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
 }

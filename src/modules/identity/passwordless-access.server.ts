@@ -11,6 +11,7 @@ import {
 } from "@/domain/local-demo-access";
 import {readSessionGrants} from "./session-grants.server";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
+import type {SessionDeviceContext} from "@/domain/session-device";
 import { and,desc,eq,gt,inArray,isNull,lt,sql } from "drizzle-orm";
 import { sendAccessLinkViaResend,type AccessEmailSender } from "./resend-access-mail.server";
 import { acceptStaffInvitations,listPendingStaffInvitations } from "./staff-invitations.server";
@@ -136,7 +137,7 @@ export async function requestOneTimeAccessWithDeliveryStatus(rawEmail:string,ret
  return issueOneTimeAccess(rawEmail,sendAccessLinkViaResend,returnTo);
 }
 /** A token is atomically consumed by its hash, allowing only one successful redemption. */
-export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
+export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceContext):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(rawToken))throw new InvalidAccessCredentialError();
  const hash=hashAccessSecret(rawToken,secretPepper()),now=new Date();
  return db.transaction(async tx=>{
@@ -211,6 +212,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
    activeGrantId:activeGrant.id,expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
+   ...(device?device:{}),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
   const [member]=await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
@@ -231,6 +233,7 @@ export async function redeemOneTimeAccess(rawToken:string):Promise<{setCookie:st
 export async function redeemDemoAccess(
  rawEmail:string,
  code:string,
+  device?:SessionDeviceContext,
 ):Promise<{setCookie:string;accountId:string;role:string;launchSiteId?:string;homeSiteId?:string}> {
  if(code!==LOCAL_DEMO_ACCESS_CODE) {
   throw new InvalidAccessCredentialError("Invalid demo credentials");
@@ -286,6 +289,7 @@ export async function redeemDemoAccess(
    secretHash:hashAccessSecret(secret,pepper),
    activeGrantId:grant.id,
    expiresAt:new Date(now.getTime()+SESSION_LIFETIME_MS),
+   ...(device?device:{}),
   }).returning({id:accessSessions.id});
   if(!session)throw new Error("Unable to establish session");
   step="session_audit";
@@ -346,7 +350,7 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const {grants}=await readSessionGrants(session.accountId,session.email,tx);
   const grant=grants.find(candidate=>candidate.id===grantId);
   if(!grant||!Object.hasOwn(roleCapabilities,grant.role))throw new AuthorizationError("active membership");
-  const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date()})
+  const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date(),lastActivityAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
     gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
@@ -372,7 +376,7 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
  */
 export async function recordMeaningfulSessionActivity(sessionId:string,accountId:string):Promise<void> {
  const now=new Date();
- const [updated]=await db.update(accessSessions).set({updatedAt:now})
+ const [updated]=await db.update(accessSessions).set({updatedAt:now,lastActivityAt:now})
   .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
     gt(accessSessions.updatedAt,sessionIdleCutoff(now))))

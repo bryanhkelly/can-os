@@ -177,7 +177,7 @@ describe("read-only staff Action detail",()=>{
   it("links missing-work assignment, student and course names to their own records",()=>{
     state.data={ok:true,data:{connected:true,items:[{
       assessmentId:"essay",title:"Evidence essay",course:"English",sectionId:"english",
-      dueAt:"2030-01-01T12:00:00Z",studentProfileId:"student-profile",
+      dueAt:"2030-01-01T12:00:00Z",timezone:"America/Los_Angeles",studentProfileId:"student-profile",followUpActionId:"owned-action",
       studentPersonId:"student-person",studentName:"Jordan Student",status:"not_started",
     }]}};
     const html=render(MissingWork);
@@ -185,6 +185,9 @@ describe("read-only staff Action detail",()=>{
     expect(html).toContain('href="/staff/students/student-person" class="underline">Jordan Student</a>');
     expect(html).toContain('href="/classes?section=english" class="underline">English</a>');
     expect(html).not.toContain('/staff/students/student-profile');
+    expect(html).toContain('href="/actions/owned-action"');
+    expect(html).toContain("Open follow-up");
+    expect(html).not.toContain("Create follow-up");
   });
   function action(canManageOperations:boolean,status="open"){
     state.data={ok:true,data:{

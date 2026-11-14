@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getActiveWorkspacePath, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
+import { getActiveWorkspacePath, getWorkspaceHome, resolveWorkspaceInstitutionSelection, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
 import { routeNavigation } from "./route-navigation";
-import { roleCapabilities } from "@/domain/access-context";
+import { roleCapabilities, type AccessContext } from "@/domain/access-context";
+import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { assertPartnerWebsitePreviewScope } from "@/domain/site-publication-policy";
 
 describe("generated workspace navigation", () => {
   const siteId = "00000000-0000-4000-8000-000000000001";
@@ -13,6 +15,80 @@ describe("generated workspace navigation", () => {
     expect(workspaceDestination("/launch/school", search)).toBe(`/launch/school?siteId=${siteId}&programId=${programId}`);
     expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
     expect(workspaceDestination("/messages", search)).toBe("/messages");
+  });
+
+  it("preserves school and Program selections only where the destination accepts them", () => {
+    const search = `?siteId=${siteId}&programId=${programId}&section=${section}`;
+    for (const path of ["/admissions", "/staff/students", "/operations/school-years", "/operations/insights", "/operations/interest-events", "/launch/hub/school", "/site-website"]) {
+      expect(workspaceDestination(path, search)).toBe(`${path}?siteId=${siteId}&programId=${programId}`);
+    }
+    expect(workspaceDestination("/settings", search)).toBe(`/settings?siteId=${siteId}`);
+    expect(workspaceDestination("/staff/attendance", search)).toBe(`/staff/attendance?programId=${programId}`);
+    expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
+  });
+
+  it("retains only verified selection per membership across routes that accept only one dimension", () => {
+    const sites=[{id:siteId},{id:"00000000-0000-4000-8000-000000000010"}];
+    const programs=[{id:programId,siteId},{id:"00000000-0000-4000-8000-000000000011",siteId:sites[1]!.id}];
+    const fromProgram=resolveWorkspaceInstitutionSelection(`?programId=${programId}`,{},sites,programs);
+    expect(fromProgram).toEqual({siteId,programId});
+    const viaSettings=resolveWorkspaceInstitutionSelection(`?siteId=${siteId}`,fromProgram,sites,programs);
+    expect(viaSettings).toEqual({siteId,programId});
+    expect(workspaceDestination("/operations/school-years","",viaSettings))
+      .toBe(`/operations/school-years?siteId=${siteId}&programId=${programId}`);
+    // A Site switch never carries an unrelated Program to the new Site.
+    expect(resolveWorkspaceInstitutionSelection(`?siteId=${sites[1]!.id}`,viaSettings,sites,programs))
+      .toEqual({siteId:sites[1]!.id});
+    expect(resolveWorkspaceInstitutionSelection("?siteId=00000000-0000-4000-8000-000000000099",{},sites,programs))
+      .toEqual({});
+    expect(workspaceDestination("/home",`?siteId=00000000-0000-4000-8000-000000000099`,viaSettings))
+      .toBe(`/home?siteId=${siteId}&programId=${programId}`);
+  });
+
+  it("keeps unauthorized roles out of guarded navigation", () => {
+    expect(workspaceLinks.site_leader.some(item => item.path === "/site-website" || item.path === "/operations/workflows")).toBe(false);
+    expect(workspaceLinks.network_admin.some(item => item.path === "/operations/workflows")).toBe(false);
+    expect(workspaceLinks.site_website_editor.some(item => item.path === "/site-website")).toBe(true);
+    expect(getWorkspaceHome("academic_content_creator")).toBe("/canonical/content");
+    expect(getWorkspaceHome("academic_content_reviewer")).toBe("/canonical/content-reviews");
+    expect(workspaceLinks.academic_content_creator[0].path).toBe("/canonical/content");
+    expect(workspaceLinks.academic_content_reviewer[0].path).toBe("/canonical/content-reviews");
+    expect(roleCapabilities.academic_content_creator).not.toContain("student:read");
+    expect(roleCapabilities.academic_content_reviewer).not.toContain("student:read");
+    const workflows = routeNavigation["/operations/workflows"];
+    expect(workflows.visibility).toBe("navigation");
+    if (workflows.visibility === "navigation") expect(workflows.personas).toEqual(["registrar", "site_admin"]);
+  });
+
+  it("crosschecks visible restricted destinations against their actual server role gates", () => {
+    const organizationId = "00000000-0000-4000-8000-000000000040";
+    const site = {id:siteId,organizationId};
+    for(const [role,links] of Object.entries(workspaceLinks)) {
+      const allowed = roleCapabilities[role] ?? [];
+      const canUseSiteWebsite = (role==="site_website_editor" || role==="site_admin") &&
+        allowed.includes("site.website.draft.read");
+      const canUseWorkflow = hasRegistrarAuthority(role) && allowed.includes("program.read");
+      const actor: AccessContext = {
+        role, grantSiteId:siteId, grantId:"grant", accountId:"account",
+        actorPersonId:"person", sessionId:"session",
+        capabilities:new Set(allowed), scope:{organizationIds:[organizationId],siteIds:[siteId]},
+      };
+      if(links.some(item=>item.path==="/site-website")) {
+        expect(canUseSiteWebsite, role).toBe(true);
+        expect(()=>assertPartnerWebsitePreviewScope(actor,site)).not.toThrow();
+      }
+      if(!canUseSiteWebsite) expect(()=>assertPartnerWebsitePreviewScope(actor,site)).toThrow();
+      if(links.some(item=>item.path==="/operations/workflows")) {
+        expect(canUseWorkflow, role).toBe(true);
+      }
+    }
+    const metadata=routeNavigation["/operations/workflows"];
+    if(metadata.visibility==="navigation") {
+      for(const role of metadata.personas) {
+        expect(hasRegistrarAuthority(role),role).toBe(true);
+        expect(roleCapabilities[role]).toContain("program.read");
+      }
+    }
   });
 
   it("keeps class context across learning, grading, and calendar destinations", () => {
@@ -36,7 +112,7 @@ describe("generated workspace navigation", () => {
 
   it("shows Messages only for roles with the communication capability", () => {
     for (const [role, links] of Object.entries(workspaceLinks)) {
-      expect(links.filter(item => item.path === "/home")).toHaveLength(1);
+      expect(links.filter(item => item.path === getWorkspaceHome(role))).toHaveLength(1);
       expect(links.some(item => item.path === "/messages"))
         .toBe(roleCapabilities[role]?.includes("communication.send") === true);
     }

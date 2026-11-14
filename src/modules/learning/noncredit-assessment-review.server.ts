@@ -46,22 +46,25 @@ export async function finalizeNoncreditKnowledgeCheck(context:CommandContext,inp
       throw new AuthorizationError("independent provider assessment review");
     const [training]=await tx.select().from(noncreditTrainingVersions)
       .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1);
-    if(!training||training.state!=="published"||!training.assessmentVersionId||
+    if(!training||training.state!=="published"||
       !context.scope.organizationIds?.includes(training.providerOrganizationId))
       throw new AuthorizationError("provider-owned training");
     const [administration]=await tx.select().from(assessmentFormAdministrations)
       .where(eq(assessmentFormAdministrations.id,attempt.administrationId)).limit(1);
-    if(!administration||administration.assessmentVersionId!==training.assessmentVersionId||
+    const baseline=administration?.assessmentVersionId===training.baselineAssessmentVersionId;
+    const final=administration?.assessmentVersionId===training.assessmentVersionId;
+    if(!administration||(!baseline&&!final)||
       administration.deploymentId!==courseAttempt.deploymentId||
       administration.courseVersionId!==courseAttempt.courseVersionId||
       administration.administeringOrganizationId!==training.providerOrganizationId)
       throw new AuthorizationError("assessment belongs to training deployment");
     const [version]=await tx.select().from(assessmentVersions)
-      .where(eq(assessmentVersions.id,training.assessmentVersionId)).limit(1);
+      .where(eq(assessmentVersions.id,administration.assessmentVersionId)).limit(1);
     const [definition]=version?await tx.select().from(assessmentDefinitions)
       .where(eq(assessmentDefinitions.id,version.assessmentId)).limit(1):[];
     if(!version||version.lifecycle!=="published"||!definition||
-       !["formative","practice","readiness","mastery"].includes(definition.purpose))
+       (baseline?definition.purpose!=="diagnostic":
+        !["formative","practice","readiness","mastery"].includes(definition.purpose)))
       throw new AuthorizationError("noncredit knowledge check");
     const [form]=await tx.select().from(assessmentFormVersions)
       .where(eq(assessmentFormVersions.id,attempt.formVersionId)).limit(1);

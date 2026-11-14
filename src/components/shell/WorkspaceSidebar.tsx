@@ -3,7 +3,7 @@ import { useSyncExternalStore } from "react";
 import { PanelLeftClose, PanelLeftOpen, Settings, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
-import { type WorkspaceNavigationItem } from "./workspace-navigation.registry";
+import { type WorkspaceInstitutionSelection, type WorkspaceNavigationItem } from "./workspace-navigation.registry";
 import { SidebarLinks } from "./WorkspaceSidebarLinks";
 
 const mobileQuery = "(max-width: 1023px)";
@@ -17,6 +17,7 @@ const isMobile = () => window.matchMedia(mobileQuery).matches;
 type WorkspaceSidebarProps = {
   member: { role: string };
   links: readonly WorkspaceNavigationItem[];
+  institutionSelection?: WorkspaceInstitutionSelection;
   activePath?: string;
   focused?: boolean;
   expanded?: boolean;
@@ -29,7 +30,7 @@ export function WorkspaceSidebar(props: WorkspaceSidebarProps) {
     : <ExpandedWorkspaceSidebar {...props}/>;
 }
 
-function FocusedWorkspaceSidebar({ links, activePath, expanded = false, onToggle }: WorkspaceSidebarProps) {
+function FocusedWorkspaceSidebar({ links, activePath, institutionSelection, expanded = false, onToggle }: WorkspaceSidebarProps) {
   const mobile = useSyncExternalStore(subscribeMobile, isMobile, () => false);
   return <>
     <aside aria-label="Workspace sidebar" className={`classroom-sidebar ${expanded ? "classroom-sidebar-expanded" : ""} border-r bg-card`}>
@@ -43,7 +44,7 @@ function FocusedWorkspaceSidebar({ links, activePath, expanded = false, onToggle
         </Button>
       </div>
       <div id="classroom-primary-links" className="flex min-h-0 flex-1 flex-col">
-        <SidebarLinks links={links} activePath={activePath} collapsed={!expanded}/>
+        <SidebarLinks links={links} activePath={activePath} collapsed={!expanded} institutionSelection={institutionSelection}/>
       </div>
       <Link to="/account/sessions" aria-label="Account sessions" title="Account sessions" className="flex justify-center border-t p-4 text-muted-foreground">
         <Settings className="size-4" aria-hidden="true"/><span className="sr-only">Account sessions</span>
@@ -53,14 +54,14 @@ function FocusedWorkspaceSidebar({ links, activePath, expanded = false, onToggle
       className="fixed inset-y-0 left-0 right-auto m-0 h-dvh max-h-dvh w-[min(18rem,85vw)] rounded-none">
       <div className="flex items-center justify-between border-b p-4"><span className="font-serif text-xl">CAN OS</span>
         <Button variant="ghost" size="icon" onClick={onToggle} aria-label="Collapse workspace sidebar"><PanelLeftClose aria-hidden="true"/></Button></div>
-      <div id="classroom-mobile-links"><SidebarLinks links={links} activePath={activePath} onNavigate={onToggle}/></div>
+      <div id="classroom-mobile-links"><SidebarLinks links={links} activePath={activePath} onNavigate={onToggle} institutionSelection={institutionSelection}/></div>
     </Modal>
   </>;
 }
 
 const footerLinkClass = "flex items-center gap-3 rounded-lg py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
-function ExpandedWorkspaceSidebar({ member, links, activePath, expanded = true, onToggle }: WorkspaceSidebarProps) {
+function ExpandedWorkspaceSidebar({ member, links, activePath, institutionSelection, expanded = true, onToggle }: WorkspaceSidebarProps) {
   const collapsed = !expanded;
   const footer = (label: string) => ({
     className: `${footerLinkClass} ${collapsed ? "justify-center px-1" : "px-3"}`,
@@ -78,7 +79,7 @@ function ExpandedWorkspaceSidebar({ member, links, activePath, expanded = true, 
       </div>}
     </div>
     <div id="workspace-primary-links" className={collapsed ? "pt-4" : undefined}>
-      <SidebarLinks links={links} activePath={activePath} collapsed={collapsed} />
+      <SidebarLinks links={links} activePath={activePath} collapsed={collapsed} institutionSelection={institutionSelection} />
     </div>
     <div className="mt-auto border-t p-4">
       <Link to="/profiles" {...footer("My profile")}>

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -41,10 +41,13 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
         .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1);
       if(!training)throw new AuthorizationError("published noncredit training");
       const now=new Date();
-      const [policy]=await tx.select().from(noncreditCompletionPolicies)
-        .where(and(eq(noncreditCompletionPolicies.trainingVersionId,registration.trainingVersionId),
-          lte(noncreditCompletionPolicies.effectiveAt,now)))
-        .orderBy(desc(noncreditCompletionPolicies.policyVersion)).limit(1);
+      // Never substitute newer rules for the participant's pinned policy.
+      const [policy]=registration.completionPolicyId
+        ?await tx.select().from(noncreditCompletionPolicies)
+          .where(and(
+            eq(noncreditCompletionPolicies.id,registration.completionPolicyId),
+            eq(noncreditCompletionPolicies.trainingVersionId,registration.trainingVersionId),
+          )).limit(1):[];
       const [lessons,progress]=await Promise.all([
         tx.select({id:courseLessons.id}).from(courseLessons)
           .where(eq(courseLessons.courseVersionId,authorized.courseVersionId)),
@@ -71,7 +74,7 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
       ).map(e=>e.id));
       const participation=events.map(e=>({
         id:e.id,supersedesId:e.supersedesId,eventKind:e.eventKind,
-        countedMinutes:e.countedMinutes,
+        countedMinutes:e.countedMinutes,occurredAt:e.occurredAt,
         evidenceVersionId:e.evidenceVersionId&&validEvidence.has(e.evidenceVersionId)?e.evidenceVersionId:null,
       }));
       let assessment:null | {learnerId:string|null;assessmentVersionId:string;
@@ -82,8 +85,11 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
           id:assessmentAttemptResults.id,
           attemptId:assessmentAttemptResults.attemptId,
           resultStatus:assessmentAttemptResults.resultStatus,
+          attemptState:assessmentAttempts.state,
           learnerId:assessmentAttempts.learnerId,
           assessmentVersionId:assessmentAdministrations.assessmentVersionId,
+          administrationDeploymentId:assessmentAdministrations.deploymentId,
+          administrationCourseVersionId:assessmentAdministrations.courseVersionId,
           pointsEarned:assessmentAttemptResults.pointsEarned,
           pointsPossible:assessmentAttemptResults.pointsPossible,
           resultRevision:assessmentAttemptResults.resultRevision,
@@ -100,7 +106,9 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
             eq(assessmentAdministrations.assessmentVersionId,training.assessmentVersionId)))
           .orderBy(desc(assessmentAttemptResults.resultRevision));
         const superseded=new Set(results.flatMap(r=>r.supersedesId?[r.supersedesId]:[]));
-        const current=results.filter(r=>!superseded.has(r.id)&&r.resultStatus==="finalized")
+        const current=results.filter(r=>!superseded.has(r.id)&&r.resultStatus==="finalized"&&
+          r.attemptState==="finalized"&&r.administrationDeploymentId===authorized.deploymentId&&
+          r.administrationCourseVersionId===authorized.courseVersionId)
           .sort((a,b)=>Number(b.pointsEarned)/Number(b.pointsPossible)-
                         Number(a.pointsEarned)/Number(a.pointsPossible))[0];
         if(current)assessment={
@@ -124,15 +132,21 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
         }:null,
         participation,completedLessonCount,totalLessonCount:lessonIds.size,assessment,now,
       });
-      const [latestDecision]=await tx.select({
+      const decisions=await tx.select({
         id:noncreditCompletionDecisions.id,
         outcome:noncreditCompletionDecisions.outcome,
+        supersedesId:noncreditCompletionDecisions.supersedesId,
       }).from(noncreditCompletionDecisions)
         .where(eq(noncreditCompletionDecisions.registrationId,registration.id))
-        .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(1);
+        .orderBy(desc(noncreditCompletionDecisions.decidedAt));
+      const supersededDecisions=new Set(decisions.flatMap(d=>
+        d.supersedesId?[d.supersedesId]:[]));
+      const latestDecision=decisions.find(d=>!supersededDecisions.has(d.id));
       return {
         courseAttemptId:authorized.courseAttemptId,trainingVersionId:training.id,
+        policyId:registration.completionPolicyId??null,
         policyVersion:policy?.policyVersion??null,
+        completionMode:policy?.completionMode??null,
         ...result,recordedCompletion:latestDecision?.outcome==="completed",
       };
     });
