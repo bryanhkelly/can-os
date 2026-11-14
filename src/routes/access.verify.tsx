@@ -5,6 +5,7 @@ import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domai
 import { accessLandingPath, accessReturnCookieHeader, safeAccessReturnTo } from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
 import {classifySessionDevice} from "@/domain/session-device";
+import {clearLearnerBrowserState} from "@/domain/session-client";
 export const Route=createFileRoute("/access/verify")({
  validateSearch:(search:Record<string,unknown>)=>({returnTo:safeAccessReturnTo(search.returnTo)}),
  server:{handlers:{
@@ -103,7 +104,7 @@ function VerifyAccess(){
  return <main className="mx-auto max-w-lg space-y-5 px-6 py-16">
   <h1 className="font-serif text-3xl">Confirm your CAN OS access</h1>
   <p role="status">{ready&&!token?"The access link is missing. Request a new sign-in link to continue.":"Use the button to complete your sign-in."}</p>
-  <form action={verifyAction} method="post" onSubmit={()=>setWorking(true)}>
+  <form action={verifyAction} method="post" onSubmit={()=>{clearLearnerBrowserState();setWorking(true);}}>
   <input type="hidden" name="token" value={token??""}/>
   <input type="hidden" name="returnTo" value={search.returnTo??""}/>
   <button type="submit" disabled={working||!ready||!token} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>

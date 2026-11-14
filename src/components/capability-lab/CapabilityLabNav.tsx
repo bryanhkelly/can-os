@@ -7,7 +7,7 @@ const currentClass = "border-primary text-primary";
 const inactiveClass = "border-transparent text-muted-foreground hover:text-foreground";
 
 export function CapabilityLabNav({ current, surveyDraftEnabled = false, surveyPublicationEnabled = false }: {
-  current: "index" | "noncredit" | "surveys" | "credentials" | "deployments" | "readiness" | "site-qualification" | "survey-drafts" | "survey-publications" | "facilitated" | "impact";
+  current: "index" | "noncredit" | "surveys" | "credentials" | "deployments" | "readiness" | "site-qualification" | "survey-drafts" | "survey-publications" | "facilitated" | "impact" | "devices";
   surveyDraftEnabled?: boolean;
   surveyPublicationEnabled?: boolean;
 }) {
@@ -33,6 +33,8 @@ export function CapabilityLabNav({ current, surveyDraftEnabled = false, surveyPu
     {(facilitatedEnabled || current === "impact") && <Link to="/canonical/lab/impact"
       aria-current={current === "impact" ? "page" : undefined}
       className={linkClass + " " + (current === "impact" ? currentClass : inactiveClass)}>Participation evidence</Link>}
+    <Link to="/canonical/lab/devices" aria-current={current === "devices" ? "page" : undefined}
+      className={linkClass + " " + (current === "devices" ? currentClass : inactiveClass)}>Site devices</Link>
     <Link to="/canonical/lab/noncredit" aria-current={current === "noncredit" ? "page" : undefined}
       className={linkClass + " " + (current === "noncredit" ? currentClass : inactiveClass)}>Noncredit testing</Link>
     <Link to="/canonical/lab/credentials" aria-current={current === "credentials" ? "page" : undefined}

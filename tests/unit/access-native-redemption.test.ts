@@ -25,7 +25,7 @@ describe("native session redemption",()=>{
   expect(response.status).toBe(303);expect(response.headers.get("Location")).toBe("/admissions");
   expect(response.headers.getSetCookie()).toContain(cookie);
   expect(response.headers.get("Cache-Control")).toBe("no-store");
-  expect(state.demo).toHaveBeenCalledWith("admin@example.test","fixture");
+  expect(state.demo).toHaveBeenCalledWith("admin@example.test","fixture",expect.objectContaining({deviceCategory:"desktop",ipAddress:null}));
  });
  it("arms one-shot return recovery only after successful sign-in to a saved page",async()=>{
   const response=await state.handler!({request:form({email:"admin@example.test",code:"fixture",returnTo:"/safeguarding"})});
@@ -34,7 +34,7 @@ describe("native session redemption",()=>{
  });
  it("preserves the canonical onboarding destination for a one-time link",async()=>{
   const response=await state.handler!({request:form({token:"fixture-token"})});
-  expect(state.token).toHaveBeenCalledWith("fixture-token");
+  expect(state.token).toHaveBeenCalledWith("fixture-token",expect.objectContaining({deviceCategory:"desktop",ipAddress:null}));
   expect(response.headers.get("Location")).toBe("/launch/hub/school?siteId=site");
  });
  it("routes a new school Site Admin to that Site's Launch Studio",async()=>{
