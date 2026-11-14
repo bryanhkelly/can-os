@@ -69,6 +69,20 @@ describe("net-new CAN OS v3.0.1 identity", () => {
     }))).toThrow();
   });
 
+  it("gives a site-scoped facilitator playback powers without registrar or learner powers", () => {
+    const facilitator = projectCanonicalCommandContext(canonicalSessionRowSchema.parse({
+      ...session,role_code:"room_facilitator",
+    }));
+    expect(facilitator.scope.siteIds).toEqual([session.site_id]);
+    expect(facilitator.capabilities.has("learning.room.facilitate")).toBe(true);
+    for(const forbidden of ["noncredit.assessment.provision","noncredit.completion.decide",
+      "blueprint.configure","credential.issue","learning.participate","survey.publish"]){
+      expect(facilitator.capabilities.has(forbidden)).toBe(false);
+    }
+    expect(() => projectCanonicalCommandContext(canonicalSessionRowSchema.parse({
+      ...session,role_code:"room_facilitator",site_id:null,
+    }))).toThrow();
+  });
   it("rejects site-less operators and Site-assigned independent reviewers", () => {
     expect(() => projectCanonicalCommandContext(canonicalSessionRowSchema.parse({
       ...session, site_id: null,
