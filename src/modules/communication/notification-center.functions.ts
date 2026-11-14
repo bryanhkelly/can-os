@@ -56,6 +56,34 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     inArray(s.programs.organizationId,context.scope.organizationIds??[]),
    )).limit(50):[];
  const conferenceById=new Map(guardianConferences.map(booking=>[booking.id,booking]));
+ // Guardian course approval notices remain private after a change of custody,
+ // enrollment or membership. A recipient notification is not a lasting grant.
+ const courseApprovalNoticeIds=rows.filter(n=>n.type==="course_registration_guardian_review"&&
+  n.resourceType==="action"&&n.resourceId).map(n=>n.resourceId!);
+ const guardianCourseActions=courseApprovalNoticeIds.length&&context.role==="guardian"?
+  await db.selectDistinct({id:s.actions.id}).from(s.actions)
+   .innerJoin(s.sections,eq(s.sections.id,s.actions.subjectId))
+   .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.personId,s.actions.ownerPersonId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+    guardianPersonId:personId,studentPersonId:s.actions.ownerPersonId,access:"enrollment",
+   }))
+   .innerJoin(s.enrollments,and(
+    eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+    eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+    eq(s.enrollments.programId,s.sections.programId),
+   ))
+   .where(and(inArray(s.actions.id,courseApprovalNoticeIds),
+    eq(s.actions.type,"course_registration_request"),
+    eq(s.actions.subjectType,"section"),
+    eq(s.actions.siteId,s.sections.siteId),
+    eq(s.actions.programId,s.sections.programId),
+    eq(s.actions.organizationId,s.programs.organizationId),
+    inArray(s.sections.siteId,context.scope.siteIds??[]),
+    inArray(s.sections.programId,context.scope.programIds??[]),
+    inArray(s.programs.organizationId,context.scope.organizationIds??[]),
+   )):[];
+ const permittedGuardianCourseActions=new Set(guardianCourseActions.map(action=>action.id));
  const tripNoticeTypes=new Set([
   "field_trip_permission_requested","field_trip_permission_signed","field_trip_permission_declined",
  ]);
@@ -595,6 +623,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    !!n.resourceId&&permittedSafeguardingIds.has(n.resourceId))
   .filter(n=>n.type!=="calendar_event_invitation"||
    n.resourceType==="calendar_event"&&!!n.resourceId&&calendarInvitationById.has(n.resourceId))
+  .filter(n=>n.type!=="course_registration_guardian_review"||
+   n.resourceType==="action"&&!!n.resourceId&&permittedGuardianCourseActions.has(n.resourceId))
   .filter(n=>n.type!=="conference_reminder"||
    n.resourceType==="conference_booking"&&!!n.resourceId&&conferenceById.has(n.resourceId))
   .filter(n=>context.role!=="guardian"||!n.resourceId||
@@ -676,7 +706,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     return memberThreadIds.has(thread.id)?`/messages?thread=${encodeURIComponent(thread.id)}`:null;})():
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
-   n.type==="course_registration_guardian_review"&&context.role==="guardian"&&n.resourceType==="action"&&n.resourceId?`/guardian/course-approvals?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="course_registration_guardian_review"&&context.role==="guardian"&&n.resourceType==="action"&&n.resourceId&&permittedGuardianCourseActions.has(n.resourceId)?`/guardian/course-approvals?action=${encodeURIComponent(n.resourceId)}`:
    n.type==="field_trip_permission_requested"&&context.role==="guardian"&&n.resourceType==="field_trip"&&n.resourceId&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${encodeURIComponent(n.resourceId)}`:
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
