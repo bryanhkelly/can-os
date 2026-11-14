@@ -640,6 +640,7 @@ export async function readSelectedInstructionalTrack(
   courseAttemptId: string;
   courseVersionId: string;
   sectionId: string | null;
+  canManageProgress: boolean;
   selection: {
     id: string;
     trackVersionId: string;
@@ -729,6 +730,7 @@ export async function readSelectedInstructionalTrack(
       courseAttemptId: attempt.id,
       courseVersionId: attempt.courseVersionId,
       sectionId: attempt.sectionId,
+      canManageProgress: participant.selectionSource === "learner",
       selection: {
         id: selection.id,
         trackVersionId: selection.trackVersionId,
