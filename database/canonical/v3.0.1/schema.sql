@@ -7782,7 +7782,8 @@ CREATE TABLE database_role_organization_bindings (
  db_role name NOT NULL,organization_id uuid NOT NULL REFERENCES organizations(id),
  purpose_code text NOT NULL CHECK(purpose_code IN ('training_registration','equipment_inventory','technology_support','read_only_reporting',
  'qualification_application','qualification_evidence','qualification_reviewer',
- 'program_catalog','program_fit','program_activation','network_reporting')),
+ 'program_catalog','program_fit','program_activation','network_reporting',
+ 'blueprint_author','blueprint_reviewer')),
  valid_from timestamptz NOT NULL,valid_through timestamptz,
  status text NOT NULL DEFAULT 'approved' CHECK(status IN ('approved','revoked')),
  PRIMARY KEY(db_role,organization_id,purpose_code,valid_from)
