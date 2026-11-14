@@ -28,24 +28,30 @@ function GuardianCourseApprovals() {
 }
 
 type Approval = Awaited<ReturnType<typeof listGuardianCourseApprovals>>[number];
+const courseConsentContext = (item: Approval) =>
+  JSON.stringify([item.id,item.studentName,item.sectionCode,item.sectionTitle,item.deadline,item.status,item.contentReady]);
 
 function CourseApprovalList({ items }: { items: Approval[] }) {
   const router = useRouter();
   const { action } = Route.useSearch();
-  const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+  const [acknowledged, setAcknowledged] = useState<Record<string, string>>({});
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
 
-  async function decide(requestId: string, approve: boolean) {
-    await mutation.run(
+  async function decide(item: Approval, approve: boolean) {
+    const requestId = item.id;
+    if(approve && acknowledged[requestId] !== courseConsentContext(item)) return;
+    const outcome = await mutation.run(
       () => decideGuardianCourseApproval({
-        data: { requestId, approve, acknowledge: approve && acknowledged[requestId] === true },
+        data: { requestId, approve, acknowledge: approve && acknowledged[requestId] === courseConsentContext(item) },
       }),
       {
         successMessage: approve ? "Your approval was recorded. The registrar must still finalize the schedule." : "Your decision to decline was recorded.",
         commandErrorMessage: "Unable to save your decision.",
       },
     );
+    if(outcome.status==="saved"||outcome.status==="refresh-failed")
+      setAcknowledged(previous=>({...previous,[requestId]:""}));
   }
 
   return (
@@ -91,9 +97,9 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
             <label className="mt-4 flex items-start gap-3 text-sm">
               <input
                 type="checkbox"
-                checked={acknowledged[item.id] ?? false}
+                checked={acknowledged[item.id] === courseConsentContext(item)}
                 onChange={event => setAcknowledged(previous => ({
-                  ...previous, [item.id]: event.target.checked,
+                  ...previous, [item.id]: event.target.checked ? courseConsentContext(item) : "",
                 }))}
                 className="mt-1"
               />
@@ -103,8 +109,8 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
-                disabled={busy || !acknowledged[item.id]}
-                onClick={() => void decide(item.id, true)}
+                disabled={busy || acknowledged[item.id] !== courseConsentContext(item)}
+                onClick={() => void decide(item, true)}
                 className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
               >
                 Approve class addition
@@ -112,7 +118,7 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() => void decide(item.id, false)}
+                onClick={() => void decide(item, false)}
                 className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
               >
                 Decline
