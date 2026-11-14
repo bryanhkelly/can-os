@@ -135,7 +135,7 @@ BEGIN
          AND (
            (training.assessment_version_id=administration.assessment_version_id
              AND coalesce(NEW.result_evidence->>'noncreditPhase','final')='final'
-             )
+             AND definition.purpose IN ('formative','practice','readiness','mastery'))
            OR (training.baseline_assessment_version_id=administration.assessment_version_id
              AND NEW.result_evidence->>'noncreditPhase'='baseline'
              AND definition.purpose='diagnostic')
@@ -146,7 +146,6 @@ BEGIN
          AND administration.proctor_policy='none'
          AND administration.status='open'
          AND version.lifecycle='published'
-         AND definition.purpose IN ('formative','practice','readiness','mastery')
          AND NOT EXISTS (
            SELECT 1 FROM assessment_attempt_items ai
            JOIN assessment_item_versions item ON item.id=ai.item_version_id
