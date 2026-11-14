@@ -185,8 +185,10 @@ export async function decideBlueprintReview(
           "blueprint.configuration.saved",
           "blueprint.configuration.submitted",
         ]),
-        sql`${auditEvents.payload}->>'versionId' = ${version.id}`,
       ));
+    // Independence applies to the entire configuration, not just the
+    // latest revision. The original author cannot approve another person's
+    // subsequent edit of the same plan.
     if (authors.length === 0 || authors.some(author => author.actorPersonId === actorPersonId)) {
       throw new AuthorizationError("independent Blueprint reviewer");
     }
