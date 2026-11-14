@@ -45,6 +45,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const community = data?.community.ok ? data.community.data : null;
   const events = [...liveData.events].sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const scheduled = events.filter(event => !event.cancelled);
+  const todayEvents = events.filter(event => dateKeyInTimezone(event.startsAt, timezone) === localDate);
   const classesToday = scheduled.filter(event => Boolean(event.sectionId) && dateKeyInTimezone(event.startsAt, timezone) === localDate);
   const visible = assignments.filter(item => filter === "all" ||
     (filter === "due" ? dueIds.has(item.assessmentId) : item.hasDraft && (item.status === "assigned" || item.status === null)));
@@ -167,7 +168,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       <DashboardCalendar date={localDate} timezone={timezone} />
       <DashboardPanel id="student-schedule" title="Today's Schedule"
         action={<Link to="/calendar" search={{date:localDate}} className={textLink}>View all →</Link>}>
-        <div className="student-schedule">{events.slice(0,5).map(event => <article key={event.id}>
+        <div className="student-schedule">{todayEvents.slice(0,5).map(event => <article key={event.id}>
           <time dateTime={new Date(event.startsAt).toISOString()}>{new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZone:event.timezone}).format(new Date(event.startsAt))}</time>
           <div><Link to="/calendar" search={{date:dateKeyInTimezone(new Date(event.startsAt).toISOString(),event.timezone),event:event.id}}
             className="text-xs font-semibold hover:underline">{event.title}</Link>
@@ -176,8 +177,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
             {event.description && <p className="mt-1 text-xs text-muted-foreground">{event.description}</p>}
           </div>
         </article>)}</div>
-        {!events.length && <p className="text-xs text-muted-foreground">No scheduled events today.</p>}
-        {events.length > 5 && <p className="mt-2 text-xs text-muted-foreground">Open the calendar for all {events.length} events.</p>}
+        {!todayEvents.length && <p className="text-xs text-muted-foreground">No scheduled events today.</p>}
+        {todayEvents.length > 5 && <p className="mt-2 text-xs text-muted-foreground">Open the calendar for all {todayEvents.length} events today.</p>}
       </DashboardPanel>
       <DashboardPanel title="Announcements">
         {data && !data.community.ok ? <p role="alert" className="text-xs">Announcements could not be loaded.</p>
