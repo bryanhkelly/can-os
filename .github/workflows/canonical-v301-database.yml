@@ -294,7 +294,7 @@ jobs:
         run: |
           {
             echo "### Canonical Blueprint restricted-role acceptance"
-            echo "- Commit: `$GITHUB_SHA`"
+            echo "- Commit: $GITHUB_SHA"
             echo "- Disposable PostgreSQL 18; native Valor/Barton fixtures"
             echo "- Verifies draft, independent approval, planning Deployment, tenant isolation and rollback"
             echo "- No application/Neon production database writes"
