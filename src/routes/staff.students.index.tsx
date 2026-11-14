@@ -17,13 +17,13 @@ function StaffStudentsPage() {
 
   return (
     <DirectoryPage eyebrow="Staff" title="Student directory"
-      subtitle="Students at your school sites." query={query} onQueryChange={setQuery}
+      subtitle="Students in your assigned classes or authorized school sites." query={query} onQueryChange={setQuery}
       searchLabel="Search by name" searchPlaceholder="First or last name">
-        <DirectoryTable label="Student directory" caption="Students at your authorized school sites."
+        <DirectoryTable label="Student directory" caption="Students in your assigned classes or authorized school sites."
           rows={students} rowKey={student => student.personId}
           loading={loading && "Loading students…"} error={error} onRetry={retry}
           empty={<EmptyState className="mt-8" kind={query.trim()?"matches":"records"}
-            title={query.trim()?"No students matched your search at your school sites.":"No students in your authorized school sites."}
+            title={query.trim()?"No students matched your search in your authorized classes or school sites.":"No students in your authorized classes or school sites."}
             actions={query.trim()?<Button variant="outline" onClick={()=>setQuery("")}>Clear search</Button>:undefined}/>}
           columns={[
             { id: "student", title: "Student", render: student => <Link className="font-semibold underline"
