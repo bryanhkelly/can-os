@@ -8,7 +8,7 @@ import {
   assessmentVersions, assessmentExecutionAttempts, assessmentExecutionItems,
   assessmentExecutionResponses, assessmentExecutionChoices, assessmentItemSecureKeys,
   assessmentAutoScores, assessmentExecutionResults, auditEvents, domainEvents,
-  noncreditRegistrations, noncreditTrainingVersions,
+  noncreditRegistrations, noncreditTrainingVersions, learnerCourseAttempts,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import {
@@ -228,14 +228,19 @@ async function allowedAttemptCount(tx:Tx,grantId:string,limit:number):Promise<nu
 export async function readNoncreditKnowledgeCheck(context:CommandContext,courseAttemptId:string) {
   return db.transaction(async tx=>{
     const scope=await loadNoncreditAssessment(tx,context,courseAttemptId,true);
+    const [participantAttempt]=await tx.select({
+      status:learnerCourseAttempts.status,
+    }).from(learnerCourseAttempts)
+      .where(eq(learnerCourseAttempts.id,courseAttemptId)).limit(1);
     const attempt=await latestAttempt(tx,scope.grant.id);
     const maxAttempts=await allowedAttemptCount(tx,scope.grant.id,scope.administration.attemptLimit);
     const details=await describeAttempt(tx,attempt,maxAttempts);
     // Closed administrations retain immutable results, not an in-progress UI.
-    const historical=(!scope.canStart && details.state==="in_progress")
+    const canStart=scope.canStart&&participantAttempt?.status==="active";
+    const historical=(!canStart && details.state==="in_progress")
       ?{...details,state:"closed" as const,questions:[],draftAnswers:[]}:details;
     return {courseAttemptId,assessmentVersionId:scope.training.assessmentVersionId,
-      canStart:scope.canStart && scope.access.source==="noncredit",...historical};
+      canStart,...historical};
   });
 }
 
