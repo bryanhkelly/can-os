@@ -24,7 +24,8 @@ export const getCanonicalCourseEvidence = createServerFn({ method: "GET" })
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const actor = await getInstructionalLearnerContext(getRequest());
-    if (!actor.actorPersonId || !["student","learner"].includes(actor.role ?? ""))
+    const personId = actor.actorPersonId;
+    if (!personId || !["student","learner"].includes(actor.role ?? ""))
       throw new AuthorizationError("authenticated learner");
     return db.transaction(async tx => {
       const participation = await authorizeCanonicalCourseAttempt(
@@ -80,12 +81,12 @@ export const getCanonicalCourseEvidence = createServerFn({ method: "GET" })
         .innerJoin(surveyInvitations,and(
           eq(surveyInvitations.id,surveyResponses.invitationId),
           eq(surveyInvitations.campaignId,surveyResponses.campaignId),
-          eq(surveyInvitations.invitedPersonId,actor.actorPersonId),
+          eq(surveyInvitations.invitedPersonId,personId),
         ))
         .where(and(
           eq(domainEvents.eventType,"LearningSurveySubmitted"),
           eq(domainEvents.aggregateType,"survey_response"),
-          eq(domainEvents.actorPersonId,actor.actorPersonId),
+          eq(domainEvents.actorPersonId,personId),
           eq(surveyResponses.respondentMode,"identified"),
           sql`${domainEvents.payload}->>'courseAttemptId' = ${data.courseAttemptId}`,
         )).orderBy(desc(surveyResponses.submittedAt)).limit(40);
