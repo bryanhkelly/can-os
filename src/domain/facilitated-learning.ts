@@ -51,3 +51,30 @@ export function canPairFacilitatedLearning(input: {
     input.sessionDeploymentId === input.attemptDeploymentId &&
     input.sessionCourseVersionId === input.attemptCourseVersionId;
 }
+
+
+export const MAX_PAIRING_ATTEMPTS = 6;
+export const PAIRING_RATE_WINDOW_MS = 15 * 60_000;
+
+/**
+ * Fixed per-Person attempt window. Persist the denied 7th attempt and its lock
+ * before returning a generic denial. Avoid storing guessed pairing codes.
+ */
+export function nextFacilitatedPairingLimit(input:{
+  attempts:number;
+  windowStartedAt:Date;
+  blockedUntil:Date|null;
+  now:Date;
+}):{allowed:boolean;attempts:number;windowStartedAt:Date;blockedUntil:Date|null}{
+  if(input.blockedUntil && input.blockedUntil>input.now)
+    return {allowed:false,attempts:input.attempts,
+      windowStartedAt:input.windowStartedAt,blockedUntil:input.blockedUntil};
+  const newWindow=input.now.getTime()-input.windowStartedAt.getTime()>=PAIRING_RATE_WINDOW_MS;
+  const count=newWindow?1:Math.min(MAX_PAIRING_ATTEMPTS+1,input.attempts+1);
+  const allowed=count<=MAX_PAIRING_ATTEMPTS;
+  return {
+    allowed,attempts:count,
+    windowStartedAt:newWindow?input.now:input.windowStartedAt,
+    blockedUntil:allowed?null:new Date(input.now.getTime()+PAIRING_RATE_WINDOW_MS),
+  };
+}
