@@ -167,7 +167,7 @@ test("student opens school community from School Life", async ({ browser }) => {
     await schoolLife.locator('a[href^="/student/my-school"]').first().click();
     await expect(page).toHaveURL(/\/student\/my-school(?:\?|$)/);
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: /School/i }).first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "About", exact: true })).toBeVisible();
     expect(errors).toEqual([]);
   });
 });
