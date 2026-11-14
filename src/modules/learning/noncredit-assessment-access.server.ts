@@ -49,7 +49,8 @@ export async function provisionNoncreditAssessmentAccess(
         eq(assessmentFormAdministrations.administeringOrganizationId,training.providerOrganizationId),
         eq(assessmentFormAdministrations.status,"open"),
       ));
-    if(administrations.length!==1||administrations[0].proctorPolicy!=="none")
+    if(administrations.length!==1||!administrations[0]||
+       administrations[0].proctorPolicy!=="none")
       throw new AuthorizationError("unique authorized noncredit assessment administration");
     const administration=administrations[0];
     const now=new Date();
