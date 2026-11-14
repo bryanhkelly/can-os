@@ -295,7 +295,8 @@ export function decideInstructionalTrackSelection(input: {
   allowSwitching: boolean;
 }): InstructionalTrackSelectionDecision {
   if (
-    input.current?.trackVersionId === input.requestedTrackVersionId &&
+    input.current !== null &&
+    input.current.trackVersionId === input.requestedTrackVersionId &&
     input.current.policyVersionId === input.policyVersionId
   ) {
     return "reuse";
