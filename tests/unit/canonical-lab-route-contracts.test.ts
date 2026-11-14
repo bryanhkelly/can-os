@@ -8,6 +8,8 @@ const cases = [
   ["canonical.lab.noncredit.tsx", "/canonical/lab/noncredit"],
   ["canonical.lab.surveys.tsx", "/canonical/lab/surveys"],
   ["canonical.lab.survey-drafts.tsx", "/canonical/lab/survey-drafts"],
+  ["canonical.lab.survey-reviews.tsx", "/canonical/lab/survey-reviews"],
+  ["canonical.lab.survey-publications.tsx", "/canonical/lab/survey-publications"],
   ["canonical.lab.credentials.tsx", "/canonical/lab/credentials"],
   ["canonical.lab.deployments.tsx", "/canonical/lab/deployments"],
   ["canonical.lab.readiness.tsx", "/canonical/lab/readiness"],

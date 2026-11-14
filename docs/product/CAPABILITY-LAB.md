@@ -106,3 +106,37 @@ restricted organization-bound role with `provision-survey-draft-author-role.sql`
 and set `CAN_CANONICAL_SURVEY_DRAFT_ENABLED=true` for the testing process.
 No SQL was executed against a database by this code change; it is not release
 or security acceptance.
+
+## Independent review and publication (off until provisioned)
+
+- `/canonical/lab/survey-reviews`: organization-only native `survey_reviewer` can inspect its
+  draft questions and append independent privacy, accessibility and safeguarding
+  decisions. A survey author cannot self-review, and the reviewer role cannot publish.
+- `/canonical/lab/survey-publications`: native provider staff inspect current
+  approval status and publish eligible drafts using the PostgreSQL trigger and
+  restricted column-only UPDATE. No campaign, learner invitation or grant of Site
+  authority is created.
+
+These are two different canonical session roles and two different PostgreSQL
+purposes, never a UI-only permission distinction. Both feature flags default
+to off. The optional database patch and provisioning script must first be
+applied to an isolated test database, followed by RLS, cross-tenant and
+authenticated-browser acceptance. These routes will be retired once their
+capabilities are promoted into production experiences.
+
+Survey review approvals also require an existing, currently verified evidence
+version owned by that canonical organization. Review rationale is written into
+the restricted audit event. Both the review-insert trigger and the published
+version's transition trigger reject missing, foreign, expired or unverified
+approval evidence. Reviewers see only evidence IDs/kinds, not file contents
+or storage references. The UI fails closed on incomplete evidence inventories.
+
+
+### Concurrent review and publication
+
+Reviewer roles have SELECT/INSERT rights only, not row UPDATE privileges.
+The independent-review INSERT and publication UPDATE triggers use the same
+version-scoped transaction advisory lock, so a new rejection and publication
+cannot race. The publisher also locks the draft version row for its lifecycle
+transition. This synchronization requires transaction-level database acceptance
+tests; it is not established by static source inspection alone.

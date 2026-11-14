@@ -46,6 +46,8 @@ export const routeNavigation = {
   "/canonical/lab/credentials": hidden("Temporary canonical provider credential previews", []),
   "/canonical/lab/surveys": hidden("Temporary canonical provider survey inspection", []),
   "/canonical/lab/survey-drafts": hidden("Feature-flagged, temporary canonical survey draft authoring", []),
+  "/canonical/lab/survey-reviews": hidden("Independent native survey reviewer; feature-flagged", []),
+  "/canonical/lab/survey-publications": hidden("Provider survey publication gate; feature-flagged", []),
   "/canonical/lab/deployments": hidden("Temporary canonical provider deployment inspection", []),
   "/canonical/lab/readiness": hidden("Temporary canonical provider assessment inventory", []),
   "/canonical/lab/site-qualification": hidden("Temporary canonical provider site qualification inspection", []),

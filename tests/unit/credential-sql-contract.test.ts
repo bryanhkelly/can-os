@@ -38,11 +38,31 @@ describe("credential patch structural security boundaries", () => {
   it("fails closed for youth activity awards until verified registrations and attendance are integrated", () => {
     expect(sql).toContain("Verified activity award source is not yet enabled");
   });
+  it("offers only session-bound SECURITY DEFINER wallet projections", () => {
+    expect(baseline).toContain("v301_list_my_learning_awards(p_secret_hash text)");
+    expect(baseline).toContain("v301_get_my_learning_award(p_secret_hash text,p_issuance_id uuid)");
+    expect(baseline).toContain("v301_canonical_session_context(p_secret_hash) ctx");
+    expect(baseline).toContain("decision.recipient_person_id=ctx.person_id");
+    expect(baseline).toContain("issuance.issuer_organization_id=ctx.organization_id");
+    expect(baseline).toContain("ctx.role_code='learner'");
+    expect(baseline).toContain("REVOKE ALL ON FUNCTION v301_get_my_learning_award(text,uuid) FROM PUBLIC");
+    expect(baseline).toContain("SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$");
+    const readerRole = readFileSync(resolve(process.cwd(),
+      "database/canonical/v3.0.1/provision-credential-learner-reader.sql"), "utf8");
+    expect(readerRole).toContain("GRANT EXECUTE ON FUNCTION");
+    expect(readerRole).toContain("NOLOGIN NOINHERIT NOBYPASSRLS");
+    expect(readerRole).not.toMatch(/GRANT SELECT ON education_v30\.learning_award_/);
+    expect(readerRole).not.toContain("GRANT SELECT ON education_v30.canonical_sessions");
+  });
   it("enforces immutable evidence, restricted RLS and live verification", () => {
     expect(sql).toContain("credential_owner_only");
     expect(sql).toContain("FORCE ROW LEVEL SECURITY");
     expect(sql).toContain("v301_credential_is_current");
     expect(sql).toContain("credential_revocation_provenance");
+    expect(sql).toContain("certificate_reference IS DISTINCT FROM NEW.credential_reference");
+    expect(sql).toContain("legacy.certificate_reference=issuance.credential_reference");
+    expect(sql).toContain("decision.noncredit_completion_decision_id IS NOT NULL");
+    expect(sql).toContain("'pdf','badge_json','png','svg'");
     expect(sql).toContain("learning_award_issuances_immutable");
     expect(sql).toContain("learning_award_issuance_events_immutable");
   });

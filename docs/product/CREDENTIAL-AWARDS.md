@@ -1,11 +1,18 @@
 # CAN OS credential awards: implementation slice 1
 
-**Status:** source and guarded provider previews implemented on `main`. The award DDL is merged into the
-canonical v3.0.1 fresh-install `schema.sql` and passed additive DDL validation on Neon `test01`. The additive schema was applied to
-Neon `main` on November 14, 2026, with six tables, RLS, triggers and the currentness
-function verified. This does not provision application access.
-The stand-alone patch is retained for upgrading existing v3.0.1 databases; runtime credential issuance remains disabled. No production issuer role, user-facing
-certificate downloads, or public verification endpoints are enabled.
+**Status (November 14, 2026):** The additive learning-award tables and hardening
+patch are installed on Neon `test01` and `main`. Fresh-install `schema.sql`
+contains the same hardened domain. The issuer's credential reference must match
+its canonical noncredit certificate; SVG badge artifacts are supported; expired,
+revoked or superseded awards are not current.
+
+The private learner wallet is implemented through two SECURITY DEFINER,
+session-bound database projections. The SQL reader is installed on `test01`
+and `main`; a restricted no-login reader role passed a negative-permission
+smoke test on `test01`. **No production application-role provisioning or
+end-to-end learner issuance/download acceptance has been completed.** Both
+`CAN_CREDENTIAL_ISSUANCE_ENABLED` and `CAN_CREDENTIAL_READER_ENABLED` must
+remain disabled. No public verification, issuer UI, or guardian delegation.
 
 ## Scope
 
@@ -47,7 +54,7 @@ CEU approval, microcredential certification, or professional license is implied.
 
 ## Activation prerequisites
 
-1. Review the additive SQL and validate on a disposable v3.0.1 Neon branch.
+1. Re-run role-bound negative acceptance with an authorized restricted app login, then add real two-organization, multi-person fixture coverage before enabling either flag.
 2. Review and provision a **dedicated scoped credential issuer role** with
    database-backed identity/organization authorization. The patch intentionally
    grants no application role read or write access.
@@ -101,3 +108,23 @@ The baseline v3.0.1 schema already owns `credential_definitions` and
 When a verified external professional certification or academic credential
 needs to be recorded, use the existing canonical credential domain; do not
 misclassify it as a noncredit learning award.
+
+## Private learner-reader security
+
+- `patch-credential-learner-reader.sql` installs two private, session-hash
+  validated SECURITY DEFINER projections. A current learner session may read
+  only awards issued by the session's Organization to that same Person.
+- `provision-credential-learner-reader.sql` creates a NOLOGIN/NOINHERIT
+  reader role and grants only EXECUTE on those projections to a verified
+  restricted application login; it does not grant raw SELECT on awards,
+  Persons, sessions, or evidence.
+- `test-credential-learner-reader.sql` checks denied direct-table access,
+  denied arbitrary status probes, and zero results for fabricated sessions.
+  The same negative-permission checks passed on `test01` with an actual
+  restricted login. This does **not** prove positive issuance, cross-issuer
+  interactions, or guardian consent enforcement.
+- Existing login sessions are Organization-scoped. Learners cannot use one
+  Organization's active session to browse another issuer's private awards.
+  There is no cross-organization wallet sharing without a separate verified
+  access grant.
+- No creator/approver/issuer workflow UI is in scope for this implementation.

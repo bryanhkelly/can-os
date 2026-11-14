@@ -11367,7 +11367,7 @@ CREATE UNIQUE INDEX credential_revoked_once ON learning_award_issuance_events (i
 CREATE TABLE learning_award_artifacts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   issuance_id uuid NOT NULL REFERENCES learning_award_issuances(id),
-  format text NOT NULL CHECK (format IN ('pdf','badge_json','png')),
+  format text NOT NULL CHECK (format IN ('pdf','badge_json','png','svg')),
   artifact_version integer NOT NULL CHECK (artifact_version>0),
   storage_reference text NOT NULL CHECK (length(btrim(storage_reference))>0),
   sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
@@ -11473,12 +11473,13 @@ BEGIN
       AND grant_row.active AND grant_row.revoked_at IS NULL
   ) THEN RAISE EXCEPTION 'Issuance requires active, independent issuer staff'; END IF;
   IF award.source_kind='noncredit_completion' AND award.kind='completion_certificate' THEN
-    SELECT decision_id,issuer_organization_id,status INTO legacy
+    SELECT decision_id,issuer_organization_id,status,certificate_reference INTO legacy
     FROM noncredit_completion_certificates WHERE id=NEW.legacy_noncredit_certificate_id;
     IF legacy.decision_id IS DISTINCT FROM award.noncredit_completion_decision_id
       OR legacy.issuer_organization_id IS DISTINCT FROM NEW.issuer_organization_id
       OR legacy.status IS DISTINCT FROM 'issued'
-      THEN RAISE EXCEPTION 'Noncredit certificate must reuse its canonical certificate'; END IF;
+      OR legacy.certificate_reference IS DISTINCT FROM NEW.credential_reference
+      THEN RAISE EXCEPTION 'Noncredit certificate must reuse its canonical certificate and reference'; END IF;
   ELSIF NEW.legacy_noncredit_certificate_id IS NOT NULL THEN
     RAISE EXCEPTION 'Legacy certificate is only valid for noncredit completion certificates';
   END IF;
@@ -11535,11 +11536,13 @@ LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $$
      AND (issuance.expires_at IS NULL OR issuance.expires_at>now())
      AND NOT EXISTS (SELECT 1 FROM learning_award_issuance_events revocation
        WHERE revocation.issuance_id=issuance.id AND revocation.event_kind='revoked')
-     AND (issuance.legacy_noncredit_certificate_id IS NULL OR legacy.status='issued')
-     AND (decision.noncredit_completion_decision_id IS NULL
-       OR (completion.outcome='completed'
-         AND NOT EXISTS (SELECT 1 FROM noncredit_completion_decisions newer
-           WHERE newer.supersedes_id=completion.id)))
+     AND (issuance.legacy_noncredit_certificate_id IS NULL
+       OR (legacy.status='issued' AND legacy.certificate_reference=issuance.credential_reference))
+     -- Activity-based awards remain disabled until independent attendance proof exists.
+     AND decision.noncredit_completion_decision_id IS NOT NULL
+     AND completion.outcome='completed'
+     AND NOT EXISTS (SELECT 1 FROM noncredit_completion_decisions newer
+       WHERE newer.supersedes_id=completion.id)
  );
 $$;
 
@@ -11569,5 +11572,71 @@ BEGIN
     EXECUTE format('CREATE POLICY credential_owner_only ON education_v30.%I TO %I USING (true) WITH CHECK (true)',table_name,schema_owner);
   END LOOP;
 END $policies$;
+
+
+-- Session-bound private learner award projections. No direct learner or
+-- credential-table privileges are granted to the application login.
+-- A verified, current canonical learner session is the sole read authority.
+CREATE FUNCTION v301_list_my_learning_awards(p_secret_hash text)
+RETURNS TABLE (
+  issuance_id uuid, title text, kind text, credential_reference text,
+  issued_at timestamptz, expires_at timestamptz, is_current boolean
+)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$
+ SELECT issuance.id, version.title, definition.kind,
+        issuance.credential_reference, issuance.issued_at, issuance.expires_at,
+        v301_credential_is_current(issuance.id)
+ FROM v301_canonical_session_context(p_secret_hash) ctx
+ JOIN learner_achievement_decisions decision
+   ON decision.recipient_person_id=ctx.person_id
+ JOIN learning_award_issuances issuance
+   ON issuance.achievement_decision_id=decision.id
+   AND issuance.issuer_organization_id=ctx.organization_id
+ JOIN learning_award_definition_versions version
+   ON version.id=decision.credential_definition_version_id
+ JOIN learning_award_definitions definition
+   ON definition.id=version.definition_id
+ WHERE ctx.role_code='learner'
+ ORDER BY issuance.issued_at DESC,issuance.id DESC
+ LIMIT 50
+$credential_wallet$;
+REVOKE ALL ON FUNCTION v301_list_my_learning_awards(text) FROM PUBLIC;
+
+CREATE FUNCTION v301_get_my_learning_award(p_secret_hash text,p_issuance_id uuid)
+RETURNS TABLE (
+  issuance_id uuid, credential_reference text, issued_at timestamptz,
+  kind text, title text, description text, issuer_name text,
+  recipient_name text
+)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$
+ SELECT issuance.id, issuance.credential_reference, issuance.issued_at,
+        definition.kind, version.title, version.description,
+        organization.display_name,
+        btrim(concat_ws(' ',person.legal_first_name,person.legal_last_name))
+ FROM v301_canonical_session_context(p_secret_hash) ctx
+ JOIN persons person ON person.id=ctx.person_id
+ JOIN learner_achievement_decisions decision
+   ON decision.recipient_person_id=ctx.person_id
+ JOIN learning_award_issuances issuance
+   ON issuance.achievement_decision_id=decision.id
+   AND issuance.issuer_organization_id=ctx.organization_id
+ JOIN organizations organization ON organization.id=issuance.issuer_organization_id
+ JOIN learning_award_definition_versions version
+   ON version.id=decision.credential_definition_version_id
+ JOIN learning_award_definitions definition
+   ON definition.id=version.definition_id
+ WHERE ctx.role_code='learner'
+   AND issuance.id=p_issuance_id
+   AND v301_credential_is_current(issuance.id)
+ LIMIT 1
+$credential_wallet$;
+REVOKE ALL ON FUNCTION v301_get_my_learning_award(text,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_credential_is_current(uuid) FROM PUBLIC;
+-- In this security-definer chain, trusted relations must precede pg_temp.
+ALTER FUNCTION v301_canonical_session_context(text)
+  SET search_path=education_v30,pg_catalog,pg_temp;
+-- No issuance, public badge assertion, or guardian delegation in this reader.
 
 COMMIT;
