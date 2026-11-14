@@ -7,6 +7,7 @@ import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress
 import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
 import { NoncreditCourseActivities } from "@/components/learning/NoncreditCourseActivities";
 import { CanonicalCourseEvidencePanel } from "@/components/learning/CanonicalCourseEvidencePanel";
+import { FacilitatedLearnerPairing } from "@/components/learning/FacilitatedLearnerPairing";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -191,6 +192,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
   ).length ?? 0;
 
   return <section aria-label="Recorded instructor" className="space-y-5">
+    <FacilitatedLearnerPairing courseAttemptId={courseAttemptId}/>
     <div className="border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Choose your recorded teacher</h2>
       <p className="mt-1 text-sm text-muted-foreground">
