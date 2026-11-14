@@ -16,6 +16,7 @@ import {
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
+import { selectBlueprintWorkspaceRecipes } from "@/domain/blueprint-configuration";
 import { z } from "zod";
 
 export const blueprintWorkspaceInputSchema = z.object({
@@ -138,16 +139,7 @@ export async function getCanonicalBlueprintWorkspace(
           && !Array.isArray(version.config) && version.config.siteId === siteId)
         .map(version => version.blueprintVersionId),
     );
-    const seenRecipes = new Set<string>();
-    const templates = recipes.filter(recipe => {
-      if (savedRecipeVersionIds.has(recipe.blueprintVersionId)) {
-        seenRecipes.add(recipe.blueprintId);
-        return true;
-      }
-      if (seenRecipes.has(recipe.blueprintId)) return false;
-      seenRecipes.add(recipe.blueprintId);
-      return true;
-    });
+    const templates = selectBlueprintWorkspaceRecipes(recipes, savedRecipeVersionIds);
     const components = templates.length
       ? await tx.select({
           id: blueprintComponents.id,
