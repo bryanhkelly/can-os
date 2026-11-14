@@ -210,9 +210,22 @@ test("student saves and submits assignment work, then sees persisted receipt", a
     await expect(page.getByRole("textbox", { name: /Your response/ })).toHaveValue(responseText);
 
     await page.getByRole("button", { name: "Submit assignment" }).click();
-    await expect(page.getByText(/Your assignment has been submitted\. Receipt:/)).toBeVisible();
+    await expect(page.getByText(/Submitted .*Receipt:/)).toBeVisible();
     await page.reload();
     await expect(page.getByText(/Submitted .*Receipt:/)).toBeVisible();
     await expect(page.getByRole("textbox", { name: /Your response/ })).toHaveCount(0);
+  });
+});
+
+test("student dashboard class links open the enrolled classroom directory", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret) throw new Error("Missing synthetic student session.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    await page.goto("/home");
+    const classLink = page.getByRole("link", { name: /View my classes/ }).first();
+    await expect(classLink).toHaveAttribute("href", "/classes");
+    await classLink.click();
+    await expect(page).toHaveURL(/\/classes(?:\?|$)/);
+    await expect(page.getByRole("main").getByRole("heading", { name: "My classes" })).toBeVisible();
   });
 });
