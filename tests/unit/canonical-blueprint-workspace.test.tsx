@@ -9,6 +9,7 @@ vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
   createCanonicalBlueprintConfiguration: vi.fn(),
   saveCanonicalBlueprintConfiguration: vi.fn(),
   submitCanonicalBlueprintConfiguration: vi.fn(),
+  executeCanonicalBlueprintConfiguration: vi.fn(),
   exploreCanonicalBlueprintReferences: vi.fn(),
   discoverCanonicalBlueprintOfferings: vi.fn(),
 }));
