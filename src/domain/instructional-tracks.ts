@@ -379,6 +379,22 @@ export function projectRecordedCourseLessons<
   });
 }
 
+/** Continue through canonical lessons without depending on the selected presenter. */
+export function nextRecordedLessonId(
+  lessons: ReadonlyArray<{ id: string; progress: { status: string } | null }>,
+  completedLessonId: string,
+): string | null {
+  const currentIndex = lessons.findIndex(lesson => lesson.id === completedLessonId);
+  if (currentIndex < 0) return null;
+  const remaining = [
+    ...lessons.slice(currentIndex + 1),
+    ...lessons.slice(0, currentIndex),
+  ];
+  return remaining.find(lesson =>
+    lesson.progress?.status !== "completed" && lesson.progress?.status !== "waived"
+  )?.id ?? null;
+}
+
 /** Accept one nonempty answer for every published practice prompt, and nothing extra. */
 export function recordedPracticeResponsesComplete(
   prompts: readonly { key: string }[],
