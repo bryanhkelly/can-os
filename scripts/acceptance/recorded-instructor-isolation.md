@@ -58,8 +58,10 @@ identity projection. Do not treat separate database usernames or caller-set
 session variables as proof of the logged-in learner. The learner-role binding
 must be verified before exposing an application route.
 
-**Current state:** The isolated `test01` branch has the corrected
-teacher-selection trigger and seven restricted learner-data read policies.
-Nine of ten structural readiness checks pass. Native canonical account,
-grant, and session identity objects are absent, and no two-learner acceptance
-fixtures or restricted login bindings exist yet. Keep the route disabled.
+**Current state:** `db3.01` (Neon branch `br-tiny-mode-arh9wa2e`)
+is the only approved database target for this acceptance. Its current
+schema and RLS status are **unverified** because Neon is blocking connections
+while the branch is being anonymized. The historical `test01` results
+must not be used to sign off `db3.01`. Keep the route disabled until both
+readiness and restricted two-learner isolation are executed successfully on
+`db3.01`.
