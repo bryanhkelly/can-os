@@ -6,6 +6,7 @@ import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {WorkspaceShell} from "@/components/workspace";
+import {groupPermissionContext} from "@/domain/guardian-permission-context";
 export const Route=createFileRoute("/guardian/group-permissions")({
  validateSearch:(search:Record<string,unknown>):{action?:string}=>({
   action:typeof search.action==="string"?search.action:undefined,
@@ -20,8 +21,7 @@ function GuardianConsents(){
  return <ConsentList items={data.data}/>;
 }
 type ConsentItem=Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>[number];
-const groupConsentContext=(item:ConsentItem)=>
- JSON.stringify([item.id,item.groupTitle,item.studentName,item.status,item.obsolete,item.decision]);
+
 function ConsentList({items}:{items:ConsentItem[]}){
  const router=useRouter();
  const {action}=Route.useSearch();
@@ -30,9 +30,9 @@ function ConsentList({items}:{items:ConsentItem[]}){
  const [acknowledged,setAcknowledged]=useState<Record<string,string>>({});
  async function decide(item:ConsentItem,approve:boolean){
   const actionId=item.id;
-  if(approve&&acknowledged[actionId]!==groupConsentContext(item))return;
+  if(approve&&acknowledged[actionId]!==groupPermissionContext(item))return;
   const outcome=await mutation.run(
-   ()=>decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===groupConsentContext(item)}}),
+   ()=>decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===groupPermissionContext(item)}}),
    {
     successMessage:result=>"obsolete" in result&&result.obsolete?"Request cleared — it was no longer active.":approve?"Permission granted; facilitator review still applies.":"Permission declined.",
     commandErrorMessage:"Unable to save permission.",
@@ -67,13 +67,13 @@ function ConsentList({items}:{items:ConsentItem[]}){
     <button disabled={busy} onClick={()=>void decide(item,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Dismiss</button>
    </div>}
    {!item.obsolete&&item.status==="open"&&<label className="mt-4 flex items-start gap-3 text-sm">
-    <input type="checkbox" checked={acknowledged[item.id]===groupConsentContext(item)}
-      onChange={event=>setAcknowledged(previous=>({...previous,[item.id]:event.target.checked?groupConsentContext(item):""}))}
+    <input type="checkbox" checked={acknowledged[item.id]===groupPermissionContext(item)}
+      onChange={event=>setAcknowledged(previous=>({...previous,[item.id]:event.target.checked?groupPermissionContext(item):""}))}
       className="mt-1"/>
     <span>I understand this request permits my student to participate in a supervised school study group, subject to facilitator approval.</span>
    </label>}
    {!item.obsolete&&item.status==="open"&&<div className="mt-4 flex gap-2">
-    <button disabled={busy||acknowledged[item.id]!==groupConsentContext(item)} onClick={()=>void decide(item,true)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Allow participation</button>
+    <button disabled={busy||acknowledged[item.id]!==groupPermissionContext(item)} onClick={()=>void decide(item,true)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Allow participation</button>
     <button disabled={busy} onClick={()=>void decide(item,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Decline</button>
    </div>}
   </article>)}
