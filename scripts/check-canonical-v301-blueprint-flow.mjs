@@ -153,6 +153,38 @@ try {
     error instanceof Error ? error.message : String(error));
   process.exitCode = 1;
 } finally {
-  try { if (started) await q("ROLLBACK"); }
-  finally { client.release(); await pool.end(); }
+  try {
+    if (started) await q("ROLLBACK");
+  } finally {
+    client.release();
+    await pool.end();
+  }
+  // Verify rollback using the isolated schema-owner login. The restricted
+  // application login must not acquire extra read privileges just for testing.
+  if (started) {
+    const verificationPool = new Pool({ connectionString: testUrl, max: 1 });
+    try {
+      const verification = await verificationPool.query(
+        `SELECT
+          (SELECT count(*) FROM education_v30.blueprint_configurations WHERE id=$1)::int AS configurations,
+          (SELECT count(*) FROM education_v30.blueprint_configuration_versions WHERE id=$2)::int AS versions,
+          (SELECT count(*) FROM education_v30.configuration_reviews WHERE id=$3)::int AS reviews,
+          (SELECT count(*) FROM education_v30.blueprint_execution_batches WHERE id=$4)::int AS batches,
+          (SELECT count(*) FROM education_v30.program_deployments WHERE id=$5)::int AS deployments`,
+        [ids.configuration, ids.version, ids.review, ids.batch, ids.deployment],
+      );
+      const counts = verification.rows[0];
+      check(Object.values(counts).every(count => count === 0),
+        "Acceptance transaction left Blueprint, review or Deployment records behind after rollback");
+      if (process.exitCode !== 1) {
+        console.log("PASS: all acceptance writes rolled back with zero persisted records");
+      }
+    } catch (error) {
+      console.error("Canonical Blueprint rollback verification failed:",
+        error instanceof Error ? error.message : String(error));
+      process.exitCode = 1;
+    } finally {
+      await verificationPool.end();
+    }
+  }
 }
