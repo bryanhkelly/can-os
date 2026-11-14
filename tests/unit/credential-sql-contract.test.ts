@@ -47,6 +47,12 @@ describe("credential patch structural security boundaries", () => {
     expect(baseline).toContain("ctx.role_code='learner'");
     expect(baseline).toContain("REVOKE ALL ON FUNCTION v301_get_my_learning_award(text,uuid) FROM PUBLIC");
     expect(baseline).toContain("SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$");
+    const readerRole = readFileSync(resolve(process.cwd(),
+      "database/canonical/v3.0.1/provision-credential-learner-reader.sql"), "utf8");
+    expect(readerRole).toContain("GRANT EXECUTE ON FUNCTION");
+    expect(readerRole).toContain("NOLOGIN NOINHERIT NOBYPASSRLS");
+    expect(readerRole).not.toMatch(/GRANT SELECT ON education_v30\.learning_award_/);
+    expect(readerRole).not.toContain("GRANT SELECT ON education_v30.canonical_sessions");
   });
   it("enforces immutable evidence, restricted RLS and live verification", () => {
     expect(sql).toContain("credential_owner_only");

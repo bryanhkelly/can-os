@@ -471,3 +471,27 @@ The verifier checks role isolation, scope bindings, review/publication triggers,
 current-evidence metadata privileges and absence of campaign, invitation and
 respondent-data access. It is not proof of successful DB integration or browser
 testing; those remain required for release.
+
+### Private credential reader installation
+
+`patch-credential-learner-reader.sql` was applied to existing Neon `test01`
+and `main` databases after the credential-award hardening patch. The
+fresh-build `schema.sql` includes the same two session-bound wallet
+projections, private EXECUTE ACLs, and `pg_temp`-safe SECURITY DEFINER paths.
+No production application login has yet been granted the reader role.
+
+After confirming an actual restricted app login (never `neondb_owner` or
+any schema owner), provision only that login:
+
+```sh
+psql "$TEST_DATABASE_URL" -v application_role=YOUR_RESTRICTED_TEST_LOGIN \
+  -f database/canonical/v3.0.1/provision-credential-learner-reader.sql
+
+psql "$RESTRICTED_TEST_APP_DATABASE_URL" \
+  -f database/canonical/v3.0.1/test-credential-learner-reader.sql
+```
+
+The negative-permission smoke test was run against `test01` with a restricted
+application login and passed. Positive two-learner/two-issuer integration
+fixtures, production role provisioning and the credential-reader feature flag
+remain deliberately pending. No issuer-management UI is included.

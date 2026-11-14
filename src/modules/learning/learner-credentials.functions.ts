@@ -52,7 +52,7 @@ export const listMyNoncreditCredentials = createServerFn({ method: "GET" })
     });
   });
 
-/** Authenticated owner download. Immutable issuer and recipient names are
+/** Authenticated learner download. Immutable issuer and recipient names are
  * resolved server-side, not supplied by the browser. Do not enable before
  * restricted read roles and revocation/source-freshness acceptance.
  */
