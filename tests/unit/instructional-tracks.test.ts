@@ -563,7 +563,7 @@ describe("recorded-instructor restricted learner database access", () => {
     expect(provisioning).toContain("ca.id=:'course_attempt_id'::uuid AND ca.status='active'");
     expect(provisioning).toContain("GRANT SELECT ON");
     expect(provisioning).toContain("WITH INHERIT FALSE, SET TRUE");
-    expect(provisioning).not.toMatch(/\\bGRANT (?:INSERT|UPDATE|DELETE) ON\\b/);
+    expect(provisioning).not.toMatch(/\bGRANT (?:INSERT|UPDATE|DELETE) ON\b/);
   });
 });
 
