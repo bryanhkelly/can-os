@@ -33,7 +33,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     roomId:string;code:string;expiresAt:string;
   }|null>(null);
   const available=data.choices.find(choice=>selected===
-    choice.deploymentId+":"+choice.courseVersionId);
+    choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId);
   async function run(action:()=>Promise<void>) {
     if(busy)return;
     setBusy(true);setMessage("");
@@ -64,7 +64,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             {data.choices.map(choice=><option
               key={choice.deploymentId+":"+choice.courseVersionId}
               value={choice.deploymentId+":"+choice.courseVersionId}>
-              {choice.deploymentName} · {choice.courseTitle}
+              {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
             </option>)}
           </select>
         </label>
@@ -72,6 +72,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           if(!available)return;
           const created=await startFacilitatedLearningRoom({data:{
             deploymentId:available.deploymentId,courseVersionId:available.courseVersionId,
+            siteId:available.siteId,
           }});
           setCode({roomId:created.facilitatedSessionId,
             code:created.pairingCode,expiresAt:created.pairingExpiresAt});
