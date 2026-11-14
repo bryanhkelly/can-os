@@ -79,7 +79,7 @@ async function run() {
       const { rows } = await client.query(`
         SELECT current_user AS db_role, r.rolsuper, r.rolbypassrls,
                r.rolinherit, r.rolcanlogin,
-               pg_has_role(current_user,
+               pg_has_role(r.oid,
                  (SELECT nspowner FROM pg_namespace WHERE nspname='education_v30'),
                  'MEMBER') AS is_schema_owner_member
         FROM pg_roles r WHERE r.rolname=current_user
