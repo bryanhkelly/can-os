@@ -23,11 +23,52 @@ const destinationContextKeys: Record<string, readonly string[]> = {
   "/calendar": ["section"],
 };
 
-export function workspaceDestination(path: string, currentSearch: string): string {
+export type WorkspaceInstitutionSelection = { siteId?: string; programId?: string };
+export type WorkspaceSiteChoice = { id: string };
+export type WorkspaceProgramChoice = { id: string; siteId: string | null };
+
+/**
+ * The URL and sessionStorage hold navigation hints only. Only choices returned
+ * for the active verified grant are eligible to survive between pages.
+ * A new Site selection clears a Program chosen for another Site.
+ */
+export function resolveWorkspaceInstitutionSelection(
+  search: string, stored: WorkspaceInstitutionSelection,
+  sites: readonly WorkspaceSiteChoice[], programs: readonly WorkspaceProgramChoice[],
+): WorkspaceInstitutionSelection {
+  const params = new URLSearchParams(search);
+  const proposedSite = optionalSearchUuid.parse(params.get("siteId") ?? undefined);
+  const proposedProgram = optionalSearchUuid.parse(params.get("programId") ?? undefined);
+  const allowedSite = (value: string | undefined) =>
+    sites.find(item => item.id === value)?.id;
+  const allowedProgram = (value: string | undefined) =>
+    programs.find(item => item.id === value);
+  const explicitProgram = allowedProgram(proposedProgram);
+  const siteId = allowedSite(proposedSite) ??
+    allowedSite(explicitProgram?.siteId ?? undefined) ??
+    allowedSite(stored.siteId);
+  const selectedProgram = explicitProgram ?? allowedProgram(stored.programId);
+  const programId = selectedProgram && (!siteId ||
+    !selectedProgram.siteId || selectedProgram.siteId === siteId)
+    ? selectedProgram.id : undefined;
+  return {
+    ...(siteId ? {siteId} : {}),
+    ...(programId ? {programId} : {}),
+  };
+}
+
+/** Only route-supported selectors are forwarded; unknown private parameters are dropped. */
+export function workspaceDestination(
+  path: string, currentSearch: string,
+  authorizedSelection?: WorkspaceInstitutionSelection,
+): string {
   const current = new URLSearchParams(currentSearch);
   const selection = new URLSearchParams();
   for (const key of destinationContextKeys[path] ?? []) {
-    const value = optionalSearchUuid.parse(current.get(key) ?? undefined);
+    const institutional = key === "siteId" || key === "programId";
+    const input = authorizedSelection && institutional
+      ? authorizedSelection[key] : current.get(key) ?? undefined;
+    const value = optionalSearchUuid.parse(input);
     if (value) selection.set(key, value);
   }
   return selection.size ? `${path}?${selection.toString()}` : path;
@@ -65,6 +106,7 @@ export const workspaceHome = {
 export type WorkspaceRole = keyof typeof workspaceHome;
 
 const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readonly string[]>>> = {
+  academic_content_creator: { "/canonical/content": ["/canonical/content/*"] },
   student: { "/student/courses": ["/student/courses/*"] },
   teacher: { "/teacher/gradebook": ["/teacher/gradebook/*"] },
 };
@@ -107,7 +149,6 @@ const roleLinks = {
     { title: "Staff", path: "/staff/teachers", icon: "users" },
     { title: "Schedule", path: "/calendar", icon: "calendar" },
     { title: "Attendance", path: "/staff/attendance", icon: "clipboard" },
-
   ],
   paraeducator: [
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },

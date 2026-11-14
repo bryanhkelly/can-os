@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getActiveWorkspacePath, getWorkspaceHome, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
+import { getActiveWorkspacePath, getWorkspaceHome, resolveWorkspaceInstitutionSelection, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
 import { routeNavigation } from "./route-navigation";
 import { roleCapabilities } from "@/domain/access-context";
 
@@ -23,6 +23,24 @@ describe("generated workspace navigation", () => {
     expect(workspaceDestination("/settings", search)).toBe(`/settings?siteId=${siteId}`);
     expect(workspaceDestination("/staff/attendance", search)).toBe(`/staff/attendance?programId=${programId}`);
     expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
+  });
+
+  it("retains only verified selection per membership across routes that accept only one dimension", () => {
+    const sites=[{id:siteId},{id:"00000000-0000-4000-8000-000000000010"}];
+    const programs=[{id:programId,siteId},{id:"00000000-0000-4000-8000-000000000011",siteId:sites[1]!.id}];
+    const fromProgram=resolveWorkspaceInstitutionSelection(`?programId=${programId}`,{},sites,programs);
+    expect(fromProgram).toEqual({siteId,programId});
+    const viaSettings=resolveWorkspaceInstitutionSelection(`?siteId=${siteId}`,fromProgram,sites,programs);
+    expect(viaSettings).toEqual({siteId,programId});
+    expect(workspaceDestination("/operations/school-years","",viaSettings))
+      .toBe(`/operations/school-years?siteId=${siteId}&programId=${programId}`);
+    // A Site switch never carries an unrelated Program to the new Site.
+    expect(resolveWorkspaceInstitutionSelection(`?siteId=${sites[1]!.id}`,viaSettings,sites,programs))
+      .toEqual({siteId:sites[1]!.id});
+    expect(resolveWorkspaceInstitutionSelection("?siteId=00000000-0000-4000-8000-000000000099",{},sites,programs))
+      .toEqual({});
+    expect(workspaceDestination("/home",`?siteId=00000000-0000-4000-8000-000000000099`,viaSettings))
+      .toBe(`/home?siteId=${siteId}&programId=${programId}`);
   });
 
   it("keeps unauthorized roles out of guarded navigation", () => {
@@ -61,7 +79,7 @@ describe("generated workspace navigation", () => {
 
   it("shows Messages only for roles with the communication capability", () => {
     for (const [role, links] of Object.entries(workspaceLinks)) {
-      expect(links.filter(item => item.path === "/home")).toHaveLength(1);
+      expect(links.filter(item => item.path === getWorkspaceHome(role))).toHaveLength(1);
       expect(links.some(item => item.path === "/messages"))
         .toBe(roleCapabilities[role]?.includes("communication.send") === true);
     }
