@@ -24,6 +24,12 @@ const areas = [
     status: "Connected testing page",
   },
   {
+    title: "Certificates and digital badges",
+    detail: "Download clearly labeled PDF, badge artwork and metadata samples for published noncredit training. Does not issue credentials.",
+    path: "/canonical/lab/credentials",
+    status: "Preview-only testing page",
+  },
+  {
     title: "Surveys and feedback",
     detail: "Inspect active campaign versions, response modes, question counts and recorded response counts.",
     path: "/canonical/lab/surveys",
@@ -49,7 +55,7 @@ function CapabilityLabOverview() {
           <p className="mt-2 text-3xl font-semibold tabular-nums text-foreground">{value}</p>
         </section>)}
     </div>
-    <div className="mt-6 grid gap-4 lg:grid-cols-3">
+    <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
       {areas.map(area => <section key={area.title} className="flex flex-col border border-border bg-card p-5">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{area.status}</p>
         <h2 className="mt-3 font-serif text-2xl text-foreground">{area.title}</h2>
