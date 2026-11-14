@@ -80,3 +80,13 @@ current session and matching permissions must still pass the owned server-side
 learner workflow. Confidential/anonymous surveys, branching, matrix questions and
 safeguarding triage remain unsupported by that flow and are shown as blockers.
 Preview data are bounded; incomplete question or option retrieval fails closed.
+
+## Noncredit assessment evidence selection
+
+The Lab selects assessment evidence from an effective, approved grant on the
+canonical Course Attempt. Revoked, expired and superseded records remain in
+canonical history but are not actionable. A scored attempt must have a current
+provisional result before the UI offers provider finalization; prior finalized
+results may be used as completion evidence only if not superseded. This is an
+advisory UI filter: provider commands and SQL independently revalidate all
+lifecycle, scorer, independence and completion requirements.

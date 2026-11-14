@@ -9,6 +9,7 @@ import {
   surveyDefinitions, surveyQuestions, surveyResponses, surveyVersions,
 } from "@/db/canonical-v301";
 import { requireCanonicalLabProvider } from "./canonical-capability-lab-access.server";
+import { selectNoncreditLabAssessmentEvidence } from "@/domain/canonical-capability-lab";
 
 /**
  * Read-only, organization-scoped index for the native canonical provider lab.
@@ -55,6 +56,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
     ? await db.select({
       id: assessmentAccess.id, courseAttemptId: assessmentAccess.courseAttemptId,
       status: assessmentAccess.accessStatus,
+      validFrom: assessmentAccess.validFrom, validThrough: assessmentAccess.validThrough,
     }).from(assessmentAccess).where(inArray(assessmentAccess.courseAttemptId, courseIds))
     : [];
   const grantIds = grants.map(row => row.id);
@@ -76,6 +78,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
       status: assessmentExecutionResults.resultStatus,
       revision: assessmentExecutionResults.resultRevision,
       outcome: assessmentExecutionResults.outcome,
+      supersedesId: assessmentExecutionResults.supersedesId,
     }).from(assessmentExecutionResults)
       .where(inArray(assessmentExecutionResults.attemptId, assessmentAttemptIds))
       .orderBy(desc(assessmentExecutionResults.resultRevision))
@@ -95,31 +98,35 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
   const decisions = registrationIds.length
     ? await db.select({
       id: noncreditCompletionDecisions.id,
+      id: noncreditCompletionDecisions.id,
       registrationId: noncreditCompletionDecisions.registrationId,
       outcome: noncreditCompletionDecisions.outcome,
+      supersedesId: noncreditCompletionDecisions.supersedesId,
       decidedAt: noncreditCompletionDecisions.decidedAt,
     }).from(noncreditCompletionDecisions)
       .where(inArray(noncreditCompletionDecisions.registrationId, registrationIds))
       .orderBy(desc(noncreditCompletionDecisions.decidedAt))
     : [];
   const now = new Date();
+  const supersededDecisions = new Set(decisions.flatMap(item =>
+    item.supersedesId ? [item.supersedesId] : []));
   const attempts = participation.map(row => {
-    const grant = grants.find(item => item.courseAttemptId === row.courseAttemptId);
-    const attempt = assessmentAttempts.find(item => item.grantId === grant?.id);
-    const finalized = results.find(item =>
-      item.attemptId === attempt?.id && item.status === "finalized");
+    const evidence = selectNoncreditLabAssessmentEvidence(
+      grants.filter(item => item.courseAttemptId === row.courseAttemptId),
+      assessmentAttempts,
+      results,
+      now,
+    );
     const policy = policies.find(item =>
       item.trainingVersionId === row.trainingVersionId && item.effectiveAt <= now);
-    const decision = decisions.find(item => item.registrationId === row.registrationId);
+    const decision = decisions.find(item =>
+      item.registrationId === row.registrationId && !supersededDecisions.has(item.id));
     const training = trainings.find(item => item.id === row.trainingVersionId);
     return {
       ...row,
+      trainingState: training?.state ?? "unavailable",
       assessmentVersionId: training?.assessmentVersionId ?? null,
-      assessmentGrantStatus: grant?.status ?? null,
-      assessmentAttemptId: attempt?.id ?? null,
-      assessmentAttemptState: attempt?.state ?? null,
-      finalizedResultId: finalized?.id ?? null,
-      finalizedOutcome: finalized?.outcome ?? null,
+      ...evidence,
       policyId: policy?.id ?? null,
       policyVersion: policy?.version ?? null,
       policyMinMinutes: policy?.minMinutes ?? null,
