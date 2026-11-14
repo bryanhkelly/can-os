@@ -153,14 +153,14 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
         </DashboardPanel>
       </div>
       <DashboardPanel id="school-life" title="School Life"
-        action={<Link to="/student/experiences" className={textLink}>View all →</Link>}>
-        {data && !data.community.ok ? <p role="alert" className="text-xs">School updates could not be loaded. <Link to="/student/experiences" className="underline">Open School Life to retry.</Link></p>
+        action={<Link to="/student/my-school" className={textLink}>View all →</Link>}>
+        {data && !data.community.ok ? <p role="alert" className="text-xs">School updates could not be loaded. <Link to="/student/my-school" className="underline">Open School Life to retry.</Link></p>
           : upcomingEvents.length ? <div className="student-life-grid">{upcomingEvents.slice(0,3).map(event =>
             <DashboardMediaTile key={event.id} title={event.title} subtitle={format(event.startsAt,event.timezone)}
               className="student-life-tile"
               href={`/calendar?date=${dateKeyInTimezone(event.startsAt,event.timezone)}&event=${encodeURIComponent(event.id)}`} />)}</div>
             : <div className="space-y-3"><p role="status" className="text-xs text-muted-foreground">No upcoming school events are published.</p>
-              <Link to="/student/experiences" className={textLink}>School &amp; community →</Link></div>}
+              <Link to="/student/my-school" className={textLink}>School &amp; community →</Link></div>}
       </DashboardPanel>
     </>}
     rail={<>
