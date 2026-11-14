@@ -1,16 +1,11 @@
 import { z } from "zod";
+import { blueprintReferenceKinds } from "./blueprint-configuration";
+
+export { blueprintReferenceKinds } from "./blueprint-configuration";
 
 export const blueprintReferenceCatalogInputSchema = z.object({
   siteId: z.string().uuid(),
 }).strict();
-
-export const blueprintReferenceKinds = [
-  "program_model",
-  "community",
-  "experience",
-  "club",
-  "activity",
-] as const;
 
 export type BlueprintReferenceKind = (typeof blueprintReferenceKinds)[number];
 
