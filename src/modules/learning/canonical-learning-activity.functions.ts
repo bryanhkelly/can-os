@@ -13,7 +13,7 @@ import {
   boundedCanonicalActiveMs, canonicalLearningEventSchema,
   learningSessionIsExpired, validateLearningEventTime,
 } from "@/domain/canonical-learning-activity";
-import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
+import { getInstructionalLearnerSession } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 
 const uuid = z.string().uuid();
@@ -24,8 +24,8 @@ const eventInput = sessionInput.extend({ event: canonicalLearningEventSchema });
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function currentLearner(tx: Tx, courseAttemptId: string) {
-  const actor = await getInstructionalLearnerContext(getRequest());
-  if (!actor.sessionId || !actor.actorPersonId) throw new AuthorizationError("authenticated session");
+  const { context:actor, sessionId } = await getInstructionalLearnerSession(getRequest());
+  if (!actor.actorPersonId) throw new AuthorizationError("authenticated session");
   await authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId);
   const [attempt] = await tx.select({
     id: learnerCourseAttempts.id,
@@ -33,17 +33,17 @@ async function currentLearner(tx: Tx, courseAttemptId: string) {
   }).from(learnerCourseAttempts)
     .where(eq(learnerCourseAttempts.id, courseAttemptId)).limit(1);
   if (!attempt) throw new AuthorizationError("current course attempt");
-  return { actor, attempt };
+  return { actor, sessionId, attempt };
 }
 async function ownedSession(tx: Tx, input: z.infer<typeof sessionInput>) {
-  const { actor, attempt } = await currentLearner(tx, input.courseAttemptId);
+  const { actor, sessionId, attempt } = await currentLearner(tx, input.courseAttemptId);
   const [session] = await tx.select().from(canonicalLearningSessions)
     .where(and(
       eq(canonicalLearningSessions.id, input.learningSessionId),
       eq(canonicalLearningSessions.courseAttemptId, attempt.id),
       eq(canonicalLearningSessions.courseVersionId, attempt.courseVersionId),
       eq(canonicalLearningSessions.participantPersonId, actor.actorPersonId),
-      eq(canonicalLearningSessions.accessSessionId, actor.sessionId),
+      eq(canonicalLearningSessions.accessSessionId, sessionId),
     )).limit(1).for("update");
   if (!session) throw new AuthorizationError("owned course learning session");
   return { actor, attempt, session };
@@ -63,7 +63,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     return db.transaction(async tx => {
-      const { actor, attempt } = await currentLearner(tx, data.courseAttemptId);
+      const { actor, sessionId, attempt } = await currentLearner(tx, data.courseAttemptId);
       const now = new Date();
       const [existing] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId, attempt.id),
@@ -91,12 +91,12 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
       // Serialize browser-tab races through the partial unique live-session index.
       await tx.insert(canonicalLearningSessions).values({
         courseAttemptId: attempt.id, courseVersionId: attempt.courseVersionId,
-        accessSessionId: actor.sessionId, clientInstanceId: data.clientInstanceId,
+        accessSessionId: sessionId, clientInstanceId: data.clientInstanceId,
         participantPersonId: actor.actorPersonId,
       }).onConflictDoNothing();
       const [created] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId,attempt.id),
-        eq(canonicalLearningSessions.accessSessionId,actor.sessionId),
+        eq(canonicalLearningSessions.accessSessionId,sessionId),
         eq(canonicalLearningSessions.clientInstanceId,data.clientInstanceId),
         isNull(canonicalLearningSessions.endedAt),
       )).limit(1);
