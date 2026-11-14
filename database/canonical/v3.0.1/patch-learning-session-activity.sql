@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_session_events (
 CREATE INDEX IF NOT EXISTS canonical_learning_events_attempt_time_idx
   ON education_v30.learning_session_events (course_attempt_id, received_at DESC);
 
+-- Fail closed for nonowner database roles. Owner connections bypass RLS and must
+-- still use the server-side authorization guards on every operation.
+ALTER TABLE education_v30.learning_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE education_v30.learning_session_events ENABLE ROW LEVEL SECURITY;
+
 -- Do not grant public table privileges: server commands must authorize current Course attempt.
 REVOKE ALL ON education_v30.learning_sessions FROM PUBLIC;
 REVOKE ALL ON education_v30.learning_session_events FROM PUBLIC;
