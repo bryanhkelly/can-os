@@ -15,7 +15,7 @@ import {
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
-import { blueprintEditorialIdentityKeys } from "@/domain/blueprint-configuration";
+import { blueprintEditorialIdentityKeys, includedBlueprintComponentIds } from "@/domain/blueprint-configuration";
 import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
@@ -156,13 +156,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   }
 
   function versionInput(template: Template, previous?: BlueprintConfigurationDetail) {
-    const proposedComponentIds = new Set((previous?.components ?? [])
-      .filter(component => component.selectionStatus === "proposed")
-      .map(component => component.componentId));
-    const includedComponentIds = new Set([
-      ...selectedComponents,
-      ...proposedComponentIds,
-    ]);
+    const includedComponentIds = includedBlueprintComponentIds(
+      selectedComponents,
+      previous?.components ?? [],
+    );
     return {
       config: { ...(previous?.config && typeof previous.config === "object" && !Array.isArray(previous.config)
         ? previous.config : {}), siteId },
