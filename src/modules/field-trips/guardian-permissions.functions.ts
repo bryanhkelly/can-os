@@ -8,7 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { permissionCanBeSigned,publishedTripPermission } from "./permission-policy";
+import { permissionCanBeSigned,publishedTripPermission,tripPermissionMatchesAcknowledgement } from "./permission-policy";
 
 import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
@@ -133,7 +133,7 @@ export const signGuardianFieldTripPermission = createServerFn({ method: "POST" }
       if (!policy) throw new Error("The school has not published permission language.");
       // Consent must match the exact statement the guardian actually saw, even
       // when school staff accidentally change the text without bumping its version.
-      if (policy.version !== data.permissionVersion || policy.text !== data.permissionText)
+      if (!tripPermissionMatchesAcknowledgement(policy, { version: data.permissionVersion, text: data.permissionText }))
         throw new Error("The school permission statement changed. Refresh and acknowledge the updated version before signing.");
       const [consent] = await tx.insert(s.consentRecords).values({
         subjectType: "field_trip_participant", subjectId: participant.id,
