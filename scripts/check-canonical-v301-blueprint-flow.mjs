@@ -123,6 +123,18 @@ try {
   await q("UPDATE education_v30.blueprint_execution_batches " +
     "SET execution_status='executed',executed_by_person_id=$2,executed_at=clock_timestamp() " +
     "WHERE id=$1", [ids.batch, author]);
+  // Replaying the same Organization-scoped execution key cannot create a
+  // second batch, even if a caller supplies a different batch identifier.
+  const duplicate = await q(
+    "INSERT INTO education_v30.blueprint_execution_batches " +
+    "(id,configuration_version_id,blueprint_version_id,review_id,idempotency_key," +
+    "executing_organization_id) VALUES($1,$2,$3,$4,$5,$6) " +
+    "ON CONFLICT (executing_organization_id,idempotency_key) DO NOTHING RETURNING id",
+    [randomUUID(), ids.version, bp.recipe_id, ids.review,
+      "acceptance:" + ids.version, org],
+  );
+  check(duplicate.rowCount === 0, "Execution replay created a duplicate batch");
+
   await q("INSERT INTO education_v30.blueprint_outputs " +
     "(blueprint_version_id,execution_batch_id,configuration_version_id,review_id,operation_id) " +
     "VALUES($1,$2,$3,$4,$5)", [bp.recipe_id, ids.batch, ids.version, ids.review, operation]);
