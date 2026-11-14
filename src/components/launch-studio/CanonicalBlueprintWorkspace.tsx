@@ -38,6 +38,7 @@ function readable(value: string): string {
 export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }: { siteId: string; enableReferences?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
+  const [revisingFrozen, setRevisingFrozen] = useState(false);
   const [review, setReview] = useState<Review | null>(null);
   const [operationId, setOperationId] = useState("");
   const [executedDeployments, setExecutedDeployments] = useState<string[] | null>(null);
@@ -70,6 +71,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     let cancelled = false;
     setWorkspace(null);
     setDetail(null);
+    setRevisingFrozen(false);
     setReview(null);
     setOperationId("");
     setExecutedDeployments(null);
@@ -117,6 +119,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
 
   async function openConfiguration(configurationId: string) {
     setBusy(true);
+    setRevisingFrozen(false);
     setOperationId("");
     setError(null);
     try {
@@ -192,7 +195,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   }
 
   async function save() {
-    if (!workspace || !selectedTemplate) return;
+    if (!workspace || !selectedTemplate || (detail?.lifecycle === "frozen" && !revisingFrozen)) return;
     setBusy(true);
     setError(null);
     setMessage(null);
@@ -260,7 +263,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   }
 
   async function createPlanningDeployment() {
-    if (!detail || !review?.latestReview || review.latestReview.decision !== "approved"
+    if (revisingFrozen || !detail || !review?.latestReview || review.latestReview.decision !== "approved"
       || !operationId || !workspace?.canExecute) return;
     setBusy(true);
     setError(null);
@@ -283,6 +286,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       setBusy(false);
     }
   }
+
+  const readOnlyFrozen = detail?.lifecycle === "frozen" && !revisingFrozen;
+  const editingDisabled = busy || readOnlyFrozen;
 
   return <section className="mt-6 border bg-card p-6" aria-labelledby="canonical-blueprint-title">
     <h2 id="canonical-blueprint-title" className="font-serif text-2xl">
@@ -346,7 +352,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             <label htmlFor="canonical-blueprint-identity" className="min-w-52 flex-1 text-sm">
               Educational identity
               <Select id="canonical-blueprint-identity" className="mt-2"
-                value={editorialIdentity} disabled={busy}
+                value={editorialIdentity} disabled={editingDisabled}
                 onChange={event => setEditorialIdentity(
                   event.currentTarget.value as typeof editorialIdentity
                 )}>
@@ -357,7 +363,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             <label htmlFor="canonical-blueprint-affiliation" className="min-w-52 flex-1 text-sm">
               Religious affiliation (optional)
               <Select id="canonical-blueprint-affiliation" className="mt-2"
-                value={religiousAffiliationCode} disabled={busy}
+                value={religiousAffiliationCode} disabled={editingDisabled}
                 onChange={event => setReligiousAffiliationCode(event.currentTarget.value)}>
                 <option value="">Unspecified</option>
                 {workspace.affiliations.map(option =>
@@ -365,13 +371,13 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
               </Select>
             </label>
           </div>
-          <fieldset className="border p-4" disabled={busy}>
+          <fieldset className="border p-4" disabled={editingDisabled}>
             <legend className="px-2 font-semibold">Blueprint components</legend>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               {selectedTemplate.components.map(component =>
                 <label key={component.id} className="flex items-center gap-3 text-sm">
                   <input type="checkbox" checked={selectedComponents.includes(component.id)}
-                    disabled={component.requirementMode === "required" || busy}
+                    disabled={component.requirementMode === "required" || editingDisabled}
                     onChange={event => setSelectedComponents(current =>
                       event.target.checked
                         ? [...current, component.id]
@@ -389,7 +395,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 reference.kind === component.kind
               );
               if (!available.length) return null;
-              return <fieldset key={component.id} className="border p-4" disabled={busy}>
+              return <fieldset key={component.id} className="border p-4" disabled={editingDisabled}>
                 <legend className="px-2 font-semibold">
                   {readable(component.key)} · curated references
                 </legend>
@@ -421,12 +427,12 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             selected={offeringAdoptions.filter(intent =>
               selectedComponents.includes(intent.componentId))}
             onChange={setOfferingAdoptions}
-            disabled={busy}
+            disabled={editingDisabled}
           />}
           {selectedTemplate.components.some(component =>
             selectedComponents.includes(component.id) &&
             ["community", "experience", "club", "activity"].includes(component.kind)
-          ) && <fieldset className="border p-4" disabled={busy}>
+          ) && <fieldset className="border p-4" disabled={editingDisabled}>
             <legend className="px-2 font-semibold">Propose a local experience</legend>
             <p className="mb-3 text-sm text-muted-foreground">
               Describe a club, activity, community project, or experience unique to your Site.
@@ -489,9 +495,17 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             </ul>}
           </fieldset>}
           <div className="flex flex-wrap gap-3">
-            {workspace.canConfigure && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
+            {workspace.canConfigure && !readOnlyFrozen && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
               {busy ? "Saving…" : detail ? "Save new revision" : "Create Blueprint configuration"}
+            </Button>}
+            {detail && detail.lifecycle === "frozen" && workspace.canConfigure && <Button type="button" variant="outline" disabled={busy}
+              onClick={() => { setRevisingFrozen(true); setOperationId(""); setExecutedDeployments(null); }}>
+              Revise submitted Blueprint
+            </Button>}
+            {detail && revisingFrozen && <Button type="button" variant="outline" disabled={busy}
+              onClick={() => void openConfiguration(detail.configurationId)}>
+              Discard revision edits
             </Button>}
             {detail && detail.lifecycle === "draft" && workspace.canConfigure &&
               <Button type="button" variant="outline" disabled={busy}
@@ -499,6 +513,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             {detail && <Button type="button" variant="outline" disabled={busy}
               onClick={() => {
                 setDetail(null);
+                setRevisingFrozen(false);
                 setReview(null);
                 setOperationId("");
                 setExecutedDeployments(null);
@@ -525,7 +540,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 onClick={() => void openConfiguration(detail.configurationId)}>
                 Refresh review status
               </Button>
-              {review?.latestReview?.decision === "approved" && workspace.canExecute &&
+              {review?.latestReview?.decision === "approved" && workspace.canExecute && !revisingFrozen &&
                 <fieldset className="mt-4 border p-4" disabled={busy}>
                   <legend className="px-2 font-semibold">Create a planning Deployment</legend>
                   <p className="mb-3">
