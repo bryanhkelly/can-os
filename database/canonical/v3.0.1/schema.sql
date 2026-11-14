@@ -6251,6 +6251,9 @@ CREATE TRIGGER control_evaluation_evidence_append_only BEFORE UPDATE OR DELETE O
  FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
 CREATE TRIGGER operation_permission_append_only BEFORE UPDATE OR DELETE ON operational_authorization_decisions
  FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
+-- Each whole-configuration review is independent, historical evidence.
+CREATE TRIGGER blueprint_configuration_review_append_only BEFORE UPDATE OR DELETE ON configuration_reviews
+ FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
 CREATE TRIGGER blueprint_component_decision_append_only BEFORE UPDATE OR DELETE ON blueprint_component_approval_decisions
  FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
 CREATE TRIGGER facility_verification_append_only BEFORE UPDATE OR DELETE ON site_space_capability_verifications
