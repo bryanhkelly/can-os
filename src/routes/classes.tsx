@@ -5,6 +5,7 @@ import { ClassroomLessonTabs } from "@/components/learning/ClassroomLessonTabs";
 import { PrivateLessonNotes } from "@/components/learning/PrivateLessonNotes";
 import { ClassroomMediaStage, type ClassroomMeetings } from "@/components/learning/ClassroomMediaStage";
 import { ClassVideoPlayer, ClassVideoPlaceholder } from "@/components/learning/ClassVideoPlayer";
+import { SafeClassExternalLink, safeClassExternalHref } from "@/components/learning/SafeClassExternalLink";
 import { ClassVideoUploadForm } from "@/components/learning/ClassVideoUploadForm";
 import { resolveClassVideo } from "@/domain/class-video";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
@@ -148,7 +149,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   function resources(items: ClassContent["resources"]) {
     return <ul className="space-y-3">{items.map(item => <li key={item.id} className="rounded-lg border p-3 text-sm">
       {item.url && resolveClassVideo(item.url) ? <ClassVideoPlayer title={item.title} url={item.url} resourceId={item.id} declaredVideo={false}/> :
-        item.url ? <a href={item.url} data-learning-resource-id={item.id} target="_blank" rel="noopener noreferrer" className="underline">{item.title} (external)</a> :
+        item.url ? <SafeClassExternalLink url={item.url} title={item.title} kind="external" resourceId={item.id}/> :
         <button type="button" data-learning-resource-id={item.id} disabled={busy} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</button>}
     </li>)}</ul>;
   }
@@ -162,7 +163,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
           return result.downloadUrl;
         } : undefined}/>;
     }
-    if (item.url) return <a href={item.url} rel="noopener noreferrer" target="_blank" className="underline">{item.title} ({item.kind})</a>;
+    if (item.url) return <SafeClassExternalLink url={item.url} title={item.title} kind={item.kind}/>;
     if (item.kind === "html" && item.resourceId) return <CommonCartridgeStaticLesson
       programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>;
     if (item.kind === "pdf") return <button type="button" disabled={busy}
@@ -174,18 +175,19 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     return <div className="mt-3 space-y-2 border-t pt-3" aria-label={"Manage "+item.title}>
       {editingResource===item.id?<form noValidate className="grid gap-2" onSubmit={event=>{
         event.preventDefault();setResourceEditAttempted(true);
-        let validHttps=false;try{validHttps=new URL(resourceEditUrl).protocol==="https:";}catch{/* invalid URL */}
+        const validHttps=Boolean(safeClassExternalHref(resourceEditUrl.trim())) &&
+          (resourceEditKind!=="video" || Boolean(resolveClassVideo(resourceEditUrl.trim())));
         if(resourceEditTitle.trim().length<3||!validHttps)return;
         void run(async()=>{
         await manageClassSupplement({data:{action:"replace",sectionId:data.section.id,supplementId:item.id,
-          title:resourceEditTitle,kind:resourceEditKind,url:resourceEditUrl}});
+          title:resourceEditTitle,kind:resourceEditKind,url:resourceEditUrl.trim()}});
         setEditingResource(null);setResourceEditAttempted(false);
       },"Teacher resource replaced. Publisher content remains unchanged.");}}>
         <Field label="Replacement title" className="text-xs" required error={resourceEditAttempted&&resourceEditTitle.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
           <Input minLength={3} maxLength={200} value={resourceEditTitle} onChange={e=>setResourceEditTitle(e.target.value)}/>
         </Field>
         <Field label="Replacement HTTPS link" className="text-xs" required
-          error={resourceEditAttempted&&(()=>{try{return new URL(resourceEditUrl).protocol!=="https:";}catch{return true;}})()?"Enter a valid HTTPS resource URL.":undefined}>
+          error={resourceEditAttempted&&(!safeClassExternalHref(resourceEditUrl.trim()) || (resourceEditKind==="video"&&!resolveClassVideo(resourceEditUrl.trim())))?"Enter a valid HTTPS resource link without credentials. Videos must use a supported video URL.":undefined}>
           <Input type="url" value={resourceEditUrl} onChange={e=>setResourceEditUrl(e.target.value)}/>
         </Field>
         <Field label="Resource format" className="text-xs"><Select value={resourceEditKind}
