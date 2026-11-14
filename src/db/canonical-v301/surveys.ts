@@ -42,7 +42,7 @@ export const surveyVersionReviews = educationV30.table("survey_version_reviews",
   reviewKind: text("review_kind").$type<"academic" | "privacy" | "accessibility" | "safeguarding">().notNull(),
   reviewerPersonId: uuid("reviewer_person_id").notNull(),
   decision: text("decision").$type<"approved" | "rejected" | "withdrawn">().notNull(),
-  decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+  decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity().notNull(),
   evidenceVersionId: uuid("evidence_version_id"),
 });
 export const surveyCampaigns = educationV30.table("survey_campaigns", {
