@@ -35,6 +35,31 @@ const ids = {
 };
 function check(condition, message) { if (!condition) fail(message); }
 
+// Read-only readiness check before the acceptance transaction. A database
+// with only the older Blueprint tables cannot authenticate canonical users or
+// exercise the configured author/reviewer roles.
+const readinessPool = new Pool({ connectionString: testUrl, max: 1 });
+try {
+  const { rows } = await readinessPool.query(`
+    SELECT
+      to_regclass('education_v30.canonical_accounts') IS NOT NULL AS accounts_ready,
+      to_regclass('education_v30.canonical_account_grants') IS NOT NULL AS grants_ready,
+      to_regclass('education_v30.canonical_sessions') IS NOT NULL AS sessions_ready,
+      to_regprocedure('education_v30.v301_canonical_session_context(text)') IS NOT NULL
+        AS session_reader_ready,
+      EXISTS (SELECT 1 FROM pg_roles WHERE rolname=$1) AS author_ready,
+      EXISTS (SELECT 1 FROM pg_roles WHERE rolname=$2) AS reviewer_ready
+  `, [authorRole, reviewerRole]);
+  const ready = rows[0];
+  check(ready?.accounts_ready && ready.grants_ready && ready.sessions_ready
+    && ready.session_reader_ready,
+    "test database is missing native v3.0.1 authentication; install the canonical baseline");
+  check(ready.author_ready && ready.reviewer_ready,
+    "test database is missing the provisioned Blueprint author/reviewer roles");
+} finally {
+  await readinessPool.end();
+}
+
 const pool = new Pool({ connectionString: appUrl, max: 1 });
 const client = await pool.connect();
 const q = (statement, args = []) => client.query(statement, args);
