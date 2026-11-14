@@ -1,5 +1,5 @@
 import { isDeepStrictEqual } from "node:util";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   auditEvents,
@@ -27,6 +27,7 @@ import {
 } from "@/domain/blueprint-configuration";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { blueprintDatabaseRole, blueprintReadDatabaseRole } from "@/domain/blueprint-database-role";
 
 const BLUEPRINT_CONFIGURE = "blueprint.configure";
 const BLUEPRINT_READ = "blueprint.read";
@@ -413,7 +414,10 @@ export async function getBlueprintConfiguration(
   configurationId: string,
 ): Promise<BlueprintConfigurationDetail> {
   assertCanRead(context);
-  const [configuration] = await db.select().from(blueprintConfigurations)
+  const databaseRole = blueprintReadDatabaseRole(context);
+  return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    const [configuration] = await tx.select().from(blueprintConfigurations)
     .where(eq(blueprintConfigurations.id, configurationId))
     .limit(1);
   if (!configuration?.owningOrganizationId) {
@@ -421,20 +425,20 @@ export async function getBlueprintConfiguration(
   }
   assertOrganization(context, configuration.owningOrganizationId);
 
-  const [version] = await db.select().from(blueprintConfigurationVersions)
+  const [version] = await tx.select().from(blueprintConfigurationVersions)
     .where(eq(blueprintConfigurationVersions.configurationId, configuration.id))
     .orderBy(desc(blueprintConfigurationVersions.revision))
     .limit(1);
   if (!version) throw new DomainError("UNAVAILABLE", "Blueprint configuration has no version.");
 
   const [components, references, offeringAdoptions, localExperiences] = await Promise.all([
-    db.select().from(blueprintConfigurationComponents)
+    tx.select().from(blueprintConfigurationComponents)
       .where(eq(blueprintConfigurationComponents.configurationVersionId, version.id)),
-    db.select().from(blueprintConfigurationComponentReferences)
+    tx.select().from(blueprintConfigurationComponentReferences)
       .where(eq(blueprintConfigurationComponentReferences.configurationVersionId, version.id)),
-    db.select().from(blueprintConfigurationOfferingIntents)
+    tx.select().from(blueprintConfigurationOfferingIntents)
       .where(eq(blueprintConfigurationOfferingIntents.configurationVersionId, version.id)),
-    db.select().from(blueprintConfigurationLocalExperiences)
+    tx.select().from(blueprintConfigurationLocalExperiences)
       .where(eq(blueprintConfigurationLocalExperiences.configurationVersionId, version.id)),
   ]);
   return {
@@ -469,6 +473,7 @@ export async function getBlueprintConfiguration(
       configuration: experience.configuration,
     })),
   };
+  });
 }
 
 export async function createBlueprintConfiguration(
@@ -479,7 +484,9 @@ export async function createBlueprintConfiguration(
   const input = createBlueprintConfigurationInputSchema.parse(rawInput);
   assertOrganization(context, input.owningOrganizationId);
 
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
   return db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [existing] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
       .limit(1)
@@ -566,7 +573,9 @@ export async function saveBlueprintConfiguration(
   assertAuthenticated(context);
   const input = saveBlueprintConfigurationInputSchema.parse(rawInput);
 
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
   return db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
       .limit(1)
@@ -629,7 +638,9 @@ export async function submitBlueprintConfiguration(
   assertAuthenticated(context);
   const input = submitBlueprintConfigurationInputSchema.parse(rawInput);
 
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
   return db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configuration] = await tx.select().from(blueprintConfigurations)
       .where(eq(blueprintConfigurations.id, input.configurationId))
       .limit(1)
