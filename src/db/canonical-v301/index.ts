@@ -7,6 +7,7 @@ export * from "./blueprints";
 export * from "./catalog";
 export * from "./learning";
 export * from "./learning-activity";
+export * from "./facilitated-learning";
 export * from "./public-planning";
 
 export * from "./surveys";
