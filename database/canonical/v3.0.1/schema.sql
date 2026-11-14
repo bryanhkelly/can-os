@@ -12099,9 +12099,12 @@ BEGIN
   -- Recorded departures may be saved after a room is closed or membership withdrawn.
   IF NEW.left_at IS NOT NULL THEN RETURN NEW; END IF;
  END IF;
- SELECT deployment_id,course_version_id,state,ended_at INTO room
+ SELECT deployment_id,course_version_id,state,ended_at,started_at,pairing_expires_at INTO room
  FROM facilitated_learning_sessions WHERE id=NEW.facilitated_session_id;
  IF room.state IS DISTINCT FROM 'live' OR room.ended_at IS NOT NULL
+    OR room.started_at>clock_timestamp()
+    OR room.started_at<=clock_timestamp()-interval '8 hours'
+    OR room.pairing_expires_at<=clock_timestamp()
     OR NOT v301_valid_learning_attempt_person(
       NEW.course_attempt_id,NEW.participant_person_id,
       room.deployment_id,room.course_version_id)

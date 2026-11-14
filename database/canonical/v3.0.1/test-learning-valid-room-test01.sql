@@ -95,6 +95,19 @@ BEGIN
     THEN RAISE EXCEPTION 'Wrong pairing denial: %',got; END IF;
   END;
   UPDATE education_v30.facilitated_learning_sessions
+    SET pairing_expires_at=clock_timestamp()-interval '1 minute' WHERE id=room;
+  BEGIN
+   UPDATE education_v30.facilitated_learning_participants
+    SET last_paired_at=clock_timestamp() WHERE facilitated_session_id=room;
+   RAISE EXCEPTION 'Expired room re-pairing allowed';
+  EXCEPTION WHEN OTHERS THEN
+   GET STACKED DIAGNOSTICS got=MESSAGE_TEXT;
+   IF got NOT LIKE '%live room and registered course participant%'
+    THEN RAISE EXCEPTION 'Wrong expired pairing denial: %',got; END IF;
+  END;
+  UPDATE education_v30.facilitated_learning_sessions
+   SET pairing_expires_at=clock_timestamp()+interval '10 minutes' WHERE id=room;
+  UPDATE education_v30.facilitated_learning_sessions
    SET state='ended',ended_at=clock_timestamp() WHERE id=room;
   BEGIN
    UPDATE education_v30.facilitated_learning_participants
