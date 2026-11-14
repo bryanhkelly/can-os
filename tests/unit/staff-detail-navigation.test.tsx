@@ -177,7 +177,7 @@ describe("read-only staff Action detail",()=>{
   it("links missing-work assignment, student and course names to their own records",()=>{
     state.data={ok:true,data:{connected:true,items:[{
       assessmentId:"essay",title:"Evidence essay",course:"English",sectionId:"english",
-      dueAt:"2030-01-01T12:00:00Z",studentProfileId:"student-profile",
+      dueAt:"2030-01-01T12:00:00Z",timezone:"America/Los_Angeles",studentProfileId:"student-profile",
       studentPersonId:"student-person",studentName:"Jordan Student",status:"not_started",
     }]}};
     const html=render(MissingWork);
