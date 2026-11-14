@@ -3,12 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { normalizeClientError } from "@/lib/client-error";
 import type { AvailableOffering } from "@/domain/program-discovery";
+import type { JsonObject } from "@/db/canonical-v301";
 import { discoverPrograms } from "@/modules/programs/program-discovery.functions";
 
 export type BlueprintOfferingIntent = {
   componentId: string;
   offeringVersionId: string;
-  configuration: Record<string, never>;
+  configuration: JsonObject;
 };
 
 type Props = {
