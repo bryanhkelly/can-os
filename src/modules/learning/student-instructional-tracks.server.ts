@@ -988,6 +988,25 @@ export async function completeRecordedLesson(
         .limit(1);
       if (!lesson) throw new DomainError("UNAVAILABLE", "Course lesson is unavailable.");
 
+      // A waived lesson is an official academic decision, not a learner-completion action.
+      const [existingProgress] = await tx.select({
+        status: learnerLessonProgress.status,
+      }).from(learnerLessonProgress).where(and(
+        eq(learnerLessonProgress.courseAttemptId, attempt.id),
+        eq(learnerLessonProgress.lessonId, lesson.id),
+      )).limit(1);
+      if (existingProgress?.status === "waived") {
+        throw new DomainError("FORBIDDEN", "A waived lesson cannot be marked complete.");
+      }
+      if (existingProgress?.status === "completed") {
+        return {
+          courseAttemptId: attempt.id,
+          courseVersionId: attempt.courseVersionId,
+          lessonId: lesson.id,
+          status: "completed",
+        };
+      }
+
       const observedAt = new Date();
       await tx.insert(learnerLessonProgress).values({
         courseAttemptId: attempt.id,
