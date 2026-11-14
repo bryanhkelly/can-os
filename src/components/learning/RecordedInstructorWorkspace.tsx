@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
-import { CanonicalLearningActivityProvider, useCanonicalLearningActivity } from "@/components/learning/CanonicalLearningTracker";
+import { CanonicalLearningActivityProvider, DisabledCanonicalLearningActivityProvider, useCanonicalLearningActivity } from "@/components/learning/CanonicalLearningTracker";
+import { getCanonicalLearningReleaseAvailability } from "@/modules/learning/canonical-learning-release.functions";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
 import { NoncreditCourseActivities } from "@/components/learning/NoncreditCourseActivities";
@@ -31,15 +33,29 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
  * the canonical Course-attempt progress shared across recorded presenters.
  */
 export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttemptId: string }) {
-  // A router may retain the same component instance while changing the
-  // selected learner/course. Never carry old catalog, media, or answers into
-  // another Course attempt.
-  return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
-    <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}/>
+  const release = useQuery({
+    queryKey: ["canonical-learning-release"],
+    queryFn: () => getCanonicalLearningReleaseAvailability(),
+    staleTime: 60_000,
+    retry: false,
+  });
+  const enabled = release.data?.activity === true;
+  const facilitatedEnabled = release.data?.facilitated === true;
+  // Always preserve independent course enrollment, progress and assessments.
+  // A missing release-status response fails closed for optional telemetry.
+  if (enabled) return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
+    <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
+      activityEnabled facilitatedEnabled={facilitatedEnabled}/>
   </CanonicalLearningActivityProvider>;
+  return <DisabledCanonicalLearningActivityProvider key={courseAttemptId}>
+    <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
+      activityEnabled={false} facilitatedEnabled={facilitatedEnabled}/>
+  </DisabledCanonicalLearningActivityProvider>;
 }
 
-function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId: string }) {
+function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled }: {
+  courseAttemptId: string; activityEnabled: boolean; facilitatedEnabled: boolean;
+}) {
   const { selectLesson, observe, observeNativeVideo } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
@@ -192,7 +208,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
   ).length ?? 0;
 
   return <section aria-label="Recorded instructor" className="space-y-5">
-    <FacilitatedLearnerPairing courseAttemptId={courseAttemptId}/>
+    {facilitatedEnabled && <FacilitatedLearnerPairing courseAttemptId={courseAttemptId}/>}
     <div className="border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Choose your recorded teacher</h2>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -312,7 +328,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
     <NoncreditCourseActivities courseAttemptId={courseAttemptId}
       lessonProgressRevision={lessonProgressRevision}/>
-    <CanonicalCourseEvidencePanel courseAttemptId={courseAttemptId}/>
+    {activityEnabled && <CanonicalCourseEvidencePanel courseAttemptId={courseAttemptId}/>}
   </section>;
 }
 

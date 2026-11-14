@@ -23,6 +23,17 @@ export function useCanonicalLearningActivity(): ActivityContext {
   return value;
 }
 
+const disabledLearningActivity: ActivityContext = {
+  selectLesson: () => undefined,
+  observe: () => undefined,
+  observeNativeVideo: () => undefined,
+};
+
+/** Keep recorded lessons functional when optional activity collection is off. */
+export function DisabledCanonicalLearningActivityProvider({ children }: { children: ReactNode }) {
+  return <Context.Provider value={disabledLearningActivity}>{children}</Context.Provider>;
+}
+
 function tabInstanceId(courseAttemptId: string): string {
   // A non-secret, tab-scoped instance key persists across reloads, never across devices.
   const key = "can-learning-instance:" + courseAttemptId;
