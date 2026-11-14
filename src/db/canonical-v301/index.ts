@@ -1,5 +1,5 @@
-// Kept outside the default Drizzle schema so the fresh-build target is not
-// treated as an additive migration over the legacy public schema.
+// Standalone canonical v3.0.1 schema. Its SQL is the fresh-install source
+// of truth and must not be treated as an additive Drizzle migration.
 export * from "./core";
 export * from "./events";
 export * from "./blueprints";
