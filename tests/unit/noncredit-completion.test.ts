@@ -8,7 +8,7 @@ const base={registrationStatus:"active",trainingVersionId:"t1",trainingState:"pu
 describe("noncredit completion policy",()=>{
  it("requires separately evidenced time and finalized assessment",()=>{
    expect(evaluateNoncreditCompletion(base)).toMatchObject({eligible:true,countedMinutes:50,assessmentFraction:0.8,blockers:[]});
-   expect(evaluateNoncreditCompletion({...base,assessment:{...assessment,resultStatus:"draft"}}).blockers).toContain("assessment_incomplete");
+   expect(evaluateNoncreditCompletion({...base,assessment:{...assessment,resultStatus:"reviewed"}}).blockers).toContain("assessment_incomplete");
  });
  it("does not count unsupported playback estimates or superseded participation",()=>{
    const revision={...event,id:"e2",supersedesId:"e1",countedMinutes:20};
