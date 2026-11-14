@@ -312,6 +312,14 @@ export function decideInstructionalTrackSelection(input: {
   return "create";
 }
 
+/** Published practice resources remain private when practice is disabled by policy. */
+export function canAccessStudentTrackMaterial(
+  materialKind: "instruction" | "practice" | "reference",
+  practiceEnabled: boolean,
+): boolean {
+  return materialKind !== "practice" || practiceEnabled;
+}
+
 export type StudentPracticeDefinition = {
   instructions: string;
   prompts: { key: string; text: string }[];
