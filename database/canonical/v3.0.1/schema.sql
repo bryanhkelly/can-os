@@ -3272,16 +3272,16 @@ BEGIN
  -- A renewed policy receipt for the same presenter is not a teacher switch.
  IF NOT policy_row.allow_switching AND EXISTS (
    SELECT 1 FROM (
-     SELECT old.track_version_id FROM learner_track_selections old
-     WHERE old.course_attempt_id=NEW.course_attempt_id
-     ORDER BY old.revision DESC LIMIT 1
+     SELECT prior_selection.track_version_id FROM learner_track_selections AS prior_selection
+     WHERE prior_selection.course_attempt_id=NEW.course_attempt_id
+     ORDER BY prior_selection.revision DESC LIMIT 1
    ) latest WHERE latest.track_version_id<>NEW.track_version_id
  ) THEN
    RAISE EXCEPTION 'Current instructional policy does not allow switching';
  END IF;
  IF NEW.revision IS DISTINCT FROM (
-    SELECT COALESCE(max(old.revision),0)+1 FROM learner_track_selections old
-    WHERE old.course_attempt_id=NEW.course_attempt_id
+    SELECT COALESCE(max(prior_selection.revision),0)+1 FROM learner_track_selections AS prior_selection
+    WHERE prior_selection.course_attempt_id=NEW.course_attempt_id
  ) THEN
    RAISE EXCEPTION 'Track selection revision must advance monotonically';
  END IF;
