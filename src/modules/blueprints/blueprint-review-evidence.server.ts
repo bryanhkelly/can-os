@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { evidenceDocuments, evidenceDocumentVersions } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 
 export const blueprintReviewEvidenceInputSchema = z.object({
   owningOrganizationId: z.string().uuid(),
@@ -27,7 +28,10 @@ export async function listBlueprintReviewEvidence(
     throw new AuthorizationError("Blueprint review evidence Organization scope");
   }
 
-  const versions = await db.select({
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
+  return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    const versions = await tx.select({
     id: evidenceDocumentVersions.id,
     documentId: evidenceDocuments.id,
     kind: evidenceDocuments.kindCode,
@@ -51,4 +55,5 @@ export async function listBlueprintReviewEvidence(
     seen.add(item.documentId);
     return true;
   }).map(({ id, title, kind }) => ({ id, title, kind }));
+  });
 }
