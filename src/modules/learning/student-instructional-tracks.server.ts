@@ -744,13 +744,13 @@ export async function readSelectedInstructionalTrack(
           eligible.policy.practiceEnabled,
         ))
         .map((material) => ({
-        id: material.id,
-        courseUnitId: material.courseUnitId,
-        assetVersionId: material.assetVersionId,
-        materialKind: material.materialKind,
-        practice: material.materialKind === "practice"
-          ? parseStudentPracticeDefinition(material.activitySpec)
-          : null,
+          id: material.id,
+          courseUnitId: material.courseUnitId,
+          assetVersionId: material.assetVersionId,
+          materialKind: material.materialKind,
+          practice: material.materialKind === "practice"
+            ? parseStudentPracticeDefinition(material.activitySpec)
+            : null,
         })),
     };
   });
