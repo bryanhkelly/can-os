@@ -154,6 +154,14 @@ describe("enrolled learning workspace", () => {
 });
 
 describe("family and student profiles", () => {
+  it("shows a retry action rather than stale family data on a failed read", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView
+      children={[]} needs={[]} loading={false} error="Unable to verify family access"
+      onRetry={() => undefined}/>);
+    expect(html).toContain("Unable to verify family access");
+    expect(html).toContain("Retry");
+    expect(html).not.toContain('aria-label="Family quick links"');
+  });
   it("shows concrete reasons and preserves each child's person ID in every academic link", () => {
     const children: ComponentProps<typeof FamilyHomeView>["children"] = [{
       studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
