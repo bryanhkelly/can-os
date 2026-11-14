@@ -18,6 +18,8 @@ on:
     paths:
       - 'database/canonical/v3.0.1/**'
       - 'scripts/check-canonical-v301-ddl.mjs'
+      - 'scripts/check-canonical-v301-blueprint-flow.mjs'
+      - 'scripts/seed-canonical-v301-demo.mjs'
       - 'scripts/isolated-test-db-guard.mjs'
       - '.github/workflows/canonical-v301-database.yml'
   workflow_dispatch:
