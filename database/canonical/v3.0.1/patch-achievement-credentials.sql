@@ -243,7 +243,7 @@ LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $
    LEFT JOIN noncredit_completion_certificates legacy
      ON legacy.id=issuance.legacy_noncredit_certificate_id
    WHERE issuance.id=p_issuance_id
-     AND (issuance.expires_at IS NULL OR issuance.expires_at>clock_timestamp())
+     AND (issuance.expires_at IS NULL OR issuance.expires_at>now())
      AND NOT EXISTS (SELECT 1 FROM credential_issuance_events revocation
        WHERE revocation.issuance_id=issuance.id AND revocation.event_kind='revoked')
      AND (issuance.legacy_noncredit_certificate_id IS NULL OR legacy.status='issued')

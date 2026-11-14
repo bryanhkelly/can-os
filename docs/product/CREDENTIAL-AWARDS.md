@@ -1,6 +1,6 @@
 # CAN OS credential awards: implementation slice 1
 
-**Status:** source implemented on `main`; SQL is an opt-in, unexecuted additive
+**Status:** source and guarded provider previews implemented on `main`; SQL is an opt-in, unexecuted additive
 candidate for canonical v3.0.1. No production issuer role, user-facing
 certificate downloads, or public verification endpoints are enabled.
 
@@ -37,6 +37,10 @@ CEU approval, microcredential certification, or professional license is implied.
 - `database/canonical/v3.0.1/patch-achievement-credentials.sql`: opt-in
   relational foundation, issuer/source checks and forced RLS.
 - `tests/unit/credential-awards.test.ts`: boundary/unit checks.
+- `src/domain/credential-artifacts.server.ts`: noncredit PDF, safe sample SVG and portable private badge metadata. This does **not** constitute Open Badges certification.
+- `src/modules/learning/credential-preview.functions.ts` and `/canonical/lab/credentials`: provider-scoped V6.1 samples, not awarded credentials.
+- `src/modules/learning/credential-issuance.functions.ts`: disabled canonical issuance command that reuses the existing noncredit certificate row and records independent digital badge awards.
+- `tests/unit/credential-sql-contract.test.ts`: structural SQL guard tests, not PostgreSQL acceptance.
 
 ## Activation prerequisites
 
@@ -64,3 +68,20 @@ CEU approval, microcredential certification, or professional license is implied.
 - Two independent award formats never create duplicate school grades,
   academic credits, or synthetic class enrollments.
 - A revoked award or superseded source cannot verify as currently valid.
+
+
+## Issuance status and safety (November 14, 2026)
+
+The SQL patch now requires separate definition author and approver identities,
+active issuer staff grants for adjudication/issuance, independently verified
+issuer-owned revocation evidence, immutable published definitions, and a
+currentness function that checks source supersession, expiry and revocation.
+The activity source remains deliberately disabled until attendance and
+eligibility can be tied to a canonical participation record.
+
+**Not shipped:** Actual credential issuance, learner/guardian wallet,
+production artifact storage, real issuer permissions, public verification and
+the canonical verified summer/after-school session bridge. All require database
+installation, restricted RLS/role verification and authorized multi-actor
+integration tests. The new preview Lab can run from the existing provider
+training catalog without querying new tables.

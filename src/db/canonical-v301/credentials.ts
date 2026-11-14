@@ -14,6 +14,7 @@ export const credentialDefinitionVersions = educationV30.table("credential_defin
   title: text("title").notNull(), description: text("description").notNull().default(""),
   minimumVerifiedMinutes: integer("minimum_verified_minutes").notNull().default(0),
   lifecycle: text("lifecycle").$type<"draft" | "published" | "retired">().notNull().default("draft"),
+  createdByPersonId: uuid("created_by_person_id").notNull(),
   approvedByPersonId: uuid("approved_by_person_id"),
   publishedAt: timestamp("published_at", { withTimezone: true }),
 });
