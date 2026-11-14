@@ -44,7 +44,7 @@ export const previewNoncreditCredential = createServerFn({ method: "POST" })
       recipientName: "Example Learner",
       awardTitle: "SAMPLE - " + training.title,
       credentialReference: "SAMPLE-NOT-ISSUED",
-      issuedAt: "2026-11-14",
+      issuedAt: new Date().toISOString().slice(0, 10),
       description: "SAMPLE PREVIEW ONLY - NOT AN ISSUED CREDENTIAL",
     } as const;
     if (data.format === "pdf") {
