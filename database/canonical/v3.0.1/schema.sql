@@ -249,38 +249,6 @@ CREATE TABLE persons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), legal_first_name text, legal_last_name text,
   preferred_name text, birth_date date, created_at timestamptz NOT NULL DEFAULT now()
 );
--- Explicit cutover bridge. Legacy session grant IDs are locators only; they
--- never become canonical Person, Organization or Site identities by inference.
--- A trusted operator must verify each mapping. Revocation is immediate.
-CREATE TABLE canonical_legacy_grant_bindings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  legacy_account_id uuid NOT NULL, legacy_grant_id uuid NOT NULL,
-  canonical_person_id uuid NOT NULL REFERENCES persons(id),
-  canonical_organization_id uuid NOT NULL REFERENCES organizations(id),
-  verified_by_person_id uuid NOT NULL REFERENCES persons(id),
-  verified_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  revoked_at timestamptz,
-  CHECK(verified_by_person_id<>canonical_person_id),
-  CHECK(revoked_at IS NULL OR revoked_at>=verified_at)
-);
-CREATE UNIQUE INDEX canonical_legacy_grant_active_uq
-  ON canonical_legacy_grant_bindings(legacy_account_id,legacy_grant_id)
-  WHERE revoked_at IS NULL;
-CREATE TABLE canonical_legacy_site_links (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  legacy_site_id uuid NOT NULL,
-  canonical_site_id uuid NOT NULL REFERENCES sites(id),
-  canonical_organization_id uuid NOT NULL REFERENCES organizations(id),
-  verified_by_person_id uuid NOT NULL REFERENCES persons(id),
-  verified_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  revoked_at timestamptz,
-  CHECK(revoked_at IS NULL OR revoked_at>=verified_at)
-);
-CREATE UNIQUE INDEX canonical_legacy_site_link_active_legacy_uq
-  ON canonical_legacy_site_links(legacy_site_id) WHERE revoked_at IS NULL;
-CREATE UNIQUE INDEX canonical_legacy_site_link_active_canonical_uq
-  ON canonical_legacy_site_links(canonical_site_id) WHERE revoked_at IS NULL;
-
 CREATE TABLE learner_profiles (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), person_id uuid NOT NULL UNIQUE REFERENCES persons(id),
   created_at timestamptz NOT NULL DEFAULT now(), metadata jsonb NOT NULL DEFAULT '{}'::jsonb
@@ -10480,7 +10448,6 @@ BEGIN
  'qualification_program_fit_policy_version_withdrawals',
  'qualification_program_fit_reviewer_revocations',
  'database_role_organization_bindings','sites','site_organization_roles',
- 'canonical_legacy_grant_bindings','canonical_legacy_site_links',
  'geographic_areas','offerings','offering_versions',
  'qualification_program_fit_policies','qualification_program_fit_policy_versions',
  'blueprint_reference_items','blueprint_reference_item_versions',
