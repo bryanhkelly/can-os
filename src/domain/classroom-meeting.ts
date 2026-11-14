@@ -7,5 +7,8 @@ export const classroomMeetingUrl = z.string().url().max(2048).refine(value => {
 
 export function readClassroomMeetingUrl(metadata: Record<string, unknown>): string | null {
   if (metadata.classroomMeetingUrl === undefined || metadata.classroomMeetingUrl === null) return null;
-  return classroomMeetingUrl.parse(metadata.classroomMeetingUrl);
+  // Older/imported calendar metadata may not satisfy the current policy.
+  // Never return an unsafe link or fail the entire class-calendar read.
+  const parsed = classroomMeetingUrl.safeParse(metadata.classroomMeetingUrl);
+  return parsed.success ? parsed.data : null;
 }

@@ -9,11 +9,13 @@ import { WorkspaceNotice } from "@/components/workspace";
 import { type LoadOutcome } from "@/lib/safe-loader";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { classroomMeetingUrl } from "@/domain/classroom-meeting";
 import type { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 
 export type ClassroomMeetings = Awaited<ReturnType<typeof getClassroomMeetings>>;
-function isHttpsMeetingUrl(value: string) {
-  try { return new URL(value).protocol === "https:"; } catch { return false; }
+function isHttpsMeetingUrl(value: string): boolean {
+  // Keep client feedback consistent with the server's actual URL contract.
+  return classroomMeetingUrl.safeParse(value.trim()).success;
 }
 export type ClassroomMeetingCommands = {
   get: (request: Parameters<typeof getClassroomMeetings>[0]) => ReturnType<typeof getClassroomMeetings>;
