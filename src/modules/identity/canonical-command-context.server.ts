@@ -6,6 +6,7 @@ import {
   canonicalAuthReaderDatabaseRole,
   canonicalSessionCookie,
   canonicalSessionRowSchema,
+  type CanonicalSessionRow,
   projectCanonicalCommandContext,
 } from "@/domain/canonical-access";
 
@@ -29,7 +30,7 @@ export function canonicalSessionDigestFromRequest(request: Request): string {
     .update(pepper).update(":").update(raw).digest("hex");
 }
 
-export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
   const digest = canonicalSessionDigestFromRequest(request);
   const records = await db.transaction(async tx => {
     // Purpose-specific role may only EXECUTE the SECURE, read-only session
@@ -44,5 +45,10 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   });
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
-  return projectCanonicalCommandContext(canonicalSessionRowSchema.parse(records[0]));
+  return canonicalSessionRowSchema.parse(records[0]);
+}
+
+/** Public command contexts never expose the database session id. */
+export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+  return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
 }

@@ -22,6 +22,8 @@ type ClassVideoPlayerProps = {
   resourceId?: string;
   declaredVideo?: boolean;
   presentation?: "standard" | "classroom";
+  /** Observations only. External embeds do not prove playback or watch time. */
+  onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
 };
 
 export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
@@ -37,7 +39,7 @@ export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
   return <ClassVideoPlayerSession key={sourceIdentity} {...props}/>;
 }
 
-function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard" }: ClassVideoPlayerProps) {
+function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent }: ClassVideoPlayerProps) {
   // Do not fetch third-party media or private signed URLs during SSR or on
   // initial navigation. Even preload="metadata" initiates a network request.
   // All formats, including direct MP4/WebM, require a deliberate Play action.
@@ -68,6 +70,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
         return;
       }
       setSource(next);
+      if (resourceId) onPlaybackEvent?.("video_opened", resourceId);
       setReady(false);
       setSpeed(1);
     } catch (failure) {
@@ -109,6 +112,9 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       preload="metadata" aria-label={title} className="aspect-video w-full rounded bg-black"
       onLoadedMetadata={event => setReady(Number.isFinite(event.currentTarget.duration))}
       onRateChange={event => setSpeed(event.currentTarget.playbackRate)}
+      onPlay={() => { if (resourceId) onPlaybackEvent?.("video_played", resourceId); }}
+      onEnded={() => { if (resourceId) onPlaybackEvent?.("video_ended", resourceId); }}
+      onPause={event => { if (resourceId && !event.currentTarget.ended) onPlaybackEvent?.("video_paused", resourceId); }}
       onError={() => { setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}>
       Your browser does not support video playback.
     </video>}
