@@ -347,7 +347,7 @@ test("teacher reaches classes, discussions, missing work and their support works
 
     await page.goto("/teacher/gradebook?section="+fixture!.sectionId);
     await expect(page.getByRole("heading",{name:"Gradebook",exact:true})).toBeVisible();
-    await expect(page.getByRole("heading",{name:"Create an assessment"})).toBeVisible();
+    await expect(page.getByText("Create an assessment",{exact:true})).toBeVisible();
 
     await page.goto("/teacher/discussions?section="+fixture!.sectionId);
     await expect(page.getByRole("main").getByRole("heading",{level:1})).toBeVisible();
