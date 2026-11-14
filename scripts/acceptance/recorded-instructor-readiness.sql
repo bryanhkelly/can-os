@@ -75,6 +75,17 @@ WITH checks AS (
     AND to_regprocedure('education_v30.v301_canonical_session_context(text)') IS NOT NULL,
     'activation_gate'
   UNION ALL
+  SELECT 'canonical_session_identity_owner_rls',
+    (SELECT count(DISTINCT c.relname)=3
+      FROM pg_class c
+      JOIN pg_namespace n ON n.oid=c.relnamespace
+      JOIN pg_policies p ON p.schemaname=n.nspname AND p.tablename=c.relname
+      WHERE n.nspname='education_v30'
+        AND c.relname IN ('canonical_accounts','canonical_account_grants','canonical_sessions')
+        AND c.relrowsecurity AND c.relforcerowsecurity
+        AND p.policyname='can_v30_trusted_owner_access' AND p.cmd='ALL'
+        AND p.roles @> ARRAY[pg_get_userbyid(c.relowner)::name]), 'security'
+  UNION ALL
   SELECT 'non_owner_instructional_access_policies_present',
     (SELECT count(DISTINCT p.schemaname||'.'||p.tablename)=7
       FROM pg_policies p WHERE
