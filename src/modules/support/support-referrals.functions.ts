@@ -6,6 +6,8 @@ import { emitEvent,notify } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,or,sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { accessibleClasses, authorizeClass } from "@/modules/learning/class-access.server";
 import { z } from "zod";
 
 const stages = ["submitted","accepted","plan_created","in_service","review","closed"] as const;
@@ -18,15 +20,30 @@ function safeNote(input: string, max = 1500) { const s = input.trim(); if (s.len
 async function context() { const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]); return { db, s }; }
 
 
-async function taughtStudentIds(db: any, s: any, actor: Actor): Promise<string[]> {
-  const rows = await db.select({ studentProfileId: s.enrollments.studentProfileId }).from(s.enrollments)
-    .innerJoin(s.sectionTeachers,eq(s.sectionTeachers.sectionId,s.enrollments.sectionId))
-    .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
-    .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId),
-      eq(s.enrollments.status,"active"),eq(s.enrollments.kind,"section"),
-      inArray(s.sections.siteId,actor.scope.siteIds??[]),
-      inArray(s.sections.programId,actor.scope.programIds??[])));
-  return [...new Set(rows.map((r: { studentProfileId: string }) => r.studentProfileId))] as string[];
+/** Only current, canonical, assigned Sections; never grant CAN teachers host-Site access. */
+async function activeTeacherReferralRoster(db: any, s: any, actor: Actor) {
+ const ids=(await accessibleClasses(actor)).map(section=>section.id);
+ if(!ids.length)return [];
+ const programMembership=alias(s.enrollments,"teacher_referral_active_program");
+ return db.select({studentProfileId:s.enrollments.studentProfileId,
+   sectionId:s.sections.id,sectionTitle:s.sections.title,
+   siteId:s.sections.siteId,programId:s.sections.programId,
+   firstName:s.people.legalFirstName,lastName:s.people.legalLastName})
+  .from(s.enrollments)
+  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(programMembership,and(
+   eq(programMembership.studentProfileId,s.enrollments.studentProfileId),
+   eq(programMembership.programId,s.sections.programId),
+   eq(programMembership.schoolYearId,s.terms.schoolYearId),
+   eq(programMembership.kind,"program"),eq(programMembership.status,"active")))
+  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+  .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
+  .where(and(inArray(s.sections.id,ids),eq(s.sections.active,true),
+   eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+   eq(s.enrollments.programId,s.sections.programId),
+   eq(s.enrollments.schoolYearId,s.terms.schoolYearId)))
+  .orderBy(s.sections.title,s.people.legalLastName);
 }
 
 /** A site role alone does not authorize reading or changing confidential cases.
@@ -86,13 +103,12 @@ export const getSupportViewerRole=createServerFn({method:"GET"}).handler(async()
 export const getSupportReferrals = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["teacher", "specialist", "counselor"]);
   setResponseHeader("Cache-Control", "no-store");
-  const sites = actorSiteIds(actor);
   const { db, s } = await context();
-  let subjectIds: string[] | null = null;
-  if (actor.role === "teacher") {
-    subjectIds = await taughtStudentIds(db, s, actor);
-    if (!subjectIds.length) throw new AuthorizationError("referral student relationship");
-  }
+  const roster=actor.role==="teacher"?await activeTeacherReferralRoster(db,s,actor):null;
+  if(roster && !roster.length)return [];
+  const subjectIds=roster?[...new Set(roster.map((row: any)=>row.studentProfileId))]:null;
+  const sites=roster?[...new Set(roster.map((row: any)=>row.siteId))]:actorSiteIds(actor);
+  const programs=roster?[...new Set(roster.map((row: any)=>row.programId))]:(actor.scope.programIds??[]);
   const rows = await db.select({
     id: s.actions.id, title: s.actions.title, description: s.actions.description, status: s.actions.status,
     priority: s.actions.priority, metadata: s.actions.metadata, ownerPersonId: s.actions.ownerPersonId, createdAt: s.actions.createdAt,
@@ -106,7 +122,7 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
     .where(and(
       eq(s.actions.type, "support_referral"),
       inArray(s.actions.siteId, sites),
-      inArray(s.actions.programId,actor.scope.programIds??[]),
+      inArray(s.actions.programId,programs),
       subjectIds ? inArray(s.actions.subjectId, subjectIds) : undefined,
        actor.role === "teacher"
          ? eq(s.supportReferrals.reporterPersonId, actor.actorPersonId)
@@ -143,22 +159,11 @@ export const getSupportReferrals = createServerFn({ method: "GET" }).handler(asy
 export const listTeacherReferralStudents=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await requireActor(["teacher"],"referrals:create");
  const {db,s}=await context();
- const rows=await db.select({id:s.studentProfiles.id,
-  firstName:s.people.legalFirstName,lastName:s.people.legalLastName,
-  sectionTitle:s.sections.title
- }).from(s.enrollments)
- .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
- .innerJoin(s.sectionTeachers,and(
-   eq(s.sectionTeachers.sectionId,s.sections.id),
-   eq(s.sectionTeachers.personId,actor.actorPersonId)))
- .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
- .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
- .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
-   inArray(s.sections.siteId,actor.scope.siteIds??[]),
-   inArray(s.sections.programId,actor.scope.programIds??[])));
- return [...new Map(rows.map(row=>[row.id,{
-  id:row.id,name:personLegalName({ legalFirstName: row.firstName, legalLastName: row.lastName }),
-  sectionTitle:row.sectionTitle
+ const rows=await activeTeacherReferralRoster(db,s,actor);
+ return [...new Map(rows.map((row: any)=>[row.studentProfileId,{
+  id:row.studentProfileId,
+  name:personLegalName({legalFirstName:row.firstName,legalLastName:row.lastName}),
+  sectionTitle:row.sectionTitle,
  }])).values()].sort((a,b)=>a.name.localeCompare(b.name));
 });
 
