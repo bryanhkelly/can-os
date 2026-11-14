@@ -71,6 +71,23 @@ export function selectBlueprintWorkspaceRecipes<
   });
 }
 
+/**
+ * A previously proposed component remains part of the author's plan even
+ * when it is not yet approved/selected. Its references and proposed
+ * experiences must survive normal draft revision saves.
+ */
+export function includedBlueprintComponentIds(
+  selectedIds: readonly string[],
+  previous: readonly { componentId: string; selectionStatus: string }[],
+): Set<string> {
+  return new Set([
+    ...selectedIds,
+    ...previous
+      .filter(component => component.selectionStatus === "proposed")
+      .map(component => component.componentId),
+  ]);
+}
+
 export const blueprintComponentSelectionSchema = z.object({
   componentId: z.string().uuid(),
   selectionStatus: z.enum(["selected", "excluded", "proposed"]),
