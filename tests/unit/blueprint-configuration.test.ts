@@ -3,6 +3,7 @@ import {
   blueprintConfigurationIdentitySchema,
   blueprintConfigurationVersionInputSchema,
   missingRequiredBlueprintComponents,
+  selectBlueprintWorkspaceRecipes,
   blueprintProgramModelDraftSchema,
   blueprintReferenceSelectionSchema,
   blueprintWeeklyPeriodSchema,
@@ -13,6 +14,23 @@ import {
 } from "@/domain/blueprint-configuration";
 
 describe("canonical Blueprint configuration contracts", () => {
+  it("keeps saved published recipe versions accessible after a newer release", () => {
+    const recipes = [
+      { blueprintId: "school", blueprintVersionId: "school-v3" },
+      { blueprintId: "school", blueprintVersionId: "school-v2" },
+      { blueprintId: "school", blueprintVersionId: "school-v1" },
+      { blueprintId: "center", blueprintVersionId: "center-v2" },
+      { blueprintId: "center", blueprintVersionId: "center-v1" },
+    ];
+    expect(selectBlueprintWorkspaceRecipes(recipes, new Set(["school-v1"])).map(
+      recipe => recipe.blueprintVersionId,
+    )).toEqual(["school-v3", "school-v1", "center-v2"]);
+    expect(selectBlueprintWorkspaceRecipes(recipes, new Set()).map(
+      recipe => recipe.blueprintVersionId,
+    )).toEqual(["school-v3", "center-v2"]);
+  });
+
+
   it("requires mandatory recipe components on every saved Blueprint version", () => {
     const catalog = [
       { id: "academic", requirementMode: "required" },
