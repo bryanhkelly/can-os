@@ -124,7 +124,7 @@ for (const persona of ["student", "guardian", "teacher"] as const) {
  * shared student services, and legacy links.
  */
 const studentDestinations = [
-  { route: "/student/courses", heading: "My classes" },
+  { route: "/student/courses", heading: "Choose your classes." },
   { route: "/student/assignments", heading: "Your assignments" },
   { route: "/student/discussions", heading: "Course discussions" },
   { route: "/student/experiences", heading: "Your actions" },
