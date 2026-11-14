@@ -526,6 +526,47 @@ describe("canonical recorded teacher selection database contract", () => {
 });
 
 
+describe("recorded-instructor restricted learner database access", () => {
+  it("binds seven instructional reader policies to a real PostgreSQL login and Course attempt", () => {
+    const ddl = readFileSync(resolve(
+      import.meta.dirname, "../../database/canonical/v3.0.1/schema.sql",
+    ), "utf8");
+    expect(ddl).toContain("CREATE TABLE instructional_learner_login_bindings");
+    expect(ddl).toContain("ALTER TABLE instructional_learner_login_bindings FORCE ROW LEVEL SECURITY");
+    expect(ddl).toContain("b.db_login=session_user::name");
+    expect(ddl).toContain("b.course_attempt_id=p_attempt_id");
+    expect(ddl).toContain("current_setting('role',true)='can_v301_recorded_instruction_reader'");
+    for (const name of [
+      "instructional_learner_attempt_read",
+      "instructional_learner_selection_read",
+      "instructional_learner_lesson_progress_read",
+      "instructional_learner_practice_read",
+      "instructional_learner_track_version_read",
+      "instructional_learner_policy_version_read",
+      "instructional_learner_response_read",
+    ]) {
+      expect(ddl).toContain(`CREATE POLICY ${name}`);
+    }
+    for (const name of ["attempt", "course", "practice"]) {
+      expect(ddl).toContain(
+        `REVOKE ALL ON FUNCTION v301_instructional_login_can_read_${name}(uuid) FROM PUBLIC;`,
+      );
+    }
+  });
+
+  it("provisions only restricted, read-only learner principals with exact attempt bindings", () => {
+    const provisioning = readFileSync(resolve(
+      import.meta.dirname, "../../database/canonical/v3.0.1/provision-recorded-learner-role.sql",
+    ), "utf8");
+    expect(provisioning).toContain("AND NOT r.rolbypassrls");
+    expect(provisioning).toContain("AND NOT r.rolinherit");
+    expect(provisioning).toContain("ca.id=:'course_attempt_id'::uuid AND ca.status='active'");
+    expect(provisioning).toContain("GRANT SELECT ON");
+    expect(provisioning).toContain("WITH INHERIT FALSE, SET TRUE");
+    expect(provisioning).not.toMatch(/\\bGRANT (?:INSERT|UPDATE|DELETE) ON\\b/);
+  });
+});
+
 describe("recorded practice answer provenance", () => {
   it("preserves the original prompt with each learner answer for review after teacher switching", () => {
     expect(snapshotRecordedPracticeAnswers(
