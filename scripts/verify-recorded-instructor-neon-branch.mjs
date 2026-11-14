@@ -1,6 +1,6 @@
 /**
  * Fail closed: recorded-instructor database acceptance belongs to the
- * designated test01 Neon branch, never test01, main or another branch.
+ * designated test01 Neon branch, never db3.01, main or another branch.
  * These values are verified from PostgreSQL's own Neon identity settings,
  * not from a caller-controlled environment variable or database hostname.
  */
