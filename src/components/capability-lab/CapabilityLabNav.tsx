@@ -16,6 +16,10 @@ export function CapabilityLabNav({ current }: {
       className={linkClass + " " + (current === "site-qualification" ? currentClass : inactiveClass)}>Site qualification</Link>
     <Link to="/canonical/lab/readiness" aria-current={current === "readiness" ? "page" : undefined}
       className={linkClass + " " + (current === "readiness" ? currentClass : inactiveClass)}>Assessment catalog</Link>
+    <Link to="/canonical/lab/facilitated" aria-current={current === "facilitated" ? "page" : undefined}
+      className={linkClass + " " + (current === "facilitated" ? currentClass : inactiveClass)}>Facilitated delivery</Link>
+    <Link to="/canonical/lab/impact" aria-current={current === "impact" ? "page" : undefined}
+      className={linkClass + " " + (current === "impact" ? currentClass : inactiveClass)}>Participation evidence</Link>
     <Link to="/canonical/lab/noncredit" aria-current={current === "noncredit" ? "page" : undefined}
       className={linkClass + " " + (current === "noncredit" ? currentClass : inactiveClass)}>Noncredit testing</Link>
     <Link to="/canonical/lab/credentials" aria-current={current === "credentials" ? "page" : undefined}
