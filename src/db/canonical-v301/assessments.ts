@@ -74,8 +74,9 @@ export const assessmentFormAdministrations = educationV30.table("assessment_admi
 export const assessmentAccess = educationV30.table("assessment_access_grants",{
   id:id(),administrationId:uuid("administration_id").notNull(),
   learnerId:uuid("learner_id").notNull(),courseAttemptId:uuid("course_attempt_id"),
-  accessStatus:text("access_status").$type<"pending"|"approved"|"revoked">().notNull(),
-  validFrom:timestamp("valid_from",{withTimezone:true}).notNull(),
+  grantedByPersonId:uuid("granted_by_person_id").notNull(),
+  accessStatus:text("access_status").$type<"pending"|"approved"|"revoked">().notNull().default("approved"),
+  validFrom:timestamp("valid_from",{withTimezone:true}).notNull().defaultNow(),
   validThrough:timestamp("valid_through",{withTimezone:true}),
 });
 export const assessmentAccommodations = educationV30.table("assessment_accommodation_decisions",{
