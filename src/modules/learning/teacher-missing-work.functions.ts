@@ -105,7 +105,7 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),assessment.siteId?eq(s.actions.siteId,assessment.siteId):isNull(s.actions.siteId),eq(s.actions.programId,assessment.programId)));
    const open=existing.find(a=>a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
    if(open)return {actionId:open.id,created:false};
-   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,programId:assessment.programId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{source:"teacher_missing_work",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
+   const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{source:"teacher_missing_work",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create follow-up");
    await notify(tx, {recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:latestAttempt?.status==="returned"
     ?"Your teacher flagged an overdue revision. Open the returned assignment, review the feedback, and resubmit it."
@@ -113,6 +113,58 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
    await emitEvent(tx, {eventType:EventTypes.ActionCreated,aggregateType:"action",aggregateId:action.id,actorPersonId:context.actorPersonId!,payload:{assessmentId:assessment.id,studentProfileId:student.id}});
    await writeAudit(tx, {actorPersonId:context.actorPersonId!,action:"missing_work.follow_up",resourceType:"action",resourceId:action.id,scope:{siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId},after:{assessmentId:assessment.id,studentProfileId:student.id},context:{accountId:context.accountId,sessionId:context.sessionId}});
    return {actionId:action.id,created:true};
+  });
+ });
+
+/** The action owner closes their own overdue-work follow-up after documenting
+ * the result. The canonical Section contract is rechecked in the transaction. */
+export const resolveMissingWorkFollowUp=createServerFn({method:"POST"})
+ .validator((value:unknown)=>z.object({
+  actionId:z.string().uuid(),resolutionNote:z.string().trim().min(5).max(1000),
+ }).parse(value))
+ .handler(async({data})=>{
+  const context=await verifiedTeacher();
+  assertCapability(context,"action.resolve");
+  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+  return db.transaction(async tx=>{
+   const [action]=await tx.select().from(s.actions)
+    .where(eq(s.actions.id,data.actionId)).for("update").limit(1);
+   if(!action||action.type!=="missing_work_follow_up"||
+    action.ownerPersonId!==context.actorPersonId||
+    action.subjectType!=="student_profile"||
+    typeof action.metadata?.assessmentId!=="string")
+    throw new AuthorizationError("own assigned missing-work follow-up");
+   const [assessment]=await tx.select({
+    sectionId:s.assessments.sectionId,siteId:s.sections.siteId,programId:s.sections.programId,
+   }).from(s.assessments)
+    .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+    .where(eq(s.assessments.id,action.metadata.assessmentId)).limit(1);
+   if(!assessment||assessment.siteId!==action.siteId||
+    assessment.programId!==action.programId||
+    (action.sectionId&&action.sectionId!==assessment.sectionId))
+    throw new AuthorizationError("original assessment and Action scope");
+   await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
+   if(action.status==="resolved")return {resolved:false};
+   if(action.status==="cancelled")throw new Error("Cancelled follow-up cannot be resolved");
+   const now=new Date();
+   await tx.update(s.actions).set({
+    status:"resolved",resolutionNote:data.resolutionNote,
+    resolvedAt:now,updatedAt:now,
+   }).where(eq(s.actions.id,action.id));
+   await emitEvent(tx,{
+    eventType:EventTypes.ActionResolved,aggregateType:"action",aggregateId:action.id,
+    actorPersonId:context.actorPersonId!,
+    payload:{subjectType:action.subjectType,subjectId:action.subjectId},
+   });
+   await writeAudit(tx,{
+    actorPersonId:context.actorPersonId!,action:"missing_work.follow_up.resolve",
+    resourceType:"action",resourceId:action.id,
+    scope:{siteId:action.siteId,programId:action.programId,sectionId:assessment.sectionId},
+    before:{status:action.status},
+    after:{status:"resolved",resolutionNote:data.resolutionNote},
+    context:{accountId:context.accountId,sessionId:context.sessionId},
+   });
+   return {resolved:true};
   });
  });
 
