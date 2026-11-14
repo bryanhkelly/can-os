@@ -133,6 +133,25 @@ jobs:
           set -euo pipefail
           PGPASSWORD=ci_v301_disposable_only psql -h 127.0.0.1 -p 5432 -U can_v30_ci_app -d can_v301_ci -X -v ON_ERROR_STOP=1 <<'SQL'
           BEGIN;
+          -- The application login itself must not inherit any domain table access.
+          -- Explicit purpose role selection is mandatory for every query.
+          DO $app_login_test$
+          BEGIN
+            IF has_table_privilege(current_user, 'education_v30.sites', 'SELECT')
+               OR has_table_privilege(current_user, 'education_v30.blueprint_configurations', 'SELECT')
+               OR has_table_privilege(current_user, 'education_v30.canonical_sessions', 'SELECT')
+               OR has_table_privilege(current_user, 'education_v30.learner_course_attempts', 'SELECT')
+               OR has_table_privilege(current_user, 'education_v30_secure.formative_practice_responses', 'SELECT')
+            THEN
+              RAISE EXCEPTION 'Restricted login inherited canonical table access';
+            END IF;
+            IF NOT pg_has_role(current_user,
+                'can_v30_program_catalog_11111111111141118111111111111111', 'SET')
+               OR NOT pg_has_role(current_user, 'can_v30_public_site_reader', 'SET')
+            THEN
+              RAISE EXCEPTION 'Restricted login lacks required purpose-role selection';
+            END IF;
+          END $app_login_test$;
           SET LOCAL ROLE can_v30_program_catalog_11111111111141118111111111111111;
           DO $role_test$
           BEGIN
