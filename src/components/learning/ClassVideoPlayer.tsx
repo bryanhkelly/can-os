@@ -23,7 +23,7 @@ type ClassVideoPlayerProps = {
   declaredVideo?: boolean;
   presentation?: "standard" | "classroom";
   /** Observations only. External embeds do not prove playback or watch time. */
-  onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_ended", resourceId: string) => void;
+  onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
 };
 
 export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
@@ -114,6 +114,7 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       onRateChange={event => setSpeed(event.currentTarget.playbackRate)}
       onPlay={() => { if (resourceId) onPlaybackEvent?.("video_played", resourceId); }}
       onEnded={() => { if (resourceId) onPlaybackEvent?.("video_ended", resourceId); }}
+      onPause={event => { if (resourceId && !event.currentTarget.ended) onPlaybackEvent?.("video_paused", resourceId); }}
       onError={() => { setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}>
       Your browser does not support video playback.
     </video>}
