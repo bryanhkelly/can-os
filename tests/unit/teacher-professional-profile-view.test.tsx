@@ -35,7 +35,8 @@ describe("teacher professional profile editor", () => {
     expect(html).toContain("University or institution");
     expect(html).toContain("Subject or specialty areas");
     expect(html).toContain("Save professional background");
-    expect(intro).toContain("This is optional and self-reported");
-    expect(intro).toContain("licenses, certificates");
+    expect((html.match(/type="button"/g) ?? [])).toHaveLength(2);
+    expect(intro).toContain("Optional, self-reported education and experience.");
+    expect(intro).toContain("Licenses, certificates");
   });
 });
