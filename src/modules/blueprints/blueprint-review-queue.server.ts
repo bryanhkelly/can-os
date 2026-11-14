@@ -79,7 +79,6 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
       tx.select({
         configurationId: auditEvents.entityId,
         authorPersonId: auditEvents.actorPersonId,
-        payload: auditEvents.payload,
       }).from(auditEvents).where(and(
         inArray(auditEvents.entityId, configurationIds),
         inArray(auditEvents.eventCode, [
@@ -134,7 +133,6 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
       .filter(version => !authors.some(author =>
         author.configurationId === version.configurationId
         && author.authorPersonId === context.actorPersonId
-        && author.payload.versionId === version.versionId
       ))
       .map(version => ({
         configurationId: version.configurationId,
