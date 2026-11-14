@@ -60,23 +60,8 @@ try {
   const siblingSite = await q("SELECT id FROM education_v30.sites WHERE id=$1",
     ["22220000-0000-4000-8000-000000000002"]);
   check(ownSite.rowCount === 1 && siblingSite.rowCount === 0, "Site RLS isolation failed");
-  // Execution is permitted only for an Operation currently attached to the
-  // Blueprint's Site, even when the Organization operates other Sites.
-  const ownParticipation = await q(
-    "SELECT id FROM education_v30.education_operation_sites " +
-    "WHERE operation_id=$1 AND site_id=$2 " +
-    "AND valid_from<=clock_timestamp() " +
-    "AND (valid_through IS NULL OR valid_through>clock_timestamp())",
-    [operation, site],
-  );
-  check(ownParticipation.rowCount === 1, "The demo Operation must serve the selected Site");
-  const wrongParticipation = await q(
-    "SELECT id FROM education_v30.education_operation_sites " +
-    "WHERE operation_id=$1 AND site_id=$2",
-    [operation, "22220000-0000-4000-8000-000000000002"],
-  );
-  check(wrongParticipation.rowCount === 0,
-    "An Operation was attached to another Site in the acceptance fixture");
+  // Operation-to-Site fixture linkage is verified by the trusted demo seeder.
+  // The Blueprint author role must not receive raw participation-table access.
 
   const recipe = (await q(
     "SELECT b.id AS blueprint_id,v.id AS recipe_id,c.id AS component_id " +
