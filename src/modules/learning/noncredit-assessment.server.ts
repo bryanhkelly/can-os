@@ -134,14 +134,17 @@ async function latestAttempt(tx:Tx,grantId:string) {
     .orderBy(desc(assessmentExecutionAttempts.attemptNo)).limit(1);
   return attempt??null;
 }
-async function describeAttempt(tx:Tx,attempt:typeof assessmentExecutionAttempts.$inferSelect|null) {
+async function describeAttempt(tx:Tx,attempt:typeof assessmentExecutionAttempts.$inferSelect|null,maxAttempts:number) {
   if(!attempt)return {state:"not_started" as const,attemptId:null,
-    attemptNo:0,questions:[] as Question[],score:null};
+    attemptNo:0,attemptLimit:maxAttempts,remainingAttempts:maxAttempts,
+    draftAnswers:[] as {questionId:string;optionIds:string[]}[],
+    questions:[] as Question[],score:null};
   const [result]=await tx.select().from(assessmentExecutionResults)
     .where(eq(assessmentExecutionResults.attemptId,attempt.id))
     .orderBy(desc(assessmentExecutionResults.resultRevision)).limit(1);
   let questions:Question[]=[];
-  if(attempt.state==="in_progress") {
+  let draftAnswers:{questionId:string;optionIds:string[]}[]=[];
+  if(attempt.state==="in_progress" && (!attempt.expiresAt||attempt.expiresAt>new Date())) {
     const snapshot=await tx.select().from(assessmentExecutionItems)
       .where(eq(assessmentExecutionItems.attemptId,attempt.id))
       .orderBy(asc(assessmentExecutionItems.questionNumber));
@@ -162,9 +165,28 @@ async function describeAttempt(tx:Tx,attempt:typeof assessmentExecutionAttempts.
           id:o.id,label:publicText(o.displayContent,"option"),
         }))};
     });
+    const revisions=await tx.select().from(assessmentExecutionResponses)
+      .where(inArray(assessmentExecutionResponses.attemptItemId,snapshot.map(item=>item.id)))
+      .orderBy(desc(assessmentExecutionResponses.revisionNo));
+    const latestByItem=new Map<string,typeof revisions[number]>();
+    for(const revision of revisions) {
+      if(!latestByItem.has(revision.attemptItemId))latestByItem.set(revision.attemptItemId,revision);
+    }
+    const current=[...latestByItem.values()];
+    const chosen=current.length?await tx.select().from(assessmentExecutionChoices)
+      .where(inArray(assessmentExecutionChoices.responseVersionId,current.map(row=>row.id)))
+      .orderBy(asc(assessmentExecutionChoices.answerPosition)):[];
+    draftAnswers=current.map(row=>({
+      questionId:row.attemptItemId,
+      optionIds:chosen.filter(choice=>choice.responseVersionId===row.id).map(choice=>choice.optionId),
+    }));
   }
   return {
-    state:attempt.state,attemptId:attempt.id,attemptNo:attempt.attemptNo,
+    state:attempt.state==="in_progress"&&attempt.expiresAt&&attempt.expiresAt<=new Date()
+      ?"expired" as const:attempt.state,
+    attemptId:attempt.id,attemptNo:attempt.attemptNo,
+    attemptLimit:maxAttempts,remainingAttempts:Math.max(0,maxAttempts-attempt.attemptNo),
+    draftAnswers,
     expiresAt:attempt.expiresAt?.toISOString()??null,
     questions,score:result?{
       resultId:result.id,status:result.resultStatus,
@@ -174,12 +196,21 @@ async function describeAttempt(tx:Tx,attempt:typeof assessmentExecutionAttempts.
   };
 }
 
+async function allowedAttemptCount(tx:Tx,grantId:string,limit:number):Promise<number> {
+  const [accommodation]=await tx.select().from(assessmentAccommodations)
+    .where(and(eq(assessmentAccommodations.accessGrantId,grantId),
+      eq(assessmentAccommodations.approvalStatus,"approved")))
+    .orderBy(desc(assessmentAccommodations.revisionNo)).limit(1);
+  return limit+(accommodation?.extraAttempts??0);
+}
+
 export async function readNoncreditKnowledgeCheck(context:CommandContext,courseAttemptId:string) {
   return db.transaction(async tx=>{
     const scope=await loadNoncreditAssessment(tx,context,courseAttemptId);
     const attempt=await latestAttempt(tx,scope.grant.id);
+    const maxAttempts=await allowedAttemptCount(tx,scope.grant.id,scope.administration.attemptLimit);
     return {courseAttemptId,assessmentVersionId:scope.training.assessmentVersionId,
-      ...await describeAttempt(tx,attempt)};
+      ...await describeAttempt(tx,attempt,maxAttempts)};
   });
 }
 
@@ -194,10 +225,17 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
     if(!lockedGrant||lockedGrant.accessStatus!=="approved")
       throw new AuthorizationError("current knowledge check grant");
     const existing=await latestAttempt(tx,scope.grant.id);
-    if(existing?.requestKey===input.requestId||existing?.state==="in_progress")
-      return describeAttempt(tx,existing);
-    if(existing && ["prepared","submitted","scored"].includes(existing.state))
-      return describeAttempt(tx,existing);
+    const maxAttempts=await allowedAttemptCount(tx,scope.grant.id,scope.administration.attemptLimit);
+    if(existing?.requestKey===input.requestId)
+      return describeAttempt(tx,existing,maxAttempts);
+    if(existing?.state==="in_progress"&&existing.expiresAt&&existing.expiresAt<=new Date()) {
+      await tx.update(assessmentExecutionAttempts).set({state:"voided"})
+        .where(eq(assessmentExecutionAttempts.id,existing.id));
+    } else if(existing && ["in_progress","prepared","submitted","scored"].includes(existing.state)) {
+      return describeAttempt(tx,existing,maxAttempts);
+    }
+    if(existing && existing.attemptNo>=maxAttempts)
+      return describeAttempt(tx,existing,maxAttempts);
     const formItems=await loadFormQuestions(tx,scope.form.id);
     const [accommodation]=await tx.select().from(assessmentAccommodations)
       .where(and(eq(assessmentAccommodations.accessGrantId,scope.grant.id),
@@ -236,7 +274,61 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       aggregateType:"assessment_attempt",aggregateId:attempt.id,
       actorPersonId:context.actorPersonId,payload:startedPayload,
     });
-    return describeAttempt(tx,started!);
+    return describeAttempt(tx,started!,maxAttempts);
+  });
+}
+
+/**
+ * Save one answer revision while the attempt remains in progress.
+ * The caller is authenticated by their canonical Course attempt and grant.
+ * Missing or cleared selections remain an unscored draft, not a submission.
+ */
+export async function saveNoncreditKnowledgeCheckDraft(context:CommandContext,input:{
+  courseAttemptId:string;attemptId:string;questionId:string;requestId:string;
+  optionIds:string[];
+}) {
+  return db.transaction(async tx=>{
+    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId);
+    const [attempt]=await tx.select().from(assessmentExecutionAttempts)
+      .where(and(eq(assessmentExecutionAttempts.id,input.attemptId),
+        eq(assessmentExecutionAttempts.accessGrantId,scope.grant.id),
+        eq(assessmentExecutionAttempts.learnerId,scope.registration.learnerId!)))
+      .for("update").limit(1);
+    if(!attempt||attempt.state!=="in_progress"||
+        (attempt.expiresAt!==null&&attempt.expiresAt<=new Date()))
+      throw new AuthorizationError("active personal knowledge check");
+    const [item]=await tx.select().from(assessmentExecutionItems)
+      .where(and(eq(assessmentExecutionItems.id,input.questionId),
+        eq(assessmentExecutionItems.attemptId,attempt.id))).limit(1);
+    if(!item)throw new AuthorizationError("published attempt question");
+    const [version]=await tx.select().from(assessmentItemVersions)
+      .where(eq(assessmentItemVersions.id,item.itemVersionId)).limit(1);
+    if(!version||!objectiveKinds.some(kind=>kind===version.responseKind))
+      throw new AuthorizationError("objective assessment question");
+    const options=await tx.select({id:assessmentItemOptions.id}).from(assessmentItemOptions)
+      .where(eq(assessmentItemOptions.itemVersionId,item.itemVersionId));
+    const allowed=new Set(options.map(row=>row.id));
+    if(input.optionIds.length>32||new Set(input.optionIds).size!==input.optionIds.length||
+        input.optionIds.some(id=>!allowed.has(id))||
+        (version.responseKind!=="multi_select"&&input.optionIds.length>1))
+      throw new Error("Invalid saved answer choices");
+    const [prior]=await tx.select().from(assessmentExecutionResponses)
+      .where(eq(assessmentExecutionResponses.attemptItemId,item.id))
+      .orderBy(desc(assessmentExecutionResponses.revisionNo)).limit(1);
+    if(prior?.clientRequestId===input.requestId)return {saved:true,revision:prior.revisionNo};
+    if(prior?.responseState==="submitted")throw new AuthorizationError("submitted answer is immutable");
+    const [saved]=await tx.insert(assessmentExecutionResponses).values({
+      attemptItemId:item.id,revisionNo:(prior?.revisionNo??0)+1,
+      responseState:"saved",clientRequestId:input.requestId,
+    }).returning({id:assessmentExecutionResponses.id});
+    if(!saved)throw new Error("Could not save draft");
+    if(input.optionIds.length)await tx.insert(assessmentExecutionChoices).values(
+      input.optionIds.map((optionId,i)=>({
+        responseVersionId:saved.id,attemptItemId:item.id,
+        itemVersionId:item.itemVersionId,optionId,answerPosition:i+1,
+      })),
+    );
+    return {saved:true,revision:(prior?.revisionNo??0)+1};
   });
 }
 
@@ -252,7 +344,8 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
         eq(assessmentExecutionAttempts.learnerId,scope.registration.learnerId!)))
       .for("update").limit(1);
     if(!attempt)throw new AuthorizationError("personal knowledge check attempt");
-    if(attempt.state!=="in_progress")return describeAttempt(tx,attempt);
+    const maxAttempts=await allowedAttemptCount(tx,scope.grant.id,scope.administration.attemptLimit);
+    if(attempt.state!=="in_progress")return describeAttempt(tx,attempt,maxAttempts);
     if(attempt.expiresAt&&attempt.expiresAt<new Date())
       throw new Error("This timed knowledge check has expired");
     const items=await tx.select().from(assessmentExecutionItems)
@@ -292,12 +385,19 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     // transition to submitted and score. The v3.0.1 SQL trigger allows
     // automatic FINAL results only for strictly scoped noncredit objective
     // checks, after the reviewed migration is installed.
+    const submittedResponses=new Map<string,string>();
     for(const {item,chosen} of scored) {
+      const [previous]=await tx.select({revisionNo:assessmentExecutionResponses.revisionNo})
+        .from(assessmentExecutionResponses)
+        .where(eq(assessmentExecutionResponses.attemptItemId,item.id))
+        .orderBy(desc(assessmentExecutionResponses.revisionNo)).limit(1);
       const [response]=await tx.insert(assessmentExecutionResponses).values({
-        attemptItemId:item.id,revisionNo:1,responseState:"submitted",
+        attemptItemId:item.id,revisionNo:(previous?.revisionNo??0)+1,
+        responseState:"submitted",
         clientRequestId:input.requestId+":"+item.id,
       }).returning({id:assessmentExecutionResponses.id});
       if(!response)throw new Error("Assessment response was not saved");
+      submittedResponses.set(item.id,response.id);
       for(const [position,optionId] of chosen.entries()) {
         await tx.insert(assessmentExecutionChoices).values({
           responseVersionId:response.id,attemptItemId:item.id,
@@ -308,11 +408,10 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     await tx.update(assessmentExecutionAttempts).set({state:"submitted"})
       .where(eq(assessmentExecutionAttempts.id,attempt.id));
     for(const {item,score} of scored) {
-      const [response]=await tx.select().from(assessmentExecutionResponses)
-        .where(and(eq(assessmentExecutionResponses.attemptItemId,item.id),
-          eq(assessmentExecutionResponses.revisionNo,1))).limit(1);
+      const responseId=submittedResponses.get(item.id);
+      if(!responseId)throw new Error("Submitted response missing");
       await tx.insert(assessmentAutoScores).values({
-        attemptItemId:item.id,responseVersionId:response.id,scoringKind:"automated",
+        attemptItemId:item.id,responseVersionId:responseId,scoringKind:"automated",
         scoringEngineVersion:NONCREDIT_SCORING_ENGINE,score:score.toFixed(4),
         rubricEvidence:{method:"exact_option_match",engine:NONCREDIT_SCORING_ENGINE},
       });
