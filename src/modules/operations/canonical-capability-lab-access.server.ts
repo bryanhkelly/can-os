@@ -13,5 +13,5 @@ export async function requireCanonicalLabProvider() {
   if (orgIds.length !== 1 || !(actor.scope.siteIds?.length)) {
     throw new AuthorizationError("single provider organization and authorized Site");
   }
-  return { actor, organizationId: orgIds[0]!, siteIds: actor.scope.siteIds };
+  return { actor, organizationId: orgIds[0]!, siteIds: actor.scope.siteIds! };
 }
