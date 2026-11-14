@@ -83,9 +83,16 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
    // institutional agreement inside the Action mutation transaction.
    await authorizeClass(context as Actor,assessment.sectionId,undefined,tx);
    const [student]=await tx.select({id:s.studentProfiles.id,personId:s.people.id,name:s.people.legalFirstName})
-    .from(s.enrollments).innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
+    .from(s.enrollments)
+    .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+    .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+    .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
     .innerJoin(s.people,eq(s.people.id,s.studentProfiles.personId))
-    .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),eq(s.enrollments.sectionId,assessment.sectionId),eq(s.studentProfiles.id,data.studentProfileId))).limit(1);
+    .where(and(eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+      eq(s.enrollments.sectionId,assessment.sectionId),
+      eq(s.enrollments.programId,s.sections.programId),
+      eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+      eq(s.studentProfiles.id,data.studentProfileId))).limit(1);
    if(!student)throw new Error("Student not actively enrolled in this section");
    const [programMembership]=await tx.select({id:s.enrollments.id})
      .from(s.enrollments).innerJoin(s.terms,
