@@ -127,11 +127,11 @@ export function TeacherProfessionalProfileEditor({ snapshot, changed }: {
               onChange={event => updateEducation(index, { graduationYear: event.target.value })}
               className="mt-2" />
           </label>
-          <Button variant="ghost"
+          <Button type="button" variant="ghost"
             onClick={() => setEducation(current => current.filter((_, itemIndex) => itemIndex !== index))}
             className="justify-self-start sm:col-span-2"><Trash2 aria-hidden="true"/>Remove education item</Button>
         </div>)}
-        {education.length < 10 && <Button variant="outline"
+        {education.length < 10 && <Button type="button" variant="outline"
           onClick={() => setEducation(current => [...current, {
             institution: "", degree: "", fieldOfStudy: "", graduationYear: "",
           }])} className="justify-self-start"><Plus aria-hidden="true"/>Add education</Button>}
