@@ -148,3 +148,39 @@ of the existing application pairing expiry checks.
 `CAN_FACILITATED_LEARNING_ENABLED` disabled** until those blockers are
 resolved. Never connect the new restricted login to `DATABASE_URL` as a
 shortcut to provisioning the missing module-specific access.
+
+### Live Playwright release acceptance (not yet run)
+
+The opt-in `playwright.canonical-learning-release.config.ts` intentionally
+does **not** start a development server or silently use an old production build.
+Before running, configure a **current, nonproduction, fully provisioned**
+Netlify preview with the exact main commit and test-only learner, facilitator,
+foreign-organization and expired-session accounts. Inject the **actual Netlify
+published deploy commit** separately from the expected GitHub SHA:
+
+```sh
+CAN_RELEASE_E2E_URL=https://YOUR-BRANCH--YOUR-SITE.netlify.app \
+CAN_RELEASE_SOURCE_SHA=<git-main-sha> \
+CAN_RELEASE_DEPLOYED_SHA=<netlify-published-commit-sha> \
+CAN_RELEASE_HOST_COOKIE=<test-only-room-facilitator-session> \
+CAN_RELEASE_FOREIGN_HOST_COOKIE=<other-organization-facilitator-session> \
+CAN_RELEASE_LEARNER_COOKIE=<test-only-learner-session> \
+CAN_RELEASE_EXPIRED_HOST_COOKIE=<expired-test-session> \
+CAN_RELEASE_HOST_ONLY_COURSE_TITLE=<host-only-test-course> \
+npx playwright test -c playwright.canonical-learning-release.config.ts
+```
+
+The test rejects a mismatched or unprovided deployment SHA. It checks
+anonymous access, host facilitator navigation, learner-role denial, expired
+sessions and cross-organization course visibility. An optional real
+pairing/unpairing flow also requires
+`CAN_RELEASE_E2E_WRITES=1` and `CAN_RELEASE_LEARNER_COURSE_PATH`, and
+**refuses a non-preview production hostname**. Tests without their required
+synthetic QA accounts are explicitly skipped, not counted as verified.
+Never supply real learner, family or staff credentials.
+
+These **browser tests have not been run**. The current live Netlify
+deployment is stale relative to main, the connected browser automation
+service could not start due to exhausted credits, and Netlify environment
+writes failed with 403. None of the SQL acceptance results substitutes for
+current-commit authenticated browser acceptance.
