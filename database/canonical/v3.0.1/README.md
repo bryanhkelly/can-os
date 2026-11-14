@@ -8,6 +8,40 @@ identifiers. Until native canonical sign-in, session, permissions and Site
 selection are implemented and verified, keep the canonical Studio write flag
 disabled. Existing app session code does not establish canonical identity.
 
+### Canonical Blueprint authoring, review, and execution roles
+
+A trusted administrator must provision **two independently scoped PostgreSQL
+roles per canonical Organization** before using the new Studio. The application
+login must be a restricted `NOINHERIT` login, never the schema owner:
+
+```sh
+psql "$TEST_DATABASE_URL" \
+  -v organization_id=11110000-0000-4000-8000-000000000001 \
+  -v application_role=YOUR_RESTRICTED_LOGIN \
+  -f database/canonical/v3.0.1/provision-blueprint-roles.sql
+```
+
+Repeat with the Barton demo Organization ID
+`11110000-0000-4000-8000-000000000002`. The roles are bound to
+`blueprint_author` and `blueprint_reviewer` purposes, and application
+services explicitly enter the permitted role for each transaction.
+Authors can create and freeze draft versions; reviewers can assess a
+different person's frozen version using current verified Organization evidence.
+Execution requires an approved review and an approved operator relationship
+with a canonical Operation. Any resulting Deployment is **planning only**.
+
+For the optional isolated acceptance fixture, after seeding the two native
+Sites, apply `seed-blueprint-execution-demo.sql` as the trusted database
+administrator. It adds independent school/learning-center Operations with
+current operators and Organization-owned reviewer evidence. No educational
+authority or external credential is fabricated.
+
+Never grant either role access to raw canonical sessions, learner records,
+safeguarding data, finance data or direct publication. SQL policies, grants
+and server transactions must be exercised in a disposable test database
+before any rollout flag is enabled. GitHub Actions runner failures are not
+evidence of passing tests.
+
 ### Native v3.0.1 authentication and demo setup
 
 The new canonical model includes `canonical_accounts`,
