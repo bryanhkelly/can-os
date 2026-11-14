@@ -58,14 +58,40 @@ identity projection. Do not treat separate database usernames or caller-set
 session variables as proof of the logged-in learner. The learner-role binding
 must be verified before exposing an application route.
 
-**Current state:** `test01` (Neon branch `br-bitter-feather-ar0u63x7`)
-is the approved database target for this acceptance, confirmed by the project
-owner. It already contains the canonical learner tables and the corrected
-same-presenter policy-renewal trigger. The canonical account, grant and session
-tables are now installed under forced RLS with owner-only access. There
-are still no seeded learner Course attempts or configured restricted
-learner logins; end-to-end session and two-learner isolation acceptance
-remain outstanding. Run the readiness check against
-`test01`; do not sign off the learner route until the eleven-check readiness
-contract and restricted two-learner isolation both pass. Do not run these
-acceptance scripts against `db3.01` or `main`.
+## Verified db3.01 acceptance state
+
+**Target:** Neon project `sweet-hall-62441909`, branch `db3.01`
+(`br-tiny-mode-arh9wa2e`). The committed acceptance scripts fail closed
+against `test01`, `main`, or a different Neon project.
+
+On 2026-11-14, the designated `db3.01` branch was verified directly:
+
+- The canonical v3.0.1 DDL and native Valor/Barton demo data are installed
+  alongside the unchanged legacy `public` tables.
+- The synthetic two-learner fixture
+  `database/canonical/v3.0.1/seed-recorded-instructor-isolation-demo.sql`
+  is installed. It creates two learner Course attempts in one Section with
+  different approved **synthetic** recorded instructors, independently saved
+  lesson progress, practice answers, and draft official course grades.
+- The eleven-check `recorded-instructor-readiness.sql` contract passed
+  **11/11** against `db3.01`.
+- Two actual restricted PostgreSQL LOGIN principals,
+  `can_v301_demo_learner_a` and `can_v301_demo_learner_b`, were provisioned
+  with no automatic role inheritance and separate active Course-attempt
+  bindings. A dedicated `can_v301_recorded_instruction_reader` role grants
+  narrowly scoped read access only when selected explicitly.
+- Each principal's independent read-only Neon database transaction verified
+  **one own / zero other** for Course attempts, selected instructors,
+  lesson progress, practice attempts, and private practice responses.
+  The raw login has no direct access to the canonical schemas.
+- A rollback-only instructor switch for Learner A verified that its prior
+  practice, private answers, lesson progress, official assignment, and
+  draft official grade remained unchanged. No changed selection persisted.
+
+**Scope of signoff:** This is real database-level acceptance for the two
+restricted identities on `db3.01`. The combined Node-based acceptance
+command has not separately run using their private connection URLs, and
+end-to-end **application** learner-session authorization has not been
+validated. The fixture contains no playable media and no real licensing or
+content-rights approvals. Do **not** enable learner-facing recorded-instructor
+routes until those independent application and content gates are met.
