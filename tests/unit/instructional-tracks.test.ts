@@ -8,6 +8,7 @@ import {
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
+  recordedInstructorSelectionIsCurrent,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
   type InstructionalTrackPolicyContext,
@@ -388,5 +389,32 @@ describe("same Section, independently selected recorded teachers", () => {
     expect(after.map(lesson => lesson.progress)).toEqual(before.map(lesson => lesson.progress));
     expect(after.map(lesson => lesson.id)).toEqual(before.map(lesson => lesson.id));
     expect(after[0]?.presentations[0]?.assetVersionId).toBe("teacher-b-video");
+  });
+});
+
+describe("recorded instructor policy renewal eligibility", () => {
+  const selected = { trackVersionId: "teacher-a", policyVersionId: "policy-old" };
+  const approved = [
+    { trackVersionId: "teacher-a", policyVersionId: "policy-new" },
+    { trackVersionId: "teacher-b", policyVersionId: "policy-new" },
+  ];
+
+  it("prompts a learner to renew the same recorded instructor after policy replacement", () => {
+    expect(recordedInstructorSelectionIsCurrent({ selection: selected, choices: approved })).toBe(false);
+    expect(decideInstructionalTrackSelection({
+      current: selected,
+      lastTrackVersionId: selected.trackVersionId,
+      requestedTrackVersionId: selected.trackVersionId,
+      policyVersionId: "policy-new",
+      allowSwitching: false,
+    })).toBe("create");
+    expect(recordedInstructorSelectionIsCurrent({
+      selection: { ...selected, policyVersionId: "policy-new" },
+      choices: approved,
+    })).toBe(true);
+  });
+
+  it("does not open lessons before a teacher is selected", () => {
+    expect(recordedInstructorSelectionIsCurrent({ selection: null, choices: approved })).toBe(false);
   });
 });
