@@ -17,14 +17,13 @@ beforeEach(()=>{
  state.options={sites:[{id:siteId,organizationId:"org",websiteDraft:null}]};state.launches=[];state.programReadFails=false;state.websiteReadFails=false;state.teamReadFails=false;state.content=null;state.grants=[{personId:"admin",active:true}];
 });
 describe("exact-Site Hub reader",()=>{
- it("keeps canonical catalog widgets behind an explicit rollout switch",async()=>{
-  vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","false");
+ it("does not expose canonical Blueprint workflows through the old School Hub",async()=>{
+  vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","true");
+  vi.stubEnv("CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED","true");
   try {
-   const disabled=await getSchoolHubData({data:{siteId,module:"academics"}});
-   expect(disabled.canonicalCatalogEnabled).toBe(false);
-   vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","true");
-   const enabled=await getSchoolHubData({data:{siteId,module:"academics"}});
-   expect(enabled.canonicalCatalogEnabled).toBe(true);
+   const result=await getSchoolHubData({data:{siteId,module:"academics"}});
+   expect("canonicalCatalogEnabled" in result).toBe(false);
+   expect("canonicalBlueprintEnabled" in result).toBe(false);
   } finally {
    vi.unstubAllEnvs();
   }
