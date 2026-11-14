@@ -5,6 +5,7 @@ import { CanonicalBlueprintWorkspace } from "@/components/launch-studio/Canonica
 vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
   readCanonicalBlueprintWorkspace: vi.fn(),
   readCanonicalBlueprintConfiguration: vi.fn(),
+  readCanonicalBlueprintReview: vi.fn(),
   createCanonicalBlueprintConfiguration: vi.fn(),
   saveCanonicalBlueprintConfiguration: vi.fn(),
   submitCanonicalBlueprintConfiguration: vi.fn(),
