@@ -58,7 +58,8 @@ function GuardianEnrollmentChecklistView({ applicationId, protectUnsaved }: { ap
   }
   return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">
     {protectUnsaved && <LaunchUnsavedChangesGuard dirty={Object.values(files).some(Boolean) ||
-      Object.values(dirtyForms).some(Boolean) || mutation.pending || mutation.refreshFailed} />}
+      Object.values(dirtyForms).some(Boolean) || mutation.pending || mutation.refreshFailed}
+      message="Leave enrollment? Unsaved form answers or selected documents will be lost. Stay to save or submit them, or leave without saving." />}
     <h3 className="text-lg font-semibold">Enrollment checklist</h3>
     <p className="text-sm">Complete the school's requested information here. Uploading a document does not accept an offer,
       sign a form or activate enrollment.</p>
