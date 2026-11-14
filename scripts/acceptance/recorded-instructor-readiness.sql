@@ -68,6 +68,13 @@ WITH checks AS (
        AND pg_get_functiondef('education_v30.validate_primary_track_selection()'::regprocedure)
        LIKE '%latest.track_version_id<>NEW.track_version_id%'), 'activation_gate'
   UNION ALL
+  SELECT 'canonical_session_identity_available',
+    to_regclass('education_v30.canonical_accounts') IS NOT NULL
+    AND to_regclass('education_v30.canonical_account_grants') IS NOT NULL
+    AND to_regclass('education_v30.canonical_sessions') IS NOT NULL
+    AND to_regprocedure('education_v30.v301_canonical_session_context(text)') IS NOT NULL,
+    'activation_gate'
+  UNION ALL
   SELECT 'non_owner_instructional_access_policies_present',
     (SELECT count(DISTINCT p.schemaname||'.'||p.tablename)=7
       FROM pg_policies p WHERE
