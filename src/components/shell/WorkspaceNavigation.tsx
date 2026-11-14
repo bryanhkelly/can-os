@@ -1,3 +1,4 @@
+import {clearLearnerBrowserState} from "@/domain/session-client";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import {useLocation} from "@tanstack/react-router";
 import {useEffect,useState,useSyncExternalStore,type ReactNode} from "react";
@@ -93,6 +94,7 @@ export function WorkspaceNavigation({children}:{children?:ReactNode}){
  const signOut=async()=>{
   const response=await fetch("/access/logout",{method:"POST",credentials:"same-origin"});
   if(!response.ok)throw new Error("Unable to sign out. Please try again.");
+  clearLearnerBrowserState();
   window.location.assign("/access");
  };
  async function changeSession(command:()=>Promise<void>,switching=false){

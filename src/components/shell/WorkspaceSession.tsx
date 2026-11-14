@@ -41,7 +41,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
   const changed = previousIdentity.current !== null && identity !== null && previousIdentity.current !== identity;
   useEffect(() => {
     // A new identity/scope must never reuse the previous workspace's mounted state or caches.
-    if (changed) window.location.reload();
+    if (changed) {clearLearnerBrowserState();window.location.reload();}
     else if (identity !== null) previousIdentity.current = identity;
   }, [changed, identity]);
   useEffect(() => {
