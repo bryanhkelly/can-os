@@ -69,6 +69,19 @@ describe("linked class video", () => {
     });
     expect(first.key).toBe(same.key);
   });
+  it("does not direct students to a source link when the URL is unsafe", () => {
+    const unsafe = renderToStaticMarkup(
+      <ClassVideoPlayer title="Unsafe source" url="javascript:alert(1)"/>,
+    );
+    expect(unsafe).toContain("unavailable or unsafe");
+    expect(unsafe).not.toContain("Use the source link below");
+    expect(unsafe).not.toContain("<a ");
+    const external = renderToStaticMarkup(
+      <ClassVideoPlayer title="External source" url="https://school.example.test/video-page" declaredVideo={false}/>,
+    );
+    expect(external).toContain("Use the source link below");
+    expect(external).toContain("Open External source at source");
+  });
   it("requires explicit playback even for classroom-stage direct MP4 and private videos", () => {
     for (const props of [
       { title: "Direct class recording", url: "https://media.example.test/unit-1.mp4", presentation: "classroom" as const },

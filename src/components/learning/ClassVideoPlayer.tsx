@@ -97,7 +97,11 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
       <span>{pending ? "Loading video..." : "Play video"}</span>
     </button>}
     {!source && !loadUrl && !video && <ClassVideoPlaceholder title="Recording unavailable" headingLevel={presentation === "classroom" ? 2 : 3}
-      message={url ? "This video source is not supported for embedded playback. Use the source link below." : "No video recording has been attached."}/>}
+      message={url
+        ? sourceLink
+          ? "This video source is not supported for embedded playback. Use the source link below."
+          : "This video source is unavailable or unsafe. Ask your school to replace the link."
+        : "No video recording has been attached."}/>}
     {source && video?.kind === "embed" && <iframe src={video.src} title={title}
       className="aspect-video w-full rounded border" allow="fullscreen; picture-in-picture; encrypted-media"
       allowFullScreen referrerPolicy="no-referrer" />}
