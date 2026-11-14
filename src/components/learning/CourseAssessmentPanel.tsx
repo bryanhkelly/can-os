@@ -77,9 +77,12 @@ function KnowledgeCheckSession({courseAttemptId,onAssessmentCompleted}:{
       {check.remainingAttempts>0?` · ${check.remainingAttempts} future attempt(s) available`:
         " · No further attempts available"}.
     </p>
-    {check.state==="not_started"&&<Button onClick={()=>void begin()} disabled={busy}>
-      {busy?"Starting...":"Start knowledge check"}
-    </Button>}
+    {check.state==="not_started"&&check.canStart&&check.remainingAttempts>0&&
+      <Button onClick={()=>void begin()} disabled={busy}>
+        {busy?"Starting...":"Start knowledge check"}
+      </Button>}
+    {check.state==="not_started"&&!check.canStart&&
+      <p className="text-sm" role="status">This knowledge check is not currently open.</p>}
     {check.state==="in_progress"&&check.attemptId&&
       <LearningQuestionnaire key={check.attemptId} title="Course knowledge questions"
         questions={check.questions} submitLabel="Submit knowledge check"
@@ -126,15 +129,18 @@ function KnowledgeCheckSession({courseAttemptId,onAssessmentCompleted}:{
       <p className="mt-2 text-muted-foreground">
         A confirmed knowledge-check result is separate from training completion, grades and credit.
       </p>
-      {check.remainingAttempts>0&&<Button className="mt-3" variant="outline"
+      {check.canStart&&check.remainingAttempts>0&&<Button className="mt-3" variant="outline"
         disabled={busy} onClick={()=>void begin()}>
         {busy?"Starting...":"Retake knowledge check"}
       </Button>}
     </div>}
-    {(check.state==="voided"||check.state==="expired")&&check.remainingAttempts>0&&
+    {(check.state==="voided"||check.state==="expired")&&check.canStart&&check.remainingAttempts>0&&
       <Button variant="outline" disabled={busy} onClick={()=>void begin()}>
         {busy?"Starting...":"Start another allowed attempt"}
       </Button>}
+    {check.state==="closed"&&<p role="status" className="border p-3 text-sm">
+      The knowledge-check submission window is closed. Saved responses remain in your attempt history.
+    </p>}
     {check.state==="voided"&&<p role="status" className="border p-3 text-sm">
       This knowledge-check attempt is unavailable.
     </p>}
