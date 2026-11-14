@@ -4,6 +4,7 @@ import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
 import { getFacilitatedImpactReport } from "@/modules/learning/facilitated-impact.functions";
+import { NoncreditPilotOutcomesPanel } from "@/components/learning/NoncreditPilotOutcomesPanel";
 
 export const Route = createFileRoute("/canonical/lab/impact")({
   loader: () => safeLoader(() => getFacilitatedImpactReport())(),
@@ -73,43 +74,13 @@ function ImpactLabPage() {
         </table>
       </div>
     </section>
-    <section className="mt-8" aria-label="Provider training outcomes">
-      <h2 className="font-serif text-xl font-semibold">Organization training outcomes</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        These are organization-owned noncredit training records. They are not attributed
-        to the Site or an individual facilitator solely because someone paired a device.
-        Counts span the available training history rather than just the 90-day room window.
+    <section className="mt-8" aria-label="Authoritative noncredit learning outcomes">
+      <p className="mb-4 text-sm text-muted-foreground">
+        Registration, baseline and final knowledge checks, identified feedback,
+        and confirmed completion are calculated by the canonical noncredit pilot
+        reporting service. These are not inferred from paired devices or video starts.
       </p>
-      {data.organizationPrograms.partial&&<p role="status" className="mt-3 text-sm">
-        Showing the first 100 training versions. The organization totals are incomplete.
-      </p>}
-      <div className="mt-4 overflow-x-auto border border-border bg-card">
-        <table className="w-full min-w-160 text-left text-sm">
-          <thead className="border-b border-border bg-muted/40">
-            <tr>
-              <th className="p-3" scope="col">Training</th>
-              <th className="p-3" scope="col">Registrations</th>
-              <th className="p-3" scope="col">Knowledge check submitted</th>
-              <th className="p-3" scope="col">Recorded completions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.organizationPrograms.trainings.map(row=><tr key={row.id}
-              className="border-b border-border last:border-b-0">
-              <th scope="row" className="p-3 font-medium">{row.title}</th>
-              <td className="p-3 tabular-nums">{row.registered}</td>
-              <td className="p-3 tabular-nums">{row.submittedKnowledgeCheck}</td>
-              <td className="p-3 tabular-nums">{row.recordedCompletionDecisions}</td>
-            </tr>)}
-            {!data.organizationPrograms.trainings.length&&<tr><td colSpan={4}
-              className="p-4 text-muted-foreground">No provider-owned noncredit training yet.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-4 text-sm">
-        Identified feedback submissions across this organization's campaigns:
-        <strong className="ml-2">{data.organizationPrograms.identifiedSurveyResponses}</strong>
-      </p>
+      <NoncreditPilotOutcomesPanel/>
     </section>
     <section className="mt-7 border-t border-border pt-5" aria-label="Evidence definitions">
       <h2 className="font-serif text-lg font-semibold">How to interpret these counts</h2>
