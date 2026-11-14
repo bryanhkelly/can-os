@@ -16,6 +16,7 @@ describe("GradebookAssessmentComposer",()=>{
  it("keeps publishing disabled without due date and confirmation",()=>{
   const html=renderToStaticMarkup(<GradebookAssessmentComposer {...base}/>);
   expect(html).toContain("Saving a draft never assigns work");
+  expect(html).toContain("Times use your class timezone (America/Los_Angeles)");
   expect(html).toMatch(/disabled=""[^>]*>Publish &amp; assign/);
  });
  it("allows publishing only with due date and explicit confirmation",()=>{
