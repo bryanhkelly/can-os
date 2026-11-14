@@ -24,6 +24,10 @@ const usd = (amount: number) => new Intl.NumberFormat("en-US", {
   style: "currency", currency: "USD", maximumFractionDigits: 2,
 }).format(amount / 100);
 
+function consentContext(studentProfileId: string, householdId: string, permissionVersion: string) {
+  return JSON.stringify([studentProfileId, householdId, permissionVersion]);
+}
+
 function FamilyEnrichment() {
   const result = Route.useLoaderData();
   if (!result.ok) return <LoaderFailure eyebrow="Family"
@@ -38,7 +42,7 @@ function EnrichmentFamilyView({ data }: {
   const router = useRouter();
   const [householdId, setHouseholdId] = useState(data.family.households[0]?.id ?? "");
   const [studentSelections, setStudentSelections] = useState<Record<string,string>>({});
-  const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+  const [acknowledged, setAcknowledged] = useState<Record<string, string>>({});
   const [packageSelections, setPackageSelections] = useState<Record<string,string[]>>({});
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
@@ -68,10 +72,11 @@ function EnrichmentFamilyView({ data }: {
       const studentProfileId = studentSelections[seasonId] ?? data.family.children[0]?.studentProfileId;
       if (!householdId || !studentProfileId)
         return setError("Choose a child and family household to register.");
-      if (acknowledged[seasonId] !== true)
-        return setError("Read and acknowledge the published permission statement.");
       const offer = data.catalog.find(item => item.seasonId === seasonId);
       if (!offer) return setError("Offering no longer available");
+      if (permissionVersion !== offer.permissionVersion ||
+          acknowledged[seasonId] !== consentContext(studentProfileId, householdId, offer.permissionVersion))
+        return setError("Read and acknowledge the published permission statement for this child and household.");
       const selectedPackageIds = packageSelections[seasonId] ?? [];
       if (offer.packages.some(item => selectedPackageIds.includes(item.id) && !item.available))
         return setError("A selected package has canceled or unavailable sessions");
@@ -86,7 +91,7 @@ function EnrichmentFamilyView({ data }: {
         seasonId, studentProfileId, householdId, permissionVersion, acknowledged: true,
         ...(offer.packages.length ? { selectedPackageIds } : {}),
       } });
-      setAcknowledged(prev => ({ ...prev, [seasonId]: false }));
+      setAcknowledged(prev => ({ ...prev, [seasonId]: "" }));
       return registered;
     }, { successMessage: registered => registered.status === "waitlisted"
         ? "Your child is on the waitlist. No activity fee was charged."
@@ -242,15 +247,17 @@ function EnrichmentFamilyView({ data }: {
               <p className="whitespace-pre-wrap">{offer.permissionText}</p>
             </div>
             <label className="mt-3 flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={acknowledged[offer.seasonId] ?? false}
+              <input type="checkbox" className="mt-1"
+                checked={acknowledged[offer.seasonId] === consentContext(selected, householdId, offer.permissionVersion)}
                 onChange={e => setAcknowledged(prev => ({
-                  ...prev, [offer.seasonId]: e.target.checked,
+                  ...prev, [offer.seasonId]: e.target.checked
+                    ? consentContext(selected, householdId, offer.permissionVersion) : "",
                 }))}/>
               I have read and agree to this participation permission for the selected child.
             </label>
             <button type="button" onClick={() => register(offer.seasonId, offer.permissionVersion)}
               disabled={busy || !selected || !householdId || !offer.registrationOpen ||
-                !acknowledged[offer.seasonId] || packageConflict || unavailableSelection ||
+                acknowledged[offer.seasonId] !== consentContext(selected, householdId, offer.permissionVersion) || packageConflict || unavailableSelection ||
                 (offer.packages.length > 0 && !chosenIds.length)}
               className="mt-4 rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
               {offer.registrationOpen ? "Submit registration" : "Registration window is closed"}
