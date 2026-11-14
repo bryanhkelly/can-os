@@ -26,6 +26,7 @@ import {
   type CommandContext,
 } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 
 type ExecutionResult = {
   executionBatchId: string;
@@ -67,8 +68,10 @@ export async function executeBlueprintConfiguration(
   const actorPersonId = context.actorPersonId;
   assertCapability(context, "blueprint.execute");
   const input = executeBlueprintConfigurationInputSchema.parse(rawInput);
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
 
   return db.transaction(async (tx) => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const [configurationVersion] = await tx.select({
       id: blueprintConfigurationVersions.id,
       blueprintId: blueprintConfigurationVersions.blueprintId,
