@@ -331,6 +331,76 @@ test("student saves and submits assignment work, then sees persisted receipt", a
   });
 });
 
+/**
+ * Teacher P0 acceptance on the same isolated, synthetic gradebook fixture as
+ * the student's real submitted assignment. No launch/setup configuration.
+ */
+test("teacher reaches classes, discussions, missing work and their support workspace", async ({ browser }) => {
+  const secret=roleSecrets.teacher;
+  if(!secret||!fixture)throw new Error("Missing synthetic teacher fixture.");
+  await withAuthenticatedPage(browser,secret,async({page})=>{
+    const errors:string[]=[];
+    page.on("pageerror",error=>errors.push(error.message));
+
+    await expectWorkspaceRoute(page,"/classes","My classes");
+    await expect(page.getByRole("main")).not.toContainText(/Sign in with an authorized|Unable to open/i);
+
+    await page.goto("/teacher/gradebook?section="+fixture!.sectionId);
+    await expect(page.getByRole("heading",{name:"Gradebook",exact:true})).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Create an assessment"})).toBeVisible();
+
+    await page.goto("/teacher/discussions?section="+fixture!.sectionId);
+    await expect(page.getByRole("main").getByRole("heading",{level:1})).toBeVisible();
+    await expect(page.getByRole("main")).not.toContainText(/Sign in with an authorized|Unable to load/i);
+
+    await page.goto("/teacher/missing-work");
+    await expect(page.getByRole("heading",{name:"Missing work",exact:true})).toBeVisible();
+
+    await page.goto("/student/support");
+    await expect(page.getByRole("heading",{name:"Refer for support"})).toBeVisible();
+    await expect(page.getByRole("option",{name:/E2E|student/i}).first()).toBeVisible();
+
+    await page.goto("/staff/students/"+fixture!.studentPersonId);
+    await expect(page.getByRole("main").getByRole("heading",{level:1})).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});
+
+test("teacher grades a submitted assignment and the student sees released feedback", async ({ browser }) => {
+  if(!fixture||!roleSecrets.teacher||!roleSecrets.student)
+    throw new Error("Missing synthetic teacher/student fixture.");
+  const submitted=await sql!.query(
+    "select status from submissions where id=$1",
+    [fixture.submissionId],
+  ) as Array<{status:string}>;
+  expect(submitted[0]?.status).toBe("submitted");
+  await withAuthenticatedPage(browser,roleSecrets.teacher,async({page})=>{
+    const response=await page.goto(
+      "/teacher/gradebook?section="+fixture!.sectionId+
+      "&assessment="+fixture!.assessmentId+"&student="+fixture!.studentProfileId,
+    );
+    expect(response?.status()).toBe(200);
+    const score=page.getByRole("spinbutton",{name:/Score \(0/});
+    await expect(score).toBeVisible();
+    await score.fill("91");
+    await page.getByRole("textbox",{name:"Feedback comment"}).fill(
+      "Clear supporting evidence. Review your final explanation.",
+    );
+    await page.getByRole("button",{name:"Post grade"}).click();
+    await expect(page.getByText("Grade posted.")).toBeVisible();
+  });
+  const graded=await sql!.query(
+    "select status, score from submissions where id=$1",
+    [fixture.submissionId],
+  ) as Array<{status:string;score:number|string|null}>;
+  expect(graded[0]?.status).toBe("graded");
+  expect(Number(graded[0]?.score)).toBe(91);
+  await withAuthenticatedPage(browser,roleSecrets.student,async({page})=>{
+    await page.goto("/student/assignments/"+fixture!.assessmentId);
+    await expect(page.getByText(/91\s*\/\s*100/).first()).toBeVisible();
+  });
+});
+
 test("student dashboard class links open the enrolled classroom directory", async ({ browser }) => {
   const secret = roleSecrets.student;
   if (!secret) throw new Error("Missing synthetic student session.");
