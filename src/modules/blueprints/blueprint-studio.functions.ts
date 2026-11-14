@@ -13,6 +13,7 @@ import {
   decideBlueprintReviewInputSchema,
 } from "@/domain/blueprint-review";
 import { executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
+import { blueprintWorkspaceInputSchema, getCanonicalBlueprintWorkspace } from "./blueprint-workspace.server";
 import {
   createBlueprintConfiguration,
   getBlueprintConfiguration,
@@ -32,6 +33,14 @@ export function requireCanonicalBlueprintWriteEnabled(): void {
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
 }
+
+export const readCanonicalBlueprintWorkspace = createServerFn({ method: "GET" })
+  .validator((value: unknown) => blueprintWorkspaceInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    noStore();
+    requireCanonicalBlueprintWriteEnabled();
+    return getCanonicalBlueprintWorkspace(await getCommandContext(getRequest()), data);
+  });
 
 export const readCanonicalBlueprintConfiguration = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ configurationId: z.string().uuid() }).strict().parse(value))
