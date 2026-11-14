@@ -117,3 +117,77 @@ for (const persona of ["student", "guardian", "teacher"] as const) {
   });
 }
 
+
+/**
+ * Every student-facing destination must resolve under a real, scoped student
+ * session. A home-page smoke test alone misses failures in secondary loaders,
+ * shared student services, and legacy links.
+ */
+const studentDestinations = [
+  { route: "/student/courses", heading: "My classes" },
+  { route: "/student/assignments", heading: "Your assignments" },
+  { route: "/student/discussions", heading: "Course discussions" },
+  { route: "/student/experiences", heading: "Your actions" },
+  { route: "/student/field-trips", heading: "My field trips" },
+  { route: "/student/report-card", heading: "My report card" },
+  { route: "/student/settings", heading: "Display settings" },
+  { route: "/student/support", heading: "Get help and follow through." },
+  { route: "/notifications", heading: "Notifications" },
+  { route: "/groups", heading: "Study groups" },
+] as const;
+
+test("student visits every learning and support page", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret) throw new Error("Missing synthetic student session.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    for (const destination of studentDestinations) {
+      await expectWorkspaceRoute(page, destination.route, destination.heading);
+      // A route shell is not enough: a failed loader can render a matching
+      // heading with a sign-in/error notice. Check the actual page content.
+      await expect(page.getByRole("main")).not.toContainText(
+        /Sign in with an authorized|You do not have permission to view|Unable to load your workspace/i,
+      );
+    }
+    await expectWorkspaceShell(page);
+    expect(errors).toEqual([]);
+  });
+});
+
+test("student opens school community from School Life", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret) throw new Error("Missing synthetic student session.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto("/home");
+    const schoolLife = page.locator("#school-life");
+    await expect(schoolLife.getByRole("heading", { name: "School Life" })).toBeVisible();
+    await schoolLife.locator('a[href^="/student/my-school"]').first().click();
+    await expect(page).toHaveURL(/\/student\/my-school(?:\?|$)/);
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: /School/i }).first()).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+});
+
+test("student opens enrolled classroom and assessment detail", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const classroom = await page.goto(`/classes?section=${fixture!.sectionId}&tab=lessons`);
+    expect(classroom?.status()).toBe(200);
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+    await expectWorkspaceShell(page);
+
+    const assignment = await page.goto(`/student/assignments/${fixture!.assessmentId}`);
+    expect(assignment?.status()).toBe(200);
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Your work" })).toBeVisible();
+    await expectWorkspaceShell(page);
+    expect(errors).toEqual([]);
+  });
+});
