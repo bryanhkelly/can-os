@@ -20,7 +20,7 @@ export type NoncreditParticipationEvidence = {
 export type NoncreditAssessmentEvidence = {
   learnerId: string | null;
   assessmentVersionId: string;
-  resultStatus: "draft" | "finalized" | "voided";
+  resultStatus: "provisional" | "reviewed" | "finalized" | "voided";
   pointsEarned: number;
   pointsPossible: number;
 };
@@ -44,7 +44,7 @@ export function evaluateNoncreditCompletion(input: {
   now: Date;
 }): NoncreditCompletionReadiness {
   const blockers: NoncreditCompletionReadiness["blockers"] = [];
-  if (!["active", "registered"].includes(input.registrationStatus) ||
+  if (!["active", "registered", "completed"].includes(input.registrationStatus) ||
       input.trainingState !== "published") blockers.push("registration_inactive");
   const p = input.policy;
   if (!p || p.trainingVersionId !== input.trainingVersionId ||
