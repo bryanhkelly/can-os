@@ -9,6 +9,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import { and,desc,eq,inArray,lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
+import { existingMissingWorkFollowUpResponse } from "@/domain/missing-work-follow-up-ownership";
 async function verifiedTeacher(){
  const context=await getCommandContext(getRequest());
  if(context.role!=="teacher"||!context.actorPersonId)throw new AuthorizationError("teacher identity required");
@@ -132,13 +133,7 @@ export const createMissingWorkFollowUp=createServerFn({method:"POST"})
    const existing=await tx.select({id:s.actions.id,status:s.actions.status,metadata:s.actions.metadata,ownerPersonId:s.actions.ownerPersonId}).from(s.actions)
     .where(and(eq(s.actions.type,"missing_work_follow_up"),eq(s.actions.subjectType,"student_profile"),eq(s.actions.subjectId,student.id),assessment.siteId?eq(s.actions.siteId,assessment.siteId):isNull(s.actions.siteId),eq(s.actions.programId,assessment.programId)));
    const open=existing.find(a=>a.metadata.assessmentId===assessment.id&&!["resolved","cancelled"].includes(a.status));
-   if(open){
-    // The Action is owned by another staff member. Do not return a private
-    // Action ID that the requesting teacher cannot inspect or resolve.
-    if(open.ownerPersonId!==context.actorPersonId)
-     return {actionId:null,created:false,assignedToAnotherTeacher:true};
-    return {actionId:open.id,created:false,assignedToAnotherTeacher:false};
-   }
+   if(open)return existingMissingWorkFollowUpResponse(open,context.actorPersonId!);
    const [action]=await tx.insert(s.actions).values({type:"missing_work_follow_up",status:"open",priority:"normal",title:"Follow up: "+assessment.title,description:"Missing work follow-up for "+student.name,ownerPersonId:context.actorPersonId!,organizationId:assessment.organizationId,siteId:assessment.siteId,programId:assessment.programId,sectionId:assessment.sectionId,subjectType:"student_profile",subjectId:student.id,dueAt:new Date(),metadata:{source:"teacher_missing_work",assessmentId:assessment.id,studentProfileId:student.id}}).returning({id:s.actions.id});
    if(!action)throw new Error("Unable to create follow-up");
    await notify(tx, {recipientPersonId:student.personId,type:"missing_work_follow_up",status:"unread",title:"Teacher follow-up: "+assessment.title,body:latestAttempt?.status==="returned"
