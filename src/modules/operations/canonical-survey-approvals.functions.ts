@@ -1,10 +1,11 @@
-import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
 import {
   surveyDefinitions, surveyVersions, surveyQuestions, surveyQuestionOptions,
-  surveyVersionReviews, auditEvents, domainEvents,
+  surveyVersionReviews, evidenceDocuments, evidenceDocumentVersions,
+  auditEvents, domainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -60,9 +61,30 @@ async function currentReviewRows(
     decision:surveyVersionReviews.decision,
     reviewerPersonId:surveyVersionReviews.reviewerPersonId,
     decisionOrder:surveyVersionReviews.decisionOrder,
+    evidenceVersionId:surveyVersionReviews.evidenceVersionId,
   }).from(surveyVersionReviews)
     .where(inArray(surveyVersionReviews.surveyVersionId,versionIds))
     .orderBy(desc(surveyVersionReviews.decisionOrder));
+}
+
+/** Label-only evidence inventory. Never return a document URL or storage key. */
+async function currentEvidenceRows(
+ tx:Parameters<Parameters<typeof db.transaction>[0]>[0],
+ organizationId:string,
+) {
+ return tx.select({
+   id:evidenceDocumentVersions.id,
+   kind:evidenceDocuments.kindCode,
+ }).from(evidenceDocuments)
+   .innerJoin(evidenceDocumentVersions,eq(evidenceDocumentVersions.documentId,evidenceDocuments.id))
+   .where(and(
+     eq(evidenceDocuments.owningOrganizationId,organizationId),
+     isNotNull(evidenceDocumentVersions.verifiedAt),
+     or(isNull(evidenceDocumentVersions.validFrom),
+       lte(evidenceDocumentVersions.validFrom,sql`CURRENT_DATE`)),
+     or(isNull(evidenceDocumentVersions.validThrough),
+       gte(evidenceDocumentVersions.validThrough,sql`CURRENT_DATE`)),
+   )).limit(1001);
 }
 
 async function listVersions(purpose:Purpose) {
@@ -88,6 +110,9 @@ async function listVersions(purpose:Purpose) {
       .limit(50);
     const ids=drafts.map(v=>v.surveyVersionId);
     const reviews=await currentReviewRows(tx,ids);
+    const evidenceRows=await currentEvidenceRows(tx,authority.organizationId);
+    const evidenceComplete=evidenceRows.length<=1000;
+    const currentEvidenceIds=new Set(evidenceComplete?evidenceRows.map(e=>e.id):[]);
     const counts=ids.length ? await tx.select({
       versionId:surveyQuestions.surveyVersionId,total:count(),
     }).from(surveyQuestions)
@@ -120,8 +145,10 @@ async function listVersions(purpose:Purpose) {
       organizationId:authority.organizationId,
       currentRole:purpose==="survey_reviewer"?"reviewer" as const:"publisher" as const,
       limit:50,
+      evidence:purpose==="survey_reviewer" && evidenceComplete?evidenceRows:[],
+      evidenceInventoryComplete:evidenceComplete,
       versions:drafts.map(row=>{
-        const status=reviewGate(row.authorPersonId,reviews.filter(x=>x.surveyVersionId===row.surveyVersionId));
+        const status=reviewGate(row.authorPersonId,reviews.filter(x=>x.surveyVersionId===row.surveyVersionId),currentEvidenceIds);
         const own=row.authorPersonId===authority.actorPersonId;
         const qs=loaded.filter(q=>q.versionId===row.surveyVersionId);
         const questionCount=Number(counts.find(q=>q.versionId===row.surveyVersionId)?.total??0);
@@ -181,17 +208,23 @@ export const recordCanonicalSurveyReview=createServerFn({method:"POST"})
           eq(surveyDefinitions.status,"active"),
         )).limit(1);
       if(!definition)throw new AuthorizationError("reviewer organization owns survey");
-      const [saved]=await tx.insert(surveyVersionReviews).values({
+      if(data.evidenceVersionId) {
+        const evidence=await currentEvidenceRows(tx,authority.organizationId);
+        if(evidence.length>1000 || !evidence.some(e=>e.id===data.evidenceVersionId))
+          throw new AuthorizationError("current verified reviewer evidence");
+      }
+            const [saved]=await tx.insert(surveyVersionReviews).values({
         surveyVersionId:data.surveyVersionId,
         reviewKind:data.kind,
         reviewerPersonId:authority.actorPersonId,
         decision:data.decision,
-        evidenceVersionId:null,
+        evidenceVersionId:data.evidenceVersionId,
       }).returning({id:surveyVersionReviews.id});
       if(!saved)throw new Error("Review decision not saved");
       const payload={
         surveyVersionId:data.surveyVersionId,reviewKind:data.kind,
         decision:data.decision,reviewId:saved.id,
+        evidenceVersionId:data.evidenceVersionId,rationale:data.rationale,
       };
       await tx.insert(auditEvents).values({
         actorPersonId:authority.actorPersonId,
@@ -232,7 +265,9 @@ export const publishCanonicalSurveyVersion=createServerFn({method:"POST"})
         )).limit(1);
       if(!definition)throw new AuthorizationError("publisher organization owns survey");
       const rows=await currentReviewRows(tx,[data.surveyVersionId]);
-      const gate=reviewGate(version.authorPersonId,rows);
+      const evidence=await currentEvidenceRows(tx,authority.organizationId);
+      const gate=reviewGate(version.authorPersonId,rows,
+        new Set(evidence.length<=1000?evidence.map(e=>e.id):[]));
       if(!gate.ready)throw new AuthorizationError("all three independent current survey approvals");
       const [q]=await tx.select({id:surveyQuestions.id}).from(surveyQuestions)
         .where(eq(surveyQuestions.surveyVersionId,data.surveyVersionId)).limit(1);

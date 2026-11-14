@@ -3,6 +3,7 @@ import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { normalizeClientError } from "@/lib/client-error";
 import { safeLoader } from "@/lib/safe-loader";
@@ -36,7 +37,8 @@ function ReviewPage() {
       </p>
     </section>
     <div className="mt-5 grid gap-4">
-      {data.data.versions.map(version=><ReviewCard key={version.id} version={version}/>)}
+      {data.data.versions.map(version=><ReviewCard key={version.id} version={version} evidence={data.data.evidence}
+        evidenceInventoryComplete={data.data.evidenceInventoryComplete}/>)}
       {data.data.versions.length===0&&<p role="status"
         className="border border-border bg-card p-5 text-sm text-muted-foreground">
         No active survey draft versions in this reviewer's organization.
@@ -44,24 +46,33 @@ function ReviewPage() {
     </div>
   </WorkspaceShell>;
 }
-function ReviewCard({version}:{version:ReviewVersion}) {
+function ReviewCard({version,evidence,evidenceInventoryComplete}:{
+  version:ReviewVersion;
+  evidence:Awaited<ReturnType<typeof readCanonicalSurveyReviewQueue>>["evidence"];
+  evidenceInventoryComplete:boolean;
+}) {
   const router=useRouter();
   const [kind,setKind]=useState<ReviewKind>("privacy");
   const [decision,setDecision]=useState<""|"approved"|"rejected">("");
   const [ack,setAck]=useState(false);
+  const [evidenceVersionId,setEvidenceVersionId]=useState("");
+  const [rationale,setRationale]=useState("");
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [success,setSuccess]=useState("");
   async function record() {
-    if(busy||!ack||!decision||version.ownDraft||!version.reviewPreviewComplete||
+    if(busy||!ack||!decision||rationale.trim().length<20||
+      (decision==="approved"&&!evidenceVersionId)||!evidenceInventoryComplete||
+      version.ownDraft||!version.reviewPreviewComplete||
       version.questionCount===0)return;
     setBusy(true);setError("");setSuccess("");
     try {
       await recordCanonicalSurveyReview({data:{
         surveyVersionId:version.id,kind,decision,
+        evidenceVersionId:evidenceVersionId||null,rationale,
       }});
       setSuccess("Review decision recorded. Refreshing current approval history.");
-      setDecision("");setAck(false);
+      setDecision("");setAck(false);setEvidenceVersionId("");setRationale("");
       await router.invalidate();
     }catch(cause){
       setError(normalizeClientError(cause,"Unable to record the independent review.").message);
@@ -83,7 +94,8 @@ function ReviewCard({version}:{version:ReviewVersion}) {
     <div className="mt-4 grid gap-2 sm:grid-cols-3">
       {version.approvals.map(row=><div key={row.kind} className="border border-border p-3 text-sm">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{row.kind}</p>
-        <p className="mt-1 font-medium">{row.decision??"Not reviewed"}{!row.independent&&row.decision?" · Not independent":""}</p>
+        <p className="mt-1 font-medium">{row.decision??"Not reviewed"}{!row.independent&&row.decision?" · Not independent":""}
+          {row.decision==="approved"&&!row.evidenceCurrent?" · Evidence invalid":""}</p>
       </div>)}
     </div>
     <details className="mt-4 border-t border-border pt-4">
@@ -125,6 +137,21 @@ function ReviewCard({version}:{version:ReviewVersion}) {
           </Select>
         </label>
       </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <label className="space-y-2 text-sm font-medium">Verified evidence reference
+          <Select value={evidenceVersionId} disabled={busy||!evidenceInventoryComplete}
+            onChange={e=>setEvidenceVersionId(e.target.value)}>
+            <option value="">Select evidence for approval</option>
+            {evidence.map(item=><option key={item.id} value={item.id}>{item.kind} · {item.id}</option>)}
+          </Select>
+        </label>
+        <label className="space-y-2 text-sm font-medium">Review rationale
+          <Textarea value={rationale} minLength={20} maxLength={1500} rows={3}
+            onChange={e=>setRationale(e.target.value)} disabled={busy}
+            placeholder="Document the independent review decision without personal information."/>
+        </label>
+      </div>
+      {!evidenceInventoryComplete&&<p className="mt-3 text-sm text-destructive">Evidence inventory exceeds the safe inspection limit. Review is disabled.</p>}
       <label className="mt-4 flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-1 size-4 accent-primary" checked={ack}
           onChange={e=>setAck(e.target.checked)} disabled={busy}/>
@@ -133,7 +160,9 @@ function ReviewCard({version}:{version:ReviewVersion}) {
       {error&&<p role="alert" className="mt-3 border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {success&&<p role="status" className="mt-3 border border-border p-3 text-sm">{success}</p>}
       <Button type="button" className="mt-4" variant="outline"
-        disabled={!decision||!ack||busy||!version.reviewPreviewComplete||version.questionCount===0}
+        disabled={!decision||!ack||busy||rationale.trim().length<20||
+          (decision==="approved"&&!evidenceVersionId)||!evidenceInventoryComplete||
+          !version.reviewPreviewComplete||version.questionCount===0}
         onClick={()=>void record()}>{busy?"Recording…":"Record independent review"}</Button>
     </section>}
   </article>;

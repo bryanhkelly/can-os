@@ -123,3 +123,10 @@ to off. The optional database patch and provisioning script must first be
 applied to an isolated test database, followed by RLS, cross-tenant and
 authenticated-browser acceptance. These routes will be retired once their
 capabilities are promoted into production experiences.
+
+Survey review approvals also require an existing, currently verified evidence
+version owned by that canonical organization. Review rationale is written into
+the restricted audit event. Both the review-insert trigger and the published
+version's transition trigger reject missing, foreign, expired or unverified
+approval evidence. Reviewers see only evidence IDs/kinds, not file contents
+or storage references. The UI fails closed on incomplete evidence inventories.

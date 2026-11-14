@@ -74,6 +74,7 @@ function PublishCard({version}:{version:Version}){
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{row.kind}</p>
         <p className="mt-1 font-medium">
           {row.decision??"Missing"}{!row.independent&&row.decision?" · Invalid reviewer":""}
+          {row.decision==="approved"&&!row.evidenceCurrent?" · Evidence invalid":""}
         </p>
       </div>)}
     </div>

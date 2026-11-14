@@ -100,6 +100,17 @@ CREATE POLICY survey_reviews_insert ON education_v30.survey_version_reviews FOR 
    AND v.author_person_id<>reviewer_person_id AND
    education_v30.v28_role_can_access_org(d.owner_organization_id,'survey_reviewer')));
 
+
+-- Verified evidence metadata is visible by organization, never the storage
+-- reference, source URI, document contents or unverified cross-tenant artifacts.
+CREATE POLICY survey_approval_evidence_documents_read ON education_v30.evidence_documents FOR SELECT USING (
+ education_v30.v28_role_can_access_org(owning_organization_id,'survey_reviewer') OR
+ education_v30.v28_role_can_access_org(owning_organization_id,'survey_publisher'));
+CREATE POLICY survey_approval_evidence_versions_read ON education_v30.evidence_document_versions FOR SELECT USING (
+ EXISTS(SELECT 1 FROM education_v30.evidence_documents d WHERE d.id=document_id
+  AND (education_v30.v28_role_can_access_org(d.owning_organization_id,'survey_reviewer')
+       OR education_v30.v28_role_can_access_org(d.owning_organization_id,'survey_publisher'))));
+
 -- Version transitions only. The restricted role gets UPDATE on lifecycle and
 -- published_at columns, never UPDATE on author, parent ID, or version content.
 CREATE POLICY survey_publisher_update ON education_v30.survey_versions FOR UPDATE
@@ -131,22 +142,65 @@ CREATE POLICY survey_approval_domain_insert ON education_v30.domain_events FOR I
 -- Even direct SQL cannot have the author independently approve their own work.
 CREATE OR REPLACE FUNCTION education_v30.v301_validate_survey_review() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $survey_review$
-DECLARE version_author uuid; version_lifecycle text;
+DECLARE version_author uuid; version_lifecycle text; version_owner uuid;
 BEGIN
- SELECT author_person_id,lifecycle INTO version_author,version_lifecycle
- FROM survey_versions WHERE id=NEW.survey_version_id FOR SHARE;
+ SELECT v.author_person_id,v.lifecycle,d.owner_organization_id
+ INTO version_author,version_lifecycle,version_owner
+ FROM survey_versions v JOIN survey_definitions d ON d.id=v.survey_id
+ WHERE v.id=NEW.survey_version_id FOR SHARE OF v;
  IF version_author IS NULL OR version_lifecycle<>'draft' THEN
   RAISE EXCEPTION 'Independent review requires a draft version';
  END IF;
  IF NEW.reviewer_person_id=version_author THEN
   RAISE EXCEPTION 'Survey authors cannot review their own versions';
  END IF;
+ IF NEW.decision='approved' AND NOT EXISTS(
+   SELECT 1 FROM evidence_document_versions e
+   JOIN evidence_documents d ON d.id=e.document_id
+   WHERE e.id=NEW.evidence_version_id AND d.owning_organization_id=version_owner
+     AND e.verified_at IS NOT NULL
+     AND (e.valid_from IS NULL OR e.valid_from<=CURRENT_DATE)
+     AND (e.valid_through IS NULL OR e.valid_through>=CURRENT_DATE)
+ ) THEN RAISE EXCEPTION 'Survey approval needs current verified organization evidence'; END IF;
  RETURN NEW;
 END $survey_review$;
 DROP TRIGGER IF EXISTS survey_independent_review_gate ON education_v30.survey_version_reviews;
 CREATE TRIGGER survey_independent_review_gate
  BEFORE INSERT ON education_v30.survey_version_reviews
  FOR EACH ROW EXECUTE FUNCTION education_v30.v301_validate_survey_review();
+
+-- Original independent review trigger remains authoritative. This additional
+-- gate prevents a publisher from using approvals with expired/unverified evidence,
+-- even if the UPDATE bypasses the application and runs directly via its DB role.
+CREATE OR REPLACE FUNCTION education_v30.v301_check_survey_publication_evidence() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $survey_evidence$
+DECLARE k text; r record; owner_id uuid;
+BEGIN
+ IF NOT (OLD.lifecycle='draft' AND NEW.lifecycle='published') THEN RETURN NEW; END IF;
+ SELECT owner_organization_id INTO owner_id FROM survey_definitions WHERE id=NEW.survey_id;
+ FOR k IN SELECT unnest(ARRAY['privacy','accessibility','safeguarding']) LOOP
+   SELECT reviewer_person_id,decision,evidence_version_id INTO r
+   FROM survey_version_reviews WHERE survey_version_id=NEW.id AND review_kind=k
+   ORDER BY decision_order DESC LIMIT 1;
+   IF r.decision IS DISTINCT FROM 'approved' OR r.reviewer_person_id=NEW.author_person_id
+      OR NOT EXISTS(
+       SELECT 1 FROM evidence_document_versions e
+       JOIN evidence_documents d ON d.id=e.document_id
+       WHERE e.id=r.evidence_version_id AND d.owning_organization_id=owner_id
+         AND e.verified_at IS NOT NULL
+         AND (e.valid_from IS NULL OR e.valid_from<=CURRENT_DATE)
+         AND (e.valid_through IS NULL OR e.valid_through>=CURRENT_DATE)
+      ) THEN
+     RAISE EXCEPTION 'Published survey requires independent current verified % evidence',k;
+   END IF;
+   r:=NULL;
+ END LOOP;
+ RETURN NEW;
+END $survey_evidence$;
+DROP TRIGGER IF EXISTS survey_publication_evidence_gate ON education_v30.survey_versions;
+CREATE TRIGGER survey_publication_evidence_gate
+ BEFORE UPDATE OF lifecycle ON education_v30.survey_versions
+ FOR EACH ROW EXECUTE FUNCTION education_v30.v301_check_survey_publication_evidence();
 
 COMMIT;
 -- This patch grants no app access and does not enable runtime feature flags.

@@ -57,6 +57,13 @@ FROM unnest(ARRAY[
 \gexec
 SELECT format('GRANT SELECT ON education_v30.survey_question_options TO %I',:'reviewer_role')
 \gexec
+-- Only non-sensitive verified evidence metadata, never storage keys or payloads.
+SELECT format('GRANT SELECT (id,kind_code,owning_organization_id) ON education_v30.evidence_documents TO %I,%I',
+ :'reviewer_role',:'publisher_role')
+\gexec
+SELECT format('GRANT SELECT (id,document_id,verified_at,valid_from,valid_through) ON education_v30.evidence_document_versions TO %I,%I',
+ :'reviewer_role',:'publisher_role')
+\gexec
 SELECT format('GRANT INSERT ON education_v30.survey_version_reviews TO %I',:'reviewer_role')
 \gexec
 SELECT format('GRANT UPDATE (lifecycle,published_at) ON education_v30.survey_versions TO %I',:'publisher_role')
