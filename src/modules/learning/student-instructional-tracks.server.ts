@@ -46,6 +46,7 @@ import {
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
+  projectRecordedCourseLessons,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
   type StudentPracticeDefinition,
@@ -708,13 +709,11 @@ export async function readSelectedInstructionalTrack(
           eq(learnerLessonProgress.courseVersionId, attempt.courseVersionId),
         )),
     ]);
-    const progressByLesson = new Map(progress.map((item) => [item.lessonId, item]));
-    const presentationsByLesson = new Map<string, typeof eligible.presentations>();
-    for (const presentation of eligible.presentations) {
-      const entries = presentationsByLesson.get(presentation.courseLessonId) ?? [];
-      entries.push(presentation);
-      presentationsByLesson.set(presentation.courseLessonId, entries);
-    }
+    const recordedLessons = projectRecordedCourseLessons({
+      lessons,
+      progress,
+      presentations: eligible.presentations,
+    });
 
     return {
       courseAttemptId: attempt.id,
@@ -731,27 +730,7 @@ export async function readSelectedInstructionalTrack(
         title: eligible.track.title,
         presenterPersonId: eligible.track.presenterPersonId,
       },
-      lessons: lessons.map((lesson) => {
-        const lessonProgress = progressByLesson.get(lesson.id);
-        const lessonPresentations = presentationsByLesson.get(lesson.id) ?? [];
-        return {
-          id: lesson.id,
-          courseUnitId: lesson.courseUnitId,
-          title: lesson.title,
-          lessonOrder: lesson.lessonOrder,
-          progress: lessonProgress
-            ? { status: lessonProgress.status, observedAt: lessonProgress.observedAt }
-            : null,
-          presentations: [...lessonPresentations]
-            .sort((left, right) => left.ordinal - right.ordinal)
-            .map((presentation) => ({
-              assetVersionId: presentation.assetVersionId,
-              presentationKind: presentation.presentationKind,
-              ordinal: presentation.ordinal,
-              accessibilityNotes: presentation.accessibilityNotes,
-            })),
-        };
-      }),
+      lessons: recordedLessons,
       materials: eligible.materials
         .filter((material) => canAccessStudentTrackMaterial(
           material.materialKind,
