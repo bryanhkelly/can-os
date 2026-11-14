@@ -64,6 +64,14 @@ export const educationOperations = educationV30.table("education_operations", {
   status: text("status").$type<"planning" | "active" | "paused" | "closed">().notNull(),
 });
 
+export const educationOperationSites = educationV30.table("education_operation_sites", {
+  id: id(),
+  operationId: uuid("operation_id").notNull(),
+  siteId: uuid("site_id").notNull(),
+  validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
+  validThrough: timestamp("valid_through", { withTimezone: true }),
+});
+
 export const qualificationApplications = educationV30.table("qualification_applications", {
   id: id(),
   applicantOrganizationId: uuid("applicant_organization_id").notNull(),
