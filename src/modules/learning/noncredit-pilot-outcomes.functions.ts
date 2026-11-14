@@ -8,7 +8,7 @@ import {
   learnerLessonProgress,courseLessons,assessmentAccess,
   assessmentExecutionAttempts,assessmentExecutionResults,
   assessmentFormAdministrations,noncreditCompletionDecisions,
-  surveyInvitations,surveyCampaigns,surveyResponses,
+  surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,
 } from "@/db/canonical-v301";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,
