@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { CourseAssessmentPanel } from "./CourseAssessmentPanel";
+import { NoncreditCourseSurveys } from "./NoncreditCourseSurveys";
 import { getLearnerCourseParticipationKind } from "@/modules/learning/noncredit-learning.functions";
 import { getNoncreditCompletionReadiness } from "@/modules/learning/noncredit-completion.functions";
 
@@ -43,6 +44,7 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
   return <div className="space-y-4" aria-label="Noncredit learning activities">
     <CourseAssessmentPanel courseAttemptId={courseAttemptId}
       onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>
+    <NoncreditCourseSurveys courseAttemptId={courseAttemptId}/>
     <section className="space-y-2 border bg-card p-4">
       <h3 className="font-serif text-lg font-semibold">Training completion</h3>
       {readiness?
