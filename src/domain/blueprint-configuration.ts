@@ -34,6 +34,23 @@ export const blueprintConfigurationIdentitySchema = z.object({
   culturalContext: jsonObjectSchema.default({}),
 }).strict();
 
+/**
+ * Published recipe requirements are non-negotiable when creating or revising
+ * a configuration. Optional components may be excluded, but required ones
+ * must be explicitly selected.
+ */
+export function missingRequiredBlueprintComponents(
+  catalog: readonly { id: string; requirementMode: string }[],
+  selections: readonly { componentId: string; selectionStatus: string }[],
+): string[] {
+  const selected = new Set(selections
+    .filter(item => item.selectionStatus === "selected")
+    .map(item => item.componentId));
+  return catalog
+    .filter(component => component.requirementMode === "required" && !selected.has(component.id))
+    .map(component => component.id);
+}
+
 export const blueprintComponentSelectionSchema = z.object({
   componentId: z.string().uuid(),
   selectionStatus: z.enum(["selected", "excluded", "proposed"]),
