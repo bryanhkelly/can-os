@@ -219,7 +219,7 @@ intentionally excluded from the default Drizzle schema and migration journal;
 the SQL baseline remains authoritative for constraints. Canonical application
 data remains separate from the legacy `public` schema.
 
-The School Launch Academics module can expose a read-only curated
+The native canonical Blueprint Studio can expose a read-only curated
 Blueprint reference library once `CAN_CANONICAL_CATALOG_ENABLED=true`.
 The flag defaults to false until a real canonical Site catalog and restricted
 application database-role provisioning are available; the existing legacy
@@ -247,11 +247,15 @@ application login. A trusted operator must first provision both non-owner,
 non-superuser login roles and manage their credentials through the deployment
 secret manager. The discovery service now derives the catalog role from the
 verified single-Organization server context and sets it transaction-locally;
-the read-only discovery function is exposed from the existing School
-Academics workflow. It requires the restricted application login and
-Organization binding to be provisioned in the target environment. The
-deployed credential and end-to-end route access remain unverified; this UI
-does not create or qualify programs, approve them, or authorize operation.
+the legacy School Academics workflow exposes the read-only discovery panel
+only when `CAN_CANONICAL_CATALOG_ENABLED=true`. With the flag disabled (the
+default), the Hub shows an explicit unavailable state and the service refuses
+catalog requests before switching database roles. Enabling the flag alone
+does not provision database roles or establish native canonical identity.
+The restricted application login, Organization binding, and exact Site
+identity must be verified in the target environment first. Deployed
+credentials and end-to-end route access remain unverified; this UI does
+not create or qualify programs, approve them, or authorize operation.
 
 On 2026-11-13, the guarded rollback validator passed on isolated PostgreSQL 18
 at integration worktree HEAD `5263e7a4` plus uncommitted changes. It creates a
