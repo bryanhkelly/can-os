@@ -61,3 +61,16 @@ export const facilitatedLearningPlayback = educationV30.table("facilitated_learn
   foreignKey({columns:[t.facilitatedSessionId,t.courseVersionId],foreignColumns:[facilitatedLearningSessions.id,facilitatedLearningSessions.courseVersionId],name:"facilitated_playback_session_course_fk"}),
   check("facilitated_playback_position_ck", sql`${t.positionSeconds} IS NULL OR (${t.positionSeconds} >= 0 AND ${t.positionSeconds} <= 43200)`),
 ]);
+
+
+/** Bounded global per-person pairing attempts, no raw failed codes retained. */
+export const facilitatedPairingRateLimits = educationV30.table("facilitated_pairing_rate_limits", {
+  participantPersonId: uuid("participant_person_id").primaryKey(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull().defaultNow(),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  blockedUntil: timestamp("blocked_until", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  index("facilitated_pair_limit_updated_idx").on(t.updatedAt),
+  check("facilitated_pair_limit_count_ck", sql`${t.attemptCount} >= 0 AND ${t.attemptCount} <= 7`),
+]);
