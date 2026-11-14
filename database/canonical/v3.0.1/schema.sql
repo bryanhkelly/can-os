@@ -10534,6 +10534,76 @@ BEGIN
  END LOOP;
 END $v301_blueprint_rls$;
 
+-- Recorded-instructor learner data: grant by trusted PostgreSQL login binding only.
+-- No caller-provided person ID, request GUC or shared application role establishes scope.
+CREATE TABLE instructional_learner_login_bindings (
+  db_login name NOT NULL,
+  course_attempt_id uuid NOT NULL REFERENCES learner_course_attempts(id),
+  status text NOT NULL DEFAULT 'approved' CHECK(status IN ('approved','revoked')),
+  valid_from timestamptz NOT NULL,
+  valid_through timestamptz,
+  PRIMARY KEY(db_login,course_attempt_id),
+  CHECK(valid_through IS NULL OR valid_through>valid_from)
+);
+ALTER TABLE instructional_learner_login_bindings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE instructional_learner_login_bindings FORCE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION v301_instructional_login_can_read_attempt(p_attempt_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog AS $v301_instructional_scope$
+ SELECT EXISTS(
+   SELECT 1 FROM instructional_learner_login_bindings b
+   JOIN pg_roles r ON r.rolname=b.db_login
+   WHERE b.db_login=session_user::name
+     AND b.course_attempt_id=p_attempt_id
+     AND b.status='approved'
+     AND b.valid_from<=clock_timestamp()
+     AND (b.valid_through IS NULL OR b.valid_through>clock_timestamp())
+     AND r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
+     AND NOT r.rolcreatedb AND NOT r.rolcreaterole
+     AND NOT pg_has_role(r.oid,
+       (SELECT nspowner FROM pg_namespace WHERE nspname='education_v30'),
+       'MEMBER')
+     AND current_setting('role',true)='can_v301_recorded_instruction_reader'
+ );
+$v301_instructional_scope$;
+
+CREATE OR REPLACE FUNCTION v301_instructional_login_can_read_course(p_course_version_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog AS $v301_instructional_scope$
+ SELECT EXISTS(SELECT 1 FROM learner_course_attempts ca
+   WHERE ca.course_version_id=p_course_version_id
+     AND v301_instructional_login_can_read_attempt(ca.id));
+$v301_instructional_scope$;
+
+CREATE OR REPLACE FUNCTION v301_instructional_login_can_read_practice(p_practice_attempt_id uuid)
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog AS $v301_instructional_scope$
+ SELECT EXISTS(SELECT 1 FROM formative_practice_attempts p
+   WHERE p.id=p_practice_attempt_id
+     AND v301_instructional_login_can_read_attempt(p.course_attempt_id));
+$v301_instructional_scope$;
+
+CREATE POLICY instructional_learner_attempt_read ON learner_course_attempts FOR SELECT
+  USING (v301_instructional_login_can_read_attempt(id));
+CREATE POLICY instructional_learner_selection_read ON learner_track_selections FOR SELECT
+  USING (v301_instructional_login_can_read_attempt(course_attempt_id));
+CREATE POLICY instructional_learner_lesson_progress_read ON learner_lesson_progress FOR SELECT
+  USING (v301_instructional_login_can_read_attempt(course_attempt_id));
+CREATE POLICY instructional_learner_practice_read ON formative_practice_attempts FOR SELECT
+  USING (v301_instructional_login_can_read_attempt(course_attempt_id));
+CREATE POLICY instructional_learner_track_version_read ON instructional_track_versions FOR SELECT
+  USING (v301_instructional_login_can_read_course(course_version_id));
+CREATE POLICY instructional_learner_policy_version_read ON instructional_track_policy_versions FOR SELECT
+  USING (v301_instructional_login_can_read_course(course_version_id));
+CREATE POLICY instructional_learner_response_read
+ ON education_v30_secure.formative_practice_responses FOR SELECT
+  USING (v301_instructional_login_can_read_practice(practice_attempt_id));
+
+REVOKE ALL ON FUNCTION v301_instructional_login_can_read_attempt(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_instructional_login_can_read_course(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_instructional_login_can_read_practice(uuid) FROM PUBLIC;
+
 -- Single canonical RLS owner policy pass, after all tables are created.
 -- Only the trusted schema-owning database role can read/write protected rows inside
 -- SECURITY DEFINER implementations; app roles still need their own scoped policies.
