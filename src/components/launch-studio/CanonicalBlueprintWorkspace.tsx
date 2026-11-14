@@ -10,6 +10,7 @@ import {
   readCanonicalBlueprintWorkspace,
   saveCanonicalBlueprintConfiguration,
   submitCanonicalBlueprintConfiguration,
+  executeCanonicalBlueprintConfiguration,
 } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
@@ -38,6 +39,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
   const [review, setReview] = useState<Review | null>(null);
+  const [operationId, setOperationId] = useState("");
+  const [executedDeployments, setExecutedDeployments] = useState<string[] | null>(null);
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [editorialIdentity, setEditorialIdentity] = useState<
@@ -68,6 +71,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     setWorkspace(null);
     setDetail(null);
     setReview(null);
+    setOperationId("");
+    setExecutedDeployments(null);
     setLoading(true);
     setError(null);
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
@@ -105,6 +110,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     ).map(component => component.id));
     setDetail(null);
     setReview(null);
+    setExecutedDeployments(null);
     setMessage(null);
   }
 
@@ -115,6 +121,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       const result = await readCanonicalBlueprintConfiguration({ data: { configurationId } });
       setDetail(result);
       setReview(null);
+      setExecutedDeployments(null);
       if (result.lifecycle === "frozen") {
         try {
           const currentReview = await readCanonicalBlueprintReview({
@@ -227,6 +234,31 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       setMessage("Blueprint submitted for independent review. No program has been authorized.");
     } catch (caught) {
       setError(normalizeClientError(caught, "Blueprint submission failed.").message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createPlanningDeployment() {
+    if (!detail || !review?.latestReview || review.latestReview.decision !== "approved"
+      || !operationId || !workspace?.canExecute) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await executeCanonicalBlueprintConfiguration({ data: {
+        configurationVersionId: detail.versionId,
+        reviewId: review.latestReview.id,
+        operationId,
+        idempotencyKey: `studio:${detail.versionId}:${operationId}`,
+      } });
+      setExecutedDeployments(result.deploymentIds);
+      setMessage(result.created
+        ? "Approved Blueprint executed as a planning-only Operation and Deployment record."
+        : "Existing Blueprint execution was reused. No additional Deployment was created.");
+    } catch (caught) {
+      setError(normalizeClientError(caught,
+        "The approved Blueprint could not be executed for this Operation.").message);
     } finally {
       setBusy(false);
     }
@@ -469,6 +501,40 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 onClick={() => void openConfiguration(detail.configurationId)}>
                 Refresh review status
               </Button>
+              {review?.latestReview?.decision === "approved" && workspace.canExecute &&
+                <fieldset className="mt-4 border p-4" disabled={busy}>
+                  <legend className="px-2 font-semibold">Create a planning Deployment</legend>
+                  <p className="mb-3">
+                    Independent review is complete. Select an Operation your Organization
+                    currently operates. This does not authorize a school to open,
+                    enroll learners, or begin instruction.
+                  </p>
+                  {workspace.operations.length > 0 ? <>
+                    <label htmlFor="canonical-blueprint-operation" className="block">
+                      Authorized Operation
+                      <Select id="canonical-blueprint-operation" className="mt-2"
+                        value={operationId}
+                        onChange={event => setOperationId(event.currentTarget.value)}>
+                        <option value="">Choose an Operation</option>
+                        {workspace.operations.map(operation =>
+                          <option key={operation.id} value={operation.id}>{operation.name}</option>)}
+                      </Select>
+                    </label>
+                    <Button type="button" className="mt-3" disabled={busy || !operationId}
+                      onClick={() => void createPlanningDeployment()}>
+                      {busy ? "Recording planning Deployment…" : "Create planning Deployment"}
+                    </Button>
+                    {executedDeployments && <p className="mt-3" role="status">
+                      Planning Deployments created or reused: {executedDeployments.length}.
+                      {executedDeployments.length > 0
+                        ? ` References: ${executedDeployments.join(", ")}`
+                        : " This Blueprint contains no published Offering adoption intents."}
+                    </p>}
+                  </> : <p>
+                    No Operation has an active operator relationship with your Organization.
+                    Configure an Operation before executing the approved Blueprint.
+                  </p>}
+                </fieldset>}
             </>}
           </div>}
         </>}
