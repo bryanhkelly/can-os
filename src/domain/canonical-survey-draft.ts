@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
+import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 
 const question = z.object({
   prompt: z.string().trim().min(5).max(1000),
@@ -37,7 +37,8 @@ export type CreateSurveyDraftInput = z.infer<typeof createSurveyDraftInput>;
 export function canonicalSurveyDraftDatabaseRole(
   actor: Pick<CommandContext, "scope" | "capabilities">,
 ): string {
-  assertCapability(actor as CommandContext, "survey.draft.create");
+  if (!actor.capabilities.has("survey.draft.create"))
+    throw new AuthorizationError("survey.draft.create");
   const ids = actor.scope.organizationIds;
   if (ids?.length !== 1 || !z.string().uuid().safeParse(ids[0]).success)
     throw new AuthorizationError("one canonical survey author organization");

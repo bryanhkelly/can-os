@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
@@ -31,9 +31,15 @@ function SurveyDraftPage() {
   const result = Route.useLoaderData();
   if (!result.ok) return <CanonicalBlueprintLoadError
     title="Survey draft authoring" message={result.message}/>;
-  return <SurveyDraftForm organizationId={result.data.organizationId}/>;
+  return <SurveyDraftForm organizationId={result.data.organizationId}
+    drafts={result.data.drafts} limit={result.data.limit}/>;
 }
-function SurveyDraftForm({ organizationId }: { organizationId: string }) {
+function SurveyDraftForm({ organizationId, drafts, limit }: {
+  organizationId: string;
+  drafts: Awaited<ReturnType<typeof readCanonicalSurveyDraftAccess>>["drafts"];
+  limit: number;
+}) {
+  const router = useRouter();
   const [code, setCode] = useState("");
   const [title, setTitle] = useState("");
   const [purposeCode, setPurposeCode] = useState("training_feedback");
@@ -67,6 +73,7 @@ function SurveyDraftForm({ organizationId }: { organizationId: string }) {
       };
       const outcome = await createCanonicalSurveyDraft({ data });
       setSaved({surveyId: outcome.surveyId, surveyVersionId: outcome.surveyVersionId});
+      void router.invalidate();
     } catch (cause) {
       setError(normalizeClientError(cause, "Could not create the survey draft.").message);
     } finally { setBusy(false); }
@@ -74,7 +81,7 @@ function SurveyDraftForm({ organizationId }: { organizationId: string }) {
   return <WorkspaceShell width="wide" eyebrow="Internal · Canonical v3.0.1"
     title="Create survey draft"
     subtitle="Save a real reusable survey definition and its first draft version. Questions are data, not hardcoded for a particular program.">
-    <CapabilityLabNav current="survey-drafts"/>
+    <CapabilityLabNav current="survey-drafts" surveyDraftEnabled/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-semibold">Draft-only boundary</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -171,5 +178,37 @@ function SurveyDraftForm({ organizationId }: { organizationId: string }) {
         <Button asChild variant="outline"><Link to="/canonical/lab/surveys">Back to surveys</Link></Button>
       </div>
     </form>
+    <section className="mt-8 border border-border bg-card p-5" aria-label="Saved draft readback">
+      <h2 className="font-serif text-2xl">Saved survey drafts</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Read back from the same organization-bound PostgreSQL role that writes drafts.
+        Showing at most {limit} drafts. No published, reviewer or respondent information is exposed.
+      </p>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
+            <tr><th scope="col" className="p-3 font-semibold">Survey</th>
+              <th scope="col" className="p-3 font-semibold">Purpose</th>
+              <th scope="col" className="p-3 font-semibold">Draft version</th>
+              <th scope="col" className="p-3 font-semibold">Questions</th></tr>
+          </thead>
+          <tbody>
+            {drafts.map(row => <tr key={row.versionId} className="border-b border-border last:border-0">
+              <th scope="row" className="p-3 font-medium">{row.title}
+                <p className="mt-1 font-mono text-xs text-muted-foreground">{row.code}</p>
+                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.surveyId}</p>
+              </th>
+              <td className="p-3">{row.purposeCode}</td>
+              <td className="p-3">{row.versionNo}
+                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.versionId}</p>
+              </td>
+              <td className="p-3 tabular-nums">{row.questionCount}</td>
+            </tr>)}
+            {drafts.length === 0 && <tr><td colSpan={4} className="p-4 text-muted-foreground">
+              No survey drafts found for this organization.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </section>
   </WorkspaceShell>;
 }

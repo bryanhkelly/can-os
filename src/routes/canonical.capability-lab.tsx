@@ -67,7 +67,7 @@ function CapabilityLabOverview() {
   const data = result.data;
   return <WorkspaceShell width="wide" eyebrow="Internal · Canonical v3.0.1" title="Capability Lab"
     subtitle="Exercise the real capabilities before expanding the production-facing UI. This workspace is restricted to authenticated canonical provider staff, not students or families.">
-    <CapabilityLabNav current="index"/>
+    <CapabilityLabNav current="index" surveyDraftEnabled={data.draftAuthoringEnabled}/>
     <div className="mt-6 grid gap-4 sm:grid-cols-3">
       {([
         ["Training versions", data.trainings.length],
@@ -80,7 +80,8 @@ function CapabilityLabOverview() {
         </section>)}
     </div>
     <div className="mt-6 grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
-      {areas.map(area => <section key={area.title} className="flex flex-col border border-border bg-card p-5">
+      {areas.filter(area => area.path !== "/canonical/lab/survey-drafts" || data.draftAuthoringEnabled)
+        .map(area => <section key={area.title} className="flex flex-col border border-border bg-card p-5">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{area.status}</p>
         <h2 className="mt-3 font-serif text-2xl text-foreground">{area.title}</h2>
         <p className="mt-3 flex-1 text-sm leading-6 text-muted-foreground">{area.detail}</p>

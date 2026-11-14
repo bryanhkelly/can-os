@@ -18,7 +18,7 @@ function SurveysLabPage() {
   return <WorkspaceShell width="wide" eyebrow="Internal · Canonical v3.0.1"
     title="Survey inspection"
     subtitle="Review organization-owned survey definitions and operating campaigns, with question previews and noncredit pilot preflight.">
-    <CapabilityLabNav current="surveys"/>
+    <CapabilityLabNav current="surveys" surveyDraftEnabled={draftAuthoringEnabled}/>
     {draftAuthoringEnabled && <p className="mt-5"><Link to="/canonical/lab/survey-drafts"
       className="inline-flex min-h-10 items-center border border-border bg-card px-4 text-sm font-semibold text-primary">
       Create survey draft</Link></p>}

@@ -413,8 +413,8 @@ a trusted schema owner first runs:
 
 ```sh
 psql "$TEST_DATABASE_URL" -f database/canonical/v3.0.1/patch-survey-draft-authoring.sql
-psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \\
-  -v application_role=YOUR_RESTRICTED_APP_LOGIN \\
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_APP_LOGIN \
   -f database/canonical/v3.0.1/provision-survey-draft-author-role.sql
 ```
 

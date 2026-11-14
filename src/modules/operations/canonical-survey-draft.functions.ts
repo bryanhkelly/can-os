@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   surveyDefinitions, surveyVersions, surveyQuestions, surveyQuestionOptions,
@@ -23,10 +23,47 @@ async function surveyAuthor() {
   return { actorPersonId: actor.actorPersonId, organizationId: actor.scope.organizationIds![0]!, role };
 }
 
+/** Role-restricted persisted readback for drafts, independent of the broader campaign dashboard. */
 export const readCanonicalSurveyDraftAccess = createServerFn({ method: "GET" }).handler(async () => {
   noStore();
   const author = await surveyAuthor();
-  return { organizationId: author.organizationId };
+  return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${author.role}`));
+    const binding = await tx.execute(sql`
+      SELECT education_v30.v28_role_can_access_org(
+        ${author.organizationId}::uuid, 'survey_draft_author') AS authorized
+    `);
+    if (binding.rows[0]?.authorized !== true)
+      throw new AuthorizationError("bound survey draft writer role");
+    const versions = await tx.select({
+      surveyId: surveyDefinitions.id,
+      versionId: surveyVersions.id,
+      code: surveyDefinitions.code,
+      title: surveyDefinitions.title,
+      purposeCode: surveyDefinitions.purposeCode,
+      versionNo: surveyVersions.versionNo,
+    }).from(surveyVersions)
+      .innerJoin(surveyDefinitions, eq(surveyVersions.surveyId, surveyDefinitions.id))
+      .where(and(
+        eq(surveyDefinitions.ownerOrganizationId, author.organizationId),
+        eq(surveyVersions.lifecycle, "draft"),
+      )).orderBy(asc(surveyDefinitions.title), asc(surveyVersions.versionNo))
+      .limit(50);
+    const versionIds = versions.map(row => row.versionId);
+    const counts = versionIds.length ? await tx.select({
+      versionId: surveyQuestions.surveyVersionId,
+      total: count(),
+    }).from(surveyQuestions).where(inArray(surveyQuestions.surveyVersionId, versionIds))
+      .groupBy(surveyQuestions.surveyVersionId) : [];
+    return {
+      organizationId: author.organizationId,
+      limit: 50,
+      drafts: versions.map(row => ({
+        ...row,
+        questionCount: Number(counts.find(count => count.versionId === row.versionId)?.total ?? 0),
+      })),
+    };
+  });
 });
 
 /** Atomic append-only survey draft, not an invitation, publication or credential. */
