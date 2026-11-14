@@ -5,6 +5,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import {
   assessmentAccess, assessmentExecutionAttempts, educationOperationSites,
+  educationOperationOrganizationRoles,
   facilitatedLearningParticipants, facilitatedLearningPlayback, facilitatedLearningSessions,
   learnerCourseAttempts, noncreditCompletionDecisions, noncreditRegistrations,
   noncreditTrainingVersions, programDeployments, siteOrganizationRoles,
@@ -44,17 +45,32 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
           lte(educationOperationSites.validFrom,now),
           or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
         )));
+      const activeOperator=exists(tx.select({id:educationOperationOrganizationRoles.id})
+        .from(educationOperationOrganizationRoles)
+        .innerJoin(programDeployments,eq(
+          programDeployments.operationId,educationOperationOrganizationRoles.operationId,
+        )).where(and(
+          eq(programDeployments.id,facilitatedLearningSessions.deploymentId),
+          eq(educationOperationOrganizationRoles.organizationId,host.organizationId),
+          eq(educationOperationOrganizationRoles.roleCode,"operator"),
+          eq(educationOperationOrganizationRoles.status,"approved"),
+          lte(educationOperationOrganizationRoles.validFrom,now),
+          or(isNull(educationOperationOrganizationRoles.validThrough),
+            gt(educationOperationOrganizationRoles.validThrough,now)),
+        )));
       const roomScope=and(
         eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
         inArray(facilitatedLearningSessions.siteId,host.siteIds),
         gt(facilitatedLearningSessions.startedAt,since),
-        siteMembership,activeOperationSite,
+        siteMembership,activeOperationSite,activeOperator,
       );
-      const rooms=await tx.select({
+      const roomRows=await tx.select({
         id:facilitatedLearningSessions.id,
         deploymentId:facilitatedLearningSessions.deploymentId,
         siteId:facilitatedLearningSessions.siteId,
-      }).from(facilitatedLearningSessions).where(roomScope);
+      }).from(facilitatedLearningSessions).where(roomScope).limit(5001);
+      const partialSiteDelivery=roomRows.length>5000;
+      const rooms=roomRows.slice(0,5000);
       const roomIds=rooms.map(row=>row.id);
       const joined=roomIds.length?await tx.select({
         sessionId:facilitatedLearningParticipants.facilitatedSessionId,
@@ -152,11 +168,13 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
         .innerJoin(surveyCampaigns,eq(
           surveyCampaigns.id,surveyResponses.campaignId,
         ))
-        .where(eq(surveyCampaigns.operatingOrganizationId,host.organizationId));
+        .where(and(eq(surveyCampaigns.operatingOrganizationId,host.organizationId),
+          eq(surveyResponses.respondentMode,"identified")));
 
       return {
         asOf:now.toISOString(),since:since.toISOString(),
         siteDelivery:{
+          partial:partialSiteDelivery,
           roomCount:rooms.length,
           distinctPairedPeople:Number(sitePairs[0]?.uniqueLearners??0),
           distinctPairedCourseAttempts:Number(sitePairs[0]?.uniqueCourseAttempts??0),
@@ -179,6 +197,7 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
         limitations:[
           "Device pairing is not proof of site attendance or watched minutes.",
           "Reported provider outcomes may occur outside the hosted room.",
+          "Site delivery totals are partial if more than 5,000 rooms are in the selected window.",
           "Superseded completion decisions are excluded, but report publication still requires review of source records.",
         ],
       };
