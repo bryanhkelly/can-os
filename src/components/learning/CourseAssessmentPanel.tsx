@@ -1,0 +1,98 @@
+import { useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { LearningQuestionnaire } from "./LearningQuestionnaire";
+import {
+  beginNoncreditKnowledgeCheckAttempt, getNoncreditKnowledgeCheck,
+  submitNoncreditKnowledgeCheckAnswers,
+} from "@/modules/learning/noncredit-assessment.functions";
+
+type KnowledgeCheck = Awaited<ReturnType<typeof getNoncreditKnowledgeCheck>>;
+
+/** Reused within the existing recorded classroom, not a separate portal. */
+export function CourseAssessmentPanel({courseAttemptId}:{courseAttemptId:string}) {
+  return <KnowledgeCheckSession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+}
+function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
+  const [check,setCheck]=useState<KnowledgeCheck|null>(null);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState("");
+  const load=useCallback(async()=>{
+    const next=await getNoncreditKnowledgeCheck({data:{courseAttemptId}});
+    setCheck(next);
+  },[courseAttemptId]);
+  useEffect(()=>{
+    let active=true;
+    setCheck(null);setError("");
+    void getNoncreditKnowledgeCheck({data:{courseAttemptId}})
+      .then(next=>{if(active)setCheck(next);})
+      .catch(()=>{if(active)setError("No knowledge check is available for this course.");});
+    return ()=>{active=false;};
+  },[courseAttemptId]);
+
+  async function begin() {
+    if(busy)return;
+    setBusy(true);setError("");
+    try {
+      await beginNoncreditKnowledgeCheckAttempt({
+        data:{courseAttemptId,requestId:crypto.randomUUID()},
+      });
+      await load();
+    }catch {
+      setError("Unable to start this knowledge check. Check your participation or attempt limit.");
+    }finally {setBusy(false);}
+  }
+
+  if(error&&!check)return <p role="status" className="border p-3 text-sm">{error}</p>;
+  if(!check)return <p role="status" className="text-sm">Loading knowledge check...</p>;
+  return <section aria-label="Noncredit knowledge check" className="space-y-4">
+    <div>
+      <h3 className="font-serif text-xl font-semibold">Knowledge check</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Check your understanding of the course material. This is not a school grade or academic credit.
+      </p>
+    </div>
+    {error&&<p role="alert" className="border p-3 text-sm">{error}</p>}
+    {check.state==="not_started"&&<Button onClick={()=>void begin()} disabled={busy}>
+      {busy?"Starting...":"Start knowledge check"}
+    </Button>}
+    {check.state==="in_progress"&&check.attemptId&&
+      <LearningQuestionnaire key={check.attemptId} title="Course knowledge questions"
+        questions={check.questions} submitLabel="Submit knowledge check"
+        onSubmit={async answers=>{
+          setError("");
+          await submitNoncreditKnowledgeCheckAnswers({
+            data:{courseAttemptId,attemptId:check.attemptId!,
+              requestId:crypto.randomUUID(),
+              answers:answers.map(answer=>({
+                questionId:answer.questionId,optionIds:answer.optionIds??[],
+              })),
+            },
+          });
+          await load();
+        }}/>}
+    {check.state==="scored"&&<p role="status" className="border p-3 text-sm">
+      Your answers were submitted and automatically scored. Your noncredit result is awaiting provider confirmation.
+    </p>}
+    {check.state==="submitted"&&<p role="status" className="border p-3 text-sm">
+      Your knowledge check was submitted. Processing is in progress.
+    </p>}
+    {check.state==="finalized"&&<div role="status" className="border p-4 text-sm">
+      <p className="font-semibold">Knowledge check result confirmed</p>
+      <p className="mt-2">
+        {check.score?.pointsEarned??0} of {check.score?.pointsPossible??0} points
+        {check.score?.outcome==="pass"?" · Knowledge check met the published threshold":
+          check.score?.outcome==="fail"?" · Additional learning recommended":""}.
+      </p>
+      <p className="mt-2 text-muted-foreground">
+        A confirmed knowledge-check result is separate from training completion, grades and credit.
+      </p>
+      <Button className="mt-3" variant="outline" disabled={busy}
+        onClick={()=>void begin()}>
+        {busy?"Starting...":"Retake, if permitted"}
+      </Button>
+    </div>}
+    {check.state==="voided"&&<p role="status" className="border p-3 text-sm">
+      This knowledge-check attempt is unavailable.
+    </p>}
+  </section>;
+}
