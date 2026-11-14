@@ -2,6 +2,7 @@ import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEdit
 import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
 import { Link } from "@tanstack/react-router";
 import type { getGradebook } from "@/modules/learning/gradebook.functions";
+import { dateKeyInTimezone, formatDateOnly, formatTimestamp } from "@/modules/calendar/timezone";
 
 type Assessment = Awaited<ReturnType<typeof getGradebook>>["assessments"][number];
 type Action = "publish" | "close" | "reopen" | "reschedule";
@@ -9,6 +10,7 @@ type Action = "publish" | "close" | "reopen" | "reschedule";
 export function GradebookAssessmentHeader({
   assessment,
   sectionId,
+  timezone,
   busy,
   dueDate,
   onDueDateChange,
@@ -18,6 +20,7 @@ export function GradebookAssessmentHeader({
 }: {
   assessment: Assessment;
   sectionId: string;
+  timezone: string;
   busy: boolean;
   dueDate: string;
   onDueDateChange: (value: string) => void;
@@ -29,14 +32,14 @@ export function GradebookAssessmentHeader({
     <th className="min-w-32 p-3 font-semibold">
       <Link to="/teacher/gradebook" search={{section:sectionId,assessment:assessment.id}} className="block underline">{assessment.title}</Link>
       <span className="block text-xs font-normal text-muted-foreground">
-        {assessment.dueAt ? `Due ${new Date(assessment.dueAt).toLocaleDateString()}` : "No due date"}
+        {assessment.dueAt ? `Due ${formatDateOnly(dateKeyInTimezone(assessment.dueAt,timezone))}` : "No due date"}
         {" · "}{assessment.pointsPossible ?? "—"} pts
         {assessment.rubric.length > 0 && ` · ${assessment.rubric.length} criteria`}
         {" · "}{assessment.kind}
         {" · "}{assessment.status}
         {assessment.maxAttempts !== null && " · " + assessment.maxAttempts + " maximum attempts"}
-        {assessment.availableAt && " · Releases " + new Date(assessment.availableAt).toLocaleString()}
-        {assessment.closesAt ? " · Closes " + new Date(assessment.closesAt).toLocaleString() : " · No submission close time"}
+        {assessment.availableAt && " · Releases " + formatTimestamp(assessment.availableAt,timezone)}
+        {assessment.closesAt ? " · Closes " + formatTimestamp(assessment.closesAt,timezone) : " · No submission close time"}
       </span>
       {assessment.status === "draft" && (
         <AssessmentDraftEditor
@@ -49,6 +52,7 @@ export function GradebookAssessmentHeader({
         <AssessmentScheduleEditor
           key={assessment.id + assessment.availableAt + assessment.closesAt}
           assessment={assessment}
+          timezone={timezone}
           onSaved={onScheduleSaved}
         />
       )}

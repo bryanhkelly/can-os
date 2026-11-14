@@ -78,11 +78,16 @@ function GuardianAttendancePage() {
   }, [load]);
 
   const submit = async (absence: Absence) => {
+    const reason = (reasons[absence.attendanceEventId] ?? "").trim();
+    if (reason.length < 3) {
+      setError("Enter at least 3 characters explaining this absence or tardy.");
+      return;
+    }
     setNotice("");
     setError("");
     await mutation.run(async () => {
       await submitEffectiveAttendanceExcuse({
-        data: { attendanceEventId: absence.attendanceEventId, reason: reasons[absence.attendanceEventId] ?? "" },
+        data: { attendanceEventId: absence.attendanceEventId, reason },
       });
     }, { successMessage: `Excuse submitted for ${absence.studentName}. You can attach a supporting document below.`,
       commandErrorMessage: "Unable to submit excuse" });
@@ -193,6 +198,9 @@ function GuardianAttendancePage() {
                 <textarea
                   className="mt-2 w-full rounded-lg border bg-background p-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
                   rows={3}
+                  maxLength={2000}
+                  required
+                  minLength={3}
                   value={reasons[absence.attendanceEventId] ?? ""}
                   onChange={event => setReasons(current => ({ ...current, [absence.attendanceEventId]: event.target.value }))}
                   placeholder="Tell the school why your student was absent"
@@ -200,7 +208,7 @@ function GuardianAttendancePage() {
               </label>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || (reasons[absence.attendanceEventId] ?? "").trim().length < 3}
                 className="mt-3 inline-flex min-h-11 items-center rounded-lg border px-3 py-2 text-xs font-semibold focus-visible:outline-2 disabled:opacity-50"
                 onClick={() => submit(absence)}
               >Submit excuse</button>

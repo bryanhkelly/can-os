@@ -15,7 +15,6 @@ export const postDiscussionMessage=createServerFn({method:"POST"})
  assertCapability(actor,actor.role==="teacher"?"discussions:moderate":"assignments:submit");
  const actorPersonId=actor.actorPersonId;
  if(!actorPersonId)throw new AuthorizationError("student identity");
- if(!actor.scope.siteIds?.length)throw new AuthorizationError("student site membership");
  if(!isValidDiscussionPost(data.body))throw new Error("Message must contain 1–5,000 characters");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  return db.transaction(async tx=>{

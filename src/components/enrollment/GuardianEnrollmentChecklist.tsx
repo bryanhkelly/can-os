@@ -27,7 +27,8 @@ function GuardianEnrollmentChecklistView({ applicationId, protectUnsaved }: { ap
   });
   // Storage availability is independent so an outage cannot block forms.
   const availabilityQuery = useQuery(enrollmentDocumentUploadAvailabilityQuery());
-  const data = checklistQuery.data;
+  // A failed revalidation must not leave a previously cached private enrollment checklist visible.
+  const data = checklistQuery.isError ? undefined : checklistQuery.data;
   const availability = availabilityQuery.data;
   const [error, setError] = useState("");
   const [files, setFiles] = useState<Record<string, File | null>>({});
@@ -58,7 +59,8 @@ function GuardianEnrollmentChecklistView({ applicationId, protectUnsaved }: { ap
   }
   return <section aria-label="Family enrollment checklist" className="mt-4 space-y-3 rounded-lg border p-4">
     {protectUnsaved && <LaunchUnsavedChangesGuard dirty={Object.values(files).some(Boolean) ||
-      Object.values(dirtyForms).some(Boolean) || mutation.pending || mutation.refreshFailed} />}
+      Object.values(dirtyForms).some(Boolean) || mutation.pending || mutation.refreshFailed}
+      message="Leave enrollment? Unsaved form answers or selected documents will be lost. Stay to save or submit them, or leave without saving." />}
     <h3 className="text-lg font-semibold">Enrollment checklist</h3>
     <p className="text-sm">Complete the school's requested information here. Uploading a document does not accept an offer,
       sign a form or activate enrollment.</p>

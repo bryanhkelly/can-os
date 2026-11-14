@@ -63,7 +63,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
     <DashboardShortcut title="My classes" description="Open your assigned sections" icon={<BookOpen className="size-5" />}>
      <Link to="/classes" />
     </DashboardShortcut>
-    <DashboardShortcut title="Gradebook" description={ready ? `${data.ungraded.length} submitted items to review` : "Review student work"} icon={<ClipboardList className="size-5" />}>
+    <DashboardShortcut title="Gradebook" description={ready ? `${data.ungradedCount} submitted items to review` : "Review student work"} icon={<ClipboardList className="size-5" />}>
      <Link to="/teacher/gradebook" />
     </DashboardShortcut>
     <DashboardShortcut title="Messages" description="Review class and family conversations" icon={<MessageCircle className="size-5" />}>
@@ -77,27 +77,27 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
     </DashboardShortcut>}
    </>}
   rail={ready ? <TeacherDaySchedule sections={data.sections} /> : undefined}
-  actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/support">Student support →</Link><Link to="/profiles">Professional profile →</Link></>}
+  actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/student/support">Student support →</Link><Link to="/profiles">Professional profile →</Link></>}
  >
    {!data.connected && <p className="mt-8 border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
    {ready && <>
     <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Today summary">
      <StatCard asChild label="Sections" value={data.sections.length}><Link to="/classes" /></StatCard>
-     <StatCard asChild label="Needs grading" value={data.ungraded.length}><Link to="/teacher/gradebook" /></StatCard>
-     <StatCard asChild label="Missing work" value={data.missingWork.length}><Link to="/teacher/missing-work" /></StatCard>
+     <StatCard asChild label="Needs grading" value={data.ungradedCount}><Link to="/teacher/gradebook" /></StatCard>
+     <StatCard asChild label="Missing work" value={data.missingWorkCount}><Link to="/teacher/missing-work" /></StatCard>
      <StatCard asChild label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length}><a href="#grade-follow-ups" /></StatCard>
     </div>
 
     <section className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm" aria-label="Teaching next actions">
       <h2 className="font-serif text-2xl font-semibold">What needs you next</h2>
-      {data.ungraded.length>0 ? <div className="mt-3">
-        <p className="font-semibold">{data.ungraded.length} submitted work item{data.ungraded.length===1?"":"s"} to review</p>
+      {data.ungradedCount>0 ? <div className="mt-3">
+        <p className="font-semibold">{data.ungradedCount} submitted work item{data.ungradedCount===1?"":"s"} to review</p>
         <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
         <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId}}
           className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Grade next submission <ArrowUpRight className="ml-2 size-4"/></Link>
-      </div> : data.missingWork.length>0 ? <div className="mt-3">
-        <p className="font-semibold">{data.missingWork.length} missing-work follow-up{data.missingWork.length===1?"":"s"}</p>
+      </div> : data.missingWorkCount>0 ? <div className="mt-3">
+        <p className="font-semibold">{data.missingWorkCount} missing-work follow-up{data.missingWorkCount===1?"":"s"}</p>
         <p className="mt-1 text-sm text-muted-foreground">Review missing work and follow up with students through the existing teacher workflow.</p>
         <Link to="/teacher/missing-work" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review missing work <ArrowUpRight className="ml-2 size-4"/></Link>
       </div> : <div className="mt-3">

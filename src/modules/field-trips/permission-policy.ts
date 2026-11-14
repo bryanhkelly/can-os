@@ -22,6 +22,14 @@ export function publishedTripPermission(
   return { version, text: text.trim() };
 }
 
+/** Fail closed if a guardian is signing anything other than the exact text they acknowledged. */
+export function tripPermissionMatchesAcknowledgement(
+  published: PublishedTripPermission,
+  displayed: { version: string; text: string },
+): boolean {
+  return published.version === displayed.version && published.text === displayed.text;
+}
+
 export function permissionCanBeSigned(input: {
   tripStatus: string;
   participantStatus: string;

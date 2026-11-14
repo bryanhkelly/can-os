@@ -110,6 +110,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
  const saveGeneration = useRef(0);
  const feedbackRef = useRef<HTMLParagraphElement>(null);
  const saving = useRef(false);
+ const autosaveInFlight = useRef<Promise<unknown> | null>(null);
  const uploads = useRef(new Map<File, { run: () => Promise<unknown> }>());
  const hydrated = useHydrated();
  useEffect(() => {
@@ -134,9 +135,17 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
   const task = setTimeout(() => {
    if (generation !== saveGeneration.current) return;
    setDraftStatus("saving");
-   saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } })
-    .then(() => { if (generation === saveGeneration.current) setDraftStatus("saved"); })
-    .catch(() => { if (generation === saveGeneration.current) setDraftStatus("error"); });
+   // Queue autosaves so a slower earlier request cannot overwrite a newer draft.
+   const previous = autosaveInFlight.current;
+   const request = (async () => {
+    await previous?.catch(() => undefined);
+    if (generation !== saveGeneration.current || saving.current) return;
+    await saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } });
+   })();
+   autosaveInFlight.current = request;
+   void request.then(() => { if (generation === saveGeneration.current) setDraftStatus("saved"); })
+    .catch(() => { if (generation === saveGeneration.current) setDraftStatus("error"); })
+    .finally(() => { if (autosaveInFlight.current === request) autosaveInFlight.current = null; });
   }, 950);
   return () => { clearTimeout(task); saveGeneration.current++; };
  }, [assignment.assessmentId, assignment.status, assignment.responseText, editable, busy, draft, hydrated]);
@@ -154,6 +163,9 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
   saveGeneration.current++;
   setError(""); setProgress("Saving your draft...");
   try {
+   // Finish any earlier autosave before writing the latest response or submitting.
+   // Otherwise a slow autosave can overwrite the explicit Save draft action.
+   await autosaveInFlight.current?.catch(() => undefined);
    await mutation.run(async () => {
     const work = {
      files: pendingFiles,

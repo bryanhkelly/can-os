@@ -8,7 +8,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and,asc,eq,inArray } from "drizzle-orm";
 import { z } from "zod";
-import { permissionCanBeSigned,publishedTripPermission } from "./permission-policy";
+import { permissionCanBeSigned,publishedTripPermission,tripPermissionMatchesAcknowledgement } from "./permission-policy";
 
 import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
@@ -82,6 +82,8 @@ export const listGuardianFieldTripPermissions = createServerFn({ method: "GET" }
 export const signGuardianFieldTripPermission = createServerFn({ method: "POST" })
   .validator((input: unknown) => z.object({
     participantId: uuid, acknowledged: z.literal(true),
+    permissionVersion: z.string().min(1).max(80),
+    permissionText: z.string().min(40).max(5000),
   }).parse(input))
   .handler(async ({ data }) => {
     const actor = await requireActor(["guardian"], "enrollment:manage");
@@ -129,6 +131,10 @@ export const signGuardianFieldTripPermission = createServerFn({ method: "POST" }
         throw new Error("This permission is no longer eligible for signature.");
       }
       if (!policy) throw new Error("The school has not published permission language.");
+      // Consent must match the exact statement the guardian actually saw, even
+      // when school staff accidentally change the text without bumping its version.
+      if (!tripPermissionMatchesAcknowledgement(policy, { version: data.permissionVersion, text: data.permissionText }))
+        throw new Error("The school permission statement changed. Refresh and acknowledge the updated version before signing.");
       const [consent] = await tx.insert(s.consentRecords).values({
         subjectType: "field_trip_participant", subjectId: participant.id,
         consentType: "field_trip_permission", signerPersonId: actor.actorPersonId,

@@ -44,7 +44,8 @@ function MessagesPage() {
     enabled: composeOpen,
     retry: (count, error) => normalizeClientError(error).retryable && count < 1,
   });
-  const threads = threadsQuery.data?.threads ?? [];
+  // Never keep cached conversation titles visible when authorization revalidation fails.
+  const threads = threadsQuery.isError ? [] : threadsQuery.data?.threads ?? [];
   const selectedId = thread ?? threads[0]?.id ?? "";
   const detailQuery = useQuery({
     queryKey: ["messages", "thread", grantId, selectedId],
@@ -52,7 +53,7 @@ function MessagesPage() {
     enabled: Boolean(selectedId),
     retry: (count, error) => normalizeClientError(error).retryable && count < 1,
   });
-  const detail = detailQuery.data ?? null;
+  const detail = threadsQuery.isError || detailQuery.isError ? null : detailQuery.data ?? null;
   const [reply, setReply] = useState("");
   const [composeRecipientId, setComposeRecipientId] = useState("");
   const [composeSubject, setComposeSubject] = useState("");
@@ -71,7 +72,7 @@ function MessagesPage() {
     ? normalizeClientError(contactsQuery.error, "Contacts could not load. Please try again.")
     : null;
   const needsSignIn = threadsFailure?.kind === "authentication";
-  const contacts = contactsQuery.data?.contacts ?? [];
+  const contacts = contactsQuery.isError || needsSignIn ? [] : contactsQuery.data?.contacts ?? [];
 
   async function refreshConversation(id: string) {
     const [updated, list] = await Promise.all([getThread({ data: { threadId: id } }), listMyThreads()]);
@@ -91,7 +92,7 @@ function MessagesPage() {
 
   async function sendReply() {
     const body = reply.trim();
-    if (!body || !selectedId) return;
+    if (!body || !selectedId || needsSignIn) return;
     const id = selectedId;
     const outcome = await mutation.run(() => replyToThread({ data: { threadId: id, body } }), {
       successMessage: "Message sent.",
@@ -105,7 +106,7 @@ function MessagesPage() {
     const subject = composeSubject.trim();
     const body = composeBody.trim();
     setComposeAttempted(true);
-    if (!composeRecipientId || !subject || !body) return;
+    if (!composeRecipientId || !subject || !body || needsSignIn) return;
     const outcome = await mutation.run(async () => {
       const result = await startThread({ data: { recipientPersonId: composeRecipientId, subject, body } });
       setComposeRecipientId(""); setComposeSubject(""); setComposeBody("");
@@ -127,14 +128,14 @@ function MessagesPage() {
     {threadsFailure && <QueryState error={needsSignIn ? "Sign in to view messages." : threadsFailure.message}
       onRetry={threadsFailure.retryable ? retryLoading : undefined} retrying={threadsQuery.isFetching} />}
     {needsSignIn && <Link to="/access" search={{ returnTo }} className="mt-4 inline-block underline">Sign in or request access</Link>}
-    {(!threadsFailure || threads.length > 0 || thread) && <MessagesWorkspace threads={threads} selectedId={selectedId} detail={detail} loading={threadsQuery.isPending}
+    {!needsSignIn && (!threadsFailure || threads.length > 0 || thread) && <MessagesWorkspace threads={threads} selectedId={selectedId} detail={detail} loading={threadsQuery.isPending}
       loadingThread={detailQuery.isPending} error={detailFailure?.message ?? ""}
       onRetry={() => { if (detailFailure?.retryable) void detailQuery.refetch(); }}
       onSelect={id => { setReply(""); void navigate({ search: { thread: id } }); }}
       reply={reply} onReplyChange={setReply} onSend={() => void sendReply()} busy={busy}
       onCompose={() => { setComposeAttempted(false); setComposeOpen(true); }}
       feedback={!composeOpen ? feedback : null} />}
-    <Modal open={composeOpen} onClose={() => setComposeOpen(false)} label="New message" dismissible={!busy} busy={busy}>
+    <Modal open={composeOpen && !needsSignIn} onClose={() => setComposeOpen(false)} label="New message" dismissible={!busy} busy={busy}>
       <div className="border-b p-5">
         <h2 className="font-serif text-section">New message</h2>
         <p className="mt-2 text-sm text-muted-foreground">Choose a contact from your verified school relationships.</p>

@@ -5,7 +5,7 @@ import { getActionDetail } from "@/modules/actions/action-detail.functions";
 const state=vi.hoisted(()=>({
   actor:undefined as AccessContext|undefined,
   action:undefined as Record<string,unknown>|undefined,
-  header:vi.fn(), authority:vi.fn(), transaction:vi.fn(), select:vi.fn(),
+  header:vi.fn(), authority:vi.fn(), authorizeClass:vi.fn(), transaction:vi.fn(), select:vi.fn(),
 }));
 vi.mock("@tanstack/react-start",()=>({
   createServerFn:()=>({
@@ -21,6 +21,7 @@ vi.mock("@tanstack/react-start/server",()=>({
 }));
 vi.mock("@/modules/identity/command-context.server",()=>({getCommandContext:async()=>state.actor}));
 vi.mock("@/modules/actions/academic-action-policy.server",()=>({assertAcademicActionAuthority:state.authority}));
+vi.mock("@/modules/learning/class-access.server",()=>({authorizeClass:state.authorizeClass}));
 vi.mock("@/db/client",()=>({db:{transaction:state.transaction}}));
 
 const actionId="00000000-0000-4000-8000-000000000001";
@@ -38,6 +39,7 @@ beforeEach(()=>{
     dueAt:new Date("2030-01-01"),resolvedAt:null,resolutionNote:null,metadata:{private:"not returned"},
   };
   state.authority.mockResolvedValue(undefined);
+  state.authorizeClass.mockResolvedValue(undefined);
   state.select.mockImplementation(()=>({
     from:()=>({where:()=>({limit:async()=>state.action?[state.action]:[]})}),
   }));
@@ -106,6 +108,48 @@ describe("staff Action detail boundary",()=>{
     state.actor!.role=role;
     expect(await getActionDetail({data:{actionId}})).toMatchObject({workspaceHome});
   });
+  it.each(["local","delegated"])("opens a teacher-owned missing-work Action for %s authority",async mode=>{
+    state.action!.type="missing_work_follow_up";
+    state.action!.sectionId=null; // older follow-ups still have a canonical assessment
+    state.action!.ownerPersonId="staff";
+    state.action!.metadata={assessmentId:"00000000-0000-4000-8000-000000000002"};
+    if(mode==="delegated")state.actor!.scope={
+      organizationIds:["academic-provider"],siteIds:[],programIds:[],sectionIds:["section"],
+    };
+    state.select.mockImplementationOnce(()=>({
+      from:()=>({where:()=>({limit:async()=>[state.action]})}),
+    })).mockImplementationOnce(()=>({
+      from:()=>({innerJoin:()=>({where:()=>({limit:async()=>[{
+        sectionId:"section",siteId:"site",programId:"program",
+      }]})})}),
+    }));
+    const result=await getActionDetail({data:{actionId}});
+    expect(result).toMatchObject({
+      canResolveMissingWork:true,canReviewClass:true,sectionId:"section",
+      workspaceHome:"/teacher/missing-work",
+    });
+    expect(state.authorizeClass).toHaveBeenCalledWith(state.actor,"section",undefined,expect.anything());
+    expect(result).not.toHaveProperty("metadata");
+  });
+
+  it("rejects a colleague's missing-work Action and revoked Section delegation",async()=>{
+    state.action!.type="missing_work_follow_up";
+    state.action!.ownerPersonId="another-teacher";
+    state.action!.metadata={assessmentId:"00000000-0000-4000-8000-000000000002"};
+    await expect(getActionDetail({data:{actionId}})).rejects.toThrow("owning workspace");
+    expect(state.authorizeClass).not.toHaveBeenCalled();
+    state.action!.ownerPersonId="staff";
+    state.select.mockImplementationOnce(()=>({
+      from:()=>({where:()=>({limit:async()=>[state.action]})}),
+    })).mockImplementationOnce(()=>({
+      from:()=>({innerJoin:()=>({where:()=>({limit:async()=>[{
+        sectionId:"section",siteId:"site",programId:"program",
+      }]})})}),
+    }));
+    state.authorizeClass.mockRejectedValueOnce(new Error("Section delegation revoked"));
+    await expect(getActionDetail({data:{actionId}})).rejects.toThrow("Section delegation revoked");
+  });
+
   it("does not substitute another record for missing or malformed IDs",async()=>{
     state.action=undefined;
     await expect(getActionDetail({data:{actionId}})).rejects.toThrow("Action detail scope");

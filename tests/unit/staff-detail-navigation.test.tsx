@@ -50,7 +50,7 @@ vi.mock("@/modules/study-groups/canonical-sessions.functions",()=>({
 vi.mock("@/modules/study-groups/facilitator-query.functions",()=>({getFacilitatorStudyGroups:vi.fn()}));
 vi.mock("@/modules/actions/action-detail.functions",()=>({getActionDetail:vi.fn()}));
 vi.mock("@/modules/learning/teacher-missing-work.functions",()=>({
-  getTeacherMissingWork:vi.fn(),createMissingWorkFollowUp:vi.fn(),
+  getTeacherMissingWork:vi.fn(),createMissingWorkFollowUp:vi.fn(),resolveMissingWorkFollowUp:vi.fn(),
 }));
 vi.mock("@/modules/health/guardian-health-updates.functions",()=>({
   listGuardianHealthReviews:vi.fn(),reviewGuardianHealthUpdate:vi.fn(),
@@ -177,7 +177,7 @@ describe("read-only staff Action detail",()=>{
   it("links missing-work assignment, student and course names to their own records",()=>{
     state.data={ok:true,data:{connected:true,items:[{
       assessmentId:"essay",title:"Evidence essay",course:"English",sectionId:"english",
-      dueAt:"2030-01-01T12:00:00Z",studentProfileId:"student-profile",
+      dueAt:"2030-01-01T12:00:00Z",timezone:"America/Los_Angeles",studentProfileId:"student-profile",followUpActionId:"owned-action",
       studentPersonId:"student-person",studentName:"Jordan Student",status:"not_started",
     }]}};
     const html=render(MissingWork);
@@ -185,6 +185,9 @@ describe("read-only staff Action detail",()=>{
     expect(html).toContain('href="/staff/students/student-person" class="underline">Jordan Student</a>');
     expect(html).toContain('href="/classes?section=english" class="underline">English</a>');
     expect(html).not.toContain('/staff/students/student-profile');
+    expect(html).toContain('href="/actions/owned-action"');
+    expect(html).toContain("Open follow-up");
+    expect(html).not.toContain("Create follow-up");
   });
   function action(canManageOperations:boolean,status="open"){
     state.data={ok:true,data:{
@@ -202,6 +205,26 @@ describe("read-only staff Action detail",()=>{
     expect(html).not.toContain('href="/home?action=');
     expect(html).not.toContain("Mark complete");
     expect(html).toContain('href="/home" class="underline">Back to workspace</a>');
+  });
+  it("allows a teacher to record and resolve only an owned open missing-work follow-up",()=>{
+    const record={
+      id:"follow-up",title:"Overdue essay",type:"missing_work_follow_up",
+      description:"Student has not submitted",status:"open",priority:"normal",
+      dueAt:null,resolvedAt:null,resolutionNote:null,sectionId:"english",
+      siteId:"site",programId:"program",canReviewClass:true,
+      canResolveMissingWork:true,canManageOperations:false,
+      workspaceHome:"/teacher/missing-work",
+    };
+    state.data={ok:true,data:record};
+    const html=render(Action);
+    expect(html).toContain('href="/teacher/missing-work"');
+    expect(html).toContain("Resolve this follow-up");
+    expect(html).toContain("Resolution note");
+    expect(html).toContain("Resolve follow-up");
+    expect(html).toContain('href="/classes?section=english"');
+    expect(html).not.toContain("Open owning operations workflow");
+    state.data={ok:true,data:{...record,status:"resolved"}};
+    expect(render(Action)).not.toContain("Resolve this follow-up");
   });
   it("links active registrar work to the exact scoped owning workflow, not closed work",()=>{
     expect(action(true)).toContain('href="/home?action=action&amp;siteId=site&amp;programId=program"');

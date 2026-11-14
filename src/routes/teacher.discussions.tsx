@@ -9,6 +9,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { z } from "zod";
+import { selectTeacherDiscussionThreads } from "@/domain/course-discussions";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -19,7 +20,7 @@ export const Route = createFileRoute("/teacher/discussions")({
   validateSearch: (search: Record<string, unknown>): { section?: string; lesson?: string; thread?: string } => ({
     section: typeof search.section === "string" ? search.section : undefined,
     lesson: typeof search.lesson === "string" && /^[A-Za-z0-9_-]{1,100}$/.test(search.lesson) ? search.lesson : undefined,
-    thread: typeof search.thread === "string" ? z.string().uuid().parse(search.thread) : undefined,
+    thread: typeof search.thread === "string" && z.string().uuid().safeParse(search.thread).success ? search.thread : undefined,
   }),
   loader: safeLoader(() => getTeacherCourseDiscussions(), { authMessage: "Sign in with an authorized teacher account to manage class discussions." }),
   component: TeacherDiscussions,
@@ -34,7 +35,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
   const { section, lesson, thread: selectedThread } = Route.useSearch();
   const router = useRouter();
   const sections = data.sections.filter(item => !section || item.id === section);
-  const threads = data.threads.filter(item => (!section || item.sectionId === section) && (!selectedThread || item.id === selectedThread));
+  const threads = selectTeacherDiscussionThreads(data.threads, { section, lesson, thread: selectedThread });
   const [sectionId, setSectionId] = useState(sections[0]?.id ?? "");
   const [subject, setSubject] = useState("");
   const [prompt, setPrompt] = useState("");
@@ -60,8 +61,18 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
         setCreateAttempted(true);
         if(!sectionId||subject.trim().length<3||prompt.trim().length<3||
           (Boolean(lesson)&&(!selectedLesson||sectionId!==section)))return;
-        void run(async () => { await createCourseDiscussion({ data: { sectionId, subject, prompt,
-          ...(selectedLesson&&sectionId===section?{curriculumLessonId:selectedLesson.id}:{}) } }); setSubject(""); setPrompt("");setCreateAttempted(false); });
+        void (async () => {
+          const outcome = await mutation.run(() => createCourseDiscussion({ data: { sectionId, subject, prompt,
+            ...(selectedLesson&&sectionId===section?{curriculumLessonId:selectedLesson.id}:{}) } }), {
+            successMessage: "Class discussion created.",
+            commandErrorMessage: "Unable to create class discussion.",
+          });
+          if (outcome.status === "saved") {
+            setSubject(""); setPrompt(""); setCreateAttempted(false);
+            void router.navigate({ to: "/teacher/discussions",
+              search: { section: sectionId, lesson, thread: outcome.value.id } });
+          }
+        })();
       }}>
         {lesson&&<p className="text-sm">Publisher lesson: {selectedLesson?.title??"Unavailable in this class"}. Discussions belong to the teacher and do not change publisher content.</p>}
         {lesson&&!selectedLesson&&<p role="alert" className="text-sm">Choose an available publisher lesson before linking this discussion.</p>}
@@ -113,6 +124,10 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
         <Button type="submit" variant="outline" disabled={busy}>Post response</Button>
       </form>}
     </WorkspacePanel>)}</div>
-    {!threads.length && <p role="status" className="mt-5 rounded-xl border p-5 text-sm text-muted-foreground">No class discussions yet.</p>}
+    {selectedThread && <p className="mt-4 text-sm"><Link to="/teacher/discussions" search={{ section, lesson }} className="underline">Show all class discussions</Link></p>}
+    {!threads.length && <p role="status" className="mt-5 rounded-xl border p-5 text-sm text-muted-foreground">
+      {selectedThread ? "This discussion is not available in your selected class or lesson." :
+        lesson ? "No discussions are linked to this lesson yet." : "No class discussions yet."}
+    </p>}
   </WorkspaceShell>;
 }

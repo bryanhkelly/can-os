@@ -45,7 +45,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const community = data?.community.ok ? data.community.data : null;
   const events = [...liveData.events].sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const scheduled = events.filter(event => !event.cancelled);
-  const classesToday = scheduled.filter(event => Boolean(event.sectionId));
+  const todayEvents = events.filter(event => dateKeyInTimezone(event.startsAt, timezone) === localDate);
+  const classesToday = scheduled.filter(event => Boolean(event.sectionId) && dateKeyInTimezone(event.startsAt, timezone) === localDate);
   const visible = assignments.filter(item => filter === "all" ||
     (filter === "due" ? dueIds.has(item.assessmentId) : item.hasDraft && (item.status === "assigned" || item.status === null)));
   const format = (stamp: Date | string, zone = timezone) => new Intl.DateTimeFormat("en-US", {
@@ -65,7 +66,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
         icon={<BookOpen className="size-5" />}>{learning?.lesson
           ? <Link to="/classes" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}} />
           : nextWork ? <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}} />
-          : <Link to="/student/courses" />}</DashboardShortcut>
+          : <Link to="/classes" />}</DashboardShortcut>
       <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
         icon={<FileText className="size-5" />}><Link to="/student/assignments"
           search={{section:nextWork?.sectionId ?? undefined,assessment:nextWork?.assessmentId}} /></DashboardShortcut>
@@ -78,7 +79,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       <div className="student-feature-grid">
         <DashboardPanel id="continue-learning" title="Continue Learning"
           action={learning?<Link to="/classes" search={{section:learning.sectionId,tab:"lessons"}} className={textLink}>View class →</Link>:
-            <Link to="/student/courses" className={textLink}>View my classes →</Link>}>
+            <Link to="/classes" className={textLink}>View my classes →</Link>}>
           {learning ? <div className="student-resume-grid">
             <div>
               <div className="flex items-start gap-3">
@@ -109,7 +110,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
             {nextWork && <><p className="text-sm font-semibold">{nextWork.title}</p>
               <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}}
                 className="student-resume-action">Continue assignment →</Link></>}
-            <Link to="/student/courses" className={textLink}>View my classes →</Link>
+            <Link to="/classes" className={textLink}>View my classes →</Link>
           </div>}
         </DashboardPanel>
         <DashboardPanel title="Today at a Glance" action={<Link to="/calendar" search={{date:localDate}} className={textLink}>View calendar →</Link>}>
@@ -153,21 +154,21 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
         </DashboardPanel>
       </div>
       <DashboardPanel id="school-life" title="School Life"
-        action={<Link to="/student/experiences" className={textLink}>View all →</Link>}>
-        {data && !data.community.ok ? <p role="alert" className="text-xs">School updates could not be loaded. <Link to="/student/experiences" className="underline">Open School Life to retry.</Link></p>
+        action={<Link to="/student/my-school" className={textLink}>View all →</Link>}>
+        {data && !data.community.ok ? <p role="alert" className="text-xs">School updates could not be loaded. <Link to="/student/my-school" className="underline">Open School Life to retry.</Link></p>
           : upcomingEvents.length ? <div className="student-life-grid">{upcomingEvents.slice(0,3).map(event =>
             <DashboardMediaTile key={event.id} title={event.title} subtitle={format(event.startsAt,event.timezone)}
               className="student-life-tile"
               href={`/calendar?date=${dateKeyInTimezone(event.startsAt,event.timezone)}&event=${encodeURIComponent(event.id)}`} />)}</div>
             : <div className="space-y-3"><p role="status" className="text-xs text-muted-foreground">No upcoming school events are published.</p>
-              <Link to="/student/experiences" className={textLink}>School &amp; community →</Link></div>}
+              <Link to="/student/my-school" className={textLink}>School &amp; community →</Link></div>}
       </DashboardPanel>
     </>}
     rail={<>
       <DashboardCalendar date={localDate} timezone={timezone} />
       <DashboardPanel id="student-schedule" title="Today's Schedule"
         action={<Link to="/calendar" search={{date:localDate}} className={textLink}>View all →</Link>}>
-        <div className="student-schedule">{events.slice(0,5).map(event => <article key={event.id}>
+        <div className="student-schedule">{todayEvents.slice(0,5).map(event => <article key={event.id}>
           <time dateTime={new Date(event.startsAt).toISOString()}>{new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit",timeZone:event.timezone}).format(new Date(event.startsAt))}</time>
           <div><Link to="/calendar" search={{date:dateKeyInTimezone(new Date(event.startsAt).toISOString(),event.timezone),event:event.id}}
             className="text-xs font-semibold hover:underline">{event.title}</Link>
@@ -176,8 +177,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
             {event.description && <p className="mt-1 text-xs text-muted-foreground">{event.description}</p>}
           </div>
         </article>)}</div>
-        {!events.length && <p className="text-xs text-muted-foreground">No scheduled events today.</p>}
-        {events.length > 5 && <p className="mt-2 text-xs text-muted-foreground">Open the calendar for all {events.length} events.</p>}
+        {!todayEvents.length && <p className="text-xs text-muted-foreground">No scheduled events today.</p>}
+        {todayEvents.length > 5 && <p className="mt-2 text-xs text-muted-foreground">Open the calendar for all {todayEvents.length} events today.</p>}
       </DashboardPanel>
       <DashboardPanel title="Announcements">
         {data && !data.community.ok ? <p role="alert" className="text-xs">Announcements could not be loaded.</p>

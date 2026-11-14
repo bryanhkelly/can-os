@@ -3,6 +3,7 @@ import { Check, Play } from "lucide-react";
 import { WorkspacePanel } from "@/components/workspace";
 import type { ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
+import { CourseLessonProgress } from "./CourseLessonProgress";
 
 export function ClassLessonOutline({ content, search, currentLessonId, completed, showCompletion }: {
   content: ClassContent | null; search: { section: string; student?: string };
@@ -10,7 +11,6 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
 }) {
   const lessons = content?.modules.flatMap(module => module.lessons).filter(isLearnerFacingInstruction) ?? [];
   const completedCount = lessons.filter(lesson => completed.has(lesson.id)).length;
-  const percent = lessons.length ? Math.round(completedCount / lessons.length * 100) : 0;
   return <WorkspacePanel title="Lesson outline" className="classroom-outline-panel"
     actions={lessons.length > 0 ? <span className="text-xs text-muted-foreground">{showCompletion ? `${completedCount} / ${lessons.length}` : `${lessons.length} lessons`}</span> : undefined}>
     {!content && <p className="text-sm text-muted-foreground">No published course sequence is available.</p>}
@@ -34,12 +34,9 @@ export function ClassLessonOutline({ content, search, currentLessonId, completed
       </section>)}
     </nav>
     {showCompletion && lessons.length > 0 && <div className="mt-4 border-t pt-4">
-      <p className="text-xs font-semibold">Course progress</p>
-      <div role="progressbar" aria-label="Self-reported lesson completion" aria-valuemin={0} aria-valuemax={lessons.length}
-        aria-valuenow={completedCount} aria-valuetext={`${completedCount} of ${lessons.length} lessons self-reported complete`}
-        className="mt-2 h-1.5 bg-muted"><div className="h-full bg-primary" style={{width:`${percent}%`}}/></div>
-      <div className="mt-2 flex justify-between gap-2 text-3xs text-muted-foreground"><span>{completedCount} of {lessons.length} lessons</span><span>{percent}% complete</span></div>
-      <p className="mt-2 text-3xs text-muted-foreground">Self-reported completion, not academic mastery or credit.</p>
+      <CourseLessonProgress completed={completedCount} total={lessons.length}
+        ariaLabel="Self-reported lesson completion"
+        description="Self-reported completion, not academic mastery or credit." />
     </div>}
   </WorkspacePanel>;
 }

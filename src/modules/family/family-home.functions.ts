@@ -173,13 +173,8 @@ export const getFamilyHome = createServerFn({ method: "GET" }).handler(async () 
       timezone: row.timezone,
      });
     }
-    // A closed assignment does not stop being missing. Teachers continue to
-    // see overdue missing/returned work after closure; families must not be
-    // marked "on track" just because the student can no longer submit it.
-    // Work not yet released cannot count as missing.
-    if (row.dueAt && row.dueAt < now &&
-        (!row.availableAt || row.availableAt <= now) && incomplete)
-     missingCount += 1;
+    // The guardian summary above already includes overdue open and closed
+    // assignments. Do not count these cases a second time here.
     if (!actionable || !row.dueAt) continue;
     if (row.dueAt.getTime() >= now.getTime() && incomplete) {
      if (!nextDueAt || row.dueAt.toISOString() < nextDueAt) {

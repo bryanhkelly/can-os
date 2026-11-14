@@ -43,6 +43,18 @@ describe("net-new CAN OS v3.0.1 identity", () => {
     expect(context.scope.siteIds).toEqual([]);
   });
 
+  it("gives a non-Site learner participation but no Blueprint or Site authority", () => {
+    const learner = canonicalSessionRowSchema.parse({...session, role_code: "learner", site_id: null});
+    const context = projectCanonicalCommandContext(learner);
+    expect(context.role).toBe("learner");
+    expect(context.scope.siteIds).toEqual([]);
+    expect(context.capabilities.has("learning.participate")).toBe(true);
+    expect(context.capabilities.has("blueprint.execute")).toBe(false);
+    expect(() => projectCanonicalCommandContext(canonicalSessionRowSchema.parse({
+      ...session, role_code: "learner",
+    }))).toThrow();
+  });
+
   it("rejects site-less operators and Site-assigned independent reviewers", () => {
     expect(() => projectCanonicalCommandContext(canonicalSessionRowSchema.parse({
       ...session, site_id: null,

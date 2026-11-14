@@ -113,6 +113,13 @@ integration("class participation cross-workspace flow", () => {
         courseTemplateVersionId: version.id,
       }).returning());
       await tx.insert(s.sectionTeachers).values({ sectionId: section.id, personId: teacher.id });
+      // Active Section membership alone cannot authorize a learner; pair it
+      // with current Program participation in the same school year.
+      await tx.insert(s.enrollments).values({
+        studentProfileId: profile.id, kind: "program", status: "active",
+        organizationId: org.id, programId: program.id, sectionId: null,
+        schoolYearId: time.schoolYear.id,
+      });
       const enrollment = first(await tx.insert(s.enrollments).values({
         studentProfileId: profile.id, kind: "section", status: "active", organizationId: org.id,
         programId: program.id, sectionId: section.id, schoolYearId: time.schoolYear.id,
@@ -297,6 +304,11 @@ integration("class participation cross-workspace flow", () => {
       expect((await messaging.getThread({ data: { threadId: conversation.threadId } })).thread.contextHref).toContain("/guardian/students?");
       act("teacher", teacher.id);
       await messaging.replyToThread({ data: { threadId: conversation.threadId, body: "Please review my annotation." } });
+      // Re-read as the guardian, simulating a fresh inbox load after delivery.
+      act("guardian", parent.id);
+      const parentConversation = await messaging.getThread({ data: { threadId: conversation.threadId } });
+      expect(parentConversation.messages.some(row => row.body === "Please review my annotation.")).toBe(true);
+      act("teacher", teacher.id);
       const prompt = await discussions.createCourseDiscussion({ data: { sectionId: section.id, subject: "Discuss evidence", prompt: "What supports the claim?" } });
       expect((await teacherDiscussions.getTeacherCourseDiscussions()).threads.some(row => row.id === prompt.id)).toBe(true);
       act("student", student.id);

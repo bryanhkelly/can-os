@@ -33,9 +33,14 @@ function GuardianAcademicsPage() {
  const [loading, setLoading] = useState(true);
  const [loadingStudents, setLoadingStudents] = useState(true);
  const [error, setError] = useState("");
+ const [retryKey, setRetryKey] = useState(0);
 
  useEffect(() => {
   let active = true;
+  setLoadingStudents(true);
+  setError("");
+  setStudents([]);
+  setSelected("");
   getGuardianStudents().then(result => {
    if (!active) return;
    setStudents(result.students);
@@ -46,7 +51,7 @@ function GuardianAcademicsPage() {
    if (active) { setError("Sign in with an authorized guardian account to view academic progress."); setLoadingStudents(false); setLoading(false); }
   });
   return () => { active = false; };
- }, []);
+ }, [retryKey]);
 
  useEffect(() => {
   if (!selected) { setAssignments([]); setLoading(false); return; }
@@ -68,15 +73,23 @@ function GuardianAcademicsPage() {
  return <WorkspaceShell width="wide" eyebrow="Guardian" title="Academic progress"
   subtitle="Review your children's class assignments, instructions and released teacher feedback."
   breadcrumbs={<><Link to="/home" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
-  actions={<Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>}>
+  actions={<div className="flex flex-wrap gap-2">
+   <Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>
+   <Link to="/guardian/report-cards" search={{student:selected||undefined}} className="rounded-lg border px-4 py-2 text-sm">Report cards</Link>
+  </div>}>
    {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
     Student
     <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
+     <option value="" disabled>Choose an authorized student</option>
      {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
     </select>
    </label>}
    {(loading || loadingStudents) && <p className="mt-8 text-sm" role="status">Loading academic progress…</p>}
-   {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
+   {error && <div className="mt-8 rounded-lg border p-4 text-sm" role="alert">
+    <p>{error}</p>
+    <button type="button" className="mt-3 rounded-lg border px-4 py-2 font-semibold"
+     onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry loading academic progress</button>
+   </div>}
    {student&&!selected&&!loadingStudents&&!error&&<p role="alert" className="mt-8 rounded-lg border p-4 text-sm">This student is unavailable in your current family workspace. Choose an authorized student above.</p>}
    {!loading && !loadingStudents && !error && students.length === 0 && <div className="mt-8 rounded-xl border bg-card p-5">
     <p className="font-semibold">No enrolled children are showing in academics yet.</p>
@@ -88,7 +101,7 @@ function GuardianAcademicsPage() {
      <Link to="/messages" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Message the school</Link>
     </div>
    </div>}
-   {!loading && !loadingStudents && !error && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
+   {!loading && !loadingStudents && !error && !!selected && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
    {(section||assessment)&&<Link to="/guardian/students" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
    {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5 rounded-xl border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Assignment summary">

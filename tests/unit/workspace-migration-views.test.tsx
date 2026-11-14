@@ -154,6 +154,14 @@ describe("enrolled learning workspace", () => {
 });
 
 describe("family and student profiles", () => {
+  it("shows a retry action rather than stale family data on a failed read", () => {
+    const html = renderToStaticMarkup(<FamilyHomeView
+      children={[]} needs={[]} loading={false} error="Unable to verify family access"
+      onRetry={() => undefined}/>);
+    expect(html).toContain("Unable to verify family access");
+    expect(html).toContain("Retry");
+    expect(html).not.toContain('aria-label="Family quick links"');
+  });
   it("shows concrete reasons and preserves each child's person ID in every academic link", () => {
     const children: ComponentProps<typeof FamilyHomeView>["children"] = [{
       studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
@@ -165,6 +173,8 @@ describe("family and student profiles", () => {
     expect(html).toContain('href="/guardian/students?student=child-person"');
     expect(html).toContain('href="/guardian/attendance?student=child-person"');
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
+    expect(html).toContain('href="/guardian/field-trips"');
+    expect(html).toContain('href="/admissions/my-credentials"');
     expect(html).not.toContain("student=child-profile");
   });
   it("shows a named child and exact application stage while enrollment is in progress", () => {
@@ -208,6 +218,23 @@ describe("family and student profiles", () => {
     expect(html).toContain('href="/guardian/students?student=child-person"');
     expect(html).not.toContain("Casey Sample");
     expect(html).toContain("focus-visible:outline-2");
+  });
+  it("shows all authorized children and clears stale child links on the family home", () => {
+    const children: ComponentProps<typeof FamilyHomeView>["children"] = [
+      { studentPersonId: "child-person", studentProfileId: "child-profile", displayName: "Jordan", lastName: "Sample",
+        sectionCount: 2, awaitingSections: false, missingCount: 1, unexcusedAbsences: 0, nextDueAt: null, status: "needs_attention",
+        workToReview: [], workNeedsAttentionCount: 0 },
+      { studentPersonId: "other-person", studentProfileId: "other-profile", displayName: "Casey", lastName: "Sample",
+        sectionCount: 1, awaitingSections: false, missingCount: 0, unexcusedAbsences: 0, nextDueAt: null, status: "on_track",
+        workToReview: [], workNeedsAttentionCount: 0 },
+    ];
+    const html = renderToStaticMarkup(<FamilyHomeView children={children} needs={[]} loading={false} error="" student="no-longer-linked" />);
+    expect(html).toContain("That child is not available");
+    expect(html).toContain("Jordan Sample");
+    expect(html).toContain("Casey Sample");
+    expect(html).toContain("Your children");
+    expect(html).not.toContain("Selected child");
+    expect(html).not.toContain("/guardian/admission-offers?student=no-longer-linked");
   });
   it("preserves child and attendance search parameters in the guardian attendance contract", () => {
     const validate = GuardianAttendance.options.validateSearch;

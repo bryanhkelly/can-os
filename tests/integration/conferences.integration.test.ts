@@ -199,6 +199,19 @@ integration("GF39 parent-teacher conferences", () => {
     expect(calendar).toHaveLength(1);
     expect(calendar[0]!.startsAt.toISOString()).toBe(slots[1]!.startsAt.toISOString());
 
+    // Parent cancellation must persist, free the slot, and be safe to retry.
+    const cancelTargetId = await conferences.bookConference(guardianContext, {
+      conferenceSlotId: slots[0]!.id, studentProfileId: student.id,
+    });
+    await conferences.cancelConferenceBooking(guardianContext, { bookingId: cancelTargetId });
+    await conferences.cancelConferenceBooking(guardianContext, { bookingId: cancelTargetId });
+    const [cancelledBooking] = await db.select().from(schema.conferenceBookings)
+      .where(eq(schema.conferenceBookings.id, cancelTargetId));
+    expect(cancelledBooking?.status).toBe("cancelled");
+    const [releasedAfterCancellation] = await db.select().from(schema.conferenceSlots)
+      .where(eq(schema.conferenceSlots.id, slots[0]!.id));
+    expect(releasedAfterCancellation?.status).toBe("available");
+
     await expect(conferences.queueConferenceReminder({
       ...teacherContext, scope: { siteIds: [crypto.randomUUID()] },
     }, bookingId)).rejects.toThrow("site scope");

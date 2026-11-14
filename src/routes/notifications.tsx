@@ -6,7 +6,7 @@ import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
 import {getNotifications,readNotification,readAllNotifications,setNotificationStatus} from "@/modules/communication/notification-center.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {z} from "zod";
+import { optionalSearchUuid } from "@/lib/route-search";
 import {getDeliveryHistory} from "@/modules/communication/delivery-history.functions";
 import {DeliveryHistory} from "@/components/communication/DeliveryHistory";
 const loadNotifications=async(deliveryCursor?:string)=>{
@@ -17,7 +17,7 @@ const loadNotifications=async(deliveryCursor?:string)=>{
 export const Route=createFileRoute("/notifications")({
  validateSearch:(search:Record<string,unknown>):{notification?:string;deliveryCursor?:string}=>({
   notification:typeof search.notification==="string"?search.notification:undefined,
-  deliveryCursor:z.string().uuid().optional().parse(search.deliveryCursor),
+  deliveryCursor:optionalSearchUuid.parse(search.deliveryCursor),
  }),
  loaderDeps:({search})=>({deliveryCursor:search.deliveryCursor}),
  loader:({deps})=>safeLoader(()=>loadNotifications(deps.deliveryCursor),{authMessage:"Sign in to view your notifications."})(),

@@ -86,7 +86,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     </section>
     <Button variant="outline" aria-expanded={checklist===app.applicationId||application===app.applicationId}
       className="mt-3" onClick={()=>setChecklist(app.applicationId)}>View enrollment checklist</Button>
-    {(checklist===app.applicationId||application===app.applicationId)&&<GuardianEnrollmentChecklist key={app.applicationId} applicationId={app.applicationId}/>}
+    {(checklist===app.applicationId||application===app.applicationId)&&<GuardianEnrollmentChecklist protectUnsaved key={app.applicationId} applicationId={app.applicationId}/>}
     {app.offers.filter(item=>!offer||item.id===offer).map(o=><div className="mt-3 border-t pt-3" key={o.id}>
      <StatusBadge tone={o.status==="accepted"?"success":o.status==="issued"?"info":o.status==="declined"||o.status==="revoked"?"danger":"neutral"}>Offer status: {o.status}</StatusBadge>
      {o.expiresAt&&<p className="mt-2 text-xs text-muted-foreground">Expires {new Date(o.expiresAt).toLocaleDateString()}</p>}

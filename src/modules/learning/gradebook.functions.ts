@@ -146,10 +146,12 @@ export const getGradebook = createServerFn({ method: "GET" })
   const [section] = await db.select({ id:s.sections.id,code:s.sections.code,
     title:s.sections.title,versionId:s.sections.courseTemplateVersionId,
     programId:s.sections.programId,schoolYearId:s.terms.schoolYearId,
-    curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status })
+    curriculum:s.courseTemplateVersions.curriculum,status:s.courseTemplateVersions.status,
+    timezone:s.sites.timezone })
    .from(s.sections)
    .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
    .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+   .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
    .where(eq(s.sections.id, data.sectionId))
    .limit(1);
   if (!section) throw new AuthorizationError("section");
@@ -233,7 +235,7 @@ export const getGradebook = createServerFn({ method: "GET" })
 
   return {
    connected: true as const,
-   section:{id:section.id,code:section.code,title:section.title},
+   section:{id:section.id,code:section.code,title:section.title,timezone:section.timezone},
    curriculumLessons:publisherLessonChoices(section.curriculum,section.status),
    students: studentRows.map(row => ({
     studentProfileId: row.studentProfileId,

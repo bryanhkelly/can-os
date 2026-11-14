@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   publishedTripPermission,
+  tripPermissionMatchesAcknowledgement,
   tripScheduleIsCurrent,
   tripScheduleIsProposable,
 } from "@/modules/field-trips/permission-policy";
@@ -39,6 +40,20 @@ describe("publishedTripPermission", () => {
         permissionText: "too short",
       }),
     ).toBeNull();
+  });
+});
+
+describe("tripPermissionMatchesAcknowledgement", () => {
+  const shown = {
+    version: "school-2026.1",
+    text: "I authorize participation in this supervised synthetic field trip under these terms.",
+  };
+  it("accepts only the exact currently published statement and version", () => {
+    expect(tripPermissionMatchesAcknowledgement(shown, { ...shown })).toBe(true);
+    expect(tripPermissionMatchesAcknowledgement(shown, { ...shown, version: "school-2026.0" })).toBe(false);
+    expect(tripPermissionMatchesAcknowledgement(shown, {
+      ...shown, text: "I authorize participation in this supervised synthetic field trip under updated terms.",
+    })).toBe(false);
   });
 });
 

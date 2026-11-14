@@ -408,6 +408,17 @@ integration("Journey C: a safe school day including verified pickup", () => {
       expect(authorization.created).toBe(true);
       expect(await pickup.createPickupAuthorization({ data: authorizationInput }))
         .toMatchObject({ authorizationId: authorization.authorizationId, created: false });
+      // A fresh guardian read must see the durable authorization, not a
+      // client-only success banner or an uncommitted request.
+      const parentPickupAfterSave = await pickup.getGuardianPickupWorkspace({
+        data: { studentPersonId: familyA.studentPersonId },
+      });
+      expect(parentPickupAfterSave.students.find(child =>
+        child.studentProfileId === familyA.studentProfileId)?.authorizations)
+        .toEqual(expect.arrayContaining([expect.objectContaining({
+          id: authorization.authorizationId, status: "active",
+          pickupName: "Morgan Authorized",
+        })]));
 
       // A same-Site guardian account without the verified child relationship
       // cannot create release authority for this Household.

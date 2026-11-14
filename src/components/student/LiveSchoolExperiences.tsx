@@ -125,7 +125,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
        <Field className="mt-2" label={`Reschedule appointment for ${children.find(x=>x.studentPersonId===booking.studentPersonId)?.firstName??"student"}`}>
         <Select disabled={busy} value={replacementSlots[booking.id]??""} onChange={event=>setReplacementSlots(value=>({...value,[booking.id]:event.target.value}))}>
          <option value="">Choose another time</option>
-         {data.slots.filter(slot=>slot.seriesId===booking.seriesId).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt,slot.timezone)} · {slot.timezone}</option>)}
+         {data.slots.filter(slot=>slot.seriesId===booking.seriesId && slot.eligibleStudentPersonIds.includes(booking.studentPersonId)).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt,slot.timezone)} · {slot.timezone}</option>)}
         </Select>
        </Field>
        <Button type="button" variant="outline" size="sm" disabled={busy||!replacementSlots[booking.id]} className="mt-2" onClick={()=>void perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</Button>
@@ -149,7 +149,10 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
        <p className="mt-1 text-xs">{slot.teacherName}</p>
        <p className="mt-1 text-sm">{format(slot.startsAt,slot.timezone)} – {format(slot.endsAt,slot.timezone)} · {slot.timezone}</p>
        <div className="mt-1"><StatusBadge tone={slot.status==="available"?"success":"neutral"}>{formatStatus(slot.status)}</StatusBadge></div></div>
-      <Button type="button" variant="outline" disabled={busy||!selectedChild||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>void perform(()=>bookOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")}>{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</Button>
+      <div className="flex flex-col items-start gap-2">
+       <Button type="button" variant="outline" disabled={busy||!selectedChild||!slot.eligibleStudentPersonIds.includes(selectedChild)||slot.status!=="available"||data.viewerRole!=="guardian"} onClick={()=>void perform(()=>bookOfficeHour({data:{slotId:slot.id,studentPersonId:selectedChild}}),"Office-hour booking saved.")}>{slot.status!=="available"?"Booked":data.viewerRole==="guardian"?"Book":"Guardians book"}</Button>
+       {data.viewerRole==="guardian"&&selectedChild&&!slot.eligibleStudentPersonIds.includes(selectedChild)&&<p role="status" className="max-w-48 text-xs text-muted-foreground">Choose a student enrolled at this school's conference program.</p>}
+      </div>
      </div>)}
      {data.slots.length===0&&<p className="text-xs text-muted-foreground">No conference times are available right now. Check back later or message your school.</p>}
      {more("conferences",data.slots.length)}

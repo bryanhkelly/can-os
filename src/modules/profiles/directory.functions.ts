@@ -2,6 +2,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { and, desc, eq, gte, ilike, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
+import { alias } from "drizzle-orm/pg-core";
+import { accessibleClasses } from "@/modules/learning/class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { studentAcademicTimeline } from "@/domain/student-academic-timeline";
@@ -34,10 +37,13 @@ async function requireStaffDirectoryContext(): Promise<StaffContext & { role: St
   if (!staffRoles.includes(context.role as StaffRole)) {
     throw new AuthorizationError("staff directory role");
   }
-  if (!context.actorPersonId || !context.scope.siteIds?.length) {
-    throw new AuthorizationError("staff site scope");
+  // Delegated academic teachers can have exact-Section authority without a
+  // host Site grant. All teacher relationships are rechecked below.
+  if (!context.actorPersonId || !(context.scope.siteIds?.length ||
+      (context.role === "teacher" && context.scope.sectionIds?.length))) {
+    throw new AuthorizationError("staff named Section or Site scope");
   }
-  return { ...context, role: context.role as StaffRole, siteIds: context.scope.siteIds };
+  return { ...context, role: context.role as StaffRole, siteIds: context.scope.siteIds ?? [] };
 }
 
 type Db = Awaited<typeof import("@/db/client")>["db"];
@@ -50,7 +56,7 @@ type Schema = typeof import("@/db/schema");
 async function visibleStudentProfileIds(
   db: Db,
   s: Schema,
-  context: { role: StaffRole; actorPersonId: string; siteIds: string[]; programIds: string[] },
+  context: { role: StaffRole; actorPersonId: string; siteIds: string[]; programIds: string[]; teacherSectionIds: string[] },
 ): Promise<string[]> {
   const conditions = [
     eq(s.enrollments.kind, "section"),
@@ -59,19 +65,24 @@ async function visibleStudentProfileIds(
     inArray(s.sections.programId, context.programIds),
   ];
   if (context.role === "teacher") {
+    if (!context.teacherSectionIds.length) return [];
+    const activeProgram = alias(s.enrollments, "staff_directory_active_program");
     const rows = await db
       .select({ studentProfileId: s.enrollments.studentProfileId })
       .from(s.enrollments)
       .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
-      .innerJoin(
-        s.sectionTeachers,
-        and(
-          eq(s.sectionTeachers.sectionId, s.sections.id),
-          eq(s.sectionTeachers.personId, context.actorPersonId),
-        ),
-      )
-      .where(and(...conditions));
-    return [...new Set(rows.map((row) => row.studentProfileId))];
+      .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
+      .innerJoin(activeProgram, and(
+        eq(activeProgram.studentProfileId, s.enrollments.studentProfileId),
+        eq(activeProgram.programId, s.sections.programId),
+        eq(activeProgram.schoolYearId, s.terms.schoolYearId),
+        eq(activeProgram.kind, "program"), eq(activeProgram.status, "active"),
+      ))
+      .where(and(eq(s.enrollments.kind, "section"),eq(s.enrollments.status, "active"),
+        eq(s.enrollments.programId, s.sections.programId),
+        eq(s.enrollments.schoolYearId, s.terms.schoolYearId),
+        inArray(s.sections.id, context.teacherSectionIds)));
+    return [...new Set(rows.map(row => row.studentProfileId))];
   }
   const rows = await db
     .select({ studentProfileId: s.enrollments.studentProfileId })
@@ -148,7 +159,7 @@ async function missingWorkCounts(
     for (const [profileId, studentSections] of sectionsByProfile) {
       if (!studentSections.has(assessment.sectionId)) continue;
       const sub = latest.get(`${assessment.id}:${profileId}`);
-      if (!sub || sub.status === "assigned") {
+      if (!sub || sub.status === "assigned" || sub.status === "returned") {
         counts.set(profileId, (counts.get(profileId) ?? 0) + 1);
       }
     }
@@ -162,12 +173,15 @@ export const searchStudents = createServerFn({ method: "GET" })
   )
   .handler(async ({ data }) => {
     const context = await requireStaffDirectoryContext();
+    const teacherSectionIds = context.role === "teacher"
+      ? (await accessibleClasses(context as Actor)).map(section => section.id) : [];
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const profileIds = await visibleStudentProfileIds(db, s, {
       role: context.role,
       actorPersonId: context.actorPersonId!,
       siteIds: context.siteIds,
       programIds: context.scope.programIds??[],
+      teacherSectionIds,
     });
     if (!profileIds.length) return { students: [] };
     const query = data.query?.trim();
@@ -194,16 +208,11 @@ export const searchStudents = createServerFn({ method: "GET" })
       .limit(50);
     if (!rows.length) return { students: [] };
     const ids = rows.map((row) => row.profileId);
-    const permittedSections = context.role==="teacher"
-      ? await db.select({id:s.sections.id}).from(s.sections)
-        .innerJoin(s.sectionTeachers,eq(s.sectionTeachers.sectionId,s.sections.id))
-        .where(and(eq(s.sectionTeachers.personId,context.actorPersonId!),
-          inArray(s.sections.siteId,context.siteIds),
-          inArray(s.sections.programId,context.scope.programIds??[])))
-      : await db.select({id:s.sections.id}).from(s.sections)
+    const permittedSectionIds = context.role === "teacher" ? teacherSectionIds :
+      (await db.select({id:s.sections.id}).from(s.sections)
         .where(and(inArray(s.sections.siteId,context.siteIds),
-          inArray(s.sections.programId,context.scope.programIds??[])));
-    const permittedSectionIds=permittedSections.map(section=>section.id);
+          inArray(s.sections.programId,context.scope.programIds??[]))))
+          .map(section=>section.id);
     const activeEnrollments = await db
       .select({ studentProfileId: s.enrollments.studentProfileId, sectionId: s.enrollments.sectionId })
       .from(s.enrollments)
@@ -242,6 +251,8 @@ export const getStudent360 = createServerFn({ method: "GET" })
     if (!uuidPattern.test(data.studentPersonId)) {
       throw new AuthorizationError("student identifier");
     }
+    const teacherSectionIds = context.role === "teacher"
+      ? (await accessibleClasses(context as Actor)).map(section => section.id) : [];
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [profile] = await db
       .select({
@@ -260,19 +271,28 @@ export const getStudent360 = createServerFn({ method: "GET" })
 
     // Per-student authorization: teacher-of-a-shared-section, or registrar/specialist
     // with the student actively enrolled at a scoped site.
+    const activeProgram = alias(s.enrollments, "staff_360_active_program");
     const activeSections = await db
       .select({ sectionId: s.sections.id, sectionTitle: s.sections.title, siteId: s.sections.siteId })
       .from(s.enrollments)
       .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
-      .where(
-        and(
-          eq(s.enrollments.studentProfileId, profile.id),
-          eq(s.enrollments.kind, "section"),
-          eq(s.enrollments.status, "active"),
-          inArray(s.sections.siteId, context.siteIds),
-          inArray(s.sections.programId,context.scope.programIds??[]),
-        ),
-      );
+      .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
+      .innerJoin(activeProgram, and(
+        eq(activeProgram.studentProfileId, s.enrollments.studentProfileId),
+        eq(activeProgram.programId, s.sections.programId),
+        eq(activeProgram.schoolYearId, s.terms.schoolYearId),
+        eq(activeProgram.kind, "program"), eq(activeProgram.status, "active"),
+      ))
+      .where(and(
+        eq(s.enrollments.studentProfileId, profile.id),
+        eq(s.enrollments.kind, "section"),eq(s.enrollments.status, "active"),
+        eq(s.enrollments.programId, s.sections.programId),
+        eq(s.enrollments.schoolYearId, s.terms.schoolYearId),
+        context.role === "teacher"
+          ? inArray(s.sections.id, teacherSectionIds)
+          : and(inArray(s.sections.siteId, context.siteIds),
+              inArray(s.sections.programId,context.scope.programIds??[])),
+      ));
     let authorized = activeSections.length > 0;
     let visibleSections = activeSections;
     if (context.role === "teacher") {
@@ -352,8 +372,10 @@ export const getStudent360 = createServerFn({ method: "GET" })
           .where(
             and(
               eq(s.attendanceEvents.studentProfileId, profile.id),
-              inArray(s.attendanceEvents.siteId,context.siteIds),
-              inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
+              ...(context.role==="teacher"?[]:[
+                inArray(s.attendanceEvents.siteId,context.siteIds),
+                inArray(s.attendanceEvents.programId,context.scope.programIds??[]),
+              ]),
               ...(context.role==="teacher"?[inArray(s.attendanceEvents.sectionId,sectionIds)]:[]),
               inArray(s.attendanceEvents.status, ["absent", "tardy"]),
               gte(s.attendanceEvents.expectedAt, thirtyDaysAgo),
@@ -375,8 +397,10 @@ export const getStudent360 = createServerFn({ method: "GET" })
             and(
               eq(s.actions.subjectType, "student_profile"),
               eq(s.actions.subjectId, profile.id),
-              inArray(s.actions.siteId,context.siteIds),
-              inArray(s.actions.programId,context.scope.programIds??[]),
+              ...(context.role==="teacher"?[]:[
+                inArray(s.actions.siteId,context.siteIds),
+                inArray(s.actions.programId,context.scope.programIds??[]),
+              ]),
               ...(context.role==="teacher"?[
                 inArray(s.actions.sectionId,sectionIds),
                 inArray(s.actions.type,["academic_intervention","guardian_grade_follow_up"]),
@@ -398,8 +422,10 @@ export const getStudent360 = createServerFn({ method: "GET" })
             and(
               eq(s.insights.subjectType, "student_profile"),
               eq(s.insights.subjectId, profile.id),
-              inArray(s.insights.siteId,context.siteIds),
-              inArray(s.insights.programId,context.scope.programIds??[]),
+              ...(context.role==="teacher"?[]:[
+                inArray(s.insights.siteId,context.siteIds),
+                inArray(s.insights.programId,context.scope.programIds??[]),
+              ]),
               ...(context.role==="teacher"?[inArray(s.insights.sectionId,sectionIds)]:[]),
             ),
           )

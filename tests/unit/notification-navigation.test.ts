@@ -107,12 +107,46 @@ describe("authorized notification destinations",()=>{
   });
   it("deep-links a guardian course approval review to its workspace",async()=>{
     notification("action","request","course_registration_guardian_review");
-    expect((await getNotifications())[0]?.href).toBe("/guardian/course-approvals");
+    state.rows.actions=[{id:"request"}];
+    expect((await getNotifications())[0]?.href).toBe("/guardian/course-approvals?action=request");
+  });
+  it("hides a guardian course approval notice when child access has ended",async()=>{
+    notification("action","request","course_registration_guardian_review");
+    expect(await getNotifications()).toEqual([]);
   });
   it("deep-links a field trip permission request to its workspace",async()=>{
     notification("field_trip","trip","field_trip_permission_requested");
     state.rows.field_trips=[{id:"trip"}];
-    expect((await getNotifications())[0]?.href).toBe("/guardian/field-trips");
+    expect((await getNotifications())[0]?.href).toBe("/guardian/field-trips?trip=trip");
+  });
+  it("links a current conference reminder to booking management with a local time",async()=>{
+    notification("conference_booking","booking","conference_reminder");
+    state.rows.conference_bookings=[{
+      id:"booking",status:"booked",
+      startsAt:new Date("2030-01-15T00:40:00.000Z"),
+      timezone:"America/Los_Angeles",
+    }];
+    const [notice]=await getNotifications();
+    expect(notice?.href).toBe("/guardian/experiences?tab=conferences");
+    expect(notice?.body).toContain("Jan 14, 2030");
+    expect(notice?.body).toContain("America/Los_Angeles");
+    expect(notice?.body).not.toContain("2030-01-15T");
+  });
+  it("corrects an obsolete conference reminder after the booking is cancelled",async()=>{
+    notification("conference_booking","booking","conference_reminder");
+    state.rows.conference_bookings=[{
+      id:"booking",status:"cancelled",
+      startsAt:new Date("2030-01-15T00:40:00.000Z"),
+      timezone:"America/Los_Angeles",
+    }];
+    const [notice]=await getNotifications();
+    expect(notice?.title).toContain("cancelled");
+    expect(notice?.body).toContain("cancelled");
+    expect(notice?.href).toBe("/guardian/experiences?tab=conferences");
+  });
+  it("hides a conference reminder when the guardian no longer has booking access",async()=>{
+    notification("conference_booking","booking","conference_reminder");
+    expect(await getNotifications()).toEqual([]);
   });
   it("withholds guardian approval destinations from other roles",async()=>{
     state.role="teacher";

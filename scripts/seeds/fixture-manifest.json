@@ -2189,6 +2189,11 @@
       "fixtureRequired": false,
       "rationale": "The public-school demo fixture cannot impersonate native canonical learner identity, recipient-bound award issuances or the protected credential reader feature flag. This is a temporary credential experience until it moves into a production learner route; live browser acceptance is still pending."
     },
+    "/canonical/lab/survey-drafts": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "The draft editor requires an actual native canonical session, enabled rollout flag and explicitly provisioned tenant-bound restricted PostgreSQL writer role. The public demo account seeds cannot impersonate any of these authorities; database and browser acceptance remain pending."
+    },
     "/canonical/content": {
       "persona": "verified academic_content_creator",
       "fixtureRequired": false,

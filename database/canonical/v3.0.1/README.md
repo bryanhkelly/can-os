@@ -384,3 +384,54 @@ read/write policies, exact-commit PostgreSQL acceptance, canonical Site identity
 cutover, reviewer grants and an evidence-picker workflow are completed. The
 legacy PR #281 School Blueprint service uses different tables and cannot be
 enabled alongside the canonical writer as an alternative authority.
+
+### Learning-award schema (November 14, 2026)
+
+The fresh-build `schema.sql` includes the additive six-table learning-award domain
+and its issuer approval, immutable evidence, currentness and forced-RLS controls.
+An existing v3.0.1 database must apply **only** `patch-achievement-credentials.sql`
+as an additive transaction; do not rerun the full fresh-install schema.
+`test01` Neon passed the isolated additive DDL/trigger/RLS verification.
+The credential issuer and learner-reader runtime paths remain disabled pending
+scoped database-role provisioning and multi-user acceptance tests. Do not interpret
+the mere existence of these tables as authorization to issue a badge or certificate.
+
+**Neon migration record (November 14, 2026):** Existing `can-os` / `neondb`
+branches `test01` and `main` have the six additive learning-award tables installed.
+On `main`, all six tables passed the read-only verification for installation,
+forced RLS, owner-only policy, trigger coverage and absence of PUBLIC table grants.
+Do **not** rerun the one-time patch on those branches. The published schema and
+runtime database are aligned for these tables, but credential feature flags
+remain disabled until restricted DB grants and role-based acceptance tests pass.
+See `verify-achievement-credentials.sql` for the reusable, read-only checks.
+
+### Optional survey draft writer (not installed by default)
+
+The temporary Capability Lab survey draft page is guarded by
+`CAN_CANONICAL_SURVEY_DRAFT_ENABLED` (default off). On an isolated test database,
+a trusted schema owner first runs:
+
+```sh
+psql "$TEST_DATABASE_URL" -f database/canonical/v3.0.1/patch-survey-draft-authoring.sql
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_APP_LOGIN \
+  -f database/canonical/v3.0.1/provision-survey-draft-author-role.sql
+```
+
+The writer role is isolated per Organization and has only SELECT/INSERT on draft
+survey definitions, versions, questions and options, plus restricted audit/event
+inserts. PostgreSQL RLS blocks cross-organization and published-content writes.
+Existing independent survey publication review and campaign permission gates
+remain unchanged. Do not enable for production until restricted-role SQL and
+browser acceptance pass. This patch is not automatically applied or migrated.
+
+Before enabling the feature flag, run the nonmutating role check:
+
+```sh
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -f database/canonical/v3.0.1/verify-survey-draft-author-role.sql
+```
+
+This verifies role restrictions, RLS policy presence, draft INSERT grants and
+absence of publication, invitation, review and respondent-data privileges.
+It does not replace a transaction-based cross-tenant database test.

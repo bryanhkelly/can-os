@@ -6,6 +6,8 @@ import { z } from "zod";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertAcademicActionAuthority } from "./academic-action-policy.server";
+import { authorizeClass } from "@/modules/learning/class-access.server";
+import type { Actor } from "@/modules/identity/actors.server";
 
 export const getActionDetail = createServerFn({ method: "GET" })
   .validator((value: unknown) => z.object({ actionId: z.string().uuid() }).parse(value))
@@ -22,7 +24,30 @@ export const getActionDetail = createServerFn({ method: "GET" })
       if (!action) throw new AuthorizationError("Action detail scope");
       const delegatedAcademic = actor.role === "teacher" && action.type === "academic_intervention" &&
         action.subjectType === "student_profile" && action.sectionId !== null;
-      if (!delegatedAcademic && (!action.organizationId || !actor.scope.organizationIds?.includes(action.organizationId) ||
+      // Earlier follow-up Actions may not have a Section ID. Use the original
+      // assessment to verify the exact live teaching authorization.
+      const originalAssessmentId=action.metadata?.assessmentId;
+      const teacherMissing = actor.role === "teacher" &&
+        action.type === "missing_work_follow_up" &&
+        action.ownerPersonId === actor.actorPersonId &&
+        action.subjectType === "student_profile" &&
+        typeof originalAssessmentId === "string";
+      let missingSectionId: string | null = null;
+      if (teacherMissing && typeof originalAssessmentId==="string") {
+        const [assessment] = await tx.select({
+          sectionId:s.assessments.sectionId,
+          siteId:s.sections.siteId,programId:s.sections.programId,
+        }).from(s.assessments)
+          .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+          .where(eq(s.assessments.id,originalAssessmentId)).limit(1);
+        if(!assessment||assessment.siteId!==action.siteId||
+          assessment.programId!==action.programId||
+          (action.sectionId && action.sectionId !== assessment.sectionId))
+          throw new AuthorizationError("original missing-work Action scope");
+        await authorizeClass(actor as Actor,assessment.sectionId,undefined,tx);
+        missingSectionId=assessment.sectionId;
+      }
+      if (!delegatedAcademic && !teacherMissing && (!action.organizationId || !actor.scope.organizationIds?.includes(action.organizationId) ||
           (action.siteId !== null && !actor.scope.siteIds?.includes(action.siteId)) ||
           (action.programId && !actor.scope.programIds?.includes(action.programId)) ||
           (action.sectionId && actor.scope.sectionIds !== undefined && !actor.scope.sectionIds.includes(action.sectionId)))) {
@@ -33,6 +58,8 @@ export const getActionDetail = createServerFn({ method: "GET" })
       }
       if (action.type === "academic_intervention" && action.subjectType === "student_profile" && action.sectionId) {
         await assertAcademicActionAuthority(tx, actor, action);
+      } else if (teacherMissing) {
+        // The Action owner and class authorization were checked above.
       } else if (!hasRegistrarAuthority(actor.role) || !action.siteId) {
         throw new AuthorizationError("Action requires its owning workspace");
       }
@@ -43,10 +70,11 @@ export const getActionDetail = createServerFn({ method: "GET" })
         resolvedAt: action.resolvedAt?.toISOString() ?? null,
         resolutionNote: action.resolutionNote,
         siteId: action.siteId, programId: action.programId,
-        sectionId: action.sectionId,
-        canReviewClass: actor.role === "teacher" && action.type === "academic_intervention" && action.sectionId !== null,
+        sectionId: missingSectionId ?? action.sectionId,
+        canReviewClass: (actor.role === "teacher" && action.type === "academic_intervention" && action.sectionId !== null) || teacherMissing,
+        canResolveMissingWork: teacherMissing,
         canManageOperations: hasRegistrarAuthority(actor.role) && action.siteId !== null,
-        workspaceHome: "/home" as const,
+        workspaceHome: teacherMissing ? "/teacher/missing-work" as const : "/home" as const,
       };
     });
   });

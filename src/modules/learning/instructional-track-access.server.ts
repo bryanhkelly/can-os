@@ -226,6 +226,10 @@ export function assertLearningParticipantRole(
     assertCapability(context, "student:read");
     return;
   }
+  if (kind !== "guardian" && context.role === "learner") {
+    assertCapability(context, "learning.participate");
+    return;
+  }
   if (kind !== "learner" && context.role === "guardian") {
     assertCapability(context, "student:related-read");
     return;

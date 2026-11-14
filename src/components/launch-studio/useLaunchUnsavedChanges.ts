@@ -9,14 +9,15 @@ export function launchNavigationLosesInput(current: { pathname: string; search: 
   return JSON.stringify(scope(current.search)) !== JSON.stringify(scope(next.search));
 }
 
-export function useLaunchUnsavedChanges(dirty: boolean | (() => boolean)) {
+export function useLaunchUnsavedChanges(dirty: boolean | (() => boolean),
+  message = "Leave setup? Changes you haven\u0027t saved or submitted will be lost. Stay to save them, or leave without saving.") {
   const released = useRef(false);
   const isDirty = () => typeof dirty === "function" ? dirty() : dirty;
   useBlocker({
     shouldBlockFn: ({ current, next }) => {
       if (released.current) { released.current = false; return false; }
       return isDirty() && launchNavigationLosesInput(current, next)
-        && !window.confirm("Leave setup? Changes you haven't saved or submitted will be lost. Stay to save them, or leave without saving.");
+        && !window.confirm(message);
     },
     enableBeforeUnload: isDirty,
     withResolver: false,
@@ -24,8 +25,8 @@ export function useLaunchUnsavedChanges(dirty: boolean | (() => boolean)) {
   return () => { released.current = true; };
 }
 
-export function LaunchUnsavedChangesGuard({ dirty }: { dirty: boolean | (() => boolean) }) {
-  useLaunchUnsavedChanges(dirty);
+export function LaunchUnsavedChangesGuard({ dirty, message }: { dirty: boolean | (() => boolean); message?: string }) {
+  useLaunchUnsavedChanges(dirty, message);
   return null;
 }
 

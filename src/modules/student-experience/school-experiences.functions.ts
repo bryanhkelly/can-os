@@ -6,6 +6,7 @@ import { z } from "zod";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { personDisplayName } from "@/domain/person-name";
+import { eligibleGuardianConferenceStudents } from "@/domain/guardian-conference-eligibility";
 
 
 
@@ -32,12 +33,13 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
     // Reuse the current guardian/student permission filtering on title and body.
     getNotifications(),
     viewerRole==="guardian" ? db.select({id:schema.conferenceSlots.id,seriesId:schema.conferenceSlots.conferenceSeriesId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,status:schema.conferenceSlots.status,
+      siteId:schema.conferenceSeries.siteId,sectionId:schema.conferenceSeries.sectionId,
       seriesTitle:schema.conferenceSeries.title,timezone:schema.sites.timezone,
       legalFirstName:schema.people.legalFirstName,legalLastName:schema.people.legalLastName,preferredName:schema.people.preferredName})
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .innerJoin(schema.sites,eq(schema.sites.id,schema.conferenceSeries.siteId))
       .innerJoin(schema.people,eq(schema.people.id,schema.conferenceSeries.teacherPersonId))
-      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
+      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(200) : Promise.resolve([]),
     viewerRole==="guardian" ? db.select({id:schema.conferenceBookings.id,slotId:schema.conferenceBookings.conferenceSlotId,studentPersonId:schema.studentProfiles.personId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,seriesId:schema.conferenceSlots.conferenceSeriesId,
       seriesTitle:schema.conferenceSeries.title,timezone:schema.sites.timezone,
       legalFirstName:schema.people.legalFirstName,legalLastName:schema.people.legalLastName,preferredName:schema.people.preferredName}).from(schema.conferenceBookings)
@@ -103,11 +105,51 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
         gte(schema.conferenceSlots.endsAt,recentConferenceCutoff),
       )).orderBy(asc(schema.conferenceSlots.endsAt)).limit(50) : Promise.resolve([]),
   ]);
+  // Match the booking command's actual Program and optional Section eligibility.
+  // A guardian can belong to two schools and each child may be enrolled at only
+  // one of them. Do not offer a booking that the server will refuse.
+  const eligiblePrograms = viewerRole==="guardian" && slots.length ? await db.select({
+    studentPersonId:schema.studentProfiles.personId,
+    studentProfileId:schema.studentProfiles.id,
+    siteId:schema.programs.siteId,
+    programId:schema.programs.id,
+  }).from(schema.guardianRelationships)
+    .innerJoin(schema.studentProfiles,eq(schema.studentProfiles.personId,schema.guardianRelationships.studentPersonId))
+    .innerJoin(schema.enrollments,and(
+      eq(schema.enrollments.studentProfileId,schema.studentProfiles.id),
+      eq(schema.enrollments.kind,"program"),eq(schema.enrollments.status,"active"),
+    ))
+    .innerJoin(schema.programs,and(
+      eq(schema.programs.id,schema.enrollments.programId),
+      eq(schema.programs.status,"active"),
+    ))
+    .where(and(guardianRelationshipPredicate({
+      guardianPersonId:actor.actorPersonId,access:"academic",
+    }),inArray(schema.programs.id,actor.scope.programIds??[]),
+    inArray(schema.programs.siteId,sites))) : [];
+  const sectionIds=[...new Set(slots.map(slot=>slot.sectionId).filter((id):id is string=>!!id))];
+  const eligibleSections = eligiblePrograms.length && sectionIds.length ? await db.select({
+    studentProfileId:schema.enrollments.studentProfileId,
+    sectionId:schema.sections.id,
+    programId:schema.sections.programId,
+    siteId:schema.sections.siteId,
+  }).from(schema.enrollments)
+    .innerJoin(schema.sections,eq(schema.sections.id,schema.enrollments.sectionId))
+    .where(and(eq(schema.enrollments.kind,"section"),eq(schema.enrollments.status,"active"),
+      eq(schema.sections.active,true),eq(schema.enrollments.programId,schema.sections.programId),
+      inArray(schema.sections.id,sectionIds),
+      inArray(schema.enrollments.studentProfileId,eligiblePrograms.map(row=>row.studentProfileId)),
+      inArray(schema.sections.programId,actor.scope.programIds??[]),
+      inArray(schema.sections.siteId,sites))) : [];
   return {connected:true,viewerRole,
     events:events.map(e=>({id:e.id,title:e.title,startsAt:e.startsAt.toISOString(),timezone:e.timezone,status:e.metadata.cancelled===true?"cancelled":"scheduled"})),
     notices:notices.map(n=>({id:n.id,title:n.title,body:n.body??"",acknowledged:n.status==="read"})),
-    slots:slots.map(s=>({id:s.id,seriesId:s.seriesId,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status,
-      seriesTitle:s.seriesTitle,timezone:s.timezone,teacherName:personDisplayName(s)})),
+    slots:slots.map(s=>({
+      id:s.id,seriesId:s.seriesId,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status,
+      siteId:s.siteId,sectionId:s.sectionId,
+      eligibleStudentPersonIds:eligibleGuardianConferenceStudents(s,eligiblePrograms,eligibleSections),
+      seriesTitle:s.seriesTitle,timezone:s.timezone,teacherName:personDisplayName(s),
+    })).filter(slot=>slot.eligibleStudentPersonIds.length>0).slice(0,25),
     bookings:bookings.map(b=>({id:b.id,slotId:b.slotId,studentPersonId:b.studentPersonId,seriesId:b.seriesId,
       startsAt:b.startsAt.toISOString(),endsAt:b.endsAt.toISOString(),
       seriesTitle:b.seriesTitle,timezone:b.timezone,teacherName:personDisplayName(b)})),

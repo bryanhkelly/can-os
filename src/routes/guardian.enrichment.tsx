@@ -2,6 +2,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
+import { enrichmentConsentContext } from "@/domain/enrichment-consent";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
@@ -38,7 +39,7 @@ function EnrichmentFamilyView({ data }: {
   const router = useRouter();
   const [householdId, setHouseholdId] = useState(data.family.households[0]?.id ?? "");
   const [studentSelections, setStudentSelections] = useState<Record<string,string>>({});
-  const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
+  const [acknowledged, setAcknowledged] = useState<Record<string, string>>({});
   const [packageSelections, setPackageSelections] = useState<Record<string,string[]>>({});
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
@@ -68,10 +69,11 @@ function EnrichmentFamilyView({ data }: {
       const studentProfileId = studentSelections[seasonId] ?? data.family.children[0]?.studentProfileId;
       if (!householdId || !studentProfileId)
         return setError("Choose a child and family household to register.");
-      if (acknowledged[seasonId] !== true)
-        return setError("Read and acknowledge the published permission statement.");
       const offer = data.catalog.find(item => item.seasonId === seasonId);
       if (!offer) return setError("Offering no longer available");
+      if (permissionVersion !== offer.permissionVersion ||
+          acknowledged[seasonId] !== enrichmentConsentContext(studentProfileId, householdId, offer.permissionVersion))
+        return setError("Read and acknowledge the published permission statement for this child and household.");
       const selectedPackageIds = packageSelections[seasonId] ?? [];
       if (offer.packages.some(item => selectedPackageIds.includes(item.id) && !item.available))
         return setError("A selected package has canceled or unavailable sessions");
@@ -86,7 +88,7 @@ function EnrichmentFamilyView({ data }: {
         seasonId, studentProfileId, householdId, permissionVersion, acknowledged: true,
         ...(offer.packages.length ? { selectedPackageIds } : {}),
       } });
-      setAcknowledged(prev => ({ ...prev, [seasonId]: false }));
+      setAcknowledged(prev => ({ ...prev, [seasonId]: "" }));
       return registered;
     }, { successMessage: registered => registered.status === "waitlisted"
         ? "Your child is on the waitlist. No activity fee was charged."
@@ -242,15 +244,17 @@ function EnrichmentFamilyView({ data }: {
               <p className="whitespace-pre-wrap">{offer.permissionText}</p>
             </div>
             <label className="mt-3 flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1" checked={acknowledged[offer.seasonId] ?? false}
+              <input type="checkbox" className="mt-1"
+                checked={acknowledged[offer.seasonId] === enrichmentConsentContext(selected, householdId, offer.permissionVersion)}
                 onChange={e => setAcknowledged(prev => ({
-                  ...prev, [offer.seasonId]: e.target.checked,
+                  ...prev, [offer.seasonId]: e.target.checked
+                    ? enrichmentConsentContext(selected, householdId, offer.permissionVersion) : "",
                 }))}/>
               I have read and agree to this participation permission for the selected child.
             </label>
             <button type="button" onClick={() => register(offer.seasonId, offer.permissionVersion)}
               disabled={busy || !selected || !householdId || !offer.registrationOpen ||
-                !acknowledged[offer.seasonId] || packageConflict || unavailableSelection ||
+                acknowledged[offer.seasonId] !== enrichmentConsentContext(selected, householdId, offer.permissionVersion) || packageConflict || unavailableSelection ||
                 (offer.packages.length > 0 && !chosenIds.length)}
               className="mt-4 rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
               {offer.registrationOpen ? "Submit registration" : "Registration window is closed"}

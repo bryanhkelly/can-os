@@ -30,6 +30,7 @@ import {
   learnerProfiles,
   learnerTrackSelections,
   noncreditRegistrations,
+  noncreditParticipationEvents,
   programDeployments,
   trackDistributionAuthorizations,
   trackLessonPresentations,
@@ -37,7 +38,8 @@ import {
   type JsonValue,
 } from "@/db/canonical-v301";
 import { assertSectionScope, AuthorizationError } from "@/domain/command-context";
-import type { AccessContext } from "@/domain/access-context";
+import type { CommandContext } from "@/domain/command-context";
+import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 import { DomainError } from "@/domain/errors";
 import {
   assertCurrentPracticeSelection,
@@ -107,9 +109,9 @@ type AuthorizedParticipant = {
 };
 
 function assertAuthenticated(
-  context: AccessContext,
+  context: CommandContext,
   kind: "learner" | "learner_or_guardian",
-): asserts context is AccessContext & {
+): asserts context is CommandContext & {
   actorPersonId: string;
 } {
   assertLearningParticipantRole(context, kind);
@@ -125,11 +127,16 @@ function conflict(message: string): never {
 
 async function loadAuthorizedParticipant(
   tx: TrackTransaction,
-  context: AccessContext,
+  context: CommandContext,
   attemptId: string,
   allowCompletedHistory = false,
 ): Promise<{ attempt: CourseAttempt; participant: AuthorizedParticipant }> {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
+  // Native canonical learners use a current Course attempt as their ONLY
+  // authorization source, independent of Site, school and Section membership.
+  if (context.role === "learner") {
+    await authorizeCanonicalCourseAttempt(tx, context, attemptId, allowCompletedHistory);
+  }
   const [attempt] = await tx.select().from(learnerCourseAttempts)
     .where(eq(learnerCourseAttempts.id, attemptId))
     .limit(1);
@@ -574,7 +581,7 @@ async function assertTrackAvailable(
 }
 
 export async function listAvailableInstructionalTracks(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof readInstructionalTrackSchema>,
 ): Promise<{
   choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null; policyVersionId: string; allowSwitching: boolean }>;
@@ -635,7 +642,7 @@ export async function listAvailableInstructionalTracks(
 }
 
 export async function readSelectedInstructionalTrack(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof readInstructionalTrackSchema>,
 ): Promise<{
   courseAttemptId: string;
@@ -764,7 +771,7 @@ export async function readSelectedInstructionalTrack(
 }
 
 export async function getSelectedInstructionalTrackAssetDownload(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof instructionalTrackAssetDownloadSchema>,
 ): Promise<{ downloadUrl: string; expiresInSeconds: number }> {
   assertAuthenticated(context, "learner_or_guardian");
@@ -833,7 +840,7 @@ export async function getSelectedInstructionalTrackAssetDownload(
 }
 
 export async function selectInstructionalTrack(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof selectInstructionalTrackSchema>,
 ): Promise<JsonObject> {
   assertAuthenticated(context, "learner_or_guardian");
@@ -938,7 +945,7 @@ export async function selectInstructionalTrack(
  * A different recorded presenter never creates another official progress row.
  */
 export async function completeRecordedLesson(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof completeRecordedLessonSchema>,
 ): Promise<JsonObject> {
   assertAuthenticated(context, "learner");
@@ -1018,6 +1025,18 @@ export async function completeRecordedLesson(
         target: [learnerLessonProgress.courseAttemptId, learnerLessonProgress.lessonId],
         set: { status: "completed", observedAt },
       });
+      if (attempt.noncreditRegistrationId) {
+        // This records a self-marked milestone, not attendance or media proof.
+        // It can never satisfy a verified-minutes requirement.
+        await tx.insert(noncreditParticipationEvents).values({
+          registrationId: attempt.noncreditRegistrationId,
+          eventKind: "lesson_completed",
+          countedMinutes: 0,
+          evidenceVersionId: null,
+          recordedByPersonId: context.actorPersonId!,
+          occurredAt: observedAt,
+        });
+      }
       return {
         courseAttemptId: attempt.id,
         courseVersionId: attempt.courseVersionId,
@@ -1029,7 +1048,7 @@ export async function completeRecordedLesson(
 }
 
 export async function recordFormativePractice(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof recordFormativePracticeSchema>,
 ): Promise<JsonObject> {
   assertAuthenticated(context, "learner");
@@ -1118,7 +1137,7 @@ export async function recordFormativePractice(
 }
 
 export async function readFormativePracticeHistory(
-  context: AccessContext,
+  context: CommandContext,
   raw: z.input<typeof readInstructionalTrackSchema>,
 ): Promise<Array<{
   id: string;

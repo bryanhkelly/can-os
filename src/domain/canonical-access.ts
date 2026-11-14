@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AuthorizationError, type CommandContext } from "./command-context";
 
-export const canonicalAccessRoles = ["site_admin", "registrar", "blueprint_reviewer"] as const;
+export const canonicalAccessRoles = ["site_admin", "registrar", "blueprint_reviewer", "learner"] as const;
 
 export const canonicalSessionRowSchema = z.object({
   account_id: z.string().uuid(),
@@ -23,12 +23,17 @@ export function projectCanonicalCommandContext(row: CanonicalSessionRow): Comman
   if (row.role_code === "blueprint_reviewer" && row.site_id !== null) {
     throw new AuthorizationError("organization-only independent reviewer");
   }
-  if (row.role_code !== "blueprint_reviewer" && !row.site_id) {
+  if (row.role_code === "learner" && row.site_id !== null) {
+    throw new AuthorizationError("organization-scoped learner");
+  }
+  if (["site_admin", "registrar"].includes(row.role_code) && !row.site_id) {
     throw new AuthorizationError("canonical Site-scoped administrator");
   }
-  const capabilities = row.role_code === "blueprint_reviewer"
-    ? ["blueprint.read", "blueprint.review"]
-    : ["blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start"];
+  const capabilities = row.role_code === "learner"
+    ? ["learning.participate", "learning.progress", "learning.survey.respond"]
+    : row.role_code === "blueprint_reviewer"
+      ? ["blueprint.read", "blueprint.review"]
+      : ["blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start", "noncredit.completion.decide", "noncredit.assessment.finalize", "noncredit.assessment.provision", "credential.issue", "survey.draft.create"];
   return {
     actorPersonId: row.person_id,
     role: row.role_code,

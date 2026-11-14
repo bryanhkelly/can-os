@@ -7,3 +7,8 @@ export * from "./blueprints";
 export * from "./catalog";
 export * from "./learning";
 export * from "./public-planning";
+
+export * from "./surveys";
+export * from "./noncredit";
+export * from "./assessments";
+export * from "./credentials";

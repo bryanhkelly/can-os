@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
+import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
+import { NoncreditCourseActivities } from "@/components/learning/NoncreditCourseActivities";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -41,6 +44,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [lessonProgressRevision,setLessonProgressRevision]=useState(0);
 
   const reload = useCallback(async () => {
     const nextCatalog = await getStudentRecordedInstructors({ data: { courseAttemptId } });
@@ -105,6 +109,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
       const nextLessonId = nextRecordedLessonId(instruction.lessons, lessonId);
       if (nextLessonId) setLessonId(nextLessonId);
       await reload();
+      setLessonProgressRevision(revision=>revision+1);
       setNotice(nextLessonId
         ? "Lesson completed. Continue with your next unfinished lesson."
         : "Lesson completed. Your course progress is saved across recorded teachers.");
@@ -180,8 +185,8 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     <div className="border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Choose your recorded teacher</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Your lessons, assignments and grades stay with your course. You may have
-        different recorded instruction from other learners in the same Section.
+        Your learning progress stays with this course when you switch recorded
+        instructors. Official grades and assignments, when applicable, remain unchanged.
       </p>
       {loading ? <p role="status" className="mt-3 text-sm">Loading recorded instruction...</p> :
         catalog && catalog.choices.length > 0
@@ -203,10 +208,11 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
       {instruction.sectionId && <RecordedOfficialCourseLinks sectionId={instruction.sectionId}/>}
       <div className="border bg-card p-4">
         <h3 className="font-semibold">Course lessons</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {completedCount} of {instruction.lessons.length} lessons completed.
-          Recorded teacher selection does not reset lesson progress.
-        </p>
+        <div className="mt-3">
+          <CourseLessonProgress completed={completedCount} total={instruction.lessons.length}
+            ariaLabel="Recorded course lesson completion"
+            description="Recorded teacher selection never resets course progress. Lesson completion alone is not a grade, noncredit attendance, or certificate." />
+        </div>
         <nav aria-label="Recorded course lessons" className="mt-3 flex flex-wrap gap-2">
           {instruction.lessons.map(lesson => <Button key={lesson.id} size="sm"
             variant={currentLesson?.id === lesson.id ? "secondary" : "outline"}
@@ -217,6 +223,20 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
       </div>
 
       {currentLesson && <div className="space-y-4">
+        <CourseLessonNavigation
+          lessonIndex={instruction.lessons.findIndex(item=>item.id===currentLesson.id)}
+          lessonCount={instruction.lessons.length} completedCount={completedCount}
+          previousLesson={instruction.lessons[instruction.lessons.findIndex(item=>item.id===currentLesson.id)-1]}
+          nextLesson={instruction.lessons[instruction.lessons.findIndex(item=>item.id===currentLesson.id)+1]}
+          renderPrevious={lesson=><button type="button" className="underline"
+            onClick={()=>{setLessonId(lesson.id);setAnswers({});}}>
+            ← Previous: {lesson.title}
+          </button>}
+          renderNext={lesson=><button type="button" className="underline"
+            onClick={()=>{setLessonId(lesson.id);setAnswers({});}}>
+            Next: {lesson.title} →
+          </button>}
+        />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-serif text-xl font-semibold">{currentLesson.title}</h3>
           <RecordedLessonCompletionAction
@@ -277,6 +297,8 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     </>}
 
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
+    <NoncreditCourseActivities courseAttemptId={courseAttemptId}
+      lessonProgressRevision={lessonProgressRevision}/>
   </section>;
 }
 

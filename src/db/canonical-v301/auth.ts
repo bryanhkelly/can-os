@@ -20,7 +20,7 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
   personId: uuid("person_id").notNull(),
   organizationId: uuid("organization_id").notNull(),
   siteId: uuid("site_id"),
-  roleCode: text("role_code").$type<"site_admin" | "registrar" | "blueprint_reviewer">().notNull(),
+  roleCode: text("role_code").$type<"site_admin" | "registrar" | "blueprint_reviewer" | "learner">().notNull(),
   active: boolean("active").notNull().default(true),
   grantedAt: timestamp("granted_at", { withTimezone: true }).notNull().defaultNow(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
