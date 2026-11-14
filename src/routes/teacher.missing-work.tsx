@@ -6,6 +6,7 @@ import { getTeacherMissingWork, createMissingWorkFollowUp } from "@/modules/lear
 import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
+import { dateKeyInTimezone, formatDateOnly } from "@/modules/calendar/timezone";
 
 const loadMissingWork = () => getTeacherMissingWork();
 
@@ -43,7 +44,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
       <section className="mt-6 space-y-3">
         {items.map(x => (
           <article key={x.assessmentId + ":" + x.studentProfileId} className="rounded-xl border bg-card p-5">
-            <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {new Date(x.dueAt).toLocaleDateString()}</p>
+            <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {formatDateOnly(dateKeyInTimezone(x.dueAt,x.timezone))}</p>
             <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId}} className="underline">{x.title}</Link></h2>
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
             <p className="mt-1 text-sm"><Link to="/staff/students/$personId" params={{personId:x.studentPersonId}} className="underline">{x.studentName}</Link> · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
