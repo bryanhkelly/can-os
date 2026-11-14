@@ -78,6 +78,12 @@ export const selectInstructionalTrackSchema = readInstructionalTrackSchema.exten
   expectedRevision: z.number().int().min(0),
   switchReason: z.string().trim().min(1).max(500).nullable().optional(),
 }).strict();
+export const completeRecordedLessonSchema = readInstructionalTrackSchema.extend({
+  requestId: uuidSchema,
+  lessonId: uuidSchema,
+  expectedRevision: z.number().int().min(1),
+}).strict();
+
 export const recordFormativePracticeSchema = z.object({
   requestId: uuidSchema,
   courseAttemptId: uuidSchema,
@@ -919,6 +925,82 @@ export async function selectInstructionalTrack(
         trackVersionId: input.trackVersionId,
         revision: currentRevision + 1,
         policyVersionId: eligible.policy.id,
+      };
+    });
+  });
+}
+
+/**
+ * Canonical lesson completion is keyed by Course attempt and Lesson.
+ * A different recorded presenter never creates another official progress row.
+ */
+export async function completeRecordedLesson(
+  context: AccessContext,
+  raw: z.input<typeof completeRecordedLessonSchema>,
+): Promise<JsonObject> {
+  assertAuthenticated(context, "learner");
+  const input = completeRecordedLessonSchema.parse(raw);
+  return db.transaction(async (tx) => {
+    const [attempt] = await tx.select().from(learnerCourseAttempts)
+      .where(eq(learnerCourseAttempts.id, input.courseAttemptId))
+      .for("update")
+      .limit(1);
+    if (!attempt) throw new DomainError("UNAVAILABLE", "Course attempt is unavailable.");
+    const { participant } = await loadAuthorizedParticipant(tx, context, attempt.id);
+    if (participant.selectionSource !== "learner") {
+      throw new AuthorizationError("learner's own lesson completion");
+    }
+
+    const owningOrganizationId = await loadCoursePublisherOrganizationId(tx, attempt.courseVersionId);
+    return runInstructionalTrackCommand(tx, context, {
+      requestId: input.requestId,
+      action: "instructional.lesson.complete",
+      eventType: "InstructionalLessonCompleted",
+      entityKind: "learner_course_attempt",
+      entityId: attempt.id,
+      owningOrganizationId,
+      payload: input,
+    }, async () => {
+      const [selection] = await tx.select().from(learnerTrackSelections)
+        .where(and(
+          eq(learnerTrackSelections.courseAttemptId, attempt.id),
+          isNull(learnerTrackSelections.supersededAt),
+        ))
+        .limit(1);
+      if (!selection || selection.revision !== input.expectedRevision) {
+        conflict("Recorded teacher selection changed. Reload the lesson before completing it.");
+      }
+      const eligible = await assertTrackAvailable(
+        tx, attempt, selection.trackVersionId, participant.selectionSource,
+        "delivery", selection.selectedAt,
+      );
+      if (selection.policyVersionId !== eligible.policy.id) {
+        conflict("The instructional policy changed after track selection.");
+      }
+      const [lesson] = await tx.select({ id: courseLessons.id }).from(courseLessons)
+        .where(and(
+          eq(courseLessons.id, input.lessonId),
+          eq(courseLessons.courseVersionId, attempt.courseVersionId),
+        ))
+        .limit(1);
+      if (!lesson) throw new DomainError("UNAVAILABLE", "Course lesson is unavailable.");
+
+      const observedAt = new Date();
+      await tx.insert(learnerLessonProgress).values({
+        courseAttemptId: attempt.id,
+        courseVersionId: attempt.courseVersionId,
+        lessonId: lesson.id,
+        status: "completed",
+        observedAt,
+      }).onConflictDoUpdate({
+        target: [learnerLessonProgress.courseAttemptId, learnerLessonProgress.lessonId],
+        set: { status: "completed", observedAt },
+      });
+      return {
+        courseAttemptId: attempt.id,
+        courseVersionId: attempt.courseVersionId,
+        lessonId: lesson.id,
+        status: "completed",
       };
     });
   });
