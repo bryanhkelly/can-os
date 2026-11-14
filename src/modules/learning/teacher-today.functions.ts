@@ -177,7 +177,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
  const missingWork = due.flatMap(assessment =>
   roster.filter(student => student.sectionId === assessment.sectionId).flatMap(student => {
    const attempt = latest.get(`${assessment.id}:${student.studentProfileId}`);
-   if (attempt && attempt.status !== "assigned") return [];
+   if (attempt && attempt.status !== "assigned" && attempt.status !== "returned") return [];
    return [{
     sectionId: assessment.sectionId,
     assessmentId: assessment.id,
