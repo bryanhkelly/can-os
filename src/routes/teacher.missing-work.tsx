@@ -25,6 +25,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
   const { connected, items } = data;
   const router = useRouter();
   const [followedUp, setFollowedUp] = useState<Record<string, string>>({});
+  const [handledElsewhere,setHandledElsewhere]=useState<Record<string,boolean>>({});
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
   const studentCount = new Set(items.map(x => x.studentProfileId)).size;
@@ -49,12 +50,14 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
             <p className="mt-1 text-sm"><Link to="/staff/students/$personId" params={{personId:x.studentPersonId}} className="underline">{x.studentName}</Link> · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
-            {followedUp[x.assessmentId + ":" + x.studentProfileId] ? (
+            {(followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId) ? (
               <Link to="/actions/$actionId"
-                params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId]!}}
+                params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId!}}
                 className="ml-4 inline-block rounded-lg border px-3 py-2 text-xs font-semibold underline">
                 Open follow-up
               </Link>
+            ) : handledElsewhere[x.assessmentId + ":" + x.studentProfileId] ? (
+              <p role="status" className="ml-4 inline-block text-xs text-muted-foreground">A colleague is handling this follow-up</p>
             ) : (
               <button type="button" disabled={busy}
                 className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
@@ -64,13 +67,18 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
                       assessmentId:x.assessmentId,studentProfileId:x.studentProfileId,
                     }}),
                     {successMessage:value=>value.created
-                      ?"Follow-up added to Operations.":"An open follow-up already exists.",
+                      ?"Follow-up added to Operations.":value.assignedToAnotherTeacher
+                      ?"An existing follow-up is assigned to another teacher.":"Your existing follow-up is open.",
                      commandErrorMessage:"Unable to create follow-up"},
                   );
                   if(result.status==="saved" || result.status==="refresh-failed"){
-                    setFollowedUp(previous=>({...previous,
-                      [x.assessmentId + ":" + x.studentProfileId]:result.value.actionId,
-                    }));
+                    if(result.value.assignedToAnotherTeacher){
+                      setHandledElsewhere(previous=>({...previous,[x.assessmentId + ":" + x.studentProfileId]:true}));
+                    }else if(result.value.actionId){
+                      setFollowedUp(previous=>({...previous,
+                        [x.assessmentId + ":" + x.studentProfileId]:result.value.actionId!,
+                      }));
+                    }
                   }
                 }}>
                 Create follow-up

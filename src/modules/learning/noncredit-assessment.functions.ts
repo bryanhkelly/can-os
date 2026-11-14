@@ -11,7 +11,8 @@ import { finalizeNoncreditKnowledgeCheck } from "./noncredit-assessment-review.s
 import { provisionNoncreditAssessmentAccess } from "./noncredit-assessment-access.server";
 
 const uuid=z.string().uuid();
-const course=z.object({courseAttemptId:uuid}).strict();
+const phase=z.enum(["baseline","final"]).optional();
+const course=z.object({courseAttemptId:uuid,phase}).strict();
 const start=course.extend({requestId:uuid}).strict();
 const submit=start.extend({
   attemptId:uuid,
@@ -29,7 +30,7 @@ export const getNoncreditKnowledgeCheck=createServerFn({method:"GET"})
   .handler(async({data})=>{
     privateResponse();
     return readNoncreditKnowledgeCheck(
-      await getInstructionalLearnerContext(getRequest()),data.courseAttemptId,
+      await getInstructionalLearnerContext(getRequest()),data.courseAttemptId,data.phase,
     );
   });
 

@@ -5510,7 +5510,7 @@ CREATE TABLE survey_answer_choices (
 CREATE TABLE survey_trigger_rules (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), campaign_id uuid NOT NULL REFERENCES survey_campaigns(id),
  trigger_kind text NOT NULL CHECK(trigger_kind IN ('enrollment_started','unit_completed','track_switched',
- 'tutoring_completed','term_ended','staff_onboarded','incident_resolved','program_renewal')),
+ 'tutoring_completed','term_ended','staff_onboarded','incident_resolved','program_renewal','knowledge_check_submitted')),
  cooldown_days integer NOT NULL DEFAULT 30 CHECK(cooldown_days>=0),
  max_invites_per_person integer NOT NULL DEFAULT 1 CHECK(max_invites_per_person>0), enabled boolean NOT NULL DEFAULT true
 );
@@ -6825,6 +6825,7 @@ CREATE TABLE noncredit_training_versions (
  published_at timestamptz, state text NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','published')),
  author_person_id uuid NOT NULL REFERENCES persons(id), approved_by_person_id uuid REFERENCES persons(id),
  assessment_version_id uuid REFERENCES assessment_versions(id),
+  baseline_assessment_version_id uuid REFERENCES assessment_versions(id),
  UNIQUE(id,offering_version_id),
  CHECK(state<>'published' OR (published_at IS NOT NULL AND approved_by_person_id IS NOT NULL AND approved_by_person_id<>author_person_id))
 );
@@ -6837,6 +6838,7 @@ CREATE TABLE noncredit_registrations (
  initiative_id uuid REFERENCES education_initiatives(id),
  registering_organization_id uuid NOT NULL REFERENCES organizations(id),
  registered_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  completion_policy_id uuid, -- immutable enrollment-time policy selection
  status text NOT NULL DEFAULT 'registered' CHECK(status IN ('registered','active','completed','withdrawn','cancelled')),
  consent_evidence_id uuid REFERENCES evidence_document_versions(id),
  FOREIGN KEY(adoption_id,deployment_id,offering_version_id)
@@ -6885,6 +6887,176 @@ CREATE TRIGGER learner_course_attempt_source_gate
    offering_version_id,course_version_id,status
  ON learner_course_attempts
  FOR EACH ROW EXECUTE FUNCTION validate_course_attempt_source();
+-- Idempotent assessment provisioning follows an approved registration and published
+-- provider-owned training. It never creates School enrollment, grades or credits.
+-- The published training approver is the accountable authorizing principal.
+CREATE OR REPLACE FUNCTION v301_provision_noncredit_knowledge_access(p_attempt uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_auto_assessment$
+DECLARE rec record; administration_id uuid; administration_count integer;
+        person_learner uuid; candidate_version uuid;
+BEGIN
+ SELECT ca.id,ca.deployment_id,ca.course_version_id,ca.status,
+        ca.offering_version_id,ca.adoption_id,
+        r.id AS registration_id,r.participant_person_id,r.learner_id AS registration_learner_id,
+        r.status AS registration_status,
+        t.assessment_version_id,t.baseline_assessment_version_id,
+        t.provider_organization_id,t.approved_by_person_id
+ INTO rec
+ FROM learner_course_attempts ca
+ JOIN noncredit_registrations r
+   ON r.id=ca.noncredit_registration_id AND r.deployment_id=ca.deployment_id
+   AND r.adoption_id=ca.adoption_id AND r.offering_version_id=ca.offering_version_id
+ JOIN noncredit_training_versions t
+   ON t.id=r.training_version_id AND t.offering_version_id=ca.offering_version_id
+ WHERE ca.id=p_attempt
+   AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+   AND ca.status='active' AND r.status IN ('registered','active')
+   AND t.state='published' AND t.approved_by_person_id IS NOT NULL
+   AND (t.assessment_version_id IS NOT NULL OR t.baseline_assessment_version_id IS NOT NULL);
+ IF NOT FOUND THEN RETURN; END IF;
+ INSERT INTO learner_profiles(person_id)
+ VALUES(rec.participant_person_id) ON CONFLICT(person_id) DO NOTHING;
+ SELECT id INTO person_learner FROM learner_profiles WHERE person_id=rec.participant_person_id;
+ IF rec.registration_learner_id IS NOT NULL
+    AND rec.registration_learner_id IS DISTINCT FROM person_learner THEN
+   RAISE EXCEPTION 'Noncredit registration is assigned to another learner';
+ END IF;
+ UPDATE noncredit_registrations SET learner_id=person_learner
+ WHERE id=rec.registration_id AND learner_id IS NULL;
+
+ FOR candidate_version IN SELECT DISTINCT phase_version.id FROM unnest(ARRAY[
+   rec.assessment_version_id,rec.baseline_assessment_version_id
+ ]) AS phase_version(id) WHERE phase_version.id IS NOT NULL LOOP
+   SELECT count(*),min(ad.id) INTO administration_count,administration_id
+   FROM assessment_administrations ad
+   JOIN assessment_versions av ON av.id=ad.assessment_version_id
+   JOIN assessment_definitions definition ON definition.id=av.assessment_id
+   JOIN assessment_form_versions form ON form.id=ad.form_version_id
+   WHERE ad.assessment_version_id=candidate_version
+     AND ad.deployment_id=rec.deployment_id
+     AND ad.course_version_id=rec.course_version_id
+     AND ad.administering_organization_id=rec.provider_organization_id
+     AND ad.status='open' AND ad.proctor_policy='none'
+     AND av.lifecycle='published' AND form.lifecycle='published'
+     AND (
+       (candidate_version=rec.assessment_version_id
+         AND definition.purpose IN ('formative','practice','readiness','mastery'))
+       OR (candidate_version=rec.baseline_assessment_version_id
+         AND definition.purpose='diagnostic')
+     );
+   IF administration_count=1 THEN
+     -- Never reopen a revoked grant. Each phase has its own administration.
+     INSERT INTO assessment_access_grants
+       (administration_id,learner_id,course_attempt_id,granted_by_person_id,access_status)
+     VALUES(administration_id,person_learner,p_attempt,rec.approved_by_person_id,'approved')
+     ON CONFLICT (administration_id,learner_id,course_attempt_id) DO NOTHING;
+   END IF;
+ END LOOP;
+END $v301_auto_assessment$;
+CREATE OR REPLACE FUNCTION v301_noncredit_attempt_access_trigger() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_attempt_provision$
+BEGIN
+ IF NEW.noncredit_registration_id IS NOT NULL AND NEW.enrollment_id IS NULL
+    AND NEW.status='active' THEN
+   PERFORM v301_provision_noncredit_knowledge_access(NEW.id);
+ END IF;
+ RETURN NEW;
+END $v301_attempt_provision$;
+CREATE TRIGGER v301_noncredit_attempt_assessment_access
+AFTER INSERT OR UPDATE OF noncredit_registration_id,status
+ON learner_course_attempts
+FOR EACH ROW EXECUTE FUNCTION v301_noncredit_attempt_access_trigger();
+
+-- When the approved administration opens after the learner enrolled, fill
+-- only course attempts for this exact deployment, course and version.
+CREATE OR REPLACE FUNCTION v301_noncredit_admin_access_trigger() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_admin_provision$
+DECLARE attempt_row record;
+BEGIN
+ IF NEW.status='open' THEN
+   FOR attempt_row IN
+     SELECT ca.id
+     FROM learner_course_attempts ca
+     JOIN noncredit_registrations r ON r.id=ca.noncredit_registration_id
+     JOIN noncredit_training_versions t ON t.id=r.training_version_id
+     WHERE ca.enrollment_id IS NULL AND ca.section_id IS NULL
+       AND ca.status='active' AND r.status IN ('registered','active')
+       AND ca.deployment_id=NEW.deployment_id
+       AND ca.course_version_id=NEW.course_version_id
+       AND (t.assessment_version_id=NEW.assessment_version_id
+         OR t.baseline_assessment_version_id=NEW.assessment_version_id)
+       AND t.provider_organization_id=NEW.administering_organization_id
+   LOOP
+     PERFORM v301_provision_noncredit_knowledge_access(attempt_row.id);
+   END LOOP;
+ END IF;
+ RETURN NEW;
+END $v301_admin_provision$;
+CREATE TRIGGER v301_noncredit_admin_assessment_access
+AFTER INSERT OR UPDATE OF status,assessment_version_id
+ON assessment_administrations
+FOR EACH ROW EXECUTE FUNCTION v301_noncredit_admin_access_trigger();
+REVOKE ALL ON FUNCTION v301_provision_noncredit_knowledge_access(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_noncredit_attempt_access_trigger() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_noncredit_admin_access_trigger() FROM PUBLIC;
+
+-- Explicit opt-in feedback campaigns receive one private in-app invitation
+-- when a published noncredit Course knowledge check is submitted and scored.
+CREATE OR REPLACE FUNCTION v301_invite_noncredit_knowledge_feedback(p_attempt uuid) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $feedback$
+DECLARE participant record; at timestamptz:=clock_timestamp();
+BEGIN
+ SELECT r.participant_person_id,r.deployment_id
+ INTO participant
+ FROM assessment_attempts a
+ JOIN assessment_access_grants g ON g.id=a.access_grant_id
+   AND g.learner_id=a.learner_id AND g.administration_id=a.administration_id
+ JOIN learner_course_attempts ca ON ca.id=g.course_attempt_id
+ JOIN noncredit_registrations r ON r.id=ca.noncredit_registration_id
+ JOIN noncredit_training_versions t ON t.id=r.training_version_id
+ JOIN assessment_administrations ad ON ad.id=a.administration_id
+ WHERE a.id=p_attempt AND a.state IN ('scored','finalized')
+   AND ca.enrollment_id IS NULL AND ca.section_id IS NULL AND ca.status='active'
+   AND r.learner_id=a.learner_id AND r.status IN ('registered','active')
+   AND r.deployment_id=ca.deployment_id
+   AND t.state='published' AND t.assessment_version_id=ad.assessment_version_id
+   AND ad.administering_organization_id=t.provider_organization_id
+   AND ad.course_version_id=ca.course_version_id
+   AND ad.deployment_id=ca.deployment_id
+   AND g.access_status='approved';
+ IF NOT FOUND THEN RETURN; END IF;
+ INSERT INTO survey_invitations(campaign_id,invited_person_id,delivery_channel,sent_at)
+ SELECT c.id,participant.participant_person_id,'in_app',at
+ FROM survey_campaigns c
+ JOIN survey_trigger_rules rule ON rule.campaign_id=c.id
+   AND rule.enabled AND rule.trigger_kind='knowledge_check_submitted'
+ JOIN survey_versions v ON v.id=c.survey_version_id AND v.lifecycle='published'
+ JOIN survey_definitions d ON d.id=v.survey_id AND d.status='active'
+   AND d.intended_audience IN ('learner','any')
+ JOIN evidence_document_versions permission ON permission.id=c.survey_permission_evidence_id
+ WHERE c.deployment_id=participant.deployment_id
+   AND c.status='active' AND c.response_mode='identified'
+   AND c.starts_at<=at AND (c.ends_at IS NULL OR c.ends_at>at)
+   AND permission.verified_by_person_id IS NOT NULL AND permission.verified_at IS NOT NULL
+   AND permission.verified_at<=at
+   AND (permission.valid_from IS NULL OR permission.valid_from<=at::date)
+   AND (permission.valid_through IS NULL OR permission.valid_through>=at::date)
+ ON CONFLICT (campaign_id,invited_person_id) DO NOTHING;
+END $feedback$;
+CREATE OR REPLACE FUNCTION v301_noncredit_feedback_attempt_trigger() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $feedback_trigger$
+BEGIN
+ IF NEW.state='scored' AND OLD.state IS DISTINCT FROM NEW.state THEN
+   PERFORM v301_invite_noncredit_knowledge_feedback(NEW.id);
+ END IF;
+ RETURN NEW;
+END $feedback_trigger$;
+CREATE TRIGGER v301_noncredit_knowledge_feedback
+AFTER UPDATE OF state ON assessment_attempts
+FOR EACH ROW EXECUTE FUNCTION v301_noncredit_feedback_attempt_trigger();
+REVOKE ALL ON FUNCTION v301_invite_noncredit_knowledge_feedback(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_noncredit_feedback_attempt_trigger() FROM PUBLIC;
+
 CREATE TABLE noncredit_participation_events (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), registration_id uuid NOT NULL REFERENCES noncredit_registrations(id),
  event_kind text NOT NULL CHECK(event_kind IN ('lesson_completed','session_attended','skill_practiced','activity_completed','attendance_corrected')),
@@ -6900,17 +7072,22 @@ CREATE TABLE noncredit_completion_policies (
  policy_version integer NOT NULL CHECK(policy_version>0),
  min_participation_minutes integer NOT NULL CHECK(min_participation_minutes>=0),
  require_all_lessons boolean NOT NULL DEFAULT false,
+  completion_mode text NOT NULL DEFAULT 'provider_review' CHECK(completion_mode IN ('provider_review','automatic')),
  skills_assessment_required boolean NOT NULL DEFAULT false, minimum_assessment_fraction numeric(6,5) CHECK(minimum_assessment_fraction BETWEEN 0 AND 1),
  effective_at timestamptz NOT NULL, approved_by_person_id uuid NOT NULL REFERENCES persons(id),
  published_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  UNIQUE(training_version_id,policy_version), UNIQUE(id,training_version_id),
  CHECK(NOT skills_assessment_required OR minimum_assessment_fraction IS NOT NULL)
 );
+ALTER TABLE noncredit_registrations ADD CONSTRAINT noncredit_registration_locked_policy_fk
+  FOREIGN KEY(completion_policy_id,training_version_id)
+  REFERENCES noncredit_completion_policies(id,training_version_id);
 CREATE TABLE noncredit_completion_decisions (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), registration_id uuid NOT NULL REFERENCES noncredit_registrations(id),
  policy_id uuid NOT NULL REFERENCES noncredit_completion_policies(id),
  assessment_result_id uuid REFERENCES assessment_attempt_results(id),
  outcome text NOT NULL CHECK(outcome IN ('completed','not_yet_completed','voided')),
+  decision_source text NOT NULL DEFAULT 'provider' CHECK(decision_source IN ('provider','automatic')),
  decided_by_person_id uuid NOT NULL REFERENCES persons(id), decided_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  evidence_version_id uuid REFERENCES evidence_document_versions(id), supersedes_id uuid UNIQUE REFERENCES noncredit_completion_decisions(id),
  CHECK(supersedes_id IS DISTINCT FROM id), UNIQUE(id,registration_id)
@@ -7270,6 +7447,35 @@ BEGIN
 END $$;
 CREATE TRIGGER register_noncredit_authority BEFORE INSERT ON noncredit_registrations
  FOR EACH ROW EXECUTE FUNCTION v28_register_noncredit();
+CREATE OR REPLACE FUNCTION v301_lock_noncredit_completion_policy() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $noncredit_policy_lock$
+DECLARE pinned uuid;
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW.training_version_id,NEW.registered_at,NEW.completion_policy_id)
+     IS DISTINCT FROM ROW(OLD.training_version_id,OLD.registered_at,OLD.completion_policy_id) THEN
+   RAISE EXCEPTION 'Noncredit completion requirements are immutable after registration';
+  END IF;
+  RETURN NEW;
+ END IF;
+ SELECT p.id INTO pinned
+ FROM noncredit_completion_policies p
+ WHERE p.training_version_id=NEW.training_version_id
+  AND p.published_at<=NEW.registered_at AND p.effective_at<=NEW.registered_at
+ ORDER BY p.effective_at DESC,p.policy_version DESC LIMIT 1;
+ IF pinned IS NULL THEN
+  RAISE EXCEPTION 'A published effective completion policy is required before noncredit registration';
+ END IF;
+ IF NEW.completion_policy_id IS NOT NULL AND NEW.completion_policy_id<>pinned THEN
+  RAISE EXCEPTION 'Cannot override the noncredit enrollment-time completion policy';
+ END IF;
+ NEW.completion_policy_id:=pinned;
+ RETURN NEW;
+END $noncredit_policy_lock$;
+CREATE TRIGGER noncredit_registration_policy_pin
+ BEFORE INSERT OR UPDATE OF completion_policy_id,training_version_id,registered_at
+ ON noncredit_registrations FOR EACH ROW
+ EXECUTE FUNCTION v301_lock_noncredit_completion_policy();
 CREATE OR REPLACE FUNCTION v28_validate_participation() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
@@ -7290,17 +7496,39 @@ BEGIN
  FROM noncredit_registrations r JOIN noncredit_training_versions t ON t.id=r.training_version_id
  WHERE r.id=NEW.registration_id FOR SHARE OF r;
  SELECT * INTO pol FROM noncredit_completion_policies WHERE id=NEW.policy_id;
- IF pol.training_version_id IS DISTINCT FROM row_registration.training_version_id
-  OR pol.effective_at>NEW.decided_at THEN RAISE EXCEPTION 'Incorrect noncredit completion policy'; END IF;
+ IF row_registration.completion_policy_id IS NULL
+  OR NEW.policy_id IS DISTINCT FROM row_registration.completion_policy_id
+  OR pol.training_version_id IS DISTINCT FROM row_registration.training_version_id
+  OR pol.effective_at>NEW.decided_at THEN
+   RAISE EXCEPTION 'Completion must use the immutable enrollment-time policy'; END IF;
+ IF row_registration.status NOT IN ('registered','active') AND NEW.outcome='completed' THEN
+   RAISE EXCEPTION 'Inactive noncredit registration cannot be completed'; END IF;
+ IF NEW.decision_source='automatic' AND
+    (pol.completion_mode<>'automatic' OR NEW.outcome<>'completed'
+      OR NEW.supersedes_id IS NOT NULL
+      OR NEW.decided_by_person_id IS DISTINCT FROM pol.approved_by_person_id) THEN
+   RAISE EXCEPTION 'Automatic completion requires an approved automatic policy'; END IF;
  IF NEW.supersedes_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM noncredit_completion_decisions d
   WHERE d.id=NEW.supersedes_id AND d.registration_id=NEW.registration_id
     AND NOT EXISTS(SELECT 1 FROM noncredit_completion_decisions nx WHERE nx.supersedes_id=d.id))
  THEN RAISE EXCEPTION 'Completion correction must supersede current decision for this registration'; END IF;
  IF NEW.outcome<>'completed' THEN RETURN NEW; END IF;
- SELECT coalesce(sum(e.counted_minutes),0)::bigint INTO minutes_seen FROM noncredit_participation_events e
-  WHERE e.registration_id=NEW.registration_id AND e.event_kind<>'attendance_corrected'
-   AND NOT EXISTS(SELECT 1 FROM noncredit_participation_events newer WHERE newer.supersedes_id=e.id);
+ -- Only independently verified current evidence contributes minutes.
+ -- Self-marked lessons, unverified uploads and replaced events contribute zero.
+ SELECT coalesce(sum(e.counted_minutes),0)::bigint INTO minutes_seen
+ FROM noncredit_participation_events e
+ JOIN evidence_document_versions v ON v.id=e.evidence_version_id
+ WHERE e.registration_id=NEW.registration_id
+   AND e.event_kind<>'attendance_corrected' AND e.counted_minutes>0
+   AND e.occurred_at<=NEW.decided_at
+   AND v.verified_at IS NOT NULL AND v.verified_by_person_id IS NOT NULL
+   AND v.verified_at<=NEW.decided_at
+   AND (v.valid_from IS NULL OR v.valid_from<=NEW.decided_at::date)
+   AND (v.valid_through IS NULL OR v.valid_through>=NEW.decided_at::date)
+   AND NOT EXISTS (
+     SELECT 1 FROM noncredit_participation_events newer WHERE newer.supersedes_id=e.id
+   );
  IF minutes_seen<pol.min_participation_minutes THEN RAISE EXCEPTION 'Noncredit participation below completion threshold'; END IF;
  -- Configurable learner-marked lessons are separate from evidenced minutes.
  -- An entire matching Course attempt must contain all published lessons.
@@ -7318,21 +7546,198 @@ BEGIN
  ) THEN RAISE EXCEPTION 'Required noncredit lessons are incomplete'; END IF;
  IF pol.skills_assessment_required THEN
   SELECT a.learner_id,admin.assessment_version_id,result.result_status,
-     result.points_earned,result.points_possible INTO q
-   FROM assessment_attempt_results result
-   JOIN assessment_attempts a ON a.id=result.attempt_id
-   JOIN assessment_administrations admin ON admin.id=a.administration_id
-   WHERE result.id=NEW.assessment_result_id;
+    result.points_earned,result.points_possible INTO q
+  FROM assessment_attempt_results result
+  JOIN assessment_attempts a ON a.id=result.attempt_id
+  JOIN assessment_access_grants grant_row ON grant_row.id=a.access_grant_id
+    AND grant_row.administration_id=a.administration_id
+    AND grant_row.learner_id=a.learner_id
+    AND grant_row.access_status='approved'
+  JOIN learner_course_attempts ca ON ca.id=grant_row.course_attempt_id
+    AND ca.noncredit_registration_id=NEW.registration_id
+    AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+  JOIN assessment_administrations admin ON admin.id=a.administration_id
+    AND admin.deployment_id=ca.deployment_id
+    AND admin.course_version_id=ca.course_version_id
+  WHERE result.id=NEW.assessment_result_id AND a.state='finalized'
+    AND NOT EXISTS (
+      SELECT 1 FROM assessment_attempt_results newer WHERE newer.supersedes_id=result.id
+    );
   IF q.learner_id IS DISTINCT FROM row_registration.learner_id
     OR q.assessment_version_id IS DISTINCT FROM row_registration.training_assessment_id
-    OR q.result_status<>'finalized' OR q.points_possible<=0 OR
-       q.points_earned/q.points_possible<pol.minimum_assessment_fraction THEN
-   RAISE EXCEPTION 'Skills certificate requires a finalized approved assessment of this participant'; END IF;
+    OR q.result_status<>'finalized'
+    OR q.points_possible IS NULL OR q.points_possible<=0
+    OR q.points_earned/q.points_possible<pol.minimum_assessment_fraction THEN
+    RAISE EXCEPTION 'Noncredit completion requires a current finalized course-bound assessment'; END IF;
  END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER noncredit_completion_authority BEFORE INSERT ON noncredit_completion_decisions
  FOR EACH ROW EXECUTE FUNCTION v28_validate_completion();
+-- Rules-driven completion is an explicitly provider-approved policy action.
+-- Automatic decisions use the policy approver as the authorizing principal,
+-- while decision_source and system-attributed audit events record automation.
+-- This function never writes school assessments, credits or credentials.
+CREATE OR REPLACE FUNCTION v301_try_auto_complete_noncredit(p_registration uuid)
+RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=education_v30,pg_catalog AS $noncredit_auto_completion$
+DECLARE reg record; pol record; at timestamptz:=clock_timestamp();
+        verified_minutes bigint:=0; matched_result uuid; new_decision uuid;
+BEGIN
+ SELECT r.*,t.state AS training_state,t.assessment_version_id AS training_assessment_id,
+        t.provider_organization_id
+ INTO reg FROM noncredit_registrations r
+ JOIN noncredit_training_versions t ON t.id=r.training_version_id
+ WHERE r.id=p_registration FOR UPDATE OF r;
+ IF NOT FOUND OR reg.completion_policy_id IS NULL
+   OR reg.status NOT IN ('registered','active')
+   OR reg.training_state<>'published' THEN RETURN NULL; END IF;
+ SELECT * INTO pol FROM noncredit_completion_policies
+ WHERE id=reg.completion_policy_id AND training_version_id=reg.training_version_id
+   AND effective_at<=at AND completion_mode='automatic';
+ IF NOT FOUND THEN RETURN NULL; END IF;
+ IF EXISTS (SELECT 1 FROM noncredit_completion_decisions d
+   WHERE d.registration_id=p_registration) THEN RETURN NULL; END IF;
+ IF NOT EXISTS(SELECT 1 FROM learner_course_attempts ca
+   WHERE ca.noncredit_registration_id=p_registration
+     AND ca.status='active' AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+     AND ca.deployment_id=reg.deployment_id AND ca.adoption_id=reg.adoption_id
+     AND ca.offering_version_id=reg.offering_version_id) THEN RETURN NULL; END IF;
+
+ -- Independent documentary verification is mandatory only for configured time.
+ SELECT coalesce(sum(e.counted_minutes),0)::bigint INTO verified_minutes
+ FROM noncredit_participation_events e
+ JOIN evidence_document_versions v ON v.id=e.evidence_version_id
+ WHERE e.registration_id=p_registration
+  AND e.event_kind<>'attendance_corrected' AND e.counted_minutes>0
+  AND e.occurred_at<=at
+  AND v.verified_at IS NOT NULL AND v.verified_by_person_id IS NOT NULL
+  AND v.verified_at<=at
+  AND (v.valid_from IS NULL OR v.valid_from<=at::date)
+  AND (v.valid_through IS NULL OR v.valid_through>=at::date)
+  AND NOT EXISTS(SELECT 1 FROM noncredit_participation_events newer
+    WHERE newer.supersedes_id=e.id);
+ IF verified_minutes<pol.min_participation_minutes THEN RETURN NULL; END IF;
+
+ IF pol.require_all_lessons AND NOT EXISTS (
+   SELECT 1 FROM learner_course_attempts ca
+   JOIN course_lessons l ON l.course_version_id=ca.course_version_id
+   LEFT JOIN learner_lesson_progress lp
+     ON lp.course_attempt_id=ca.id AND lp.lesson_id=l.id AND lp.status='completed'
+   WHERE ca.noncredit_registration_id=p_registration
+     AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+     AND ca.status IN ('active','completed')
+     AND ca.offering_version_id=reg.offering_version_id
+   GROUP BY ca.id
+   HAVING count(l.id)>0 AND count(lp.lesson_id)=count(l.id)
+ ) THEN RETURN NULL; END IF;
+
+ IF pol.skills_assessment_required THEN
+   SELECT result.id INTO matched_result
+   FROM assessment_attempt_results result
+   JOIN assessment_attempts a ON a.id=result.attempt_id AND a.state='finalized'
+   JOIN assessment_access_grants grant_row
+     ON grant_row.id=a.access_grant_id
+       AND grant_row.administration_id=a.administration_id
+       AND grant_row.learner_id=a.learner_id
+       AND grant_row.access_status='approved'
+   JOIN learner_course_attempts ca
+     ON ca.id=grant_row.course_attempt_id
+       AND ca.noncredit_registration_id=p_registration
+       AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+   JOIN assessment_administrations admin
+     ON admin.id=a.administration_id
+       AND admin.deployment_id=ca.deployment_id
+       AND admin.course_version_id=ca.course_version_id
+   WHERE a.learner_id=reg.learner_id
+     AND admin.assessment_version_id=reg.training_assessment_id
+     AND result.result_status='finalized' AND result.points_possible>0
+     AND result.points_earned/result.points_possible>=pol.minimum_assessment_fraction
+     AND NOT EXISTS(SELECT 1 FROM assessment_attempt_results newer
+       WHERE newer.supersedes_id=result.id)
+   ORDER BY result.calculated_at DESC,result.id LIMIT 1;
+   IF matched_result IS NULL THEN RETURN NULL; END IF;
+ END IF;
+ INSERT INTO noncredit_completion_decisions(
+  registration_id,policy_id,assessment_result_id,
+  outcome,decision_source,decided_by_person_id)
+ VALUES(p_registration,pol.id,matched_result,'completed','automatic',pol.approved_by_person_id)
+ RETURNING id INTO new_decision;
+ INSERT INTO audit_events(
+   actor_person_id,owning_organization_id,event_code,entity_kind,entity_id,payload)
+ VALUES(NULL,reg.provider_organization_id,'noncredit.completion.automatic',
+   'noncredit_completion_decision',new_decision,
+   jsonb_build_object('registrationId',p_registration,'policyId',pol.id,
+     'authorizedByPersonId',pol.approved_by_person_id,'decisionSource','automatic'));
+ INSERT INTO domain_events(event_type,aggregate_type,aggregate_id,actor_person_id,payload)
+ VALUES('NoncreditTrainingCompleted','noncredit_completion_decision',
+   new_decision,NULL,
+   jsonb_build_object('registrationId',p_registration,'policyId',pol.id,
+     'decisionSource','automatic'));
+ RETURN new_decision;
+END $noncredit_auto_completion$;
+
+CREATE OR REPLACE FUNCTION v301_auto_complete_noncredit_event() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $auto_event$
+DECLARE registration uuid;
+BEGIN
+ IF TG_TABLE_NAME='noncredit_participation_events' THEN
+   registration:=NEW.registration_id;
+ ELSIF TG_TABLE_NAME='learner_lesson_progress' THEN
+   IF NEW.status<>'completed' THEN RETURN NEW; END IF;
+   SELECT ca.noncredit_registration_id INTO registration
+   FROM learner_course_attempts ca WHERE ca.id=NEW.course_attempt_id;
+ ELSIF TG_TABLE_NAME='assessment_attempts' THEN
+   IF NEW.state<>'finalized' THEN RETURN NEW; END IF;
+   SELECT ca.noncredit_registration_id INTO registration
+   FROM assessment_access_grants grant_row
+   JOIN learner_course_attempts ca ON ca.id=grant_row.course_attempt_id
+   WHERE grant_row.id=NEW.access_grant_id;
+ ELSIF TG_TABLE_NAME='learner_course_attempts' THEN
+   IF NEW.status<>'active' OR NEW.enrollment_id IS NOT NULL THEN RETURN NEW; END IF;
+   registration:=NEW.noncredit_registration_id;
+ END IF;
+ IF registration IS NOT NULL THEN
+   PERFORM v301_try_auto_complete_noncredit(registration);
+ END IF;
+ RETURN NEW;
+END $auto_event$;
+
+CREATE TRIGGER v301_noncredit_auto_on_participation
+ AFTER INSERT ON noncredit_participation_events
+ FOR EACH ROW EXECUTE FUNCTION v301_auto_complete_noncredit_event();
+CREATE TRIGGER v301_noncredit_auto_on_lesson
+ AFTER INSERT OR UPDATE OF status ON learner_lesson_progress
+ FOR EACH ROW EXECUTE FUNCTION v301_auto_complete_noncredit_event();
+CREATE TRIGGER v301_noncredit_auto_on_assessment
+ AFTER UPDATE OF state ON assessment_attempts
+ FOR EACH ROW EXECUTE FUNCTION v301_auto_complete_noncredit_event();
+CREATE TRIGGER v301_noncredit_auto_on_course
+ AFTER INSERT OR UPDATE OF status ON learner_course_attempts
+ FOR EACH ROW EXECUTE FUNCTION v301_auto_complete_noncredit_event();
+
+-- Evidence sometimes becomes verified after the attendance entry was recorded.
+CREATE OR REPLACE FUNCTION v301_auto_complete_on_evidence_verification() RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $auto_evidence$
+DECLARE r record;
+BEGIN
+ IF NEW.verified_at IS NOT NULL AND NEW.verified_by_person_id IS NOT NULL THEN
+  FOR r IN SELECT DISTINCT e.registration_id
+   FROM noncredit_participation_events e WHERE e.evidence_version_id=NEW.id
+  LOOP
+   PERFORM v301_try_auto_complete_noncredit(r.registration_id);
+  END LOOP;
+ END IF;
+ RETURN NEW;
+END $auto_evidence$;
+CREATE TRIGGER v301_noncredit_auto_on_evidence
+ AFTER UPDATE OF verified_at,verified_by_person_id,valid_from,valid_through
+ ON evidence_document_versions
+ FOR EACH ROW EXECUTE FUNCTION v301_auto_complete_on_evidence_verification();
+REVOKE ALL ON FUNCTION v301_try_auto_complete_noncredit(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_auto_complete_noncredit_event() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_auto_complete_on_evidence_verification() FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION v28_validate_completion_certificate() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 DECLARE cert record;
@@ -11054,14 +11459,20 @@ BEGIN
          AND registration.status IN ('registered','active')
          AND registration.deployment_id=course.deployment_id
          AND training.state='published'
-         AND training.assessment_version_id=administration.assessment_version_id
+         AND (
+           (training.assessment_version_id=administration.assessment_version_id
+             AND coalesce(NEW.result_evidence->>'noncreditPhase','final')='final'
+             AND definition.purpose IN ('formative','practice','readiness','mastery'))
+           OR (training.baseline_assessment_version_id=administration.assessment_version_id
+             AND NEW.result_evidence->>'noncreditPhase'='baseline'
+             AND definition.purpose='diagnostic')
+         )
          AND administration.deployment_id=course.deployment_id
          AND administration.course_version_id=course.course_version_id
          AND administration.administering_organization_id=training.provider_organization_id
          AND administration.proctor_policy='none'
          AND administration.status='open'
          AND version.lifecycle='published'
-         AND definition.purpose IN ('formative','practice','readiness','mastery')
          AND NOT EXISTS (
            SELECT 1 FROM assessment_attempt_items ai
            JOIN assessment_item_versions item ON item.id=ai.item_version_id
@@ -11099,5 +11510,664 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+
+
+-- 58. Learning achievement awards: noncredit certificates and digital badges.
+-- Aligned with patch-achievement-credentials.sql; existing academic credential
+-- tables remain authoritative and unchanged. No runtime role grants.
+CREATE TABLE learning_award_definitions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  issuer_organization_id uuid NOT NULL REFERENCES organizations(id),
+  code text NOT NULL CHECK (length(btrim(code)) BETWEEN 1 AND 80),
+  kind text NOT NULL CHECK (kind IN ('completion_certificate','digital_badge')),
+  source_kind text NOT NULL CHECK (source_kind IN ('noncredit_completion','verified_activity')),
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (issuer_organization_id,code)
+);
+CREATE TABLE learning_award_definition_versions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  definition_id uuid NOT NULL REFERENCES learning_award_definitions(id),
+  version_no integer NOT NULL CHECK (version_no>0),
+  title text NOT NULL CHECK (length(btrim(title)) BETWEEN 1 AND 160),
+  description text NOT NULL DEFAULT '',
+  minimum_verified_minutes integer NOT NULL DEFAULT 0 CHECK (minimum_verified_minutes>=0),
+  lifecycle text NOT NULL DEFAULT 'draft' CHECK (lifecycle IN ('draft','published','retired')),
+  created_by_person_id uuid NOT NULL REFERENCES persons(id),
+  approved_by_person_id uuid REFERENCES persons(id),
+  published_at timestamptz,
+  UNIQUE (definition_id,version_no),
+  CHECK (lifecycle<>'published' OR (
+    approved_by_person_id IS NOT NULL AND published_at IS NOT NULL
+    AND approved_by_person_id<>created_by_person_id
+  ))
+);
+CREATE TABLE learner_achievement_decisions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  credential_definition_version_id uuid NOT NULL REFERENCES learning_award_definition_versions(id),
+  recipient_person_id uuid NOT NULL REFERENCES persons(id),
+  noncredit_completion_decision_id uuid REFERENCES noncredit_completion_decisions(id),
+  activity_evidence_version_id uuid REFERENCES evidence_document_versions(id),
+  decided_by_person_id uuid NOT NULL REFERENCES persons(id),
+  decided_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (num_nonnulls(noncredit_completion_decision_id,activity_evidence_version_id)=1),
+  CHECK (decided_by_person_id<>recipient_person_id)
+);
+CREATE UNIQUE INDEX achievement_noncredit_once ON learner_achievement_decisions
+  (credential_definition_version_id,noncredit_completion_decision_id)
+  WHERE noncredit_completion_decision_id IS NOT NULL;
+CREATE UNIQUE INDEX achievement_activity_once ON learner_achievement_decisions
+  (credential_definition_version_id,recipient_person_id,activity_evidence_version_id)
+  WHERE activity_evidence_version_id IS NOT NULL;
+
+-- A noncredit completion certificate still originates in the v3.0.1
+-- noncredit_completion_certificates table. The generic registry points to it;
+-- it does not silently create a second independent certificate.
+CREATE TABLE learning_award_issuances (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  achievement_decision_id uuid NOT NULL UNIQUE REFERENCES learner_achievement_decisions(id),
+  issuer_organization_id uuid NOT NULL REFERENCES organizations(id),
+  legacy_noncredit_certificate_id uuid UNIQUE REFERENCES noncredit_completion_certificates(id),
+  credential_reference text NOT NULL UNIQUE CHECK (length(btrim(credential_reference)) BETWEEN 12 AND 160),
+  issued_by_person_id uuid NOT NULL REFERENCES persons(id),
+  issued_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  expires_at timestamptz,
+  CHECK (expires_at IS NULL OR expires_at>issued_at)
+);
+CREATE INDEX learning_award_issuances_issuer_idx ON learning_award_issuances (issuer_organization_id,issued_at);
+CREATE TABLE learning_award_issuance_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  issuance_id uuid NOT NULL REFERENCES learning_award_issuances(id),
+  event_kind text NOT NULL CHECK (event_kind IN ('revoked')),
+  reason text NOT NULL CHECK (length(btrim(reason)) BETWEEN 3 AND 1000),
+  evidence_version_id uuid NOT NULL REFERENCES evidence_document_versions(id),
+  decided_by_person_id uuid NOT NULL REFERENCES persons(id),
+  occurred_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
+CREATE UNIQUE INDEX credential_revoked_once ON learning_award_issuance_events (issuance_id)
+  WHERE event_kind='revoked';
+CREATE TABLE learning_award_artifacts (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  issuance_id uuid NOT NULL REFERENCES learning_award_issuances(id),
+  format text NOT NULL CHECK (format IN ('pdf','badge_json','png','svg')),
+  artifact_version integer NOT NULL CHECK (artifact_version>0),
+  storage_reference text NOT NULL CHECK (length(btrim(storage_reference))>0),
+  sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
+  generated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  UNIQUE (issuance_id,format,artifact_version)
+);
+CREATE INDEX learning_award_artifacts_issuance_idx ON learning_award_artifacts (issuance_id);
+
+-- Published definitions are identities, not mutable display labels. Use a
+-- new definition/version for a new interpretation or future recognition mode.
+CREATE FUNCTION v301_guard_credential_definition() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+BEGIN
+  RAISE EXCEPTION 'Credential definition identity is immutable';
+END $$;
+CREATE TRIGGER credential_definition_immutable BEFORE UPDATE OR DELETE ON learning_award_definitions
+  FOR EACH ROW EXECUTE FUNCTION v301_guard_credential_definition();
+
+CREATE FUNCTION v301_guard_credential_version() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+BEGIN
+  IF TG_OP='DELETE' OR OLD.lifecycle<>'draft'
+    THEN RAISE EXCEPTION 'Published or retired credential versions are immutable'; END IF;
+  IF (NEW.definition_id,NEW.version_no,NEW.created_by_person_id)
+       IS DISTINCT FROM (OLD.definition_id,OLD.version_no,OLD.created_by_person_id)
+    THEN RAISE EXCEPTION 'Credential version identity cannot change'; END IF;
+  IF NEW.lifecycle='published' THEN
+    IF (NEW.title,NEW.description,NEW.minimum_verified_minutes)
+         IS DISTINCT FROM (OLD.title,OLD.description,OLD.minimum_verified_minutes)
+      THEN RAISE EXCEPTION 'Freeze credential definition before publishing'; END IF;
+    IF NEW.approved_by_person_id IS NULL OR NEW.published_at IS NULL
+      OR NEW.approved_by_person_id=NEW.created_by_person_id
+      THEN RAISE EXCEPTION 'Independent approval required for published credential'; END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER credential_version_approval_guard BEFORE UPDATE OR DELETE ON learning_award_definition_versions
+  FOR EACH ROW EXECUTE FUNCTION v301_guard_credential_version();
+
+CREATE FUNCTION v301_validate_achievement_award() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+DECLARE definition record; source_record record; v record;
+BEGIN
+  SELECT d.kind,d.source_kind,d.issuer_organization_id,version.lifecycle,
+         version.minimum_verified_minutes INTO definition
+    FROM learning_award_definition_versions version
+    JOIN learning_award_definitions d ON d.id=version.definition_id
+    WHERE version.id=NEW.credential_definition_version_id;
+  IF definition.lifecycle IS DISTINCT FROM 'published'
+    THEN RAISE EXCEPTION 'Credential definition is not published'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM canonical_account_grants grant_row
+    WHERE grant_row.person_id=NEW.decided_by_person_id
+      AND grant_row.organization_id=definition.issuer_organization_id
+      AND grant_row.role_code IN ('registrar','site_admin')
+      AND grant_row.active AND grant_row.revoked_at IS NULL
+  ) THEN RAISE EXCEPTION 'Award decision requires active issuer staff grant'; END IF;
+  IF NEW.noncredit_completion_decision_id IS NOT NULL THEN
+    IF definition.source_kind<>'noncredit_completion'
+      THEN RAISE EXCEPTION 'Credential source kind mismatch'; END IF;
+    SELECT completion.outcome,reg.participant_person_id,
+      training.provider_organization_id INTO source_record
+      FROM noncredit_completion_decisions completion
+      JOIN noncredit_registrations reg ON reg.id=completion.registration_id
+      JOIN noncredit_training_versions training ON training.id=reg.training_version_id
+      WHERE completion.id=NEW.noncredit_completion_decision_id
+        AND NOT EXISTS (SELECT 1 FROM noncredit_completion_decisions later
+          WHERE later.supersedes_id=completion.id);
+    IF source_record.outcome IS DISTINCT FROM 'completed'
+      OR source_record.participant_person_id IS DISTINCT FROM NEW.recipient_person_id
+      OR source_record.provider_organization_id IS DISTINCT FROM definition.issuer_organization_id
+      THEN RAISE EXCEPTION 'Award requires current provider-owned completion'; END IF;
+  ELSE
+    IF definition.source_kind<>'verified_activity'
+      THEN RAISE EXCEPTION 'Credential source kind mismatch'; END IF;
+    -- The canonical Activity/registration integration is still pending.
+    -- A document alone does not attest to a child's registration or attendance.
+    -- Disallow activity award inserts until verified session evidence is wired.
+    RAISE EXCEPTION 'Verified activity award source is not yet enabled';
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER credential_achievement_evidence BEFORE INSERT ON learner_achievement_decisions
+  FOR EACH ROW EXECUTE FUNCTION v301_validate_achievement_award();
+
+CREATE FUNCTION v301_validate_credential_issuance() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+DECLARE award record; legacy record;
+BEGIN
+  SELECT a.noncredit_completion_decision_id,a.recipient_person_id,d.kind,d.source_kind,
+         d.issuer_organization_id INTO award
+   FROM learner_achievement_decisions a
+   JOIN learning_award_definition_versions v ON v.id=a.credential_definition_version_id
+   JOIN learning_award_definitions d ON d.id=v.definition_id
+   WHERE a.id=NEW.achievement_decision_id FOR SHARE OF a;
+  IF award.issuer_organization_id IS DISTINCT FROM NEW.issuer_organization_id
+    THEN RAISE EXCEPTION 'Credential issuer mismatch'; END IF;
+  IF NEW.issued_by_person_id=award.recipient_person_id OR NOT EXISTS (
+    SELECT 1 FROM canonical_account_grants grant_row
+    WHERE grant_row.person_id=NEW.issued_by_person_id
+      AND grant_row.organization_id=NEW.issuer_organization_id
+      AND grant_row.role_code IN ('registrar','site_admin')
+      AND grant_row.active AND grant_row.revoked_at IS NULL
+  ) THEN RAISE EXCEPTION 'Issuance requires active, independent issuer staff'; END IF;
+  IF award.source_kind='noncredit_completion' AND award.kind='completion_certificate' THEN
+    SELECT decision_id,issuer_organization_id,status,certificate_reference INTO legacy
+    FROM noncredit_completion_certificates WHERE id=NEW.legacy_noncredit_certificate_id;
+    IF legacy.decision_id IS DISTINCT FROM award.noncredit_completion_decision_id
+      OR legacy.issuer_organization_id IS DISTINCT FROM NEW.issuer_organization_id
+      OR legacy.status IS DISTINCT FROM 'issued'
+      OR legacy.certificate_reference IS DISTINCT FROM NEW.credential_reference
+      THEN RAISE EXCEPTION 'Noncredit certificate must reuse its canonical certificate and reference'; END IF;
+  ELSIF NEW.legacy_noncredit_certificate_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Legacy certificate is only valid for noncredit completion certificates';
+  END IF;
+  IF award.noncredit_completion_decision_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM noncredit_completion_decisions newer
+    WHERE newer.supersedes_id=award.noncredit_completion_decision_id)
+    THEN RAISE EXCEPTION 'Award evidence has been superseded'; END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER credential_issuance_evidence BEFORE INSERT ON learning_award_issuances
+ FOR EACH ROW EXECUTE FUNCTION v301_validate_credential_issuance();
+
+-- Revocations require independently verified evidence belonging to the issuer.
+CREATE FUNCTION v301_validate_credential_revocation() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+DECLARE issuer uuid; evidence record;
+BEGIN
+  SELECT issuer_organization_id INTO issuer FROM learning_award_issuances
+    WHERE id=NEW.issuance_id FOR SHARE;
+  IF issuer IS NULL THEN RAISE EXCEPTION 'Unknown credential issuer'; END IF;
+  SELECT version.verified_at,version.verified_by_person_id,
+         document.owning_organization_id INTO evidence
+    FROM evidence_document_versions version
+    JOIN evidence_documents document ON document.id=version.document_id
+    WHERE version.id=NEW.evidence_version_id;
+  IF evidence.verified_at IS NULL OR evidence.verified_by_person_id IS NULL
+    OR evidence.owning_organization_id IS DISTINCT FROM issuer
+    THEN RAISE EXCEPTION 'Revocation requires verified issuer-owned evidence'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM canonical_account_grants grant_row
+    WHERE grant_row.person_id=NEW.decided_by_person_id
+      AND grant_row.organization_id=issuer
+      AND grant_row.role_code IN ('registrar','site_admin')
+      AND grant_row.active AND grant_row.revoked_at IS NULL
+  ) THEN RAISE EXCEPTION 'Only current issuer staff can revoke'; END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER credential_revocation_provenance BEFORE INSERT ON learning_award_issuance_events
+  FOR EACH ROW EXECUTE FUNCTION v301_validate_credential_revocation();
+
+-- A point-in-time PDF is never authoritative. Re-evaluate source freshness,
+-- legacy certificate state, expiry and append-only revocation on each read.
+CREATE FUNCTION v301_credential_is_current(p_issuance_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $$
+ SELECT EXISTS (
+   SELECT 1 FROM learning_award_issuances issuance
+   JOIN learner_achievement_decisions decision
+     ON decision.id=issuance.achievement_decision_id
+   LEFT JOIN noncredit_completion_decisions completion
+     ON completion.id=decision.noncredit_completion_decision_id
+   LEFT JOIN noncredit_completion_certificates legacy
+     ON legacy.id=issuance.legacy_noncredit_certificate_id
+   WHERE issuance.id=p_issuance_id
+     AND (issuance.expires_at IS NULL OR issuance.expires_at>now())
+     AND NOT EXISTS (SELECT 1 FROM learning_award_issuance_events revocation
+       WHERE revocation.issuance_id=issuance.id AND revocation.event_kind='revoked')
+     AND (issuance.legacy_noncredit_certificate_id IS NULL
+       OR (legacy.status='issued' AND legacy.certificate_reference=issuance.credential_reference))
+     -- Activity-based awards remain disabled until independent attendance proof exists.
+     AND decision.noncredit_completion_decision_id IS NOT NULL
+     AND completion.outcome='completed'
+     AND NOT EXISTS (SELECT 1 FROM noncredit_completion_decisions newer
+       WHERE newer.supersedes_id=completion.id)
+ );
+$$;
+
+-- Award evidence and issued artifacts are append-only; a revocation is an event.
+CREATE TRIGGER achievement_decisions_immutable BEFORE UPDATE OR DELETE ON learner_achievement_decisions
+ FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
+CREATE TRIGGER learning_award_issuances_immutable BEFORE UPDATE OR DELETE ON learning_award_issuances
+ FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
+CREATE TRIGGER learning_award_issuance_events_immutable BEFORE UPDATE OR DELETE ON learning_award_issuance_events
+ FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
+CREATE TRIGGER learning_award_artifacts_immutable BEFORE UPDATE OR DELETE ON learning_award_artifacts
+ FOR EACH ROW EXECUTE FUNCTION v27_reject_update_delete();
+
+-- Fail closed: only the applying schema owner can inspect or mutate these
+-- new relations. A dedicated scoped issuer role/RLS policy must be audited
+-- before wiring application issuance.
+DO $policies$
+DECLARE table_name text; schema_owner name := current_user;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY[
+    'learning_award_definitions','learning_award_definition_versions',
+    'learner_achievement_decisions','learning_award_issuances',
+    'learning_award_issuance_events','learning_award_artifacts'
+  ] LOOP
+    EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',table_name);
+    EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',table_name);
+    EXECUTE format('CREATE POLICY credential_owner_only ON education_v30.%I TO %I USING (true) WITH CHECK (true)',table_name,schema_owner);
+  END LOOP;
+END $policies$;
+
+
+-- Session-bound private learner award projections. No direct learner or
+-- credential-table privileges are granted to the application login.
+-- A verified, current canonical learner session is the sole read authority.
+CREATE FUNCTION v301_list_my_learning_awards(p_secret_hash text)
+RETURNS TABLE (
+  issuance_id uuid, title text, kind text, credential_reference text,
+  issued_at timestamptz, expires_at timestamptz, is_current boolean
+)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$
+ SELECT issuance.id, version.title, definition.kind,
+        issuance.credential_reference, issuance.issued_at, issuance.expires_at,
+        v301_credential_is_current(issuance.id)
+ FROM v301_canonical_session_context(p_secret_hash) ctx
+ JOIN learner_achievement_decisions decision
+   ON decision.recipient_person_id=ctx.person_id
+ JOIN learning_award_issuances issuance
+   ON issuance.achievement_decision_id=decision.id
+   AND issuance.issuer_organization_id=ctx.organization_id
+ JOIN learning_award_definition_versions version
+   ON version.id=decision.credential_definition_version_id
+ JOIN learning_award_definitions definition
+   ON definition.id=version.definition_id
+ WHERE ctx.role_code='learner'
+ ORDER BY issuance.issued_at DESC,issuance.id DESC
+ LIMIT 50
+$credential_wallet$;
+REVOKE ALL ON FUNCTION v301_list_my_learning_awards(text) FROM PUBLIC;
+
+CREATE FUNCTION v301_get_my_learning_award(p_secret_hash text,p_issuance_id uuid)
+RETURNS TABLE (
+  issuance_id uuid, credential_reference text, issued_at timestamptz,
+  kind text, title text, description text, issuer_name text,
+  recipient_name text
+)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$
+ SELECT issuance.id, issuance.credential_reference, issuance.issued_at,
+        definition.kind, version.title, version.description,
+        organization.display_name,
+        btrim(concat_ws(' ',person.legal_first_name,person.legal_last_name))
+ FROM v301_canonical_session_context(p_secret_hash) ctx
+ JOIN persons person ON person.id=ctx.person_id
+ JOIN learner_achievement_decisions decision
+   ON decision.recipient_person_id=ctx.person_id
+ JOIN learning_award_issuances issuance
+   ON issuance.achievement_decision_id=decision.id
+   AND issuance.issuer_organization_id=ctx.organization_id
+ JOIN organizations organization ON organization.id=issuance.issuer_organization_id
+ JOIN learning_award_definition_versions version
+   ON version.id=decision.credential_definition_version_id
+ JOIN learning_award_definitions definition
+   ON definition.id=version.definition_id
+ WHERE ctx.role_code='learner'
+   AND issuance.id=p_issuance_id
+   AND v301_credential_is_current(issuance.id)
+ LIMIT 1
+$credential_wallet$;
+REVOKE ALL ON FUNCTION v301_get_my_learning_award(text,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_credential_is_current(uuid) FROM PUBLIC;
+-- In this security-definer chain, trusted relations must precede pg_temp.
+ALTER FUNCTION v301_canonical_session_context(text)
+  SET search_path=education_v30,pg_catalog,pg_temp;
+-- No issuance, public badge assertion, or guardian delegation in this reader.
+
+
+-- Canonical sessions and facilitated activity evidence (non-credit, not official attendance).
+CREATE TABLE IF NOT EXISTS education_v30.learning_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  course_attempt_id uuid NOT NULL REFERENCES education_v30.learner_course_attempts(id) ON DELETE RESTRICT,
+  course_version_id uuid NOT NULL REFERENCES education_v30.course_versions(id) ON DELETE RESTRICT,
+  access_session_id uuid NOT NULL,
+  client_instance_id uuid NOT NULL,
+  participant_person_id uuid NOT NULL,
+  state text NOT NULL DEFAULT 'active' CHECK (state IN ('active','paused','ended')),
+  started_at timestamptz NOT NULL DEFAULT now(),
+  last_interaction_at timestamptz,
+  last_foreground boolean NOT NULL DEFAULT false,
+  last_lesson_id uuid,
+  ended_at timestamptz,
+  estimated_active_ms integer NOT NULL DEFAULT 0 CHECK (estimated_active_ms >= 0),
+  CONSTRAINT canonical_learning_sessions_attempt_version_fk FOREIGN KEY (course_attempt_id,course_version_id)
+    REFERENCES education_v30.learner_course_attempts(id,course_version_id),
+  CONSTRAINT canonical_learning_sessions_end_chk CHECK (
+    (ended_at IS NULL AND state <> 'ended') OR (ended_at IS NOT NULL AND state = 'ended')
+  )
+);
+CREATE INDEX IF NOT EXISTS canonical_learning_sessions_attempt_idx
+  ON education_v30.learning_sessions (course_attempt_id, started_at);
+CREATE UNIQUE INDEX IF NOT EXISTS canonical_learning_sessions_id_attempt_uq
+  ON education_v30.learning_sessions (id, course_attempt_id);
+CREATE UNIQUE INDEX IF NOT EXISTS canonical_learning_sessions_live_idx
+  ON education_v30.learning_sessions (course_attempt_id, access_session_id, client_instance_id) WHERE ended_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS education_v30.learning_session_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  learning_session_id uuid NOT NULL REFERENCES education_v30.learning_sessions(id) ON DELETE RESTRICT,
+  course_attempt_id uuid NOT NULL REFERENCES education_v30.learner_course_attempts(id) ON DELETE RESTRICT,
+  client_event_id uuid NOT NULL,
+  request_digest text NOT NULL,
+  kind text NOT NULL CHECK (kind IN (
+    'lesson_opened','lesson_resumed','resource_opened',
+    'video_opened','video_played','video_paused','video_ended','engaged_interval'
+  )),
+  lesson_id uuid,
+  resource_id text,
+  occurred_at timestamptz NOT NULL,
+  received_at timestamptz NOT NULL DEFAULT now(),
+  estimated_active_ms integer NOT NULL DEFAULT 0 CHECK (estimated_active_ms >= 0),
+  CONSTRAINT canonical_learning_events_dedupe_uq UNIQUE (learning_session_id, client_event_id),
+  CONSTRAINT canonical_learning_events_session_attempt_fk FOREIGN KEY (learning_session_id,course_attempt_id)
+    REFERENCES education_v30.learning_sessions(id,course_attempt_id)
+);
+CREATE INDEX IF NOT EXISTS canonical_learning_events_attempt_time_idx
+  ON education_v30.learning_session_events (course_attempt_id, received_at DESC);
+
+-- Fail closed for nonowner database roles. Owner connections bypass RLS and must
+-- still use the server-side authorization guards on every operation.
+ALTER TABLE education_v30.learning_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE education_v30.learning_session_events ENABLE ROW LEVEL SECURITY;
+
+-- Do not grant public table privileges: server commands must authorize current Course attempt.
+REVOKE ALL ON education_v30.learning_sessions FROM PUBLIC;
+REVOKE ALL ON education_v30.learning_session_events FROM PUBLIC;
+DO $activity_policy$
+DECLARE table_name text; schema_owner name := current_user;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['learning_sessions','learning_session_events'] LOOP
+    EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',table_name);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='education_v30' AND tablename=table_name AND policyname='learning_evidence_owner_only') THEN
+      EXECUTE format('CREATE POLICY learning_evidence_owner_only ON education_v30.%I TO %I USING (true) WITH CHECK (true)',table_name,schema_owner);
+    END IF;
+  END LOOP;
+END $activity_policy$;
+
+CREATE TABLE IF NOT EXISTS education_v30.facilitated_learning_sessions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  deployment_id uuid NOT NULL REFERENCES education_v30.program_deployments(id),
+  course_version_id uuid NOT NULL REFERENCES education_v30.course_versions(id),
+  site_id uuid NOT NULL REFERENCES education_v30.sites(id),
+  host_organization_id uuid NOT NULL,
+  facilitator_person_id uuid NOT NULL,
+  state text NOT NULL DEFAULT 'live' CHECK (state IN ('live','ended')),
+  pairing_code_digest text NOT NULL,
+  pairing_expires_at timestamptz NOT NULL,
+  started_at timestamptz NOT NULL DEFAULT now(),
+  ended_at timestamptz,
+  CONSTRAINT facilitated_sessions_lifecycle_ck CHECK (
+    (state='live' AND ended_at IS NULL) OR (state='ended' AND ended_at IS NOT NULL)
+  ),
+  CONSTRAINT facilitated_sessions_id_course_uq UNIQUE (id,course_version_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS facilitated_sessions_code_digest_uq
+  ON education_v30.facilitated_learning_sessions(pairing_code_digest);
+CREATE INDEX IF NOT EXISTS facilitated_sessions_site_time_idx
+  ON education_v30.facilitated_learning_sessions(site_id,started_at DESC);
+CREATE INDEX IF NOT EXISTS facilitated_sessions_deployment_time_idx
+  ON education_v30.facilitated_learning_sessions(deployment_id,started_at DESC);
+
+CREATE TABLE IF NOT EXISTS education_v30.facilitated_learning_participants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  facilitated_session_id uuid NOT NULL REFERENCES education_v30.facilitated_learning_sessions(id),
+  course_attempt_id uuid NOT NULL REFERENCES education_v30.learner_course_attempts(id),
+  participant_person_id uuid NOT NULL,
+  joined_at timestamptz NOT NULL DEFAULT now(),
+  last_paired_at timestamptz NOT NULL DEFAULT now(),
+  left_at timestamptz,
+  CONSTRAINT facilitated_participant_session_attempt_uq UNIQUE (facilitated_session_id,course_attempt_id)
+);
+CREATE INDEX IF NOT EXISTS facilitated_participant_attempt_idx
+  ON education_v30.facilitated_learning_participants(course_attempt_id);
+
+CREATE TABLE IF NOT EXISTS education_v30.facilitated_learning_playback (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  facilitated_session_id uuid NOT NULL REFERENCES education_v30.facilitated_learning_sessions(id),
+  course_version_id uuid NOT NULL REFERENCES education_v30.course_versions(id),
+  lesson_id uuid NOT NULL,
+  asset_version_id uuid NOT NULL,
+  facilitator_person_id uuid NOT NULL,
+  request_id uuid NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('opened','played','paused','ended')),
+  position_seconds integer CHECK (position_seconds IS NULL OR position_seconds BETWEEN 0 AND 43200),
+  occurred_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT facilitated_playback_request_uq UNIQUE (facilitated_session_id,request_id),
+  CONSTRAINT facilitated_playback_session_course_fk FOREIGN KEY (facilitated_session_id,course_version_id)
+    REFERENCES education_v30.facilitated_learning_sessions(id,course_version_id)
+);
+CREATE INDEX IF NOT EXISTS facilitated_playback_recent_idx
+  ON education_v30.facilitated_learning_playback(facilitated_session_id,occurred_at DESC);
+
+-- No implicit public or unscoped user access. Server owner must enforce
+-- site, operation and course-participation checks on every request.
+ALTER TABLE education_v30.facilitated_learning_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE education_v30.facilitated_learning_participants ENABLE ROW LEVEL SECURITY;
+ALTER TABLE education_v30.facilitated_learning_playback ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON education_v30.facilitated_learning_sessions FROM PUBLIC;
+REVOKE ALL ON education_v30.facilitated_learning_participants FROM PUBLIC;
+REVOKE ALL ON education_v30.facilitated_learning_playback FROM PUBLIC;
+DO $facilitated_policy$
+DECLARE table_name text; schema_owner name := current_user;
+BEGIN
+  FOREACH table_name IN ARRAY ARRAY['facilitated_learning_sessions','facilitated_learning_participants','facilitated_learning_playback'] LOOP
+    EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',table_name);
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='education_v30' AND tablename=table_name AND policyname='learning_evidence_owner_only') THEN
+      EXECUTE format('CREATE POLICY learning_evidence_owner_only ON education_v30.%I TO %I USING (true) WITH CHECK (true)',table_name,schema_owner);
+    END IF;
+  END LOOP;
+END $facilitated_policy$;
+
+
+-- Learning evidence integrity (patch-learning-session-integrity.sql).
+ALTER TABLE learning_sessions
+  ADD CONSTRAINT canonical_learning_sessions_person_fk FOREIGN KEY (participant_person_id) REFERENCES persons(id),
+  ADD CONSTRAINT canonical_learning_sessions_active_time_ck CHECK (estimated_active_ms<=43200000);
+ALTER TABLE learning_session_events
+  ADD CONSTRAINT canonical_learning_events_lesson_fk FOREIGN KEY (lesson_id) REFERENCES course_lessons(id),
+  ADD CONSTRAINT canonical_learning_events_active_time_ck CHECK (estimated_active_ms<=60000);
+ALTER TABLE facilitated_learning_sessions
+  ADD CONSTRAINT facilitated_rooms_host_fk FOREIGN KEY (host_organization_id) REFERENCES organizations(id),
+  ADD CONSTRAINT facilitated_rooms_facilitator_fk FOREIGN KEY (facilitator_person_id) REFERENCES persons(id);
+ALTER TABLE facilitated_learning_participants
+  ADD CONSTRAINT facilitated_pairs_person_fk FOREIGN KEY (participant_person_id) REFERENCES persons(id);
+ALTER TABLE facilitated_learning_playback
+  ADD CONSTRAINT facilitated_playback_lesson_fk FOREIGN KEY (lesson_id) REFERENCES course_lessons(id),
+  ADD CONSTRAINT facilitated_playback_asset_fk FOREIGN KEY (asset_version_id) REFERENCES content_asset_versions(id),
+  ADD CONSTRAINT facilitated_playback_facilitator_fk FOREIGN KEY (facilitator_person_id) REFERENCES persons(id);
+
+CREATE FUNCTION v301_valid_learning_attempt_person(
+  p_attempt uuid,p_person uuid,p_deployment uuid,p_course_version uuid
+) RETURNS boolean LANGUAGE sql STABLE
+SET search_path=education_v30,pg_catalog,pg_temp AS $person_guard$
+ SELECT EXISTS (
+  SELECT 1 FROM learner_course_attempts attempt
+  LEFT JOIN noncredit_registrations registration
+    ON registration.id=attempt.noncredit_registration_id
+  LEFT JOIN enrollments enrollment ON enrollment.id=attempt.enrollment_id
+  LEFT JOIN learner_profiles profile ON profile.id=enrollment.learner_id
+  WHERE attempt.id=p_attempt AND attempt.status='active'
+    AND attempt.course_version_id=p_course_version
+    AND (p_deployment IS NULL OR attempt.deployment_id=p_deployment)
+    AND (
+     (attempt.noncredit_registration_id IS NOT NULL
+       AND registration.participant_person_id=p_person
+       AND registration.status IN ('registered','active')
+       AND registration.deployment_id=attempt.deployment_id
+       AND registration.offering_version_id=attempt.offering_version_id)
+     OR
+     (attempt.enrollment_id IS NOT NULL AND profile.person_id=p_person
+       AND enrollment.status='active'
+       AND enrollment.deployment_id=attempt.deployment_id)
+    )
+ )
+$person_guard$;
+REVOKE ALL ON FUNCTION v301_valid_learning_attempt_person(uuid,uuid,uuid,uuid) FROM PUBLIC;
+
+CREATE FUNCTION v301_guard_learning_session_identity() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog,pg_temp AS $session_guard$
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW.course_attempt_id,NEW.course_version_id,NEW.participant_person_id,
+        NEW.access_session_id,NEW.client_instance_id,NEW.started_at)
+    IS DISTINCT FROM ROW(OLD.course_attempt_id,OLD.course_version_id,OLD.participant_person_id,
+        OLD.access_session_id,OLD.client_instance_id,OLD.started_at)
+  THEN RAISE EXCEPTION 'Learning session identity is immutable'; END IF;
+  RETURN NEW;
+ END IF;
+ IF NOT v301_valid_learning_attempt_person(
+   NEW.course_attempt_id,NEW.participant_person_id,NULL,NEW.course_version_id)
+ THEN RAISE EXCEPTION 'Learning session must match the current participant and course attempt'; END IF;
+ RETURN NEW;
+END $session_guard$;
+CREATE TRIGGER canonical_learning_session_identity
+ BEFORE INSERT OR UPDATE OF course_attempt_id,course_version_id,participant_person_id,
+   access_session_id,client_instance_id,started_at
+ ON learning_sessions FOR EACH ROW EXECUTE FUNCTION v301_guard_learning_session_identity();
+
+CREATE FUNCTION v301_guard_facilitated_room_identity() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog,pg_temp AS $room_guard$
+BEGIN
+ IF ROW(NEW.deployment_id,NEW.course_version_id,NEW.site_id,
+        NEW.host_organization_id,NEW.facilitator_person_id,NEW.started_at)
+ IS DISTINCT FROM ROW(OLD.deployment_id,OLD.course_version_id,OLD.site_id,
+        OLD.host_organization_id,OLD.facilitator_person_id,OLD.started_at)
+ THEN RAISE EXCEPTION 'Facilitated room identity is immutable'; END IF;
+ RETURN NEW;
+END $room_guard$;
+CREATE TRIGGER facilitated_room_identity
+ BEFORE UPDATE OF deployment_id,course_version_id,site_id,host_organization_id,
+   facilitator_person_id,started_at
+ ON facilitated_learning_sessions FOR EACH ROW EXECUTE FUNCTION v301_guard_facilitated_room_identity();
+
+CREATE FUNCTION v301_guard_facilitated_pair_identity() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog,pg_temp AS $pair_guard$
+DECLARE room record;
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW.facilitated_session_id,NEW.course_attempt_id,NEW.participant_person_id,
+         NEW.joined_at)
+   IS DISTINCT FROM ROW(OLD.facilitated_session_id,OLD.course_attempt_id,
+         OLD.participant_person_id,OLD.joined_at)
+  THEN RAISE EXCEPTION 'Facilitated pairing identity is immutable'; END IF;
+  -- Recorded departures may be saved after a room is closed or membership withdrawn.
+  IF NEW.left_at IS NOT NULL THEN RETURN NEW; END IF;
+ END IF;
+ SELECT deployment_id,course_version_id,state,ended_at,started_at,pairing_expires_at INTO room
+ FROM facilitated_learning_sessions WHERE id=NEW.facilitated_session_id;
+ IF room.state IS DISTINCT FROM 'live' OR room.ended_at IS NOT NULL
+    OR room.started_at>clock_timestamp()
+    OR room.started_at<=clock_timestamp()-interval '8 hours'
+    OR room.pairing_expires_at<=clock_timestamp()
+    OR NOT v301_valid_learning_attempt_person(
+      NEW.course_attempt_id,NEW.participant_person_id,
+      room.deployment_id,room.course_version_id)
+ THEN RAISE EXCEPTION 'Pairing must match a live room and registered course participant'; END IF;
+ RETURN NEW;
+END $pair_guard$;
+CREATE TRIGGER facilitated_pair_identity
+ BEFORE INSERT OR UPDATE OF facilitated_session_id,course_attempt_id,
+    participant_person_id,joined_at,last_paired_at,left_at
+ ON facilitated_learning_participants
+ FOR EACH ROW EXECUTE FUNCTION v301_guard_facilitated_pair_identity();
+
+CREATE FUNCTION v301_guard_facilitated_playback_identity() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog,pg_temp AS $playback_guard$
+BEGIN
+ IF NOT EXISTS (
+  SELECT 1 FROM facilitated_learning_sessions room
+  JOIN course_lessons lesson
+    ON lesson.id=NEW.lesson_id AND lesson.course_version_id=room.course_version_id
+  JOIN content_asset_versions asset
+    ON asset.id=NEW.asset_version_id AND asset.lifecycle='published'
+  WHERE room.id=NEW.facilitated_session_id
+    AND room.course_version_id=NEW.course_version_id
+    AND room.facilitator_person_id=NEW.facilitator_person_id
+    AND room.state='live' AND room.ended_at IS NULL
+ ) THEN RAISE EXCEPTION 'Playback must match the live room, facilitator, lesson and published media'; END IF;
+ RETURN NEW;
+END $playback_guard$;
+CREATE TRIGGER facilitated_playback_identity
+ BEFORE INSERT ON facilitated_learning_playback
+ FOR EACH ROW EXECUTE FUNCTION v301_guard_facilitated_playback_identity();
+
+CREATE FUNCTION v301_guard_learning_evidence_immutable() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog,pg_temp AS $evidence_guard$
+BEGIN
+ RAISE EXCEPTION 'Recorded learning evidence is append-only';
+END $evidence_guard$;
+CREATE TRIGGER canonical_learning_evidence_immutable
+ BEFORE UPDATE OR DELETE ON learning_session_events
+ FOR EACH ROW EXECUTE FUNCTION v301_guard_learning_evidence_immutable();
+CREATE TRIGGER facilitated_playback_evidence_immutable
+ BEFORE UPDATE OR DELETE ON facilitated_learning_playback
+ FOR EACH ROW EXECUTE FUNCTION v301_guard_learning_evidence_immutable();
+
+-- Caller cannot execute validation/trigger functions as a public API.
+REVOKE ALL ON FUNCTION v301_guard_learning_session_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_facilitated_room_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_facilitated_pair_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_facilitated_playback_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_learning_evidence_immutable() FROM PUBLIC;
+
+-- SECURITY DEFINER functions must resolve trusted schema objects before pg_temp.
+ALTER FUNCTION education_v30.v301_provision_noncredit_knowledge_access(uuid)
+  SET search_path=education_v30,pg_catalog,pg_temp;
+ALTER FUNCTION education_v30.v301_noncredit_attempt_access_trigger()
+  SET search_path=education_v30,pg_catalog,pg_temp;
+ALTER FUNCTION education_v30.v301_noncredit_admin_access_trigger()
+  SET search_path=education_v30,pg_catalog,pg_temp;
+ALTER FUNCTION education_v30.v301_try_auto_complete_noncredit(uuid)
+  SET search_path=education_v30,pg_catalog,pg_temp;
+ALTER FUNCTION education_v30.v301_auto_complete_noncredit_event()
+  SET search_path=education_v30,pg_catalog,pg_temp;
+ALTER FUNCTION education_v30.v301_auto_complete_on_evidence_verification()
+  SET search_path=education_v30,pg_catalog,pg_temp;
 
 COMMIT;

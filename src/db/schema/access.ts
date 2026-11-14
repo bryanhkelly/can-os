@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
 import { people } from "./identity";
 
@@ -76,4 +76,21 @@ export const accessSessions = pgTable("access_sessions", {
  revokedAt: timestamp("revoked_at",{withTimezone:true}),
  createdAt: createdAt(),
  updatedAt: updatedAt(),
+ lastActivityAt:timestamp("last_activity_at",{withTimezone:true}).notNull().defaultNow(),
+ clientInstanceId:uuid("client_instance_id"),deviceCategory:text("device_category"),
+ browserFamily:text("browser_family"),osFamily:text("os_family"),
+ ipAddress:text("ip_address"),networkObservedAt:timestamp("network_observed_at",{withTimezone:true}),
+ sharedDevice:boolean("shared_device").notNull().default(false),
 }, t => [uniqueIndex("access_sessions_secret_uq").on(t.secretHash),index("access_sessions_account_idx").on(t.accountId)]);
+
+/** Account-scoped, bounded security indicators, not independent authentication. */
+export const accessSessionSignals=pgTable("access_session_signals",{
+ id:id(),accountId:uuid("account_id").notNull().references(()=>accessAccounts.id,{onDelete:"cascade"}),
+ sessionId:uuid("session_id").notNull().references(()=>accessSessions.id,{onDelete:"cascade"}),
+ signal:text("signal").$type<"new_device_profile"|"concurrent_session"|"network_changed">().notNull(),
+ occurredAt:timestamp("occurred_at",{withTimezone:true}).notNull().defaultNow(),
+ details:jsonb("details").$type<Record<string,string>>().notNull().default({}),
+},t=>[
+ uniqueIndex("access_session_signals_session_kind_uq").on(t.sessionId,t.signal),
+ index("access_session_signals_account_time_idx").on(t.accountId,t.occurredAt),
+]);

@@ -1,1 +1,0 @@
-ALTER TABLE "classroom_sessions" ADD COLUMN "join_policy" text DEFAULT 'open' NOT NULL;

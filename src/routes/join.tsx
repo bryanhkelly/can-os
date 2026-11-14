@@ -1,56 +1,37 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  CLASS_CODE_LENGTH,
-  isValidClassCode,
-  joinPathForCode,
-  normalizeClassCode,
-} from "@/domain/classroom-sessions";
+import { classroomJoinPath } from "@/domain/classroom-connect";
 
 export const Route = createFileRoute("/join")({ component: JoinClassroomPage });
 
-/** Keyboard-accessible entry point: join by typed code, not QR only. */
 function JoinClassroomPage() {
   const navigate = useNavigate();
-  const [value, setValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  const submit = (event: React.FormEvent) => {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const code = normalizeClassCode(value);
-    if (!isValidClassCode(code)) {
-      setError(`Enter the ${CLASS_CODE_LENGTH}-character class code shown on the classroom screen.`);
-      return;
+    try {
+      const path = classroomJoinPath(code);
+      setError("");
+      void navigate({ to: path });
+    } catch {
+      setError("Enter the 10-character pairing code displayed by the facilitator.");
     }
-    setError(null);
-    void navigate({ to: joinPathForCode(code) });
-  };
-
-  return (
-    <WorkspaceShell width="reading" eyebrow="Classroom Connect" title="Join a classroom"
-      subtitle="Enter the class code shown on the classroom screen. You can also scan the QR code with your phone.">
-      <form onSubmit={submit} className="space-y-4">
-        <Field label="Class code">
-          <Input
-            value={value}
-            onChange={event => setValue(event.target.value.toUpperCase())}
-            placeholder="e.g. ABC234"
-            maxLength={CLASS_CODE_LENGTH + 4}
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            inputMode="text"
-            aria-describedby={error ? "class-code-error" : undefined}
-            className="text-center font-mono text-2xl tracking-widest"
-          />
-        </Field>
-        {error && <p id="class-code-error" role="alert" className="text-sm text-destructive">{error}</p>}
-        <Button type="submit">Continue</Button>
-      </form>
-    </WorkspaceShell>
-  );
+  }
+  return <WorkspaceShell width="reading" eyebrow="Classroom Connect"
+    title="Join a classroom" subtitle="Pair your own device to a facilitator-led course.">
+    <form onSubmit={submit} className="space-y-4">
+      <label className="block text-sm font-medium" htmlFor="classroom-pair-code">Pairing code</label>
+      <Input id="classroom-pair-code" value={code} maxLength={15} autoComplete="off"
+        autoCapitalize="characters" spellCheck={false}
+        aria-describedby={error ? "classroom-pair-error" : undefined}
+        placeholder="XXXXX-XXXXX" onChange={event => setCode(event.target.value.toUpperCase())}
+        className="font-mono text-xl tracking-wider" />
+      {error && <p id="classroom-pair-error" role="alert" className="text-sm text-destructive">{error}</p>}
+      <Button type="submit">Continue</Button>
+    </form>
+  </WorkspaceShell>;
 }

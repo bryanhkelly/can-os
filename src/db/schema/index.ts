@@ -65,5 +65,3 @@ export * from "./curriculum-year-adoptions";
 export * from "./finance";
 
 export * from "./jurisdiction-profiles";
-
-export * from "./classroom-sessions";

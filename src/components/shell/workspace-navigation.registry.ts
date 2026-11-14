@@ -5,6 +5,15 @@ import { optionalSearchUuid } from "@/lib/route-search";
 const destinationContextKeys: Record<string, readonly string[]> = {
   "/home": ["siteId", "programId"],
   "/launch/school": ["siteId", "programId"],
+  "/launch/hub/school": ["siteId", "programId"],
+  "/admissions": ["siteId", "programId"],
+  "/staff/students": ["siteId", "programId"],
+  "/operations/school-years": ["siteId", "programId"],
+  "/operations/interest-events": ["siteId", "programId"],
+  "/operations/insights": ["siteId", "programId"],
+  "/settings": ["siteId"],
+  "/site-website": ["siteId", "programId"],
+  "/staff/attendance": ["programId"],
   "/operations/curriculum": ["programId"],
   "/operations/teacher-marketplace": ["programId"],
   "/classes": ["section"],
@@ -14,11 +23,52 @@ const destinationContextKeys: Record<string, readonly string[]> = {
   "/calendar": ["section"],
 };
 
-export function workspaceDestination(path: string, currentSearch: string): string {
+export type WorkspaceInstitutionSelection = { siteId?: string; programId?: string };
+export type WorkspaceSiteChoice = { id: string };
+export type WorkspaceProgramChoice = { id: string; siteId: string | null };
+
+/**
+ * The URL and sessionStorage hold navigation hints only. Only choices returned
+ * for the active verified grant are eligible to survive between pages.
+ * A new Site selection clears a Program chosen for another Site.
+ */
+export function resolveWorkspaceInstitutionSelection(
+  search: string, stored: WorkspaceInstitutionSelection,
+  sites: readonly WorkspaceSiteChoice[], programs: readonly WorkspaceProgramChoice[],
+): WorkspaceInstitutionSelection {
+  const params = new URLSearchParams(search);
+  const proposedSite = optionalSearchUuid.parse(params.get("siteId") ?? undefined);
+  const proposedProgram = optionalSearchUuid.parse(params.get("programId") ?? undefined);
+  const allowedSite = (value: string | undefined) =>
+    sites.find(item => item.id === value)?.id;
+  const allowedProgram = (value: string | undefined) =>
+    programs.find(item => item.id === value);
+  const explicitProgram = allowedProgram(proposedProgram);
+  const siteId = allowedSite(proposedSite) ??
+    allowedSite(explicitProgram?.siteId ?? undefined) ??
+    allowedSite(stored.siteId);
+  const selectedProgram = explicitProgram ?? allowedProgram(stored.programId);
+  const programId = selectedProgram && (!siteId ||
+    !selectedProgram.siteId || selectedProgram.siteId === siteId)
+    ? selectedProgram.id : undefined;
+  return {
+    ...(siteId ? {siteId} : {}),
+    ...(programId ? {programId} : {}),
+  };
+}
+
+/** Only route-supported selectors are forwarded; unknown private parameters are dropped. */
+export function workspaceDestination(
+  path: string, currentSearch: string,
+  authorizedSelection?: WorkspaceInstitutionSelection,
+): string {
   const current = new URLSearchParams(currentSearch);
   const selection = new URLSearchParams();
   for (const key of destinationContextKeys[path] ?? []) {
-    const value = optionalSearchUuid.parse(current.get(key) ?? undefined);
+    const institutional = key === "siteId" || key === "programId";
+    const input = authorizedSelection && institutional
+      ? authorizedSelection[key as keyof WorkspaceInstitutionSelection] : current.get(key) ?? undefined;
+    const value = optionalSearchUuid.parse(input);
     if (value) selection.set(key, value);
   }
   return selection.size ? `${path}?${selection.toString()}` : path;
@@ -32,6 +82,8 @@ export interface WorkspaceNavigationItem {
 }
 
 export const workspaceHome = {
+  academic_content_creator: "/canonical/content",
+  academic_content_reviewer: "/canonical/content-reviews",
   site_website_editor: "/home",
   room_facilitator: "/home",
   site_staff: "/home",
@@ -54,6 +106,7 @@ export const workspaceHome = {
 export type WorkspaceRole = keyof typeof workspaceHome;
 
 const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readonly string[]>>> = {
+  academic_content_creator: { "/canonical/content": ["/canonical/content/*"] },
   student: { "/student/courses": ["/student/courses/*"] },
   teacher: { "/teacher/gradebook": ["/teacher/gradebook/*"] },
 };
@@ -76,6 +129,8 @@ const siteAdminProfileLink = {
  * Role-specific destinations. Home and Messages are generated once below.
  */
 const roleLinks = {
+  academic_content_creator: [],
+  academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
   site_website_editor: [{ title: "Website", path: "/site-website", icon: "globe" }],
   room_facilitator: [
@@ -94,8 +149,6 @@ const roleLinks = {
     { title: "Staff", path: "/staff/teachers", icon: "users" },
     { title: "Schedule", path: "/calendar", icon: "calendar" },
     { title: "Attendance", path: "/staff/attendance", icon: "clipboard" },
-    { title: "Community", path: "/site-website", icon: "globe" },
-    { title: "Operations", path: "/operations/workflows", icon: "clipboard" },
   ],
   paraeducator: [
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },
@@ -103,9 +156,7 @@ const roleLinks = {
   ],
   safeguarding_responder: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
   safeguarding_lead: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
-  network_admin: [
-    { title: "Operations", path: "/operations/workflows", icon: "clipboard" },
-  ],
+  network_admin: [],
   can_network_steward: [
     { title: "Jurisdiction profiles", path: "/operations/jurisdiction-profiles", icon: "clipboard" },
   ],

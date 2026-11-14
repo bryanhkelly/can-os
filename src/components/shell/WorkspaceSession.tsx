@@ -3,6 +3,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
 import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
 import { WorkspaceSessionContext } from "./workspace-session-context";
+import {registerAccessClient,isSharedDeviceMode,clearLearnerBrowserState} from "@/domain/session-client";
 
 export { useActiveWorkspaceMember } from "./workspace-session-context";
 
@@ -51,11 +52,24 @@ export function WorkspaceSessionProvider({ initial, children }: {
     // Do not use refetch timers, page load, focus, visibility, or synthetic
     // browser events as a signal of user activity. Only trusted interaction.
     // This is a session-idle signal, not educational attendance or time on task.
-    let lastSentAt = 0;
+    let lastSentAt=0;
+    let lastInteractionAt=Date.now();
+    let closing=false;
+    // Registration never extends idle expiry; only actual trusted interaction does.
+    void registerAccessClient().catch(()=>{});
+    const guard=window.setInterval(()=>{
+      if(closing || !isSharedDeviceMode() || Date.now()-lastInteractionAt<5*60_000)return;
+      closing=true;
+      void fetch("/access/logout",{method:"POST",credentials:"same-origin",
+        headers:{"Content-Type":"application/json"}}).finally(()=>{
+        clearLearnerBrowserState();window.location.assign("/access");
+      });
+    },15_000);
     const onInteraction = (event: Event) => {
       if (!event.isTrusted || document.visibilityState !== "visible") return;
-      const now = Date.now();
-      if (now - lastSentAt < 60_000) return;
+      const now=Date.now();
+      lastInteractionAt=now;
+      if(now-lastSentAt<60_000)return;
       lastSentAt = now;
       void fetch("/access/session", {
         method: "POST",
@@ -72,6 +86,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
     document.addEventListener("pointerdown", onInteraction, { passive: true });
     document.addEventListener("keydown", onInteraction);
     return () => {
+      window.clearInterval(guard);
       document.removeEventListener("pointerdown", onInteraction);
       document.removeEventListener("keydown", onInteraction);
     };

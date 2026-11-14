@@ -384,3 +384,153 @@ read/write policies, exact-commit PostgreSQL acceptance, canonical Site identity
 cutover, reviewer grants and an evidence-picker workflow are completed. The
 legacy PR #281 School Blueprint service uses different tables and cannot be
 enabled alongside the canonical writer as an alternative authority.
+
+### Learning-award schema (November 14, 2026)
+
+The fresh-build `schema.sql` includes the additive six-table learning-award domain
+and its issuer approval, immutable evidence, currentness and forced-RLS controls.
+An existing v3.0.1 database must apply **only** `patch-achievement-credentials.sql`
+as an additive transaction; do not rerun the full fresh-install schema.
+`test01` Neon passed the isolated additive DDL/trigger/RLS verification.
+The credential issuer and learner-reader runtime paths remain disabled pending
+scoped database-role provisioning and multi-user acceptance tests. Do not interpret
+the mere existence of these tables as authorization to issue a badge or certificate.
+
+**Neon migration record (November 14, 2026):** Existing `can-os` / `neondb`
+branches `test01` and `main` have the six additive learning-award tables installed.
+On `main`, all six tables passed the read-only verification for installation,
+forced RLS, owner-only policy, trigger coverage and absence of PUBLIC table grants.
+Do **not** rerun the one-time patch on those branches. The published schema and
+runtime database are aligned for these tables, but credential feature flags
+remain disabled until restricted DB grants and role-based acceptance tests pass.
+See `verify-achievement-credentials.sql` for the reusable, read-only checks.
+
+### Optional survey draft writer (not installed by default)
+
+The temporary Capability Lab survey draft page is guarded by
+`CAN_CANONICAL_SURVEY_DRAFT_ENABLED` (default off). On an isolated test database,
+a trusted schema owner first runs:
+
+```sh
+psql "$TEST_DATABASE_URL" -f database/canonical/v3.0.1/patch-survey-draft-authoring.sql
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_APP_LOGIN \
+  -f database/canonical/v3.0.1/provision-survey-draft-author-role.sql
+```
+
+The writer role is isolated per Organization and has only SELECT/INSERT on draft
+survey definitions, versions, questions and options, plus restricted audit/event
+inserts. PostgreSQL RLS blocks cross-organization and published-content writes.
+Existing independent survey publication review and campaign permission gates
+remain unchanged. Do not enable for production until restricted-role SQL and
+browser acceptance pass. This patch is not automatically applied or migrated.
+
+Before enabling the feature flag, run the nonmutating role check:
+
+```sh
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -f database/canonical/v3.0.1/verify-survey-draft-author-role.sql
+```
+
+This verifies role restrictions, RLS policy presence, draft INSERT grants and
+absence of publication, invitation, review and respondent-data privileges.
+It does not replace a transaction-based cross-tenant database test.
+
+### Optional independent survey reviews and publication
+
+After the draft-authoring patch, the trusted schema administrator can apply
+`patch-survey-review-publication.sql` in an **isolated test database**, then
+provision the narrow `survey_reviewer` and `survey_publisher` roles per Organization
+using `provision-survey-review-publication-roles.sql`. This explicitly extends
+native canonical account grants to an **organization-only survey reviewer**;
+the existing Site-scoped provider may publish only after independent privacy,
+accessibility and safeguarding approvals. Existing published-version immutable
+triggers and draft-child gates remain in force. No database patch is automatically
+installed by application deployment.
+
+```sh
+psql "$TEST_DATABASE_URL" -f database/canonical/v3.0.1/patch-survey-review-publication.sql
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_APP_LOGIN \
+  -f database/canonical/v3.0.1/provision-survey-review-publication-roles.sql
+```
+
+Do not enable `CAN_CANONICAL_SURVEY_REVIEW_ENABLED` or
+`CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED` until role and RLS tests,
+cross-tenant denials, and authenticated browser tests pass. Neither role can
+create survey campaigns or invite respondents.
+
+Run the nonmutating verification before switching on either feature flag:
+
+```sh
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -f database/canonical/v3.0.1/verify-survey-review-publication-roles.sql
+```
+
+The verifier checks role isolation, scope bindings, review/publication triggers,
+current-evidence metadata privileges and absence of campaign, invitation and
+respondent-data access. It is not proof of successful DB integration or browser
+testing; those remain required for release.
+
+### Private credential reader installation
+
+`patch-credential-learner-reader.sql` was applied to existing Neon `test01`
+and `main` databases after the credential-award hardening patch. The
+fresh-build `schema.sql` includes the same two session-bound wallet
+projections, private EXECUTE ACLs, and `pg_temp`-safe SECURITY DEFINER paths.
+No production application login has yet been granted the reader role.
+
+After confirming an actual restricted app login (never `neondb_owner` or
+any schema owner), provision only that login:
+
+```sh
+psql "$TEST_DATABASE_URL" -v application_role=YOUR_RESTRICTED_TEST_LOGIN \
+  -f database/canonical/v3.0.1/provision-credential-learner-reader.sql
+
+psql "$RESTRICTED_TEST_APP_DATABASE_URL" \
+  -f database/canonical/v3.0.1/test-credential-learner-reader.sql
+```
+
+The negative-permission smoke test was run against `test01` with a restricted
+application login and passed. Positive two-learner/two-issuer integration
+fixtures, production role provisioning and the credential-reader feature flag
+remain deliberately pending. No issuer-management UI is included.
+
+### Canonical activity, noncredit migration and integrity record (November 14, 2026)
+
+Applied the additive noncredit patches in order on Neon `test01`, then
+atomically on Neon `main`: objective result finalization, noncredit assessment
+access provisioning, baseline diagnostic support, lesson milestones, verified
+completion evidence, immutable enrollment-time policy, and opt-in automatic
+completion. The production database had zero noncredit trainings, registrations,
+course attempts, and completion decisions at deployment; the migration wrote no
+completion decisions. Approval remains explicitly `provider_review` by default.
+
+The five learning session/facilitated delivery tables additionally received
+`patch-learning-session-integrity.sql` on both databases. It introduces 10
+constraints and six identity/append-only triggers. Unknown participant attempts,
+room pairings and room media were rejected during negative database tests.
+
+Read-only checks after selecting the appropriate database connection:
+
+```sh
+CAN_NONCREDIT_SCHEMA_VALIDATION=1 npm run db:canonical:noncredit-schema
+CAN_ACTIVITY_SCHEMA_VALIDATION=1 npm run db:canonical:activity-schema
+```
+
+These tests establish schema presence, not full authorization or activation.
+GitHub Actions runs still report `startup_failure` with no executed jobs.
+Credential issuance, learner-wallet reading, canonical activity and facilitated
+learning runtime flags remain disabled. Do not treat a database migration as a
+production application release.
+
+### Security hardening: noncredit privileged functions (November 14, 2026)
+
+After the verified noncredit migration, `patch-noncredit-definer-hardening.sql`
+was applied to both Neon `test01` and `main`. Six SECURITY DEFINER
+functions now resolve the canonical schema before `pg_catalog` and
+`pg_temp`, protecting against untrusted temporary relation shadowing.
+No PUBLIC execution privileges were granted; both databases passed the
+read-only function ACL and execution-search-path check. The additive source
+patches and fresh-install `schema.sql` contain the corresponding security
+configuration. The noncredit release checker now enforces these properties.

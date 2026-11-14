@@ -1,84 +1,69 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
-import { joinClassroomSession } from "@/modules/learning/classroom-join.functions";
-import { normalizeClassCode } from "@/domain/classroom-sessions";
+import { displayClassroomCode } from "@/domain/classroom-connect";
+import { getClassroomConnectCourseChoices } from "@/modules/learning/classroom-connect.functions";
+import { pairWithFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 
-export const Route = createFileRoute("/join/$code")({ component: JoinSessionPage });
+export const Route = createFileRoute("/join/$code")({ component: JoinClassroomByCode });
 
-const DEVICE_KEY_STORAGE = "classroom_device_key";
-
-function deviceKey(): string {
-  if (typeof window === "undefined") return "server-rendering";
-  let key = window.localStorage.getItem(DEVICE_KEY_STORAGE);
-  if (!key) {
-    key = crypto.randomUUID();
-    window.localStorage.setItem(DEVICE_KEY_STORAGE, key);
-  }
-  return key;
-}
-
-function JoinSessionPage() {
+function JoinClassroomByCode() {
   const { code } = Route.useParams();
-  const normalized = useMemo(() => normalizeClassCode(code), [code]);
-  const [joined, setJoined] = useState<null | { title: string }>(null);
-
-  const join = useMutation({
-    mutationFn: () => {
-      const device = deviceKey();
-      return joinClassroomSession({
-        data: {
-          code: normalized,
-          deviceKey: device,
-          // One idempotency key per device per code: retries and refreshes never
-          // create a duplicate participant or connection.
-          idempotencyKey: `${device}:${normalized}`,
-        },
-      });
-    },
-    onSuccess: result => setJoined({ title: result.title }),
+  const normalized = useMemo(() => {
+    try { return displayClassroomCode(code); } catch { return null; }
+  }, [code]);
+  const [paired, setPaired] = useState(false);
+  const courses = useQuery({
+    queryKey: ["classroom-connect-choices"],
+    queryFn: () => getClassroomConnectCourseChoices(),
+    enabled: !!normalized,
+    retry: false,
   });
-
-  const needsSignIn = join.isError && String(join.error).includes("authenticated");
-
-  return (
-    <WorkspaceShell width="reading" eyebrow="Classroom Connect"
-      title={joined ? `You're in: ${joined.title}` : `Join class ${normalized}`}
-      subtitle={joined
-        ? "You are connected to this classroom session. Your responses stay private to you."
-        : "Confirm to join the live classroom session on your device."}>
-      {joined ? (
-        <div className="space-y-4">
-          <p role="status">You are connected. Keep this page open during the class.</p>
-          <Button asChild variant="outline"><Link to="/">Go to my workspace</Link></Button>
-        </div>
-      ) : needsSignIn ? (
-        <div className="space-y-4">
-          <p role="alert">Sign in to join this classroom. You will come straight back here afterwards.</p>
-          <Button asChild>
-            <Link to="/access" search={{ returnTo: `/join/${normalized}` }}>Sign in</Link>
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            First time here? Ask your facilitator or site organizer to register your email;
-            you will then be able to sign in and join with this code.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          <Button onClick={() => join.mutate()} disabled={join.isPending}>
-            {join.isPending ? "Joining…" : "Join classroom"}
-          </Button>
-          {join.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              {String(join.error).includes("not valid")
-                ? "That class code is not valid or has expired. Check the classroom screen for the current code."
-                : "Unable to join right now. Please try again."}
-            </p>
-          )}
-        </div>
-      )}
-    </WorkspaceShell>
-  );
+  const join = useMutation({
+    mutationFn: (courseAttemptId: string) => pairWithFacilitatedRoom({
+      data: { courseAttemptId, pairingCode: normalized! },
+    }),
+    onSuccess: () => setPaired(true),
+  });
+  return <WorkspaceShell width="reading" eyebrow="Classroom Connect"
+    title={paired ? "Device paired" : "Join the facilitated classroom"}
+    subtitle="Only an active learner in the matching approved course can pair.">
+    {!normalized ? <div className="space-y-3">
+      <p role="alert">That pairing code is not in the expected format.</p>
+      <Button asChild variant="outline"><Link to="/join">Enter a different code</Link></Button>
+    </div> : paired ? <div className="space-y-4">
+      <p role="status">Your device is paired to the facilitator's room.</p>
+      <p className="text-sm text-muted-foreground">
+        Pairing does not mean you are marked present or have completed the course.
+      </p>
+      <Button asChild variant="outline"><Link to="/">Go to my workspace</Link></Button>
+    </div> : <div className="space-y-4">
+      <p className="font-mono text-2xl tracking-wider">{normalized}</p>
+      {courses.isPending && <p role="status">Checking your eligible course registrations…</p>}
+      {courses.isError && <div className="space-y-3">
+        <p role="alert">Your course registrations could not be verified. Sign in as an enrolled learner or ask your site facilitator for assistance. This feature may not be enabled yet.</p>
+        <Button asChild variant="outline"><Link to="/access" search={{ returnTo: "/join/" + code }}>Sign in</Link></Button>
+      </div>}
+      {courses.isSuccess && courses.data.choices.length === 0 && <p role="status">
+        No active authorized course attempts are available to this signed-in learner.
+        Ask the facilitator to confirm your registration.
+      </p>}
+      {courses.isSuccess && courses.data.choices.map(choice => <div key={choice.courseAttemptId}
+        className="flex flex-wrap items-center justify-between gap-3 border border-border p-4">
+        <span className="font-medium">{choice.courseTitle}</span>
+        <Button disabled={join.isPending} onClick={() => join.mutate(choice.courseAttemptId)}>
+          {join.isPending ? "Pairing…" : "Pair to this course"}
+        </Button>
+      </div>)}
+      {join.isError && <p role="alert" className="text-sm text-destructive">
+        Pairing was refused. Check the code, expiration, your enrollment and the facilitator's current room.
+      </p>}
+      <p className="text-sm text-muted-foreground">
+        The pairing code does not prove your identity or attendance. Only CAN OS verifies the selected course registration.
+      </p>
+      <Button asChild variant="outline"><Link to="/join">Use another code</Link></Button>
+    </div>}
+  </WorkspaceShell>;
 }

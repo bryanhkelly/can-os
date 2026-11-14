@@ -586,6 +586,7 @@ export const noncreditTrainingVersions = educationV30.table("noncredit_training_
   authorPersonId: uuid("author_person_id").notNull(),
   approvedByPersonId: uuid("approved_by_person_id"),
   assessmentVersionId: uuid("assessment_version_id"),
+  baselineAssessmentVersionId: uuid("baseline_assessment_version_id"),
 });
 
 export const noncreditRegistrations = educationV30.table("noncredit_registrations", {
@@ -598,6 +599,7 @@ export const noncreditRegistrations = educationV30.table("noncredit_registration
   learnerId: uuid("learner_id"),
   registeringOrganizationId: uuid("registering_organization_id").notNull(),
   registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
+  completionPolicyId: uuid("completion_policy_id"),
   status: text("status")
     .$type<"registered" | "active" | "completed" | "withdrawn" | "cancelled">()
     .notNull()

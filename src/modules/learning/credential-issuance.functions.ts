@@ -5,8 +5,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents, credentialDefinitions, credentialDefinitionVersions,
-  credentialIssuanceEvents, credentialIssuances, domainEvents, learnerAchievementDecisions,
+  auditEvents, learningAwardDefinitions, learningAwardDefinitionVersions,
+  learningAwardIssuanceEvents, learningAwardIssuances, domainEvents, learnerAchievementDecisions,
   noncreditCompletionCertificates, noncreditCompletionDecisions,
   noncreditRegistrations, noncreditTrainingVersions,
 } from "@/db/canonical-v301";
@@ -37,15 +37,15 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
 
     return db.transaction(async tx => {
       const [definition] = await tx.select({
-        versionId: credentialDefinitionVersions.id,
-        lifecycle: credentialDefinitionVersions.lifecycle,
-        definitionKind: credentialDefinitions.kind,
-        sourceKind: credentialDefinitions.sourceKind,
-        issuerOrganizationId: credentialDefinitions.issuerOrganizationId,
-      }).from(credentialDefinitionVersions)
-        .innerJoin(credentialDefinitions,
-          eq(credentialDefinitionVersions.definitionId, credentialDefinitions.id))
-        .where(eq(credentialDefinitionVersions.id, data.credentialDefinitionVersionId)).limit(1);
+        versionId: learningAwardDefinitionVersions.id,
+        lifecycle: learningAwardDefinitionVersions.lifecycle,
+        definitionKind: learningAwardDefinitions.kind,
+        sourceKind: learningAwardDefinitions.sourceKind,
+        issuerOrganizationId: learningAwardDefinitions.issuerOrganizationId,
+      }).from(learningAwardDefinitionVersions)
+        .innerJoin(learningAwardDefinitions,
+          eq(learningAwardDefinitionVersions.definitionId, learningAwardDefinitions.id))
+        .where(eq(learningAwardDefinitionVersions.id, data.credentialDefinitionVersionId)).limit(1);
 
       if (!definition || definition.lifecycle !== "published" ||
         definition.sourceKind !== "noncredit_completion" ||
@@ -90,33 +90,36 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
 
       const [existing] = await tx.select({
         awardId: learnerAchievementDecisions.id,
-        issuanceId: credentialIssuances.id,
-        reference: credentialIssuances.credentialReference,
-        legacyCertificateId: credentialIssuances.legacyNoncreditCertificateId,
+        issuanceId: learningAwardIssuances.id,
+        reference: learningAwardIssuances.credentialReference,
+        legacyCertificateId: learningAwardIssuances.legacyNoncreditCertificateId,
+        expiresAt: learningAwardIssuances.expiresAt,
       }).from(learnerAchievementDecisions)
-        .leftJoin(credentialIssuances,
-          eq(credentialIssuances.achievementDecisionId, learnerAchievementDecisions.id))
+        .leftJoin(learningAwardIssuances,
+          eq(learningAwardIssuances.achievementDecisionId, learnerAchievementDecisions.id))
         .where(and(
           eq(learnerAchievementDecisions.credentialDefinitionVersionId, definition.versionId),
           eq(learnerAchievementDecisions.noncreditCompletionDecisionId, completion.id),
         )).limit(1);
 
       if (existing?.issuanceId) {
-        const [revocation] = await tx.select({ id: credentialIssuanceEvents.id })
-          .from(credentialIssuanceEvents).where(and(
-            eq(credentialIssuanceEvents.issuanceId, existing.issuanceId),
-            eq(credentialIssuanceEvents.eventKind, "revoked"),
+        const [revocation] = await tx.select({ id: learningAwardIssuanceEvents.id })
+          .from(learningAwardIssuanceEvents).where(and(
+            eq(learningAwardIssuanceEvents.issuanceId, existing.issuanceId),
+            eq(learningAwardIssuanceEvents.eventKind, "revoked"),
           )).limit(1);
         const [legacy] = existing.legacyCertificateId
-          ? await tx.select({ status: noncreditCompletionCertificates.status })
+          ? await tx.select({ status: noncreditCompletionCertificates.status, certificateReference: noncreditCompletionCertificates.certificateReference })
             .from(noncreditCompletionCertificates)
             .where(eq(noncreditCompletionCertificates.id, existing.legacyCertificateId)).limit(1)
           : [];
         if (!credentialIsCurrent({
           issued: true, revoked: Boolean(revocation), sourceStillValid: true,
-          legacyCertificateRevoked: !!existing.legacyCertificateId && legacy?.status !== "issued",
+          legacyCertificateRevoked: !!existing.legacyCertificateId &&
+            (legacy?.status !== "issued" || legacy?.certificateReference !== existing.reference),
+          expiresAt: existing.expiresAt,
           now: new Date(),
-        })) throw new AuthorizationError("issued credential has been revoked");
+        })) throw new AuthorizationError("issued credential is no longer current");
         return { issuanceId: existing.issuanceId, credentialReference: existing.reference,
           kind: definition.definitionKind, alreadyIssued: true };
       }
@@ -130,7 +133,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
       }).returning({ id: learnerAchievementDecisions.id });
       if (!award) throw new Error("Unable to record achievement decision");
 
-      const credentialReference = `CAN-${randomUUID()}`;
+      let credentialReference = `CAN-${randomUUID()}`;
       let legacyCertificateId: string | null = null;
       if (definition.definitionKind === "completion_certificate") {
         const [priorCertificate] = await tx.select().from(noncreditCompletionCertificates)
@@ -140,6 +143,8 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
           throw new AuthorizationError("existing certificate is invalid");
         if (priorCertificate) {
           legacyCertificateId = priorCertificate.id;
+          // A reused canonical certificate is a single award with one reference.
+          credentialReference = priorCertificate.certificateReference;
         } else {
           const [certificate] = await tx.insert(noncreditCompletionCertificates).values({
             decisionId: completion.id,
@@ -153,13 +158,13 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         }
       }
 
-      const [issuance] = await tx.insert(credentialIssuances).values({
+      const [issuance] = await tx.insert(learningAwardIssuances).values({
         achievementDecisionId: award.id,
         issuerOrganizationId: definition.issuerOrganizationId,
         legacyNoncreditCertificateId: legacyCertificateId,
         issuedByPersonId: actor.actorPersonId,
         credentialReference,
-      }).returning({ id: credentialIssuances.id });
+      }).returning({ id: learningAwardIssuances.id });
       if (!issuance) throw new Error("Unable to record credential issuance");
 
       const payload = {

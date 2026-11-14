@@ -1218,3 +1218,27 @@ export async function readFormativePracticeHistory(
     return rows.map(row => ({ ...row, answers: answersByAttempt.get(row.id) ?? [] }));
   });
 }
+
+
+/**
+ * Reuse the same independent rights, publication-manifest, distribution-policy,
+ * reviewer and withdrawal guards for facilitator-operated room playback.
+ * The caller must separately establish current Site/room host authority.
+ */
+export async function assertFacilitatedInstructionalDelivery(
+  tx: TrackTransaction,
+  attempt: CourseAttempt,
+  trackVersionId: string,
+  lessonId: string,
+  assetVersionId: string,
+): Promise<void> {
+  const eligible = await assertTrackAvailable(
+    tx, attempt, trackVersionId, "learner", "delivery", null,
+  );
+  if (!eligible.presentations.some(presentation =>
+    presentation.courseLessonId === lessonId &&
+    presentation.assetVersionId === assetVersionId
+  )) {
+    throw new AuthorizationError("approved room presentation");
+  }
+}

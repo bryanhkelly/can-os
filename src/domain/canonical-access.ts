@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { AuthorizationError, type CommandContext } from "./command-context";
 
-export const canonicalAccessRoles = ["site_admin", "registrar", "blueprint_reviewer", "learner"] as const;
+export const canonicalAccessRoles = ["site_admin", "registrar", "blueprint_reviewer", "survey_reviewer", "learner", "room_facilitator"] as const;
 
 export const canonicalSessionRowSchema = z.object({
   account_id: z.string().uuid(),
@@ -20,20 +20,24 @@ export const canonicalAuthReaderDatabaseRole = "can_v30_canonical_auth_reader";
 
 /** Authority comes from a current native session, never user-submitted roles. */
 export function projectCanonicalCommandContext(row: CanonicalSessionRow): CommandContext {
-  if (row.role_code === "blueprint_reviewer" && row.site_id !== null) {
+  if (["blueprint_reviewer", "survey_reviewer"].includes(row.role_code) && row.site_id !== null) {
     throw new AuthorizationError("organization-only independent reviewer");
   }
   if (row.role_code === "learner" && row.site_id !== null) {
     throw new AuthorizationError("organization-scoped learner");
   }
-  if (["site_admin", "registrar"].includes(row.role_code) && !row.site_id) {
+  if (["site_admin", "registrar", "room_facilitator"].includes(row.role_code) && !row.site_id) {
     throw new AuthorizationError("canonical Site-scoped administrator");
   }
-  const capabilities = row.role_code === "learner"
+  const capabilities = row.role_code === "room_facilitator"
+    ? ["learning.room.facilitate"]
+    : row.role_code === "learner"
     ? ["learning.participate", "learning.progress", "learning.survey.respond"]
     : row.role_code === "blueprint_reviewer"
       ? ["blueprint.read", "blueprint.review"]
-      : ["blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start", "noncredit.completion.decide", "noncredit.assessment.finalize", "noncredit.assessment.provision"];
+      : row.role_code === "survey_reviewer"
+        ? ["survey.review"]
+      : ["learning.room.facilitate", "blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start", "noncredit.completion.decide", "noncredit.assessment.finalize", "noncredit.assessment.provision", "credential.issue", "survey.draft.create", "survey.publish"];
   return {
     actorPersonId: row.person_id,
     role: row.role_code,

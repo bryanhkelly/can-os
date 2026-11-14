@@ -16,6 +16,7 @@ export type NoncreditParticipationEvidence = {
   supersedesId: string | null;
   eventKind: "lesson_completed" | "session_attended" | "skill_practiced" | "activity_completed" | "attendance_corrected";
   countedMinutes: number;
+  occurredAt: Date;
   evidenceVersionId: string | null;
 };
 export type NoncreditAssessmentEvidence = {
@@ -67,7 +68,8 @@ export function evaluateNoncreditCompletion(input: {
   const countedMinutes = input.participation.reduce((sum, event) => {
     if (superseded.has(event.id) || event.eventKind === "attendance_corrected" ||
         !event.evidenceVersionId || !Number.isSafeInteger(event.countedMinutes) ||
-        event.countedMinutes < 0) return sum;
+        event.countedMinutes < 0 || !Number.isFinite(event.occurredAt.getTime()) ||
+        event.occurredAt > input.now) return sum;
     return sum + event.countedMinutes;
   }, 0);
   if (p && countedMinutes < p.minParticipationMinutes) blockers.push("participation_incomplete");

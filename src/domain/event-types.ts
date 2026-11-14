@@ -247,10 +247,6 @@ export const EventTypes = {
   StudyGroupSessionCancelled: "StudyGroupSessionCancelled",
   DemoRegistrarProvisioned: "DemoRegistrarProvisioned",
   DemoFacilitatorProvisioned: "DemoFacilitatorProvisioned",
-  ClassroomSessionOpened: "ClassroomSessionOpened",
-  ClassroomSessionEnded: "ClassroomSessionEnded",
-  ClassroomJoinCodeRotated: "ClassroomJoinCodeRotated",
-  ClassroomSessionJoined: "ClassroomSessionJoined",
 } as const;
 
 export type EventType = (typeof EventTypes)[keyof typeof EventTypes];
