@@ -221,17 +221,26 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   }
 
   async function submit() {
-    if (!detail) return;
+    if (!detail || !selectedTemplate || !workspace?.canConfigure || detail.lifecycle !== "draft") return;
     setBusy(true);
     setError(null);
     setMessage(null);
     try {
+      // Submit what the author actually sees. A previously saved draft may not
+      // include edits made since it was opened. Save first using optimistic
+      // revision control; the service reuses an identical draft revision.
+      const saved = await saveCanonicalBlueprintConfiguration({ data: {
+        configurationId: detail.configurationId,
+        versionId: crypto.randomUUID(),
+        expectedRevision: detail.revision,
+        version: versionInput(selectedTemplate, detail),
+      } });
       await submitCanonicalBlueprintConfiguration({
-        data: { configurationId: detail.configurationId, expectedRevision: detail.revision },
+        data: { configurationId: detail.configurationId, expectedRevision: saved.revision },
       });
       await openConfiguration(detail.configurationId);
       await reload();
-      setMessage("Blueprint submitted for independent review. No program has been authorized.");
+      setMessage("Current Blueprint changes saved and submitted for independent review. No program has been authorized.");
     } catch (caught) {
       setError(normalizeClientError(caught, "Blueprint submission failed.").message);
     } finally {
