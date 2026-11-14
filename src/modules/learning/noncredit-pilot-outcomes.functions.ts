@@ -42,6 +42,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const trainings=await db.select({
       id:noncreditTrainingVersions.id,title:noncreditTrainingVersions.title,
       finalAssessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
+      baselineAssessmentVersionId:noncreditTrainingVersions.baselineAssessmentVersionId,
     }).from(noncreditTrainingVersions)
       .where(eq(noncreditTrainingVersions.providerOrganizationId,organizationId))
       .orderBy(asc(noncreditTrainingVersions.title));
@@ -175,10 +176,27 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       const training=trainingById.get(reg.trainingVersionId);
       const finalCheck=ownChecks.filter(c=>adminById.get(c.administrationId)?.assessmentVersionId===
         training?.finalAssessmentVersionId);
+      const baselineCheck=ownChecks.filter(c=>!!training?.baselineAssessmentVersionId &&
+        adminById.get(c.administrationId)?.assessmentVersionId===
+          training.baselineAssessmentVersionId);
       const finalCheckIds=new Set(finalCheck.map(c=>c.id));
       const finalResults=latestResults.filter(r=>finalCheckIds.has(r.attemptId) &&
         Number(r.possible)>0).sort((a,b)=>Number(b.earned)/Number(b.possible)-
                                                  Number(a.earned)/Number(a.possible));
+      // Learning gain uses the first finalized baseline and first finalized
+      // post-check in time order, never the learner's best retake.
+      const checkById=new Map(ownChecks.map(c=>[c.id,c]));
+      const firstFinal=finalResults.filter(r=>checkById.get(r.attemptId)?.submittedAt)
+        .sort((a,b)=>checkById.get(a.attemptId)!.submittedAt!.getTime()-
+                     checkById.get(b.attemptId)!.submittedAt!.getTime())[0];
+      const firstBaseline=latestResults.filter(r=>
+        baselineCheck.some(check=>check.id===r.attemptId) &&
+        Number(r.possible)>0 && checkById.get(r.attemptId)?.submittedAt)
+        .sort((a,b)=>checkById.get(a.attemptId)!.submittedAt!.getTime()-
+                     checkById.get(b.attemptId)!.submittedAt!.getTime())[0];
+      const paired=!!firstBaseline&&!!firstFinal&&
+        checkById.get(firstBaseline.attemptId)!.submittedAt!<
+        checkById.get(firstFinal.attemptId)!.submittedAt!;
       const passed=finalResults.find(r=>r.outcome==="pass");
       const currentDecision=currentDecisions.find(d=>d.registrationId===reg.id);
       const surveyKey=reg.deploymentId+":"+reg.participantPersonId;
@@ -192,8 +210,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         knowledgeResult:passed?"pass":finalResults[0]?.outcome??null,
         surveySubmitted:registrationCounts.get(surveyKey)===1&&surveyedKeys.has(surveyKey),
         completionRecorded:currentDecision?.outcome==="completed",
-        baselineFraction:null,
-        finalFraction:finalResults[0]?Number(finalResults[0].earned)/Number(finalResults[0].possible):null,
+        baselineFraction:paired?Number(firstBaseline.earned)/Number(firstBaseline.possible):null,
+        finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
       };
     });
     const byTraining=trainings.map(t=>{
