@@ -1,7 +1,14 @@
+import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RecordedInstructorWorkspace, RecordedInstructorChoices, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
+import { RecordedInstructorWorkspace, RecordedInstructorChoices, RecordedOfficialCourseLinks, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
 
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({ to, search, children, className }: {
+    to: string; search?: Record<string, string>; children: ReactNode; className?: string;
+  }) => <a href={to + (search ? "?" + new URLSearchParams(search).toString() : "")}
+    className={className}>{children}</a>,
+}));
 vi.mock("@/modules/learning/instructional-tracks.functions", () => ({
   getStudentRecordedInstructors: vi.fn(),
   getRecordedLessonInstruction: vi.fn(),
@@ -22,6 +29,18 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Loading recorded instruction");
     expect(html).not.toContain("Save practice");
   });
+  it("keeps class lessons, assignments and grades linked to one canonical Section", () => {
+    const html = renderToStaticMarkup(
+      <RecordedOfficialCourseLinks sectionId="a1000000-0000-4000-8000-000000000123"/>,
+    );
+    expect(html).toContain("Official class lessons");
+    expect(html).toContain("Assignments and feedback");
+    expect(html).toContain("Grades");
+    expect(html).toContain("/classes?section=a1000000-0000-4000-8000-000000000123&amp;tab=lessons");
+    expect(html).toContain("/student/assignments?section=a1000000-0000-4000-8000-000000000123");
+    expect(html).toContain("/student/courses?section=a1000000-0000-4000-8000-000000000123&amp;tab=grades");
+  });
+
   it("retains separately labeled practice from both recorded instructors", () => {
     const html = renderToStaticMarkup(<RecordedPracticeHistory history={[
       {
