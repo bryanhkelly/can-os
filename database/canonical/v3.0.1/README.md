@@ -4,9 +4,9 @@
 identity/session principals, role grants and demo data must be created directly
 in the canonical model. No legacy identity mapping tables, cross-schema record
 bridges, historical-data migration or reliance on existing demo account/Site
-identifiers. Until native canonical sign-in, session, permissions and Site
-selection are implemented and verified, keep the canonical Studio write flag
-disabled. Existing app session code does not establish canonical identity.
+identifiers. Native canonical sign-in, session scope, PostgreSQL permissions and Site selection
+are enforced directly for Blueprint actions. Existing app session code does
+not establish canonical identity.
 
 ### Canonical Blueprint authoring, review, and execution roles
 
@@ -137,10 +137,11 @@ Use `/canonical/blueprints` for the native v3 planning experience and
 not mount canonical widgets because its identifiers come from a separate
 application model. No mappings or compatibility tables are required.
 
-**Keep `CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED=false` in deployment.**
-Native authentication and the isolated seed do not by themselves provision
-Blueprint read/write RLS or establish the production sign-in/verification
-workflow. These remain required before enabling the routes for real users.
+The Blueprint endpoints have no global write feature switch. They require
+native authenticated sessions, restricted database roles and authorized
+Blueprint lifecycle transitions. Provision the canonical database and its
+roles before exposing the routes to real users. Acceptance testing remains
+required before release.
 
 `schema.sql` is a fresh-build target for PostgreSQL 16 or newer. It owns the
 `education_v30` and `education_v30_secure` schemas; it is not an additive
@@ -321,8 +322,8 @@ expiry, revocation, supersession, and override tests.
 
 ## Canonical Blueprint Studio integration
 
-The School Launch Academics module can mount `CanonicalBlueprintWorkspace`
-behind `CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED=true` (off by default). Its
+The dedicated canonical Blueprint author route mounts `CanonicalBlueprintWorkspace`
+using native canonical authentication and explicit Site selection. Its
 Organization-owned configuration is tied to a chosen canonical Site in the
 version's `config.siteId` planning context. A verified Site operator may
 create a draft from a published recipe, select required or optional components,
