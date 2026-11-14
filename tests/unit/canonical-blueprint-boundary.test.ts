@@ -93,6 +93,8 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(runner).toContain('process.env.APP_ENV !== "test"');
     expect(runner).toContain("assertIsolatedTestDatabaseTarget");
     expect(runner).toContain("CAN_CANONICAL_TEST_APP_DATABASE_URL");
+    expect(runner).toContain("blueprint_policies_ready");
+    expect(runner).toContain("blueprint_rls_ready");
     expect(runner).toContain('await q("ROLLBACK")');
     expect(runner).toContain("blueprint_component_approval_decisions");
     expect(runner).toContain("deployment_offering_adoptions");
