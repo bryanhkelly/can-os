@@ -202,12 +202,27 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
       </div>}
     </>}
 
-    {history.length > 0 && <div className="border bg-card p-4">
-      <h3 className="font-semibold">Practice history</h3>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {history.length} saved practice {history.length === 1 ? "attempt" : "attempts"} across
-        recorded instructors. Switching teachers does not erase this history.
-      </p>
-    </div>}
+    {history.length > 0 && <RecordedPracticeHistory history={history}/>}
+  </section>;
+}
+
+export function RecordedPracticeHistory({ history }: { history: PracticeHistory }) {
+  return <section aria-label="Practice history" className="border bg-card p-4">
+    <h3 className="font-semibold">Practice history</h3>
+    <p className="mt-1 text-sm text-muted-foreground">
+      {history.length} saved practice {history.length === 1 ? "attempt" : "attempts"}.
+      Switching teachers does not erase this history or change official grades.
+    </p>
+    <ol className="mt-3 divide-y">
+      {history.map(attempt => <li key={attempt.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
+        <span>
+          <strong>{attempt.courseUnitTitle ?? "Course unit"}</strong>
+          <span className="ml-2 text-muted-foreground">· {attempt.trackTitle ?? "Recorded teacher"}</span>
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {new Date(attempt.recordedAt).toISOString().slice(0, 10)}
+        </span>
+      </li>)}
+    </ol>
   </section>;
 }
