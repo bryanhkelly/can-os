@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { normalizeClientError } from "@/lib/client-error";
-import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent } from "@/domain/instructional-tracks";
+import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
   completeRecordedCourseLesson,
   getRecordedInstructorPracticeHistory,
@@ -46,11 +46,9 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
     setCatalog(nextCatalog);
     setInstruction(nextInstruction);
     setHistory(nextHistory);
-    setLessonId(previous => nextInstruction?.lessons.some(lesson => lesson.id === previous)
-      ? previous
-      : nextInstruction?.lessons.find(lesson => lesson.progress?.status !== "completed")?.id
-        ?? nextInstruction?.lessons[0]?.id
-        ?? null);
+    setLessonId(previous => nextInstruction
+      ? resumeRecordedLessonId(nextInstruction.lessons, previous)
+      : null);
   }, [courseAttemptId]);
 
   useEffect(() => {
@@ -76,7 +74,6 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         expectedRevision: catalog.selection?.revision ?? 0,
       } });
       setAnswers({});
-      setLessonId(null);
       await reload();
       setNotice("Recorded instructor updated. Your course progress and practice history are preserved.");
     } catch (failure) {
