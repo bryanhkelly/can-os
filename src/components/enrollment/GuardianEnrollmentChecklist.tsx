@@ -27,7 +27,8 @@ function GuardianEnrollmentChecklistView({ applicationId, protectUnsaved }: { ap
   });
   // Storage availability is independent so an outage cannot block forms.
   const availabilityQuery = useQuery(enrollmentDocumentUploadAvailabilityQuery());
-  const data = checklistQuery.data;
+  // A failed revalidation must not leave a previously cached private enrollment checklist visible.
+  const data = checklistQuery.isError ? undefined : checklistQuery.data;
   const availability = availabilityQuery.data;
   const [error, setError] = useState("");
   const [files, setFiles] = useState<Record<string, File | null>>({});
