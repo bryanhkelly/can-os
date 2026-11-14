@@ -15,7 +15,7 @@ import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/bluepr
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
 import { blueprintEditorialIdentityKeys } from "@/domain/blueprint-configuration";
-import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
+import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 import { BlueprintOfferingAdoptionPicker, type BlueprintOfferingIntent } from "./BlueprintOfferingAdoptionPicker";
 
@@ -85,7 +85,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       return;
     }
     let cancelled = false;
-    void exploreBlueprintReferenceCatalog({ data: { siteId } })
+    void exploreCanonicalBlueprintReferences({ data: { siteId } })
       .then(items => { if (!cancelled) setReferenceCatalog(items); })
       .catch(() => { if (!cancelled) setReferenceCatalog([]); });
     return () => { cancelled = true; };
