@@ -38,10 +38,10 @@ export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
 }
 
 function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard" }: ClassVideoPlayerProps) {
-  const initialVideo = !loadUrl && url ? resolveClassVideo(url, declaredVideo) : null;
-  const [source, setSource] = useState<string | null>(
-    presentation === "classroom" && initialVideo?.kind === "file" ? url ?? null : null,
-  );
+  // Do not fetch third-party media or private signed URLs during SSR or on
+  // initial navigation. Even preload="metadata" initiates a network request.
+  // All formats, including direct MP4/WebM, require a deliberate Play action.
+  const [source, setSource] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);

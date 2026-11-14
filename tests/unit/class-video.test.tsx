@@ -69,6 +69,25 @@ describe("linked class video", () => {
     });
     expect(first.key).toBe(same.key);
   });
+  it("requires explicit playback even for classroom-stage direct MP4 and private videos", () => {
+    for (const props of [
+      { title: "Direct class recording", url: "https://media.example.test/unit-1.mp4", presentation: "classroom" as const },
+      { title: "Signed class recording", url: "https://media.example.test/object?token=private", declaredVideo: true, presentation: "classroom" as const },
+      { title: "WebM class recording", url: "https://media.example.test/unit-2.webm", presentation: "classroom" as const },
+      { title: "YouTube class recording", url: "https://youtube.com/watch?v=abcdefghijk", presentation: "classroom" as const },
+    ]) {
+      const html = renderToStaticMarkup(<ClassVideoPlayer {...props}/>);
+      expect(html).toContain("Play video");
+      expect(html).not.toContain("<video");
+      expect(html).not.toContain("<iframe");
+    }
+    const privateHtml = renderToStaticMarkup(
+      <ClassVideoPlayer title="Private recorded lesson" presentation="classroom"
+        loadUrl={async () => "https://media.example.test/private?signature=secret"}/>,
+    );
+    expect(privateHtml).not.toContain("signature=secret");
+    expect(privateHtml).toContain("Play video");
+  });
   it("does not load third-party frames or media before explicit playback", () => {
     const markup = renderToStaticMarkup(<ClassVideoPlayer title="Lesson video" url="https://youtu.be/abcdefghijk"/>);
     expect(markup).toContain("Play video");
