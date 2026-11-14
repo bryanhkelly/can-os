@@ -83,6 +83,23 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
     }
   }
 
+  async function openTrackResource(assetVersionId: string) {
+    if (pending) return;
+    setPending(true);
+    setError("");
+    try {
+      const resource = await getRecordedInstructionAssetDownload({ data: {
+        courseAttemptId,
+        assetVersionId,
+      } });
+      window.location.assign(resource.downloadUrl);
+    } catch (failure) {
+      setError(normalizeClientError(failure, "Unable to open instructional resource.").message);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function savePractice(material: NonNullable<SelectedInstruction>["materials"][number]) {
     if (!instruction || !catalog?.selection || !material.practice || pending) return;
     setPending(true);
@@ -117,6 +134,11 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
     material.materialKind === "practice" &&
     material.courseUnitId === currentLesson?.courseUnitId &&
     material.practice !== null
+  ) ?? [];
+  const currentResources = instruction?.materials.filter(material =>
+    material.materialKind !== "practice" &&
+    material.courseUnitId === currentLesson?.courseUnitId &&
+    material.assetVersionId !== null
   ) ?? [];
   const completedCount = instruction?.lessons.filter(
     lesson => lesson.progress?.status === "completed",
@@ -176,6 +198,18 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         ) : <p className="text-sm text-muted-foreground">
           This teacher does not have a recording for the selected lesson.
         </p>}
+
+        {currentResources.length > 0 && <div className="space-y-2 border bg-card p-4">
+          <h4 className="font-semibold">Instructional resources</h4>
+          <ul className="space-y-2">
+            {currentResources.map(resource => <li key={resource.id}>
+              <Button size="sm" variant="outline" disabled={pending}
+                onClick={() => resource.assetVersionId && void openTrackResource(resource.assetVersionId)}>
+                Open {resource.materialKind === "reference" ? "reference" : "instruction"} resource
+              </Button>
+            </li>)}
+          </ul>
+        </div>}
 
         {currentPractice.map(material => <form key={material.id} className="space-y-3 border bg-card p-4"
           onSubmit={event => { event.preventDefault(); void savePractice(material); }}>
