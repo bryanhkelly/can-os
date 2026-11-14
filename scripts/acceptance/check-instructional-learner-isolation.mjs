@@ -99,6 +99,7 @@ async function run() {
 
     const own = [];
     const selectedTracks = [];
+    const ownPracticeIds = [];
     for (let i=0; i<2; i++) {
       const other = 1-i;
       const client = clients[i];
@@ -134,6 +135,7 @@ async function run() {
         "education_v30.formative_practice_attempts", "id", attempts[other]);
       assert(ownPractice.length >= 1 && otherPractice.length === 0,
         "Practice history must stay learner-private.");
+      ownPracticeIds.push(ownPractice[0].id);
 
       const { rows: ownAnswers } = await client.query(`
         SELECT r.practice_attempt_id
@@ -152,7 +154,20 @@ async function run() {
       "Both learners must belong to the same canonical Section and Course version.");
     assert(selectedTracks[0] !== selectedTracks[1],
       "The two learners must be independently using different recorded instructors.");
-    console.log("PASS: same Section, different recorded instructors, isolated progress and practice.");
+
+    // Verify the private response table itself rejects a known other-learner
+    // practice ID, even when an ID is presented directly to the query.
+    for (let i=0; i<2; i++) {
+      const otherPracticeId = ownPracticeIds[1-i];
+      const { rows: exposedResponses } = await clients[i].query(`
+        SELECT practice_attempt_id
+        FROM education_v30_secure.formative_practice_responses
+        WHERE practice_attempt_id=$1
+      `, [otherPracticeId]);
+      assert(exposedResponses.length === 0,
+        "A learner must not read another learner's saved practice answers.");
+    }
+    console.log("PASS: same Section, different instructors, isolated progress, practice and answers.");
   } finally {
     for (const client of clients) {
       await client.query("ROLLBACK").catch(() => undefined);
