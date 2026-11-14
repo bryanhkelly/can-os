@@ -284,6 +284,74 @@ async function main() {
         ($1, $2, 'operator', $4),
         ($3, $5, 'operator', $4)
     `, [authorizedSiteId, catalogOrganizationId, otherSiteId, relationshipStart, otherOrganizationId]);
+    // Native v3 account, grant, Site and bearer-session smoke test.
+    const canonicalPersonId = randomUUID();
+    const canonicalAccountId = randomUUID();
+    const canonicalGrantId = randomUUID();
+    const canonicalSessionHash = "a".repeat(64);
+    await client.query(`
+      INSERT INTO education_v30.persons (id,preferred_name)
+      VALUES ($1,'Canonical test administrator')
+    `, [canonicalPersonId]);
+    await client.query(`
+      INSERT INTO education_v30.canonical_accounts (id,email_normalized,email_verified_at)
+      VALUES ($1,$2,clock_timestamp())
+    `, [canonicalAccountId, `canonical-${randomUUID()}@example.test`]);
+    await client.query(`
+      INSERT INTO education_v30.canonical_account_grants (
+        id,account_id,person_id,organization_id,site_id,role_code
+      ) VALUES ($1,$2,$3,$4,$5,'site_admin')
+    `, [canonicalGrantId, canonicalAccountId, canonicalPersonId,
+      catalogOrganizationId, authorizedSiteId]);
+    await client.query(`
+      INSERT INTO education_v30.canonical_sessions (
+        account_id,active_grant_id,secret_hash,expires_at
+      ) VALUES ($1,$2,$3,clock_timestamp()+interval '12 hours')
+    `, [canonicalAccountId, canonicalGrantId, canonicalSessionHash]);
+    await client.query(`
+      CREATE ROLE can_v30_canonical_auth_reader
+       NOLOGIN NOINHERIT NOBYPASSRLS NOCREATEDB NOCREATEROLE
+    `);
+    await client.query(`
+      GRANT USAGE ON SCHEMA education_v30 TO can_v30_canonical_auth_reader
+    `);
+    await client.query(`
+      GRANT EXECUTE ON FUNCTION education_v30.v301_canonical_session_context(text)
+      TO can_v30_canonical_auth_reader
+    `);
+    await client.query("GRANT can_v30_canonical_auth_reader TO CURRENT_USER");
+    await client.query("SET LOCAL ROLE can_v30_canonical_auth_reader");
+    const canonicalSessionResult = await client.query(`
+      SELECT person_id,organization_id,site_id,role_code
+      FROM education_v30.v301_canonical_session_context($1)
+    `, [canonicalSessionHash]);
+    if (canonicalSessionResult.rows.length !== 1 ||
+      canonicalSessionResult.rows[0].person_id !== canonicalPersonId ||
+      canonicalSessionResult.rows[0].organization_id !== catalogOrganizationId ||
+      canonicalSessionResult.rows[0].site_id !== authorizedSiteId ||
+      canonicalSessionResult.rows[0].role_code !== "site_admin") {
+      throw new Error("Native v3 session did not resolve exactly one scoped Person and Site.");
+    }
+    await expectQueryDenied(
+      client, "canonical_raw_sessions_denied",
+      "SELECT secret_hash FROM education_v30.canonical_sessions LIMIT 1",
+      [], "42501",
+    );
+    await client.query("RESET ROLE");
+    await client.query(`
+      UPDATE education_v30.canonical_sessions
+      SET revoked_at=clock_timestamp() WHERE secret_hash=$1
+    `, [canonicalSessionHash]);
+    await client.query("SET LOCAL ROLE can_v30_canonical_auth_reader");
+    const revokedNativeSession = await client.query(`
+      SELECT count(*)::integer AS remaining
+      FROM education_v30.v301_canonical_session_context($1)
+    `, [canonicalSessionHash]);
+    if (revokedNativeSession.rows[0].remaining !== 0) {
+      throw new Error("Revoked canonical sessions must not resolve an identity.");
+    }
+    await client.query("RESET ROLE");
+
     await client.query(`
       INSERT INTO education_v30.site_publication_bindings (
         site_id, public_slug, status, published_at
