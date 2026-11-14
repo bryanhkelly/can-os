@@ -143,7 +143,6 @@ jobs:
         with:
           openai-api-key: ${{ secrets.OPENAI_API_KEY }}
           permission-profile: ':workspace'
-          output-file: ${{ runner.temp }}/codex-final.md
           prompt: |
             You are diagnosing on-demand Playwright failures for CAN OS.
             Read AGENTS.md, docs/README.md, and evidence/live-test.log and any relevant trace files.
