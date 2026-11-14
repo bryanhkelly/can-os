@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_sessions (
   course_attempt_id uuid NOT NULL REFERENCES education_v30.learner_course_attempts(id) ON DELETE RESTRICT,
   course_version_id uuid NOT NULL REFERENCES education_v30.course_versions(id) ON DELETE RESTRICT,
   access_session_id uuid NOT NULL,
+  client_instance_id uuid NOT NULL,
   participant_person_id uuid NOT NULL,
   state text NOT NULL DEFAULT 'active' CHECK (state IN ('active','paused','ended')),
   started_at timestamptz NOT NULL DEFAULT now(),
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_sessions (
 CREATE INDEX IF NOT EXISTS canonical_learning_sessions_attempt_idx
   ON education_v30.learning_sessions (course_attempt_id, started_at);
 CREATE UNIQUE INDEX IF NOT EXISTS canonical_learning_sessions_live_idx
-  ON education_v30.learning_sessions (course_attempt_id, access_session_id) WHERE ended_at IS NULL;
+  ON education_v30.learning_sessions (course_attempt_id, access_session_id, client_instance_id) WHERE ended_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS education_v30.learning_session_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
