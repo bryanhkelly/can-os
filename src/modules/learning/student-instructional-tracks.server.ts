@@ -631,6 +631,7 @@ export async function readSelectedInstructionalTrack(
 ): Promise<{
   courseAttemptId: string;
   courseVersionId: string;
+  sectionId: string | null;
   selection: {
     id: string;
     trackVersionId: string;
@@ -719,6 +720,7 @@ export async function readSelectedInstructionalTrack(
     return {
       courseAttemptId: attempt.id,
       courseVersionId: attempt.courseVersionId,
+      sectionId: attempt.sectionId,
       selection: {
         id: selection.id,
         trackVersionId: selection.trackVersionId,
