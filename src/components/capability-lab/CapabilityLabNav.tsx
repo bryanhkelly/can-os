@@ -4,8 +4,10 @@ const linkClass = "inline-flex min-h-10 items-center border-b-2 px-3 text-sm fon
 const currentClass = "border-primary text-primary";
 const inactiveClass = "border-transparent text-muted-foreground hover:text-foreground";
 
-export function CapabilityLabNav({ current }: {
-  current: "index" | "noncredit" | "surveys" | "credentials" | "deployments" | "readiness" | "site-qualification";
+export function CapabilityLabNav({ current, surveyDraftEnabled = false, surveyPublicationEnabled = false }: {
+  current: "index" | "noncredit" | "surveys" | "credentials" | "deployments" | "readiness" | "site-qualification" | "survey-drafts" | "survey-publications" | "facilitated" | "impact";
+  surveyDraftEnabled?: boolean;
+  surveyPublicationEnabled?: boolean;
 }) {
   return <nav aria-label="Capability Lab sections" className="mt-5 flex flex-wrap gap-2 border-b border-border">
     <Link to="/canonical/capability-lab" aria-current={current === "index" ? "page" : undefined}
@@ -24,6 +26,11 @@ export function CapabilityLabNav({ current }: {
       className={linkClass + " " + (current === "noncredit" ? currentClass : inactiveClass)}>Noncredit testing</Link>
     <Link to="/canonical/lab/credentials" aria-current={current === "credentials" ? "page" : undefined}
       className={linkClass + " " + (current === "credentials" ? currentClass : inactiveClass)}>Credential previews</Link>
+    {(surveyDraftEnabled || current === "survey-drafts") && <Link to="/canonical/lab/survey-drafts" aria-current={current === "survey-drafts" ? "page" : undefined}
+      className={linkClass + " " + (current === "survey-drafts" ? currentClass : inactiveClass)}>Survey drafts</Link>}
+    {(surveyPublicationEnabled || current === "survey-publications") && <Link to="/canonical/lab/survey-publications"
+      aria-current={current === "survey-publications" ? "page" : undefined}
+      className={linkClass + " " + (current === "survey-publications" ? currentClass : inactiveClass)}>Survey publication</Link>}
     <Link to="/canonical/lab/surveys" aria-current={current === "surveys" ? "page" : undefined}
       className={linkClass + " " + (current === "surveys" ? currentClass : inactiveClass)}>Survey inspection</Link>
   </nav>;
