@@ -119,6 +119,64 @@ for (const persona of ["student", "guardian", "teacher"] as const) {
 
 
 /**
+ * Parent P0 acceptance uses the real, independently scoped synthetic guardian
+ * session and fixture. These routes were previously missing from the browser
+ * sweep, so primary navigation alone could pass while parent loaders failed.
+ * No real family data or production deployment is involved.
+ */
+const guardianP0Destinations = [
+  { route: "/guardian/students", heading: "Academic progress" },
+  { route: "/classes", heading: "Your family's classes" },
+  { route: "/guardian/report-cards", heading: "Report card" },
+  { route: "/messages", heading: "Messages" },
+  { route: "/notifications", heading: "Notifications" },
+  { route: "/guardian/attendance", heading: "Attendance & excuses" },
+  { route: "/guardian/experiences", heading: "E2E Campus" },
+  { route: "/calendar", heading: "Calendar" },
+] as const;
+
+for (const destination of guardianP0Destinations) {
+  test(`guardian P0 route ${destination.route} loads with verified family access`, async ({ browser }) => {
+    const secret = roleSecrets.guardian;
+    if (!secret) throw new Error("Missing synthetic guardian session.");
+    await withAuthenticatedPage(browser, secret, async ({ page }) => {
+      const errors: string[] = [];
+      page.on("pageerror", error => errors.push(error.message));
+      await expectWorkspaceRoute(page, destination.route, destination.heading);
+      await expect(page.getByRole("main")).not.toContainText(
+        /Sign in with an authorized|You do not have permission to view|Unable to load your workspace/i,
+      );
+      expect(errors).toEqual([]);
+    });
+  });
+}
+
+test("guardian home links to academic, communication, attendance, safety and conference workflows", async ({ browser }) => {
+  const secret = roleSecrets.guardian;
+  if (!secret || !fixture) throw new Error("Missing guardian P0 fixture.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.goto("/home");
+    await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Family quick links" })).toBeVisible();
+    const links = [
+      "/guardian/experiences",
+      "/guardian/attendance",
+      "/guardian/report-cards",
+      "/guardian/field-trips",
+      "/guardian/health",
+    ] as const;
+    for (const route of links) {
+      await expect(page.locator('nav[aria-label="Family quick links"] a[href^="' + route + '"]').first()).toBeVisible();
+    }
+    await expect(page.getByRole("link", { name: "Official records and credentials" })).toBeVisible();
+    await expectWorkspaceShell(page);
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
  * Every student-facing destination must resolve under a real, scoped student
  * session. A home-page smoke test alone misses failures in secondary loaders,
  * shared student services, and legacy links.
