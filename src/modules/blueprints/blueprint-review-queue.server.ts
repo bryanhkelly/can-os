@@ -4,6 +4,13 @@ import {
   auditEvents,
   blueprintComponents,
   blueprintConfigurationComponents,
+  blueprintConfigurationComponentReferences,
+  blueprintConfigurationLocalExperiences,
+  blueprintConfigurationOfferingIntents,
+  blueprintReferenceItemVersions,
+  blueprintReferenceItems,
+  offeringVersions,
+  offerings,
   blueprintConfigurations,
   blueprintConfigurationVersions,
   blueprints,
@@ -30,6 +37,9 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
       versionId: blueprintConfigurationVersions.id,
       revision: blueprintConfigurationVersions.revision,
       lifecycle: blueprintConfigurationVersions.lifecycle,
+      config: blueprintConfigurationVersions.config,
+      religiousAffiliationCode: blueprintConfigurationVersions.religiousAffiliationCode,
+      editorialIdentity: blueprintConfigurationVersions.editorialIdentity,
     }).from(blueprintConfigurations)
       .innerJoin(blueprints, eq(blueprints.id, blueprintConfigurations.blueprintId))
       .innerJoin(blueprintConfigurationVersions,
@@ -47,7 +57,7 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
 
     const versionIds = pending.map(version => version.versionId);
     const configurationIds = pending.map(version => version.configurationId);
-    const [reviews, components, authors] = await Promise.all([
+    const [reviews, components, authors, references, offeringIntents, localExperiences] = await Promise.all([
       tx.select({
         versionId: configurationReviews.configurationVersionId,
         decision: configurationReviews.decision,
@@ -79,6 +89,41 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
           "blueprint.configuration.submitted",
         ]),
       )),
+      tx.select({
+        versionId: blueprintConfigurationComponentReferences.configurationVersionId,
+        componentId: blueprintConfigurationComponentReferences.componentId,
+        title: blueprintReferenceItemVersions.title,
+        kind: blueprintReferenceItems.referenceKind,
+        summary: blueprintReferenceItemVersions.summary,
+      }).from(blueprintConfigurationComponentReferences)
+        .innerJoin(blueprintReferenceItemVersions,
+          eq(blueprintReferenceItemVersions.id,
+            blueprintConfigurationComponentReferences.referenceItemVersionId))
+        .innerJoin(blueprintReferenceItems,
+          eq(blueprintReferenceItems.id, blueprintReferenceItemVersions.itemId))
+        .where(inArray(blueprintConfigurationComponentReferences.configurationVersionId,
+          versionIds)),
+      tx.select({
+        versionId: blueprintConfigurationOfferingIntents.configurationVersionId,
+        componentId: blueprintConfigurationOfferingIntents.componentId,
+        title: offerings.title,
+        code: offerings.code,
+        offeringVersionNo: offeringVersions.versionNo,
+      }).from(blueprintConfigurationOfferingIntents)
+        .innerJoin(offeringVersions,
+          eq(offeringVersions.id, blueprintConfigurationOfferingIntents.offeringVersionId))
+        .innerJoin(offerings, eq(offerings.id, offeringVersions.offeringId))
+        .where(inArray(blueprintConfigurationOfferingIntents.configurationVersionId,
+          versionIds)),
+      tx.select({
+        versionId: blueprintConfigurationLocalExperiences.configurationVersionId,
+        componentId: blueprintConfigurationLocalExperiences.componentId,
+        kind: blueprintConfigurationLocalExperiences.experienceKind,
+        title: blueprintConfigurationLocalExperiences.title,
+        summary: blueprintConfigurationLocalExperiences.summary,
+      }).from(blueprintConfigurationLocalExperiences)
+        .where(inArray(blueprintConfigurationLocalExperiences.configurationVersionId,
+          versionIds)),
     ]);
     const latestReviews = new Map<string, string>();
     for (const review of reviews) {
@@ -99,7 +144,24 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
         name: version.name,
         blueprintTitle: version.blueprintTitle,
         revision: version.revision,
+        siteId: version.config && typeof version.config === "object" &&
+          !Array.isArray(version.config) && typeof version.config.siteId === "string"
+            ? version.config.siteId : null,
+        editorialIdentity: version.editorialIdentity,
+        religiousAffiliationCode: version.religiousAffiliationCode,
         latestDecision: latestReviews.get(version.versionId) ?? "not_reviewed",
+        references: references.filter(item => item.versionId === version.versionId)
+          .map(({ componentId, title, kind, summary }) => ({
+            componentId, title, kind, summary,
+          })),
+        offeringIntents: offeringIntents.filter(item => item.versionId === version.versionId)
+          .map(({ componentId, title, code, offeringVersionNo }) => ({
+            componentId, title, code, offeringVersionNo,
+          })),
+        localExperiences: localExperiences.filter(item => item.versionId === version.versionId)
+          .map(({ componentId, title, kind, summary }) => ({
+            componentId, title, kind, summary,
+          })),
         selectedComponents: components
           .filter(component => component.versionId === version.versionId)
           .map(({ componentId, key, kind }) => ({ componentId, key, kind })),
