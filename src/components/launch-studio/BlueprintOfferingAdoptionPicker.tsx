@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { normalizeClientError } from "@/lib/client-error";
-import type { AvailableOffering } from "@/domain/program-discovery";
+import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
 import type { JsonObject } from "@/db/canonical-v301";
 import { discoverPrograms } from "@/modules/programs/program-discovery.functions";
 
@@ -52,9 +52,7 @@ export function BlueprintOfferingAdoptionPicker({
     }
   }
 
-  const available = offerings?.filter(item => item.availability.some(policy =>
-    policy.catalogStatus === "supported" || policy.catalogStatus === "conditional"
-  )) ?? [];
+  const available = offerings?.filter(canPlanOffering) ?? [];
   return <fieldset className="border p-4" disabled={disabled} aria-label="Published Offering adoption">
     <legend className="px-2 font-semibold">Adopt a published Offering</legend>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -98,9 +96,7 @@ export function BlueprintOfferingAdoptionPicker({
     </label>}
     {offerings && offerings.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-2">
       {offerings.map(item => {
-        const selectable = item.availability.some(policy =>
-          policy.catalogStatus === "supported" || policy.catalogStatus === "conditional"
-        );
+        const selectable = canPlanOffering(item);
         const attached = selected.some(intent =>
           intent.offeringVersionId === item.offering.offeringVersionId &&
           intent.componentId === targetComponentId
