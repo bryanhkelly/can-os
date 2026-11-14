@@ -3,7 +3,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { DomainError } from "@/domain/errors";
-import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { AuthorizationError } from "@/domain/command-context";
+import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
 import {
   createBlueprintConfigurationInputSchema,
   saveBlueprintConfigurationInputSchema,
@@ -33,21 +34,6 @@ export function requireCanonicalBlueprintWriteEnabled(): void {
 
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
-}
-
-/** Site-scoped UI commands cannot rewrite or open another Site's private plan. */
-export function requireBlueprintSiteScope(
-  context: CommandContext,
-  rawConfig: unknown,
-): string {
-  if (!rawConfig || typeof rawConfig !== "object" || Array.isArray(rawConfig)) {
-    throw new AuthorizationError("canonical Blueprint Site selection");
-  }
-  const siteId = (rawConfig as Record<string, unknown>).siteId;
-  if (typeof siteId !== "string" || !context.scope.siteIds?.includes(siteId)) {
-    throw new AuthorizationError("canonical Blueprint Site scope");
-  }
-  return siteId;
 }
 
 export const readCanonicalBlueprintWorkspace = createServerFn({ method: "GET" })
