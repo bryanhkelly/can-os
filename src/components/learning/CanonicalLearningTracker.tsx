@@ -28,7 +28,7 @@ export function CanonicalLearningTracker({ courseAttemptId, lessonId }: {
   useEffect(()=>{
     let closed=false;
     session.current=null;
-    void startCanonicalLearningSession({data:{courseAttemptId}}).then(async result=>{
+    void startCanonicalLearningSession({data:{courseAttemptId,clientInstanceId:crypto.randomUUID()}}).then(async result=>{
       if(closed){
         await setCanonicalLearningSessionState({data:{
           courseAttemptId,learningSessionId:result.learningSessionId,action:"end",
@@ -42,6 +42,10 @@ export function CanonicalLearningTracker({ courseAttemptId, lessonId }: {
       }
     }).catch(()=>{/* Telemetry outage must not block instruction. */});
     const onHidden=()=>{
+      if(document.visibilityState==="visible"){
+        onFocus();
+        return;
+      }
       needsResume.current=true;
       lastInteraction.current=Date.now();
       const active=session.current;
