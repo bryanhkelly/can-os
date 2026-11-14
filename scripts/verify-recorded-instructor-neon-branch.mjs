@@ -1,16 +1,16 @@
 /**
  * Fail closed: recorded-instructor database acceptance belongs to the
- * designated db3.01 Neon branch, never test01, main or another branch.
+ * designated test01 Neon branch, never test01, main or another branch.
  * These values are verified from PostgreSQL's own Neon identity settings,
  * not from a caller-controlled environment variable or database hostname.
  */
 export const RECORDED_INSTRUCTION_NEON_PROJECT_ID = "sweet-hall-62441909";
-export const RECORDED_INSTRUCTION_NEON_BRANCH_ID = "br-tiny-mode-arh9wa2e";
+export const RECORDED_INSTRUCTION_NEON_BRANCH_ID = "br-bitter-feather-ar0u63x7";
 
 export function assertRecordedInstructorNeonBranch(identity) {
   if (identity?.project_id !== RECORDED_INSTRUCTION_NEON_PROJECT_ID ||
       identity?.branch_id !== RECORDED_INSTRUCTION_NEON_BRANCH_ID) {
-    throw new Error("Recorded-instructor acceptance requires the designated db3.01 Neon branch.");
+    throw new Error("Recorded-instructor acceptance requires the designated test01 Neon branch.");
   }
 }
 
