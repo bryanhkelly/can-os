@@ -67,7 +67,7 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
       eq(assessmentFormAdministrations.status,"open"),
     ));
   // The pilot uses one pinned open administration per course offering.
-  if(rows.length!==1)throw new AuthorizationError("unique active knowledge check administration");
+  if(rows.length!==1||!rows[0])throw new AuthorizationError("unique active knowledge check administration");
   const administration=rows[0];
   if(administration.proctorPolicy!=="none"||
       administration.administeringOrganizationId!==training.providerOrganizationId)
@@ -117,7 +117,6 @@ async function loadFormQuestions(tx:Tx,formVersionId:string) {
     if(!version||version.lifecycle!=="published"||
       !objectiveKinds.some(x=>x===version.responseKind))
       throw new Error("Only published objective questions are supported");
-    const kind=version.responseKind as typeof objectiveKinds[number];
     const choices=options.filter(o=>o.itemVersionId===version.id);
     if(choices.length<2)throw new Error("Objective questions require at least two options");
     const maxPoints=Number(f.pointsOverride??version.maximumPoints);
@@ -212,6 +211,7 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       accommodationDecisionId:accommodation?.id??null,
       requestKey:input.requestId,
     }).returning();
+    if(!attempt)throw new Error("Assessment attempt was not created");
     for(const [i,item] of formItems.entries()) {
       await tx.insert(assessmentExecutionItems).values({
         attemptId:attempt.id,formVersionId:scope.form.id,
@@ -284,6 +284,7 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
         attemptItemId:item.id,revisionNo:1,responseState:"submitted",
         clientRequestId:input.requestId+":"+item.id,
       }).returning({id:assessmentExecutionResponses.id});
+      if(!response)throw new Error("Assessment response was not saved");
       for(const [position,optionId] of chosen.entries()) {
         await tx.insert(assessmentExecutionChoices).values({
           responseVersionId:response.id,attemptItemId:item.id,
@@ -325,6 +326,7 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
         ...(autoFinalize?{noncreditAutoFinalized:"v1"}:{}),
       },
     }).returning({id:assessmentExecutionResults.id});
+    if(!result)throw new Error("Knowledge-check result was not saved");
     if(autoFinalize) {
       // Database validation requires the finalized result before the
       // attempt may enter the finalized state. No academic grade is written.
