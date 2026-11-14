@@ -57,6 +57,7 @@ export const readCanonicalSurveyDraftAccess = createServerFn({ method: "GET" }).
       .groupBy(surveyQuestions.surveyVersionId) : [];
     return {
       organizationId: author.organizationId,
+      surveyPublicationEnabled: process.env.CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED === "true",
       limit: 50,
       drafts: versions.map(row => ({
         ...row,

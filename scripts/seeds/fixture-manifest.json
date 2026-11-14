@@ -2193,6 +2193,16 @@
       "persona": "native canonical site_admin or registrar",
       "fixtureRequired": false,
       "rationale": "The draft editor requires an actual native canonical session, enabled rollout flag and explicitly provisioned tenant-bound restricted PostgreSQL writer role. The public demo account seeds cannot impersonate any of these authorities; database and browser acceptance remain pending."
+    },
+    "/canonical/lab/survey-reviews": {
+      "persona": "native canonical survey_reviewer",
+      "fixtureRequired": false,
+      "rationale": "The independent reviewer must have a real native organization-only survey_reviewer grant and an explicitly bound restricted PostgreSQL review role. Public-schema fixtures cannot impersonate these protected approvals, and browser and database acceptance are still pending."
+    },
+    "/canonical/lab/survey-publications": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Survey publication requires an approved native provider session, a separately provisioned organization-bound survey_publisher database role and independent review history under protected canonical RLS. Static synthetic public accounts cannot validate these privileges or the immutable publication transition."
     }
   }
 }

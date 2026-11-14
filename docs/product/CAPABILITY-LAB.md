@@ -106,3 +106,20 @@ restricted organization-bound role with `provision-survey-draft-author-role.sql`
 and set `CAN_CANONICAL_SURVEY_DRAFT_ENABLED=true` for the testing process.
 No SQL was executed against a database by this code change; it is not release
 or security acceptance.
+
+## Independent review and publication (off until provisioned)
+
+- `/canonical/lab/survey-reviews`: organization-only native `survey_reviewer` can inspect its
+  draft questions and append independent privacy, accessibility and safeguarding
+  decisions. A survey author cannot self-review, and the reviewer role cannot publish.
+- `/canonical/lab/survey-publications`: native provider staff inspect current
+  approval status and publish eligible drafts using the PostgreSQL trigger and
+  restricted column-only UPDATE. No campaign, learner invitation or grant of Site
+  authority is created.
+
+These are two different canonical session roles and two different PostgreSQL
+purposes, never a UI-only permission distinction. Both feature flags default
+to off. The optional database patch and provisioning script must first be
+applied to an isolated test database, followed by RLS, cross-tenant and
+authenticated-browser acceptance. These routes will be retired once their
+capabilities are promoted into production experiences.

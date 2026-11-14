@@ -32,12 +32,14 @@ function SurveyDraftPage() {
   if (!result.ok) return <CanonicalBlueprintLoadError
     title="Survey draft authoring" message={result.message}/>;
   return <SurveyDraftForm organizationId={result.data.organizationId}
-    drafts={result.data.drafts} limit={result.data.limit}/>;
+    drafts={result.data.drafts} limit={result.data.limit}
+    surveyPublicationEnabled={result.data.surveyPublicationEnabled}/>;
 }
-function SurveyDraftForm({ organizationId, drafts, limit }: {
+function SurveyDraftForm({ organizationId, drafts, limit, surveyPublicationEnabled }: {
   organizationId: string;
   drafts: Awaited<ReturnType<typeof readCanonicalSurveyDraftAccess>>["drafts"];
   limit: number;
+  surveyPublicationEnabled: boolean;
 }) {
   const router = useRouter();
   const [code, setCode] = useState("");
@@ -81,7 +83,8 @@ function SurveyDraftForm({ organizationId, drafts, limit }: {
   return <WorkspaceShell width="wide" eyebrow="Internal · Canonical v3.0.1"
     title="Create survey draft"
     subtitle="Save a real reusable survey definition and its first draft version. Questions are data, not hardcoded for a particular program.">
-    <CapabilityLabNav current="survey-drafts" surveyDraftEnabled/>
+    <CapabilityLabNav current="survey-drafts" surveyDraftEnabled
+      surveyPublicationEnabled={surveyPublicationEnabled}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-semibold">Draft-only boundary</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">

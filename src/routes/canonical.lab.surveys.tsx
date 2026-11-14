@@ -13,12 +13,16 @@ export const Route = createFileRoute("/canonical/lab/surveys")({
 function SurveysLabPage() {
   const result = Route.useLoaderData();
   if (!result.ok) return <CanonicalBlueprintLoadError title="Survey inspection" message={result.message}/>;
-  const { definitions, campaigns, limits, draftAuthoringEnabled } = result.data;
+  const { definitions, campaigns, limits, draftAuthoringEnabled, surveyPublicationEnabled } = result.data;
 
   return <WorkspaceShell width="wide" eyebrow="Internal · Canonical v3.0.1"
     title="Survey inspection"
     subtitle="Review organization-owned survey definitions and operating campaigns, with question previews and noncredit pilot preflight.">
-    <CapabilityLabNav current="surveys" surveyDraftEnabled={draftAuthoringEnabled}/>
+    <CapabilityLabNav current="surveys" surveyDraftEnabled={draftAuthoringEnabled}
+      surveyPublicationEnabled={surveyPublicationEnabled}/>
+    {surveyPublicationEnabled && <p className="mt-5"><Link to="/canonical/lab/survey-publications"
+      className="inline-flex min-h-10 items-center border border-border bg-card px-4 text-sm font-semibold text-primary">
+      Inspect publication readiness</Link></p>}
     {draftAuthoringEnabled && <p className="mt-5"><Link to="/canonical/lab/survey-drafts"
       className="inline-flex min-h-10 items-center border border-border bg-card px-4 text-sm font-semibold text-primary">
       Create survey draft</Link></p>}

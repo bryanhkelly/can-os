@@ -355,6 +355,24 @@
       "writeBoundary": "Atomic restricted SET LOCAL ROLE inserts definition, version, question/options, audit and domain event; RLS draft-only and no publication, review or invitation grant"
     },
     {
+      "file": "src/routes/canonical.lab.survey-publications.tsx",
+      "route": "/canonical/lab/survey-publications",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Native Site-scoped provider publishes a reviewed version only after all current independent review decisions are approved",
+      "readBoundary": "Feature flag, canonical provider scope, survey_publisher purpose-bound DB role, organization-owned drafts and review decision history",
+      "writeBoundary": "Published lifecycle/published_at column-only UPDATE under survey_publisher role, trigger rechecks independent approvals; no review insert or campaign activation"
+    },
+    {
+      "file": "src/routes/canonical.lab.survey-reviews.tsx",
+      "route": "/canonical/lab/survey-reviews",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Native organization-only survey_reviewer independently reviews draft survey content and records privacy/accessibility/safeguarding decisions",
+      "readBoundary": "Feature flag and native survey_reviewer identity; organization-bound PostgreSQL reviewer role with scoped survey version and question SELECT",
+      "writeBoundary": "Append-only review INSERT and audit/domain event under survey_reviewer DB role; no publication, campaign, invitation or answer access"
+    },
+    {
       "file": "src/routes/canonical.lab.surveys.tsx",
       "route": "/canonical/lab/surveys",
       "owner": "operations",
