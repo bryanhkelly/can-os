@@ -1,4 +1,5 @@
 import { AuthorizationError } from "@/domain/command-context";
+import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 
 /**
  * Explicit opt-in only. Do not open learner activity or shared-screen delivery
@@ -6,8 +7,9 @@ import { AuthorizationError } from "@/domain/command-context";
  * Failing configuration never grants a broader default DB connection.
  */
 function nativeAuthConfigured() {
-  return Boolean(process.env.CAN_CANONICAL_AUTH_DATABASE_URL) &&
-    (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) >= 32;
+  return canonicalRestrictedAuthUrlValid(
+    process.env.CAN_CANONICAL_AUTH_DATABASE_URL, process.env.DATABASE_URL,
+  ) && (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) >= 32;
 }
 export function requireCanonicalLearningActivityEnabled() {
   if (process.env.CAN_CANONICAL_ACTIVITY_ENABLED !== "true")

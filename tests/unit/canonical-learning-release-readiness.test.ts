@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 const setNativeAuth = () => {
   vi.stubEnv("CAN_CANONICAL_AUTH_DATABASE_URL",
-    "postgresql://restricted-auth-app:placeholder@database.invalid/neondb");
+    "postgresql://can_os_canonical_auth_app:placeholder@database.invalid/neondb");
   vi.stubEnv("CAN_CANONICAL_ACCESS_TOKEN_PEPPER", "a".repeat(48));
 };
 
@@ -30,6 +30,17 @@ describe("canonical activity release prerequisites", () => {
     expect(() => requireCanonicalLearningActivityEnabled()).toThrow();
     setNativeAuth();
     expect(() => requireCanonicalLearningActivityEnabled()).not.toThrow();
+  });
+  it("rejects an owner or general DATABASE_URL masquerading as auth", () => {
+    vi.stubEnv("CAN_CANONICAL_ACTIVITY_ENABLED", "true");
+    vi.stubEnv("CAN_CANONICAL_ACCESS_TOKEN_PEPPER", "a".repeat(48));
+    vi.stubEnv("CAN_CANONICAL_AUTH_DATABASE_URL",
+      "postgresql://neondb_owner:placeholder@database.invalid/neondb");
+    expect(() => requireCanonicalLearningActivityEnabled()).toThrow();
+    const restricted = "postgresql://can_os_canonical_auth_app:placeholder@database.invalid/neondb";
+    vi.stubEnv("CAN_CANONICAL_AUTH_DATABASE_URL", restricted);
+    vi.stubEnv("DATABASE_URL", restricted);
+    expect(() => requireCanonicalLearningActivityEnabled()).toThrow();
   });
   it("requires a separate strong pairing pepper for shared-screen sessions", () => {
     vi.stubEnv("CAN_FACILITATED_LEARNING_ENABLED", "true");

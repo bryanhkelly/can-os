@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 import { Pool } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import {
@@ -34,7 +35,8 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
   // Dedicated restricted login: never switch roles from the app's broad
   // DATABASE_URL connection. This connection has no raw identity-table reads.
   const connectionString = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
-  if (!connectionString) throw new AuthorizationError("canonical session reader configuration");
+  if (!canonicalRestrictedAuthUrlValid(connectionString, process.env.DATABASE_URL))
+    throw new AuthorizationError("dedicated restricted canonical session reader configuration");
   const pool = new Pool({ connectionString, max: 1 });
   let client: Awaited<ReturnType<Pool["connect"]>> | undefined;
   let records: Array<Record<string, unknown>> = [];
