@@ -26,19 +26,20 @@ export const getActionDetail = createServerFn({ method: "GET" })
         action.subjectType === "student_profile" && action.sectionId !== null;
       // Earlier follow-up Actions may not have a Section ID. Use the original
       // assessment to verify the exact live teaching authorization.
+      const originalAssessmentId=action.metadata?.assessmentId;
       const teacherMissing = actor.role === "teacher" &&
         action.type === "missing_work_follow_up" &&
         action.ownerPersonId === actor.actorPersonId &&
         action.subjectType === "student_profile" &&
-        typeof action.metadata?.assessmentId === "string";
+        typeof originalAssessmentId === "string";
       let missingSectionId: string | null = null;
-      if (teacherMissing) {
+      if (teacherMissing && typeof originalAssessmentId==="string") {
         const [assessment] = await tx.select({
           sectionId:s.assessments.sectionId,
           siteId:s.sections.siteId,programId:s.sections.programId,
         }).from(s.assessments)
           .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
-          .where(eq(s.assessments.id,action.metadata.assessmentId)).limit(1);
+          .where(eq(s.assessments.id,originalAssessmentId)).limit(1);
         if(!assessment||assessment.siteId!==action.siteId||
           assessment.programId!==action.programId||
           (action.sectionId && action.sectionId !== assessment.sectionId))
