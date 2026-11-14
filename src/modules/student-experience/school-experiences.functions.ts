@@ -39,7 +39,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
       .from(schema.conferenceSlots).innerJoin(schema.conferenceSeries,eq(schema.conferenceSeries.id,schema.conferenceSlots.conferenceSeriesId))
       .innerJoin(schema.sites,eq(schema.sites.id,schema.conferenceSeries.siteId))
       .innerJoin(schema.people,eq(schema.people.id,schema.conferenceSeries.teacherPersonId))
-      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(25) : Promise.resolve([]),
+      .where(and(inArray(schema.conferenceSeries.siteId,sites),eq(schema.conferenceSeries.status,"published"),eq(schema.conferenceSlots.status,"available"),gte(schema.conferenceSlots.startsAt,new Date()))).orderBy(asc(schema.conferenceSlots.startsAt)).limit(200) : Promise.resolve([]),
     viewerRole==="guardian" ? db.select({id:schema.conferenceBookings.id,slotId:schema.conferenceBookings.conferenceSlotId,studentPersonId:schema.studentProfiles.personId,startsAt:schema.conferenceSlots.startsAt,endsAt:schema.conferenceSlots.endsAt,seriesId:schema.conferenceSlots.conferenceSeriesId,
       seriesTitle:schema.conferenceSeries.title,timezone:schema.sites.timezone,
       legalFirstName:schema.people.legalFirstName,legalLastName:schema.people.legalLastName,preferredName:schema.people.preferredName}).from(schema.conferenceBookings)
@@ -136,7 +136,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
   }).from(schema.enrollments)
     .innerJoin(schema.sections,eq(schema.sections.id,schema.enrollments.sectionId))
     .where(and(eq(schema.enrollments.kind,"section"),eq(schema.enrollments.status,"active"),
-      eq(schema.sections.active,true),
+      eq(schema.sections.active,true),eq(schema.enrollments.programId,schema.sections.programId),
       inArray(schema.sections.id,sectionIds),
       inArray(schema.enrollments.studentProfileId,eligiblePrograms.map(row=>row.studentProfileId)),
       inArray(schema.sections.programId,actor.scope.programIds??[]),
@@ -149,7 +149,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
       siteId:s.siteId,sectionId:s.sectionId,
       eligibleStudentPersonIds:eligibleGuardianConferenceStudents(s,eligiblePrograms,eligibleSections),
       seriesTitle:s.seriesTitle,timezone:s.timezone,teacherName:personDisplayName(s),
-    })).filter(slot=>slot.eligibleStudentPersonIds.length>0),
+    })).filter(slot=>slot.eligibleStudentPersonIds.length>0).slice(0,25),
     bookings:bookings.map(b=>({id:b.id,slotId:b.slotId,studentPersonId:b.studentPersonId,seriesId:b.seriesId,
       startsAt:b.startsAt.toISOString(),endsAt:b.endsAt.toISOString(),
       seriesTitle:b.seriesTitle,timezone:b.timezone,teacherName:personDisplayName(b)})),
