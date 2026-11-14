@@ -26,7 +26,7 @@ export const noncreditCompletionDecisions = educationV30.table("noncredit_comple
   policyId:uuid("policy_id").notNull(),assessmentResultId:uuid("assessment_result_id"),
   outcome:text("outcome").$type<"completed"|"not_yet_completed"|"voided">().notNull(),
   decidedByPersonId:uuid("decided_by_person_id").notNull(),
-  decidedAt:timestamp("decided_at",{withTimezone:true}).notNull(),
+  decidedAt:timestamp("decided_at",{withTimezone:true}).notNull().defaultNow(),
   evidenceVersionId:uuid("evidence_version_id"),supersedesId:uuid("supersedes_id"),
 });
 export const assessmentAdministrations = educationV30.table("assessment_administrations",{
