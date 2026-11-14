@@ -30,11 +30,46 @@ different person's frozen version using current verified Organization evidence.
 Execution requires an approved review and an approved operator relationship
 with a canonical Operation. Any resulting Deployment is **planning only**.
 
-For the optional isolated acceptance fixture, after seeding the two native
-Sites, apply `seed-blueprint-execution-demo.sql` as the trusted database
-administrator. It adds independent school/learning-center Operations with
-current operators and Organization-owned reviewer evidence. No educational
-authority or external credential is fabricated.
+The isolated native demo-seeding command automatically applies
+`seed-blueprint-execution-demo.sql` in the same transaction. It provides
+school/learning-center Operations, their explicit Site relationships, active
+operators, verified Organization-owned review evidence, and one published,
+non-credentialed Digital Skills demo Offering. No external credential or
+permission to operate is fabricated.
+
+The acceptance runner uses a *different restricted application login*
+pointing at that same disposable database. It always rolls its drafts,
+approvals, execution batches and planning-only Deployment back.
+
+```sh
+# Prepare an isolated database with schema.sql, then seed the new entities:
+APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true \
+  npm run db:seed:canonical:v301:demo
+
+# Publish the two starter recipes as a trusted schema administrator:
+psql "$TEST_DATABASE_URL" \
+  -v publisher_organization_id=11110000-0000-4000-8000-000000000003 \
+  -f database/canonical/v3.0.1/seed-blueprint-starters.sql
+
+# Provision the Valor author/reviewer roles for a *restricted* test login:
+psql "$TEST_DATABASE_URL" \
+  -v organization_id=11110000-0000-4000-8000-000000000001 \
+  -v application_role=YOUR_RESTRICTED_TEST_LOGIN \
+  -f database/canonical/v3.0.1/provision-blueprint-roles.sql
+
+# CAN_CANONICAL_TEST_APP_DATABASE_URL points to the same TEST_DATABASE_URL
+# database, but authenticates as YOUR_RESTRICTED_TEST_LOGIN.
+APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true \
+  npm run db:test:canonical:v301:blueprint-flow
+```
+
+This acceptance checks the mainline flow with the actual restricted database
+roles: create a draft, select a published Offering, freeze it, record an
+independent evidence-backed approval, execute the approved recipe, and assert
+the result remains a *planning* Deployment with a *proposed* Offering adoption.
+It also checks that Valor roles cannot see Barton Sites or evidence and that
+authors cannot self-approve. This is an executable test path, **not** a claim
+that tests have passed.
 
 Never grant either role access to raw canonical sessions, learner records,
 safeguarding data, finance data or direct publication. SQL policies, grants
