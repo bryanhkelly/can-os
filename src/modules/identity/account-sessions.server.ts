@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessSessions, accessSessionSignals } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
@@ -7,10 +7,9 @@ import { sessionIdleCutoff } from "@/domain/access-tokens";
 import { recordSessionSecurityEvent } from "./session-security-audit.server";
 
 /**
- * Account-owned sessions, never school-owned sessions. No raw credential,
- * fingerprint, IP address or guessed device is included in the response.
- * updatedAt is provisionally the meaningful-activity timestamp; a distinct
- * activity timestamp and optional device metadata are a separate future bite.
+ * Account-owned sessions, never school-owned sessions. Raw credentials,
+ * fingerprints, IP addresses, and client-instance IDs stay out of the API.
+ * Device category, browser, and OS are untrusted descriptive metadata.
  */
 export async function listAccountSessions(actor: AccessContext) {
  if (!actor.accountId || !actor.sessionId || !actor.actorPersonId)
@@ -31,6 +30,8 @@ export async function listAccountSessions(actor: AccessContext) {
    isNull(accessSessions.revokedAt),
    gt(accessSessions.expiresAt, now),
    gt(accessSessions.updatedAt, sessionIdleCutoff(now)),
+   or(eq(accessSessions.sharedDevice,false),
+     gt(accessSessions.lastActivityAt,new Date(now.getTime()-5*60_000))),
   ))
   .orderBy(desc(accessSessions.updatedAt))
   .limit(100);
