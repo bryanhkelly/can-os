@@ -49,6 +49,7 @@ describe("recorded instructor learner workspace", () => {
         courseUnitTitle: "Foundations",
         trackVersionId: "track-teacher-a",
         trackTitle: "Teacher A",
+        answers: [{ promptKey: "q1", promptText: "Explain how you reached your answer", response: "I used the first approach." }],
         policyVersionId: "policy-1",
         scoreNumeric: null,
         recordedAt: new Date("2026-11-12T12:00:00Z"),
@@ -59,6 +60,7 @@ describe("recorded instructor learner workspace", () => {
         courseUnitTitle: "Foundations",
         trackVersionId: "track-teacher-b",
         trackTitle: "Teacher B",
+        answers: [{ promptKey: "q2", promptText: "Try another solution", response: "I tried a different method." }],
         policyVersionId: "policy-1",
         scoreNumeric: null,
         recordedAt: new Date("2026-11-13T12:00:00Z"),
@@ -68,6 +70,10 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Teacher A");
     expect(html).toContain("Teacher B");
     expect(html).toContain("Foundations");
+    expect(html).toContain("Explain how you reached your answer");
+    expect(html).toContain("I used the first approach.");
+    expect(html).toContain("Try another solution");
+    expect(html).toContain("I tried a different method.");
     expect(html).toContain("Switching teachers does not erase this history");
   });
 
