@@ -48,8 +48,10 @@ import {
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
+  snapshotRecordedPracticeAnswers,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
+  type RecordedPracticeAnswer,
   type StudentPracticeDefinition,
 } from "@/domain/instructional-tracks";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
@@ -1002,7 +1004,7 @@ export async function recordFormativePractice(
       }
       await tx.insert(formativePracticeResponses).values({
         practiceAttemptId: practiceAttempt.id,
-        response: { responses: input.responses },
+        response: { responses: snapshotRecordedPracticeAnswers(definition.prompts, input.responses) },
       });
       return {
         practiceAttemptId: practiceAttempt.id,
@@ -1027,17 +1029,18 @@ export async function readFormativePracticeHistory(
   recordedAt: Date;
   trackTitle: string | null;
   courseUnitTitle: string | null;
+  answers: RecordedPracticeAnswer[];
 }>> {
   assertAuthenticated(context, "learner_or_guardian");
   const input = readInstructionalTrackSchema.parse(raw);
   return db.transaction(async (tx) => {
-    const { attempt } = await loadAuthorizedParticipant(
+    const { attempt, participant } = await loadAuthorizedParticipant(
       tx,
       context,
       input.courseAttemptId,
       true,
     );
-    return tx.select({
+    const rows = await tx.select({
       id: formativePracticeAttempts.id,
       courseUnitId: formativePracticeAttempts.courseUnitId,
       trackVersionId: formativePracticeAttempts.trackVersionId,
@@ -1061,5 +1064,38 @@ export async function readFormativePracticeHistory(
       ))
       .where(eq(formativePracticeAttempts.courseAttemptId, attempt.id))
       .orderBy(desc(formativePracticeAttempts.recordedAt));
+
+    // Guardians may inspect the history summary; the learner owns private answers.
+    if (participant.selectionSource !== "learner" || rows.length === 0) {
+      return rows.map(row => ({ ...row, answers: [] as RecordedPracticeAnswer[] }));
+    }
+    const saved = await tx.select({
+      practiceAttemptId: formativePracticeResponses.practiceAttemptId,
+      response: formativePracticeResponses.response,
+    }).from(formativePracticeResponses).where(and(
+      inArray(formativePracticeResponses.practiceAttemptId, rows.map(row => row.id)),
+      or(
+        isNull(formativePracticeResponses.retainedUntil),
+        gt(formativePracticeResponses.retainedUntil, new Date()),
+      ),
+    ));
+    const responseSchema = z.object({
+      responses: z.array(z.object({
+        promptKey: z.string(),
+        promptText: z.string().optional(),
+        response: z.string(),
+      })),
+    });
+    const answersByAttempt = new Map<string, RecordedPracticeAnswer[]>();
+    for (const entry of saved) {
+      const parsed = responseSchema.safeParse(entry.response);
+      if (!parsed.success) continue;
+      answersByAttempt.set(entry.practiceAttemptId, parsed.data.responses.map(answer => ({
+        promptKey: answer.promptKey,
+        promptText: answer.promptText ?? answer.promptKey,
+        response: answer.response,
+      })));
+    }
+    return rows.map(row => ({ ...row, answers: answersByAttempt.get(row.id) ?? [] }));
   });
 }
