@@ -55,3 +55,20 @@ VALUES
   'aaaa0000-0000-4000-8000-000000000002',1,
   '44440000-0000-4000-8000-000000000004','2026-01-02T00:00:00Z')
 ON CONFLICT (id) DO NOTHING;
+
+-- One published, non-credentialed product is sufficient to exercise
+-- Blueprint adoption and planning Deployment creation without a fake license.
+INSERT INTO education_v30.offerings (id,publisher_organization_id,code,title,origin,status)
+VALUES ('cccc0000-0000-4000-8000-000000000001',
+        '11110000-0000-4000-8000-000000000003',
+        'can.digital-skills-foundations.demo','Digital Skills Foundations (demo)',
+        'native','active')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO education_v30.offering_versions
+ (id,offering_id,version_no,product_definition,lifecycle,published_at)
+VALUES ('cccc0000-0000-4000-8000-000000000002',
+        'cccc0000-0000-4000-8000-000000000001',1,
+        '{"demo_only":true,"credentialing":"none","approval_required":true}'::jsonb,
+        'published','2026-01-02T00:00:00Z')
+ON CONFLICT (id) DO NOTHING;
