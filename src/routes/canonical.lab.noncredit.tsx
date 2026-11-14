@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import { NoncreditPilotOutcomesPanel } from "@/components/learning/NoncreditPilotOutcomesPanel";
+import { NoncreditCompletionPolicyPanel } from "@/components/learning/NoncreditCompletionPolicyPanel";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { noncreditLabActions } from "@/domain/canonical-capability-lab";
@@ -88,6 +89,9 @@ function NoncreditLabContent({ attempts, trainings }: {
 
     <div className="mt-8">
       <NoncreditPilotOutcomesPanel/>
+    </div>
+    <div className="mt-8">
+      <NoncreditCompletionPolicyPanel/>
     </div>
     <section className="mt-6" aria-label="Provider training versions">
       <h2 className="font-serif text-2xl">Training versions</h2>
