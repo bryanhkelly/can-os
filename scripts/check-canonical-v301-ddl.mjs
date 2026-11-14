@@ -123,6 +123,7 @@ async function main() {
       "blueprint_reference_selection_immutability",
       "blueprint_offering_intent_immutability",
       "blueprint_local_experience_immutability",
+      "blueprint_configuration_review_append_only",
     ]]);
     const learningRlsCount = await client.query(`
       SELECT count(*)::integer AS table_count
@@ -822,7 +823,7 @@ async function main() {
       referenceVersionCount.rows[0].item_count !== 74 && "published Blueprint reference versions",
       affiliationCount.rows[0].item_count !== 25 && "religious affiliation options",
       rlsCount.rows[0].table_count !== 10 && "Blueprint forced RLS",
-      immutableChildTriggerCount.rows[0].trigger_count !== 3 && "Blueprint child immutability",
+      immutableChildTriggerCount.rows[0].trigger_count !== 4 && "Blueprint child immutability",
       learningRlsCount.rows[0].table_count !== 19 && "learning forced RLS",
       programCatalogRlsCount.rows[0].table_count !== 11 && "program catalog forced RLS",
       (programCatalogPolicyCheck.rows[0].policy_count !== 21 ||
