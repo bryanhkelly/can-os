@@ -1,6 +1,6 @@
 # Recorded-instructor RLS acceptance
 
-**Gate:** Do not enable the recorded-instructor route until both the nine-check
+**Gate:** Do not enable the recorded-instructor route until both the ten-check
 schema readiness query and the restricted two-learner isolation test pass.
 
 The schema and UI are intentionally separate from operating permission. A
@@ -29,7 +29,7 @@ Set these environment variables in the isolated test environment:
 Run `npm run db:canonical:v301:instructional-readiness`.
 
 The command first checks the canonical relationships, immutability, force-RLS
-and presence of application policies. **Only when all nine pass**, it invokes
+and presence of application policies. **Only when all ten pass**, it invokes
 `db:canonical:v301:instructional-isolation` to prove that both restricted
 logins can read their own Course attempts, selected presenters, lesson
 progress, and practice records but cannot see the other learner's rows.
@@ -41,7 +41,13 @@ actual application to use verified, scoped identities through its database
 transactions. Merely creating a policy or supplying an app-wide login must
 not count as signoff.
 
+**Identity prerequisite:** A forced-RLS policy must be backed by the
+canonical account, grant, and session tables and their approved server-side
+identity projection. Do not treat separate database usernames or caller-set
+session variables as proof of the logged-in learner. The learner-role binding
+must be verified before exposing an application route.
+
 **Current state:** The isolated `test01` branch has the corrected
-same-presenter policy renewal function and passed eight of nine schema checks.
-The remaining application-role RLS policies and two-learner restricted
-acceptance fixtures/logins have not been provisioned. Keep the route disabled.
+same-presenter policy renewal function and has the updated teacher-selection trigger. Its native canonical account,
+grant, and session tables are absent, and scoped learner RLS policies and
+restricted acceptance fixtures/logins have not been provisioned. Keep the route disabled.
