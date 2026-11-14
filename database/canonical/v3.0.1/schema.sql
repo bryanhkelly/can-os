@@ -10526,7 +10526,7 @@ BEGIN
   'religious_affiliation_options','evidence_documents','evidence_document_versions',
   'blueprint_component_approval_decisions',
   'blueprint_execution_batches','education_operations',
-  'education_operation_organization_roles',
+  'education_operation_organization_roles','education_operation_sites',
   'program_deployments','deployment_offering_adoptions'
  ] LOOP
   EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',t);
@@ -10733,6 +10733,30 @@ CREATE POLICY blueprint_operations_read ON education_operations FOR SELECT USING
     AND r.status='approved' AND r.valid_from<=clock_timestamp()
     AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
     AND v28_role_can_access_org(r.organization_id,'blueprint_author')));
+
+-- Author access to Operation/Site links is confined to current authorized
+-- operators. The purpose-specific SELECT grant must never expose other tenants.
+CREATE POLICY blueprint_operation_sites_read ON education_operation_sites FOR SELECT USING (
+ valid_from<=clock_timestamp()
+ AND (valid_through IS NULL OR valid_through>clock_timestamp())
+ AND EXISTS (SELECT 1 FROM education_operation_organization_roles r
+   WHERE r.operation_id=education_operation_sites.operation_id
+     AND r.role_code='operator' AND r.status='approved'
+     AND r.valid_from<=clock_timestamp()
+     AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
+     AND v28_role_can_access_org(r.organization_id,'blueprint_author'))
+ AND EXISTS (SELECT 1 FROM site_organization_roles s
+   JOIN education_operation_organization_roles r
+     ON r.organization_id=s.organization_id
+   WHERE s.site_id=education_operation_sites.site_id
+     AND s.role_code='operator'
+     AND s.valid_from<=clock_timestamp()
+     AND (s.valid_through IS NULL OR s.valid_through>clock_timestamp())
+     AND r.operation_id=education_operation_sites.operation_id
+     AND r.role_code='operator' AND r.status='approved'
+     AND r.valid_from<=clock_timestamp()
+     AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
+     AND v28_role_can_access_org(r.organization_id,'blueprint_author')));
 
 CREATE POLICY blueprint_batches_read ON blueprint_execution_batches FOR SELECT USING (
  v28_role_can_access_org(executing_organization_id,'blueprint_author'));
