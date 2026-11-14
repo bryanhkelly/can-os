@@ -120,7 +120,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
  const attemptLimitReached = Boolean(assignment.metadata.maxAttempts !== null && nextAttempt > assignment.metadata.maxAttempts);
  const editable = assignment.canEdit === true && !submittedReceipt;
  const canSubmit = draft.trim().length >= 3 || pendingFiles.length > 0 ||
-  attachments.length > 0;
+  (assignment.status === "assigned" && attachments.length > 0);
  useEffect(() => {
   let active = true;
   listSubmissionAttachments({ data: { assessmentId: assignment.assessmentId } })
