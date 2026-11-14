@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import {
-  SafeClassExternalLink, safeClassExternalHref,
+  SafeClassExternalLink, SafeExternalOpenLink, safeClassExternalHref,
 } from "@/components/learning/SafeClassExternalLink";
 
 describe("external classroom resource links", () => {
@@ -17,6 +17,17 @@ describe("external classroom resource links", () => {
     expect(html).toContain('rel="noopener noreferrer"');
   });
 
+  it("protects curriculum marketplace supplement links as well as class links", () => {
+    const safe = renderToStaticMarkup(<SafeExternalOpenLink url="https://example.test/resources/1"/>);
+    expect(safe).toContain('href="https://example.test/resources/1"');
+    expect(safe).toContain(">Open</a>");
+    for (const url of ["javascript:alert(1)", "http://example.test/one",
+      "https://user:pass@example.test/one", "not a URL"]) {
+      const html = renderToStaticMarkup(<SafeExternalOpenLink url={url}/>);
+      expect(html).not.toContain("<a ");
+      expect(html).toContain("Link unavailable");
+    }
+  });
   it("does not render clickable anchors for malformed or unsafe legacy links", () => {
     for (const url of [
       "javascript:alert(1)",

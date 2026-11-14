@@ -26,3 +26,11 @@ export function SafeClassExternalLink({ url, title, kind, resourceId }: {
         rel="noopener noreferrer" className="underline">{title} ({kind})</a>
     : <span role="status" className="text-muted-foreground">{title} (external link unavailable)</span>;
 }
+
+/** Marketplace supplements may include legacy/imported URLs. No raw hrefs. */
+export function SafeExternalOpenLink({ url }: { url: string }) {
+  const href = safeClassExternalHref(url);
+  return href
+    ? <a href={href} target="_blank" rel="noopener noreferrer" className="ml-1 underline">Open</a>
+    : <span role="status" className="ml-1 text-muted-foreground">Link unavailable</span>;
+}

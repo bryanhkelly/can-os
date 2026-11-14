@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
 import { StaffClassVideos } from "@/components/learning/StaffClassVideos";
+import { SafeExternalOpenLink } from "@/components/learning/SafeClassExternalLink";
 import { CurriculumCourseOutline } from "@/components/learning/CurriculumCourseOutline";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -302,7 +303,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
     <h3 className="font-semibold">Current supplements</h3>
     <ul className="space-y-2 text-sm">{market.overlays.map(item=><li className="rounded border p-3" key={item.id}>
      <strong>{item.title}</strong> · {item.kind} · {item.sectionId?"Class":item.siteId?"Site":"Program"} ·
-     {item.url&&<a href={item.url} target="_blank" rel="noopener noreferrer" className="ml-1 underline">Open</a>}
+     {item.url && <SafeExternalOpenLink url={item.url}/>}
     </li>)}</ul>
     {!market.overlays.length&&<p className="text-sm text-muted-foreground">No supplemental materials yet.</p>}
     </section></>}
