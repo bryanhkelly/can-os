@@ -14,6 +14,10 @@ import {
   blueprintReviewReadInputSchema,
   decideBlueprintReviewInputSchema,
 } from "@/domain/blueprint-review";
+import { programDiscoveryInputSchema } from "@/domain/program-discovery";
+import { getAvailableOfferings } from "@/modules/programs/program-discovery.server";
+import { blueprintReferenceCatalogInputSchema } from "@/domain/blueprint-reference-catalog";
+import { getBlueprintReferenceCatalog } from "./blueprint-reference-catalog.server";
 import { executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
 import { blueprintWorkspaceInputSchema, getCanonicalBlueprintWorkspace } from "./blueprint-workspace.server";
 import { getCanonicalBlueprintReviewQueue } from "./blueprint-review-queue.server";
@@ -37,6 +41,35 @@ export function requireCanonicalBlueprintWriteEnabled(): void {
 function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
 }
+
+export const readCanonicalBlueprintHome = createServerFn({ method: "GET" })
+  .handler(async () => {
+    noStore();
+    requireCanonicalBlueprintWriteEnabled();
+    const context = await getCanonicalCommandContext(getRequest());
+    return {
+      role: context.role,
+      siteId: context.scope.siteIds?.[0] ?? null,
+      organizationId: context.scope.organizationIds?.[0] ?? null,
+      referencesEnabled: process.env.CAN_CANONICAL_CATALOG_ENABLED === "true",
+    };
+  });
+
+export const exploreCanonicalBlueprintReferences = createServerFn({ method: "GET" })
+  .validator((value: unknown) => blueprintReferenceCatalogInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    noStore();
+    requireCanonicalBlueprintWriteEnabled();
+    return getBlueprintReferenceCatalog(await getCanonicalCommandContext(getRequest()), data);
+  });
+
+export const discoverCanonicalBlueprintOfferings = createServerFn({ method: "GET" })
+  .validator((value: unknown) => programDiscoveryInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    noStore();
+    requireCanonicalBlueprintWriteEnabled();
+    return getAvailableOfferings(await getCanonicalCommandContext(getRequest()), data);
+  });
 
 export const readCanonicalBlueprintWorkspace = createServerFn({ method: "GET" })
   .validator((value: unknown) => blueprintWorkspaceInputSchema.parse(value))
