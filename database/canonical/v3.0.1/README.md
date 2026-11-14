@@ -1,5 +1,13 @@
 # CAN OS canonical database v3.0.1
 
+**Integration decision: net-new only.** Organizations, Sites, Persons,
+identity/session principals, role grants and demo data must be created directly
+in the canonical model. No legacy identity mapping tables, cross-schema record
+bridges, historical-data migration or reliance on existing demo account/Site
+identifiers. Until native canonical sign-in, session, permissions and Site
+selection are implemented and verified, keep the canonical Studio write flag
+disabled. Existing app session code does not establish canonical identity.
+
 `schema.sql` is a fresh-build target for PostgreSQL 16 or newer. It owns the
 `education_v30` and `education_v30_secure` schemas; it is not an additive
 Drizzle migration and must not be run with `npm run db:migrate`.
