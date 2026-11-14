@@ -10,7 +10,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getCreatorInstructionalDraft } from "@/modules/learning/provider-content-workspace.functions";
 import { saveRecordedInstructionDraft, submitRecordedInstructionDraft } from "@/modules/learning/instructional-tracks.functions";
 
-export const Route = createFileRoute("/canonical/content/$trackVersionId")({
+export const Route = createFileRoute("/canonical/content_/$trackVersionId")({
   loader: ({params}) => safeLoader(() => getCreatorInstructionalDraft({data:{trackVersionId:params.trackVersionId}}))(),
   component: CreatorDraftPage,
 });
