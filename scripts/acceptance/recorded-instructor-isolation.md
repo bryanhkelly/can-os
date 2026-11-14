@@ -59,6 +59,7 @@ session variables as proof of the logged-in learner. The learner-role binding
 must be verified before exposing an application route.
 
 **Current state:** The isolated `test01` branch has the corrected
-same-presenter policy renewal function and has the updated teacher-selection trigger. Its native canonical account,
-grant, and session tables are absent, and scoped learner RLS policies and
-restricted acceptance fixtures/logins have not been provisioned. Keep the route disabled.
+teacher-selection trigger and seven restricted learner-data read policies.
+Nine of ten structural readiness checks pass. Native canonical account,
+grant, and session identity objects are absent, and no two-learner acceptance
+fixtures or restricted login bindings exist yet. Keep the route disabled.
