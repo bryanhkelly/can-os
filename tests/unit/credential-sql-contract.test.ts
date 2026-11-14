@@ -38,6 +38,16 @@ describe("credential patch structural security boundaries", () => {
   it("fails closed for youth activity awards until verified registrations and attendance are integrated", () => {
     expect(sql).toContain("Verified activity award source is not yet enabled");
   });
+  it("offers only session-bound SECURITY DEFINER wallet projections", () => {
+    expect(baseline).toContain("v301_list_my_learning_awards(p_secret_hash text)");
+    expect(baseline).toContain("v301_get_my_learning_award(p_secret_hash text,p_issuance_id uuid)");
+    expect(baseline).toContain("v301_canonical_session_context(p_secret_hash) ctx");
+    expect(baseline).toContain("decision.recipient_person_id=ctx.person_id");
+    expect(baseline).toContain("issuance.issuer_organization_id=ctx.organization_id");
+    expect(baseline).toContain("ctx.role_code='learner'");
+    expect(baseline).toContain("REVOKE ALL ON FUNCTION v301_get_my_learning_award(text,uuid) FROM PUBLIC");
+    expect(baseline).toContain("SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$");
+  });
   it("enforces immutable evidence, restricted RLS and live verification", () => {
     expect(sql).toContain("credential_owner_only");
     expect(sql).toContain("FORCE ROW LEVEL SECURITY");

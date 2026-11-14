@@ -11583,7 +11583,7 @@ RETURNS TABLE (
   issued_at timestamptz, expires_at timestamptz, is_current boolean
 )
 LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $credential_wallet$
+SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$
  SELECT issuance.id, version.title, definition.kind,
         issuance.credential_reference, issuance.issued_at, issuance.expires_at,
         v301_credential_is_current(issuance.id)
@@ -11610,7 +11610,7 @@ RETURNS TABLE (
   recipient_name text
 )
 LANGUAGE sql STABLE SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $credential_wallet$
+SET search_path=education_v30,pg_catalog,pg_temp AS $credential_wallet$
  SELECT issuance.id, issuance.credential_reference, issuance.issued_at,
         definition.kind, version.title, version.description,
         organization.display_name,
@@ -11633,6 +11633,10 @@ SET search_path=education_v30,pg_catalog AS $credential_wallet$
  LIMIT 1
 $credential_wallet$;
 REVOKE ALL ON FUNCTION v301_get_my_learning_award(text,uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_credential_is_current(uuid) FROM PUBLIC;
+-- In this security-definer chain, trusted relations must precede pg_temp.
+ALTER FUNCTION v301_canonical_session_context(text)
+  SET search_path=education_v30,pg_catalog,pg_temp;
 -- No issuance, public badge assertion, or guardian delegation in this reader.
 
 COMMIT;
