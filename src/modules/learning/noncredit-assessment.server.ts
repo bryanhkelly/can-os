@@ -37,9 +37,10 @@ function publicText(raw:Record<string,unknown>,field:string):string {
   return value;
 }
 
-async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemptId:string) {
+async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemptId:string,
+  readHistory=false) {
   requireLearner(context);
-  const access=await authorizeCanonicalCourseAttempt(tx,context,courseAttemptId);
+  const access=await authorizeCanonicalCourseAttempt(tx,context,courseAttemptId,readHistory);
   if(access.source!=="noncredit"||!access.noncreditRegistrationId)
     throw new AuthorizationError("active noncredit course attempt");
   const [registration]=await tx.select().from(noncreditRegistrations)
@@ -64,34 +65,54 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
       eq(assessmentFormAdministrations.assessmentVersionId,version.id),
       eq(assessmentFormAdministrations.deploymentId,access.deploymentId),
       eq(assessmentFormAdministrations.courseVersionId,access.courseVersionId),
-      eq(assessmentFormAdministrations.status,"open"),
+      readHistory?undefined:eq(assessmentFormAdministrations.status,"open"),
     ));
-  // The pilot uses one pinned open administration per course offering.
-  if(rows.length!==1||!rows[0])throw new AuthorizationError("unique active knowledge check administration");
-  const administration=rows[0];
-  if(administration.proctorPolicy!=="none"||
-      administration.administeringOrganizationId!==training.providerOrganizationId)
-    throw new AuthorizationError("nonproctored provider training assessment");
+  const available=rows.filter(row=>row.proctorPolicy==="none" &&
+    row.administeringOrganizationId===training.providerOrganizationId);
+  if(!available.length || (!readHistory&&available.length!==1))
+    throw new AuthorizationError("matching knowledge check administration");
   const now=new Date();
-  if((administration.opensAt&&administration.opensAt>now)||
-     (administration.closesAt&&administration.closesAt<=now))
+  const grants=await tx.select().from(assessmentAccess).where(and(
+    inArray(assessmentAccess.administrationId,available.map(row=>row.id)),
+    eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
+    eq(assessmentAccess.learnerId,registration.learnerId),
+    readHistory?undefined:eq(assessmentAccess.accessStatus,"approved"),
+    readHistory?undefined:lte(assessmentAccess.validFrom,now),
+    readHistory?undefined:or(isNull(assessmentAccess.validThrough),gt(assessmentAccess.validThrough,now)),
+  ));
+  if(!grants.length)throw new AuthorizationError("personal course knowledge check grant");
+  // Historical reads select the grant that owns an actual attempt. They do
+  // NOT reopen the administration, mutate an expired grant or permit retakes.
+  const completedAttempts=readHistory?await tx.select({
+      grantId:assessmentExecutionAttempts.accessGrantId,
+    }).from(assessmentExecutionAttempts)
+      .where(inArray(assessmentExecutionAttempts.accessGrantId,grants.map(g=>g.id)))
+      .orderBy(desc(assessmentExecutionAttempts.createdAt)):[];
+  const historicalGrant=completedAttempts.length?
+    grants.find(g=>g.id===completedAttempts[0]?.grantId):undefined;
+  const activeGrant=grants.find(g=>{
+    const ad=available.find(a=>a.id===g.administrationId);
+    return ad?.status==="open" && g.accessStatus==="approved" &&
+      g.validFrom<=now && (!g.validThrough||g.validThrough>now) &&
+      (!ad.opensAt||ad.opensAt<=now) && (!ad.closesAt||ad.closesAt>now);
+  });
+  const grant=readHistory?(historicalGrant??activeGrant):activeGrant;
+  const administration=available.find(a=>a.id===grant?.administrationId);
+  if(!grant||!administration)
+    throw new AuthorizationError("current or historically completed knowledge check");
+  if(!readHistory&&!activeGrant)
     throw new AuthorizationError("current knowledge check window");
   const [form]=await tx.select().from(assessmentFormVersions)
     .where(and(eq(assessmentFormVersions.id,administration.formVersionId),
       eq(assessmentFormVersions.assessmentVersionId,version.id),
       eq(assessmentFormVersions.lifecycle,"published"))).limit(1);
   if(!form||form.shuffleQuestions)throw new AuthorizationError("approved fixed assessment form");
-  const [grant]=await tx.select().from(assessmentAccess)
-    .where(and(
-      eq(assessmentAccess.administrationId,administration.id),
-      eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
-      eq(assessmentAccess.learnerId,registration.learnerId),
-      eq(assessmentAccess.accessStatus,"approved"),
-      lte(assessmentAccess.validFrom,now),
-      or(isNull(assessmentAccess.validThrough),gt(assessmentAccess.validThrough,now)),
-    )).limit(1);
-  if(!grant)throw new AuthorizationError("preapproved course assessment access grant");
-  return {access,registration,training,administration,form,grant};
+  const canStart=administration.status==="open"&&grant.accessStatus==="approved"&&
+    grant.validFrom<=now&&(!grant.validThrough||grant.validThrough>now)&&
+    (!administration.opensAt||administration.opensAt<=now)&&
+    (!administration.closesAt||administration.closesAt>now)&&
+    access.sectionId===null;
+  return {access,registration,training,administration,form,grant,canStart};
 }
 
 async function loadFormQuestions(tx:Tx,formVersionId:string) {
@@ -206,11 +227,15 @@ async function allowedAttemptCount(tx:Tx,grantId:string,limit:number):Promise<nu
 
 export async function readNoncreditKnowledgeCheck(context:CommandContext,courseAttemptId:string) {
   return db.transaction(async tx=>{
-    const scope=await loadNoncreditAssessment(tx,context,courseAttemptId);
+    const scope=await loadNoncreditAssessment(tx,context,courseAttemptId,true);
     const attempt=await latestAttempt(tx,scope.grant.id);
     const maxAttempts=await allowedAttemptCount(tx,scope.grant.id,scope.administration.attemptLimit);
+    const details=await describeAttempt(tx,attempt,maxAttempts);
+    // Closed administrations retain immutable results, not an in-progress UI.
+    const historical=(!scope.canStart && details.state==="in_progress")
+      ?{...details,state:"closed" as const,questions:[],draftAnswers:[]}:details;
     return {courseAttemptId,assessmentVersionId:scope.training.assessmentVersionId,
-      ...await describeAttempt(tx,attempt,maxAttempts)};
+      canStart:scope.canStart && scope.access.source==="noncredit",...historical};
   });
 }
 
