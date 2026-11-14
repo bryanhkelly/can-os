@@ -19,21 +19,28 @@ function GuardianConsents(){
  if(!data.ok)return <LoaderFailure eyebrow="Family" title="Study group consent" outcome={data}/>;
  return <ConsentList items={data.data}/>;
 }
-function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>}){
+type ConsentItem=Awaited<ReturnType<typeof listCanonicalGuardianGroupConsents>>[number];
+const groupConsentContext=(item:ConsentItem)=>
+ JSON.stringify([item.id,item.groupTitle,item.studentName,item.status,item.obsolete,item.decision]);
+function ConsentList({items}:{items:ConsentItem[]}){
  const router=useRouter();
  const {action}=Route.useSearch();
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
- const [acknowledged,setAcknowledged]=useState<Record<string,boolean>>({});
- async function decide(actionId:string,approve:boolean){
-  await mutation.run(
-   ()=>decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===true}}),
+ const [acknowledged,setAcknowledged]=useState<Record<string,string>>({});
+ async function decide(item:ConsentItem,approve:boolean){
+  const actionId=item.id;
+  if(approve&&acknowledged[actionId]!==groupConsentContext(item))return;
+  const outcome=await mutation.run(
+   ()=>decideCanonicalGroupConsent({data:{actionId,approve,acknowledged:approve && acknowledged[actionId]===groupConsentContext(item)}}),
    {
     successMessage:result=>"obsolete" in result&&result.obsolete?"Request cleared — it was no longer active.":approve?"Permission granted; facilitator review still applies.":"Permission declined.",
     commandErrorMessage:"Unable to save permission.",
     refreshErrorMessage:"Your decision was saved, but the permission list could not refresh. Reopen it rather than submitting twice.",
    },
   );
+  if(outcome.status==="saved"||outcome.status==="refresh-failed")
+   setAcknowledged(previous=>({...previous,[actionId]:""}));
  }
  return <WorkspaceShell eyebrow="Family" title="Study group permissions"
   subtitle="Decide whether your student may participate in a teacher-facilitated group. The facilitator must also approve membership."
@@ -57,17 +64,17 @@ function ConsentList({items}:{items:Awaited<ReturnType<typeof listCanonicalGuard
       ?"Next actor: the group facilitator — guardian permission is recorded, but membership is not active until the facilitator approves."
       :"No further action: permission was declined and the student was not added to the group."}</p>
    {item.obsolete&&<div className="mt-4 flex gap-2">
-    <button disabled={busy} onClick={()=>decide(item.id,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Dismiss</button>
+    <button disabled={busy} onClick={()=>void decide(item,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Dismiss</button>
    </div>}
    {!item.obsolete&&item.status==="open"&&<label className="mt-4 flex items-start gap-3 text-sm">
-    <input type="checkbox" checked={acknowledged[item.id]??false}
-      onChange={event=>setAcknowledged(previous=>({...previous,[item.id]:event.target.checked}))}
+    <input type="checkbox" checked={acknowledged[item.id]===groupConsentContext(item)}
+      onChange={event=>setAcknowledged(previous=>({...previous,[item.id]:event.target.checked?groupConsentContext(item):""}))}
       className="mt-1"/>
     <span>I understand this request permits my student to participate in a supervised school study group, subject to facilitator approval.</span>
    </label>}
    {!item.obsolete&&item.status==="open"&&<div className="mt-4 flex gap-2">
-    <button disabled={busy||!acknowledged[item.id]} onClick={()=>decide(item.id,true)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Allow participation</button>
-    <button disabled={busy} onClick={()=>decide(item.id,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Decline</button>
+    <button disabled={busy||acknowledged[item.id]!==groupConsentContext(item)} onClick={()=>void decide(item,true)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Allow participation</button>
+    <button disabled={busy} onClick={()=>void decide(item,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Decline</button>
    </div>}
   </article>)}
   {!items.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No group permission requests are waiting for your decision.</p>}
