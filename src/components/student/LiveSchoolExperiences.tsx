@@ -125,7 +125,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
        <Field className="mt-2" label={`Reschedule appointment for ${children.find(x=>x.studentPersonId===booking.studentPersonId)?.firstName??"student"}`}>
         <Select disabled={busy} value={replacementSlots[booking.id]??""} onChange={event=>setReplacementSlots(value=>({...value,[booking.id]:event.target.value}))}>
          <option value="">Choose another time</option>
-         {data.slots.filter(slot=>slot.seriesId===booking.seriesId).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt,slot.timezone)} · {slot.timezone}</option>)}
+         {data.slots.filter(slot=>slot.seriesId===booking.seriesId && slot.eligibleStudentPersonIds.includes(booking.studentPersonId)).map(slot=><option key={slot.id} value={slot.id}>{format(slot.startsAt,slot.timezone)} · {slot.timezone}</option>)}
         </Select>
        </Field>
        <Button type="button" variant="outline" size="sm" disabled={busy||!replacementSlots[booking.id]} className="mt-2" onClick={()=>void perform(()=>rescheduleOfficeHour({data:{bookingId:booking.id,newSlotId:replacementSlots[booking.id]}}),"Appointment rescheduled.")}>Save new time</Button>
