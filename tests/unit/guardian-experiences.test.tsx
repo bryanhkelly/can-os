@@ -48,6 +48,7 @@ const guardianData = {
   events: [],
   notices: [],
   slots: [{ id: "slot-1", seriesId: "series-1", startsAt: "2027-11-10T22:00:00.000Z", endsAt: "2027-11-10T22:20:00.000Z", status: "available",
+    siteId: "synthetic-site-1", sectionId: null, eligibleStudentPersonIds: ["student-1"],
     seriesTitle:"Synthetic office hours",teacherName:"Synthetic Teacher",timezone:"America/Los_Angeles" }],
   recentConferenceNotes: [{ id: "note-1", bookingId: "booking-1", studentPersonId: "student-1",
     status: "held", startsAt: "2027-11-09T22:00:00.000Z", seriesTitle: "Synthetic office hours",
