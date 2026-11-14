@@ -76,8 +76,20 @@ try {
   const siblingSite = await q("SELECT id FROM education_v30.sites WHERE id=$1",
     ["22220000-0000-4000-8000-000000000002"]);
   check(ownSite.rowCount === 1 && siblingSite.rowCount === 0, "Site RLS isolation failed");
-  // Operation-to-Site fixture linkage is verified by the trusted demo seeder.
-  // The Blueprint author role must not receive raw participation-table access.
+  // Scoped Operation/Site participation is readable only for current
+  // operators of this Organization; other organizations' links stay hidden.
+  const ownParticipation = await q(
+    "SELECT id FROM education_v30.education_operation_sites " +
+    "WHERE operation_id=$1 AND site_id=$2",
+    [operation, site],
+  );
+  const otherParticipation = await q(
+    "SELECT id FROM education_v30.education_operation_sites " +
+    "WHERE site_id=$1",
+    ["22220000-0000-4000-8000-000000000002"],
+  );
+  check(ownParticipation.rowCount === 1 && otherParticipation.rowCount === 0,
+    "Blueprint Operation-to-Site RLS scope failed");
 
   // A restricted Valor author cannot create a configuration owned by Barton.
   await expectPermissionDenied(
