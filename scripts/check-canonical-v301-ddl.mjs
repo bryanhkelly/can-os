@@ -154,6 +154,34 @@ async function main() {
       "formative_practice_attempts",
       "noncredit_registrations",
     ]]);
+    const nativeBlueprintSecurity = await client.query(`
+      SELECT (SELECT count(*)::integer
+        FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='education_v30'
+          AND c.relname=ANY($1::text[])
+          AND c.relrowsecurity AND c.relforcerowsecurity) AS protected_tables,
+        (SELECT count(*)::integer
+        FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid
+        JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='education_v30'
+          AND p.polname LIKE 'blueprint_%') AS scoped_policies,
+        (SELECT count(*)::integer
+        FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+        WHERE n.nspname='education_v30'
+          AND p.proname='v301_canonical_session_context'
+          AND NOT EXISTS (SELECT 1
+            FROM aclexplode(COALESCE(p.proacl,acldefault('f',p.proowner))) a
+            WHERE a.grantee=0 AND a.privilege_type='EXECUTE'))
+        AS private_session_functions
+    `, [[
+      "canonical_accounts","canonical_account_grants","canonical_sessions",
+      "blueprints","blueprint_versions","blueprint_components",
+      "religious_affiliation_options","evidence_documents",
+      "evidence_document_versions","blueprint_component_approval_decisions",
+      "blueprint_execution_batches","education_operations",
+      "education_operation_organization_roles","program_deployments",
+      "deployment_offering_adoptions",
+    ]]);
     const programCatalogRlsCount = await client.query(`
       SELECT count(*)::integer AS table_count
       FROM pg_class c
@@ -908,6 +936,10 @@ async function main() {
       affiliationCount.rows[0].item_count !== 25 && "religious affiliation options",
       rlsCount.rows[0].table_count !== 10 && "Blueprint forced RLS",
       immutableChildTriggerCount.rows[0].trigger_count !== 4 && "Blueprint child immutability",
+      (nativeBlueprintSecurity.rows[0].protected_tables !== 15 ||
+        nativeBlueprintSecurity.rows[0].scoped_policies < 20 ||
+        nativeBlueprintSecurity.rows[0].private_session_functions !== 1) &&
+        "native Blueprint database and session RLS",
       learningRlsCount.rows[0].table_count !== 19 && "learning forced RLS",
       programCatalogRlsCount.rows[0].table_count !== 11 && "program catalog forced RLS",
       (programCatalogPolicyCheck.rows[0].policy_count !== 21 ||
