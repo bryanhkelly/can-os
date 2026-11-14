@@ -50,9 +50,9 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
             <p className="mt-1 text-sm"><Link to="/staff/students/$personId" params={{personId:x.studentPersonId}} className="underline">{x.studentName}</Link> · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
-            {followedUp[x.assessmentId + ":" + x.studentProfileId] ? (
+            {(followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId) ? (
               <Link to="/actions/$actionId"
-                params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId]!}}
+                params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId!}}
                 className="ml-4 inline-block rounded-lg border px-3 py-2 text-xs font-semibold underline">
                 Open follow-up
               </Link>
