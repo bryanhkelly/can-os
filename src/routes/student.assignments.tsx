@@ -49,7 +49,7 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
    Boolean(item.revisionFeedbackText)))));
  return <WorkspaceShell width="wide" eyebrow="Student learning" title="Your assignments"
   subtitle="Read instructions, open an assignment to work on it, and follow through on feedback."
-  breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/student/courses" search={{ section }} className="underline">{section ? "Class" : "My classes"}</Link><span>/</span><span>Assignments</span></>}
+  breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/classes" search={section ? { section } : {}} className="underline">{section ? "Class" : "My classes"}</Link><span>/</span><span>Assignments</span></>}
   actions={<Link to="/calendar-export" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Export deadlines (.ics)</Link>}>
   {!connected && <p role="status" className="mt-5 rounded-xl border p-4 text-sm">School records are currently unavailable.</p>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
