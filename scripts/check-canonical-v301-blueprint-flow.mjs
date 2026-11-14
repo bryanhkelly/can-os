@@ -63,6 +63,15 @@ try {
   // Operation-to-Site fixture linkage is verified by the trusted demo seeder.
   // The Blueprint author role must not receive raw participation-table access.
 
+  // A restricted Valor author cannot create a configuration owned by Barton.
+  await expectPermissionDenied(
+    "INSERT INTO education_v30.blueprint_configurations " +
+    "(id,blueprint_id,owning_organization_id,name) " +
+    "SELECT $1,id,$2,'Cross-organization denial' " +
+    "FROM education_v30.blueprints WHERE code='can.school.starter'",
+    [randomUUID(), "11110000-0000-4000-8000-000000000002"],
+  );
+
   const recipe = (await q(
     "SELECT b.id AS blueprint_id,v.id AS recipe_id,c.id AS component_id " +
     "FROM education_v30.blueprints b " +
