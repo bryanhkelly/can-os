@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace";
-import { LoaderFailure } from "@/lib/loader-failure";
+import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/canonical/blueprint-reviews")({
 
 function BlueprintReviewPage() {
   const result = Route.useLoaderData();
-  if (!result.ok) return <LoaderFailure eyebrow="CAN OS" title="Blueprint review" outcome={result}/>;
+  if (!result.ok) return <CanonicalBlueprintLoadError title="Independent Blueprint review" message={result.message}/>;
   return <WorkspaceShell
     eyebrow="Independent authorization"
     title="Blueprint reviews"
