@@ -387,7 +387,11 @@ test("teacher grades a submitted assignment and the student sees released feedba
       "Clear supporting evidence. Review your final explanation.",
     );
     await page.getByRole("button",{name:"Post grade"}).click();
-    await expect(page.getByText("Grade posted.")).toBeVisible();
+    await expect.poll(async()=>{
+      const rows=await sql!.query("select status from submissions where id=$1",
+        [fixture!.submissionId]) as Array<{status:string}>;
+      return rows[0]?.status;
+    }).toBe("graded");
   });
   const graded=await sql!.query(
     "select status, score from submissions where id=$1",
