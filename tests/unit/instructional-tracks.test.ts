@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertCurrentPracticeSelection,
   buildTrackManifestUsages,
+  canAccessStudentTrackMaterial,
   decideInstructionalTrackSelection,
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
@@ -299,5 +300,18 @@ describe("learner instructor transition decisions", () => {
       lastTrackVersionId: null,
       requestedTrackVersionId: "teacher-b",
     })).toBe("create");
+  });
+});
+
+describe("policy-scoped learner practice materials", () => {
+  it("hides practice-only materials when the published policy disables practice", () => {
+    expect(canAccessStudentTrackMaterial("practice", false)).toBe(false);
+    expect(canAccessStudentTrackMaterial("practice", true)).toBe(true);
+  });
+
+  it("preserves normal instruction and reference assets regardless of practice settings", () => {
+    expect(canAccessStudentTrackMaterial("instruction", false)).toBe(true);
+    expect(canAccessStudentTrackMaterial("reference", false)).toBe(true);
+    expect(canAccessStudentTrackMaterial("instruction", true)).toBe(true);
   });
 });
