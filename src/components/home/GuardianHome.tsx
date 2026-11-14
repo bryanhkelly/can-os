@@ -152,6 +152,8 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <nav aria-label="Family quick links" className="mt-4 flex flex-wrap gap-2">
      <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">School &amp; conferences</Link>
      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Attendance</Link>
+     <Link to="/guardian/report-cards" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Report cards</Link>
+     <Link to="/guardian/field-trips" className="border bg-card px-3 py-2 text-sm">Field trip permissions</Link>
      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} hash="pickup" className="border bg-card px-3 py-2 text-sm">Pickup &amp; safety</Link>
      <Link to="/guardian/health" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Health &amp; clearance</Link>
      <Link to="/guardian/enrollment-changes" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Transfer &amp; family changes</Link>
@@ -317,6 +319,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
      <Link to="/guardian/watching" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Things CAN Is Watching</Link>
      <Link to="/guardian/admission-offers" search={{student:undefined}} className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Admission offers</Link>
      <Link to="/guardian/course-approvals" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Course approvals</Link>
+     <Link to="/admissions/my-credentials" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Official records and credentials</Link>
      <Link to="/messages" className="inline-flex min-h-11 items-center rounded-full border px-4 py-2 hover:bg-muted focus-visible:outline-2">Messages</Link>
     </div>
    </section>
