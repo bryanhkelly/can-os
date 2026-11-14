@@ -38,6 +38,7 @@ import {
 } from "@/db/canonical-v301";
 import { assertSectionScope, AuthorizationError } from "@/domain/command-context";
 import type { CommandContext } from "@/domain/command-context";
+import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 import { DomainError } from "@/domain/errors";
 import {
   assertCurrentPracticeSelection,
@@ -130,6 +131,11 @@ async function loadAuthorizedParticipant(
   allowCompletedHistory = false,
 ): Promise<{ attempt: CourseAttempt; participant: AuthorizedParticipant }> {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
+  // Native canonical learners use a current Course attempt as their ONLY
+  // authorization source, independent of Site, school and Section membership.
+  if (context.role === "learner") {
+    await authorizeCanonicalCourseAttempt(tx, context, attemptId, allowCompletedHistory);
+  }
   const [attempt] = await tx.select().from(learnerCourseAttempts)
     .where(eq(learnerCourseAttempts.id, attemptId))
     .limit(1);
