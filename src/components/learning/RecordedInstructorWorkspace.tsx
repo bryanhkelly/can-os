@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
+import { CourseAssessmentPanel } from "@/components/learning/CourseAssessmentPanel";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -294,6 +295,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     </>}
 
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
+    {instruction && !instruction.sectionId && <CourseAssessmentPanel courseAttemptId={courseAttemptId}/>}
   </section>;
 }
 
