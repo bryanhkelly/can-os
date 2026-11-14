@@ -5,7 +5,7 @@ export const canonicalLearningEventSchema = z.object({
   clientEventId: z.string().uuid(),
   kind: z.enum([
     "lesson_opened", "lesson_resumed", "resource_opened",
-    "video_opened", "video_played", "video_ended", "engaged_interval",
+    "video_opened", "video_played", "video_paused", "video_ended", "engaged_interval",
   ]),
   lessonId: z.string().uuid().nullable(),
   resourceId: z.string().uuid().nullable(),
