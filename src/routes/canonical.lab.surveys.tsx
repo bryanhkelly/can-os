@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
@@ -13,12 +13,15 @@ export const Route = createFileRoute("/canonical/lab/surveys")({
 function SurveysLabPage() {
   const result = Route.useLoaderData();
   if (!result.ok) return <CanonicalBlueprintLoadError title="Survey inspection" message={result.message}/>;
-  const { definitions, campaigns, limits } = result.data;
+  const { definitions, campaigns, limits, draftAuthoringEnabled } = result.data;
 
   return <WorkspaceShell width="wide" eyebrow="Internal · Canonical v3.0.1"
     title="Survey inspection"
     subtitle="Review organization-owned survey definitions and operating campaigns, with question previews and noncredit pilot preflight.">
     <CapabilityLabNav current="surveys"/>
+    {draftAuthoringEnabled && <p className="mt-5"><Link to="/canonical/lab/survey-drafts"
+      className="inline-flex min-h-10 items-center border border-border bg-card px-4 text-sm font-semibold text-primary">
+      Create survey draft</Link></p>}
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="text-base font-semibold">What preflight checks</h2>
       <p className="mt-2 text-sm leading-6 text-muted-foreground">

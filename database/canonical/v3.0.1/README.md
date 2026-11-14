@@ -404,3 +404,23 @@ Do **not** rerun the one-time patch on those branches. The published schema and
 runtime database are aligned for these tables, but credential feature flags
 remain disabled until restricted DB grants and role-based acceptance tests pass.
 See `verify-achievement-credentials.sql` for the reusable, read-only checks.
+
+### Optional survey draft writer (not installed by default)
+
+The temporary Capability Lab survey draft page is guarded by
+`CAN_CANONICAL_SURVEY_DRAFT_ENABLED` (default off). On an isolated test database,
+a trusted schema owner first runs:
+
+```sh
+psql "$TEST_DATABASE_URL" -f database/canonical/v3.0.1/patch-survey-draft-authoring.sql
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \\
+  -v application_role=YOUR_RESTRICTED_APP_LOGIN \\
+  -f database/canonical/v3.0.1/provision-survey-draft-author-role.sql
+```
+
+The writer role is isolated per Organization and has only SELECT/INSERT on draft
+survey definitions, versions, questions and options, plus restricted audit/event
+inserts. PostgreSQL RLS blocks cross-organization and published-content writes.
+Existing independent survey publication review and campaign permission gates
+remain unchanged. Do not enable for production until restricted-role SQL and
+browser acceptance pass. This patch is not automatically applied or migrated.

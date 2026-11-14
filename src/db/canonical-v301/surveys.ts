@@ -13,6 +13,7 @@ export const surveyDefinitions = educationV30.table("survey_definitions", {
 export const surveyVersions = educationV30.table("survey_versions", {
   id:id(), surveyId:uuid("survey_id").notNull(),
   versionNo:integer("version_no").notNull(),locale:text("locale").notNull(),
+  authorPersonId:uuid("author_person_id").notNull(),
   lifecycle:text("lifecycle").$type<"draft"|"published">().notNull(),
   publishedAt:timestamp("published_at",{withTimezone:true}),
 });

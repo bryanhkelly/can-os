@@ -90,3 +90,19 @@ provisional result before the UI offers provider finalization; prior finalized
 results may be used as completion evidence only if not superseded. This is an
 advisory UI filter: provider commands and SQL independently revalidate all
 lifecycle, scorer, independence and completion requirements.
+
+## Survey draft authoring (flagged)
+
+The temporary `/canonical/lab/survey-drafts` page creates a new reusable survey
+and its version 1 in `draft` lifecycle, including dynamically configured questions
+and choices, in one audited transaction. It cannot modify an existing survey,
+publish a version, create campaigns, invite respondents or handle protected
+safeguarding questions. The database separately requires independent privacy,
+accessibility and safeguarding reviews for publication.
+
+Disabled by default. To test, a trusted administrator must first apply
+`patch-survey-draft-authoring.sql` to an isolated database, provision the exact
+restricted organization-bound role with `provision-survey-draft-author-role.sql`,
+and set `CAN_CANONICAL_SURVEY_DRAFT_ENABLED=true` for the testing process.
+No SQL was executed against a database by this code change; it is not release
+or security acceptance.

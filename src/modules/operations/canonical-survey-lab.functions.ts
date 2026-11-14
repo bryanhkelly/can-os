@@ -77,6 +77,7 @@ export const getCanonicalSurveyLab = createServerFn({ method: "GET" }).handler(a
   if (!versionIds.length) {
     return {
       organizationId,
+      draftAuthoringEnabled: process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED === "true",
       limits: { campaigns: CAMPAIGN_LIMIT, definitions: DEFINITION_LIMIT },
       definitions: definitions.map(row => ({
         ...row,
@@ -136,6 +137,7 @@ export const getCanonicalSurveyLab = createServerFn({ method: "GET" }).handler(a
 
   return {
     organizationId,
+    draftAuthoringEnabled: process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED === "true",
     limits: { campaigns: CAMPAIGN_LIMIT, definitions: DEFINITION_LIMIT },
     definitions: definitions.map(row => ({
       ...row,
@@ -148,9 +150,10 @@ export const getCanonicalSurveyLab = createServerFn({ method: "GET" }).handler(a
       const questions = loadedQuestions.filter(item => item.versionId === row.versionId)
         .map(question => ({
           ...question,
-          options: options.filter(option => option.questionId === question.id).map(option => ({
+          prompt: question.safetyTriage ? "" : question.prompt,
+          options: (question.safetyTriage ? [] : options.filter(option => option.questionId === question.id).map(option => ({
             id: option.id, ordinal: option.ordinal, label: option.label,
-          })),
+          }))),
         }));
       const invitations = invitationCounts.find(item => item.campaignId === row.id);
       const branchCount = Number(branchCounts.find(item => item.versionId === row.versionId)?.total ?? 0);

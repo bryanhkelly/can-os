@@ -346,6 +346,15 @@
       "writeBoundary": "Read-only GET; no qualification review, document write, or opening authorization"
     },
     {
+      "file": "src/routes/canonical.lab.survey-drafts.tsx",
+      "route": "/canonical/lab/survey-drafts",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Native canonical site_admin or registrar creates a version 1 survey draft, not a published or learner-accessible campaign",
+      "readBoundary": "Native canonical Site-scoped staff session and feature flag; exact organization-derived purpose-bound PostgreSQL role",
+      "writeBoundary": "Atomic restricted SET LOCAL ROLE inserts definition, version, question/options, audit and domain event; RLS draft-only and no publication, review or invitation grant"
+    },
+    {
       "file": "src/routes/canonical.lab.surveys.tsx",
       "route": "/canonical/lab/surveys",
       "owner": "operations",

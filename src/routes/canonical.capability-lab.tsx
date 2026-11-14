@@ -12,6 +12,12 @@ export const Route = createFileRoute("/canonical/capability-lab")({
 
 const areas = [
   {
+    title: "Survey draft authoring",
+    detail: "Create versioned, reusable survey drafts. Disabled by default until the scoped writer role is provisioned.",
+    path: "/canonical/lab/survey-drafts",
+    status: "Feature-flagged write workflow",
+  },
+  {
     title: "Site qualification",
     detail: "Inspect site qualification applications, program-fit assessments, requirement findings and reviewer recommendations.",
     path: "/canonical/lab/site-qualification",
