@@ -20,7 +20,7 @@ import {
   offerings,
   programDeployments,
 } from "@/db/canonical-v301";
-import { blueprintDeploymentCode, executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
+import { assertCurrentBlueprintExecutionVersion, blueprintDeploymentCode, executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
 import {
   assertCapability,
   AuthorizationError,
@@ -105,10 +105,7 @@ export async function executeBlueprintConfiguration(
       .where(eq(blueprintConfigurationVersions.configurationId, configurationVersion.configurationId))
       .orderBy(desc(blueprintConfigurationVersions.revision))
       .limit(1);
-    if (latestConfigurationVersion?.id !== configurationVersion.id) {
-      throw new DomainError("CONFLICT",
-        "This Blueprint configuration was revised. Submit and review the latest version before execution.");
-    }
+    assertCurrentBlueprintExecutionVersion(configurationVersion.id, latestConfigurationVersion?.id);
 
     const [operation] = await tx.select({
       id: educationOperations.id,
