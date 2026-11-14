@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { CanonicalBlueprintWorkspace } from "@/components/launch-studio/CanonicalBlueprintWorkspace";
 import { BlueprintReferenceCatalogPanel } from "@/components/launch-studio/BlueprintReferenceCatalogPanel";
 import { WorkspaceShell } from "@/components/workspace";
-import { LoaderFailure } from "@/lib/loader-failure";
+import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
 import { readCanonicalBlueprintHome } from "@/modules/blueprints/blueprint-studio.functions";
 
@@ -14,7 +14,7 @@ export const Route = createFileRoute("/canonical/blueprints")({
 
 function CanonicalBlueprintPage() {
   const outcome = Route.useLoaderData();
-  if (!outcome.ok) return <LoaderFailure title="Canonical Blueprint Studio" outcome={outcome} />;
+  if (!outcome.ok) return <CanonicalBlueprintLoadError title="Canonical Blueprint Studio" message={outcome.message} />;
 
   const { role, siteId, referencesEnabled } = outcome.data;
   if (role === "blueprint_reviewer") {
