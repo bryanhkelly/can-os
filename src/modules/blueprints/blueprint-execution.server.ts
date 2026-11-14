@@ -15,6 +15,7 @@ import {
   domainEvents,
   educationOperationOrganizationRoles,
   educationOperations,
+  educationOperationSites,
   offeringVersions,
   offerings,
   programDeployments,
@@ -78,6 +79,7 @@ export async function executeBlueprintConfiguration(
       blueprintVersionId: blueprintConfigurationVersions.blueprintVersionId,
       configurationId: blueprintConfigurationVersions.configurationId,
       lifecycle: blueprintConfigurationVersions.lifecycle,
+      config: blueprintConfigurationVersions.config,
       owningOrganizationId: blueprintConfigurations.owningOrganizationId,
     }).from(blueprintConfigurationVersions)
       .innerJoin(
@@ -124,6 +126,26 @@ export async function executeBlueprintConfiguration(
       .limit(1);
     if (!operatorRole) {
       throw new AuthorizationError("current Operation operator relationship");
+    }
+    // The Organization may operate multiple schools or learning centers.
+    // Execution must target the Operation serving this specific planned Site.
+    const plannedSiteId = configurationVersion.config?.siteId;
+    if (typeof plannedSiteId !== "string"
+      || !context.scope.siteIds?.includes(plannedSiteId)) {
+      throw new AuthorizationError("Blueprint execution Site scope");
+    }
+    const [siteParticipation] = await tx.select({ id: educationOperationSites.id })
+      .from(educationOperationSites)
+      .where(and(
+        eq(educationOperationSites.operationId, operation.id),
+        eq(educationOperationSites.siteId, plannedSiteId),
+        lte(educationOperationSites.validFrom, now),
+        or(isNull(educationOperationSites.validThrough),
+          gt(educationOperationSites.validThrough, now)),
+      ))
+      .limit(1);
+    if (!siteParticipation) {
+      throw new AuthorizationError("current Operation participation in the Blueprint Site");
     }
 
     const commandLockKey = [
