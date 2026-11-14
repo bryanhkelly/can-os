@@ -6825,6 +6825,7 @@ CREATE TABLE noncredit_training_versions (
  published_at timestamptz, state text NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','published')),
  author_person_id uuid NOT NULL REFERENCES persons(id), approved_by_person_id uuid REFERENCES persons(id),
  assessment_version_id uuid REFERENCES assessment_versions(id),
+  baseline_assessment_version_id uuid REFERENCES assessment_versions(id),
  UNIQUE(id,offering_version_id),
  CHECK(state<>'published' OR (published_at IS NOT NULL AND approved_by_person_id IS NOT NULL AND approved_by_person_id<>author_person_id))
 );
@@ -6891,63 +6892,67 @@ CREATE TRIGGER learner_course_attempt_source_gate
 -- The published training approver is the accountable authorizing principal.
 CREATE OR REPLACE FUNCTION v301_provision_noncredit_knowledge_access(p_attempt uuid) RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_auto_assessment$
-DECLARE rec record; administration_id uuid; administration_count integer; person_learner uuid;
+DECLARE rec record; administration_id uuid; administration_count integer;
+        person_learner uuid; candidate_version uuid;
 BEGIN
  SELECT ca.id,ca.deployment_id,ca.course_version_id,ca.status,
         ca.offering_version_id,ca.adoption_id,
         r.id AS registration_id,r.participant_person_id,r.learner_id AS registration_learner_id,
         r.status AS registration_status,
-        t.assessment_version_id,t.provider_organization_id,t.approved_by_person_id
+        t.assessment_version_id,t.baseline_assessment_version_id,
+        t.provider_organization_id,t.approved_by_person_id
  INTO rec
  FROM learner_course_attempts ca
  JOIN noncredit_registrations r
-   ON r.id=ca.noncredit_registration_id
-   AND r.deployment_id=ca.deployment_id
-   AND r.adoption_id=ca.adoption_id
-   AND r.offering_version_id=ca.offering_version_id
+   ON r.id=ca.noncredit_registration_id AND r.deployment_id=ca.deployment_id
+   AND r.adoption_id=ca.adoption_id AND r.offering_version_id=ca.offering_version_id
  JOIN noncredit_training_versions t
    ON t.id=r.training_version_id AND t.offering_version_id=ca.offering_version_id
  WHERE ca.id=p_attempt
    AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
-   AND ca.status='active'
-   AND r.status IN ('registered','active')
-   AND t.state='published' AND t.assessment_version_id IS NOT NULL
-   AND t.approved_by_person_id IS NOT NULL;
-
+   AND ca.status='active' AND r.status IN ('registered','active')
+   AND t.state='published' AND t.approved_by_person_id IS NOT NULL
+   AND (t.assessment_version_id IS NOT NULL OR t.baseline_assessment_version_id IS NOT NULL);
  IF NOT FOUND THEN RETURN; END IF;
- SELECT count(*),min(ad.id) INTO administration_count,administration_id
- FROM assessment_administrations ad
- JOIN assessment_versions version ON version.id=ad.assessment_version_id
- JOIN assessment_definitions definition ON definition.id=version.assessment_id
- JOIN assessment_form_versions form ON form.id=ad.form_version_id
- WHERE ad.assessment_version_id=rec.assessment_version_id
-   AND ad.deployment_id=rec.deployment_id
-   AND ad.course_version_id=rec.course_version_id
-   AND ad.administering_organization_id=rec.provider_organization_id
-   AND ad.status='open' AND ad.proctor_policy='none'
-   AND version.lifecycle='published'
-   AND form.lifecycle='published'
-   AND definition.purpose IN ('formative','practice','readiness','mastery');
- IF administration_count<>1 THEN RETURN; END IF;
-
  INSERT INTO learner_profiles(person_id)
- VALUES(rec.participant_person_id)
- ON CONFLICT(person_id) DO NOTHING;
- SELECT id INTO person_learner FROM learner_profiles
- WHERE person_id=rec.participant_person_id;
+ VALUES(rec.participant_person_id) ON CONFLICT(person_id) DO NOTHING;
+ SELECT id INTO person_learner FROM learner_profiles WHERE person_id=rec.participant_person_id;
  IF rec.registration_learner_id IS NOT NULL
     AND rec.registration_learner_id IS DISTINCT FROM person_learner THEN
    RAISE EXCEPTION 'Noncredit registration is assigned to another learner';
  END IF;
  UPDATE noncredit_registrations SET learner_id=person_learner
  WHERE id=rec.registration_id AND learner_id IS NULL;
- -- Never reopen a revoked grant; conflict means preserve its existing status.
- INSERT INTO assessment_access_grants
-   (administration_id,learner_id,course_attempt_id,granted_by_person_id,access_status)
- VALUES(administration_id,person_learner,p_attempt,rec.approved_by_person_id,'approved')
- ON CONFLICT (administration_id,learner_id,course_attempt_id) DO NOTHING;
-END $v301_auto_assessment$;
 
+ FOR candidate_version IN SELECT DISTINCT id FROM unnest(ARRAY[
+   rec.assessment_version_id,rec.baseline_assessment_version_id
+ ]) AS id WHERE id IS NOT NULL LOOP
+   SELECT count(*),min(ad.id) INTO administration_count,administration_id
+   FROM assessment_administrations ad
+   JOIN assessment_versions av ON av.id=ad.assessment_version_id
+   JOIN assessment_definitions definition ON definition.id=av.assessment_id
+   JOIN assessment_form_versions form ON form.id=ad.form_version_id
+   WHERE ad.assessment_version_id=candidate_version
+     AND ad.deployment_id=rec.deployment_id
+     AND ad.course_version_id=rec.course_version_id
+     AND ad.administering_organization_id=rec.provider_organization_id
+     AND ad.status='open' AND ad.proctor_policy='none'
+     AND av.lifecycle='published' AND form.lifecycle='published'
+     AND (
+       (candidate_version=rec.assessment_version_id
+         AND definition.purpose IN ('formative','practice','readiness','mastery'))
+       OR (candidate_version=rec.baseline_assessment_version_id
+         AND definition.purpose='diagnostic')
+     );
+   IF administration_count=1 THEN
+     -- Never reopen a revoked grant. Each phase has its own administration.
+     INSERT INTO assessment_access_grants
+       (administration_id,learner_id,course_attempt_id,granted_by_person_id,access_status)
+     VALUES(administration_id,person_learner,p_attempt,rec.approved_by_person_id,'approved')
+     ON CONFLICT (administration_id,learner_id,course_attempt_id) DO NOTHING;
+   END IF;
+ END LOOP;
+END $v301_auto_assessment$;
 CREATE OR REPLACE FUNCTION v301_noncredit_attempt_access_trigger() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_attempt_provision$
 BEGIN
@@ -6978,7 +6983,8 @@ BEGIN
        AND ca.status='active' AND r.status IN ('registered','active')
        AND ca.deployment_id=NEW.deployment_id
        AND ca.course_version_id=NEW.course_version_id
-       AND t.assessment_version_id=NEW.assessment_version_id
+       AND (t.assessment_version_id=NEW.assessment_version_id
+         OR t.baseline_assessment_version_id=NEW.assessment_version_id)
        AND t.provider_organization_id=NEW.administering_organization_id
    LOOP
      PERFORM v301_provision_noncredit_knowledge_access(attempt_row.id);
@@ -11453,7 +11459,14 @@ BEGIN
          AND registration.status IN ('registered','active')
          AND registration.deployment_id=course.deployment_id
          AND training.state='published'
-         AND training.assessment_version_id=administration.assessment_version_id
+         AND (
+           (training.assessment_version_id=administration.assessment_version_id
+             AND coalesce(NEW.result_evidence->>'noncreditPhase','final')='final'
+             )
+           OR (training.baseline_assessment_version_id=administration.assessment_version_id
+             AND NEW.result_evidence->>'noncreditPhase'='baseline'
+             AND definition.purpose='diagnostic')
+         )
          AND administration.deployment_id=course.deployment_id
          AND administration.course_version_id=course.course_version_id
          AND administration.administering_organization_id=training.provider_organization_id
