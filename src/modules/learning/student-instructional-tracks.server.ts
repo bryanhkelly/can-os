@@ -568,7 +568,7 @@ export async function listAvailableInstructionalTracks(
   context: AccessContext,
   raw: z.input<typeof readInstructionalTrackSchema>,
 ): Promise<{
-  choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null }>;
+  choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null; policyVersionId: string }>;
   blocked: Array<{ trackVersionId: string; reason: string }>;
   selection: { trackVersionId: string; revision: number; policyVersionId: string } | null;
 }> {
@@ -600,11 +600,11 @@ export async function listAvailableInstructionalTracks(
         isNull(learnerTrackSelections.supersededAt),
       ))
       .limit(1);
-    const choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null }> = [];
+    const choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null; policyVersionId: string }> = [];
     const blocked: Array<{ trackVersionId: string; reason: string }> = [];
     for (const candidate of candidates) {
       try {
-        await assertTrackAvailable(
+        const eligible = await assertTrackAvailable(
           tx,
           attempt,
           candidate.trackVersionId,
@@ -612,7 +612,7 @@ export async function listAvailableInstructionalTracks(
           "student_choice",
           null,
         );
-        choices.push(candidate);
+        choices.push({ ...candidate, policyVersionId: eligible.policy.id });
       } catch (error) {
         if (!(error instanceof DomainError) && !(error instanceof AuthorizationError)) throw error;
         blocked.push({
