@@ -6,11 +6,16 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   catalogSites, contentAssetVersions, courseLessons, courseVersions, courses,
+  educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
   facilitatedLearningSessions, learnerCourseAttempts, programDeployments,
   siteOrganizationRoles, trackLessonPresentations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
+import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
+import { signPrivateObjectUrl } from "@/platform/storage/r2";
+import { assertFacilitatedInstructionalDelivery } from "./student-instructional-tracks.server";
 import {
   canPairFacilitatedLearning, facilitatedCodeAlphabet, facilitatedCodeLength,
   facilitatedPairSchema, facilitatedPairingWindowMs, facilitatedPlaybackSchema,
@@ -51,7 +56,7 @@ function displayCode(code: string) { return code.slice(0, 5) + "-" + code.slice(
  * AND a current host/operator organization relationship at that same Site.
  * A separate network/denomination affiliation is never required.
  */
-async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string) {
+async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
   const now = new Date();
   const [deployment] = await tx.select({
     id: programDeployments.id, operationId: programDeployments.operationId,
@@ -59,6 +64,18 @@ async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string
   }).from(programDeployments).where(eq(programDeployments.id, deploymentId)).limit(1);
   if (!deployment || !["authorized", "active"].includes(deployment.status))
     throw new AuthorizationError("active or authorized deployment");
+  const [operatingRelationship] = await tx.select({id:educationOperationOrganizationRoles.id})
+    .from(educationOperationOrganizationRoles).where(and(
+      eq(educationOperationOrganizationRoles.operationId,deployment.operationId),
+      eq(educationOperationOrganizationRoles.organizationId,host.organizationId),
+      eq(educationOperationOrganizationRoles.roleCode,"operator"),
+      eq(educationOperationOrganizationRoles.status,"approved"),
+      lte(educationOperationOrganizationRoles.validFrom,now),
+      or(isNull(educationOperationOrganizationRoles.validThrough),
+        gt(educationOperationOrganizationRoles.validThrough,now)),
+    )).limit(1);
+  if (!operatingRelationship)
+    throw new AuthorizationError("approved operator relationship for deployment");
   const [authorizedSite] = await tx.select({siteId:educationOperationSites.siteId})
     .from(educationOperationSites)
     .innerJoin(siteOrganizationRoles,and(
@@ -75,6 +92,7 @@ async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string
     .where(and(
       eq(educationOperationSites.operationId,deployment.operationId),
       inArray(educationOperationSites.siteId,host.siteIds),
+      ...(requiredSiteId ? [eq(educationOperationSites.siteId,requiredSiteId)] : []),
       lte(educationOperationSites.validFrom,now),
       or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
     )).limit(1);
@@ -90,7 +108,7 @@ async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   )).limit(1);
   const [room] = lock ? await query.for("update") : await query;
   if(!room) throw new AuthorizationError("owned facilitated learning room");
-  const access = await authorizedHostDeployment(tx,host,room.deploymentId);
+  const access = await authorizedHostDeployment(tx,host,room.deploymentId,room.siteId);
   if(access.siteId!==room.siteId) throw new AuthorizationError("current Site hosting authority");
   return room;
 }
@@ -100,7 +118,10 @@ function assertRoomLive(room: typeof facilitatedLearningSessions.$inferSelect, n
     throw new AuthorizationError("current facilitated room");
 }
 async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string,assetVersionId:string) {
-  const [presentation] = await tx.select({id:trackLessonPresentations.id})
+  const [presentation] = await tx.select({
+    id:trackLessonPresentations.id,
+    trackVersionId:trackLessonPresentations.trackVersionId,
+  })
     .from(trackLessonPresentations)
     .innerJoin(courseLessons,and(
       eq(courseLessons.id,trackLessonPresentations.courseLessonId),
@@ -116,7 +137,98 @@ async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string
       eq(trackLessonPresentations.assetVersionId,assetVersionId),
     )).limit(1);
   if(!presentation) throw new AuthorizationError("published presentation in this course");
+  return presentation.trackVersionId;
 }
+
+/** Permission checks for a room use a real active Course attempt with a current
+ * Deployment adoption, never a fabricated facilitator enrollment. */
+async function representativeAttempt(tx: Tx, deploymentId:string, courseVersionId:string) {
+  const [attempt] = await tx.select().from(learnerCourseAttempts).where(and(
+    eq(learnerCourseAttempts.deploymentId,deploymentId),
+    eq(learnerCourseAttempts.courseVersionId,courseVersionId),
+    eq(learnerCourseAttempts.status,"active"),
+  )).limit(1);
+  if(!attempt) throw new AuthorizationError("active registered course delivery");
+  return attempt;
+}
+const roomMediaInput=roomIdInput.extend({
+  lessonId:z.string().uuid(),assetVersionId:z.string().uuid(),
+}).strict();
+const protectedMediaKey=/^learning\/instructional-track\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Preview only the currently distributable, independently approved recordings
+ * for the selected room. The private media URL is never included in this catalog.
+ */
+export const getFacilitatedRoomMedia = createServerFn({method:"GET"})
+  .validator((value:unknown)=>roomIdInput.parse(value))
+  .handler(async({data})=>{
+    privateResult();
+    const host=await requireCanonicalLabProvider();
+    return db.transaction(async tx=>{
+      const room=await ownedRoom(tx,host,data.facilitatedSessionId);
+      assertRoomLive(room,new Date());
+      const attempt=await representativeAttempt(tx,room.deploymentId,room.courseVersionId);
+      const candidates=await tx.select({
+        lessonId:courseLessons.id,lessonTitle:courseLessons.title,
+        assetVersionId:trackLessonPresentations.assetVersionId,
+        trackVersionId:trackLessonPresentations.trackVersionId,
+      }).from(trackLessonPresentations).innerJoin(courseLessons,and(
+        eq(courseLessons.id,trackLessonPresentations.courseLessonId),
+        eq(courseLessons.courseVersionId,room.courseVersionId),
+      )).where(eq(trackLessonPresentations.courseVersionId,room.courseVersionId))
+        .orderBy(asc(courseLessons.lessonOrder)).limit(25);
+      const approved:typeof candidates=[];
+      for(const candidate of candidates){
+        try {
+          await assertFacilitatedInstructionalDelivery(
+            tx,attempt,candidate.trackVersionId,candidate.lessonId,candidate.assetVersionId,
+          );
+          approved.push(candidate);
+        }catch(error){
+          if(!(error instanceof AuthorizationError) && !(error instanceof DomainError))
+            throw error;
+        }
+      }
+      return {facilitatedSessionId:room.id,media:approved,
+        truncated:candidates.length===25,
+        note:"Only current authorized instructional track recordings appear."};
+    });
+  });
+
+/** Facilitators can stream only recordings that pass the SAME track review,
+ * rights, publication-manifest and withdrawal guards as the learner player.
+ */
+export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
+  .validator((value:unknown)=>roomMediaInput.parse(value))
+  .handler(async({data})=>{
+    privateResult();
+    const host=await requireCanonicalLabProvider();
+    return db.transaction(async tx=>{
+      const room=await ownedRoom(tx,host,data.facilitatedSessionId);
+      assertRoomLive(room,new Date());
+      const trackVersionId=await validateRoomVideo(
+        tx,room.courseVersionId,data.lessonId,data.assetVersionId,
+      );
+      const attempt=await representativeAttempt(tx,room.deploymentId,room.courseVersionId);
+      await assertFacilitatedInstructionalDelivery(
+        tx,attempt,trackVersionId,data.lessonId,data.assetVersionId,
+      );
+      const [asset]=await tx.select({
+        storageReference:contentAssetVersions.storageReference,
+      }).from(contentAssetVersions).where(and(
+        eq(contentAssetVersions.id,data.assetVersionId),
+        eq(contentAssetVersions.lifecycle,"published"),
+      )).limit(1);
+      const expectedKey=instructionalTrackAssetStorageKey(data.assetVersionId);
+      if(!asset||asset.storageReference!==expectedKey||
+        !protectedMediaKey.test(asset.storageReference))
+        throw new AuthorizationError("approved private video resource");
+      return {downloadUrl:signPrivateObjectUrl({
+        method:"GET",key:asset.storageReference,
+        keyPattern:protectedMediaKey,expiresSeconds:30,
+      }),expiresInSeconds:30};
+    });
+  });
 
 export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
   .handler(async()=>{
@@ -278,7 +390,13 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       assertRoomLive(room,new Date());
-      await validateRoomVideo(tx,room.courseVersionId,data.lessonId,data.assetVersionId);
+      const trackVersionId=await validateRoomVideo(
+        tx,room.courseVersionId,data.lessonId,data.assetVersionId,
+      );
+      const attempt=await representativeAttempt(tx,room.deploymentId,room.courseVersionId);
+      await assertFacilitatedInstructionalDelivery(
+        tx,attempt,trackVersionId,data.lessonId,data.assetVersionId,
+      );
       const [existing]=await tx.select().from(facilitatedLearningPlayback)
         .where(and(
           eq(facilitatedLearningPlayback.facilitatedSessionId,room.id),
