@@ -73,18 +73,20 @@ async function run() {
       const client = await pool.connect();
       clients.push(client);
       await client.query("BEGIN TRANSACTION READ ONLY");
+      await client.query("SET LOCAL ROLE can_v301_recorded_instruction_reader");
     }
     const contexts = [];
     for (const client of clients) {
       const { rows } = await client.query(`
-        SELECT current_user AS db_role, r.rolsuper, r.rolbypassrls,
-               r.rolinherit, r.rolcanlogin,
+        SELECT current_user AS selected_role, session_user AS db_role,
+               r.rolsuper, r.rolbypassrls, r.rolinherit, r.rolcanlogin,
                pg_has_role(r.oid,
                  (SELECT nspowner FROM pg_namespace WHERE nspname='education_v30'),
                  'MEMBER') AS is_schema_owner_member
-        FROM pg_roles r WHERE r.rolname=current_user
+        FROM pg_roles r WHERE r.rolname=session_user
       `);
       assert(rows.length === 1 && rows[0].rolcanlogin &&
+        rows[0].selected_role === "can_v301_recorded_instruction_reader" &&
         !rows[0].rolsuper && !rows[0].rolbypassrls &&
         !rows[0].is_schema_owner_member,
         "Only restricted, non-owner database principals may pass acceptance.");
