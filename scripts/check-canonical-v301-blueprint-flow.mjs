@@ -53,6 +53,22 @@ let started = false;
 try {
   await q("BEGIN");
   started = true;
+  // Establish the real restricted login boundary before entering purpose roles.
+  const login = (await q(`
+    SELECT current_user AS db_user, session_user AS login_user,
+      has_table_privilege(current_user,
+        'education_v30.blueprint_configurations', 'SELECT') AS can_read_plans,
+      has_table_privilege(current_user,
+        'education_v30.configuration_reviews', 'INSERT') AS can_approve,
+      has_table_privilege(current_user,
+        'education_v30.canonical_sessions', 'SELECT') AS can_read_sessions,
+      pg_has_role(current_user, $1, 'SET') AS can_set_author,
+      pg_has_role(current_user, $2, 'SET') AS can_set_reviewer
+  `, [authorRole, reviewerRole])).rows[0];
+  check(login.db_user === login.login_user && !login.can_read_plans &&
+    !login.can_approve && !login.can_read_sessions &&
+    login.can_set_author && login.can_set_reviewer,
+    "The Blueprint test login must be unprivileged and use explicit purpose roles");
   await q("SET LOCAL ROLE " + authorRole);
   const currentRole = (await q("SELECT current_user AS role")).rows[0].role;
   check(currentRole === authorRole, "Author role not established");
