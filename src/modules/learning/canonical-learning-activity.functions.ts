@@ -22,9 +22,10 @@ const startInput = attemptInput.extend({ clientInstanceId: uuid });
 const sessionInput = attemptInput.extend({ learningSessionId: uuid });
 const eventInput = sessionInput.extend({ event: canonicalLearningEventSchema });
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type LearningIdentity = Awaited<ReturnType<typeof getInstructionalLearnerSession>>;
 
-async function currentLearner(tx: Tx, courseAttemptId: string) {
-  const { context:actor, sessionId } = await getInstructionalLearnerSession(getRequest());
+async function currentLearner(tx: Tx, courseAttemptId: string, identity: LearningIdentity) {
+  const { context:actor, sessionId } = identity;
   const personId = actor.actorPersonId;
   if (!personId) throw new AuthorizationError("authenticated session");
   await authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId);
@@ -36,8 +37,8 @@ async function currentLearner(tx: Tx, courseAttemptId: string) {
   if (!attempt) throw new AuthorizationError("current course attempt");
   return { personId, sessionId, attempt };
 }
-async function ownedSession(tx: Tx, input: z.infer<typeof sessionInput>) {
-  const { personId, sessionId, attempt } = await currentLearner(tx, input.courseAttemptId);
+async function ownedSession(tx: Tx, input: z.infer<typeof sessionInput>, identity: LearningIdentity) {
+  const { personId, sessionId, attempt } = await currentLearner(tx, input.courseAttemptId, identity);
   const [session] = await tx.select().from(canonicalLearningSessions)
     .where(and(
       eq(canonicalLearningSessions.id, input.learningSessionId),
@@ -63,8 +64,9 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
   .validator((input: unknown) => startInput.parse(input))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
+    const identity = await getInstructionalLearnerSession(getRequest());
     return db.transaction(async tx => {
-      const { personId, sessionId, attempt } = await currentLearner(tx, data.courseAttemptId);
+      const { personId, sessionId, attempt } = await currentLearner(tx, data.courseAttemptId, identity);
       const now = new Date();
       const [existing] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId, attempt.id),
@@ -115,8 +117,9 @@ export const setCanonicalLearningSessionState = createServerFn({method:"POST"})
   }).parse(input))
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control","private, no-store");
+    const identity = await getInstructionalLearnerSession(getRequest());
     return db.transaction(async tx => {
-      const {session}=await ownedSession(tx,data);
+      const {session}=await ownedSession(tx,data,identity);
       const now=new Date();
       if (session.endedAt) return { ...output(session), changed:false };
       const expired=learningSessionIsExpired(session.startedAt,session.lastInteractionAt,now);
@@ -139,8 +142,9 @@ export const recordCanonicalLearningEvent = createServerFn({method:"POST"})
   .validator((input:unknown)=>eventInput.parse(input))
   .handler(async ({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const identity = await getInstructionalLearnerSession(getRequest());
     return db.transaction(async tx=>{
-      const {attempt,session}=await ownedSession(tx,data);
+      const {attempt,session}=await ownedSession(tx,data,identity);
       const digest=createHash("sha256").update(JSON.stringify(data.event)).digest("hex");
       const [prior]=await tx.select().from(canonicalLearningEvents).where(and(
         eq(canonicalLearningEvents.learningSessionId,session.id),
@@ -220,9 +224,10 @@ export const getCanonicalLearningHistory=createServerFn({method:"GET"})
   .validator((input:unknown)=>attemptInput.parse(input))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const identity = await getInstructionalLearnerSession(getRequest());
     return db.transaction(async tx=>{
       // The completed-attempt history path may be enabled once policy and read grants are tested.
-      await currentLearner(tx,data.courseAttemptId);
+      await currentLearner(tx,data.courseAttemptId,identity);
       const events=await tx.select({
         id:canonicalLearningEvents.id,kind:canonicalLearningEvents.kind,
         lessonId:canonicalLearningEvents.lessonId,resourceId:canonicalLearningEvents.resourceId,
