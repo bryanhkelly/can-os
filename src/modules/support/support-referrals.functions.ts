@@ -176,29 +176,37 @@ export const createSupportReferral = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireActor(["teacher"], "referrals:create");
     const observations = safeNote(data.observations);
-    const sites = actorSiteIds(actor);
     const { db, s } = await context();
-    const students = await taughtStudentIds(db, s, actor);
+    const roster=await activeTeacherReferralRoster(db,s,actor);
     const subjectId = data.studentProfileId;
-    if (!subjectId || !students.includes(subjectId)) throw new AuthorizationError("referral student relationship");
+    const eligibleSection=roster.find((row: any)=>row.studentProfileId===subjectId);
+    if(!eligibleSection)throw new AuthorizationError("referral student relationship");
     const created = await db.transaction(async (tx: any) => {
       // Derive the referral's owning school and program from the student's
       // actual active enrollment in a section taught by this teacher.
+      await authorizeClass(actor,eligibleSection.sectionId,undefined,tx);
+      // Recheck both current memberships in the mutation transaction.
+      const activeProgram=alias(s.enrollments,"teacher_referral_create_program");
       const [placement]=await tx.select({
         siteId:s.sections.siteId,programId:s.sections.programId,
-        organizationId:s.programs.organizationId,
+        organizationId:s.programs.organizationId,sectionId:s.sections.id,
       }).from(s.enrollments)
-       .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
-       .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
-       .innerJoin(s.sectionTeachers,and(
-         eq(s.sectionTeachers.sectionId,s.sections.id),
-         eq(s.sectionTeachers.personId,actor.actorPersonId)))
-       .where(and(eq(s.enrollments.studentProfileId,subjectId),
-         eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
-         inArray(s.sections.siteId,actor.scope.siteIds??[]),
-         inArray(s.sections.programId,actor.scope.programIds??[])))
-       .limit(1);
-      if(!placement)throw new AuthorizationError("student enrollment in a taught section");
+        .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+        .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+        .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+        .innerJoin(activeProgram,and(
+          eq(activeProgram.studentProfileId,s.enrollments.studentProfileId),
+          eq(activeProgram.programId,s.sections.programId),
+          eq(activeProgram.schoolYearId,s.terms.schoolYearId),
+          eq(activeProgram.kind,"program"),eq(activeProgram.status,"active"),
+        ))
+        .where(and(eq(s.enrollments.studentProfileId,subjectId),
+          eq(s.sections.id,eligibleSection.sectionId),eq(s.sections.active,true),
+          eq(s.enrollments.programId,s.sections.programId),
+          eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+          eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active")))
+        .limit(1);
+      if(!placement)throw new AuthorizationError("current student enrollment in an authorized Section");
        const coordinatorPersonId = await firstSpecialistAtSites(
          tx, s, [placement.siteId], destination[data.category],
        );
@@ -209,6 +217,7 @@ export const createSupportReferral = createServerFn({ method: "POST" })
          organizationId: placement.organizationId,
         siteId: placement.siteId,
         programId: placement.programId,
+        sectionId: placement.sectionId,
         subjectType: "student_profile", subjectId,
         metadata: { source: "teacher_referral" },
       }).returning({ id: s.actions.id });
