@@ -204,14 +204,15 @@ describe("read-only staff Action detail",()=>{
     expect(html).toContain('href="/home" class="underline">Back to workspace</a>');
   });
   it("allows a teacher to record and resolve only an owned open missing-work follow-up",()=>{
-    state.data={ok:true,data:{
+    const record={
       id:"follow-up",title:"Overdue essay",type:"missing_work_follow_up",
       description:"Student has not submitted",status:"open",priority:"normal",
       dueAt:null,resolvedAt:null,resolutionNote:null,sectionId:"english",
       siteId:"site",programId:"program",canReviewClass:true,
       canResolveMissingWork:true,canManageOperations:false,
       workspaceHome:"/teacher/missing-work",
-    }};
+    };
+    state.data={ok:true,data:record};
     const html=render(Action);
     expect(html).toContain('href="/teacher/missing-work"');
     expect(html).toContain("Resolve this follow-up");
@@ -219,7 +220,7 @@ describe("read-only staff Action detail",()=>{
     expect(html).toContain("Resolve follow-up");
     expect(html).toContain('href="/classes?section=english"');
     expect(html).not.toContain("Open owning operations workflow");
-    state.data={ok:true,data:{...state.data.data,status:"resolved"}};
+    state.data={ok:true,data:{...record,status:"resolved"}};
     expect(render(Action)).not.toContain("Resolve this follow-up");
   });
   it("links active registrar work to the exact scoped owning workflow, not closed work",()=>{
