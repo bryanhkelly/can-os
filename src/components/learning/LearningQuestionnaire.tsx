@@ -13,13 +13,21 @@ export type LearningQuestion = SurveyQuestion & {
  * structured assessments. Scoring remains server-side in the assessment
  * engine. This component never contains correct answers or awards credit.
  */
-export function LearningQuestionnaire({title,questions,submitLabel="Submit responses",onSubmit}:{
+export function LearningQuestionnaire({
+  title,questions,submitLabel="Submit responses",onSubmit,
+  initialAnswers=[],onDraftChange,
+}:{
   title:string;
   questions:readonly LearningQuestion[];
   submitLabel?:string;
   onSubmit:(answers:SurveyAnswerInput[])=>Promise<void>;
+  /** Initial server-restored draft. Key the component by attempt to reset it. */
+  initialAnswers?:readonly SurveyAnswerInput[];
+  onDraftChange?:(questionId:string,answer:SurveyAnswerInput|null)=>void;
 }) {
-  const [draft,setDraft]=useState<Record<string,SurveyAnswerInput>>({});
+  const [draft,setDraft]=useState<Record<string,SurveyAnswerInput>>(
+    ()=>Object.fromEntries(initialAnswers.map(answer=>[answer.questionId,answer])),
+  );
   const [pending,setPending]=useState(false);
   const [error,setError]=useState("");
   function update(questionId:string,answer:SurveyAnswerInput|null) {
@@ -29,6 +37,7 @@ export function LearningQuestionnaire({title,questions,submitLabel="Submit respo
       return next;
     });
     setError("");
+    onDraftChange?.(questionId,answer);
   }
   async function submit(event:FormEvent<HTMLFormElement>) {
     event.preventDefault();
