@@ -77,6 +77,20 @@ BEGIN
     course_attempt_id,course_version_id,access_session_id,
     client_instance_id,participant_person_id)
    VALUES(attempt,version,gen_random_uuid(),gen_random_uuid(),person);
+  -- Re-pairing must also fail once the room pairing window has expired.
+  UPDATE education_v30.facilitated_learning_sessions
+    SET pairing_expires_at=clock_timestamp()-interval '1 second' WHERE id=room;
+  BEGIN
+    UPDATE education_v30.facilitated_learning_participants
+      SET last_paired_at=clock_timestamp() WHERE id=pair;
+    RAISE EXCEPTION 'EXPIRED_PAIRING_ACCEPTED';
+  EXCEPTION WHEN OTHERS THEN
+    GET STACKED DIAGNOSTICS diagnostic=MESSAGE_TEXT;
+    IF diagnostic NOT LIKE '%live room and registered course participant%' THEN
+      RAISE EXCEPTION 'Expired room code test failed: %',diagnostic; END IF;
+  END;
+  UPDATE education_v30.facilitated_learning_sessions
+    SET pairing_expires_at=clock_timestamp()+interval '5 minutes' WHERE id=room;
   UPDATE education_v30.facilitated_learning_sessions
     SET state='ended',ended_at=clock_timestamp() WHERE id=room;
   BEGIN
