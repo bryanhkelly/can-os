@@ -296,27 +296,54 @@
       "route": "/canonical/capability-lab",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Provider overview of scoped counts and links; no route-level mutation",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
+    },
+    {
+      "file": "src/routes/canonical.lab.credentials.tsx",
+      "route": "/canonical/lab/credentials",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Provider-scoped credential previews only; no credential issuance",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
+    },
+    {
+      "file": "src/routes/canonical.lab.deployments.tsx",
+      "route": "/canonical/lab/deployments",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only current approved operator and Site scoped deployment, adoption and aggregate participation inspection",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
     },
     {
       "file": "src/routes/canonical.lab.noncredit.tsx",
       "route": "/canonical/lab/noncredit",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Provider noncredit access provisioning, finalized assessment and completion commands use owned audited server functions",
+      "writeBoundary": "No direct writes on this route; command-enabled noncredit testing delegates to authorized audited canonical domain commands",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
+    },
+    {
+      "file": "src/routes/canonical.lab.readiness.tsx",
+      "route": "/canonical/lab/readiness",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only provider-owned assessment definitions/versions, without secure answers or learner results",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records; assessment definitions are owned by the session organization",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
     },
     {
       "file": "src/routes/canonical.lab.surveys.tsx",
       "route": "/canonical/lab/surveys",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only provider-owned survey campaign and response counts; no individual answers",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
       "file": "src/routes/church.apply.tsx",

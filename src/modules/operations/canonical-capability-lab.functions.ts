@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
 import {
   assessmentAccess, assessmentExecutionAttempts, assessmentExecutionResults,
@@ -8,8 +8,7 @@ import {
   noncreditRegistrations, noncreditTrainingVersions, surveyCampaigns,
   surveyDefinitions, surveyQuestions, surveyResponses, surveyVersions,
 } from "@/db/canonical-v301";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
-import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { requireCanonicalLabProvider } from "./canonical-capability-lab-access.server";
 
 /**
  * Read-only, organization-scoped index for the native canonical provider lab.
@@ -18,13 +17,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
  */
 export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handler(async () => {
   setResponseHeader("Cache-Control", "private, no-store");
-  const actor = await getCanonicalCommandContext(getRequest());
-  if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? ""))
-    throw new AuthorizationError("canonical provider staff");
-  assertCapability(actor, "noncredit.assessment.provision");
-  const orgIds = actor.scope.organizationIds ?? [];
-  if (orgIds.length !== 1) throw new AuthorizationError("single provider organization");
-  const organizationId = orgIds[0]!;
+  const { actor, organizationId } = await requireCanonicalLabProvider();
 
   const trainings = await db.select({
     id: noncreditTrainingVersions.id,
