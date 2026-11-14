@@ -6,7 +6,7 @@ import type { Actor } from "@/modules/identity/actors.server";
 import { emitEvent,notify,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and,eq,inArray,lt } from "drizzle-orm";
+import { and,desc,eq,inArray,lt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 async function verifiedTeacher(){
@@ -28,7 +28,7 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  const sectionIds=[...new Set((await accessibleClasses(context as Actor)).map(x=>x.id))];
  if(!sectionIds.length)return {connected:true,items:[]};
  const now=new Date();
- const due=await db.select({id:s.assessments.id,title:s.assessments.title,dueAt:s.assessments.dueAt,sectionId:s.assessments.sectionId,course:s.sections.title,timezone:s.sites.timezone}).from(s.assessments)
+ const due=await db.select({id:s.assessments.id,title:s.assessments.title,dueAt:s.assessments.dueAt,sectionId:s.assessments.sectionId,programId:s.sections.programId,course:s.sections.title,timezone:s.sites.timezone}).from(s.assessments)
   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
   .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
   .where(and(inArray(s.assessments.sectionId,sectionIds),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,now)));
@@ -57,10 +57,30 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  ));
  const latest=new Map<string,(typeof submissions)[number]>();
  for(const sub of submissions){const key=sub.assessmentId+":"+sub.studentId;const prev=latest.get(key);if(!prev||sub.attempt>prev.attempt)latest.set(key,sub);}
+ // Existing owner Actions must remain accessible after a reload. Never
+ // surface Action IDs owned by colleagues or tied to other assessments.
+ const ownedActions=await db.select({
+   id:s.actions.id,subjectId:s.actions.subjectId,metadata:s.actions.metadata,
+ }).from(s.actions).where(and(
+   eq(s.actions.type,"missing_work_follow_up"),
+   eq(s.actions.ownerPersonId,context.actorPersonId!),
+   eq(s.actions.subjectType,"student_profile"),
+   inArray(s.actions.status,["open","in_progress","waiting"]),
+   inArray(s.actions.subjectId,[...new Set(eligible.map(x=>x.studentId))]),
+   inArray(s.actions.programId,[...new Set(due.map(x=>x.programId))]),
+ )).orderBy(desc(s.actions.createdAt));
+ const ownedByAssessmentAndStudent=new Map<string,string>();
+ const dueIds=new Set(due.map(x=>x.id));
+ for(const action of ownedActions){
+   const assessmentId=action.metadata?.assessmentId;
+   if(typeof assessmentId!=="string"||!dueIds.has(assessmentId))continue;
+   const key=assessmentId+":"+action.subjectId;
+   if(!ownedByAssessmentAndStudent.has(key))ownedByAssessmentAndStudent.set(key,action.id);
+ }
  const items=due.flatMap(a=>eligible.filter(student=>student.sectionId===a.sectionId).flatMap(student=>{
   const sub=latest.get(a.id+":"+student.studentId);
   if(sub&&sub.status!=="assigned"&&sub.status!=="returned")return [];
-  return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),timezone:a.timezone,studentProfileId:student.studentId,studentPersonId:student.studentPersonId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started"}];
+  return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),timezone:a.timezone,studentProfileId:student.studentId,studentPersonId:student.studentPersonId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started",followUpActionId:ownedByAssessmentAndStudent.get(a.id+":"+student.studentId)??null}];
  })).sort((a,b)=>a.dueAt.localeCompare(b.dueAt));
  return {connected:true,items};
 });
