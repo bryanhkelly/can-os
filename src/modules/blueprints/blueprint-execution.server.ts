@@ -28,6 +28,7 @@ import {
 } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
+import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
 
 type ExecutionResult = {
   executionBatchId: string;
@@ -138,11 +139,7 @@ export async function executeBlueprintConfiguration(
     }
     // The Organization may operate multiple schools or learning centers.
     // Execution must target the Operation serving this specific planned Site.
-    const plannedSiteId = configurationVersion.config?.siteId;
-    if (typeof plannedSiteId !== "string"
-      || !context.scope.siteIds?.includes(plannedSiteId)) {
-      throw new AuthorizationError("Blueprint execution Site scope");
-    }
+    const plannedSiteId = requireBlueprintSiteScope(context, configurationVersion.config);
     const [siteParticipation] = await tx.select({ id: educationOperationSites.id })
       .from(educationOperationSites)
       .where(and(
