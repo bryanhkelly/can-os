@@ -22,8 +22,7 @@ Instrument Serif headings and semantic status colors.
 - `/canonical/lab/noncredit`: provider-scoped noncredit course attempts; existing
   assessment access provisioning, provider result finalization and noncredit
   completion commands, each subject to canonical service and SQL rules.
-- `/canonical/lab/surveys`: provider-scoped campaign/status/version/question/
-  response counts. No individual answers, respondent names or unsafe survey writes.
+- `/canonical/lab/surveys`: provider-owned survey definition inventory, operating campaign invitation/response counts, ordered question/option previews and a fail-closed configuration preflight for the existing identified noncredit learner survey flow. It exposes no individual answers, invitation recipients or survey writes.
 - `/canonical/blueprints` and `/canonical/blueprint-reviews`: pre-existing owned
   Blueprint authoring and independent review workflows.
 
@@ -48,7 +47,7 @@ tenant. Actions are real database writes; the UI requires explicit acknowledgeme
 
 This is **not** a generic management UI for all canonical tables. Current
 coverage is limited to the first 100 training versions, course attempts and
-survey campaigns in the organization. Survey authoring, invitations and publishing; actual foundation/readiness decisions;
+survey campaigns in the organization. Survey authoring, invitation writes and publishing; actual foundation/readiness decisions;
 site-qualification authoring and full evidence verification; funding/grant configuration; and end-to-end cross-role
 smoke tests remain to be wired using canonical owned services.
 
@@ -71,3 +70,13 @@ credential reader rather than a provider Lab page. It is also temporary and shou
 move to the approved production learner experience once permission and browser
 acceptance are complete. Do not treat the presence of this route as certification
 that credential revocation, provenance or database role hardening is complete.
+
+### Survey preflight limitations
+
+The Lab's compatibility result checks configuration against the existing identified
+noncredit learner survey flow, not personal eligibility or actual delivery.
+An active learner course participation, authorized deployment, eligible invitation,
+current session and matching permissions must still pass the owned server-side
+learner workflow. Confidential/anonymous surveys, branching, matrix questions and
+safeguarding triage remain unsupported by that flow and are shown as blockers.
+Preview data are bounded; incomplete question or option retrieval fails closed.

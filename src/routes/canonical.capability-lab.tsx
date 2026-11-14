@@ -49,7 +49,7 @@ const areas = [
   },
   {
     title: "Surveys and feedback",
-    detail: "Inspect active campaign versions, response modes, question counts and recorded response counts.",
+    detail: "Inspect owned definitions, operating campaigns, question structure, invitations and pilot compatibility checks.",
     path: "/canonical/lab/surveys",
     status: "Read-only testing page",
   },

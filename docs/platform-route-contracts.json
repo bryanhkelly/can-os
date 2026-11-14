@@ -350,9 +350,9 @@
       "route": "/canonical/lab/surveys",
       "owner": "operations",
       "verification": "pending",
-      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only provider-owned survey campaign and response counts; no individual answers",
-      "writeBoundary": "Read-only GET; no new mutation or lifecycle command",
-      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
+      "roleJourney": "Canonical provider staff inspect owned definitions and operated campaigns, with no respondent identities, private answers or mutation; preflight tests identified noncredit configuration only",
+      "writeBoundary": "Read-only GET; no survey authoring, invitation, publication or response mutation on this page",
+      "readBoundary": "Native canonical session and single provider organization; owned survey definitions and organization-operated campaigns, question definitions, options and aggregate invitation/response counts; no submitted answers or recipient identities"
     },
     {
       "file": "src/routes/canonical.my-credentials.tsx",
