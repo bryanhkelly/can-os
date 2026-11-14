@@ -1,6 +1,6 @@
 # Recorded-instructor RLS acceptance
 
-**Gate:** Do not enable the recorded-instructor route until both the ten-check
+**Gate:** Do not enable the recorded-instructor route until both the eleven-check
 schema readiness query and the restricted two-learner isolation test pass.
 
 The schema and UI are intentionally separate from operating permission. A
@@ -40,7 +40,7 @@ Set these environment variables in the isolated test environment:
 Run `npm run db:canonical:v301:instructional-readiness`.
 
 The command first checks the canonical relationships, immutability, force-RLS
-and presence of application policies. **Only when all ten pass**, it invokes
+and presence of application policies. **Only when all eleven pass**, it invokes
 `db:canonical:v301:instructional-isolation` to prove that both restricted
 logins can read their own Course attempts, selected presenters, lesson
 progress, and practice records but cannot see the other learner's rows.
@@ -61,9 +61,11 @@ must be verified before exposing an application route.
 **Current state:** `test01` (Neon branch `br-bitter-feather-ar0u63x7`)
 is the approved database target for this acceptance, confirmed by the project
 owner. It already contains the canonical learner tables and the corrected
-same-presenter policy-renewal trigger. It has no seeded learner Course
-attempts, and native canonical account/session tables and restricted
-application-role policies remain absent. Run the readiness check against
-`test01`; do not sign off the learner route until the ten-check readiness
+same-presenter policy-renewal trigger. The canonical account, grant and session
+tables are now installed under forced RLS with owner-only access. There
+are still no seeded learner Course attempts or configured restricted
+learner logins; end-to-end session and two-learner isolation acceptance
+remain outstanding. Run the readiness check against
+`test01`; do not sign off the learner route until the eleven-check readiness
 contract and restricted two-learner isolation both pass. Do not run these
 acceptance scripts against `db3.01` or `main`.
