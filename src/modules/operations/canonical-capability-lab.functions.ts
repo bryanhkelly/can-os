@@ -35,6 +35,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
     courseStatus: learnerCourseAttempts.status,
     registrationId: noncreditRegistrations.id,
     registrationStatus: noncreditRegistrations.status,
+    completionPolicyId: noncreditRegistrations.completionPolicyId,
     trainingVersionId: noncreditTrainingVersions.id,
     trainingTitle: noncreditTrainingVersions.title,
   }).from(learnerCourseAttempts)
@@ -98,7 +99,6 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
   const decisions = registrationIds.length
     ? await db.select({
       id: noncreditCompletionDecisions.id,
-      id: noncreditCompletionDecisions.id,
       registrationId: noncreditCompletionDecisions.registrationId,
       outcome: noncreditCompletionDecisions.outcome,
       supersedesId: noncreditCompletionDecisions.supersedesId,
@@ -118,7 +118,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
       now,
     );
     const policy = policies.find(item =>
-      item.trainingVersionId === row.trainingVersionId && item.effectiveAt <= now);
+      item.id === row.completionPolicyId && item.trainingVersionId === row.trainingVersionId);
     const decision = decisions.find(item =>
       item.registrationId === row.registrationId && !supersededDecisions.has(item.id));
     const training = trainings.find(item => item.id === row.trainingVersionId);
