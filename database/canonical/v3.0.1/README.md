@@ -89,7 +89,7 @@ with `seed-blueprint-starters.sql`, using publisher Organization
 `11110000-0000-4000-8000-000000000003`.
 
 Use `/canonical/blueprints` for the native v3 planning experience and
-`/operations/blueprint-reviews` for reviewers. The existing School Hub does
+`/canonical/blueprint-reviews` for reviewers. The existing School Hub does
 not mount canonical widgets because its identifiers come from a separate
 application model. No mappings or compatibility tables are required.
 
