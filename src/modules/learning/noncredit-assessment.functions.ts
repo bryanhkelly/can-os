@@ -5,6 +5,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import {
   beginNoncreditKnowledgeCheck, readNoncreditKnowledgeCheck, submitNoncreditKnowledgeCheck,
+  saveNoncreditKnowledgeCheckDraft,
 } from "./noncredit-assessment.server";
 import { finalizeNoncreditKnowledgeCheck } from "./noncredit-assessment-review.server";
 import { provisionNoncreditAssessmentAccess } from "./noncredit-assessment-access.server";
@@ -37,6 +38,21 @@ export const beginNoncreditKnowledgeCheckAttempt=createServerFn({method:"POST"})
   .handler(async({data})=>{
     privateResponse();
     return beginNoncreditKnowledgeCheck(
+      await getInstructionalLearnerContext(getRequest()),data,
+    );
+  });
+
+const draft=course.extend({
+  attemptId:uuid,questionId:uuid,requestId:uuid,
+  optionIds:z.array(uuid).max(32),
+}).strict();
+
+/** Durable draft answers for interrupted mobile sessions and resume. */
+export const saveNoncreditKnowledgeCheckAnswer=createServerFn({method:"POST"})
+  .validator((v:unknown)=>draft.parse(v))
+  .handler(async({data})=>{
+    privateResponse();
+    return saveNoncreditKnowledgeCheckDraft(
       await getInstructionalLearnerContext(getRequest()),data,
     );
   });
