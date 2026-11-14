@@ -384,3 +384,14 @@ read/write policies, exact-commit PostgreSQL acceptance, canonical Site identity
 cutover, reviewer grants and an evidence-picker workflow are completed. The
 legacy PR #281 School Blueprint service uses different tables and cannot be
 enabled alongside the canonical writer as an alternative authority.
+
+### Learning-award schema (November 14, 2026)
+
+The fresh-build `schema.sql` includes the additive six-table learning-award domain
+and its issuer approval, immutable evidence, currentness and forced-RLS controls.
+An existing v3.0.1 database must apply **only** `patch-achievement-credentials.sql`
+as an additive transaction; do not rerun the full fresh-install schema.
+`test01` Neon passed the isolated additive DDL/trigger/RLS verification.
+The credential issuer and learner-reader runtime paths remain disabled pending
+scoped database-role provisioning and multi-user acceptance tests. Do not interpret
+the mere existence of these tables as authorization to issue a badge or certificate.

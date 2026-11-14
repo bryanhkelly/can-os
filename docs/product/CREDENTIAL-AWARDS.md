@@ -1,7 +1,8 @@
 # CAN OS credential awards: implementation slice 1
 
-**Status:** source and guarded provider previews implemented on `main`; SQL is an opt-in, unexecuted additive
-candidate for canonical v3.0.1. No production issuer role, user-facing
+**Status:** source and guarded provider previews implemented on `main`. The award DDL is merged into the
+canonical v3.0.1 fresh-install `schema.sql` and passed additive DDL validation on Neon `test01`.
+The stand-alone patch is retained for upgrading existing v3.0.1 databases; runtime credential issuance remains disabled. No production issuer role, user-facing
 certificate downloads, or public verification endpoints are enabled.
 
 ## Scope
