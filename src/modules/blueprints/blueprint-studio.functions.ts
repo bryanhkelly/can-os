@@ -17,6 +17,7 @@ import {
 import { executeBlueprintConfigurationInputSchema } from "@/domain/blueprint-execution";
 import { blueprintWorkspaceInputSchema, getCanonicalBlueprintWorkspace } from "./blueprint-workspace.server";
 import { getCanonicalBlueprintReviewQueue } from "./blueprint-review-queue.server";
+import { blueprintReviewEvidenceInputSchema, listBlueprintReviewEvidence } from "./blueprint-review-evidence.server";
 import {
   createBlueprintConfiguration,
   getBlueprintConfiguration,
@@ -89,6 +90,14 @@ export const submitCanonicalBlueprintConfiguration = createServerFn({ method: "P
     const existing = await getBlueprintConfiguration(context, data.configurationId);
     requireBlueprintSiteScope(context, existing.config);
     return submitBlueprintConfiguration(context, data);
+  });
+
+export const listCanonicalBlueprintReviewEvidence = createServerFn({ method: "GET" })
+  .validator((value: unknown) => blueprintReviewEvidenceInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    noStore();
+    requireCanonicalBlueprintWriteEnabled();
+    return listBlueprintReviewEvidence(await getCommandContext(getRequest()), data);
   });
 
 export const listCanonicalBlueprintReviews = createServerFn({ method: "GET" })
