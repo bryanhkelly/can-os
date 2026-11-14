@@ -68,7 +68,10 @@ function GuardianAcademicsPage() {
  return <WorkspaceShell width="wide" eyebrow="Guardian" title="Academic progress"
   subtitle="Review your children's class assignments, instructions and released teacher feedback."
   breadcrumbs={<><Link to="/home" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
-  actions={<Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>}>
+  actions={<div className="flex flex-wrap gap-2">
+   <Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>
+   <Link to="/guardian/report-cards" search={{student:selected||undefined}} className="rounded-lg border px-4 py-2 text-sm">Report cards</Link>
+  </div>}>
    {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
     Student
     <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
