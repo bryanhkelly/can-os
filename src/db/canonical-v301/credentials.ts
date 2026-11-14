@@ -44,7 +44,7 @@ export const learningAwardIssuanceEvents = educationV30.table("learning_award_is
 });
 export const learningAwardArtifacts = educationV30.table("learning_award_artifacts", {
   id: id(), issuanceId: uuid("issuance_id").notNull(),
-  format: text("format").$type<"pdf" | "badge_json" | "png">().notNull(),
+  format: text("format").$type<"pdf" | "badge_json" | "png" | "svg">().notNull(),
   artifactVersion: integer("artifact_version").notNull(),
   storageReference: text("storage_reference").notNull(), sha256: text("sha256").notNull(),
   generatedAt: timestamp("generated_at", { withTimezone: true }).notNull().defaultNow(),

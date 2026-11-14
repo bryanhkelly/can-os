@@ -57,5 +57,7 @@ describe("credential achievement boundary", () => {
     expect(credentialIsCurrent({ ...state, sourceStillValid: false })).toBe(false);
     expect(credentialIsCurrent({ ...state, legacyCertificateRevoked: true })).toBe(false);
     expect(credentialIsCurrent({ ...state, now: new Date("2027-01-01") })).toBe(false);
+    expect(credentialIsCurrent({ ...state, expiresAt: new Date("invalid") })).toBe(false);
+    expect(credentialIsCurrent({ ...state, expiresAt: new Date("2026-11-13") })).toBe(false);
   });
 });

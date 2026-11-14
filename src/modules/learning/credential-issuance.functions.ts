@@ -93,6 +93,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         issuanceId: learningAwardIssuances.id,
         reference: learningAwardIssuances.credentialReference,
         legacyCertificateId: learningAwardIssuances.legacyNoncreditCertificateId,
+        expiresAt: learningAwardIssuances.expiresAt,
       }).from(learnerAchievementDecisions)
         .leftJoin(learningAwardIssuances,
           eq(learningAwardIssuances.achievementDecisionId, learnerAchievementDecisions.id))
@@ -108,15 +109,17 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
             eq(learningAwardIssuanceEvents.eventKind, "revoked"),
           )).limit(1);
         const [legacy] = existing.legacyCertificateId
-          ? await tx.select({ status: noncreditCompletionCertificates.status })
+          ? await tx.select({ status: noncreditCompletionCertificates.status, certificateReference: noncreditCompletionCertificates.certificateReference })
             .from(noncreditCompletionCertificates)
             .where(eq(noncreditCompletionCertificates.id, existing.legacyCertificateId)).limit(1)
           : [];
         if (!credentialIsCurrent({
           issued: true, revoked: Boolean(revocation), sourceStillValid: true,
-          legacyCertificateRevoked: !!existing.legacyCertificateId && legacy?.status !== "issued",
+          legacyCertificateRevoked: !!existing.legacyCertificateId &&
+            (legacy?.status !== "issued" || legacy?.certificateReference !== existing.reference),
+          expiresAt: existing.expiresAt,
           now: new Date(),
-        })) throw new AuthorizationError("issued credential has been revoked");
+        })) throw new AuthorizationError("issued credential is no longer current");
         return { issuanceId: existing.issuanceId, credentialReference: existing.reference,
           kind: definition.definitionKind, alreadyIssued: true };
       }
@@ -130,7 +133,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
       }).returning({ id: learnerAchievementDecisions.id });
       if (!award) throw new Error("Unable to record achievement decision");
 
-      const credentialReference = `CAN-${randomUUID()}`;
+      let credentialReference = `CAN-${randomUUID()}`;
       let legacyCertificateId: string | null = null;
       if (definition.definitionKind === "completion_certificate") {
         const [priorCertificate] = await tx.select().from(noncreditCompletionCertificates)
@@ -140,6 +143,8 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
           throw new AuthorizationError("existing certificate is invalid");
         if (priorCertificate) {
           legacyCertificateId = priorCertificate.id;
+          // A reused canonical certificate is a single award with one reference.
+          credentialReference = priorCertificate.certificateReference;
         } else {
           const [certificate] = await tx.insert(noncreditCompletionCertificates).values({
             decisionId: completion.id,

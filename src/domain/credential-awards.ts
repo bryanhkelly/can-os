@@ -71,5 +71,7 @@ export function credentialIsCurrent(input: {
 }): boolean {
   return input.issued && !input.revoked && input.sourceStillValid &&
     !input.legacyCertificateRevoked && Number.isFinite(input.now.getTime()) &&
-    (!input.expiresAt || input.expiresAt.getTime() > input.now.getTime());
+    (!input.expiresAt ||
+      (Number.isFinite(input.expiresAt.getTime()) &&
+        input.expiresAt.getTime() > input.now.getTime()));
 }
