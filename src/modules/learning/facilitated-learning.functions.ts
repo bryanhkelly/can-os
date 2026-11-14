@@ -9,6 +9,7 @@ import {
   catalogSites, contentAssetVersions, courseLessons, courseVersions, courses,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
+  facilitatedPairingRateLimits,
   facilitatedLearningSessions, learnerCourseAttempts, programDeployments,
   siteOrganizationRoles, trackLessonPresentations,
 } from "@/db/canonical-v301";
@@ -21,6 +22,7 @@ import {
   canPairFacilitatedLearning, facilitatedCodeAlphabet, facilitatedCodeLength,
   facilitatedPairSchema, facilitatedPairingWindowMs, facilitatedPlaybackSchema,
   facilitatedRoomMaxMs, facilitatedStartSchema, normalizeFacilitatedPairingCode,
+  nextFacilitatedPairingLimit,
 } from "@/domain/facilitated-learning";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
@@ -459,18 +461,36 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
       throw new AuthorizationError("authenticated course learner");
     const normalized=normalizeFacilitatedPairingCode(data.pairingCode);
     const codeHash=digestCode(normalized);
-    return db.transaction(async tx=>{
+    // Denials are returned (rather than thrown) inside the transaction to
+    // commit the rate-limit counter even when the pairing code is invalid.
+    const paired=await db.transaction(async tx=>{
       const attempt=await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId);
+      const now=new Date();
+      await tx.insert(facilitatedPairingRateLimits).values({
+        participantPersonId:personId,windowStartedAt:now,attemptCount:0,updatedAt:now,
+      }).onConflictDoNothing();
+      const [limit]=await tx.select().from(facilitatedPairingRateLimits)
+        .where(eq(facilitatedPairingRateLimits.participantPersonId,personId))
+        .for("update").limit(1);
+      if(!limit)throw new Error("Pairing rate-limit record unavailable");
+      const decision=nextFacilitatedPairingLimit({
+        attempts:limit.attemptCount,windowStartedAt:limit.windowStartedAt,
+        blockedUntil:limit.blockedUntil,now,
+      });
+      await tx.update(facilitatedPairingRateLimits).set({
+        windowStartedAt:decision.windowStartedAt,attemptCount:decision.attempts,
+        blockedUntil:decision.blockedUntil,updatedAt:now,
+      }).where(eq(facilitatedPairingRateLimits.participantPersonId,personId));
+      if(!decision.allowed)return null;
       const [room]=await tx.select().from(facilitatedLearningSessions)
         .where(eq(facilitatedLearningSessions.pairingCodeDigest,codeHash))
         .for("update").limit(1);
-      const now=new Date();
-      if(!room||!canPairFacilitatedLearning({
+      if(!room || !canPairFacilitatedLearning({
         sessionState:room.state,startedAt:room.startedAt,
         pairingExpiresAt:room.pairingExpiresAt,now,
         sessionDeploymentId:room.deploymentId,sessionCourseVersionId:room.courseVersionId,
         attemptDeploymentId:attempt.deploymentId,attemptCourseVersionId:attempt.courseVersionId,
-      })) throw new AuthorizationError("valid current course pairing code");
+      }))return null;
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
@@ -480,8 +500,10 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
         set:{lastPairedAt:now,leftAt:null},
       });
       return {facilitatedSessionId:room.id,paired:true,
-        note:"This pairing records a learner's device connection, not attendance or verified watch time."};
+        note:"Pairing records a device connection, not attendance or verified watch time."};
     });
+    if(!paired)throw new AuthorizationError("valid current course pairing code");
+    return paired;
   });
 
 export const leaveFacilitatedRoom = createServerFn({method:"POST"})
