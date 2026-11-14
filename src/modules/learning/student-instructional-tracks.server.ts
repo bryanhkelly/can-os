@@ -48,6 +48,7 @@ import {
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
+  recordedPracticeResponsesComplete,
   snapshotRecordedPracticeAnswers,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
@@ -1068,12 +1069,8 @@ export async function recordFormativePractice(
       );
       if (!material) throw new DomainError("UNAVAILABLE", "Practice activity is unavailable for this track.");
       const definition = parseStudentPracticeDefinition(material.activitySpec);
-      const promptKeys = new Set(definition.prompts.map((prompt) => prompt.key));
-      if (
-        new Set(input.responses.map((response) => response.promptKey)).size !== input.responses.length ||
-        input.responses.some((response) => !promptKeys.has(response.promptKey))
-      ) {
-        invalid("Practice responses must match distinct published prompt keys.");
+      if (!recordedPracticeResponsesComplete(definition.prompts, input.responses)) {
+        invalid("Answer every published practice prompt before saving.");
       }
       const [practiceAttempt] = await tx.insert(formativePracticeAttempts).values({
         courseAttemptId: attempt.id,
