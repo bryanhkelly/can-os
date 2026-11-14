@@ -188,6 +188,16 @@ choose approved catalog references, propose local experiences, save immutable
 revisions, and freeze the current revision for independent review. Approval
 and execution remain distinct from permission to operate a school or program.
 
+The editor's program-model components can now carry published Offering
+adoption intents selected from the Site's canonical availability service.
+Only `supported` and `conditional` results are selectable for private
+planning; unavailable or research-required Offerings are not selectable. An
+intent is not a Deployment or operating approval. The reviewer queue shows the
+Site, selected curated references, Offering intents, and locally proposed
+experiences. Its evidence picker returns only current, verified documents
+owned by the reviewing Organization; the decision service rechecks that scope
+before recording approval.
+
 The canonical review service requires the `blueprint.review` capability, an
 Organization-scoped independent reviewer, and evidence for approved decisions.
 Selected components are approved explicitly in the same transaction as the
