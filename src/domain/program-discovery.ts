@@ -44,6 +44,14 @@ export interface AvailableOffering {
   activationEligible: false;
 }
 
+/** Site planning may select only supported or conditional published Offerings.
+ * Selecting one is still an unapproved adoption intent, never a Deployment. */
+export function canPlanOffering(item: AvailableOffering): boolean {
+  return item.availability.some(policy =>
+    policy.catalogStatus === "supported" || policy.catalogStatus === "conditional"
+  );
+}
+
 export function projectAvailableOfferings(
   products: readonly PublishedOffering[],
   availability: readonly ProgramAvailability[],
