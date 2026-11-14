@@ -23,7 +23,7 @@ function CanonicalBlueprintPage() {
       title="Independent Blueprint review"
       subtitle="Your canonical account has review authority, not Site authoring authority.">
       <p className="mt-5">
-        <Link to="/operations/blueprint-reviews" className="underline">
+        <Link to="/canonical/blueprint-reviews" className="underline">
           Open submitted Blueprint reviews
         </Link>
       </p>
