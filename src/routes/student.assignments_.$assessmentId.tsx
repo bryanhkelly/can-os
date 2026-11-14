@@ -135,7 +135,13 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
   const task = setTimeout(() => {
    if (generation !== saveGeneration.current) return;
    setDraftStatus("saving");
-   const request = saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } });
+   // Queue autosaves so a slower earlier request cannot overwrite a newer draft.
+   const previous = autosaveInFlight.current;
+   const request = (async () => {
+    await previous?.catch(() => undefined);
+    if (generation !== saveGeneration.current || saving.current) return;
+    await saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } });
+   })();
    autosaveInFlight.current = request;
    void request.then(() => { if (generation === saveGeneration.current) setDraftStatus("saved"); })
     .catch(() => { if (generation === saveGeneration.current) setDraftStatus("error"); })
