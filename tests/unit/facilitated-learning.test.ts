@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canPairFacilitatedLearning, facilitatedPairSchema, facilitatedPlaybackSchema,
-  normalizeFacilitatedPairingCode,
+  normalizeFacilitatedPairingCode,nextFacilitatedPairingLimit,
 } from "@/domain/facilitated-learning";
 
 const now = new Date("2026-11-14T19:00:00Z");
@@ -29,6 +29,28 @@ describe("facilitated classroom pairing", () => {
     expect(canPairFacilitatedLearning({...baseline,sessionState:"ended"})).toBe(false);
     expect(canPairFacilitatedLearning({...baseline,pairingExpiresAt:now})).toBe(false);
     expect(canPairFacilitatedLearning({...baseline,startedAt:new Date(now.getTime() - 9*3600_000)})).toBe(false);
+  });
+  it("locks after six attempts, keeps the counter, then resets after the lock window",()=>{
+    const first=nextFacilitatedPairingLimit({
+      attempts:0,windowStartedAt:now,blockedUntil:null,now,
+    });
+    expect(first).toMatchObject({allowed:true,attempts:1,blockedUntil:null});
+    const blocked=nextFacilitatedPairingLimit({
+      attempts:6,windowStartedAt:now,blockedUntil:null,now,
+    });
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.attempts).toBe(7);
+    const denied=nextFacilitatedPairingLimit({
+      attempts:blocked.attempts,windowStartedAt:now,blockedUntil:blocked.blockedUntil,
+      now:new Date(now.getTime()+1000),
+    });
+    expect(denied.allowed).toBe(false);
+    const reset=nextFacilitatedPairingLimit({
+      attempts:blocked.attempts,windowStartedAt:now,blockedUntil:blocked.blockedUntil,
+      now:new Date(now.getTime()+16*60_000),
+    });
+    expect(reset.allowed).toBe(true);
+    expect(reset.attempts).toBe(1);
   });
   it("forbids arbitrary student identity and playback position abuse", () => {
     expect(facilitatedPairSchema.safeParse({
