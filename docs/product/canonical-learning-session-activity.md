@@ -1,9 +1,16 @@
 # CAN OS canonical learning sessions and activity evidence
 
-**Implementation:** Feature branch / PR #293, not merged or deployed.  
-**Migration:** `database/canonical/v3.0.1/patch-learning-session-activity.sql`.  
-**Live DB validation:** Blocked by Neon branch quota. Do not run DDL on main as a substitute.  
-**CI:** Netlify deploy preview skipped due to account build usage; GitHub Actions had a startup failure. Neither provides code-level acceptance.
+**Implementation:** Merged PR #293 into GitHub `main` on November 14, 2026
+(commit `eb131bddd85b93b021cc4a469ceeed14934e9035`).
+**Migration:** The five new session/activity/facilitation tables are installed
+on Neon `test01` and Neon `main`. Both standalone SQL patches are retained
+and their definitions are included in fresh-build `schema.sql`.
+**Database security:** All five tables have FORCE ROW LEVEL SECURITY, one
+owner-only policy, and no PUBLIC table grants; the SQL structure was verified.
+**Release:** `CAN_CANONICAL_ACTIVITY_ENABLED` and
+`CAN_FACILITATED_LEARNING_ENABLED` are **off by default**. No feature activation
+or end-to-end browser acceptance is claimed.
+**CI:** GitHub Actions is still reporting `startup_failure`, not test success.
 
 ## What is implemented
 
@@ -22,15 +29,20 @@
 ## Security and privacy boundary
 
 - No IP, raw token, device fingerprint or keystroke content is stored. The tab instance UUID is not an authentication secret.
-- Non-owner roles have no public grant on activity tables; PostgreSQL row security is enabled with no general read policy. Owner connections bypass RLS, so every server operation still requires authorization.
+- Forced row-level security applies to all five activity/facilitation tables. The only database policy is migration-owner-only; no general learner or PUBLIC table privileges are granted. Every enabled server operation must still check current participation/host authority.
 - Current read model only returns the authorized learner's own course attempt, with no survey answers or private referral data. Provider/network reporting requires separate scope policies and aggregate reads.
 - Estimated active milliseconds are not official attended minutes, proof of video consumption or evidence of mastery. Browser events remain untrusted observations even when linked to a published resource.
 - Privacy notices, retention and deletion/export policy for children and adults require approval before production instrumentation is scaled.
 
 ## Acceptance checks
 
-1. Apply `patch-learning-session-activity.sql` **only** on an explicitly approved disposable Neon branch.
-2. Run `CAN_ACTIVITY_SCHEMA_VALIDATION=1 npm run db:canonical:activity-schema` against that branch's `DATABASE_URL`. This is read-only and checks required tables, columns, composite FKs, indexes and RLS.
+1. The patches are already installed on Neon `test01` and `main`. **Do not
+   rerun those one-time migrations**. For new isolated databases, apply them
+   only after a baseline v3.0.1 schema install.
+2. Run `CAN_ACTIVITY_SCHEMA_VALIDATION=1 npm run db:canonical:activity-schema`
+   against an explicitly selected nonproduction connection. This read-only
+   verifier checks five tables, required columns, composite FKs, indexes,
+   forced RLS, owner-only policies and absence of public table grants.
 3. Run `npm run typecheck`, `npm run lint`, `npx vitest run tests/unit/canonical-learning-activity.test.ts` and recorded-instructor UI tests.
 4. Browser test: current learner, another learner, unrelated guardian, revoked login, withdrawn registration, changed course version, cross-organization attempts, two tabs, reload, browser hidden/focus, idle expiry, and retries.
 5. Confirm the result read model matches real assessment and survey transactions, and cannot be forged by client events.
@@ -39,11 +51,18 @@
 
 ## Not yet delivered
 
-- Facilitator-controlled room pairing and supervised group participation.
-- Program/site/network reporting with a formally approved provider-versus-host authorization policy.
+- Production activation of facilitated room pairing and supervised group
+  participation; the implementation is present but disabled by default.
+- Network-wide reporting and a formally approved provider-versus-host
+  authorization policy; preliminary site-scoped participation evidence is
+  available only behind the release gate.
 - Native video watch-duration measurements; iframe provider analytics require supported provider APIs and consent.
 - Automatic session expiry cleanup, retention jobs, and sustained write-load tests.
 - Offline/supervised time attestation and intervention tracking.
-- Connected browser and database acceptance; CI and schema validation remain blocked.
+- Connected learner/browser and cross-site authorization acceptance. The
+  live schema and forced-RLS checks have passed, but GitHub Actions/Netlify
+  execution have not passed.
 
-Do not merge to production or claim readiness solely on code and isolated unit tests.
+The **code and schema have been merged**, not the release decision. Do not
+enable either new feature flag until restricted-role, multi-learner, paired-
+facilitator, session-expiry and browser flows have passed.

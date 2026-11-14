@@ -48,10 +48,18 @@ try {
         )
     `),
     pool.query(`
-      SELECT c.relname, c.relrowsecurity FROM pg_class c
-        JOIN pg_namespace n ON n.oid=c.relnamespace
+      SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
+        (SELECT count(*) FROM pg_policies p WHERE p.schemaname='education_v30'
+          AND p.tablename=c.relname
+          AND p.policyname='learning_evidence_owner_only') AS owner_policies,
+        (SELECT count(*) FROM aclexplode(
+          coalesce(c.relacl,acldefault('r',c.relowner))) grant_row
+          WHERE grant_row.grantee=0) AS public_grants
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='education_v30'
-        AND c.relname IN ('learning_sessions','learning_session_events')
+        AND c.relname IN ('learning_sessions','learning_session_events',
+          'facilitated_learning_sessions','facilitated_learning_participants',
+          'facilitated_learning_playback')
     `),
   ]);
   const present = new Set(columns.rows.map(row => `${row.table_name}.${row.column_name}`));
@@ -100,7 +108,12 @@ try {
     "facilitated_playback_recent_idx",
   ]) assert(indexSet.has(name), `Missing evidence index: ${name}`);
   assert.equal(security.rows.length,5,"Expected five canonical learning evidence tables");
-  assert(security.rows.every(row=>row.relrowsecurity===true),"Row security must be enabled");
+  assert(security.rows.every(row=>row.relrowsecurity===true &&
+    row.relforcerowsecurity===true),"Forced row security must be enabled on all five tables");
+  assert(security.rows.every(row=>Number(row.owner_policies)===1),
+    "Only explicit owner-only release-gate policies may exist");
+  assert(security.rows.every(row=>Number(row.public_grants)===0),
+    "Learning evidence must have no PUBLIC table permissions");
   console.log("Canonical and facilitated learning evidence schemas verified (read-only).");
 } finally {
   await pool.end();
