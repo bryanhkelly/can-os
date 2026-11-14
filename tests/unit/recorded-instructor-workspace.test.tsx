@@ -52,12 +52,31 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Switching teachers does not erase this history");
   });
 
+  it("shows switching restrictions while still letting a learner renew the same teacher", () => {
+    const choices = [
+      { trackVersionId: "teacher-a", presenterPersonId: "presenter-a",
+        title: "Teacher A", policyVersionId: "new-policy", allowSwitching: false },
+      { trackVersionId: "teacher-b", presenterPersonId: "presenter-b",
+        title: "Teacher B", policyVersionId: "new-policy", allowSwitching: false },
+    ];
+    const html = renderToStaticMarkup(<RecordedInstructorChoices
+      catalog={{
+        choices, blocked: [],
+        selection: { trackVersionId: "teacher-a", policyVersionId: "old-policy", revision: 1 },
+      }}
+      pending={false} onSelect={vi.fn()}/>);
+    expect(html).toContain("Teacher A (renew selection)");
+    expect(html).toContain("Teacher B (switching unavailable)");
+    expect(html).toMatch(/<button(?=[^>]*disabled="")(?=[^>]*>Teacher B)/);
+  });
+
   it("enables renewal of the same instructor while disabling an already-current selection", () => {
     const choice = {
       trackVersionId: "teacher-a",
       presenterPersonId: "presenter-a",
       title: "Teacher A",
       policyVersionId: "policy-2",
+      allowSwitching: true,
     };
     const catalog = {
       choices: [choice],
