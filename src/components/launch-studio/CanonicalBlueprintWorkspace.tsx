@@ -257,11 +257,14 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
               </Select>
             </label>
             <label htmlFor="canonical-blueprint-affiliation" className="min-w-52 flex-1 text-sm">
-              Affiliation code (optional)
-              <Input id="canonical-blueprint-affiliation" className="mt-2"
-                value={religiousAffiliationCode} disabled={busy} maxLength={96}
-                onChange={event => setReligiousAffiliationCode(event.currentTarget.value)}
-                placeholder="Leave blank for unspecified"/>
+              Religious affiliation (optional)
+              <Select id="canonical-blueprint-affiliation" className="mt-2"
+                value={religiousAffiliationCode} disabled={busy}
+                onChange={event => setReligiousAffiliationCode(event.currentTarget.value)}>
+                <option value="">Unspecified</option>
+                {workspace.affiliations.map(option =>
+                  <option key={option.code} value={option.code}>{option.label}</option>)}
+              </Select>
             </label>
           </div>
           <fieldset className="border p-4" disabled={busy}>
