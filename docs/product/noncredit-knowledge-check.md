@@ -2,6 +2,15 @@
 
 **Scope:** Phase 1 private organizational learning; reusable for adult, summer, workforce and other authorized noncredit offerings. No new routes, navigation, grading, academic credits, transcript, or credential issuance.
 
+## Reusable Phase 1 learner experience
+
+- **Assessment availability is course-participation based**, not dependent on whether a recorded instructor has been selected or any video is available. The shared classroom mounts `NoncreditCourseActivities` for authorized noncredit Course attempts.
+- **Recovery:** choice changes are saved as append-only `assessment_response_versions` in the canonical database, with `response_state='saved'`. Resume fetches the latest version for each attempt item and hydrates the shared questionnaire. It never exposes secure answer keys.
+- **Retakes:** the published administration's `attempt_limit` plus authorized accommodation allowances determines the attempt budget. The UI displays attempts remaining and hides the retake action once exhausted. Database attempt-limit triggers remain authoritative.
+- **Milestones:** a published noncredit completion policy can enable `require_all_lessons`. Learner-marked progress uses `learner_lesson_progress` and creates an unscored, **zero-minute** participation event. The completion database gate verifies all lessons are complete on a single authorized noncredit Course attempt before allowing a completion decision. No self-marked lesson becomes attendance minutes.
+- **Status refresh:** the completion panel refreshes after a lesson is marked complete or a knowledge check is submitted. Formal completion remains a separately authorized provider decision and never creates academic records.
+- **Existing databases:** the new lesson policy requires `database/canonical/v3.0.1/patch-noncredit-lesson-milestones.sql` to be reviewed/applied on an isolated database before the service can read `require_all_lessons`.
+
 ## Supported flow
 
 1. An authorized registrar provisions a canonical `learner_profile` (only when missing) and an `assessment_access_grant` bound to the existing noncredit `learner_course_attempt`. No school Enrollment or Section is created.
