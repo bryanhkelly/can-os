@@ -585,7 +585,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    pickupNotificationTypes.has(n.type)&&n.resourceId&&pickupStudents.has(n.resourceType+":"+n.resourceId)?
    `/guardian/attendance?student=${encodeURIComponent(pickupStudents.get(n.resourceType+":"+n.resourceId)!)}#pickup`:
    n.resourceType==="health_office_visit"&&n.resourceId&&permittedMedicalIds.has(n.resourceId)&&context.role==="guardian"?`/guardian/health?student=${encodeURIComponent(medicalChildByVisit.get(n.resourceId)!)}`:
-   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?"/guardian/field-trips":
+   n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&context.role==="guardian"&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="field_trip"&&n.resourceId&&tripNoticeTypes.has(n.type)&&hasRegistrarAuthority(context.role)&&staffTripIds.has(n.resourceId)?"/operations/field-trips":
    n.type==="school_family_alert"&&n.resourceType==="action"&&n.resourceId&&permittedSchoolAlerts.has(n.resourceId)?"/guardian/experiences":
    n.type==="transfer_destination_transcript_ready"&&n.resourceType==="application"&&n.resourceId&&permittedReceivingTranscriptIds.has(n.resourceId)?
@@ -625,8 +625,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     return memberThreadIds.has(thread.id)?`/messages?thread=${encodeURIComponent(thread.id)}`:null;})():
    n.resourceType==="admission_offer"&&n.resourceId&&permittedGuardianOffers.has(n.resourceId)&&context.role==="guardian"?`/guardian/admission-offers?student=${encodeURIComponent(personByProfile.get(admissionOffers.find(offer=>offer.id===n.resourceId)!.studentProfileId)!)}&offer=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="admission_offer"&&n.resourceId&&permittedRegistrarOffers.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/admissions?application=${encodeURIComponent(admissionOffers.find(offer=>offer.id===n.resourceId)!.applicationId)}`:
-   n.type==="course_registration_guardian_review"&&context.role==="guardian"?"/guardian/course-approvals":
-   n.type==="field_trip_permission_requested"&&context.role==="guardian"?"/guardian/field-trips":
+   n.type==="course_registration_guardian_review"&&context.role==="guardian"&&n.resourceType==="action"&&n.resourceId?`/guardian/course-approvals?action=${encodeURIComponent(n.resourceId)}`:
+   n.type==="field_trip_permission_requested"&&context.role==="guardian"&&n.resourceType==="field_trip"&&n.resourceId&&guardianTripIds.has(n.resourceId)?`/guardian/field-trips?trip=${encodeURIComponent(n.resourceId)}`:
    n.type==="study_group_consent_requested"&&context.role==="guardian"&&(
     n.resourceType==="action"&&n.resourceId&&permittedConsents.has(n.resourceId)||
     n.resourceType==="study_group"&&n.resourceId&&groupRows.some(group=>group.id===n.resourceId))?(n.resourceType==="action"?`/guardian/group-permissions?action=${encodeURIComponent(n.resourceId!)}`:"/guardian/group-permissions"):
