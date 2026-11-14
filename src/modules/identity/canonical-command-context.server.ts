@@ -6,6 +6,7 @@ import {
   canonicalAuthReaderDatabaseRole,
   canonicalSessionCookie,
   canonicalSessionRowSchema,
+  type CanonicalSessionRow,
   projectCanonicalCommandContext,
 } from "@/domain/canonical-access";
 
@@ -13,7 +14,7 @@ import {
  * A completely native v3.0.1 session. No account, Person, Site, grant or
  * Organization is read from public-schema identity records.
  */
-export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
   const cookie = request.headers.get("cookie") ?? "";
   const raw = cookie.split(";").map(item => item.trim())
     .find(item => item.startsWith(canonicalSessionCookie + "="))
@@ -41,5 +42,10 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   });
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
-  return projectCanonicalCommandContext(canonicalSessionRowSchema.parse(records[0]));
+  return canonicalSessionRowSchema.parse(records[0]);
+}
+
+/** Domain commands intentionally receive no raw session identifiers. */
+export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+  return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
 }
