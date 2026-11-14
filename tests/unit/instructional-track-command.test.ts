@@ -7,6 +7,7 @@ import {
   saveInstructionalTrackDraftSchema,
 } from "../../src/modules/learning/instructional-track-authoring.server";
 import {
+  completeRecordedLessonSchema,
   instructionalTrackAssetDownloadSchema,
   recordFormativePracticeSchema,
 } from "../../src/modules/learning/student-instructional-tracks.server";
@@ -33,6 +34,21 @@ describe("instructional track commands", () => {
     expect(() => instructionalTrackAssetDownloadSchema.parse({
       ...request,
       assetVersionId: "../private-object",
+    })).toThrow();
+  });
+
+  it("requires learner completion to name one canonical lesson and current selection revision", () => {
+    const request = {
+      requestId: "6a11e2ec-7aa0-4b6f-853e-180e90160614",
+      courseAttemptId: "814910c9-dc18-428a-a400-9b73587cc27e",
+      lessonId: "e35ffedc-7c99-4405-a1c3-37a32cc672ba",
+      expectedRevision: 2,
+    };
+    expect(completeRecordedLessonSchema.parse(request)).toEqual(request);
+    expect(() => completeRecordedLessonSchema.parse({ ...request, lessonId: undefined })).toThrow();
+    expect(() => completeRecordedLessonSchema.parse({ ...request, expectedRevision: 0 })).toThrow();
+    expect(() => completeRecordedLessonSchema.parse({
+      ...request, trackVersionId: "fa9fd6d3-0792-46de-a1e3-bf803179e447",
     })).toThrow();
   });
 
