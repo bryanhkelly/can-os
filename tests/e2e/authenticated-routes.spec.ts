@@ -358,7 +358,7 @@ test("teacher reaches classes, discussions, missing work and their support works
 
     await page.goto("/student/support");
     await expect(page.getByRole("heading",{name:"Refer for support"})).toBeVisible();
-    await expect(page.getByRole("option",{name:/E2E|student/i}).first()).toBeVisible();
+    await expect(page.getByRole("option",{name:/E2E Jordan/})).toBeVisible();
 
     await page.goto("/staff/students/"+fixture!.studentPersonId);
     await expect(page.getByRole("main").getByRole("heading",{level:1})).toBeVisible();
