@@ -25,11 +25,16 @@ describe("canonical learning activity", () => {
     expect(boundedCanonicalActiveMs({event,previousReceivedAt,now,previousForeground:true,sameLesson:false})).toBe(0);
     expect(boundedCanonicalActiveMs({event,previousReceivedAt:new Date(now.getTime()-95_000),now,previousForeground:true,sameLesson:true})).toBe(0);
   });
+  it("rejects unverified assessment and survey outcomes", () => {
+    expect(canonicalLearningEventSchema.safeParse({...event,kind:"survey_submitted"}).success).toBe(false);
+    expect(canonicalLearningEventSchema.safeParse({...event,kind:"assessment_submitted"}).success).toBe(false);
+  });
   it("limits timestamps and session age", () => {
     expect(() => validateLearningEventTime(new Date(now.getTime()-360_000).toISOString(), now)).toThrow();
     expect(() => validateLearningEventTime(new Date(now.getTime()+20_000).toISOString(), now)).toThrow();
     expect(learningSessionIsExpired(new Date(now.getTime()-20_000),null,now)).toBe(false);
     expect(learningSessionIsExpired(new Date(now.getTime()-13*3600_000),null,now)).toBe(true);
+    expect(learningSessionIsExpired(new Date(now.getTime()-31*60_000),null,now)).toBe(true);
     expect(learningSessionIsExpired(new Date(now.getTime()-3600_000),new Date(now.getTime()-31*60_000),now)).toBe(true);
   });
 });
