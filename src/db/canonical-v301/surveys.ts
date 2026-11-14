@@ -55,8 +55,8 @@ export const surveyResponses = educationV30.table("survey_responses", {
   id:id(),campaignId:uuid("campaign_id").notNull(),
   surveyVersionId:uuid("survey_version_id").notNull(),
   respondentMode:text("respondent_mode").$type<"identified"|"confidential"|"anonymous">().notNull(),
-  invitationId:uuid("invitation_id"),submittedAt:timestamp("submitted_at",{withTimezone:true}).notNull(),
-  languageCode:text("language_code").notNull(),
+  invitationId:uuid("invitation_id"),submittedAt:timestamp("submitted_at",{withTimezone:true}).notNull().defaultNow(),
+  languageCode:text("language_code").notNull().default("en-US"),
 });
 export const surveyAnswers = educationV30.table("survey_answers", {
   id:id(),responseId:uuid("response_id").notNull(),
