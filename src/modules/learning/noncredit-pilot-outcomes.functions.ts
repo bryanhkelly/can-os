@@ -85,6 +85,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       courseIds.length?db.select({
         courseAttemptId:learnerLessonProgress.courseAttemptId,
         lessonId:learnerLessonProgress.lessonId,status:learnerLessonProgress.status,
+        observedAt:learnerLessonProgress.observedAt,
       }).from(learnerLessonProgress)
         .where(inArray(learnerLessonProgress.courseAttemptId,courseIds)):[],
       courseIds.length?db.select({
@@ -102,6 +103,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         .orderBy(desc(noncreditCompletionDecisions.decidedAt)),
       db.select({
         registrationId:noncreditParticipationEvents.registrationId,
+        occurredAt:noncreditParticipationEvents.occurredAt,
+        countedMinutes:noncreditParticipationEvents.countedMinutes,
       }).from(noncreditParticipationEvents)
         .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)),
     ]);
@@ -194,7 +197,12 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         Number(r.possible)>0 && checkById.get(r.attemptId)?.submittedAt)
         .sort((a,b)=>checkById.get(a.attemptId)!.submittedAt!.getTime()-
                      checkById.get(b.attemptId)!.submittedAt!.getTime())[0];
-      const paired=!!firstBaseline&&!!firstFinal&&
+      const startedBeforeInstruction=!!firstBaseline&&
+        !progress.some(p=>ownAttemptIds.has(p.courseAttemptId)&&p.status==="completed"&&
+          p.observedAt<checkById.get(firstBaseline.attemptId)!.submittedAt!)&&
+        !participationEvents.some(p=>p.registrationId===reg.id&&p.countedMinutes>0&&
+          p.occurredAt<checkById.get(firstBaseline.attemptId)!.submittedAt!);
+      const paired=!!firstBaseline&&!!firstFinal&&startedBeforeInstruction&&
         checkById.get(firstBaseline.attemptId)!.submittedAt!<
         checkById.get(firstFinal.attemptId)!.submittedAt!;
       const passed=finalResults.find(r=>r.outcome==="pass");

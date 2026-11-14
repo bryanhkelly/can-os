@@ -9,6 +9,7 @@ import {
   assessmentExecutionResponses, assessmentExecutionChoices, assessmentItemSecureKeys,
   assessmentAutoScores, assessmentExecutionResults, auditEvents, domainEvents,
   noncreditRegistrations, noncreditTrainingVersions, learnerCourseAttempts,
+  learnerLessonProgress,noncreditParticipationEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import {
@@ -129,8 +130,21 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
       )).limit(1);
     baselineLocked=!!laterPhase;
   }
+  if(phase==="baseline"){
+    // Initial knowledge measurements must precede documented instruction,
+    // not merely precede the final assessment.
+    const [progressed]=await tx.select({id:learnerLessonProgress.id})
+      .from(learnerLessonProgress)
+      .where(and(eq(learnerLessonProgress.courseAttemptId,access.courseAttemptId),
+        eq(learnerLessonProgress.status,"completed"))).limit(1);
+    const [attended]=await tx.select({id:noncreditParticipationEvents.id})
+      .from(noncreditParticipationEvents)
+      .where(and(eq(noncreditParticipationEvents.registrationId,registration.id),
+        gt(noncreditParticipationEvents.countedMinutes,0))).limit(1);
+    baselineLocked=baselineLocked||!!progressed||!!attended;
+  }
   if(!readHistory&&baselineLocked)
-    throw new AuthorizationError("baseline diagnostic must precede final assessment");
+    throw new AuthorizationError("baseline diagnostic must precede documented instruction and final assessment");
   const canStart=!baselineLocked&&administration.status==="open"&&grant.accessStatus==="approved"&&
     grant.validFrom<=now&&(!grant.validThrough||grant.validThrough>now)&&
     (!administration.opensAt||administration.opensAt<=now)&&
