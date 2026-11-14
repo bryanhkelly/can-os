@@ -30,9 +30,14 @@ function GuardianReportCardsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [error, setError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     let active = true;
+    setLoadingStudents(true);
+    setError("");
+    setStudents([]);
+    setSelected("");
     getGuardianStudents().then(result => {
       if (!active) return;
       setStudents(result.students);
@@ -47,7 +52,7 @@ function GuardianReportCardsPage() {
       }
     });
     return () => { active = false; };
-  }, []);
+  }, [retryKey]);
 
   useEffect(() => {
     if (!selected) { setGrades([]); setTranscript({ rows: [], issuances: [] }); setLoading(false); return; }
@@ -87,7 +92,9 @@ function GuardianReportCardsPage() {
         </select>
       </label>}
       <QueryState loading={(loading || loadingStudents) && "Loading report card…"}
-        error={error || unavailable} isEmpty={students.length === 0}
+        error={error || unavailable}
+        onRetry={error ? ()=>{setError("");setRetryKey(current=>current+1);} : undefined}
+        isEmpty={students.length === 0}
         empty={<EmptyState className="mt-8" title="No students with academic-viewing permission were found at your school." />}>
         <ReportCardView grades={grades} />
         <TranscriptView rows={transcript.rows} issuances={transcript.issuances} />
