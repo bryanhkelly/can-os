@@ -32,16 +32,22 @@ describe("recorded instructor learner workspace", () => {
   });
   it("shows a course-level completion action without tying progress to the instructor", () => {
     const available = renderToStaticMarkup(
-      <RecordedLessonCompletionAction completed={false} pending={false} onComplete={vi.fn()}/>,
+      <RecordedLessonCompletionAction allowed={true} completed={false} pending={false} onComplete={vi.fn()}/>,
     );
     expect(available).toContain("Mark lesson complete");
     expect(available).not.toContain("disabled");
 
     const completed = renderToStaticMarkup(
-      <RecordedLessonCompletionAction completed={true} pending={false} onComplete={vi.fn()}/>,
+      <RecordedLessonCompletionAction allowed={true} completed={true} pending={false} onComplete={vi.fn()}/>,
     );
     expect(completed).toContain("Lesson completed");
     expect(completed).toContain("disabled");
+
+    const guardian = renderToStaticMarkup(
+      <RecordedLessonCompletionAction allowed={false} completed={false} pending={false} onComplete={vi.fn()}/>,
+    );
+    expect(guardian).toBe("");
+    expect(guardian).not.toContain("Mark lesson complete");
   });
 
   it("keeps class lessons, assignments and grades linked to one canonical Section", () => {
