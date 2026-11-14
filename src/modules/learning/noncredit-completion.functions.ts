@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -41,10 +41,13 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
         .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1);
       if(!training)throw new AuthorizationError("published noncredit training");
       const now=new Date();
-      const [policy]=await tx.select().from(noncreditCompletionPolicies)
-        .where(and(eq(noncreditCompletionPolicies.trainingVersionId,registration.trainingVersionId),
-          lte(noncreditCompletionPolicies.effectiveAt,now)))
-        .orderBy(desc(noncreditCompletionPolicies.policyVersion)).limit(1);
+      // Never substitute newer rules for the participant's pinned policy.
+      const [policy]=registration.completionPolicyId
+        ?await tx.select().from(noncreditCompletionPolicies)
+          .where(and(
+            eq(noncreditCompletionPolicies.id,registration.completionPolicyId),
+            eq(noncreditCompletionPolicies.trainingVersionId,registration.trainingVersionId),
+          )).limit(1):[];
       const [lessons,progress]=await Promise.all([
         tx.select({id:courseLessons.id}).from(courseLessons)
           .where(eq(courseLessons.courseVersionId,authorized.courseVersionId)),
@@ -132,7 +135,9 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
         .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(1);
       return {
         courseAttemptId:authorized.courseAttemptId,trainingVersionId:training.id,
+        policyId:registration.completionPolicyId??null,
         policyVersion:policy?.policyVersion??null,
+        completionMode:policy?.completionMode??null,
         ...result,recordedCompletion:latestDecision?.outcome==="completed",
       };
     });

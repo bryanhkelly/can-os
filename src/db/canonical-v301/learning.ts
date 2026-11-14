@@ -598,6 +598,7 @@ export const noncreditRegistrations = educationV30.table("noncredit_registration
   learnerId: uuid("learner_id"),
   registeringOrganizationId: uuid("registering_organization_id").notNull(),
   registeredAt: timestamp("registered_at", { withTimezone: true }).notNull().defaultNow(),
+  completionPolicyId: uuid("completion_policy_id"),
   status: text("status")
     .$type<"registered" | "active" | "completed" | "withdrawn" | "cancelled">()
     .notNull()

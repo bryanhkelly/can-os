@@ -48,6 +48,9 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
       knowledgeCheckRevision={assessmentRevision}/>
     <section className="space-y-2 border bg-card p-4">
       <h3 className="font-serif text-lg font-semibold">Training completion</h3>
+      {readiness?.policyVersion&&<p className="text-xs text-muted-foreground">
+        Your requirements are locked to completion policy v{readiness.policyVersion}.
+      </p>}
       {readiness?
         <>
           <p className="text-sm">
@@ -60,6 +63,8 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
           </p>
           <p className="text-sm">
             {readiness.recordedCompletion?"Training completion recorded.":
+              readiness.eligible&&readiness.completionMode==="automatic"
+                ?"Completion requirements satisfied; automatic confirmation is processing.":
               readiness.eligible?"Completion requirements satisfied; provider decision pending.":
                 "Some completion requirements remain outstanding."}
           </p>
