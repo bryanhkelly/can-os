@@ -107,12 +107,12 @@ describe("authorized notification destinations",()=>{
   });
   it("deep-links a guardian course approval review to its workspace",async()=>{
     notification("action","request","course_registration_guardian_review");
-    expect((await getNotifications())[0]?.href).toBe("/guardian/course-approvals");
+    expect((await getNotifications())[0]?.href).toBe("/guardian/course-approvals?action=request");
   });
   it("deep-links a field trip permission request to its workspace",async()=>{
     notification("field_trip","trip","field_trip_permission_requested");
     state.rows.field_trips=[{id:"trip"}];
-    expect((await getNotifications())[0]?.href).toBe("/guardian/field-trips");
+    expect((await getNotifications())[0]?.href).toBe("/guardian/field-trips?trip=trip");
   });
   it("withholds guardian approval destinations from other roles",async()=>{
     state.role="teacher";
