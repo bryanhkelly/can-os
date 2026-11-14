@@ -7,8 +7,8 @@ import {
   assessmentFormVersions, assessmentItemOptions, assessmentItemVersions,
   assessmentVersions, assessmentExecutionAttempts, assessmentExecutionItems,
   assessmentExecutionResponses, assessmentExecutionChoices, assessmentItemSecureKeys,
-  assessmentAutoScores, assessmentExecutionResults, noncreditRegistrations,
-  noncreditTrainingVersions,
+  assessmentAutoScores, assessmentExecutionResults, auditEvents, domainEvents,
+  noncreditRegistrations, noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import {
@@ -223,6 +223,19 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       .where(eq(assessmentExecutionAttempts.id,attempt.id));
     const [started]=await tx.select().from(assessmentExecutionAttempts)
       .where(eq(assessmentExecutionAttempts.id,attempt.id)).limit(1);
+    const startedPayload={courseAttemptId:scope.access.courseAttemptId,
+      assessmentAttemptId:attempt.id,assessmentVersionId:scope.training.assessmentVersionId};
+    await tx.insert(auditEvents).values({
+      actorPersonId:context.actorPersonId,
+      owningOrganizationId:scope.training.providerOrganizationId,
+      eventCode:"noncredit.assessment.started",
+      entityKind:"assessment_attempt",entityId:attempt.id,payload:startedPayload,
+    });
+    await tx.insert(domainEvents).values({
+      eventType:"NoncreditKnowledgeCheckStarted",
+      aggregateType:"assessment_attempt",aggregateId:attempt.id,
+      actorPersonId:context.actorPersonId,payload:startedPayload,
+    });
     return describeAttempt(tx,started!);
   });
 }
@@ -333,6 +346,22 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
       await tx.update(assessmentExecutionAttempts).set({state:"finalized"})
         .where(eq(assessmentExecutionAttempts.id,attempt.id));
     }
+    const submittedPayload={
+      courseAttemptId:scope.access.courseAttemptId,assessmentAttemptId:attempt.id,
+      assessmentResultId:result.id,assessmentVersionId:scope.training.assessmentVersionId,
+      autoFinalized:autoFinalize,
+    };
+    await tx.insert(auditEvents).values({
+      actorPersonId:context.actorPersonId,
+      owningOrganizationId:scope.training.providerOrganizationId,
+      eventCode:"noncredit.assessment.submitted",
+      entityKind:"assessment_attempt",entityId:attempt.id,payload:submittedPayload,
+    });
+    await tx.insert(domainEvents).values({
+      eventType:"NoncreditKnowledgeCheckSubmitted",
+      aggregateType:"assessment_attempt",aggregateId:attempt.id,
+      actorPersonId:context.actorPersonId,payload:submittedPayload,
+    });
     return {state:autoFinalize?"finalized" as const:"scored" as const,
       attemptId:attempt.id,resultId:result.id,outcome:evaluated.outcome,
       pointsEarned:earned,pointsPossible:total,
