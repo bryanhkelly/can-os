@@ -12146,4 +12146,11 @@ CREATE TRIGGER facilitated_playback_evidence_immutable
  BEFORE UPDATE OR DELETE ON facilitated_learning_playback
  FOR EACH ROW EXECUTE FUNCTION v301_guard_learning_evidence_immutable();
 
+-- Caller cannot execute validation/trigger functions as a public API.
+REVOKE ALL ON FUNCTION v301_guard_learning_session_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_facilitated_room_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_facilitated_pair_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_facilitated_playback_identity() FROM PUBLIC;
+REVOKE ALL ON FUNCTION v301_guard_learning_evidence_immutable() FROM PUBLIC;
+
 COMMIT;
