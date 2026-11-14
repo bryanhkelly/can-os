@@ -25,6 +25,7 @@ export function FamilyHomePage({action,student}: {action?:string;student?:string
  const [needs, setNeeds] = useState<NeedItem[]>([]);
  const [loading, setLoading] = useState(true);
  const [error, setError] = useState("");
+ const [retryKey, setRetryKey] = useState(0);
  const [needsWarning, setNeedsWarning] = useState("");
  const [gradeFollowUps, setGradeFollowUps] = useState<GradeFollowUp[]>([]);
  const [gradeFollowUpsWarning, setGradeFollowUpsWarning] = useState("");
@@ -35,6 +36,10 @@ export function FamilyHomePage({action,student}: {action?:string;student?:string
 
  useEffect(() => {
   let active = true;
+  setLoading(true);
+  setError("");
+  setChildren([]);
+  setNeeds([]);
   Promise.all([getFamilyHome(), getGuardianNeedsYou().then(
    result => ({items:result.items,unavailable:false,groupConsentsUnavailable:result.groupConsentsUnavailable,
     attendanceUnavailable:result.attendanceUnavailable}),
@@ -71,21 +76,21 @@ export function FamilyHomePage({action,student}: {action?:string;student?:string
    if (active) { setError("Sign in with an authorized guardian account to view your family home."); setLoading(false); }
   });
   return () => { active = false; };
- }, []);
+ }, [retryKey]);
 
  return <FamilyHomeView children={children} needs={needs} loading={loading} error={error} needsWarning={needsWarning}
   gradeFollowUps={gradeFollowUps} gradeFollowUpsWarning={gradeFollowUpsWarning}
    courseApprovals={courseApprovals} courseApprovalsWarning={courseApprovalsWarning}
    enrollmentApplications={enrollmentApplications} enrollmentWarning={enrollmentWarning}
-   action={action} student={student}/>;
+   action={action} student={student} onRetry={()=>setRetryKey(key=>key+1)}/>;
 }
 
 export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeFollowUps=[],gradeFollowUpsWarning,
-  courseApprovals=[],courseApprovalsWarning,enrollmentApplications=[],enrollmentWarning,action,student}:{
+  courseApprovals=[],courseApprovalsWarning,enrollmentApplications=[],enrollmentWarning,action,student,onRetry}:{
  children:Child[];needs:NeedItem[];loading:boolean;error:string;needsWarning?:string;
  gradeFollowUps?:GradeFollowUp[];gradeFollowUpsWarning?:string;
  courseApprovals?:CourseApproval[];courseApprovalsWarning?:string;
- enrollmentApplications?:EnrollmentApplication[];enrollmentWarning?:string;action?:string;student?:string;
+ enrollmentApplications?:EnrollmentApplication[];enrollmentWarning?:string;action?:string;student?:string;onRetry?:()=>void;
 }){
  const selectedChild=children.find(child=>child.studentPersonId===student);
  const selectedEnrollment=enrollmentApplications.find(app=>app.studentPersonId===student);
@@ -148,7 +153,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
    <Link to="/messages" className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2">Family inbox</Link>
   </div>}
  >
-  <QueryState loading={loading ? "Loading your family…" : ""} error={error}>
+  <QueryState loading={loading ? "Loading your family…" : ""} error={error} onRetry={error?onRetry:undefined}>
    <nav aria-label="Family quick links" className="mt-4 flex flex-wrap gap-2">
      <Link to="/guardian/experiences" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">School &amp; conferences</Link>
      <Link to="/guardian/attendance" search={{student:selectedChild?.studentPersonId}} className="border bg-card px-3 py-2 text-sm">Attendance</Link>
