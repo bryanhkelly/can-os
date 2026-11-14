@@ -44,6 +44,7 @@ function GuardianEnrollmentChanges(){
  const [attempted,setAttempted]=useState(false);
  const [loading,setLoading]=useState(true);
  const [error,setError]=useState("");
+ const [retryKey,setRetryKey]=useState(0);
  const mutation=useMutationFeedback(refresh);
  const busy=mutation.pending||mutation.refreshFailed;
  async function refresh(){
@@ -74,7 +75,7 @@ function GuardianEnrollmentChanges(){
   }).catch(()=>{if(active)setError("Unable to verify your current family enrollment. Contact admissions.");})
     .finally(()=>{if(active)setLoading(false);});
   return()=>{active=false};
- },[student]);
+ },[student,retryKey]);
  async function submit(event:FormEvent){
   event.preventDefault();
   setAttempted(true);
@@ -122,10 +123,14 @@ function GuardianEnrollmentChanges(){
    subtitle="Request a withdrawal, transfer or family record correction from your current school. These requests go to the authorized school office; they never automatically remove a student, alter custody or issue a transcript."
    actions={<Link to="/home" search={{student}} className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
   {loading&&<p className="mt-6" role="status">Checking verified family enrollment…</p>}
-  {error&&<p className="mt-6 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
+  {error&&<div className="mt-6 rounded-lg border p-4 text-sm" role="alert">
+   <p>{error}</p>
+   {!loading&&<button type="button" className="mt-3 rounded border px-4 py-2 font-semibold"
+    onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry verifying family enrollment</button>}
+  </div>}
   <MutationFeedback state={mutation} className="mt-6" pendingMessage="Saving family request..."/>
-  {!loading&&choices.length===0&&<p className="mt-6 rounded-lg border p-4 text-sm">No active school enrollment is available for a new request. Contact admissions if your child has already transferred or withdrawn.</p>}
-  {choices.length>0&&<form noValidate onSubmit={event=>void submit(event)} className="mt-6 max-w-2xl space-y-4 rounded-xl border bg-card p-5">
+  {!loading&&!error&&choices.length===0&&<p className="mt-6 rounded-lg border p-4 text-sm">No active school enrollment is available for a new request. Contact admissions if your child has already transferred or withdrawn.</p>}
+  {!error&&choices.length>0&&<form noValidate onSubmit={event=>void submit(event)} className="mt-6 max-w-2xl space-y-4 rounded-xl border bg-card p-5">
    <h2 className="text-lg font-semibold">New request to your school</h2>
    <Field label="Student and school" required>
     <Select
