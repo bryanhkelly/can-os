@@ -81,7 +81,8 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(independence).toContain("eq(auditEvents.entityId, version.configurationId)");
     expect(independence).toContain("authors.some(author => author.actorPersonId === actorPersonId)");
     expect(independence).not.toContain("payload}->>'versionId'");
-    const queueFilter = queue.slice(queue.indexOf("return pending"), queue.indexOf(".map(version =>"));
+    const filterStart = queue.indexOf("return pending");
+    const queueFilter = queue.slice(filterStart, queue.indexOf(".map(version =>", filterStart));
     expect(queueFilter).toContain("author.configurationId === version.configurationId");
     expect(queueFilter).toContain("author.authorPersonId === context.actorPersonId");
     expect(queueFilter).not.toContain("author.payload.versionId");
