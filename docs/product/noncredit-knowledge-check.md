@@ -23,6 +23,9 @@ Do not run these migrations against production without a reviewed, isolated acce
 4. `patch-noncredit-evidence-and-result-authority.sql`
 5. `patch-auto-noncredit-assessment-access.sql`
 6. `patch-noncredit-feedback-invitations.sql`
+7. `patch-noncredit-locked-policy.sql` (immutable registration policy plus opt-in mode)
+8. `patch-noncredit-automatic-completion.sql` (authorized automatic evaluator and event hooks)
+9. `patch-noncredit-baseline-diagnostic.sql` (optional before-course diagnostic, alternate grants and scorer rule)
 
 The canonical `schema.sql` incorporates the fresh-install variants. The lesson milestone patch was updated to retain the stricter evidence function even when patches are applied out of order. These patches are committed to GitHub but **not deployed** by this development work.
 
@@ -37,6 +40,30 @@ npx vitest run tests/unit/noncredit-completion.test.ts tests/unit/noncredit-know
 Then run a transactionally rolled-back, **restricted-principal** acceptance scenario with two unrelated adult Persons and a provider operator: registration, automatic grant, recorded and presenter-independent lesson milestones, draft save and resume across devices, duplicate submit, retake-limit exhaustion, feedback invitation and submission, verified attendance evidence, completed noncredit decision, cross-learner denial, and historical result access after administration closure.
 
 A GitHub Actions `startup_failure` is not a passing test. Do not claim integrated production readiness until the actual tests complete successfully on the isolated branch and application roles pass RLS isolation.
+
+## Phase 1+ completion and impact reporting
+
+- **Requirements are pinned:** `noncredit_registrations.completion_policy_id` selects the most recent approved, published, effective policy at registration. It cannot change later. Historic rows without a policy eligible at registration remain unpinned, are ineligible for completion, and need a reviewed enrollment remediation instead of silently inheriting a new policy.
+- **Provider-controlled automation:** `noncredit_completion_policies.completion_mode` defaults to `provider_review`. Independently authorized provider staff can publish an immutable new policy with `publishNoncreditCompletionPolicy`; existing registrants retain their version. Automatic completion is available only for policies explicitly marked `automatic`.
+- **Decision provenance:** automatic decisions use `decision_source='automatic'`, with the policy reviewer retained as the authorizing person, and separate system-attributed audit and domain events. The evaluator locks the registration, never overwrites a recorded decision and never writes school grades or credits.
+- **Evidence gates:** event hooks re-evaluate on Course activation, lesson completion, recorded attendance, assessment finalization and later evidence verification. The completion SQL independently validates verified minutes, lesson milestones, and the current finalized course-bound result. Zero required minutes is valid for asynchronous training when learning requirements provide the evidence.
+- **Before/after measurement:** an optional `baseline_assessment_version_id` on published training uses the same objective assessment engine and a `diagnostic` purpose. Only a baseline taken before documented instruction and before the final check is eligible for paired improvement reporting. The final assessment remains the only one that may satisfy a completion knowledge requirement.
+- **Reusable reporting:** `getNoncreditPilotOutcomes` returns provider-scoped registrations, engagement, knowledge checks, responses and confirmed completion decisions. `publicationSafePilotSummary` suppresses small cells in partner-facing reports. A learner's progress click is not automatically a verified minute or a completion.
+- **Provider UI:** the existing canonical noncredit lab now embeds `NoncreditCompletionPolicyPanel` and `NoncreditPilotOutcomesPanel`, without creating new navigation paths.
+- **Scale guard:** the initial interactive report has an explicit 5,000-participant ceiling per query; larger network reports require batched/warehouse-style aggregation rather than silently truncated results.
+
+### Acceptance before pilot activation
+
+```bash
+npm run typecheck
+npx vitest run tests/unit/noncredit-completion.test.ts tests/unit/noncredit-completion-automation.test.ts tests/unit/noncredit-pilot-outcomes.test.ts tests/unit/noncredit-phase1-integrity.test.ts
+APP_ENV=test TEST_DATABASE_URL="..." node scripts/acceptance/check-noncredit-pilot-readiness.mjs
+APP_ENV=test TEST_DATABASE_URL="..." node scripts/acceptance/check-noncredit-pilot-isolation.mjs
+```
+
+The two-learner isolation test additionally requires `CAN_NONCREDIT_LEARNER_A_*` and `CAN_NONCREDIT_LEARNER_B_*` restricted database credentials and identifiers documented inside that script. Use a disposable Neon branch and explicit, authorized test principals; no owner bypass-RLS login qualifies.
+
+Test both policy modes, multiple versions published after existing enrollment, simultaneous completion events, revoked proof, withdrawn registrations, superseded assessment results, no-lesson policies, no-minute asynchronous courses, and intentionally unapproved baseline administration. The SQL migrations have been committed to `main`, **not applied** to any Neon environment in this phase. GitHub Actions `startup_failure` remains a blocker to claiming passing CI.
 
 ## Reusable Phase 1 learner experience
 
