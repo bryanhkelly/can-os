@@ -22,11 +22,21 @@ export type ClassroomMeetingCommands = {
   schedule: (request: Parameters<typeof scheduleClassroomMeeting>[0]) => ReturnType<typeof scheduleClassroomMeeting>;
   saveLink: (request: Parameters<typeof setClassroomMeetingLink>[0]) => ReturnType<typeof setClassroomMeetingLink>;
 };
-export function ClassroomMediaStage({ recorded, meetings, sectionId, timezone, role, studentPersonId, commands }: {
+type ClassroomMediaStageProps = {
   recorded: ReactNode; meetings?: LoadOutcome<ClassroomMeetings>; sectionId: string; timezone: string;
   role: string; studentPersonId?: string;
   commands: ClassroomMeetingCommands;
-}) {
+};
+
+export function ClassroomMediaStage(props: ClassroomMediaStageProps) {
+  // A classroom route can change Section, viewed student, or persona without
+  // unmounting the media stage. Reset all local meeting and draft state rather
+  // than showing the prior Section's refreshed calendar or meeting links.
+  const audienceKey = [props.sectionId, props.studentPersonId ?? "", props.role].join(":");
+  return <ClassroomMediaStageSession key={audienceKey} {...props}/>;
+}
+
+function ClassroomMediaStageSession({ recorded, meetings, sectionId, timezone, role, studentPersonId, commands }: ClassroomMediaStageProps) {
   const [mode, setMode] = useState<"recorded" | "live">("recorded");
   const modeChosenByStudent = useRef(false);
   const [reloaded, setReloaded] = useState<LoadOutcome<ClassroomMeetings> | null>(null);
