@@ -8,6 +8,7 @@ import {
 } from "@/modules/learning/canonical-learning-activity.functions";
 import type { CanonicalLearningEvent } from "@/domain/canonical-learning-activity";
 import { pruneLearningOutbox, type LearningOutboxItem } from "@/domain/canonical-learning-outbox";
+import {accessClientInstance} from "@/domain/session-client";
 
 type Kind = CanonicalLearningEvent["kind"];
 type ActivityContext = {
@@ -34,19 +35,7 @@ export function DisabledCanonicalLearningActivityProvider({ children }: { childr
   return <Context.Provider value={disabledLearningActivity}>{children}</Context.Provider>;
 }
 
-function tabInstanceId(courseAttemptId: string): string {
-  // A non-secret, tab-scoped instance key persists across reloads, never across devices.
-  const key = "can-learning-instance:" + courseAttemptId;
-  try {
-    const saved = window.sessionStorage.getItem(key);
-    if (saved && /^[0-9a-f-]{36}$/i.test(saved)) return saved;
-    const next = crypto.randomUUID();
-    window.sessionStorage.setItem(key, next);
-    return next;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
+function tabInstanceId(): string { return accessClientInstance(); }
 
 /**
  * Evidence is non-authoritative and never grants attendance, credit or completion.
@@ -160,7 +149,7 @@ export function CanonicalLearningActivityProvider({
       });
     }catch{pending.current=[];}
     let disposed = false;
-    instance.current = tabInstanceId(courseAttemptId);
+    instance.current = tabInstanceId();
     // A failed initial session request must not disable evidence for the whole
     // lesson. Retry during an open, focused tab; the server deduplicates starts.
     let starting = false;

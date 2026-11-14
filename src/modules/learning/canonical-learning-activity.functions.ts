@@ -16,6 +16,7 @@ import {
 } from "@/domain/canonical-learning-activity";
 import { getInstructionalLearnerSession } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
+import {learningEvidenceLevel} from "@/domain/session-device";
 
 const uuid = z.string().uuid();
 const attemptInput = z.object({ courseAttemptId: uuid }).strict();
@@ -209,6 +210,7 @@ export const recordCanonicalLearningEvent = createServerFn({method:"POST"})
         clientEventId:data.event.clientEventId,requestDigest:digest,
         kind:data.event.kind,lessonId:data.event.lessonId,resourceId:data.event.resourceId,
         occurredAt:new Date(data.event.occurredAt),receivedAt:now,estimatedActiveMs,
+        evidenceLevel:learningEvidenceLevel(data.event.kind),
       }).returning({id:canonicalLearningEvents.id});
       if(!recorded)throw new Error("Unable to record learning event");
       await tx.update(canonicalLearningSessions).set({
@@ -238,6 +240,7 @@ export const getCanonicalLearningHistory=createServerFn({method:"GET"})
         lessonId:canonicalLearningEvents.lessonId,resourceId:canonicalLearningEvents.resourceId,
         receivedAt:canonicalLearningEvents.receivedAt,
         estimatedActiveMs:canonicalLearningEvents.estimatedActiveMs,
+        evidenceLevel:canonicalLearningEvents.evidenceLevel,
       }).from(canonicalLearningEvents)
         .where(eq(canonicalLearningEvents.courseAttemptId,data.courseAttemptId))
         .orderBy(desc(canonicalLearningEvents.receivedAt)).limit(100);
