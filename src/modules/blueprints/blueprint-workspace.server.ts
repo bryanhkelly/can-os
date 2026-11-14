@@ -8,6 +8,7 @@ import {
   blueprints,
   catalogSites,
   siteOrganizationRoles,
+  religiousAffiliationOptions,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -56,7 +57,7 @@ export async function getCanonicalBlueprintWorkspace(
     )).limit(1);
     if (!operator) throw new AuthorizationError("current Blueprint Site operator relationship");
 
-    const [recipes, configurations] = await Promise.all([
+    const [recipes, configurations, affiliations] = await Promise.all([
       tx.select({
         blueprintId: blueprints.id,
         title: blueprints.title,
@@ -74,6 +75,12 @@ export async function getCanonicalBlueprintWorkspace(
       }).from(blueprintConfigurations)
         .where(eq(blueprintConfigurations.owningOrganizationId, operator.organizationId))
         .orderBy(asc(blueprintConfigurations.name)),
+      tx.select({
+        code: religiousAffiliationOptions.code,
+        label: religiousAffiliationOptions.label,
+      }).from(religiousAffiliationOptions)
+        .where(eq(religiousAffiliationOptions.active, true))
+        .orderBy(asc(religiousAffiliationOptions.sortOrder)),
     ]);
     const seenRecipes = new Set<string>();
     const templates = recipes.filter(recipe => {
@@ -118,6 +125,7 @@ export async function getCanonicalBlueprintWorkspace(
       canConfigure: context.capabilities.has("blueprint.configure"),
       canReview: context.capabilities.has("blueprint.review"),
       canExecute: context.capabilities.has("blueprint.execute"),
+      affiliations,
       templates: templates.map(template => ({
         ...template,
         components: components
