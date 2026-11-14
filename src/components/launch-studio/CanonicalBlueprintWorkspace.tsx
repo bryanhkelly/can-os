@@ -110,12 +110,14 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     ).map(component => component.id));
     setDetail(null);
     setReview(null);
+    setOperationId("");
     setExecutedDeployments(null);
     setMessage(null);
   }
 
   async function openConfiguration(configurationId: string) {
     setBusy(true);
+    setOperationId("");
     setError(null);
     try {
       const result = await readCanonicalBlueprintConfiguration({ data: { configurationId } });
@@ -496,7 +498,11 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
               onClick={() => {
                 setDetail(null);
                 setReview(null);
+                setOperationId("");
+                setExecutedDeployments(null);
                 setTemplateId("");
+                setEditorialIdentity("community_belonging");
+                setReligiousAffiliationCode("");
                 setSelectedComponents([]);
                 setSelectedReferences({});
                 setOfferingAdoptions([]);
