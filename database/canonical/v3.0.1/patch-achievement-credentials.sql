@@ -90,15 +90,15 @@ CREATE INDEX learning_award_artifacts_issuance_idx ON learning_award_artifacts (
 -- Published definitions are identities, not mutable display labels. Use a
 -- new definition/version for a new interpretation or future recognition mode.
 CREATE FUNCTION v301_guard_credential_definition() RETURNS trigger
-LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
   RAISE EXCEPTION 'Credential definition identity is immutable';
-END $;
+END $$;
 CREATE TRIGGER credential_definition_immutable BEFORE UPDATE OR DELETE ON learning_award_definitions
   FOR EACH ROW EXECUTE FUNCTION v301_guard_credential_definition();
 
 CREATE FUNCTION v301_guard_credential_version() RETURNS trigger
-LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
   IF TG_OP='DELETE' OR OLD.lifecycle<>'draft'
     THEN RAISE EXCEPTION 'Published or retired credential versions are immutable'; END IF;
@@ -114,7 +114,7 @@ BEGIN
       THEN RAISE EXCEPTION 'Independent approval required for published credential'; END IF;
   END IF;
   RETURN NEW;
-END $;
+END $$;
 CREATE TRIGGER credential_version_approval_guard BEFORE UPDATE OR DELETE ON learning_award_definition_versions
   FOR EACH ROW EXECUTE FUNCTION v301_guard_credential_version();
 
@@ -204,7 +204,7 @@ CREATE TRIGGER credential_issuance_evidence BEFORE INSERT ON learning_award_issu
 
 -- Revocations require independently verified evidence belonging to the issuer.
 CREATE FUNCTION v301_validate_credential_revocation() RETURNS trigger
-LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 DECLARE issuer uuid; evidence record;
 BEGIN
   SELECT issuer_organization_id INTO issuer FROM learning_award_issuances
@@ -226,14 +226,14 @@ BEGIN
       AND grant_row.active AND grant_row.revoked_at IS NULL
   ) THEN RAISE EXCEPTION 'Only current issuer staff can revoke'; END IF;
   RETURN NEW;
-END $;
+END $$;
 CREATE TRIGGER credential_revocation_provenance BEFORE INSERT ON learning_award_issuance_events
   FOR EACH ROW EXECUTE FUNCTION v301_validate_credential_revocation();
 
 -- A point-in-time PDF is never authoritative. Re-evaluate source freshness,
 -- legacy certificate state, expiry and append-only revocation on each read.
 CREATE FUNCTION v301_credential_is_current(p_issuance_id uuid) RETURNS boolean
-LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $
+LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $$
  SELECT EXISTS (
    SELECT 1 FROM learning_award_issuances issuance
    JOIN learner_achievement_decisions decision
@@ -252,7 +252,7 @@ LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $
          AND NOT EXISTS (SELECT 1 FROM noncredit_completion_decisions newer
            WHERE newer.supersedes_id=completion.id)))
  );
-$;
+$$;
 
 -- Award evidence and issued artifacts are append-only; a revocation is an event.
 CREATE TRIGGER achievement_decisions_immutable BEFORE UPDATE OR DELETE ON learner_achievement_decisions
