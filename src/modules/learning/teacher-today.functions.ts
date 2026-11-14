@@ -2,7 +2,7 @@ import { latestSubmissionCondition } from "./latest-submission.server";
 import { personLegalName } from "@/domain/person-name";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
@@ -25,6 +25,8 @@ const EMPTY_TODAY = {
  connected: false,
  teacher: { firstName: "" },
  sections: [] as { id: string; title: string; studentCount: number | null; classroom: FirstClassroom | null }[],
+ ungradedCount: 0,
+ missingWorkCount: 0,
  ungraded: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; submittedAt: string | null }[],
  missingWork: [] as { sectionId: string; assessmentId: string; studentProfileId: string; studentName: string; assessmentTitle: string; sectionTitle: string; dueAt: string }[],
  notices: [] as { id: string; title: string; body: string | null; status: string; createdAt: string }[],
@@ -82,6 +84,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   assessmentTitle: s.assessments.title,
   sectionTitle: s.sections.title,
   submittedAt: s.submissions.submittedAt,
+  total: sql<number>`count(*) OVER ()`,
  }).from(s.submissions)
   .innerJoin(s.assessments, eq(s.assessments.id, s.submissions.assessmentId))
   .innerJoin(s.sections, eq(s.sections.id, s.assessments.sectionId))
@@ -114,6 +117,7 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   ))
   .orderBy(asc(s.submissions.submittedAt))
   .limit(20);
+ const ungradedCount = Number(ungradedRows[0]?.total ?? 0);
  const ungraded = ungradedRows.map(row => ({
   sectionId: row.sectionId,
   assessmentId: row.assessmentId,
@@ -188,7 +192,8 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
     dueAt: assessment.dueAt!.toISOString(),
    }];
   }),
- ).sort((a, b) => a.dueAt.localeCompare(b.dueAt)).slice(0, 20);
+ ).sort((a, b) => a.dueAt.localeCompare(b.dueAt));
+ const missingWorkCount = missingWork.length;
 
  // Same notice query as the teacher notices page.
  const noticeRows = await db.select({
@@ -210,8 +215,10 @@ export const getTeacherToday = createServerFn({ method: "GET" }).handler(async (
   connected: true,
   teacher: { firstName: teacher?.firstName ?? "" },
   sections,
+  ungradedCount,
+  missingWorkCount,
   ungraded,
-  missingWork,
+  missingWork: missingWork.slice(0, 20),
   notices,
  };
 });
