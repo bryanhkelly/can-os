@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getActiveWorkspacePath, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
+import { getActiveWorkspacePath, getWorkspaceHome, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
 import { routeNavigation } from "./route-navigation";
 import { roleCapabilities } from "@/domain/access-context";
 
@@ -13,6 +13,31 @@ describe("generated workspace navigation", () => {
     expect(workspaceDestination("/launch/school", search)).toBe(`/launch/school?siteId=${siteId}&programId=${programId}`);
     expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
     expect(workspaceDestination("/messages", search)).toBe("/messages");
+  });
+
+  it("preserves school and Program selections only where the destination accepts them", () => {
+    const search = `?siteId=${siteId}&programId=${programId}&section=${section}`;
+    for (const path of ["/admissions", "/staff/students", "/operations/school-years", "/operations/insights", "/operations/interest-events", "/launch/hub/school", "/site-website"]) {
+      expect(workspaceDestination(path, search)).toBe(`${path}?siteId=${siteId}&programId=${programId}`);
+    }
+    expect(workspaceDestination("/settings", search)).toBe(`/settings?siteId=${siteId}`);
+    expect(workspaceDestination("/staff/attendance", search)).toBe(`/staff/attendance?programId=${programId}`);
+    expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
+  });
+
+  it("keeps unauthorized roles out of guarded navigation", () => {
+    expect(workspaceLinks.site_leader.some(item => item.path === "/site-website" || item.path === "/operations/workflows")).toBe(false);
+    expect(workspaceLinks.network_admin.some(item => item.path === "/operations/workflows")).toBe(false);
+    expect(workspaceLinks.site_website_editor.some(item => item.path === "/site-website")).toBe(true);
+    expect(getWorkspaceHome("academic_content_creator")).toBe("/canonical/content");
+    expect(getWorkspaceHome("academic_content_reviewer")).toBe("/canonical/content-reviews");
+    expect(workspaceLinks.academic_content_creator[0].path).toBe("/canonical/content");
+    expect(workspaceLinks.academic_content_reviewer[0].path).toBe("/canonical/content-reviews");
+    expect(roleCapabilities.academic_content_creator).not.toContain("student:read");
+    expect(roleCapabilities.academic_content_reviewer).not.toContain("student:read");
+    const workflows = routeNavigation["/operations/workflows"];
+    expect(workflows.visibility).toBe("navigation");
+    if (workflows.visibility === "navigation") expect(workflows.personas).toEqual(["registrar", "site_admin"]);
   });
 
   it("keeps class context across learning, grading, and calendar destinations", () => {

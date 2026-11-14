@@ -5,6 +5,15 @@ import { optionalSearchUuid } from "@/lib/route-search";
 const destinationContextKeys: Record<string, readonly string[]> = {
   "/home": ["siteId", "programId"],
   "/launch/school": ["siteId", "programId"],
+  "/launch/hub/school": ["siteId", "programId"],
+  "/admissions": ["siteId", "programId"],
+  "/staff/students": ["siteId", "programId"],
+  "/operations/school-years": ["siteId", "programId"],
+  "/operations/interest-events": ["siteId", "programId"],
+  "/operations/insights": ["siteId", "programId"],
+  "/settings": ["siteId"],
+  "/site-website": ["siteId", "programId"],
+  "/staff/attendance": ["programId"],
   "/operations/curriculum": ["programId"],
   "/operations/teacher-marketplace": ["programId"],
   "/classes": ["section"],
@@ -32,6 +41,8 @@ export interface WorkspaceNavigationItem {
 }
 
 export const workspaceHome = {
+  academic_content_creator: "/canonical/content",
+  academic_content_reviewer: "/canonical/content-reviews",
   site_website_editor: "/home",
   room_facilitator: "/home",
   site_staff: "/home",
@@ -76,6 +87,8 @@ const siteAdminProfileLink = {
  * Role-specific destinations. Home and Messages are generated once below.
  */
 const roleLinks = {
+  academic_content_creator: [],
+  academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
   site_website_editor: [{ title: "Website", path: "/site-website", icon: "globe" }],
   room_facilitator: [
@@ -94,8 +107,7 @@ const roleLinks = {
     { title: "Staff", path: "/staff/teachers", icon: "users" },
     { title: "Schedule", path: "/calendar", icon: "calendar" },
     { title: "Attendance", path: "/staff/attendance", icon: "clipboard" },
-    { title: "Community", path: "/site-website", icon: "globe" },
-    { title: "Operations", path: "/operations/workflows", icon: "clipboard" },
+
   ],
   paraeducator: [
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },
@@ -103,9 +115,7 @@ const roleLinks = {
   ],
   safeguarding_responder: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
   safeguarding_lead: [{ title: "Assigned safeguarding", path: "/safeguarding", icon: "safety" }],
-  network_admin: [
-    { title: "Operations", path: "/operations/workflows", icon: "clipboard" },
-  ],
+  network_admin: [],
   can_network_steward: [
     { title: "Jurisdiction profiles", path: "/operations/jurisdiction-profiles", icon: "clipboard" },
   ],

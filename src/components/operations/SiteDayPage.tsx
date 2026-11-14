@@ -18,6 +18,7 @@ import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisio
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
 import { OnsitePickupPanel } from "@/components/operations/OnsitePickupPanel";
 import { AttendanceConfigurationNotice } from "@/components/operations/AttendanceConfigurationNotice";
+import { deriveOnsiteObservedHeadcount } from "@/domain/onsite-physical-headcount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -122,6 +123,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
     retry: (count, error) => normalizeClientError(error).retryable && count < 1,
   });
   const roster = dayQuery.data?.kind === "roster" ? dayQuery.data.data as Roster : null;
+  const headcount = roster ? deriveOnsiteObservedHeadcount(roster.students) : null;
   const preparation = dayQuery.data?.kind === "preparation"
     ? dayQuery.data.data as Awaited<ReturnType<typeof getOnsiteSchoolDayPreparation>> : null;
   const openingQuery = useQuery({
@@ -303,13 +305,20 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
       <AttendanceConfigurationNotice programs={roster.programs}
         canConfigure={roster.canConfigureAcademicYear} date={date}/>
       <section aria-label="Onsite day summary" className="mt-8">
-        <h2 className="font-serif text-2xl font-semibold">Who's here</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Counts are student-program roster entries, not unique students. Only staff observations count as recorded attendance.</p>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <StatCard label="Expected roster entries" value={roster.students.length}/>
-          <StatCard label="Staff-marked entries" value={roster.students.filter(student=>!["unmarked","expected"].includes(student.status)).length}/>
+        <h2 className="font-serif text-2xl font-semibold">Observed attendance and unique students</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Distinct students are counted once across the Programs in your authorized roster. Present and tardy require a recorded staff observation. These are daily attendance observations, not a live building headcount or proof a child has not already been released.</p>
+        {headcount && <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <StatCard label="Distinct expected students" value={headcount.distinctExpectedStudents}/>
+          <StatCard label="Distinct observed onsite" value={headcount.observedOnsiteStudents}/>
+          <StatCard label="Students with unmarked entries" value={headcount.studentsWithIncompleteMarks}/>
+          <StatCard label="Student-Program roster entries" value={headcount.scopedRosterEntries}/>
+          <StatCard label="Staff-marked entries" value={roster.students.filter(student=>student.attendanceEventId&&["present","tardy","absent","excused"].includes(student.status)).length}/>
           <StatCard label="Needs attendance mark" value={roster.students.filter(student=>["unmarked","expected"].includes(student.status)).length}/>
-        </div>
+        </div>}
+        {headcount && headcount.conflictingObservations > 0 && <p role="alert" className="mt-4 border border-warning p-3 text-sm">
+          {headcount.conflictingObservations} distinct students have conflicting onsite and away observations across Programs. Review each Program's record before interpreting attendance or custody.
+        </p>}
+        <p className="mt-3 text-xs text-muted-foreground">Live physical headcount is unverified without witnessed arrivals, departures and custody handoffs. Use the pickup workspace for release verification, not these figures.</p>
       </section>
       {roster.students.some(student=>["unmarked","expected"].includes(student.status))&&
         <section aria-label="Needs attention" className="mt-7 border-l-4 border-warning bg-muted/40 px-5 py-4">
