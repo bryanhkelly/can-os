@@ -66,7 +66,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
         icon={<BookOpen className="size-5" />}>{learning?.lesson
           ? <Link to="/classes" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}} />
           : nextWork ? <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}} />
-          : <Link to="/student/courses" />}</DashboardShortcut>
+          : <Link to="/classes" />}</DashboardShortcut>
       <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
         icon={<FileText className="size-5" />}><Link to="/student/assignments"
           search={{section:nextWork?.sectionId ?? undefined,assessment:nextWork?.assessmentId}} /></DashboardShortcut>
@@ -79,7 +79,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       <div className="student-feature-grid">
         <DashboardPanel id="continue-learning" title="Continue Learning"
           action={learning?<Link to="/classes" search={{section:learning.sectionId,tab:"lessons"}} className={textLink}>View class →</Link>:
-            <Link to="/student/courses" className={textLink}>View my classes →</Link>}>
+            <Link to="/classes" className={textLink}>View my classes →</Link>}>
           {learning ? <div className="student-resume-grid">
             <div>
               <div className="flex items-start gap-3">
@@ -110,7 +110,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
             {nextWork && <><p className="text-sm font-semibold">{nextWork.title}</p>
               <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}}
                 className="student-resume-action">Continue assignment →</Link></>}
-            <Link to="/student/courses" className={textLink}>View my classes →</Link>
+            <Link to="/classes" className={textLink}>View my classes →</Link>
           </div>}
         </DashboardPanel>
         <DashboardPanel title="Today at a Glance" action={<Link to="/calendar" search={{date:localDate}} className={textLink}>View calendar →</Link>}>
