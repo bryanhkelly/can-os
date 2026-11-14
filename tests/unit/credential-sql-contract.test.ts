@@ -9,6 +9,12 @@ const baseline = readFileSync(resolve(process.cwd(),
   "database/canonical/v3.0.1/schema.sql"), "utf8");
 
 describe("credential patch structural security boundaries", () => {
+  it("keeps the standalone upgrade patch identical to the fresh-install DDL", () => {
+    const patchBody = sql.split("SET LOCAL search_path = education_v30, public;\n")[1]
+      ?.split(/\nCOMMIT;\s*$/)[0]?.trim();
+    expect(patchBody).toBeTruthy();
+    expect(baseline).toContain(patchBody);
+  });
   it("does not collide with existing canonical credential tables", () => {
     expect(baseline).toContain("CREATE TABLE credential_definitions (");
     expect(baseline).toContain("CREATE TABLE credential_issuances (");

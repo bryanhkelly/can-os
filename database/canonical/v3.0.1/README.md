@@ -395,3 +395,12 @@ as an additive transaction; do not rerun the full fresh-install schema.
 The credential issuer and learner-reader runtime paths remain disabled pending
 scoped database-role provisioning and multi-user acceptance tests. Do not interpret
 the mere existence of these tables as authorization to issue a badge or certificate.
+
+**Neon migration record (November 14, 2026):** Existing `can-os` / `neondb`
+branches `test01` and `main` have the six additive learning-award tables installed.
+On `main`, all six tables passed the read-only verification for installation,
+forced RLS, owner-only policy, trigger coverage and absence of PUBLIC table grants.
+Do **not** rerun the one-time patch on those branches. The published schema and
+runtime database are aligned for these tables, but credential feature flags
+remain disabled until restricted DB grants and role-based acceptance tests pass.
+See `verify-achievement-credentials.sql` for the reusable, read-only checks.
