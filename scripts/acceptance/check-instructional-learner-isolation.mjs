@@ -54,7 +54,7 @@ async function run() {
       "The learner acceptance database must differ from the application database.");
   }
   if (process.env.CAN_APPLICATION_DB_HOST) {
-    assert(testHost !== process.env.CAN_APPLICATION_DB_HOST.replace(/-pooler(?=\\.)/, ""),
+    assert(testHost !== process.env.CAN_APPLICATION_DB_HOST.replace("-pooler.", "."),
       "The learner acceptance database must differ from the application host.");
   }
   for (const url of urls) {
