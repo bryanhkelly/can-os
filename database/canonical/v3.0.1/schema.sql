@@ -6837,6 +6837,7 @@ CREATE TABLE noncredit_registrations (
  initiative_id uuid REFERENCES education_initiatives(id),
  registering_organization_id uuid NOT NULL REFERENCES organizations(id),
  registered_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  completion_policy_id uuid, -- immutable enrollment-time policy selection
  status text NOT NULL DEFAULT 'registered' CHECK(status IN ('registered','active','completed','withdrawn','cancelled')),
  consent_evidence_id uuid REFERENCES evidence_document_versions(id),
  FOREIGN KEY(adoption_id,deployment_id,offering_version_id)
@@ -7065,17 +7066,22 @@ CREATE TABLE noncredit_completion_policies (
  policy_version integer NOT NULL CHECK(policy_version>0),
  min_participation_minutes integer NOT NULL CHECK(min_participation_minutes>=0),
  require_all_lessons boolean NOT NULL DEFAULT false,
+  completion_mode text NOT NULL DEFAULT 'provider_review' CHECK(completion_mode IN ('provider_review','automatic')),
  skills_assessment_required boolean NOT NULL DEFAULT false, minimum_assessment_fraction numeric(6,5) CHECK(minimum_assessment_fraction BETWEEN 0 AND 1),
  effective_at timestamptz NOT NULL, approved_by_person_id uuid NOT NULL REFERENCES persons(id),
  published_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  UNIQUE(training_version_id,policy_version), UNIQUE(id,training_version_id),
  CHECK(NOT skills_assessment_required OR minimum_assessment_fraction IS NOT NULL)
 );
+ALTER TABLE noncredit_registrations ADD CONSTRAINT noncredit_registration_locked_policy_fk
+  FOREIGN KEY(completion_policy_id,training_version_id)
+  REFERENCES noncredit_completion_policies(id,training_version_id);
 CREATE TABLE noncredit_completion_decisions (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), registration_id uuid NOT NULL REFERENCES noncredit_registrations(id),
  policy_id uuid NOT NULL REFERENCES noncredit_completion_policies(id),
  assessment_result_id uuid REFERENCES assessment_attempt_results(id),
  outcome text NOT NULL CHECK(outcome IN ('completed','not_yet_completed','voided')),
+  decision_source text NOT NULL DEFAULT 'provider' CHECK(decision_source IN ('provider','automatic')),
  decided_by_person_id uuid NOT NULL REFERENCES persons(id), decided_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  evidence_version_id uuid REFERENCES evidence_document_versions(id), supersedes_id uuid UNIQUE REFERENCES noncredit_completion_decisions(id),
  CHECK(supersedes_id IS DISTINCT FROM id), UNIQUE(id,registration_id)
@@ -7435,6 +7441,35 @@ BEGIN
 END $$;
 CREATE TRIGGER register_noncredit_authority BEFORE INSERT ON noncredit_registrations
  FOR EACH ROW EXECUTE FUNCTION v28_register_noncredit();
+CREATE OR REPLACE FUNCTION v301_lock_noncredit_completion_policy() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $noncredit_policy_lock$
+DECLARE pinned uuid;
+BEGIN
+ IF TG_OP='UPDATE' THEN
+  IF ROW(NEW.training_version_id,NEW.registered_at,NEW.completion_policy_id)
+     IS DISTINCT FROM ROW(OLD.training_version_id,OLD.registered_at,OLD.completion_policy_id) THEN
+   RAISE EXCEPTION 'Noncredit completion requirements are immutable after registration';
+  END IF;
+  RETURN NEW;
+ END IF;
+ SELECT p.id INTO pinned
+ FROM noncredit_completion_policies p
+ WHERE p.training_version_id=NEW.training_version_id
+  AND p.published_at<=NEW.registered_at AND p.effective_at<=NEW.registered_at
+ ORDER BY p.effective_at DESC,p.policy_version DESC LIMIT 1;
+ IF pinned IS NULL THEN
+  RAISE EXCEPTION 'A published effective completion policy is required before noncredit registration';
+ END IF;
+ IF NEW.completion_policy_id IS NOT NULL AND NEW.completion_policy_id<>pinned THEN
+  RAISE EXCEPTION 'Cannot override the noncredit enrollment-time completion policy';
+ END IF;
+ NEW.completion_policy_id:=pinned;
+ RETURN NEW;
+END $noncredit_policy_lock$;
+CREATE TRIGGER noncredit_registration_policy_pin
+ BEFORE INSERT OR UPDATE OF completion_policy_id,training_version_id,registered_at
+ ON noncredit_registrations FOR EACH ROW
+ EXECUTE FUNCTION v301_lock_noncredit_completion_policy();
 CREATE OR REPLACE FUNCTION v28_validate_participation() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
@@ -7455,8 +7490,18 @@ BEGIN
  FROM noncredit_registrations r JOIN noncredit_training_versions t ON t.id=r.training_version_id
  WHERE r.id=NEW.registration_id FOR SHARE OF r;
  SELECT * INTO pol FROM noncredit_completion_policies WHERE id=NEW.policy_id;
- IF pol.training_version_id IS DISTINCT FROM row_registration.training_version_id
-  OR pol.effective_at>NEW.decided_at THEN RAISE EXCEPTION 'Incorrect noncredit completion policy'; END IF;
+ IF row_registration.completion_policy_id IS NULL
+  OR NEW.policy_id IS DISTINCT FROM row_registration.completion_policy_id
+  OR pol.training_version_id IS DISTINCT FROM row_registration.training_version_id
+  OR pol.effective_at>NEW.decided_at THEN
+   RAISE EXCEPTION 'Completion must use the immutable enrollment-time policy'; END IF;
+ IF row_registration.status NOT IN ('registered','active') AND NEW.outcome='completed' THEN
+   RAISE EXCEPTION 'Inactive noncredit registration cannot be completed'; END IF;
+ IF NEW.decision_source='automatic' AND
+    (pol.completion_mode<>'automatic' OR NEW.outcome<>'completed'
+      OR NEW.supersedes_id IS NOT NULL
+      OR NEW.decided_by_person_id IS DISTINCT FROM pol.approved_by_person_id) THEN
+   RAISE EXCEPTION 'Automatic completion requires an approved automatic policy'; END IF;
  IF NEW.supersedes_id IS NOT NULL AND NOT EXISTS (
   SELECT 1 FROM noncredit_completion_decisions d
   WHERE d.id=NEW.supersedes_id AND d.registration_id=NEW.registration_id
