@@ -2,9 +2,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { CanonicalLearningActivityProvider, useCanonicalLearningActivity } from "@/components/learning/CanonicalLearningTracker";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
 import { NoncreditCourseActivities } from "@/components/learning/NoncreditCourseActivities";
+import { CanonicalCourseEvidencePanel } from "@/components/learning/CanonicalCourseEvidencePanel";
+import { FacilitatedLearnerPairing } from "@/components/learning/FacilitatedLearnerPairing";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -31,10 +34,13 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
   // A router may retain the same component instance while changing the
   // selected learner/course. Never carry old catalog, media, or answers into
   // another Course attempt.
-  return <RecordedInstructorCourseSession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+  return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
+    <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}/>
+  </CanonicalLearningActivityProvider>;
 }
 
 function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId: string }) {
+  const { selectLesson, observe } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
   const [history, setHistory] = useState<PracticeHistory>([]);
@@ -129,6 +135,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
         courseAttemptId,
         assetVersionId,
       } });
+      if (currentLesson?.id) observe("resource_opened", currentLesson.id, assetVersionId);
       window.location.assign(resource.downloadUrl);
     } catch (failure) {
       setError(normalizeClientError(failure, "Unable to open instructional resource.").message);
@@ -167,6 +174,9 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
 
   const currentLesson = instruction?.lessons.find(lesson => lesson.id === lessonId)
     ?? instruction?.lessons[0];
+  useEffect(() => {
+    selectLesson(currentLesson?.id ?? null);
+  }, [currentLesson?.id, selectLesson]);
   const currentPractice = instruction?.canManageProgress ? instruction.materials.filter(material =>
     material.materialKind === "practice" &&
     material.courseUnitId === currentLesson?.courseUnitId &&
@@ -182,6 +192,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
   ).length ?? 0;
 
   return <section aria-label="Recorded instructor" className="space-y-5">
+    <FacilitatedLearnerPairing courseAttemptId={courseAttemptId}/>
     <div className="border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Choose your recorded teacher</h2>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -252,6 +263,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
             key={`${courseAttemptId}:${instruction.selection.trackVersionId}:${presentation.assetVersionId}`}
             title={`${currentLesson.title} recording`}
             resourceId={presentation.assetVersionId}
+            onPlaybackEvent={(kind, resourceId) => observe(kind, currentLesson.id, resourceId)}
             loadUrl={async () => (await getRecordedInstructionAssetDownload({ data: {
               courseAttemptId,
               assetVersionId: presentation.assetVersionId,
@@ -299,6 +311,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
     <NoncreditCourseActivities courseAttemptId={courseAttemptId}
       lessonProgressRevision={lessonProgressRevision}/>
+    <CanonicalCourseEvidencePanel courseAttemptId={courseAttemptId}/>
   </section>;
 }
 
