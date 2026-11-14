@@ -568,6 +568,7 @@ export async function listAvailableInstructionalTracks(
 ): Promise<{
   choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null }>;
   blocked: Array<{ trackVersionId: string; reason: string }>;
+  selection: { trackVersionId: string; revision: number; policyVersionId: string } | null;
 }> {
   assertAuthenticated(context, "learner_or_guardian");
   const input = readInstructionalTrackSchema.parse(raw);
@@ -587,6 +588,16 @@ export async function listAvailableInstructionalTracks(
         eq(instructionalTrackVersions.lifecycle, "published"),
         eq(instructionalTrackVersions.trackKind, "primary"),
       ));
+    const [selection] = await tx.select({
+      trackVersionId: learnerTrackSelections.trackVersionId,
+      revision: learnerTrackSelections.revision,
+      policyVersionId: learnerTrackSelections.policyVersionId,
+    }).from(learnerTrackSelections)
+      .where(and(
+        eq(learnerTrackSelections.courseAttemptId, attempt.id),
+        isNull(learnerTrackSelections.supersededAt),
+      ))
+      .limit(1);
     const choices: Array<{ trackVersionId: string; title: string; presenterPersonId: string | null }> = [];
     const blocked: Array<{ trackVersionId: string; reason: string }> = [];
     for (const candidate of candidates) {
@@ -608,7 +619,7 @@ export async function listAvailableInstructionalTracks(
         });
       }
     }
-    return { choices, blocked };
+    return { choices, blocked, selection: selection ?? null };
   });
 }
 
@@ -629,6 +640,7 @@ export async function readSelectedInstructionalTrack(
   track: { title: string; presenterPersonId: string | null };
   lessons: Array<{
     id: string;
+    courseUnitId: string;
     title: string;
     lessonOrder: number;
     progress: { status: string; observedAt: Date } | null;
@@ -680,6 +692,7 @@ export async function readSelectedInstructionalTrack(
     const [lessons, progress] = await Promise.all([
       tx.select({
         id: courseLessons.id,
+        courseUnitId: courseLessons.courseUnitId,
         title: courseLessons.title,
         lessonOrder: courseLessons.lessonOrder,
       }).from(courseLessons)
@@ -723,6 +736,7 @@ export async function readSelectedInstructionalTrack(
         const lessonPresentations = presentationsByLesson.get(lesson.id) ?? [];
         return {
           id: lesson.id,
+          courseUnitId: lesson.courseUnitId,
           title: lesson.title,
           lessonOrder: lesson.lessonOrder,
           progress: lessonProgress
