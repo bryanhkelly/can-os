@@ -71,6 +71,15 @@ It also checks that Valor roles cannot see Barton Sites or evidence and that
 authors cannot self-approve. This is an executable test path, **not** a claim
 that tests have passed.
 
+The optional reference library and published Offering discovery use the
+separate, restricted `program_catalog` purpose and its
+`provision-program-catalog-role.sql` workflow. The native Blueprint author
+role does **not** implicitly become a program-catalog reader. Provision that
+read-only role and its current Organization binding before enabling
+`CAN_CANONICAL_CATALOG_ENABLED`. The default is off. The isolated
+draft → review → planning Deployment acceptance test does not require
+catalog discovery or claim to validate real-world program eligibility.
+
 Never grant either role access to raw canonical sessions, learner records,
 safeguarding data, finance data or direct publication. SQL policies, grants
 and server transactions must be exercised in a disposable test database
