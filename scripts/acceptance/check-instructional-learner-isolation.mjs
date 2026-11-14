@@ -94,6 +94,7 @@ async function run() {
       "Learners must resolve to independently restricted database principals.");
 
     const own = [];
+    const selectedTracks = [];
     for (let i=0; i<2; i++) {
       const other = 1-i;
       const client = clients[i];
@@ -105,14 +106,23 @@ async function run() {
         "Each restricted learner must see their own Course attempt, never the other learner.");
       own.push(visibleAttempts[0]);
 
-      const ownSelections = await readVisible(client,
-        "education_v30.learner_track_selections", "track_version_id",
-        attempts[i]);
+      const { rows: ownSelections } = await client.query(`
+        SELECT track_version_id FROM education_v30.learner_track_selections
+        WHERE course_attempt_id=$1 AND superseded_at IS NULL
+      `, [attempts[i]]);
       const otherSelections = await readVisible(client,
         "education_v30.learner_track_selections", "id",
         attempts[other]);
-      assert(ownSelections.length >= 1 && otherSelections.length === 0,
-        "Recorded instructor selections must stay learner-private.");
+      assert(ownSelections.length === 1 && otherSelections.length === 0,
+        "Each learner must have exactly one private active recorded instructor.");
+      selectedTracks.push(ownSelections[0].track_version_id);
+
+      const ownProgress = await readVisible(client,
+        "education_v30.learner_lesson_progress", "lesson_id", attempts[i]);
+      const otherProgress = await readVisible(client,
+        "education_v30.learner_lesson_progress", "lesson_id", attempts[other]);
+      assert(ownProgress.length >= 1 && otherProgress.length === 0,
+        "Canonical lesson progress must stay learner-private.");
 
       const ownPractice = await readVisible(client,
         "education_v30.formative_practice_attempts", "id", attempts[i]);
@@ -136,7 +146,9 @@ async function run() {
     assert(own[0].section_id && own[0].section_id === own[1].section_id &&
       own[0].course_version_id === own[1].course_version_id,
       "Both learners must belong to the same canonical Section and Course version.");
-    console.log("PASS: learners share one Section but have isolated instructional records.");
+    assert(selectedTracks[0] !== selectedTracks[1],
+      "The two learners must be independently using different recorded instructors.");
+    console.log("PASS: same Section, different recorded instructors, isolated progress and practice.");
   } finally {
     for (const client of clients) {
       await client.query("ROLLBACK").catch(() => undefined);
