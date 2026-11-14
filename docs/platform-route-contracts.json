@@ -274,6 +274,24 @@
       "readBoundary": "Canonical scoped calendar visibility; guardian deadline child bindings come only from active academic relationships and active Section enrollments within current Site and Program scope"
     },
     {
+      "file": "src/routes/canonical.blueprint-reviews.tsx",
+      "route": "/canonical/blueprint-reviews",
+      "owner": "blueprints",
+      "verification": "pending",
+      "roleJourney": "Native v3.0.1 Organization-scoped independent reviewer views frozen Blueprint versions and records evidence-backed decisions; not a legacy School Hub session",
+      "readBoundary": "Canonical session projection and independent Blueprint reviewer role; review queue and evidence are Organization-scoped, with no authoring authority",
+      "writeBoundary": "POST review decision through canonical server function; reviewer independence, current verified evidence, component decisions, and audit required; review cannot activate a school or Offering"
+    },
+    {
+      "file": "src/routes/canonical.blueprints.tsx",
+      "route": "/canonical/blueprints",
+      "owner": "blueprints",
+      "verification": "pending",
+      "roleJourney": "Native v3.0.1 Site-scoped author explicitly selects an authorized Site, prepares Blueprint revisions, submits for independent review, and may create a planning-only Deployment after approval",
+      "readBoundary": "Native canonical session and restricted PostgreSQL role; exact authorized Site chosen explicitly, with no legacy account or implicit fallback Site",
+      "writeBoundary": "Canonical server functions enforce Site ownership, immutable revisions, evidence-backed review, and planning-only execution; no direct program activation"
+    },
+    {
       "file": "src/routes/church.apply.tsx",
       "route": "/church/apply",
       "owner": "network",
@@ -292,6 +310,15 @@
       "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
     },
     {
+      "file": "src/routes/enrichment_.$seasonId.tsx",
+      "route": "/enrichment/$seasonId",
+      "owner": "activities",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
       "file": "src/routes/enrichment-review.tsx",
       "route": "/enrichment-review",
       "owner": "activities",
@@ -303,15 +330,6 @@
     {
       "file": "src/routes/enrichment.tsx",
       "route": "/enrichment",
-      "owner": "activities",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
-    },
-    {
-      "file": "src/routes/enrichment_.$seasonId.tsx",
-      "route": "/enrichment/$seasonId",
       "owner": "activities",
       "verification": "pending",
       "roleJourney": "pending",
@@ -337,15 +355,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/groups.tsx",
-      "route": "/groups",
-      "owner": "study-groups",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
-    },
-    {
       "file": "src/routes/groups_.$groupId.tsx",
       "route": "/groups/$groupId",
       "owner": "study-groups",
@@ -364,9 +373,9 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/guardian.students.tsx",
-      "route": "/guardian/students",
-      "owner": "learning",
+      "file": "src/routes/groups.tsx",
+      "route": "/groups",
+      "owner": "study-groups",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -457,6 +466,15 @@
       "file": "src/routes/guardian.report-cards.tsx",
       "route": "/guardian/report-cards",
       "owner": "family",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/guardian.students.tsx",
+      "route": "/guardian/students",
+      "owner": "learning",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
@@ -1120,8 +1138,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/student.assignments.tsx",
-      "route": "/student/assignments",
+      "file": "src/routes/student.assignments_.$assessmentId.tsx",
+      "route": "/student/assignments/$assessmentId",
       "owner": "student-experience",
       "verification": "pending",
       "roleJourney": "pending",
@@ -1129,8 +1147,8 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/student.assignments_.$assessmentId.tsx",
-      "route": "/student/assignments/$assessmentId",
+      "file": "src/routes/student.assignments.tsx",
+      "route": "/student/assignments",
       "owner": "student-experience",
       "verification": "pending",
       "roleJourney": "pending",

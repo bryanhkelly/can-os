@@ -14,6 +14,7 @@ on:
       - '.github/workflows/canonical-v301-database.yml'
   push:
     branches:
+      - main
       - 'integration/canonical-v301-pr279-281'
     paths:
       - 'database/canonical/v3.0.1/**'
