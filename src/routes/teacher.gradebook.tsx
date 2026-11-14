@@ -24,6 +24,7 @@ import {
 import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { parseAssignmentContentDraft } from "@/domain/assignment-content";
+import { assessmentClockToUtc, assessmentDueAtForDate } from "@/domain/assessment-local-schedule";
 import { QueryState, WorkspaceShell, WorkspacePanel } from "@/components/workspace";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -71,6 +72,7 @@ function TeacherGradebookPage() {
   retry:(count,cause)=>normalizeClientError(cause).retryable&&count<1,
  });
  const gradebook=gradebookQuery.data??null;
+ const sectionTimezone=gradebook?.section?.timezone;
  const loading=sectionsQuery.isPending||(selectedSection&&gradebookQuery.isPending);
  const error=sectionsQuery.error
   ?normalizeClientError(sectionsQuery.error,"Sign in with an authorized teacher account to view the gradebook.").message
@@ -233,6 +235,15 @@ function TeacherGradebookPage() {
   }));
   try { validateAssessmentRubric(rubricCriteria,pointsValue); }
   catch(cause){setNotice(mutationErrorMessage(cause, "Invalid scoring rubric."));return;}
+  if(!sectionTimezone){setNotice("Select an authorized class to set assessment deadlines.");return;}
+  let deadline:string|undefined;
+  let release:string|undefined;
+  let close:string|undefined;
+  try{
+   deadline=due?assessmentDueAtForDate(due,sectionTimezone):undefined;
+   release=releaseAt?assessmentClockToUtc(releaseAt,sectionTimezone):undefined;
+   close=closeAt?assessmentClockToUtc(closeAt,sectionTimezone):undefined;
+  }catch(cause){setNotice(mutationErrorMessage(cause,"Enter valid class-timezone dates."));return;}
   setNotice("");
   const assignmentContent = parseAssignmentContentDraft(contentDraft);
   await mutation.run(async()=>{
@@ -247,9 +258,9 @@ function TeacherGradebookPage() {
     publishNow,
     ...(assignmentContent?{assignmentContent}:{}),
     ...(curriculumLessonId?{curriculumLessonId}:{}),
-    ...(due ? { dueAt: new Date(`${due}T23:59:00`).toISOString() } : {}),
-    ...(releaseAt?{availableAt:new Date(releaseAt).toISOString()}:{}),
-    ...(closeAt?{closesAt:new Date(closeAt).toISOString()}:{}),
+    ...(deadline?{dueAt:deadline}:{}),
+    ...(release?{availableAt:release}:{}),
+    ...(close?{closesAt:close}:{}),
    } });
    setTitle("");
    setInstructions("");
@@ -274,10 +285,14 @@ function TeacherGradebookPage() {
     (!savedDueAt||new Date(savedDueAt)<=new Date()))){
    setNotice("Select a future due date first.");return;
   }
+  if(!sectionTimezone){setNotice("Select an authorized class to change the deadline.");return;}
+  let deadline:string|undefined;
+  try{deadline=date?assessmentDueAtForDate(date,sectionTimezone):undefined;}
+  catch(cause){setNotice(mutationErrorMessage(cause,"Enter a valid class due date."));return;}
   setNotice("");
   await mutation.run(()=>manageAssessment({data:{
     assessmentId:id,action,
-    ...(date?{dueAt:new Date(date+"T23:59:00").toISOString()}:{})
+    ...(deadline?{dueAt:deadline}:{})
    }}),{successMessage:result=>"Assessment "+result.status+".",
     commandErrorMessage:"Unable to update assessment"});
  }
@@ -346,7 +361,7 @@ function TeacherGradebookPage() {
        onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}
      </WorkspacePanel>
     </div>}
-    <GradebookAssessmentComposer title={title} points={points} due={due}
+    <GradebookAssessmentComposer timezone={sectionTimezone} title={title} points={points} due={due}
       releaseAt={releaseAt} closeAt={closeAt} assignmentKind={assignmentKind}
       curriculumLessonId={curriculumLessonId} maxAttempts={maxAttempts} instructions={instructions}
       newRubric={newRubric} publishConfirmed={publishConfirmed} busy={busy}
@@ -368,7 +383,7 @@ function TeacherGradebookPage() {
        <tr className="border-b text-left">
         <th className="p-3 font-semibold">Student</th>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment =>
-         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} sectionId={selected} busy={busy}
+         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} sectionId={selected} timezone={sectionTimezone} busy={busy}
           dueDate={assessmentDueDates[assessment.id]??""}
           onDueDateChange={value=>setAssessmentDueDates(current=>({...current,[assessment.id]:value}))}
           onAction={action=>void changeAssessment(assessment.id,action)}
