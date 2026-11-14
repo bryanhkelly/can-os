@@ -7,6 +7,7 @@ import {
   beginNoncreditKnowledgeCheck, readNoncreditKnowledgeCheck, submitNoncreditKnowledgeCheck,
 } from "./noncredit-assessment.server";
 import { finalizeNoncreditKnowledgeCheck } from "./noncredit-assessment-review.server";
+import { provisionNoncreditAssessmentAccess } from "./noncredit-assessment-access.server";
 
 const uuid=z.string().uuid();
 const course=z.object({courseAttemptId:uuid}).strict();
@@ -59,5 +60,15 @@ export const finalizeNoncreditKnowledgeCheckResult=createServerFn({method:"POST"
     privateResponse();
     return finalizeNoncreditKnowledgeCheck(
       await getCanonicalCommandContext(getRequest()),data,
+    );
+  });
+
+/** Provider-issued learner grant; never self-issued by a learner account. */
+export const provisionNoncreditKnowledgeCheckAccess=createServerFn({method:"POST"})
+  .validator((v:unknown)=>course.parse(v))
+  .handler(async({data})=>{
+    privateResponse();
+    return provisionNoncreditAssessmentAccess(
+      await getCanonicalCommandContext(getRequest()),data.courseAttemptId,
     );
   });
