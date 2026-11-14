@@ -10,6 +10,7 @@ const cases = [
   ["canonical.lab.credentials.tsx", "/canonical/lab/credentials"],
   ["canonical.lab.deployments.tsx", "/canonical/lab/deployments"],
   ["canonical.lab.readiness.tsx", "/canonical/lab/readiness"],
+  ["canonical.lab.site-qualification.tsx", "/canonical/lab/site-qualification"],
 ] as const;
 
 describe("temporary canonical Capability Lab route boundaries", () => {

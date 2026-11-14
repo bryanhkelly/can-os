@@ -12,6 +12,8 @@ Instrument Serif headings and semantic status colors.
 
 ## Routes
 
+- `/canonical/lab/site-qualification`: applicant-organization and authorized Site-scoped site/proposed-site applications, latest program-fit assessment requirement observations and recommendations; no evidence bodies or approval actions.
+
 - `/canonical/lab/deployments`: read-only, current operator organization and authorized Site-scoped deployment/Offering adoption state, aggregate enrollments and provider-owned Blueprint execution evidence.
 - `/canonical/lab/readiness`: organization-owned assessment definitions for diagnostic, foundation, readiness, mastery and other purposes; version/publishing state only, no answer keys or learner evidence.
 - `/canonical/lab/credentials`: provider preview-only noncredit credential artwork/PDF/metadata; preview does not issue a credential.
@@ -47,7 +49,7 @@ tenant. Actions are real database writes; the UI requires explicit acknowledgeme
 This is **not** a generic management UI for all canonical tables. Current
 coverage is limited to the first 100 training versions, course attempts and
 survey campaigns in the organization. Survey authoring, invitations and publishing; actual foundation/readiness decisions;
-site-qualification evidence; funding/grant configuration; and end-to-end cross-role
+site-qualification authoring and full evidence verification; funding/grant configuration; and end-to-end cross-role
 smoke tests remain to be wired using canonical owned services.
 
 All new route-contract entries remain `pending` until test execution.

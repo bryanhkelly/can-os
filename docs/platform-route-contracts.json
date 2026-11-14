@@ -337,6 +337,15 @@
       "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
     },
     {
+      "file": "src/routes/canonical.lab.site-qualification.tsx",
+      "route": "/canonical/lab/site-qualification",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar inspects applicant organization-owned site qualification and program fit evidence summaries in a temporary lab, without granting an opening approval",
+      "readBoundary": "Native canonical session and authorized Site required; qualification applicant and subject must match the session organization, and existing Sites must match the authorized Site",
+      "writeBoundary": "Read-only GET; no qualification review, document write, or opening authorization"
+    },
+    {
       "file": "src/routes/canonical.lab.surveys.tsx",
       "route": "/canonical/lab/surveys",
       "owner": "operations",

@@ -44,6 +44,7 @@ export const routeNavigation = {
   "/canonical/lab/surveys": hidden("Temporary canonical provider survey inspection", []),
   "/canonical/lab/deployments": hidden("Temporary canonical provider deployment inspection", []),
   "/canonical/lab/readiness": hidden("Temporary canonical provider assessment inventory", []),
+  "/canonical/lab/site-qualification": hidden("Temporary canonical provider site qualification inspection", []),
   "/classes": page(learn, ["student", "teacher", "guardian"]),
   "/enrichment": hidden("Contextual extended-learning registration"),
   "/enrichment/$seasonId": hidden("Extended-learning offering detail"),

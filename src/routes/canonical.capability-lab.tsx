@@ -12,6 +12,12 @@ export const Route = createFileRoute("/canonical/capability-lab")({
 
 const areas = [
   {
+    title: "Site qualification",
+    detail: "Inspect site qualification applications, program-fit assessments, requirement findings and reviewer recommendations.",
+    path: "/canonical/lab/site-qualification",
+    status: "Read-only testing page",
+  },
+  {
     title: "Program deployments",
     detail: "Inspect operator-scoped deployments, offering adoption, learner counts and executed Blueprint lineage.",
     path: "/canonical/lab/deployments",
@@ -78,7 +84,7 @@ function CapabilityLabOverview() {
     </div>
     <section className="mt-6 border border-border bg-card p-5" aria-label="Lab limitations">
       <h2 className="text-base font-semibold">Boundaries and next coverage</h2>
-      <p className="mt-2 text-sm leading-6 text-muted-foreground">Records above are scoped to your canonical provider organization, limited to the first {data.limitPerCollection} per collection, and are not acceptance results. Survey authoring, actual foundation diagnostics and mastery decisions, site qualification and funding administration still need owned services and workflow pages. The existing school routes continue to use their own authorization context.</p>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">Records above are scoped to your canonical provider organization, limited to the first {data.limitPerCollection} per collection, and are not acceptance results. Survey authoring, actual foundation diagnostics and mastery decisions, site qualification authoring and funding administration still need owned services and workflow pages. The existing school routes continue to use their own authorization context.</p>
       <p className="mt-3 text-sm">Provider organization: <code className="break-all font-mono text-xs">{data.organizationId}</code></p>
     </section>
   </WorkspaceShell>;

@@ -2178,6 +2178,11 @@
       "persona": "native canonical site_admin or registrar",
       "fixtureRequired": false,
       "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Read-only provider-owned assessment definitions/versions, without secure answers or learner results. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/site-qualification": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "The public-schema demo dataset does not establish canonical qualification reviewer authority, Site grants or protected evidence provenance. The temporary page is a read-only inspection of isolated v3.0.1 applicant-owned qualification summaries; live authenticated browser tests remain outstanding."
     }
   }
 }
