@@ -9,6 +9,7 @@ import {
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
   recordedInstructorSelectionIsCurrent,
+  snapshotRecordedPracticeAnswers,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
   type InstructionalTrackPolicyContext,
@@ -416,5 +417,21 @@ describe("recorded instructor policy renewal eligibility", () => {
 
   it("does not open lessons before a teacher is selected", () => {
     expect(recordedInstructorSelectionIsCurrent({ selection: null, choices: approved })).toBe(false);
+  });
+});
+
+describe("recorded practice answer provenance", () => {
+  it("preserves the original prompt with each learner answer for review after teacher switching", () => {
+    expect(snapshotRecordedPracticeAnswers(
+      [{ key: "prompt-1", text: "Explain your first calculation" },
+        { key: "prompt-2", text: "Show an alternate method" }],
+      [{ promptKey: "prompt-1", response: "I multiplied both sides." },
+        { promptKey: "prompt-2", response: "I used a diagram." }],
+    )).toEqual([
+      { promptKey: "prompt-1", promptText: "Explain your first calculation",
+        response: "I multiplied both sides." },
+      { promptKey: "prompt-2", promptText: "Show an alternate method",
+        response: "I used a diagram." },
+    ]);
   });
 });
