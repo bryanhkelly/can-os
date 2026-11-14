@@ -30,7 +30,8 @@ export function FacilitatedRoomPlayer({ facilitatedSessionId }: {
       .then(result=>{
         if(!active)return;
         setCatalog(result);
-        setSelected(result.media[0]?.lessonId+":"+result.media[0]?.assetVersionId || "");
+        setSelected(result.media[0] ?
+          result.media[0].lessonId+":"+result.media[0].assetVersionId : "");
       }).catch(()=>{
         if(active)setError("Approved recorded media could not be loaded for this room.");
       }).finally(()=>{if(active)setLoading(false);});
