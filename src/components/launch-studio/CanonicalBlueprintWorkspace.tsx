@@ -199,14 +199,16 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     try {
       const version = versionInput(selectedTemplate, detail ?? undefined);
       if (detail) {
-        await saveCanonicalBlueprintConfiguration({ data: {
+        const saved = await saveCanonicalBlueprintConfiguration({ data: {
           configurationId: detail.configurationId,
           versionId: crypto.randomUUID(),
           expectedRevision: detail.revision,
           version,
         } });
         await openConfiguration(detail.configurationId);
-        setMessage("A new Blueprint configuration revision was saved.");
+        setMessage(saved.revision > detail.revision
+          ? "A new Blueprint configuration revision was saved."
+          : "The Blueprint configuration is already up to date.");
       } else {
         const configurationId = crypto.randomUUID();
         await createCanonicalBlueprintConfiguration({ data: {
