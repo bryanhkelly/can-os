@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { CanonicalLearningTracker } from "@/components/learning/CanonicalLearningTracker";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
 import { NoncreditCourseActivities } from "@/components/learning/NoncreditCourseActivities";
@@ -182,6 +183,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
   ).length ?? 0;
 
   return <section aria-label="Recorded instructor" className="space-y-5">
+    <CanonicalLearningTracker courseAttemptId={courseAttemptId} lessonId={currentLesson?.id ?? null}/>
     <div className="border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Choose your recorded teacher</h2>
       <p className="mt-1 text-sm text-muted-foreground">
