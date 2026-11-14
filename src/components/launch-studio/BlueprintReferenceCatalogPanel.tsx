@@ -4,7 +4,7 @@ import {
   type BlueprintReferenceCatalogItem,
   type BlueprintReferenceKind,
 } from "@/domain/blueprint-reference-catalog";
-import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
+import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/blueprint-studio.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
@@ -34,7 +34,7 @@ export function BlueprintReferenceCatalogPanel({ siteId }: { siteId: string }) {
     setLoading(true);
     setError(null);
     try {
-      setItems(await exploreBlueprintReferenceCatalog({ data: { siteId } }));
+      setItems(await exploreCanonicalBlueprintReferences({ data: { siteId } }));
     } catch (caught) {
       setError(normalizeClientError(caught, "The Blueprint reference library is unavailable.").message);
     } finally {
