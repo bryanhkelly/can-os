@@ -10518,7 +10518,10 @@ BEGIN
  FOREACH t IN ARRAY ARRAY[
   'blueprints','blueprint_versions','blueprint_components',
   'religious_affiliation_options','evidence_documents','evidence_document_versions',
-  'blueprint_component_approval_decisions'
+  'blueprint_component_approval_decisions',
+  'blueprint_execution_batches','education_operations',
+  'education_operation_organization_roles',
+  'program_deployments','deployment_offering_adoptions'
  ] LOOP
   EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',t);
   EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',t);
@@ -10708,6 +10711,80 @@ CREATE POLICY blueprint_domain_event_insert ON domain_events FOR INSERT WITH CHE
   WHERE bc.id=domain_events.aggregate_id
     AND (v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')
       OR v28_role_can_access_org(bc.owning_organization_id,'blueprint_reviewer'))));
+
+-- Approved Blueprint execution can create a *planning* Deployment, not
+-- operating authority. The executing Organization must operate the Operation.
+CREATE POLICY blueprint_operation_roles_read ON education_operation_organization_roles
+ FOR SELECT USING (
+  role_code='operator' AND status='approved'
+  AND valid_from<=clock_timestamp()
+  AND (valid_through IS NULL OR valid_through>clock_timestamp())
+  AND v28_role_can_access_org(organization_id,'blueprint_author'));
+CREATE POLICY blueprint_operations_read ON education_operations FOR SELECT USING (
+ status<>'closed' AND EXISTS(
+  SELECT 1 FROM education_operation_organization_roles r
+  WHERE r.operation_id=education_operations.id AND r.role_code='operator'
+    AND r.status='approved' AND r.valid_from<=clock_timestamp()
+    AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
+    AND v28_role_can_access_org(r.organization_id,'blueprint_author')));
+
+CREATE POLICY blueprint_batches_read ON blueprint_execution_batches FOR SELECT USING (
+ v28_role_can_access_org(executing_organization_id,'blueprint_author'));
+CREATE POLICY blueprint_batches_insert ON blueprint_execution_batches FOR INSERT WITH CHECK (
+ execution_status='proposed'
+ AND v28_role_can_access_org(executing_organization_id,'blueprint_author')
+ AND EXISTS (SELECT 1 FROM blueprint_configuration_versions v
+  JOIN blueprint_configurations bc ON bc.id=v.configuration_id
+  WHERE v.id=blueprint_execution_batches.configuration_version_id
+    AND v.lifecycle='frozen'
+    AND bc.owning_organization_id=blueprint_execution_batches.executing_organization_id));
+CREATE POLICY blueprint_batches_execute ON blueprint_execution_batches FOR UPDATE
+ USING (execution_status='proposed'
+  AND v28_role_can_access_org(executing_organization_id,'blueprint_author'))
+ WITH CHECK (execution_status='executed' AND executed_by_person_id IS NOT NULL
+  AND executed_at IS NOT NULL
+  AND v28_role_can_access_org(executing_organization_id,'blueprint_author'));
+
+CREATE POLICY blueprint_deployments_read ON program_deployments FOR SELECT USING (
+ status='planning'
+ AND EXISTS(SELECT 1 FROM education_operation_organization_roles r
+  WHERE r.operation_id=program_deployments.operation_id AND r.role_code='operator'
+    AND r.status='approved' AND r.valid_from<=clock_timestamp()
+    AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
+    AND v28_role_can_access_org(r.organization_id,'blueprint_author')));
+CREATE POLICY blueprint_deployments_insert ON program_deployments FOR INSERT WITH CHECK (
+ status='planning'
+ AND EXISTS(SELECT 1 FROM education_operation_organization_roles r
+  WHERE r.operation_id=program_deployments.operation_id AND r.role_code='operator'
+    AND r.status='approved' AND r.valid_from<=clock_timestamp()
+    AND (r.valid_through IS NULL OR r.valid_through>clock_timestamp())
+    AND v28_role_can_access_org(r.organization_id,'blueprint_author')));
+CREATE POLICY blueprint_adoptions_read ON deployment_offering_adoptions FOR SELECT USING (
+ EXISTS(SELECT 1 FROM program_deployments p
+  WHERE p.id=deployment_offering_adoptions.deployment_id AND p.status='planning'));
+CREATE POLICY blueprint_adoptions_insert ON deployment_offering_adoptions FOR INSERT WITH CHECK (
+ approval_status='proposed'
+ AND EXISTS(SELECT 1 FROM program_deployments p
+  WHERE p.id=deployment_offering_adoptions.deployment_id AND p.status='planning'));
+CREATE POLICY blueprint_outputs_read ON blueprint_outputs FOR SELECT USING (
+ EXISTS(SELECT 1 FROM blueprint_execution_batches b
+  WHERE b.id=blueprint_outputs.execution_batch_id
+    AND v28_role_can_access_org(b.executing_organization_id,'blueprint_author')));
+CREATE POLICY blueprint_outputs_insert ON blueprint_outputs FOR INSERT WITH CHECK (
+ EXISTS(SELECT 1 FROM blueprint_execution_batches b
+  WHERE b.id=blueprint_outputs.execution_batch_id AND b.execution_status='executed'
+    AND v28_role_can_access_org(b.executing_organization_id,'blueprint_author')));
+
+CREATE POLICY blueprint_execution_audit_insert ON audit_events FOR INSERT WITH CHECK (
+ entity_kind='blueprint_execution_batch' AND event_code='blueprint.configuration.executed'
+ AND v28_role_can_access_org(owning_organization_id,'blueprint_author')
+ AND EXISTS (SELECT 1 FROM blueprint_execution_batches b
+  WHERE b.id=audit_events.entity_id AND b.executing_organization_id=owning_organization_id));
+CREATE POLICY blueprint_execution_domain_event_insert ON domain_events FOR INSERT WITH CHECK (
+ aggregate_type='BlueprintExecutionBatch' AND event_type='BlueprintConfigurationExecuted'
+ AND EXISTS (SELECT 1 FROM blueprint_execution_batches b
+  WHERE b.id=domain_events.aggregate_id
+    AND v28_role_can_access_org(b.executing_organization_id,'blueprint_author')));
 
 -- Read-only bearer session projection; scoped authority is verified server-side.
 CREATE OR REPLACE FUNCTION v301_canonical_session_context(p_secret_hash text)
