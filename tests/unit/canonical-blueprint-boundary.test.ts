@@ -71,6 +71,22 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(editor).toContain('setRevisingFrozen(false)');
   });
 
+  it("enforces independent review across the whole Blueprint configuration", () => {
+    const review = source("src/modules/blueprints/blueprint-review.server.ts");
+    const queue = source("src/modules/blueprints/blueprint-review-queue.server.ts");
+    const independence = review.slice(
+      review.indexOf("const authors = await tx.select"),
+      review.indexOf("const selectedComponents = await tx.select"),
+    );
+    expect(independence).toContain("eq(auditEvents.entityId, version.configurationId)");
+    expect(independence).toContain("authors.some(author => author.actorPersonId === actorPersonId)");
+    expect(independence).not.toContain("payload}->>'versionId'");
+    const queueFilter = queue.slice(queue.indexOf("return pending"), queue.indexOf(".map(version =>"));
+    expect(queueFilter).toContain("author.configurationId === version.configurationId");
+    expect(queueFilter).toContain("author.authorPersonId === context.actorPersonId");
+    expect(queueFilter).not.toContain("author.payload.versionId");
+  });
+
   it("retains isolated, reversible database acceptance", () => {
     const runner = source("scripts/check-canonical-v301-blueprint-flow.mjs");
     expect(runner).toContain('process.env.APP_ENV !== "test"');
