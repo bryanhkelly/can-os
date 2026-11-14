@@ -523,3 +523,14 @@ GitHub Actions runs still report `startup_failure` with no executed jobs.
 Credential issuance, learner-wallet reading, canonical activity and facilitated
 learning runtime flags remain disabled. Do not treat a database migration as a
 production application release.
+
+### Security hardening: noncredit privileged functions (November 14, 2026)
+
+After the verified noncredit migration, `patch-noncredit-definer-hardening.sql`
+was applied to both Neon `test01` and `main`. Six SECURITY DEFINER
+functions now resolve the canonical schema before `pg_catalog` and
+`pg_temp`, protecting against untrusted temporary relation shadowing.
+No PUBLIC execution privileges were granted; both databases passed the
+read-only function ACL and execution-search-path check. The additive source
+patches and fresh-install `schema.sql` contain the corresponding security
+configuration. The noncredit release checker now enforces these properties.

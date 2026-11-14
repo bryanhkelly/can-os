@@ -7,7 +7,7 @@ if (process.env.CAN_NONCREDIT_SCHEMA_VALIDATION !== "1")
 if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required.");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
 try {
-  const [columns,functions,triggers,completionBody]=await Promise.all([
+  const [columns,functions,triggers,completionBody,privilegedFns]=await Promise.all([
     pool.query(`
       SELECT table_name,column_name FROM information_schema.columns
       WHERE table_schema='education_v30' AND (
@@ -40,6 +40,21 @@ try {
         AS validation, pg_get_functiondef(
           'education_v30.v301_try_auto_complete_noncredit(uuid)'::regprocedure) AS automation
     `),
+    pool.query(`
+      SELECT p.proname,p.prosecdef,
+        (SELECT setting FROM unnest(p.proconfig) setting
+         WHERE setting LIKE 'search_path=%' LIMIT 1) AS search_path,
+        NOT EXISTS (
+          SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+          WHERE a.grantee=0 AND a.privilege_type='EXECUTE'
+        ) AS not_public
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='education_v30' AND p.proname IN (
+        'v301_provision_noncredit_knowledge_access','v301_noncredit_attempt_access_trigger',
+        'v301_noncredit_admin_access_trigger','v301_try_auto_complete_noncredit',
+        'v301_auto_complete_noncredit_event','v301_auto_complete_on_evidence_verification'
+      )
+    `),
   ]);
   assert.equal(columns.rows.length,5,"Noncredit policy, provenance and baseline columns missing");
   assert.equal(functions.rows.length,3,"Noncredit policy/automatic/assessment functions missing");
@@ -53,6 +68,11 @@ try {
     "Completion validation must require verified participation");
   assert(code?.automation?.includes("completion_mode"),
     "Automatic completion must require an explicit provider-approved mode");
+  assert.equal(privilegedFns.rows.length,6,
+    "Expected six noncredit privileged functions");
+  assert(privilegedFns.rows.every(row=>row.prosecdef===true && row.not_public===true &&
+    String(row.search_path).replaceAll(" ","").endsWith(",pg_temp")),
+    "SECURITY DEFINER functions must be private and put pg_temp last");
   console.log("CAN OS noncredit migration contract verified, read-only.");
 } finally {
   await pool.end();
