@@ -9,6 +9,7 @@ import {
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
   recordedInstructorSelectionIsCurrent,
+  recordedPracticeResponsesComplete,
   snapshotRecordedPracticeAnswers,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
@@ -224,6 +225,29 @@ describe("student-safe practice and stale submissions", () => {
     null,
   ])("rejects private or malformed practice definition %j", (input) => {
     expect(() => parseStudentPracticeDefinition(input)).toThrow();
+  });
+
+  it("requires completed responses to exactly match published practice prompts", () => {
+    const prompts = [{ key: "q1" }, { key: "q2" }];
+    expect(recordedPracticeResponsesComplete(prompts, [
+      { promptKey: "q2", response: "Another approach." },
+      { promptKey: "q1", response: "First approach." },
+    ])).toBe(true);
+    expect(recordedPracticeResponsesComplete(prompts, [
+      { promptKey: "q1", response: "First approach." },
+    ])).toBe(false);
+    expect(recordedPracticeResponsesComplete(prompts, [
+      { promptKey: "q1", response: "First approach." },
+      { promptKey: "q1", response: "First approach." },
+    ])).toBe(false);
+    expect(recordedPracticeResponsesComplete(prompts, [
+      { promptKey: "q1", response: "First approach." },
+      { promptKey: "q3", response: "Unknown activity." },
+    ])).toBe(false);
+    expect(recordedPracticeResponsesComplete(prompts, [
+      { promptKey: "q1", response: "   " },
+      { promptKey: "q2", response: "Another approach." },
+    ])).toBe(false);
   });
 
   it("rejects a delayed practice submission after track switching", () => {
