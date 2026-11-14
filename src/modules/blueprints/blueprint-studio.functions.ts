@@ -3,6 +3,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { DomainError } from "@/domain/errors";
+import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import {
   createBlueprintConfigurationInputSchema,
   saveBlueprintConfigurationInputSchema,
@@ -34,6 +35,21 @@ function noStore() {
   setResponseHeader("Cache-Control", "private, no-store");
 }
 
+/** Site-scoped UI commands cannot rewrite or open another Site's private plan. */
+export function requireBlueprintSiteScope(
+  context: CommandContext,
+  rawConfig: unknown,
+): string {
+  if (!rawConfig || typeof rawConfig !== "object" || Array.isArray(rawConfig)) {
+    throw new AuthorizationError("canonical Blueprint Site selection");
+  }
+  const siteId = (rawConfig as Record<string, unknown>).siteId;
+  if (typeof siteId !== "string" || !context.scope.siteIds?.includes(siteId)) {
+    throw new AuthorizationError("canonical Blueprint Site scope");
+  }
+  return siteId;
+}
+
 export const readCanonicalBlueprintWorkspace = createServerFn({ method: "GET" })
   .validator((value: unknown) => blueprintWorkspaceInputSchema.parse(value))
   .handler(async ({ data }) => {
@@ -47,7 +63,10 @@ export const readCanonicalBlueprintConfiguration = createServerFn({ method: "GET
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return getBlueprintConfiguration(await getCommandContext(getRequest()), data.configurationId);
+    const context = await getCommandContext(getRequest());
+    const detail = await getBlueprintConfiguration(context, data.configurationId);
+    requireBlueprintSiteScope(context, detail.config);
+    return detail;
   });
 
 export const createCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
@@ -55,7 +74,9 @@ export const createCanonicalBlueprintConfiguration = createServerFn({ method: "P
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return createBlueprintConfiguration(await getCommandContext(getRequest()), data);
+    const context = await getCommandContext(getRequest());
+    requireBlueprintSiteScope(context, data.version.config);
+    return createBlueprintConfiguration(context, data);
   });
 
 export const saveCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
@@ -63,7 +84,13 @@ export const saveCanonicalBlueprintConfiguration = createServerFn({ method: "POS
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return saveBlueprintConfiguration(await getCommandContext(getRequest()), data);
+    const context = await getCommandContext(getRequest());
+    const siteId = requireBlueprintSiteScope(context, data.version.config);
+    const existing = await getBlueprintConfiguration(context, data.configurationId);
+    if (requireBlueprintSiteScope(context, existing.config) !== siteId) {
+      throw new AuthorizationError("Blueprint configuration Site cannot be reassigned");
+    }
+    return saveBlueprintConfiguration(context, data);
   });
 
 export const submitCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
@@ -71,7 +98,10 @@ export const submitCanonicalBlueprintConfiguration = createServerFn({ method: "P
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return submitBlueprintConfiguration(await getCommandContext(getRequest()), data);
+    const context = await getCommandContext(getRequest());
+    const existing = await getBlueprintConfiguration(context, data.configurationId);
+    requireBlueprintSiteScope(context, existing.config);
+    return submitBlueprintConfiguration(context, data);
   });
 
 export const readCanonicalBlueprintReview = createServerFn({ method: "GET" })
