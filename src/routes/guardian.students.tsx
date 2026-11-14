@@ -33,9 +33,14 @@ function GuardianAcademicsPage() {
  const [loading, setLoading] = useState(true);
  const [loadingStudents, setLoadingStudents] = useState(true);
  const [error, setError] = useState("");
+ const [retryKey, setRetryKey] = useState(0);
 
  useEffect(() => {
   let active = true;
+  setLoadingStudents(true);
+  setError("");
+  setStudents([]);
+  setSelected("");
   getGuardianStudents().then(result => {
    if (!active) return;
    setStudents(result.students);
@@ -46,7 +51,7 @@ function GuardianAcademicsPage() {
    if (active) { setError("Sign in with an authorized guardian account to view academic progress."); setLoadingStudents(false); setLoading(false); }
   });
   return () => { active = false; };
- }, []);
+ }, [retryKey]);
 
  useEffect(() => {
   if (!selected) { setAssignments([]); setLoading(false); return; }
@@ -80,7 +85,11 @@ function GuardianAcademicsPage() {
     </select>
    </label>}
    {(loading || loadingStudents) && <p className="mt-8 text-sm" role="status">Loading academic progress…</p>}
-   {error && <p className="mt-8 rounded-lg border p-4 text-sm" role="alert">{error}</p>}
+   {error && <div className="mt-8 rounded-lg border p-4 text-sm" role="alert">
+    <p>{error}</p>
+    <button type="button" className="mt-3 rounded-lg border px-4 py-2 font-semibold"
+     onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry loading academic progress</button>
+   </div>}
    {student&&!selected&&!loadingStudents&&!error&&<p role="alert" className="mt-8 rounded-lg border p-4 text-sm">This student is unavailable in your current family workspace. Choose an authorized student above.</p>}
    {!loading && !loadingStudents && !error && students.length === 0 && <div className="mt-8 rounded-xl border bg-card p-5">
     <p className="font-semibold">No enrolled children are showing in academics yet.</p>
