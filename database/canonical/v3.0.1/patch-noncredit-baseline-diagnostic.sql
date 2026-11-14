@@ -39,9 +39,9 @@ BEGIN
  UPDATE noncredit_registrations SET learner_id=person_learner
  WHERE id=rec.registration_id AND learner_id IS NULL;
 
- FOR candidate_version IN SELECT DISTINCT id FROM unnest(ARRAY[
+ FOR candidate_version IN SELECT DISTINCT phase_version.id FROM unnest(ARRAY[
    rec.assessment_version_id,rec.baseline_assessment_version_id
- ]) AS id WHERE id IS NOT NULL LOOP
+ ]) AS phase_version(id) WHERE phase_version.id IS NOT NULL LOOP
    SELECT count(*),min(ad.id) INTO administration_count,administration_id
    FROM assessment_administrations ad
    JOIN assessment_versions av ON av.id=ad.assessment_version_id
