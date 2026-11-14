@@ -30,6 +30,8 @@ if (email && (!pepper || pepper.length < 32)) {
   throw new Error("CAN_CANONICAL_ACCESS_TOKEN_PEPPER (32+ characters) is required for demo session issuance.");
 }
 const seed = readFileSync(resolve("database/canonical/v3.0.1/seed-canonical-demo.sql"), "utf8");
+const learningSiteSeed = readFileSync(resolve(
+  "database/canonical/v3.0.1/seed-blueprint-execution-demo.sql"), "utf8");
 const pool = new Pool({ connectionString: testUrl, max: 1 });
 const client = await pool.connect();
 let secret = null;
@@ -40,6 +42,7 @@ try {
     throw new Error("Install canonical schema.sql into the isolated test database first.");
   }
   await client.query(seed);
+  await client.query(learningSiteSeed);
   const count = await client.query(`
     SELECT (SELECT count(*) FROM education_v30.canonical_accounts
       WHERE email_normalized LIKE '%@can.example')::integer AS accounts,
@@ -49,6 +52,22 @@ try {
   `);
   if (count.rows[0]?.accounts !== 4 || count.rows[0]?.grants !== 4) {
     throw new Error("Expected exactly four native canonical demo accounts and grants.");
+  }
+  const linkage = await client.query(`
+    SELECT
+      (SELECT count(*) FROM education_v30.education_operation_sites
+        WHERE id IN ('dddd0000-0000-4000-8000-000000000001',
+                     'dddd0000-0000-4000-8000-000000000002'))::integer AS sites,
+      (SELECT count(*) FROM education_v30.education_operation_organization_roles
+        WHERE id IN ('99990000-0000-4000-8000-000000000001',
+                     '99990000-0000-4000-8000-000000000002'))::integer AS operators,
+      (SELECT count(*) FROM education_v30.evidence_document_versions
+        WHERE id IN ('bbbb0000-0000-4000-8000-000000000001',
+                     'bbbb0000-0000-4000-8000-000000000002'))::integer AS evidence
+  `);
+  if (linkage.rows[0]?.sites !== 2 || linkage.rows[0]?.operators !== 2 ||
+      linkage.rows[0]?.evidence !== 2) {
+    throw new Error("The two canonical demo Sites need independent Operations and evidence.");
   }
   if (email) {
     const records = await client.query(`
@@ -71,7 +90,7 @@ try {
     `, [records.rows[0].account_id, records.rows[0].grant_id, secretHash]);
   }
   await client.query("COMMIT");
-  console.log("Seeded four native canonical demo accounts across two independent Sites.");
+  console.log("Seeded two native Sites, their Operations and review evidence, and four demo accounts.");
   if (secret) {
     console.log("LOCAL TEST SESSION ONLY. Set this secure cookie in your test browser:");
     console.log(`__Host-can_os_v3_session=${secret}`);
