@@ -6,6 +6,7 @@ import { CanonicalLearningActivityProvider, useCanonicalLearningActivity } from 
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
 import { NoncreditCourseActivities } from "@/components/learning/NoncreditCourseActivities";
+import { CanonicalCourseEvidencePanel } from "@/components/learning/CanonicalCourseEvidencePanel";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -308,6 +309,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
     <NoncreditCourseActivities courseAttemptId={courseAttemptId}
       lessonProgressRevision={lessonProgressRevision}/>
+    <CanonicalCourseEvidencePanel courseAttemptId={courseAttemptId}/>
   </section>;
 }
 
