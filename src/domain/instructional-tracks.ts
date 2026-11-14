@@ -379,6 +379,19 @@ export function projectRecordedCourseLessons<
   });
 }
 
+/** Resume the same canonical lesson when the learner changes recorded presenters. */
+export function resumeRecordedLessonId(
+  lessons: ReadonlyArray<{ id: string; progress: { status: string } | null }>,
+  preferredLessonId: string | null,
+): string | null {
+  if (preferredLessonId && lessons.some(lesson => lesson.id === preferredLessonId)) {
+    return preferredLessonId;
+  }
+  return lessons.find(lesson =>
+    lesson.progress?.status !== "completed" && lesson.progress?.status !== "waived"
+  )?.id ?? lessons[0]?.id ?? null;
+}
+
 /** Continue through canonical lessons without depending on the selected presenter. */
 export function nextRecordedLessonId(
   lessons: ReadonlyArray<{ id: string; progress: { status: string } | null }>,
