@@ -64,7 +64,7 @@ WITH checks AS (
   UNION ALL
   SELECT 'recorded_teacher_policy_renewal_supported',
     (SELECT pg_get_functiondef('education_v30.validate_primary_track_selection()'::regprocedure)
-       LIKE '%ORDER BY old.revision DESC LIMIT 1%'
+       LIKE '%ORDER BY prior_selection.revision DESC LIMIT 1%'
        AND pg_get_functiondef('education_v30.validate_primary_track_selection()'::regprocedure)
        LIKE '%latest.track_version_id<>NEW.track_version_id%'), 'activation_gate'
   UNION ALL
