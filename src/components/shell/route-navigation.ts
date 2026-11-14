@@ -76,7 +76,7 @@ export const routeNavigation = {
   "/published-site": publicPage,
   "/readiness": page("/home", admins),
   "/safeguarding": hidden("Restricted reports and assigned-case workspace"),
-  "/settings": page("/settings", all),
+  "/settings": page("/settings", [...all, "academic_content_creator", "academic_content_reviewer"]),
   "/settings/school/$module": page("/settings", admins),
   "/site-website": page({site_website_editor:"/site-website",site_admin:"/settings"}, ["site_website_editor", "site_admin"]),
   "/student": hidden("Student layout redirect", ["student"]),

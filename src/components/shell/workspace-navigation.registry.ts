@@ -67,7 +67,7 @@ export function workspaceDestination(
   for (const key of destinationContextKeys[path] ?? []) {
     const institutional = key === "siteId" || key === "programId";
     const input = authorizedSelection && institutional
-      ? authorizedSelection[key] : current.get(key) ?? undefined;
+      ? authorizedSelection[key as keyof WorkspaceInstitutionSelection] : current.get(key) ?? undefined;
     const value = optionalSearchUuid.parse(input);
     if (value) selection.set(key, value);
   }

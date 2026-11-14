@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { getActiveWorkspacePath, getWorkspaceHome, resolveWorkspaceInstitutionSelection, workspaceDestination, workspaceLinks } from "./workspace-navigation.registry";
 import { routeNavigation } from "./route-navigation";
-import { roleCapabilities } from "@/domain/access-context";
+import { roleCapabilities, type AccessContext } from "@/domain/access-context";
+import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { assertPartnerWebsitePreviewScope } from "@/domain/site-publication-policy";
 
 describe("generated workspace navigation", () => {
   const siteId = "00000000-0000-4000-8000-000000000001";
@@ -56,6 +58,37 @@ describe("generated workspace navigation", () => {
     const workflows = routeNavigation["/operations/workflows"];
     expect(workflows.visibility).toBe("navigation");
     if (workflows.visibility === "navigation") expect(workflows.personas).toEqual(["registrar", "site_admin"]);
+  });
+
+  it("crosschecks visible restricted destinations against their actual server role gates", () => {
+    const organizationId = "00000000-0000-4000-8000-000000000040";
+    const site = {id:siteId,organizationId};
+    for(const [role,links] of Object.entries(workspaceLinks)) {
+      const allowed = roleCapabilities[role] ?? [];
+      const canUseSiteWebsite = (role==="site_website_editor" || role==="site_admin") &&
+        allowed.includes("site.website.draft.read");
+      const canUseWorkflow = hasRegistrarAuthority(role) && allowed.includes("program.read");
+      const actor: AccessContext = {
+        role, grantSiteId:siteId, grantId:"grant", accountId:"account",
+        actorPersonId:"person", sessionId:"session",
+        capabilities:new Set(allowed), scope:{organizationIds:[organizationId],siteIds:[siteId]},
+      };
+      if(links.some(item=>item.path==="/site-website")) {
+        expect(canUseSiteWebsite, role).toBe(true);
+        expect(()=>assertPartnerWebsitePreviewScope(actor,site)).not.toThrow();
+      }
+      if(!canUseSiteWebsite) expect(()=>assertPartnerWebsitePreviewScope(actor,site)).toThrow();
+      if(links.some(item=>item.path==="/operations/workflows")) {
+        expect(canUseWorkflow, role).toBe(true);
+      }
+    }
+    const metadata=routeNavigation["/operations/workflows"];
+    if(metadata.visibility==="navigation") {
+      for(const role of metadata.personas) {
+        expect(hasRegistrarAuthority(role),role).toBe(true);
+        expect(roleCapabilities[role]).toContain("program.read");
+      }
+    }
   });
 
   it("keeps class context across learning, grading, and calendar destinations", () => {
