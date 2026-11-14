@@ -30,7 +30,7 @@ async function main() {
   try {
     await client.query("BEGIN TRANSACTION READ ONLY");
     const { rows } = await client.query(sql);
-    if (rows.length !== 9) throw new Error("Recorded-instructor readiness returned an incomplete contract.");
+    if (rows.length !== 10) throw new Error("Recorded-instructor readiness returned an incomplete contract.");
     for (const row of rows) {
       console.log(`${row.passed === true ? "PASS" : "FAIL"} [${row.category}] ${row.check_name}`);
     }
