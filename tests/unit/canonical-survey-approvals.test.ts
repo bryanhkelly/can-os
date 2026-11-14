@@ -1,5 +1,5 @@
 import { describe,expect,it } from "vitest";
-import {reviewGate,surveyApprovalDatabaseRole} from "@/domain/canonical-survey-approvals";
+import {reviewGate,surveyApprovalDatabaseRole,recordSurveyReviewInput} from "@/domain/canonical-survey-approvals";
 const org="11110000-0000-4000-8000-000000000001";
 const author="44440000-0000-4000-8000-000000000001";
 const reviewer="44440000-0000-4000-8000-000000000002";
@@ -22,6 +22,14 @@ describe("survey independent approval gate",()=>{
   const rows=[decision("privacy",1n),decision("accessibility",2n),decision("safeguarding",3n)];
   expect(reviewGate(author,rows,new Set()).ready).toBe(false);
   expect(reviewGate(author,rows,validEvidence).ready).toBe(true);
+ });
+ it("refuses approval without evidence or a meaningful review rationale",()=>{
+  const base={surveyVersionId:"88880000-0000-4000-8000-000000000001",
+    kind:"privacy", decision:"approved",evidenceVersionId:null,
+    rationale:"Privacy and disclosure controls were independently inspected."};
+  expect(recordSurveyReviewInput.safeParse(base).success).toBe(false);
+  expect(recordSurveyReviewInput.safeParse({...base,evidenceVersionId:evidence}).success).toBe(true);
+  expect(recordSurveyReviewInput.safeParse({...base,evidenceVersionId:evidence,rationale:"ok"}).success).toBe(false);
  });
  it("derives separate reviewer and publisher DB roles only from trusted scope and capability",()=>{
   expect(surveyApprovalDatabaseRole({scope:{organizationIds:[org]},capabilities:new Set(["survey.review"])},"survey_reviewer"))

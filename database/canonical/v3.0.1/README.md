@@ -459,3 +459,15 @@ Do not enable `CAN_CANONICAL_SURVEY_REVIEW_ENABLED` or
 `CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED` until role and RLS tests,
 cross-tenant denials, and authenticated browser tests pass. Neither role can
 create survey campaigns or invite respondents.
+
+Run the nonmutating verification before switching on either feature flag:
+
+```sh
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -f database/canonical/v3.0.1/verify-survey-review-publication-roles.sql
+```
+
+The verifier checks role isolation, scope bindings, review/publication triggers,
+current-evidence metadata privileges and absence of campaign, invitation and
+respondent-data access. It is not proof of successful DB integration or browser
+testing; those remain required for release.

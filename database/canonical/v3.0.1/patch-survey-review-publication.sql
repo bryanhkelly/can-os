@@ -124,6 +124,9 @@ CREATE POLICY survey_publisher_update ON education_v30.survey_versions FOR UPDAT
 CREATE POLICY survey_approval_audit_insert ON education_v30.audit_events FOR INSERT WITH CHECK (
  event_code IN ('survey.review.recorded','survey.version.published') AND
  entity_kind='survey_version' AND
+ EXISTS(SELECT 1 FROM education_v30.survey_versions v
+  JOIN education_v30.survey_definitions d ON d.id=v.survey_id
+  WHERE v.id=entity_id AND d.owner_organization_id=owning_organization_id) AND
  ((event_code='survey.review.recorded' AND
    education_v30.v28_role_can_access_org(owning_organization_id,'survey_reviewer'))
  OR (event_code='survey.version.published' AND
