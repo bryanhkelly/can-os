@@ -42,6 +42,6 @@ BEGIN
       'program_activation','network_reporting','blueprint_author',
       'blueprint_reviewer'
     ));
-END
+END;
 $test01_blueprint_purposes$;
 COMMIT;
