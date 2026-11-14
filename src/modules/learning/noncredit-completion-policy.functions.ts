@@ -21,6 +21,7 @@ export const getNoncreditCompletionPolicyCatalog=createServerFn({method:"GET"})
     if(!organizations.length)throw new AuthorizationError("provider organization scope");
     const training=await db.select({
       id:noncreditTrainingVersions.id,title:noncreditTrainingVersions.title,
+      state:noncreditTrainingVersions.state,
       authorPersonId:noncreditTrainingVersions.authorPersonId,
       providerOrganizationId:noncreditTrainingVersions.providerOrganizationId,
       assessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
@@ -31,7 +32,8 @@ export const getNoncreditCompletionPolicyCatalog=createServerFn({method:"GET"})
     const rows=ids.length?await db.select().from(noncreditCompletionPolicies)
       .where(inArray(noncreditCompletionPolicies.trainingVersionId,ids))
       .orderBy(desc(noncreditCompletionPolicies.policyVersion)):[];
-    return training.filter(t=>t.authorPersonId!==actor.actorPersonId).map(t=>{
+    return training.filter(t=>t.state==="published"&&
+      t.authorPersonId!==actor.actorPersonId).map(t=>{
       const latest=rows.find(r=>r.trainingVersionId===t.id);
       return {
         trainingVersionId:t.id,title:t.title,
