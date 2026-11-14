@@ -4,6 +4,7 @@ import {
   blueprintConfigurationVersionInputSchema,
   missingRequiredBlueprintComponents,
   selectBlueprintWorkspaceRecipes,
+  includedBlueprintComponentIds,
   blueprintProgramModelDraftSchema,
   blueprintReferenceSelectionSchema,
   blueprintWeeklyPeriodSchema,
@@ -14,6 +15,22 @@ import {
 } from "@/domain/blueprint-configuration";
 
 describe("canonical Blueprint configuration contracts", () => {
+
+  it("keeps proposed component intents when revising a Blueprint", () => {
+    const included = includedBlueprintComponentIds(
+      ["required", "selected"],
+      [
+        { componentId: "required", selectionStatus: "selected" },
+        { componentId: "proposed", selectionStatus: "proposed" },
+        { componentId: "excluded", selectionStatus: "excluded" },
+      ],
+    );
+    expect([...included].sort()).toEqual(["proposed", "required", "selected"]);
+    expect(included.has("proposed")).toBe(true);
+    expect(included.has("excluded")).toBe(false);
+  });
+
+
   it("keeps saved published recipe versions accessible after a newer release", () => {
     const recipes = [
       { blueprintId: "school", blueprintVersionId: "school-v3" },
