@@ -114,6 +114,48 @@ try {
     "Only explicit owner-only release-gate policies may exist");
   assert(security.rows.every(row=>Number(row.public_grants)===0),
     "Learning evidence must have no PUBLIC table permissions");
+  const [integrityConstraints, integrityTriggers, privateGuardFns] = await Promise.all([
+    pool.query(`
+      SELECT conname FROM pg_constraint
+      WHERE connamespace='education_v30'::regnamespace
+        AND conname = ANY(ARRAY[
+          'canonical_learning_sessions_person_fk','canonical_learning_sessions_active_time_ck',
+          'canonical_learning_events_lesson_fk','canonical_learning_events_active_time_ck',
+          'facilitated_rooms_host_fk','facilitated_rooms_facilitator_fk',
+          'facilitated_pairs_person_fk','facilitated_playback_lesson_fk',
+          'facilitated_playback_asset_fk','facilitated_playback_facilitator_fk'
+        ])
+    `),
+    pool.query(`
+      SELECT tgname FROM pg_trigger t
+      JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+      WHERE n.nspname='education_v30' AND NOT t.tgisinternal
+        AND tgname = ANY(ARRAY[
+          'canonical_learning_session_identity','facilitated_room_identity',
+          'facilitated_pair_identity','facilitated_playback_identity',
+          'canonical_learning_evidence_immutable','facilitated_playback_evidence_immutable'
+        ])
+    `),
+    pool.query(`
+      SELECT p.proname,
+        NOT EXISTS(
+          SELECT 1 FROM aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a
+          WHERE a.grantee=0 AND a.privilege_type='EXECUTE'
+        ) AS not_public
+      FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+      WHERE n.nspname='education_v30'
+        AND p.proname = ANY(ARRAY[
+          'v301_valid_learning_attempt_person','v301_guard_learning_session_identity',
+          'v301_guard_facilitated_room_identity','v301_guard_facilitated_pair_identity',
+          'v301_guard_facilitated_playback_identity','v301_guard_learning_evidence_immutable'
+        ])
+    `),
+  ]);
+  assert.equal(integrityConstraints.rows.length,10,"Ten immutable identity/FK constraints required");
+  assert.equal(integrityTriggers.rows.length,6,"Six session/activity integrity triggers required");
+  assert.equal(privateGuardFns.rows.length,6,"Six private validation functions required");
+  assert(privateGuardFns.rows.every(row=>row.not_public===true),
+    "Validation functions must never be executable by PUBLIC");
   console.log("Canonical and facilitated learning evidence schemas verified (read-only).");
 } finally {
   await pool.end();

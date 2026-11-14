@@ -495,3 +495,31 @@ The negative-permission smoke test was run against `test01` with a restricted
 application login and passed. Positive two-learner/two-issuer integration
 fixtures, production role provisioning and the credential-reader feature flag
 remain deliberately pending. No issuer-management UI is included.
+
+### Canonical activity, noncredit migration and integrity record (November 14, 2026)
+
+Applied the additive noncredit patches in order on Neon `test01`, then
+atomically on Neon `main`: objective result finalization, noncredit assessment
+access provisioning, baseline diagnostic support, lesson milestones, verified
+completion evidence, immutable enrollment-time policy, and opt-in automatic
+completion. The production database had zero noncredit trainings, registrations,
+course attempts, and completion decisions at deployment; the migration wrote no
+completion decisions. Approval remains explicitly `provider_review` by default.
+
+The five learning session/facilitated delivery tables additionally received
+`patch-learning-session-integrity.sql` on both databases. It introduces 10
+constraints and six identity/append-only triggers. Unknown participant attempts,
+room pairings and room media were rejected during negative database tests.
+
+Read-only checks after selecting the appropriate database connection:
+
+```sh
+CAN_NONCREDIT_SCHEMA_VALIDATION=1 npm run db:canonical:noncredit-schema
+CAN_ACTIVITY_SCHEMA_VALIDATION=1 npm run db:canonical:activity-schema
+```
+
+These tests establish schema presence, not full authorization or activation.
+GitHub Actions runs still report `startup_failure` with no executed jobs.
+Credential issuance, learner-wallet reading, canonical activity and facilitated
+learning runtime flags remain disabled. Do not treat a database migration as a
+production application release.

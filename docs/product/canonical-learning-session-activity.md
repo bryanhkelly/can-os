@@ -36,13 +36,16 @@ or end-to-end browser acceptance is claimed.
 
 ## Acceptance checks
 
-1. The patches are already installed on Neon `test01` and `main`. **Do not
+1. The patches and `patch-learning-session-integrity.sql` are already installed
+   on Neon `test01` and `main`. **Do not
    rerun those one-time migrations**. For new isolated databases, apply them
    only after a baseline v3.0.1 schema install.
 2. Run `CAN_ACTIVITY_SCHEMA_VALIDATION=1 npm run db:canonical:activity-schema`
    against an explicitly selected nonproduction connection. This read-only
    verifier checks five tables, required columns, composite FKs, indexes,
-   forced RLS, owner-only policies and absence of public table grants.
+   forced RLS, owner-only policies, absence of public table grants,
+   10 relational/active-time constraints, 6 integrity triggers and private
+   SQL guard functions.
 3. Run `npm run typecheck`, `npm run lint`, `npx vitest run tests/unit/canonical-learning-activity.test.ts` and recorded-instructor UI tests.
 4. Browser test: current learner, another learner, unrelated guardian, revoked login, withdrawn registration, changed course version, cross-organization attempts, two tabs, reload, browser hidden/focus, idle expiry, and retries.
 5. Confirm the result read model matches real assessment and survey transactions, and cannot be forged by client events.
@@ -66,3 +69,29 @@ or end-to-end browser acceptance is claimed.
 The **code and schema have been merged**, not the release decision. Do not
 enable either new feature flag until restricted-role, multi-learner, paired-
 facilitator, session-expiry and browser flows have passed.
+
+## Deployment integrity verification (November 14, 2026)
+
+The canonical activity domain has 5 tables, 10 additional cross-identity/FK
+constraints and 6 triggers enforcing course/participant attribution and
+append-only learning evidence. Negative inserts using fabricated learner,
+room and playback references failed correctly on Neon `test01`. On Neon
+`main`, the 10 constraints, 6 triggers and person/attempt validation function
+are installed and verified. Both databases retain forced-RLS owner-only access
+and zero PUBLIC table permissions. This is schema acceptance, **not**
+end-to-end learner browser acceptance.
+
+One-time patch: `patch-learning-session-integrity.sql`. Its DDL is included in
+fresh-install `schema.sql`. The noncredit baseline, enrollment-time policy,
+verified-evidence and opt-in automatic-completion patches also passed
+installation checks on `test01` and `main`. Run the two explicit read-only
+schema acceptance commands before any feature activation:
+
+```sh
+CAN_ACTIVITY_SCHEMA_VALIDATION=1 npm run db:canonical:activity-schema
+CAN_NONCREDIT_SCHEMA_VALIDATION=1 npm run db:canonical:noncredit-schema
+```
+
+Do not enable `CAN_CANONICAL_ACTIVITY_ENABLED` or
+`CAN_FACILITATED_LEARNING_ENABLED` until scoped runtime DB roles,
+positive/negative learner and host flows, privacy review, and CI are verified.
