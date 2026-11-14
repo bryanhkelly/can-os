@@ -17,6 +17,18 @@ beforeEach(()=>{
  state.options={sites:[{id:siteId,organizationId:"org",websiteDraft:null}]};state.launches=[];state.programReadFails=false;state.websiteReadFails=false;state.teamReadFails=false;state.content=null;state.grants=[{personId:"admin",active:true}];
 });
 describe("exact-Site Hub reader",()=>{
+ it("does not expose canonical Blueprint workflows through the old School Hub",async()=>{
+  vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","true");
+  vi.stubEnv("CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED","true");
+  try {
+   const result=await getSchoolHubData({data:{siteId,module:"academics"}});
+   expect("canonicalCatalogEnabled" in result).toBe(false);
+   expect("canonicalBlueprintEnabled" in result).toBe(false);
+  } finally {
+   vi.unstubAllEnvs();
+  }
+ });
+
  it("returns real empty preparation without inventing approvals",async()=>{
   const result=await getSchoolHubData({data:{siteId}});
   expect(result.statuses?.website?.state).toBe("Not Started");expect(result.statuses?.team?.detail).toContain("1 active members");expect(result.statuses?.academics?.state).toBe("Not Started");expect(result.statuses?.compliance?.state).toBe("Blocked");

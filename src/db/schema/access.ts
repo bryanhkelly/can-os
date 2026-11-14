@@ -1,4 +1,5 @@
-import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import { boolean, check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { createdAt, id, updatedAt } from "./common";
 import { people } from "./identity";
 
@@ -24,6 +25,23 @@ export const accountPersonGrants = pgTable("account_person_grants", {
  createdAt: createdAt(),
  updatedAt: updatedAt(),
 }, t => [index("account_person_grants_account_idx").on(t.accountId),index("account_person_grants_person_idx").on(t.personId)]);
+
+/** Explicit operator-verified binding; canonical principal IDs are not inferred from legacy people or Sites. */
+export const accessAccountCanonicalPrincipals = pgTable("access_account_canonical_principals", {
+ id: id(),
+ accountId: uuid("account_id").notNull().references(() => accessAccounts.id, { onDelete: "restrict" }),
+ canonicalPrincipalId: uuid("canonical_principal_id").notNull(),
+ verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull(),
+ verifiedByAccountId: uuid("verified_by_account_id").notNull().references(() => accessAccounts.id, { onDelete: "restrict" }),
+ revokedAt: timestamp("revoked_at", { withTimezone: true }),
+ createdAt: createdAt(),
+}, t => [
+ uniqueIndex("access_account_canonical_principals_active_account_uq")
+  .on(t.accountId).where(sql`${t.revokedAt} IS NULL`),
+ index("access_account_canonical_principals_principal_idx").on(t.canonicalPrincipalId),
+ check("access_account_canonical_principals_not_self_verified", sql`${t.accountId} <> ${t.verifiedByAccountId}`),
+ check("access_account_canonical_principals_revocation_after_verification", sql`${t.revokedAt} IS NULL OR ${t.revokedAt} >= ${t.verifiedAt}`),
+]);
 
 /** Hash at rest; one-time token redemption must be atomic and attempt limited. */
 export const accessChallenges = pgTable("access_challenges", {

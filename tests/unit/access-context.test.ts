@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {assertGrantSelection,resolveAccessContext,type VerifiedAccessGrant} from "@/domain/access-context";
+import {assertGrantSelection,resolveAccessContext,roleCapabilities,type VerifiedAccessGrant} from "@/domain/access-context";
 const grant:VerifiedAccessGrant={id:"grant-1",accountId:"account-1",personId:"person-1",role:"teacher",organizationId:"org-1",siteId:"site-1",active:true};
 describe("provider-independent authorization context",()=>{
  it("derives the actor, capabilities and scope from verified grants",()=>{
@@ -32,6 +32,17 @@ describe("provider-independent authorization context",()=>{
   expect(context.capabilities.has("network.sites.manage")).toBe(true);
   for(const forbidden of ["admissions:read","enrollment.activate","assignments:grade","student:read","admin.manage","program.launch.start"]){
    expect(context.capabilities.has(forbidden)).toBe(false);
+  }
+ });
+ it("limits instructional content roles to course-authoring and review capabilities",()=>{
+  expect(roleCapabilities.academic_content_creator).toEqual(["instructional_track.author"]);
+  expect(roleCapabilities.academic_content_reviewer).toEqual([
+   "instructional_track.review","instructional_track.publish","instructional_track.withdraw",
+  ]);
+  for(const role of ["academic_content_creator","academic_content_reviewer"]){
+   expect(roleCapabilities[role]).not.toContain("student:read");
+   expect(roleCapabilities[role]).not.toContain("assignments:grade");
+   expect(roleCapabilities[role]).not.toContain("enrollment:manage");
   }
  });
  it("rejects an account trying to use another account's membership",()=>{

@@ -75,4 +75,5 @@ describe("access navigation", () => {
   it("never sends a role without registrar authority to the launcher", () => {
     expect(accessLandingPath("teacher", "new-school-site", "/home")).toBe("/home");
   });
+  
 });

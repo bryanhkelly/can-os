@@ -5,6 +5,7 @@ import { ClassroomLessonTabs } from "@/components/learning/ClassroomLessonTabs";
 import { PrivateLessonNotes } from "@/components/learning/PrivateLessonNotes";
 import { ClassroomMediaStage, type ClassroomMeetings } from "@/components/learning/ClassroomMediaStage";
 import { ClassVideoPlayer, ClassVideoPlaceholder } from "@/components/learning/ClassVideoPlayer";
+import { ClassVideoUploadForm } from "@/components/learning/ClassVideoUploadForm";
 import { resolveClassVideo } from "@/domain/class-video";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
 import { CommonCartridgeStaticLesson } from "@/components/learning/CommonCartridgeStaticLesson";

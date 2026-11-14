@@ -7,6 +7,7 @@ import { isPublicSiteSlug } from "./public-site-address";
 import { type PublicSitePath } from "./public-site-paths";
 import type { PublicParentSchoolProfile } from "./parent-information";
 import type { PublicAcademicProgram } from "./academic-program-publication";
+import type { PublicSiteProjection } from "./public-operation-projection";
 import type {PublicSchoolSiteMedia} from "./school-site-media-public";
 import { createIllustrativeSchoolContent, normalizeSiteLocalContent, type SiteLocalContent } from "./site-local-content";
 
@@ -72,6 +73,21 @@ export function escapePublicHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]!);
+}
+
+export function renderPublicSiteClaimsHtml(page: PublicSiteProjection): string {
+  const claims = page.claims.map((claim) =>
+    `<li><h2>${escapePublicHtml(claim.displayText)}</h2>` +
+    `<p>Public status: ${escapePublicHtml(claim.kind)}.</p></li>`,
+  ).join("");
+  return `<!doctype html><html lang="en"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>${escapePublicHtml(page.siteName)}</title>
+    <style>body{font-family:system-ui,sans-serif;max-width:48rem;margin:3rem auto;padding:0 1rem;line-height:1.6}li{margin:1rem 0}h2{font-size:1.2rem}</style>
+    </head><body><main><h1>${escapePublicHtml(page.siteName)}</h1>
+    <h2>Public program claims</h2>
+    ${claims ? `<ul>${claims}</ul>` : "<p>No program claims are currently published.</p>"}
+    </main></body></html>`;
 }
 
 function money(cents: number): string {

@@ -9,6 +9,7 @@ export type AuthorizationScope = {
 
 export type CommandContext = {
   actorPersonId: string | null;
+  role?: string;
   capabilities: ReadonlySet<string>;
   scope: AuthorizationScope;
   requestId?: string;
