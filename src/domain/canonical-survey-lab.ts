@@ -58,7 +58,7 @@ export function inspectIdentifiedNoncreditSurvey(
     blockers.push("Matrix questions require dedicated response support");
   if (input.questions.some(q =>
     (q.questionType === "single_choice" || q.questionType === "multiple_choice") &&
-    q.optionCount < (q.questionType === "single_choice" ? 2 : 1)))
+    q.optionCount < 1))
     blockers.push("Choice questions need selectable options");
   if (input.questions.some(q =>
     ["rating", "likert", "nps"].includes(q.questionType) &&
