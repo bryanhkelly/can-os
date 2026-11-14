@@ -1,4 +1,4 @@
-name: CAN OS live QA - Test, Fix, Retest
+name: CAN OS live QA - On-demand test and repair
 
 on:
   workflow_dispatch:
@@ -181,35 +181,36 @@ jobs:
           path: proposed-fix.patch
           retention-days: 14
 
-  propose:
-    name: Validate code fix and open review PR
+  validate:
+    name: Verify proposed fix without repository write access
     needs: fix
     if: ${{ always() && needs.fix.outputs.has_patch == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 35
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/download-artifact@v4
         with:
           name: live-qa-proposed-patch-${{ github.run_id }}
-          path: qa-patch
+          path: ${{ runner.temp }}/qa-patch
       - name: Apply patch and enforce limited file scope
         shell: bash
         run: |
-          git apply --check qa-patch/proposed-fix.patch
-          git apply qa-patch/proposed-fix.patch
+          git apply --check "$RUNNER_TEMP/qa-patch/proposed-fix.patch"
+          git apply "$RUNNER_TEMP/qa-patch/proposed-fix.patch"
+          git add -N .
           while IFS= read -r file; do
             case "$file" in
               src/*|tests/*|scripts/*|docs/*|playwright.live.config.ts) ;;
               *) echo "::error::Autofix touched disallowed file: $file"; exit 1 ;;
             esac
-          done < <(git diff --name-only)
+          done < <(git diff --name-only HEAD)
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -221,7 +222,35 @@ jobs:
         run: npm run typecheck
       - name: Run unit regression suite
         run: npm test
-      - name: Open PR with validated code patch
+      - name: Save independently validated patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-qa-validated-patch-${{ github.run_id }}
+          path: ${{ runner.temp }}/qa-patch/proposed-fix.patch
+          retention-days: 14
+
+  publish:
+    name: Open review PR for validated fix
+    needs: validate
+    if: ${{ always() && needs.validate.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: live-qa-validated-patch-${{ github.run_id }}
+          path: ${{ runner.temp }}/qa-patch
+      - name: Apply independently validated patch
+        shell: bash
+        run: git apply "$RUNNER_TEMP/qa-patch/proposed-fix.patch"
+      - name: Open pull request (do not merge or deploy)
         uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -238,5 +267,3 @@ jobs:
             Verified: build, typecheck and unit tests on the proposed patch.
             **Not verified:** The changed code is not yet deployed to the live URL.
             Review the patch and run Playwright against a deployed preview before merging.
-          labels: |
-            bug
