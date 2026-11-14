@@ -15,14 +15,29 @@ export function ClassVideoPlaceholder({ title, message, headingLevel = 2 }: {
   </div>;
 }
 
-export function ClassVideoPlayer({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard" }: {
+type ClassVideoPlayerProps = {
   title: string;
   url?: string | null;
   loadUrl?: () => Promise<string>;
   resourceId?: string;
   declaredVideo?: boolean;
   presentation?: "standard" | "classroom";
-}) {
+};
+
+export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
+  // React may retain this component when a teacher replaces the URL of the
+  // same resource. Re-key internal playback state rather than displaying an
+  // old video or retaining a signed URL from the previous source.
+  const sourceIdentity = [
+    props.resourceId ?? props.title,
+    props.url ?? "",
+    props.declaredVideo ?? true,
+    props.presentation ?? "standard",
+  ].join("|");
+  return <ClassVideoPlayerSession key={sourceIdentity} {...props}/>;
+}
+
+function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard" }: ClassVideoPlayerProps) {
   const initialVideo = !loadUrl && url ? resolveClassVideo(url, declaredVideo) : null;
   const [source, setSource] = useState<string | null>(
     presentation === "classroom" && initialVideo?.kind === "file" ? url ?? null : null,

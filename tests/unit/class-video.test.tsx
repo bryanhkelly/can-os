@@ -53,6 +53,22 @@ describe("linked class video", () => {
     expect(resolveClassVideo("https://private.test/object?signature=abc", true)?.kind).toBe("file");
     expect(resolveClassVideo("https://media.test/movie.webm")?.kind).toBe("file");
   });
+  it("resets local playback when the resource URL changes without changing its ID", () => {
+    const first = ClassVideoPlayer({
+      title: "Lesson", resourceId: "resource-one",
+      url: "https://www.youtube.com/watch?v=abcdefghijk",
+    });
+    const replacement = ClassVideoPlayer({
+      title: "Lesson", resourceId: "resource-one",
+      url: "https://youtu.be/zyxwvutsrqp",
+    });
+    expect(first.key).not.toBe(replacement.key);
+    const same = ClassVideoPlayer({
+      title: "Lesson", resourceId: "resource-one",
+      url: "https://www.youtube.com/watch?v=abcdefghijk",
+    });
+    expect(first.key).toBe(same.key);
+  });
   it("does not load third-party frames or media before explicit playback", () => {
     const markup = renderToStaticMarkup(<ClassVideoPlayer title="Lesson video" url="https://youtu.be/abcdefghijk"/>);
     expect(markup).toContain("Play video");
