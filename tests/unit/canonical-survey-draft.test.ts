@@ -11,6 +11,11 @@ describe("canonical survey draft validation",()=>{
  it("accepts generic reusable questions without embedding a particular organization",()=>{
   expect(createSurveyDraftInput.parse(base).questions).toHaveLength(1);
  });
+ it("uses the standard 0 to 10 net promoter score range",()=>{
+  const q = {...base.questions[0], type:"nps", ratingMin:0, ratingMax:10};
+  expect(createSurveyDraftInput.safeParse({...base, questions:[q]}).success).toBe(true);
+  expect(createSurveyDraftInput.safeParse({...base, questions:[{...q, ratingMin:1}]}).success).toBe(false);
+ });
  it("rejects unreviewable or unsupported survey question shapes",()=>{
   expect(createSurveyDraftInput.safeParse({...base,questions:[{...base.questions[0],type:"matrix"}]}).success).toBe(false);
   expect(createSurveyDraftInput.safeParse({...base,questions:[{...base.questions[0],type:"single_choice",options:["Yes","yes"],ratingMin:null,ratingMax:null}]}).success).toBe(false);

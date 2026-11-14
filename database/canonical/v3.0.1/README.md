@@ -424,3 +424,14 @@ inserts. PostgreSQL RLS blocks cross-organization and published-content writes.
 Existing independent survey publication review and campaign permission gates
 remain unchanged. Do not enable for production until restricted-role SQL and
 browser acceptance pass. This patch is not automatically applied or migrated.
+
+Before enabling the feature flag, run the nonmutating role check:
+
+```sh
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -f database/canonical/v3.0.1/verify-survey-draft-author-role.sql
+```
+
+This verifies role restrictions, RLS policy presence, draft INSERT grants and
+absence of publication, invitation, review and respondent-data privileges.
+It does not replace a transaction-based cross-tenant database test.

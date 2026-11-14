@@ -145,7 +145,10 @@ function SurveyDraftForm({ organizationId, drafts, limit }: {
             <div className="mt-4 grid gap-4 md:grid-cols-2">
               <div className="space-y-2"><Label htmlFor={"kind-"+index}>Answer format</Label>
                 <Select id={"kind-"+index} value={question.type}
-                  onChange={e => edit(index, {type: e.target.value as Kind})}>
+                  onChange={e => edit(index, {
+                    type: e.target.value as Kind,
+                    ...(e.target.value === "nps" ? {min:"0", max:"10"} : {}),
+                  })}>
                   <option value="rating">Rating</option><option value="likert">Likert</option>
                   <option value="nps">Net promoter score</option><option value="text">Text response</option>
                   <option value="single_choice">Single choice</option>

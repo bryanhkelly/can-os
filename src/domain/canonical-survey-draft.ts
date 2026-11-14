@@ -18,6 +18,8 @@ const question = z.object({
   if (numeric && (value.ratingMin === null || value.ratingMax === null ||
       value.ratingMax <= value.ratingMin))
     ctx.addIssue({ code: "custom", message: "Numeric range must be increasing" });
+  if (value.type === "nps" && (value.ratingMin !== 0 || value.ratingMax !== 10))
+    ctx.addIssue({ code: "custom", message: "Net promoter scores must use 0 to 10" });
   if (!numeric && (value.ratingMin !== null || value.ratingMax !== null))
     ctx.addIssue({ code: "custom", message: "Only rating questions accept a numeric range" });
   if (new Set(value.options.map(option => option.toLowerCase())).size !== value.options.length)

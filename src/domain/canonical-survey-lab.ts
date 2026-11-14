@@ -64,6 +64,9 @@ export function inspectIdentifiedNoncreditSurvey(
     ["rating", "likert", "nps"].includes(q.questionType) &&
     (q.ratingMin === null || q.ratingMax === null || q.ratingMin > q.ratingMax)))
     blockers.push("Rating questions need a valid numeric range");
+  if (input.questions.some(q => q.questionType === "nps" &&
+    (q.ratingMin !== 0 || q.ratingMax !== 10)))
+    blockers.push("Net promoter score requires a 0 to 10 range");
   if (input.questions.some(q =>
     !["single_choice", "multiple_choice", "rating", "likert", "nps", "text", "matrix"]
       .includes(q.questionType)))

@@ -47,6 +47,13 @@ describe("identified noncredit survey configuration preflight", () => {
     expect(result.blockers.join(" ")).toMatch(/Complete question/);
     expect(result.blockers.join(" ")).toMatch(/invitations/);
   });
+  it("flags a nonstandard net promoter score scale", () => {
+    const result = inspectIdentifiedNoncreditSurvey({ ...base,
+      questions: [{ ...base.questions[0]!, questionType: "nps", ratingMin: 1, ratingMax: 5 }, base.questions[1]!],
+    }, now);
+    expect(result.compatible).toBe(false);
+    expect(result.blockers.join(" ")).toMatch(/0 to 10/);
+  });
   it("rejects expired, out-of-range, malformed and matrix surveys", () => {
     const result = inspectIdentifiedNoncreditSurvey({
       ...base, endsAt: now, questions: [
