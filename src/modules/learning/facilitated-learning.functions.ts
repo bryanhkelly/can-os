@@ -62,8 +62,8 @@ async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string
     id: programDeployments.id, operationId: programDeployments.operationId,
     name: programDeployments.name, status: programDeployments.status,
   }).from(programDeployments).where(eq(programDeployments.id, deploymentId)).limit(1);
-  if (!deployment || !["authorized", "active"].includes(deployment.status))
-    throw new AuthorizationError("active or authorized deployment");
+  if (!deployment || deployment.status !== "active")
+    throw new AuthorizationError("active deployment");
   const [operatingRelationship] = await tx.select({id:educationOperationOrganizationRoles.id})
     .from(educationOperationOrganizationRoles).where(and(
       eq(educationOperationOrganizationRoles.operationId,deployment.operationId),
@@ -236,21 +236,42 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
     const host = await requireCanonicalLabProvider();
     return db.transaction(async tx=>{
       const now = new Date();
-      const potential = await tx.select({
-        deploymentId:programDeployments.id,deploymentName:programDeployments.name,
-        operationId:programDeployments.operationId,
-      }).from(programDeployments).where(inArray(programDeployments.status,["active","authorized"]))
-        .orderBy(asc(programDeployments.name)).limit(200);
-      const visible: {deploymentId:string;deploymentName:string;siteId:string}[] = [];
-      for(const deployment of potential){
-        try {
-          const access=await authorizedHostDeployment(tx,host,deployment.deploymentId);
-          visible.push({deploymentId:deployment.deploymentId,
-            deploymentName:deployment.deploymentName,siteId:access.siteId});
-        } catch(error) {
-          if (!(error instanceof AuthorizationError)) throw error;
-        }
-      }
+      // Query only currently authorized Site/deployment relationships; do not
+      // iterate across unrelated organizations' deployments to discover access.
+      const visible = await tx.selectDistinct({
+        deploymentId:programDeployments.id,
+        deploymentName:programDeployments.name,
+        siteId:educationOperationSites.siteId,
+      }).from(programDeployments)
+        .innerJoin(educationOperationOrganizationRoles,and(
+          eq(educationOperationOrganizationRoles.operationId,programDeployments.operationId),
+          eq(educationOperationOrganizationRoles.organizationId,host.organizationId),
+          eq(educationOperationOrganizationRoles.roleCode,"operator"),
+          eq(educationOperationOrganizationRoles.status,"approved"),
+          lte(educationOperationOrganizationRoles.validFrom,now),
+          or(isNull(educationOperationOrganizationRoles.validThrough),
+            gt(educationOperationOrganizationRoles.validThrough,now)),
+        ))
+        .innerJoin(educationOperationSites,and(
+          eq(educationOperationSites.operationId,programDeployments.operationId),
+          inArray(educationOperationSites.siteId,host.siteIds),
+          lte(educationOperationSites.validFrom,now),
+          or(isNull(educationOperationSites.validThrough),
+            gt(educationOperationSites.validThrough,now)),
+        ))
+        .innerJoin(siteOrganizationRoles,and(
+          eq(siteOrganizationRoles.siteId,educationOperationSites.siteId),
+          eq(siteOrganizationRoles.organizationId,host.organizationId),
+          inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+          lte(siteOrganizationRoles.validFrom,now),
+          or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+        ))
+        .innerJoin(catalogSites,and(
+          eq(catalogSites.id,educationOperationSites.siteId),
+          eq(catalogSites.status,"active"),
+        ))
+        .where(eq(programDeployments.status,"active"))
+        .orderBy(asc(programDeployments.name)).limit(100);
       const deploymentIds=visible.map(row=>row.deploymentId);
       const versions=deploymentIds.length ? await tx.select({
         deploymentId:learnerCourseAttempts.deploymentId,
