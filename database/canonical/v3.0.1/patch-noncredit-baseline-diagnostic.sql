@@ -6,7 +6,7 @@ ALTER TABLE noncredit_training_versions
  ADD COLUMN IF NOT EXISTS baseline_assessment_version_id uuid
  REFERENCES assessment_versions(id);
 CREATE OR REPLACE FUNCTION v301_provision_noncredit_knowledge_access(p_attempt uuid) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_auto_assessment$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $v301_auto_assessment$
 DECLARE rec record; administration_id uuid; administration_count integer;
         person_learner uuid; candidate_version uuid;
 BEGIN
@@ -70,7 +70,7 @@ BEGIN
 END $v301_auto_assessment$;
 
 CREATE OR REPLACE FUNCTION v301_noncredit_admin_access_trigger() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_admin_provision$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $v301_admin_provision$
 DECLARE attempt_row record;
 BEGIN
  IF NEW.status='open' THEN

@@ -7,7 +7,7 @@ SET LOCAL search_path TO education_v30,pg_catalog;
 -- provider-owned training. It never creates School enrollment, grades or credits.
 -- The published training approver is the accountable authorizing principal.
 CREATE OR REPLACE FUNCTION v301_provision_noncredit_knowledge_access(p_attempt uuid) RETURNS void
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_auto_assessment$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $v301_auto_assessment$
 DECLARE rec record; administration_id uuid; administration_count integer; person_learner uuid;
 BEGIN
  SELECT ca.id,ca.deployment_id,ca.course_version_id,ca.status,
@@ -66,7 +66,7 @@ BEGIN
 END $v301_auto_assessment$;
 
 CREATE OR REPLACE FUNCTION v301_noncredit_attempt_access_trigger() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_attempt_provision$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $v301_attempt_provision$
 BEGIN
  IF NEW.noncredit_registration_id IS NOT NULL AND NEW.enrollment_id IS NULL
     AND NEW.status='active' THEN
@@ -82,7 +82,7 @@ FOR EACH ROW EXECUTE FUNCTION v301_noncredit_attempt_access_trigger();
 -- When the approved administration opens after the learner enrolled, fill
 -- only course attempts for this exact deployment, course and version.
 CREATE OR REPLACE FUNCTION v301_noncredit_admin_access_trigger() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $v301_admin_provision$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $v301_admin_provision$
 DECLARE attempt_row record;
 BEGIN
  IF NEW.status='open' THEN

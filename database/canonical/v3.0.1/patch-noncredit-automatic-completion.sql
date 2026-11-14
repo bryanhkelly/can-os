@@ -106,7 +106,7 @@ BEGIN
 END $noncredit_auto_completion$;
 
 CREATE OR REPLACE FUNCTION v301_auto_complete_noncredit_event() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $auto_event$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $auto_event$
 DECLARE registration uuid;
 BEGIN
  IF TG_TABLE_NAME='noncredit_participation_events' THEN
@@ -146,7 +146,7 @@ CREATE TRIGGER v301_noncredit_auto_on_course
 
 -- Evidence sometimes becomes verified after the attendance entry was recorded.
 CREATE OR REPLACE FUNCTION v301_auto_complete_on_evidence_verification() RETURNS trigger
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $auto_evidence$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog,pg_temp AS $auto_evidence$
 DECLARE r record;
 BEGIN
  IF NEW.verified_at IS NOT NULL AND NEW.verified_by_person_id IS NOT NULL THEN
