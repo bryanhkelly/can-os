@@ -22,12 +22,12 @@ import {
   facilitatedPairSchema, facilitatedPairingWindowMs, facilitatedPlaybackSchema,
   facilitatedRoomMaxMs, facilitatedStartSchema, normalizeFacilitatedPairingCode,
 } from "@/domain/facilitated-learning";
-import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type Host = Awaited<ReturnType<typeof requireCanonicalLabProvider>>;
+type Host = Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
 const roomIdInput = z.object({ facilitatedSessionId: z.string().uuid() }).strict();
 const joinInput = facilitatedPairSchema;
 const leaveInput = z.object({
@@ -165,7 +165,7 @@ export const getFacilitatedRoomMedia = createServerFn({method:"GET"})
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host=await requireCanonicalLabProvider();
+    const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       assertRoomLive(room,new Date());
@@ -205,7 +205,7 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host=await requireCanonicalLabProvider();
+    const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       assertRoomLive(room,new Date());
@@ -237,7 +237,7 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
   .handler(async()=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host = await requireCanonicalLabProvider();
+    const host = await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const now = new Date();
       // Query only currently authorized Site/deployment relationships; do not
@@ -345,7 +345,7 @@ export const startFacilitatedLearningRoom = createServerFn({method:"POST"})
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host=await requireCanonicalLabProvider();
+    const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const access=await authorizedHostDeployment(tx,host,data.deploymentId,data.siteId);
       const [version]=await tx.select({id:courseVersions.id})
@@ -379,7 +379,7 @@ export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host=await requireCanonicalLabProvider();
+    const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       const now=new Date(); assertRoomLive(room,now);
@@ -398,7 +398,7 @@ export const endFacilitatedLearningRoom = createServerFn({method:"POST"})
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host=await requireCanonicalLabProvider();
+    const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       if(room.state==="ended")return {ended:true,alreadyEnded:true};
@@ -414,7 +414,7 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
-    const host=await requireCanonicalLabProvider();
+    const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       assertRoomLive(room,new Date());
