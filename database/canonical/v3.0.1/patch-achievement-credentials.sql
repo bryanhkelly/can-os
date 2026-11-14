@@ -22,10 +22,14 @@ CREATE TABLE credential_definition_versions (
   description text NOT NULL DEFAULT '',
   minimum_verified_minutes integer NOT NULL DEFAULT 0 CHECK (minimum_verified_minutes>=0),
   lifecycle text NOT NULL DEFAULT 'draft' CHECK (lifecycle IN ('draft','published','retired')),
+  created_by_person_id uuid NOT NULL REFERENCES persons(id),
   approved_by_person_id uuid REFERENCES persons(id),
   published_at timestamptz,
   UNIQUE (definition_id,version_no),
-  CHECK (lifecycle<>'published' OR (approved_by_person_id IS NOT NULL AND published_at IS NOT NULL))
+  CHECK (lifecycle<>'published' OR (
+    approved_by_person_id IS NOT NULL AND published_at IS NOT NULL
+    AND approved_by_person_id<>created_by_person_id
+  ))
 );
 CREATE TABLE learner_achievement_decisions (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -83,6 +87,37 @@ CREATE TABLE credential_artifacts (
 );
 CREATE INDEX credential_artifacts_issuance_idx ON credential_artifacts (issuance_id);
 
+-- Published definitions are identities, not mutable display labels. Use a
+-- new definition/version for a new interpretation or future recognition mode.
+CREATE FUNCTION v301_guard_credential_definition() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+BEGIN
+  RAISE EXCEPTION 'Credential definition identity is immutable';
+END $;
+CREATE TRIGGER credential_definition_immutable BEFORE UPDATE OR DELETE ON credential_definitions
+  FOR EACH ROW EXECUTE FUNCTION v301_guard_credential_definition();
+
+CREATE FUNCTION v301_guard_credential_version() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+BEGIN
+  IF TG_OP='DELETE' OR OLD.lifecycle<>'draft'
+    THEN RAISE EXCEPTION 'Published or retired credential versions are immutable'; END IF;
+  IF (NEW.definition_id,NEW.version_no,NEW.created_by_person_id)
+       IS DISTINCT FROM (OLD.definition_id,OLD.version_no,OLD.created_by_person_id)
+    THEN RAISE EXCEPTION 'Credential version identity cannot change'; END IF;
+  IF NEW.lifecycle='published' THEN
+    IF (NEW.title,NEW.description,NEW.minimum_verified_minutes)
+         IS DISTINCT FROM (OLD.title,OLD.description,OLD.minimum_verified_minutes)
+      THEN RAISE EXCEPTION 'Freeze credential definition before publishing'; END IF;
+    IF NEW.approved_by_person_id IS NULL OR NEW.published_at IS NULL
+      OR NEW.approved_by_person_id=NEW.created_by_person_id
+      THEN RAISE EXCEPTION 'Independent approval required for published credential'; END IF;
+  END IF;
+  RETURN NEW;
+END $;
+CREATE TRIGGER credential_version_approval_guard BEFORE UPDATE OR DELETE ON credential_definition_versions
+  FOR EACH ROW EXECUTE FUNCTION v301_guard_credential_version();
+
 CREATE FUNCTION v301_validate_achievement_award() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 DECLARE definition record; source_record record; v record;
@@ -94,6 +129,13 @@ BEGIN
     WHERE version.id=NEW.credential_definition_version_id;
   IF definition.lifecycle IS DISTINCT FROM 'published'
     THEN RAISE EXCEPTION 'Credential definition is not published'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM canonical_account_grants grant_row
+    WHERE grant_row.person_id=NEW.decided_by_person_id
+      AND grant_row.organization_id=definition.issuer_organization_id
+      AND grant_row.role_code IN ('registrar','site_admin')
+      AND grant_row.active AND grant_row.revoked_at IS NULL
+  ) THEN RAISE EXCEPTION 'Award decision requires active issuer staff grant'; END IF;
   IF NEW.noncredit_completion_decision_id IS NOT NULL THEN
     IF definition.source_kind<>'noncredit_completion'
       THEN RAISE EXCEPTION 'Credential source kind mismatch'; END IF;
@@ -126,7 +168,7 @@ CREATE FUNCTION v301_validate_credential_issuance() RETURNS trigger
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 DECLARE award record; legacy record;
 BEGIN
-  SELECT a.noncredit_completion_decision_id, d.kind,d.source_kind,
+  SELECT a.noncredit_completion_decision_id,a.recipient_person_id,d.kind,d.source_kind,
          d.issuer_organization_id INTO award
    FROM learner_achievement_decisions a
    JOIN credential_definition_versions v ON v.id=a.credential_definition_version_id
@@ -134,6 +176,13 @@ BEGIN
    WHERE a.id=NEW.achievement_decision_id FOR SHARE OF a;
   IF award.issuer_organization_id IS DISTINCT FROM NEW.issuer_organization_id
     THEN RAISE EXCEPTION 'Credential issuer mismatch'; END IF;
+  IF NEW.issued_by_person_id=award.recipient_person_id OR NOT EXISTS (
+    SELECT 1 FROM canonical_account_grants grant_row
+    WHERE grant_row.person_id=NEW.issued_by_person_id
+      AND grant_row.organization_id=NEW.issuer_organization_id
+      AND grant_row.role_code IN ('registrar','site_admin')
+      AND grant_row.active AND grant_row.revoked_at IS NULL
+  ) THEN RAISE EXCEPTION 'Issuance requires active, independent issuer staff'; END IF;
   IF award.source_kind='noncredit_completion' AND award.kind='completion_certificate' THEN
     SELECT decision_id,issuer_organization_id,status INTO legacy
     FROM noncredit_completion_certificates WHERE id=NEW.legacy_noncredit_certificate_id;
@@ -152,6 +201,58 @@ BEGIN
 END $$;
 CREATE TRIGGER credential_issuance_evidence BEFORE INSERT ON credential_issuances
  FOR EACH ROW EXECUTE FUNCTION v301_validate_credential_issuance();
+
+-- Revocations require independently verified evidence belonging to the issuer.
+CREATE FUNCTION v301_validate_credential_revocation() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+DECLARE issuer uuid; evidence record;
+BEGIN
+  SELECT issuer_organization_id INTO issuer FROM credential_issuances
+    WHERE id=NEW.issuance_id FOR SHARE;
+  IF issuer IS NULL THEN RAISE EXCEPTION 'Unknown credential issuer'; END IF;
+  SELECT version.verified_at,version.verified_by_person_id,
+         document.owning_organization_id INTO evidence
+    FROM evidence_document_versions version
+    JOIN evidence_documents document ON document.id=version.document_id
+    WHERE version.id=NEW.evidence_version_id;
+  IF evidence.verified_at IS NULL OR evidence.verified_by_person_id IS NULL
+    OR evidence.owning_organization_id IS DISTINCT FROM issuer
+    THEN RAISE EXCEPTION 'Revocation requires verified issuer-owned evidence'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM canonical_account_grants grant_row
+    WHERE grant_row.person_id=NEW.decided_by_person_id
+      AND grant_row.organization_id=issuer
+      AND grant_row.role_code IN ('registrar','site_admin')
+      AND grant_row.active AND grant_row.revoked_at IS NULL
+  ) THEN RAISE EXCEPTION 'Only current issuer staff can revoke'; END IF;
+  RETURN NEW;
+END $;
+CREATE TRIGGER credential_revocation_provenance BEFORE INSERT ON credential_issuance_events
+  FOR EACH ROW EXECUTE FUNCTION v301_validate_credential_revocation();
+
+-- A point-in-time PDF is never authoritative. Re-evaluate source freshness,
+-- legacy certificate state, expiry and append-only revocation on each read.
+CREATE FUNCTION v301_credential_is_current(p_issuance_id uuid) RETURNS boolean
+LANGUAGE sql STABLE SET search_path=education_v30,pg_catalog AS $
+ SELECT EXISTS (
+   SELECT 1 FROM credential_issuances issuance
+   JOIN learner_achievement_decisions decision
+     ON decision.id=issuance.achievement_decision_id
+   LEFT JOIN noncredit_completion_decisions completion
+     ON completion.id=decision.noncredit_completion_decision_id
+   LEFT JOIN noncredit_completion_certificates legacy
+     ON legacy.id=issuance.legacy_noncredit_certificate_id
+   WHERE issuance.id=p_issuance_id
+     AND (issuance.expires_at IS NULL OR issuance.expires_at>clock_timestamp())
+     AND NOT EXISTS (SELECT 1 FROM credential_issuance_events revocation
+       WHERE revocation.issuance_id=issuance.id AND revocation.event_kind='revoked')
+     AND (issuance.legacy_noncredit_certificate_id IS NULL OR legacy.status='issued')
+     AND (decision.noncredit_completion_decision_id IS NULL
+       OR (completion.outcome='completed'
+         AND NOT EXISTS (SELECT 1 FROM noncredit_completion_decisions newer
+           WHERE newer.supersedes_id=completion.id)))
+ );
+$;
 
 -- Award evidence and issued artifacts are append-only; a revocation is an event.
 CREATE TRIGGER achievement_decisions_immutable BEFORE UPDATE OR DELETE ON learner_achievement_decisions
