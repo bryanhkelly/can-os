@@ -29,6 +29,22 @@ describe("canonical learning activity", () => {
     expect(canonicalLearningEventSchema.safeParse({...event,kind:"survey_submitted"}).success).toBe(false);
     expect(canonicalLearningEventSchema.safeParse({...event,kind:"assessment_submitted"}).success).toBe(false);
   });
+  it("validates all video observations as references to concrete course assets", () => {
+    const media={...event,kind:"video_opened",durationMs:undefined,pageVisible:undefined,
+      windowFocused:undefined,resourceId:"8c7dbaee-4b7e-4e42-96d2-1c754640d109"};
+    expect(canonicalLearningEventSchema.safeParse(media).success).toBe(true);
+    expect(canonicalLearningEventSchema.safeParse({...media,resourceId:null}).success).toBe(false);
+    expect(canonicalLearningEventSchema.safeParse({...media,lessonId:null}).success).toBe(false);
+    expect(canonicalLearningEventSchema.safeParse({...media,resourceId:"a-random-url"}).success).toBe(false);
+  });
+  it("rejects activity inflation from an untrusted source", () => {
+    expect(canonicalLearningEventSchema.safeParse({...event,durationMs:360_000}).success).toBe(false);
+    expect(canonicalLearningEventSchema.safeParse({...event,windowFocused:false}).success).toBe(false);
+    expect(boundedCanonicalActiveMs({
+      event,previousReceivedAt:new Date(now.getTime()-35_000),
+      now,previousForeground:true,sameLesson:true,
+    })).toBeLessThanOrEqual(60_000);
+  });
   it("limits timestamps and session age", () => {
     expect(() => validateLearningEventTime(new Date(now.getTime()-360_000).toISOString(), now)).toThrow();
     expect(() => validateLearningEventTime(new Date(now.getTime()+20_000).toISOString(), now)).toThrow();
