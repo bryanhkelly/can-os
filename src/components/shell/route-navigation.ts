@@ -37,6 +37,7 @@ export const routeNavigation = {
   "/calendar": page({ registrar: "/home", site_admin: "/home", student: "/calendar", guardian: "/calendar", teacher: "/calendar", room_facilitator: "/calendar", site_staff: "/calendar", site_leader: "/calendar", specialist: "/calendar", counselor: "/calendar" }, [...staff, "student", "guardian", "room_facilitator"]),
   "/calendar-export": endpoint,
   "/canonical/content": hidden("Verified provider content creator workspace on canonical course records", []),
+  "/canonical/content/$trackVersionId": hidden("Author-owned instructional track content editor", []),
   "/canonical/content-reviews": hidden("Independent provider instructional track review workspace", []),
   "/canonical/blueprints": hidden("Native v3.0.1 Site-scoped Blueprint planning; requires a canonical session", []),
   "/canonical/blueprint-reviews": hidden("Native v3.0.1 independent Blueprint reviewer; requires a canonical session", []),
