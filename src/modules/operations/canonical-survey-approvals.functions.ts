@@ -197,7 +197,7 @@ export const recordCanonicalSurveyReview=createServerFn({method:"POST"})
         lifecycle:surveyVersions.lifecycle,
         authorPersonId:surveyVersions.authorPersonId,
       }).from(surveyVersions)
-        .where(eq(surveyVersions.id,data.surveyVersionId)).for("share").limit(1);
+        .where(eq(surveyVersions.id,data.surveyVersionId)).limit(1);
       if(!version||version.lifecycle!=="draft"||
          version.authorPersonId===authority.actorPersonId)
         throw new AuthorizationError("independent draft survey reviewer");
@@ -247,8 +247,8 @@ export const publishCanonicalSurveyVersion=createServerFn({method:"POST"})
     const authority=await requireSurveyAuthority("survey_publisher");
     return db.transaction(async tx=>{
       await enterRole(tx,authority,"survey_publisher");
-      // Version lock is also acquired FOR SHARE by new review inserts. This
-      // serializes a fresh rejection against publishing the same draft.
+      // The database triggers use the same version-scoped transaction advisory
+      // lock for review inserts and publication. Version UPDATE still locks the row.
       const [version]=await tx.select({
         surveyId:surveyVersions.surveyId,
         lifecycle:surveyVersions.lifecycle,

@@ -130,3 +130,13 @@ the restricted audit event. Both the review-insert trigger and the published
 version's transition trigger reject missing, foreign, expired or unverified
 approval evidence. Reviewers see only evidence IDs/kinds, not file contents
 or storage references. The UI fails closed on incomplete evidence inventories.
+
+
+### Concurrent review and publication
+
+Reviewer roles have SELECT/INSERT rights only, not row UPDATE privileges.
+The independent-review INSERT and publication UPDATE triggers use the same
+version-scoped transaction advisory lock, so a new rejection and publication
+cannot race. The publisher also locks the draft version row for its lifecycle
+transition. This synchronization requires transaction-level database acceptance
+tests; it is not established by static source inspection alone.

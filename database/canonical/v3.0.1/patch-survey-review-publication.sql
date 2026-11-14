@@ -147,10 +147,13 @@ CREATE OR REPLACE FUNCTION education_v30.v301_validate_survey_review() RETURNS t
 LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $survey_review$
 DECLARE version_author uuid; version_lifecycle text; version_owner uuid;
 BEGIN
+ -- Serialize review INSERT with publication UPDATE without granting the reviewer
+ -- row UPDATE privileges. The publisher takes the same advisory lock first.
+ PERFORM pg_advisory_xact_lock(hashtextextended(NEW.survey_version_id::text,0));
  SELECT v.author_person_id,v.lifecycle,d.owner_organization_id
  INTO version_author,version_lifecycle,version_owner
  FROM survey_versions v JOIN survey_definitions d ON d.id=v.survey_id
- WHERE v.id=NEW.survey_version_id FOR SHARE OF v;
+ WHERE v.id=NEW.survey_version_id;
  IF version_author IS NULL OR version_lifecycle<>'draft' THEN
   RAISE EXCEPTION 'Independent review requires a draft version';
  END IF;
@@ -180,6 +183,7 @@ LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $survey_evidence$
 DECLARE k text; r record; owner_id uuid;
 BEGIN
  IF NOT (OLD.lifecycle='draft' AND NEW.lifecycle='published') THEN RETURN NEW; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended(NEW.id::text,0));
  SELECT owner_organization_id INTO owner_id FROM survey_definitions WHERE id=NEW.survey_id;
  FOR k IN SELECT unnest(ARRAY['privacy','accessibility','safeguarding']) LOOP
    SELECT reviewer_person_id,decision,evidence_version_id INTO r
