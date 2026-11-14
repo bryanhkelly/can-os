@@ -2,8 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { BlueprintReferenceCatalogPanel } from "@/components/launch-studio/BlueprintReferenceCatalogPanel";
 
-vi.mock("@/modules/blueprints/blueprint-reference-catalog.functions", () => ({
-  exploreBlueprintReferenceCatalog: vi.fn(),
+vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
+  exploreCanonicalBlueprintReferences: vi.fn(),
 }));
 
 describe("BlueprintReferenceCatalogPanel", () => {
