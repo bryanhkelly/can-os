@@ -48,7 +48,18 @@ try {
       to_regprocedure('education_v30.v301_canonical_session_context(text)') IS NOT NULL
         AS session_reader_ready,
       EXISTS (SELECT 1 FROM pg_roles WHERE rolname=$1) AS author_ready,
-      EXISTS (SELECT 1 FROM pg_roles WHERE rolname=$2) AS reviewer_ready
+      EXISTS (SELECT 1 FROM pg_roles WHERE rolname=$2) AS reviewer_ready,
+      (SELECT count(*) >= 46 FROM pg_policies
+        WHERE schemaname='education_v30' AND policyname LIKE 'blueprint_%')
+        AS blueprint_policies_ready,
+      (SELECT COALESCE(bool_and(c.relrowsecurity AND c.relforcerowsecurity),false)
+        FROM pg_class c WHERE c.oid IN (
+          'education_v30.blueprints'::regclass,
+          'education_v30.blueprint_components'::regclass,
+          'education_v30.blueprint_configurations'::regclass,
+          'education_v30.blueprint_execution_batches'::regclass,
+          'education_v30.program_deployments'::regclass
+        )) AS blueprint_rls_ready
   `, [authorRole, reviewerRole]);
   const ready = rows[0];
   check(ready?.accounts_ready && ready.grants_ready && ready.sessions_ready
@@ -56,6 +67,8 @@ try {
     "test database is missing native v3.0.1 authentication; install the canonical baseline");
   check(ready.author_ready && ready.reviewer_ready,
     "test database is missing the provisioned Blueprint author/reviewer roles");
+  check(ready.blueprint_policies_ready && ready.blueprint_rls_ready,
+    "test database is missing canonical Blueprint RLS policies or FORCE RLS");
 } finally {
   await readinessPool.end();
 }
