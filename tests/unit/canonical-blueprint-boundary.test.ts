@@ -43,6 +43,24 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(oldHub).not.toContain("<BlueprintReferenceCatalogPanel");
   });
 
+  it("submits the saved revision and clears stale Operation selection between plans", () => {
+    const editor = source("src/components/launch-studio/CanonicalBlueprintWorkspace.tsx");
+    const submission = editor.slice(
+      editor.indexOf("async function submit()"),
+      editor.indexOf("async function createPlanningDeployment()"),
+    );
+    expect(submission).toContain("const saved = await saveCanonicalBlueprintConfiguration");
+    expect(submission).toContain("expectedRevision: saved.revision");
+    expect(submission.indexOf("await saveCanonicalBlueprintConfiguration"))
+      .toBeLessThan(submission.indexOf("await submitCanonicalBlueprintConfiguration"));
+    const loading = editor.slice(
+      editor.indexOf("async function openConfiguration("),
+      editor.indexOf("function versionInput("),
+    );
+    expect(loading).toContain('setOperationId("")');
+    expect(editor).toContain("saved.revision > detail.revision");
+  });
+
   it("retains isolated, reversible database acceptance", () => {
     const runner = source("scripts/check-canonical-v301-blueprint-flow.mjs");
     expect(runner).toContain('process.env.APP_ENV !== "test"');
