@@ -16,12 +16,16 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_sessions (
   last_lesson_id uuid,
   ended_at timestamptz,
   estimated_active_ms integer NOT NULL DEFAULT 0 CHECK (estimated_active_ms >= 0),
+  CONSTRAINT canonical_learning_sessions_attempt_version_fk FOREIGN KEY (course_attempt_id,course_version_id)
+    REFERENCES education_v30.learner_course_attempts(id,course_version_id),
   CONSTRAINT canonical_learning_sessions_end_chk CHECK (
     (ended_at IS NULL AND state <> 'ended') OR (ended_at IS NOT NULL AND state = 'ended')
   )
 );
 CREATE INDEX IF NOT EXISTS canonical_learning_sessions_attempt_idx
   ON education_v30.learning_sessions (course_attempt_id, started_at);
+CREATE UNIQUE INDEX IF NOT EXISTS canonical_learning_sessions_id_attempt_uq
+  ON education_v30.learning_sessions (id, course_attempt_id);
 CREATE UNIQUE INDEX IF NOT EXISTS canonical_learning_sessions_live_idx
   ON education_v30.learning_sessions (course_attempt_id, access_session_id, client_instance_id) WHERE ended_at IS NULL;
 
@@ -40,7 +44,9 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_session_events (
   occurred_at timestamptz NOT NULL,
   received_at timestamptz NOT NULL DEFAULT now(),
   estimated_active_ms integer NOT NULL DEFAULT 0 CHECK (estimated_active_ms >= 0),
-  CONSTRAINT canonical_learning_events_dedupe_uq UNIQUE (learning_session_id, client_event_id)
+  CONSTRAINT canonical_learning_events_dedupe_uq UNIQUE (learning_session_id, client_event_id),
+  CONSTRAINT canonical_learning_events_session_attempt_fk FOREIGN KEY (learning_session_id,course_attempt_id)
+    REFERENCES education_v30.learning_sessions(id,course_attempt_id)
 );
 CREATE INDEX IF NOT EXISTS canonical_learning_events_attempt_time_idx
   ON education_v30.learning_session_events (course_attempt_id, received_at DESC);
