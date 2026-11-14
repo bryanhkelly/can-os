@@ -6,12 +6,12 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   auditEvents, credentialDefinitions, credentialDefinitionVersions,
-  credentialIssuances, domainEvents, learnerAchievementDecisions,
+  credentialIssuanceEvents, credentialIssuances, domainEvents, learnerAchievementDecisions,
   noncreditCompletionCertificates, noncreditCompletionDecisions,
   noncreditRegistrations, noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
-import { evaluateAchievementAward } from "@/domain/credential-awards";
+import { credentialIsCurrent, evaluateAchievementAward } from "@/domain/credential-awards";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 
 const inputSchema = z.object({
@@ -64,7 +64,8 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
 
       const [training] = await tx.select().from(noncreditTrainingVersions)
         .where(eq(noncreditTrainingVersions.id, registration.trainingVersionId)).limit(1);
-      if (!training || training.providerOrganizationId !== definition.issuerOrganizationId ||
+      if (!training || training.state !== "published" ||
+        training.providerOrganizationId !== definition.issuerOrganizationId ||
         !["registered", "active", "completed"].includes(registration.status))
         throw new AuthorizationError("provider-owned completed training");
 
@@ -91,6 +92,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         awardId: learnerAchievementDecisions.id,
         issuanceId: credentialIssuances.id,
         reference: credentialIssuances.credentialReference,
+        legacyCertificateId: credentialIssuances.legacyNoncreditCertificateId,
       }).from(learnerAchievementDecisions)
         .leftJoin(credentialIssuances,
           eq(credentialIssuances.achievementDecisionId, learnerAchievementDecisions.id))
@@ -99,9 +101,25 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
           eq(learnerAchievementDecisions.noncreditCompletionDecisionId, completion.id),
         )).limit(1);
 
-      if (existing?.issuanceId)
+      if (existing?.issuanceId) {
+        const [revocation] = await tx.select({ id: credentialIssuanceEvents.id })
+          .from(credentialIssuanceEvents).where(and(
+            eq(credentialIssuanceEvents.issuanceId, existing.issuanceId),
+            eq(credentialIssuanceEvents.eventKind, "revoked"),
+          )).limit(1);
+        const [legacy] = existing.legacyCertificateId
+          ? await tx.select({ status: noncreditCompletionCertificates.status })
+            .from(noncreditCompletionCertificates)
+            .where(eq(noncreditCompletionCertificates.id, existing.legacyCertificateId)).limit(1)
+          : [];
+        if (!credentialIsCurrent({
+          issued: true, revoked: Boolean(revocation), sourceStillValid: true,
+          legacyCertificateRevoked: !!existing.legacyCertificateId && legacy?.status !== "issued",
+          now: new Date(),
+        })) throw new AuthorizationError("issued credential has been revoked");
         return { issuanceId: existing.issuanceId, credentialReference: existing.reference,
           kind: definition.definitionKind, alreadyIssued: true };
+      }
       if (existing) throw new AuthorizationError("incomplete credential issuance");
 
       const [award] = await tx.insert(learnerAchievementDecisions).values({
