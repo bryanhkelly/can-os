@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, countDistinct, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, countDistinct, eq, exists, gt, inArray, isNotNull, isNull, lte, not, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import {
   assessmentAccess, assessmentExecutionAttempts, educationOperationSites,
@@ -110,11 +111,11 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
         .groupBy(noncreditRegistrations.trainingVersionId,noncreditRegistrations.status):[];
 
       // Count completed decisions only if no later decision superseded them.
-      const superseded=exists(tx.select({id:noncreditCompletionDecisions.id})
-        .from(noncreditCompletionDecisions)
-        .where(eq(noncreditCompletionDecisions.supersedesId,
-          noncreditCompletionDecisions.id)));
-      // The superseder alias is declared separately below for an unambiguous SQL check.
+      const laterDecision=alias(noncreditCompletionDecisions,"facilitated_report_later_decision");
+      const superseded=exists(tx.select({id:laterDecision.id})
+        .from(laterDecision).where(eq(
+          laterDecision.supersedesId,noncreditCompletionDecisions.id,
+        )));
       const reportedCompletions=trainingIds.length?await tx.select({
         trainingVersionId:noncreditRegistrations.trainingVersionId,
         confirmed:countDistinct(noncreditCompletionDecisions.registrationId),
@@ -125,6 +126,7 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
         .where(and(
           inArray(noncreditRegistrations.trainingVersionId,trainingIds),
           eq(noncreditCompletionDecisions.outcome,"completed"),
+          not(superseded),
         )).groupBy(noncreditRegistrations.trainingVersionId):[];
 
       const submitted=trainingIds.length?await tx.select({
@@ -177,7 +179,7 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
         limitations:[
           "Device pairing is not proof of site attendance or watched minutes.",
           "Reported provider outcomes may occur outside the hosted room.",
-          "Completion decisions can be revised; reports must exclude superseded decisions before external publication.",
+          "Superseded completion decisions are excluded, but report publication still requires review of source records.",
         ],
       };
     });
