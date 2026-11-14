@@ -6,6 +6,7 @@ import {
   decideInstructionalTrackSelection,
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
+  nextRecordedLessonId,
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
   recordedInstructorSelectionIsCurrent,
@@ -441,6 +442,43 @@ describe("recorded instructor policy renewal eligibility", () => {
 
   it("does not open lessons before a teacher is selected", () => {
     expect(recordedInstructorSelectionIsCurrent({ selection: null, choices: approved })).toBe(false);
+  });
+});
+
+describe("recorded lesson continuation", () => {
+  const lesson = (id: string, status: string | null) => ({
+    id,
+    progress: status ? { status } : null,
+  });
+
+  it("advances to the next unfinished lesson after completion", () => {
+    const lessons = [
+      lesson("one", "in_progress"),
+      lesson("two", "completed"),
+      lesson("three", null),
+      lesson("four", "not_started"),
+    ];
+    expect(nextRecordedLessonId(lessons, "one")).toBe("three");
+    expect(nextRecordedLessonId(lessons, "three")).toBe("four");
+  });
+
+  it("wraps to unfinished lessons when completing one later in the course", () => {
+    const lessons = [
+      lesson("one", "completed"),
+      lesson("two", "in_progress"),
+      lesson("three", "completed"),
+    ];
+    expect(nextRecordedLessonId(lessons, "three")).toBe("two");
+  });
+
+  it("does not reopen completed or waived lessons", () => {
+    const lessons = [
+      lesson("one", "completed"),
+      lesson("two", "waived"),
+      lesson("three", "in_progress"),
+    ];
+    expect(nextRecordedLessonId(lessons, "three")).toBe(null);
+    expect(nextRecordedLessonId(lessons, "not-in-course")).toBe(null);
   });
 });
 
