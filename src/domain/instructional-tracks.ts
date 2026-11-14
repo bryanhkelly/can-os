@@ -379,6 +379,25 @@ export function projectRecordedCourseLessons<
   });
 }
 
+export type RecordedPracticeAnswer = {
+  promptKey: string;
+  promptText: string;
+  response: string;
+};
+
+/** Snapshot approved practice prompts so learners can review their own work after switching teachers. */
+export function snapshotRecordedPracticeAnswers(
+  prompts: readonly { key: string; text: string }[],
+  responses: readonly { promptKey: string; response: string }[],
+): RecordedPracticeAnswer[] {
+  const titles = new Map(prompts.map(prompt => [prompt.key, prompt.text]));
+  return responses.map(answer => ({
+    promptKey: answer.promptKey,
+    promptText: titles.get(answer.promptKey) ?? answer.promptKey,
+    response: answer.response,
+  }));
+}
+
 export type StudentPracticeDefinition = {
   instructions: string;
   prompts: { key: string; text: string }[];
