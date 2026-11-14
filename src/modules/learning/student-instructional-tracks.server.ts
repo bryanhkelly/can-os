@@ -9,6 +9,7 @@ import {
   contentWithdrawals,
   courses,
   courseLessons,
+  courseUnits,
   deploymentOfferingAdoptions,
   educationOperationOrganizationRoles,
   evidenceDocuments,
@@ -1022,6 +1023,8 @@ export async function readFormativePracticeHistory(
   policyVersionId: string | null;
   scoreNumeric: string | null;
   recordedAt: Date;
+  trackTitle: string | null;
+  courseUnitTitle: string | null;
 }>> {
   assertAuthenticated(context, "learner_or_guardian");
   const input = readInstructionalTrackSchema.parse(raw);
@@ -1039,7 +1042,21 @@ export async function readFormativePracticeHistory(
       policyVersionId: formativePracticeAttempts.policyVersionId,
       scoreNumeric: formativePracticeAttempts.scoreNumeric,
       recordedAt: formativePracticeAttempts.recordedAt,
+      trackTitle: instructionalTracks.title,
+      courseUnitTitle: courseUnits.title,
     }).from(formativePracticeAttempts)
+      .leftJoin(instructionalTrackVersions, eq(
+        instructionalTrackVersions.id,
+        formativePracticeAttempts.trackVersionId,
+      ))
+      .leftJoin(instructionalTracks, eq(
+        instructionalTracks.id,
+        instructionalTrackVersions.instructionalTrackId,
+      ))
+      .leftJoin(courseUnits, eq(
+        courseUnits.id,
+        formativePracticeAttempts.courseUnitId,
+      ))
       .where(eq(formativePracticeAttempts.courseAttemptId, attempt.id))
       .orderBy(desc(formativePracticeAttempts.recordedAt));
   });
