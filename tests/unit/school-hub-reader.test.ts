@@ -17,12 +17,22 @@ beforeEach(()=>{
  state.options={sites:[{id:siteId,organizationId:"org",websiteDraft:null}]};state.launches=[];state.programReadFails=false;state.websiteReadFails=false;state.teamReadFails=false;state.content=null;state.grants=[{personId:"admin",active:true}];
 });
 describe("exact-Site Hub reader",()=>{
- it("does not expose canonical Blueprint workflows through the old School Hub",async()=>{
+ it("reports catalog availability without enabling canonical Blueprint writes in the old School Hub",async()=>{
   vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","true");
   vi.stubEnv("CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED","true");
   try {
    const result=await getSchoolHubData({data:{siteId,module:"academics"}});
-   expect("canonicalCatalogEnabled" in result).toBe(false);
+   expect(result.canonicalCatalogEnabled).toBe(true);
+   expect("canonicalBlueprintEnabled" in result).toBe(false);
+  } finally {
+   vi.unstubAllEnvs();
+  }
+ });
+ it("reports the canonical catalog as disabled by default",async()=>{
+  vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","false");
+  try {
+   const result=await getSchoolHubData({data:{siteId,module:"academics"}});
+   expect(result.canonicalCatalogEnabled).toBe(false);
    expect("canonicalBlueprintEnabled" in result).toBe(false);
   } finally {
    vi.unstubAllEnvs();
