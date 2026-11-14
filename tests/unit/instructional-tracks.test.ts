@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   assertCurrentPracticeSelection,
@@ -504,6 +506,25 @@ describe("recorded lesson continuation", () => {
     expect(nextRecordedLessonId(lessons, "not-in-course")).toBe(null);
   });
 });
+
+describe("canonical recorded teacher selection database contract", () => {
+  it("permits renewal of the last presenter while refusing an unauthorized switch", () => {
+    const ddl = readFileSync(
+      resolve(import.meta.dirname, "../../database/canonical/v3.0.1/schema.sql"),
+      "utf8",
+    );
+    const start = ddl.indexOf("CREATE OR REPLACE FUNCTION validate_primary_track_selection()");
+    const end = ddl.indexOf("CREATE TRIGGER track_selection_published", start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    const trigger = ddl.slice(start, end);
+    expect(trigger).toContain("IF NOT policy_row.allow_switching AND EXISTS");
+    expect(trigger).toContain("ORDER BY old.revision DESC LIMIT 1");
+    expect(trigger).toContain("latest.track_version_id<>NEW.track_version_id");
+    expect(trigger).not.toContain("WHERE old.course_attempt_id=NEW.course_attempt_id)\\n    AND NOT policy_row.allow_switching");
+  });
+});
+
 
 describe("recorded practice answer provenance", () => {
   it("preserves the original prompt with each learner answer for review after teacher switching", () => {
