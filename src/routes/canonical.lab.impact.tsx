@@ -29,6 +29,9 @@ function ImpactLabPage() {
         Counts are restricted to Site relationships authorized for your account.
         One person can attend several rooms but is counted only once in the distinct paired total.
       </p>
+      {data.siteDelivery.partial&&<p role="status" className="mt-3 border border-border p-3 text-sm">
+        Site delivery contains more than 5,000 rooms. The displayed counts are partial and must not be published as totals.
+      </p>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {label:"Facilitator rooms",value:data.siteDelivery.roomCount},
