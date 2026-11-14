@@ -21,6 +21,9 @@ import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
 type Review = Awaited<ReturnType<typeof getBlueprintReview>>;
+type LocalExperienceDraft = BlueprintConfigurationDetail["localExperiences"][number] & {
+  source: "proposed_local_experience";
+};
 
 function readable(value: string): string {
   return value.replaceAll("_", " ");
@@ -43,6 +46,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
   const [selectedReferences, setSelectedReferences] = useState<Record<string, string[]>>({});
   const [referenceCatalog, setReferenceCatalog] = useState<BlueprintReferenceCatalogItem[]>([]);
+  const [localExperiences, setLocalExperiences] = useState<LocalExperienceDraft[]>([]);
+  const [localComponentId, setLocalComponentId] = useState("");
+  const [localTitle, setLocalTitle] = useState("");
+  const [localSummary, setLocalSummary] = useState("");
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +96,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   function chooseTemplate(template: Template) {
     setTemplateId(template.blueprintVersionId);
     setSelectedReferences({});
+    setLocalExperiences([]);
     setSelectedComponents(template.components.filter(component =>
       component.requirementMode === "required"
     ).map(component => component.id));
@@ -120,6 +128,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       setSelectedComponents(result.components
         .filter(component => component.selectionStatus === "selected")
         .map(component => component.componentId));
+      setLocalExperiences(result.localExperiences.map(item => ({ ...item, source: "proposed_local_experience" as const })));
       setSelectedReferences(Object.fromEntries(
         result.components.map(component => [
           component.componentId,
@@ -157,15 +166,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       }),
       offeringAdoptions: previous?.offeringAdoptions.filter(intent =>
         selectedComponents.includes(intent.componentId)) ?? [],
-      localExperiences: previous?.localExperiences.filter(item =>
-        selectedComponents.includes(item.componentId)).map(item => ({
-          source: "proposed_local_experience" as const,
-          componentId: item.componentId,
-          kind: item.kind,
-          title: item.title,
-          summary: item.summary,
-          configuration: item.configuration,
-        })) ?? [],
+      localExperiences: localExperiences.filter(item =>
+        selectedComponents.includes(item.componentId)),
     };
   }
 
@@ -353,6 +355,71 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 </div>
               </fieldset>;
             })}
+          {selectedTemplate.components.some(component =>
+            selectedComponents.includes(component.id) &&
+            ["community", "experience", "club", "activity"].includes(component.kind)
+          ) && <fieldset className="border p-4" disabled={busy}>
+            <legend className="px-2 font-semibold">Propose a local experience</legend>
+            <p className="mb-3 text-sm text-muted-foreground">
+              Describe a club, activity, community project, or experience unique to your Site.
+              A proposal is not an approved activity.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <label className="text-sm" htmlFor="canonical-local-component">
+                Category
+                <Select id="canonical-local-component" className="mt-2"
+                  value={localComponentId}
+                  onChange={event => setLocalComponentId(event.currentTarget.value)}>
+                  <option value="">Choose category</option>
+                  {selectedTemplate.components
+                    .filter(component => selectedComponents.includes(component.id) &&
+                      ["community", "experience", "club", "activity"].includes(component.kind))
+                    .map(component => <option key={component.id} value={component.id}>
+                      {readable(component.key)}
+                    </option>)}
+                </Select>
+              </label>
+              <label className="text-sm" htmlFor="canonical-local-title">
+                Name
+                <Input id="canonical-local-title" className="mt-2" maxLength={160}
+                  value={localTitle} onChange={event => setLocalTitle(event.currentTarget.value)}/>
+              </label>
+              <label className="text-sm" htmlFor="canonical-local-summary">
+                Summary
+                <Input id="canonical-local-summary" className="mt-2" maxLength={4000}
+                  value={localSummary} onChange={event => setLocalSummary(event.currentTarget.value)}/>
+              </label>
+            </div>
+            <Button type="button" variant="outline" className="mt-3"
+              disabled={!localComponentId || localTitle.trim().length < 2 || localExperiences.length >= 200}
+              onClick={() => {
+                const component = selectedTemplate.components.find(item => item.id === localComponentId);
+                if (!component || !["community", "experience", "club", "activity"].includes(component.kind)) return;
+                setLocalExperiences(current => [...current, {
+                  source: "proposed_local_experience",
+                  componentId: component.id,
+                  kind: component.kind as LocalExperienceDraft["kind"],
+                  title: localTitle.trim(),
+                  summary: localSummary.trim(),
+                  configuration: {},
+                }]);
+                setLocalTitle("");
+                setLocalSummary("");
+              }}>
+              Add to private Blueprint draft
+            </Button>
+            {localExperiences.length > 0 && <ul className="mt-4 space-y-2 text-sm">
+              {localExperiences.map((item, index) => <li key={index}
+                className="flex items-center justify-between gap-3 border p-3">
+                <span>{item.title} · {readable(item.kind)}</span>
+                <Button type="button" variant="outline"
+                  onClick={() => setLocalExperiences(current =>
+                    current.filter((_value, itemIndex) => itemIndex !== index))}>
+                  Remove
+                </Button>
+              </li>)}
+            </ul>}
+          </fieldset>}
           <div className="flex flex-wrap gap-3">
             {workspace.canConfigure && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
@@ -368,6 +435,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 setTemplateId("");
                 setSelectedComponents([]);
                 setSelectedReferences({});
+                setLocalExperiences([]);
                 setName("");
                 setMessage(null);
               }}>Start a new configuration</Button>}
