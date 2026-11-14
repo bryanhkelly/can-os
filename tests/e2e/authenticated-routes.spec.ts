@@ -269,7 +269,12 @@ test("student non-dashboard experiences load and preferences persist", async ({ 
     ] as const) {
       const response = await page.goto(route);
       expect(response?.status(), route).toBe(200);
-      await expect(page.getByRole("main").getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      if (route === "/student/my-school") {
+        // A connected school uses its own name as the page heading.
+        await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+      } else {
+        await expect(page.getByRole("main").getByRole("heading", { name: heading, exact: true })).toBeVisible();
+      }
     }
 
     await page.goto("/student/settings");
