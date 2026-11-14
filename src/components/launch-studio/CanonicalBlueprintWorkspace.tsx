@@ -156,6 +156,13 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
   }
 
   function versionInput(template: Template, previous?: BlueprintConfigurationDetail) {
+    const proposedComponentIds = new Set((previous?.components ?? [])
+      .filter(component => component.selectionStatus === "proposed")
+      .map(component => component.componentId));
+    const includedComponentIds = new Set([
+      ...selectedComponents,
+      ...proposedComponentIds,
+    ]);
     return {
       config: { ...(previous?.config && typeof previous.config === "object" && !Array.isArray(previous.config)
         ? previous.config : {}), siteId },
@@ -178,9 +185,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
         };
       }),
       offeringAdoptions: offeringAdoptions.filter(intent =>
-        selectedComponents.includes(intent.componentId)),
+        includedComponentIds.has(intent.componentId)),
       localExperiences: localExperiences.filter(item =>
-        selectedComponents.includes(item.componentId)),
+        includedComponentIds.has(item.componentId)),
     };
   }
 
