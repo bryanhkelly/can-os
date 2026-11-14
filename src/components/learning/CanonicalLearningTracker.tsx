@@ -41,17 +41,17 @@ export function CanonicalLearningTracker({ courseAttemptId, lessonId }: {
         void send(courseAttemptId,result.learningSessionId,currentLesson.current,"lesson_opened").catch(()=>{});
       }
     }).catch(()=>{/* Telemetry outage must not block instruction. */});
-    const onHidden=()=>{
-      if(document.visibilityState==="visible"){
-        onFocus();
-        return;
-      }
+    const pause=()=>{
       needsResume.current=true;
       lastInteraction.current=Date.now();
       const active=session.current;
       if(active) void setCanonicalLearningSessionState({data:{
         courseAttemptId,learningSessionId:active,action:"pause",
       }}).catch(()=>{});
+    };
+    const onHidden=()=>{
+      if(document.visibilityState==="visible")onFocus();
+      else pause();
     };
     const onFocus=()=>{
       const active=session.current;
@@ -77,14 +77,14 @@ export function CanonicalLearningTracker({ courseAttemptId, lessonId }: {
       void send(courseAttemptId,active,lesson,"engaged_interval",elapsed).catch(()=>{});
     };
     document.addEventListener("visibilitychange",onHidden);
-    window.addEventListener("blur",onHidden);
+    window.addEventListener("blur",pause);
     window.addEventListener("focus",onFocus);
     document.addEventListener("pointerdown",onActivity,{passive:true});
     document.addEventListener("keydown",onActivity);
     return ()=>{
       closed=true;
       document.removeEventListener("visibilitychange",onHidden);
-      window.removeEventListener("blur",onHidden);
+      window.removeEventListener("blur",pause);
       window.removeEventListener("focus",onFocus);
       document.removeEventListener("pointerdown",onActivity);
       document.removeEventListener("keydown",onActivity);
