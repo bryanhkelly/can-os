@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveClassVideo, safeClassVideoSourceLink } from "@/domain/class-video";
 import { normalizeClientError } from "@/lib/client-error";
 import { Play, VideoOff } from "lucide-react";
@@ -24,6 +24,8 @@ type ClassVideoPlayerProps = {
   presentation?: "standard" | "classroom";
   /** Observations only. External embeds do not prove playback or watch time. */
   onPlaybackEvent?: (kind: "video_opened" | "video_played" | "video_paused" | "video_ended", resourceId: string) => void;
+  /** Observational watch-heartbeat from focused, genuinely advancing native playback; never attendance. */
+  onVideoEngagement?: (durationMs: number) => void;
 };
 
 export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
@@ -39,7 +41,7 @@ export function ClassVideoPlayer(props: ClassVideoPlayerProps) {
   return <ClassVideoPlayerSession key={sourceIdentity} {...props}/>;
 }
 
-function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent }: ClassVideoPlayerProps) {
+function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVideo = true, presentation = "standard", onPlaybackEvent, onVideoEngagement }: ClassVideoPlayerProps) {
   // Do not fetch third-party media or private signed URLs during SSR or on
   // initial navigation. Even preload="metadata" initiates a network request.
   // All formats, including direct MP4/WebM, require a deliberate Play action.
@@ -58,6 +60,37 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
   const inFlight = useRef(false);
   const video = source ? resolveClassVideo(source, true) : url ? resolveClassVideo(url, declaredVideo) : null;
   const sourceLink = safeClassVideoSourceLink(url);
+  // Actual native media playback can be hands-free. Track short observed
+  // intervals only while the tab is foreground, media is advancing and playback
+  // is not paused/seeking/buffering. Embedded YouTube/Vimeo cannot be verified.
+  // Event time is bounded again by the server and never grants attendance.
+  useEffect(() => {
+    if (!source || video?.kind !== "file" || !onVideoEngagement) return;
+    let lastWall = Date.now();
+    let lastMedia = player.current?.currentTime ?? 0;
+    const check = () => {
+      const element = player.current;
+      const now = Date.now();
+      const media = element?.currentTime ?? 0;
+      if (!element || element.paused || element.ended || element.seeking ||
+          element.readyState < 3 || document.visibilityState !== "visible" ||
+          !document.hasFocus() || !Number.isFinite(media)) {
+        lastWall = now; lastMedia = media;
+        return;
+      }
+      const elapsed = now - lastWall;
+      const advanced = (media - lastMedia) * 1000;
+      if (elapsed >= 25_000) {
+        if (advanced >= 1_000 && elapsed <= 90_000) {
+          const bounded = Math.floor(Math.min(elapsed, advanced, 60_000));
+          if (bounded > 0) onVideoEngagement(bounded);
+        }
+        lastWall = now; lastMedia = media;
+      }
+    };
+    const timer = window.setInterval(check, 5_000);
+    return () => window.clearInterval(timer);
+  }, [source, video?.kind, onVideoEngagement]);
   async function open() {
     if (inFlight.current) return;
     inFlight.current = true;
