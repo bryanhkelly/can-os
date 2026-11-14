@@ -93,6 +93,11 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
         {workspace.students.map(student => {
           const key = keyFor(student);
           const activeHold = student.holds.some(hold => hold.status === "active");
+          const startsOn = startDates[key] ?? student.schoolLocalToday;
+          const expiresOn = expiryDates[key] ?? "";
+          const authorizationReady = Boolean(firstNames[key]?.trim() && lastNames[key]?.trim() &&
+            (relationships[key] ?? "").trim().length >= 2 && startsOn &&
+            (!expiresOn || expiresOn >= startsOn));
           return <section key={key} className="rounded-xl border p-4" aria-label={`Pickup authority for ${student.studentName}`}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div><h3 className="font-semibold">{student.studentName}</h3>
@@ -113,11 +118,11 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                   {adult.status === "active" && <details className="mt-2">
                     <summary className="cursor-pointer text-xs font-semibold">Revoke authorization</summary>
                     <label className="mt-2 block text-xs">Reason
-                      <textarea rows={2} maxLength={2000} value={revocationReasons[adult.id] ?? ""}
+                      <textarea rows={2} maxLength={2000} minLength={10} required value={revocationReasons[adult.id] ?? ""}
                         onChange={event => setRevocationReasons(current => ({ ...current, [adult.id]: event.target.value }))}
                         className="mt-1 w-full rounded border bg-background p-2" />
                     </label>
-                    <button type="button" disabled={busy}
+                    <button type="button" disabled={busy || (revocationReasons[adult.id] ?? "").trim().length < 10}
                       className="mt-2 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                       onClick={() => void run(adult.id, `Pickup authorization revoked for ${adult.pickupName}.`, (mutationId) => revokePickupAuthorization({ data: {
                         authorizationId: adult.id,
@@ -167,7 +172,8 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
                 </label>
               </div>
               <p className="mt-3 text-xs text-muted-foreground">Only enter the adult's legal name. Never enter identity-document numbers in CAN OS. The default start date uses the school's local calendar day, not your device's time zone.</p>
-              <button type="button" disabled={busy}
+              <p className="mt-2 text-xs text-muted-foreground">Enter both legal names, a relationship of at least two characters, and a valid date range to save.</p>
+              <button type="button" disabled={busy || !authorizationReady}
                 className="mt-3 rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50"
                 onClick={() => void run(key, `Pickup authorization added for ${student.studentName}.`, (mutationId) => createPickupAuthorization({ data: {
                   studentProfileId: student.studentProfileId,
@@ -187,11 +193,11 @@ export function GuardianPickupPanel({ studentPersonId }: { studentPersonId?: str
               <summary className="cursor-pointer text-sm font-semibold">Report disputed custody — pause all release</summary>
               <p className="mt-2 text-xs text-muted-foreground">This immediately blocks every pickup authorization until an authorized site leader resolves the hold. It does not decide legal custody. The school receives an urgent review task; staff independently determine safe recipients for any family notification.</p>
               <label className="mt-3 block text-xs font-semibold">What requires school review
-                <textarea rows={3} maxLength={2000} value={holdReasons[key] ?? ""}
+                <textarea rows={3} maxLength={2000} minLength={10} required value={holdReasons[key] ?? ""}
                   onChange={event => setHoldReasons(current => ({ ...current, [key]: event.target.value }))}
                   className="mt-1 w-full rounded border bg-background p-2 text-sm" />
               </label>
-              <button type="button" disabled={busy || activeHold}
+              <button type="button" disabled={busy || activeHold || (holdReasons[key] ?? "").trim().length < 10}
                 className="mt-3 rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 onClick={() => window.confirm("Pause every pickup release for this child until an authorized site leader resolves the custody hold?") && void run(key + ":hold", `Disputed custody reported for ${student.studentName}; all release is paused.`, (mutationId) => createPickupCustodyHold({ data: {
                   studentProfileId: student.studentProfileId,
