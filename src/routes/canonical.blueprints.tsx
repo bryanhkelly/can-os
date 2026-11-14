@@ -33,7 +33,9 @@ function CanonicalBlueprintPage() {
     return <WorkspaceShell
       eyebrow="CAN OS v3.0.1"
       title="Choose an authorized Site"
-      subtitle="This account has no active canonical Site assignment. An administrator must grant a Site role before planning." />;
+      subtitle="This account has no active canonical Site assignment. An administrator must grant a Site role before planning.">
+      <p className="mt-5 text-sm">No Site is available for Blueprint planning.</p>
+    </WorkspaceShell>;
   }
   return <WorkspaceShell
     eyebrow="CAN OS v3.0.1"
