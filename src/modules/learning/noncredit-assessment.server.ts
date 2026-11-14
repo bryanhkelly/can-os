@@ -276,7 +276,9 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
       return {item,chosen,score};
     });
     // Write answers while the attempt is in_progress, then atomically
-    // transition to submitted, score, and record a provisional result.
+    // transition to submitted and score. The v3.0.1 SQL trigger allows
+    // automatic FINAL results only for strictly scoped noncredit objective
+    // checks, after the reviewed migration is installed.
     for(const {item,chosen} of scored) {
       const [response]=await tx.insert(assessmentExecutionResponses).values({
         attemptItemId:item.id,revisionNo:1,responseState:"submitted",
@@ -308,15 +310,32 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     const evaluated=evaluateKnowledgeCheckResult(
       earned,total,scope.form.passingFraction===null?null:Number(scope.form.passingFraction),
     );
+    // Keep legacy canonical SQL deployments safe: until the additional
+    // noncredit result gate is installed and verified, stay provisional.
+    const autoFinalize=process.env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true";
     const [result]=await tx.insert(assessmentExecutionResults).values({
-      attemptId:attempt.id,resultRevision:1,resultStatus:"provisional",
+      attemptId:attempt.id,resultRevision:1,
+      resultStatus:autoFinalize?"finalized":"provisional",
       pointsEarned:earned.toFixed(4),pointsPossible:total.toFixed(4),
       outcome:evaluated.outcome,
-      resultEvidence:{engine:NONCREDIT_SCORING_ENGINE,courseAttemptId:scope.access.courseAttemptId},
+      reviewedByPersonId:null,
+      resultEvidence:{
+        engine:NONCREDIT_SCORING_ENGINE,
+        courseAttemptId:scope.access.courseAttemptId,
+        ...(autoFinalize?{noncreditAutoFinalized:"v1"}:{}),
+      },
     }).returning({id:assessmentExecutionResults.id});
-    return {state:"scored" as const,attemptId:attempt.id,
-      resultId:result.id,outcome:evaluated.outcome,
+    if(autoFinalize) {
+      // Database validation requires the finalized result before the
+      // attempt may enter the finalized state. No academic grade is written.
+      await tx.update(assessmentExecutionAttempts).set({state:"finalized"})
+        .where(eq(assessmentExecutionAttempts.id,attempt.id));
+    }
+    return {state:autoFinalize?"finalized" as const:"scored" as const,
+      attemptId:attempt.id,resultId:result.id,outcome:evaluated.outcome,
       pointsEarned:earned,pointsPossible:total,
-      message:"Knowledge check submitted. Result pending provider finalization."};
+      message:autoFinalize
+        ?"Noncredit knowledge check finalized automatically."
+        :"Knowledge check submitted. Result pending provider confirmation."};
   });
 }
