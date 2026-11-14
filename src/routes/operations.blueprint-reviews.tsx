@@ -113,6 +113,52 @@ function ReviewEditor({ item }: { item: Item }) {
     <p className="mt-2 text-sm">
       {item.selectedComponents.length} selected component{item.selectedComponents.length === 1 ? "" : "s"}
     </p>
+    <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+      <div className="border p-3">
+        <h3 className="font-semibold">Site and identity</h3>
+        <p className="mt-1 text-muted-foreground">
+          Site: {item.siteId ?? "No Site selected"}
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Educational identity: {item.editorialIdentity.replaceAll("_", " ")}
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Affiliation: {item.religiousAffiliationCode ?? "Unspecified"}
+        </p>
+      </div>
+      <div className="border p-3">
+        <h3 className="font-semibold">Published Offering intents</h3>
+        {item.offeringIntents.length === 0
+          ? <p className="mt-1 text-muted-foreground">No Offerings proposed</p>
+          : <ul className="mt-2 space-y-1">
+              {item.offeringIntents.map((offering, index) =>
+                <li key={index}>{offering.title} · v{offering.offeringVersionNo}</li>)}
+            </ul>}
+      </div>
+    </div>
+    {(item.references.length > 0 || item.localExperiences.length > 0) &&
+      <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        {item.references.length > 0 && <section className="border p-3">
+          <h3 className="font-semibold">Selected curated references</h3>
+          <ul className="mt-2 space-y-2">
+            {item.references.map((reference, index) =>
+              <li key={index}>
+                <strong>{reference.title}</strong>
+                <p className="text-muted-foreground">{reference.summary}</p>
+              </li>)}
+          </ul>
+        </section>}
+        {item.localExperiences.length > 0 && <section className="border p-3">
+          <h3 className="font-semibold">Locally proposed experiences</h3>
+          <ul className="mt-2 space-y-2">
+            {item.localExperiences.map((experience, index) =>
+              <li key={index}>
+                <strong>{experience.title}</strong>
+                <p className="text-muted-foreground">{experience.summary}</p>
+              </li>)}
+          </ul>
+        </section>}
+      </div>}
     <Button type="button" variant="outline" className="mt-3"
       onClick={() => setExpanded(open => !open)}>
       {expanded ? "Close review" : "Review submitted Blueprint"}
