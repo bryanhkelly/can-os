@@ -19,4 +19,16 @@ describe("shared learner question form",()=>{
     expect(html).toContain('type="radio"');
     expect(html).toContain("Submit responses");
   });
+  it("restores previously saved noncredit choices without rendering an answer key",()=>{
+    const html=renderToStaticMarkup(<LearningQuestionnaire
+      title="Recovered knowledge check"
+      questions={[{id:"question-1",prompt:"Choose the best answer",
+        type:"single_choice",required:true,min:null,max:null,
+        options:[{id:"yes",label:"Continue"},{id:"no",label:"Stop"}]}]}
+      initialAnswers={[{questionId:"question-1",optionIds:["yes"]}]}
+      onSubmit={vi.fn()}/>);
+    expect(html).toContain("Recovered knowledge check");
+    expect(html).toMatch(/value="yes"[^>]*checked=""/);
+    expect(html).not.toContain("correctOptionIds");
+  });
 });
