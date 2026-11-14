@@ -281,6 +281,17 @@ export function assertCurrentPracticeSelection(input: {
   }
 }
 
+/** The selected teacher remains usable only under its current approved policy. */
+export function recordedInstructorSelectionIsCurrent(input: {
+  selection: { trackVersionId: string; policyVersionId: string } | null;
+  choices: ReadonlyArray<{ trackVersionId: string; policyVersionId: string }>;
+}): boolean {
+  return input.selection !== null && input.choices.some(choice =>
+    choice.trackVersionId === input.selection?.trackVersionId &&
+    choice.policyVersionId === input.selection?.policyVersionId
+  );
+}
+
 export type InstructionalTrackSelectionDecision = "reuse" | "create" | "switch_denied";
 
 /**
