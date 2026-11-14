@@ -41,6 +41,7 @@ import { DomainError } from "@/domain/errors";
 import {
   assertCurrentPracticeSelection,
   buildTrackManifestUsages,
+  canAccessStudentTrackMaterial,
   decideInstructionalTrackSelection,
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
@@ -737,15 +738,20 @@ export async function readSelectedInstructionalTrack(
             })),
         };
       }),
-      materials: eligible.materials.map((material) => ({
+      materials: eligible.materials
+        .filter((material) => canAccessStudentTrackMaterial(
+          material.materialKind,
+          eligible.policy.practiceEnabled,
+        ))
+        .map((material) => ({
         id: material.id,
         courseUnitId: material.courseUnitId,
         assetVersionId: material.assetVersionId,
         materialKind: material.materialKind,
-        practice: eligible.policy.practiceEnabled && material.materialKind === "practice"
+        practice: material.materialKind === "practice"
           ? parseStudentPracticeDefinition(material.activitySpec)
           : null,
-      })),
+        })),
     };
   });
 }
@@ -785,7 +791,10 @@ export async function getSelectedInstructionalTrackAssetDownload(
     }
     const selectedTrackUsesAsset = eligible.presentations.some(
       (presentation) => presentation.assetVersionId === input.assetVersionId,
-    ) || eligible.materials.some((material) => material.assetVersionId === input.assetVersionId);
+    ) || eligible.materials.some((material) =>
+      canAccessStudentTrackMaterial(material.materialKind, eligible.policy.practiceEnabled) &&
+      material.assetVersionId === input.assetVersionId
+    );
     if (!selectedTrackUsesAsset) {
       throw new DomainError("UNAVAILABLE", "The requested resource is not part of the selected instruction.");
     }
