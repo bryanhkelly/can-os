@@ -264,6 +264,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
             title={`${currentLesson.title} recording`}
             resourceId={presentation.assetVersionId}
             onPlaybackEvent={(kind, resourceId) => observe(kind, currentLesson.id, resourceId)}
+             onVideoEngagement={durationMs => observeNativeVideo(currentLesson.id, durationMs)}
             loadUrl={async () => (await getRecordedInstructionAssetDownload({ data: {
               courseAttemptId,
               assetVersionId: presentation.assetVersionId,
