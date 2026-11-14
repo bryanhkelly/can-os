@@ -187,7 +187,32 @@ test("student opens enrolled classroom and assessment detail", async ({ browser 
     expect(assignment?.status()).toBe(200);
     await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Your work" })).toBeVisible();
-    await expectWorkspaceShell(page);
+    await expect(page.getByRole("heading", { name: fixture!.assessmentTitle })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Save draft" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Submit assignment" })).toBeVisible();
     expect(errors).toEqual([]);
+  });
+});
+
+test("student saves and submits assignment work, then sees persisted receipt", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
+  const assignmentUrl = "/student/assignments/" + fixture.assessmentId;
+  const responseText = "Synthetic student response " + fixture.suffix + ": showing my work.";
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    await page.goto(assignmentUrl);
+    const response = page.getByRole("textbox", { name: /Your response/ });
+    await expect(response).toBeEnabled();
+    await response.fill(responseText);
+    await page.getByRole("button", { name: "Save draft" }).click();
+    await expect(page.getByText("Draft: Saved")).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("textbox", { name: /Your response/ })).toHaveValue(responseText);
+
+    await page.getByRole("button", { name: "Submit assignment" }).click();
+    await expect(page.getByText(/Your assignment has been submitted\. Receipt:/)).toBeVisible();
+    await page.reload();
+    await expect(page.getByText(/Submitted .*Receipt:/)).toBeVisible();
+    await expect(page.getByRole("textbox", { name: /Your response/ })).toHaveCount(0);
   });
 });
