@@ -252,6 +252,18 @@ test("student opens enrolled classroom and assessment detail", async ({ browser 
   });
 });
 
+test("student assignment list links back to enrolled classes", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    await page.goto("/student/assignments");
+    const classesLink = page.getByRole("link", { name: "My classes", exact: true });
+    await expect(classesLink).toHaveAttribute("href", "/classes");
+    await classesLink.click();
+    await expect(page).toHaveURL(/\\/classes(?:\\?|$)/);
+  });
+});
+
 test("student saves and submits assignment work, then sees persisted receipt", async ({ browser }) => {
   const secret = roleSecrets.student;
   if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
