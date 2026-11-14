@@ -13,9 +13,12 @@ import { sites } from "./organizations";
 export const classroomSessions = pgTable("classroom_sessions", {
   id: id(),
   // Nullable while pre-session site/program configuration (spec §4.1) is
-  // intentionally out of scope for the first pairing slice. When set,
-  // server-side join eligibility checks enrollment at this site.
+  // intentionally out of scope for the first pairing slice.
   siteId: uuid("site_id").references(() => sites.id, { onDelete: "restrict" }),
+  // "enrolled": only learners with an active enrollment at the session's site
+  // may join. "open": any authenticated CAN OS person may join. Enrolled
+  // requires siteId; open sessions may be site-less.
+  joinPolicy: text("join_policy").$type<"enrolled" | "open">().notNull().default("open"),
   title: text("title").notNull(),
   status: text("status").$type<"scheduled" | "open" | "ended" | "cancelled">()
     .notNull().default("scheduled"),

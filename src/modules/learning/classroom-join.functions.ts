@@ -33,6 +33,10 @@ export const openClassroomSession = createServerFn({ method: "POST" })
   .validator((value: unknown) => z.object({
     title: z.string().trim().min(2).max(150),
     siteId: uuid.nullish(),
+    // "enrolled": only learners enrolled at the session's site may join.
+    // "open": any authenticated person may join. Defaults to enrolled when a
+    // site is provided, otherwise open.
+    joinPolicy: z.enum(["enrolled", "open"]).optional(),
   }).parse(value))
   .handler(async ({ data }) => {
     const actor = await requireClassroomActor();

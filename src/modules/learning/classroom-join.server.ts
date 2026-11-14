@@ -68,9 +68,13 @@ export async function facilitatedClassroomSession(tx: Tx, actor: Actor, sessionI
 /** Open a session directly into the live state and issue its first join code. */
 export async function openClassroomSessionForActor(
   actor: Actor,
-  input: { title: string; siteId?: string | null },
+  input: { title: string; siteId?: string | null; joinPolicy?: "enrolled" | "open" },
 ) {
   const now = new Date();
+  const joinPolicy = input.joinPolicy ?? (input.siteId ? "enrolled" : "open");
+  if (joinPolicy === "enrolled" && !input.siteId) {
+    throw new Error("An enrolled-only classroom needs a site so enrollments can be checked");
+  }
   return db.transaction(async tx => {
     if (input.siteId && !(actor.scope.siteIds ?? []).includes(input.siteId)) {
       throw new AuthorizationError("site scope");
@@ -78,6 +82,7 @@ export async function openClassroomSessionForActor(
     const [session] = await tx.insert(s.classroomSessions).values({
       title: input.title,
       siteId: input.siteId ?? null,
+      joinPolicy,
       status: "open",
       facilitatorPersonId: actor.actorPersonId,
       openedAt: now,
@@ -157,10 +162,11 @@ export async function endClassroomSessionForActor(actor: Actor, sessionId: strin
 }
 
 /**
- * Eligibility for a paired learner join. When the session is site-scoped,
- * the learner needs an active enrollment at that site; enrollment-free
- * sessions (pre-configuration slice) accept any authenticated person.
- * Guest joining (spec §13.4) remains a pending decision and is not implemented.
+ * Enforced only for joinPolicy "enrolled" sessions: the learner needs an
+ * active program enrollment at the session's site. "Open" sessions accept
+ * any authenticated person (spec §13.4: both modes are first-class).
+ * Anonymous guests are not implemented; identity always comes from the
+ * verified session, never from typed-in join information.
  */
 async function assertJoinEligibility(tx: Tx, actor: Actor, session: { siteId: string | null }) {
   if (!session.siteId) return;
@@ -218,7 +224,9 @@ export async function joinClassroomSessionForActor(
       throw new Error("That class code is not valid");
     }
 
-    await assertJoinEligibility(tx, actor, session);
+    if (session.joinPolicy === "enrolled") {
+      await assertJoinEligibility(tx, actor, session);
+    }
 
     const [participant] = await tx.insert(s.classroomSessionParticipants).values({
       sessionId: session.id, personId: actor.actorPersonId,
@@ -280,6 +288,7 @@ export async function classroomPresentationForActor(actor: Actor, sessionId: str
       sessionId: session.id,
       title: session.title,
       status: session.status,
+      joinPolicy: session.joinPolicy,
       code: token?.code ?? null,
       joinCodeExpiresAt: token?.expiresAt.toISOString() ?? null,
       participantCount: count?.count ?? 0,

@@ -31,6 +31,8 @@ export function isValidClassCode(value: string): boolean {
 
 export type ClassroomSessionStatus = "scheduled" | "open" | "ended" | "cancelled";
 export type JoinTokenStatus = "active" | "rotated" | "revoked";
+export const JOIN_POLICIES = ["enrolled", "open"] as const;
+export type JoinPolicy = (typeof JOIN_POLICIES)[number];
 
 /** Allowed lifecycle transitions; anything else is rejected server-side. */
 export const SESSION_STATUS_TRANSITIONS: Record<ClassroomSessionStatus, ClassroomSessionStatus[]> = {

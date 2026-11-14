@@ -95,6 +95,11 @@ function ClassroomPresentationPage() {
             <p className="mt-8 text-2xl" aria-live="polite">
               {data.participantCount} {data.participantCount === 1 ? "learner is" : "learners are"} connected
             </p>
+            <p className="mt-1 text-muted-foreground">
+              {data.joinPolicy === "enrolled"
+                ? "Enrolled learners only — joining is checked against this site's registrations."
+                : "Open to any signed-in participant."}
+            </p>
             {data.joinCodeExpiresAt && (
               <p className="mt-2 text-muted-foreground">
                 This code refreshes automatically; ask for a new one if it expires.

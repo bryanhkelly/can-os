@@ -50,7 +50,7 @@ function learner() {
 }
 
 const openSessionRow = {
-  id: "session-1", siteId: SITE, title: "AI Foundations",
+  id: "session-1", siteId: SITE, title: "AI Foundations", joinPolicy: "enrolled",
   status: "open", facilitatorPersonId: FACILITATOR,
   openedAt: new Date(), endedAt: null, metadata: {},
 };
@@ -79,9 +79,25 @@ describe("openClassroomSessionForActor", () => {
       .mockResolvedValueOnce([{ id: "token-1", code: "ABC234" }]);
     const result = await openClassroomSessionForActor(facilitator(), { title: "AI Foundations", siteId: SITE });
     expect(result).toEqual({ sessionId: "session-1", title: "AI Foundations", code: "ABC234" });
+    // A site-scoped session defaults to the enrolled-only join policy.
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ joinPolicy: "enrolled" }));
     expect(emitEvent).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       eventType: "ClassroomSessionOpened", aggregateId: "session-1",
     }));
+  });
+
+  it("defaults site-less sessions to the open join policy", async () => {
+    returning
+      .mockResolvedValueOnce([{ id: "session-2", title: "Open Night" }])
+      .mockResolvedValueOnce([{ id: "token-2", code: "XYZ789" }]);
+    await openClassroomSessionForActor(facilitator(), { title: "Open Night" });
+    expect(values).toHaveBeenCalledWith(expect.objectContaining({ joinPolicy: "open", siteId: null }));
+  });
+
+  it("refuses an enrolled-only session without a site to check against", async () => {
+    await expect(openClassroomSessionForActor(facilitator(), { title: "Nope", joinPolicy: "enrolled" }))
+      .rejects.toThrow("needs a site");
+    expect(values).not.toHaveBeenCalled();
   });
 
   it("rejects a site outside the actor's grant", async () => {
@@ -144,7 +160,7 @@ describe("joinClassroomSessionForActor", () => {
     expect(set).toHaveBeenCalledWith(expect.objectContaining({ failedAttempts: 10, status: "revoked" }));
   });
 
-  it("requires an active enrollment at the session's site when site-scoped", async () => {
+  it("requires an active enrollment at the session's site for enrolled-policy sessions", async () => {
     select
       .mockReturnValueOnce(query([activeTokenRow]))
       .mockReturnValueOnce(query([openSessionRow]))
@@ -155,10 +171,24 @@ describe("joinClassroomSessionForActor", () => {
     expect(values).not.toHaveBeenCalled();
   });
 
+  it("lets any authenticated person join an open-policy session even when site-scoped", async () => {
+    select
+      .mockReturnValueOnce(query([activeTokenRow]))
+      .mockReturnValueOnce(query([{ ...openSessionRow, joinPolicy: "open" }]));
+    // No enrollment lookup happens for open sessions.
+    returning
+      .mockResolvedValueOnce([{ id: "participant-1", joinedAt: new Date() }])
+      .mockResolvedValueOnce([{ id: "connection-1" }]);
+    await expect(joinClassroomSessionForActor(learner(), {
+      code: "ABC234", deviceKey: "device-key-1", idempotencyKey: "idem-1",
+    })).resolves.toMatchObject({ participantId: "participant-1" });
+    expect(select).toHaveBeenCalledTimes(2);
+  });
+
   it("accepts any authenticated person when the session is not site-scoped (pre-config slice)", async () => {
     select
       .mockReturnValueOnce(query([activeTokenRow]))
-      .mockReturnValueOnce(query([{ ...openSessionRow, siteId: null }]));
+      .mockReturnValueOnce(query([{ ...openSessionRow, siteId: null, joinPolicy: "open" }]));
     returning
       .mockResolvedValueOnce([{ id: "participant-1", joinedAt: new Date() }])
       .mockResolvedValueOnce([{ id: "connection-1" }]);
@@ -222,7 +252,8 @@ describe("classroomPresentationForActor", () => {
       .mockReturnValueOnce(query([{ count: 12 }]));
     const data = await classroomPresentationForActor(facilitator(), "session-1");
     expect(data).toMatchObject({
-      title: "AI Foundations", status: "open", code: "ABC234", participantCount: 12,
+      title: "AI Foundations", status: "open", code: "ABC234",
+      joinPolicy: "enrolled", participantCount: 12,
     });
     expect(JSON.stringify(data)).not.toContain(LEARNER);
   });
