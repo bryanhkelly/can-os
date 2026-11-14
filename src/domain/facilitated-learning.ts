@@ -8,6 +8,7 @@ export const facilitatedRoomMaxMs = 8 * 60 * 60_000;
 export const facilitatedStartSchema = z.object({
   deploymentId: z.string().uuid(),
   courseVersionId: z.string().uuid(),
+  siteId: z.string().uuid(),
 }).strict();
 
 export const facilitatedPairSchema = z.object({
