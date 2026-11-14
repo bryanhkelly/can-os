@@ -1,5 +1,5 @@
 import {
-  createContext, useCallback, useContext, useEffect, useRef,
+  createContext, useCallback, useContext, useEffect, useRef, useState,
   type ReactNode,
 } from "react";
 import {
@@ -7,11 +7,13 @@ import {
   startCanonicalLearningSession,
 } from "@/modules/learning/canonical-learning-activity.functions";
 import type { CanonicalLearningEvent } from "@/domain/canonical-learning-activity";
+import { pruneLearningOutbox, type LearningOutboxItem } from "@/domain/canonical-learning-outbox";
 
 type Kind = CanonicalLearningEvent["kind"];
 type ActivityContext = {
   selectLesson: (id: string | null) => void;
   observe: (kind: Kind, lessonId: string | null, resourceId?: string | null) => void;
+  observeNativeVideo: (lessonId: string, durationMs: number) => void;
 };
 const Context = createContext<ActivityContext | null>(null);
 
@@ -49,6 +51,18 @@ export function CanonicalLearningActivityProvider({
   const operation = useRef<Promise<unknown>>(Promise.resolve());
   const alive = useRef(false);
   const instance = useRef<string | null>(null);
+  const pending = useRef<LearningOutboxItem[]>([]);
+  const [syncPending, setSyncPending] = useState(false);
+  const outboxKey = "can-learning-outbox:" + courseAttemptId;
+  const persist = useCallback(() => {
+    try {
+      if (pending.current.length) {
+        window.sessionStorage.setItem(outboxKey, JSON.stringify(pending.current));
+      } else {
+        window.sessionStorage.removeItem(outboxKey);
+      }
+    } catch { /* Lack of browser storage never blocks the lesson. */ }
+  }, [outboxKey]);
 
   const serialize = useCallback((work: () => Promise<unknown>) => {
     const next = operation.current.catch(() => undefined).then(work);
@@ -56,23 +70,55 @@ export function CanonicalLearningActivityProvider({
     return next;
   }, []);
 
+  const flush = useCallback(() => serialize(async () => {
+    const id=session.current;
+    if(!id || !alive.current || document.visibilityState!=="visible" ||
+      !document.hasFocus())return;
+    pending.current=pruneLearningOutbox(pending.current,id,new Date());
+    persist();
+    while(pending.current.length && alive.current && session.current===id){
+      const next=pending.current[0]!;
+      try {
+        await recordCanonicalLearningEvent({
+          data:{courseAttemptId,learningSessionId:id,event:next.event},
+        });
+        pending.current.shift();
+        persist();
+      }catch {
+        setSyncPending(true);
+        return;
+      }
+    }
+    if(!pending.current.length)setSyncPending(false);
+  }),[courseAttemptId,serialize,persist]);
+
   const postEvent = useCallback((
     kind: Kind, lessonId: string | null, resourceId: string | null = null,
     durationMs?: number,
-  ) => serialize(async () => {
-    const id = session.current;
-    if (!id || !alive.current) return;
-    const event = {
-      clientEventId: crypto.randomUUID(),
-      kind, lessonId, resourceId, occurredAt: new Date().toISOString(),
-      ...(kind === "engaged_interval"
-        ? { durationMs, pageVisible: true, windowFocused: true }
+  ) => {
+    const id=session.current;
+    if(!id || !alive.current)return Promise.resolve();
+    const event={
+      clientEventId:crypto.randomUUID(),
+      kind,lessonId,resourceId,occurredAt:new Date().toISOString(),
+      ...(kind==="engaged_interval"
+        ? {durationMs,pageVisible:true,windowFocused:true}
         : {}),
-    };
-    await recordCanonicalLearningEvent({
-      data: { courseAttemptId, learningSessionId: id, event },
-    });
-  }), [courseAttemptId, serialize]);
+    } as CanonicalLearningEvent;
+    pending.current.push({learningSessionId:id,event});
+    pending.current=pruneLearningOutbox(pending.current,id,new Date());
+    persist();
+    return flush();
+  },[flush,persist]);
+
+  const observeNativeVideo=useCallback((lessonId:string,durationMs:number) => {
+    if(!lessonId || !alive.current || needsResume.current ||
+      document.visibilityState!=="visible" || !document.hasFocus() ||
+      !Number.isFinite(durationMs) || durationMs<1000)return;
+    lastInteraction.current=Date.now();
+    void postEvent("engaged_interval",lessonId,null,
+      Math.floor(Math.min(durationMs,60_000))).catch(()=>{});
+  },[postEvent]);
 
   const selectLesson = useCallback((id: string | null) => {
     if (lesson.current === id) return;
@@ -92,6 +138,16 @@ export function CanonicalLearningActivityProvider({
   useEffect(() => {
     alive.current = true;
     session.current = null;
+    pending.current=[];
+    try {
+      const stored=JSON.parse(window.sessionStorage.getItem(outboxKey)??"[]");
+      // Restore only bounded, schema-valid observations for this tab.
+      if(Array.isArray(stored)) pending.current=stored.slice(-48).flatMap(item=>{
+        const event=item?.event;
+        return event && typeof event.clientEventId==="string" &&
+          typeof item.learningSessionId==="string" ? [item] : [];
+      });
+    }catch{pending.current=[];}
     let disposed = false;
     instance.current = tabInstanceId(courseAttemptId);
     void startCanonicalLearningSession({
@@ -99,6 +155,9 @@ export function CanonicalLearningActivityProvider({
     }).then(result => {
       if (disposed) return;
       session.current = result.learningSessionId;
+      pending.current=pruneLearningOutbox(pending.current,result.learningSessionId,new Date());
+      persist();
+      void flush();
       lastInteraction.current = Date.now();
       const id = lesson.current;
       if (id && document.visibilityState === "visible")
@@ -137,6 +196,7 @@ export function CanonicalLearningActivityProvider({
           });
         }
         needsResume.current = false;
+        void flush();
       }).catch(() => {});
     };
     const visibility = () => {
@@ -156,6 +216,9 @@ export function CanonicalLearningActivityProvider({
       void postEvent("engaged_interval", lessonId, null, Math.min(elapsed, 60_000))
         .catch(() => {});
     };
+    const online=()=>{if(!needsResume.current)void flush();};
+    const retry=window.setInterval(()=>{if(!needsResume.current)void flush();},15_000);
+    window.addEventListener("online",online);
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("blur", pause);
     window.addEventListener("focus", resume);
@@ -164,6 +227,8 @@ export function CanonicalLearningActivityProvider({
     return () => {
       disposed = true;
       alive.current = false;
+      window.clearInterval(retry);
+      window.removeEventListener("online",online);
       document.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("blur", pause);
       window.removeEventListener("focus", resume);
@@ -173,7 +238,12 @@ export function CanonicalLearningActivityProvider({
       // The server enforces the 30-minute inactivity window on reuse.
       session.current = null;
     };
-  }, [courseAttemptId, postEvent, serialize]);
+  }, [courseAttemptId, postEvent, serialize, outboxKey, persist, flush]);
 
-  return <Context.Provider value={{ selectLesson, observe }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ selectLesson, observe, observeNativeVideo }}>
+    {children}
+    {syncPending && <p role="status" className="border-t border-border px-3 py-1 text-xs text-muted-foreground">
+      Recent learning observations will retry while this tab remains open.
+    </p>}
+  </Context.Provider>;
 }
