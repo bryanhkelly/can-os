@@ -33,7 +33,7 @@ export function projectCanonicalCommandContext(row: CanonicalSessionRow): Comman
     ? ["learning.participate", "learning.progress", "learning.survey.respond"]
     : row.role_code === "blueprint_reviewer"
       ? ["blueprint.read", "blueprint.review"]
-      : ["blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start"];
+      : ["blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start", "noncredit.completion.decide"];
   return {
     actorPersonId: row.person_id,
     role: row.role_code,
