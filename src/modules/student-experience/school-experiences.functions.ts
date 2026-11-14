@@ -6,6 +6,7 @@ import { z } from "zod";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { personDisplayName } from "@/domain/person-name";
+import { eligibleGuardianConferenceStudents } from "@/domain/guardian-conference-eligibility";
 
 
 
@@ -146,12 +147,7 @@ export const getSchoolExperiences = createServerFn({method:"GET"}).handler(async
     slots:slots.map(s=>({
       id:s.id,seriesId:s.seriesId,startsAt:s.startsAt.toISOString(),endsAt:s.endsAt.toISOString(),status:s.status,
       siteId:s.siteId,sectionId:s.sectionId,
-      eligibleStudentPersonIds:[...new Set(eligiblePrograms.filter(child=>
-        child.siteId===s.siteId && (!s.sectionId || eligibleSections.some(section=>
-          section.studentProfileId===child.studentProfileId &&
-          section.sectionId===s.sectionId && section.programId===child.programId &&
-          section.siteId===s.siteId,
-        ))).map(child=>child.studentPersonId))],
+      eligibleStudentPersonIds:eligibleGuardianConferenceStudents(s,eligiblePrograms,eligibleSections),
       seriesTitle:s.seriesTitle,timezone:s.timezone,teacherName:personDisplayName(s),
     })).filter(slot=>slot.eligibleStudentPersonIds.length>0),
     bookings:bookings.map(b=>({id:b.id,slotId:b.slotId,studentPersonId:b.studentPersonId,seriesId:b.seriesId,
