@@ -355,6 +355,15 @@
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
+      "file": "src/routes/canonical.my-credentials.tsx",
+      "route": "/canonical/my-credentials",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Feature-flagged canonical learner views issued noncredit certificates and badges for the authenticated recipient; final production placement is pending",
+      "readBoundary": "Canonical native learner session, credential reader feature flag and subject-bound issuance search; no provider or other recipient records exposed",
+      "writeBoundary": "Download uses a recipient-bound POST with current credential validity check; no issuance or revocation action on this page"
+    },
+    {
       "file": "src/routes/church.apply.tsx",
       "route": "/church/apply",
       "owner": "network",

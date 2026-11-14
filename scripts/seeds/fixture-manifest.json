@@ -2183,6 +2183,11 @@
       "persona": "native canonical site_admin or registrar",
       "fixtureRequired": false,
       "rationale": "The public-schema demo dataset does not establish canonical qualification reviewer authority, Site grants or protected evidence provenance. The temporary page is a read-only inspection of isolated v3.0.1 applicant-owned qualification summaries; live authenticated browser tests remain outstanding."
+    },
+    "/canonical/my-credentials": {
+      "persona": "native canonical learner",
+      "fixtureRequired": false,
+      "rationale": "The public-school demo fixture cannot impersonate native canonical learner identity, recipient-bound award issuances or the protected credential reader feature flag. This is a temporary credential experience until it moves into a production learner route; live browser acceptance is still pending."
     }
   }
 }

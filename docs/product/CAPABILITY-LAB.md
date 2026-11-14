@@ -65,3 +65,9 @@ navigation, fixture and route-contract entries together. Production code must im
 shared domain/server services, never a Lab route or component. No canonical database
 schema or history is removed when a Lab route is retired. Keep `verification: pending`
 until those checks have actually been executed.
+
+The separate feature-flagged `/canonical/my-credentials` route is a native learner
+credential reader rather than a provider Lab page. It is also temporary and should
+move to the approved production learner experience once permission and browser
+acceptance are complete. Do not treat the presence of this route as certification
+that credential revocation, provenance or database role hardening is complete.

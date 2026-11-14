@@ -33,3 +33,16 @@ describe("temporary canonical Capability Lab route boundaries", () => {
     expect(fixture.routes[route]?.rationale?.length).toBeGreaterThan(80);
   });
 });
+
+describe("native canonical learner credential route", () => {
+  it("is inventoried and hidden until promotion into a production learner experience", () => {
+    const contracts = JSON.parse(readFileSync(resolve("docs/platform-route-contracts.json"), "utf8"))
+      as { routes: Array<{file: string; route: string; owner: string; verification: string}> };
+    expect(contracts.routes.find(row => row.file === "src/routes/canonical.my-credentials.tsx"))
+      .toEqual(expect.objectContaining({
+        route: "/canonical/my-credentials", owner: "learning", verification: "pending",
+      }));
+    expect(routeNavigation["/canonical/my-credentials"])
+      .toEqual(expect.objectContaining({visibility: "hidden", personas: []}));
+  });
+});
