@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { normalizeClientError } from "@/lib/client-error";
-import { recordedInstructorSelectionIsCurrent } from "@/domain/instructional-tracks";
+import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent } from "@/domain/instructional-tracks";
 import {
   completeRecordedCourseLesson,
   getRecordedInstructorPracticeHistory,
@@ -98,8 +98,12 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         lessonId,
         expectedRevision: instruction.selection.revision,
       } });
+      const nextLessonId = nextRecordedLessonId(instruction.lessons, lessonId);
+      if (nextLessonId) setLessonId(nextLessonId);
       await reload();
-      setNotice("Lesson completed. Your progress stays with your course when you switch teachers.");
+      setNotice(nextLessonId
+        ? "Lesson completed. Continue with your next unfinished lesson."
+        : "Lesson completed. Your course progress is saved across recorded teachers.");
     } catch (failure) {
       setError(normalizeClientError(failure, "Unable to complete this lesson.").message);
     } finally {
