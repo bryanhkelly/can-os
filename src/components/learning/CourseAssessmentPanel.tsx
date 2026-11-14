@@ -10,10 +10,15 @@ import {
 type KnowledgeCheck = Awaited<ReturnType<typeof getNoncreditKnowledgeCheck>>;
 
 /** Reused within the existing recorded classroom, not a separate portal. */
-export function CourseAssessmentPanel({courseAttemptId}:{courseAttemptId:string}) {
-  return <KnowledgeCheckSession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+export function CourseAssessmentPanel({courseAttemptId,onAssessmentCompleted}:{
+  courseAttemptId:string;onAssessmentCompleted?:()=>void;
+}) {
+  return <KnowledgeCheckSession key={courseAttemptId} courseAttemptId={courseAttemptId}
+    onAssessmentCompleted={onAssessmentCompleted}/>;
 }
-function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
+function KnowledgeCheckSession({courseAttemptId,onAssessmentCompleted}:{
+  courseAttemptId:string;onAssessmentCompleted?:()=>void;
+}) {
   const [check,setCheck]=useState<KnowledgeCheck|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
@@ -94,6 +99,7 @@ function KnowledgeCheckSession({courseAttemptId}:{courseAttemptId:string}) {
             },
           });
           await load();
+          onAssessmentCompleted?.();
         }}/>}
     {check.state==="in_progress"&&<p className="text-xs text-muted-foreground" role="status">
       {draftStatus==="saving"?"Saving answers...":

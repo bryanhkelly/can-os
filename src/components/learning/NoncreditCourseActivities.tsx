@@ -9,29 +9,40 @@ type Readiness = Awaited<ReturnType<typeof getNoncreditCompletionReadiness>>;
  * This content depends only on canonical course participation.
  * No recorded teacher, presentation, or instructional track is required.
  */
-export function NoncreditCourseActivities({courseAttemptId}:{courseAttemptId:string}) {
-  return <NoncreditActivitiesSession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+export function NoncreditCourseActivities({courseAttemptId,lessonProgressRevision=0}:{
+  courseAttemptId:string;lessonProgressRevision?:number;
+}) {
+  return <NoncreditActivitiesSession key={courseAttemptId}
+    courseAttemptId={courseAttemptId} lessonProgressRevision={lessonProgressRevision}/>;
 }
-function NoncreditActivitiesSession({courseAttemptId}:{courseAttemptId:string}) {
+function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
+  courseAttemptId:string;lessonProgressRevision:number;
+}) {
   const [source,setSource]=useState<"school"|"noncredit"|null>(null);
   const [readiness,setReadiness]=useState<Readiness|null>(null);
   const [error,setError]=useState(false);
+  const [assessmentRevision,setAssessmentRevision]=useState(0);
   useEffect(()=>{
     let active=true;
-    setSource(null);setReadiness(null);setError(false);
+    setSource(null);
     void getLearnerCourseParticipationKind({data:{courseAttemptId}}).then(result=>{
-      if(!active)return;
-      setSource(result.source);
-      if(result.source!=="noncredit")return;
-      return getNoncreditCompletionReadiness({data:{courseAttemptId}}).then(status=>{
-        if(active)setReadiness(status);
-      }).catch(()=>{if(active)setError(true);});
+      if(active)setSource(result.source);
     }).catch(()=>{if(active)setError(true);});
     return ()=>{active=false;};
   },[courseAttemptId]);
+  useEffect(()=>{
+    if(source!=="noncredit")return;
+    let active=true;
+    setError(false);
+    void getNoncreditCompletionReadiness({data:{courseAttemptId}})
+      .then(status=>{if(active)setReadiness(status);})
+      .catch(()=>{if(active)setError(true);});
+    return ()=>{active=false;};
+  },[courseAttemptId,source,lessonProgressRevision,assessmentRevision]);
   if(source!=="noncredit")return null;
   return <div className="space-y-4" aria-label="Noncredit learning activities">
-    <CourseAssessmentPanel courseAttemptId={courseAttemptId}/>
+    <CourseAssessmentPanel courseAttemptId={courseAttemptId}
+      onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>
     <section className="space-y-2 border bg-card p-4">
       <h3 className="font-serif text-lg font-semibold">Training completion</h3>
       {readiness?

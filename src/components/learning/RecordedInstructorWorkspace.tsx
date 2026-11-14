@@ -44,6 +44,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [lessonProgressRevision,setLessonProgressRevision]=useState(0);
 
   const reload = useCallback(async () => {
     const nextCatalog = await getStudentRecordedInstructors({ data: { courseAttemptId } });
@@ -108,6 +109,7 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
       const nextLessonId = nextRecordedLessonId(instruction.lessons, lessonId);
       if (nextLessonId) setLessonId(nextLessonId);
       await reload();
+      setLessonProgressRevision(revision=>revision+1);
       setNotice(nextLessonId
         ? "Lesson completed. Continue with your next unfinished lesson."
         : "Lesson completed. Your course progress is saved across recorded teachers.");
@@ -295,7 +297,8 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     </>}
 
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
-    <NoncreditCourseActivities courseAttemptId={courseAttemptId}/>
+    <NoncreditCourseActivities courseAttemptId={courseAttemptId}
+      lessonProgressRevision={lessonProgressRevision}/>
   </section>;
 }
 
