@@ -8,6 +8,62 @@ identifiers. Until native canonical sign-in, session, permissions and Site
 selection are implemented and verified, keep the canonical Studio write flag
 disabled. Existing app session code does not establish canonical identity.
 
+### Native v3.0.1 authentication and demo setup
+
+The new canonical model includes `canonical_accounts`,
+`canonical_account_grants`, and `canonical_sessions`. A new v3 session
+identifies one Person, Organization and optional Site directly in
+`education_v30`. The session projection checks that the account is verified,
+the grant is current and the Site has a current operator relationship. A
+Blueprint reviewer is Organization-scoped and cannot author or execute.
+
+After installing `schema.sql`, a database administrator can provision the
+least-privilege session projection role for the real application login:
+
+```sh
+psql "$TEST_DATABASE_URL" -v application_role=YOUR_RESTRICTED_LOGIN \
+  -f database/canonical/v3.0.1/provision-canonical-auth-reader.sql
+```
+
+The restricted role can only execute
+`v301_canonical_session_context(text)`. It cannot directly query the raw
+accounts, grants or session hashes. The application selects this role within
+the session read transaction. The new session cookie is
+`__Host-can_os_v3_session` and requires a separate
+`CAN_CANONICAL_ACCESS_TOKEN_PEPPER`.
+
+The isolated v3 demo is independent of the current application's records. It
+creates Valor School and Barton Community Learning Center with separate
+operators, administrators and independent reviewers, plus a separate CAN
+publisher Organization. No network is mandatory. For a disposable database
+already initialized with `schema.sql`:
+
+```sh
+APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true \
+  npm run db:seed:canonical:v301:demo
+
+# With the test session pepper configured:
+APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true \
+  npm run db:seed:canonical:v301:demo -- \
+  --issue-session=valor.admin@can.example
+```
+
+The guarded script requires an isolated `TEST_DATABASE_URL`, separate from
+the deployed `DATABASE_URL`. It prints a one-time browser cookie **only** when
+explicitly asked to issue a test session. Apply the starter recipes separately
+with `seed-blueprint-starters.sql`, using publisher Organization
+`11110000-0000-4000-8000-000000000003`.
+
+Use `/canonical/blueprints` for the native v3 planning experience and
+`/operations/blueprint-reviews` for reviewers. The existing School Hub does
+not mount canonical widgets because its identifiers come from a separate
+application model. No mappings or compatibility tables are required.
+
+**Keep `CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED=false` in deployment.**
+Native authentication and the isolated seed do not by themselves provision
+Blueprint read/write RLS or establish the production sign-in/verification
+workflow. These remain required before enabling the routes for real users.
+
 `schema.sql` is a fresh-build target for PostgreSQL 16 or newer. It owns the
 `education_v30` and `education_v30_secure` schemas; it is not an additive
 Drizzle migration and must not be run with `npm run db:migrate`.
