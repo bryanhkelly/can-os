@@ -169,14 +169,9 @@ export function CanonicalLearningActivityProvider({
       window.removeEventListener("focus", resume);
       document.removeEventListener("pointerdown", interact);
       document.removeEventListener("keydown", interact);
-      // Preserve a live instance across reloads. Server idle timeout is authoritative.
-      const previous = session.current;
+      // Do not race the next mount with a late HTTP pause during refresh.
+      // The server enforces the 30-minute inactivity window on reuse.
       session.current = null;
-      if (previous) {
-        void setCanonicalLearningSessionState({
-          data: { courseAttemptId, learningSessionId: previous, action: "pause" },
-        }).catch(() => {});
-      }
     };
   }, [courseAttemptId, postEvent, serialize]);
 
