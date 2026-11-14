@@ -98,6 +98,7 @@ export async function finalizeNoncreditKnowledgeCheck(context:CommandContext,inp
       supersedesId:prior.id,
       resultEvidence:{noncredit:true,reviewKind:"provider_confirmation"},
     }).returning({id:assessmentExecutionResults.id});
+    if(!final)throw new Error("Final assessment result was not saved");
     await tx.update(assessmentExecutionAttempts).set({state:"finalized"})
       .where(eq(assessmentExecutionAttempts.id,attempt.id));
     const payload={courseAttemptId:courseAttempt.id,
