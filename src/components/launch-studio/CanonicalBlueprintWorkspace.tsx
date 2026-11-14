@@ -169,7 +169,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
         const selected = selectedComponents.includes(component.id);
         return {
           componentId: component.id,
-          selectionStatus: selected ? "selected" as const : "excluded" as const,
+          selectionStatus: selected ? "selected" as const
+            : current?.selectionStatus === "proposed" ? "proposed" as const
+            : "excluded" as const,
           referenceItemVersionIds: selected ? selectedReferences[component.id] ?? current?.referenceItemVersionIds ?? [] : [],
           settings: current?.settings && typeof current.settings === "object"
             && !Array.isArray(current.settings) ? current.settings : {},
