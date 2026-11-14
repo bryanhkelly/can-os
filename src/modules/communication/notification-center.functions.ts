@@ -25,6 +25,37 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
  const rows=await db.select({id:s.notifications.id,type:s.notifications.type,title:s.notifications.title,body:s.notifications.body,
   status:s.notifications.status,resourceType:s.notifications.resourceType,resourceId:s.notifications.resourceId,createdAt:s.notifications.createdAt})
  .from(s.notifications).where(eq(s.notifications.recipientPersonId,personId)).orderBy(sql`CASE WHEN ${s.notifications.type} = 'school_family_alert' AND ${s.notifications.status} = 'unread' THEN 0 ELSE 1 END`,desc(s.notifications.createdAt)).limit(50);
+ // Resolve conference reminders against the current booking instead of trusting an
+ // old delivered message, and recheck the guardian's live school relationship.
+ const conferenceIds=rows.filter(n=>n.type==="conference_reminder"&&
+  n.resourceType==="conference_booking"&&n.resourceId).map(n=>n.resourceId!);
+ const guardianConferences=conferenceIds.length&&context.role==="guardian"?
+  await db.select({
+   id:s.conferenceBookings.id,status:s.conferenceBookings.status,
+   startsAt:s.conferenceSlots.startsAt,timezone:s.sites.timezone,
+  }).from(s.conferenceBookings)
+   .innerJoin(s.conferenceSlots,eq(s.conferenceSlots.id,s.conferenceBookings.conferenceSlotId))
+   .innerJoin(s.conferenceSeries,eq(s.conferenceSeries.id,s.conferenceSlots.conferenceSeriesId))
+   .innerJoin(s.sites,eq(s.sites.id,s.conferenceSeries.siteId))
+   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.conferenceBookings.studentProfileId))
+   .innerJoin(s.guardianRelationships,guardianRelationshipPredicate({
+    guardianPersonId:personId,studentPersonId:s.studentProfiles.personId,access:"academic",
+   }))
+   .innerJoin(s.enrollments,and(
+    eq(s.enrollments.studentProfileId,s.studentProfiles.id),
+    eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
+   ))
+   .innerJoin(s.programs,and(
+    eq(s.programs.id,s.enrollments.programId),eq(s.programs.status,"active"),
+    eq(s.programs.siteId,s.conferenceSeries.siteId),
+   ))
+   .where(and(inArray(s.conferenceBookings.id,conferenceIds),
+    eq(s.conferenceBookings.guardianPersonId,personId),
+    inArray(s.conferenceSeries.siteId,context.scope.siteIds??[]),
+    inArray(s.programs.id,context.scope.programIds??[]),
+    inArray(s.programs.organizationId,context.scope.organizationIds??[]),
+   )).limit(50):[];
+ const conferenceById=new Map(guardianConferences.map(booking=>[booking.id,booking]));
  const tripNoticeTypes=new Set([
   "field_trip_permission_requested","field_trip_permission_signed","field_trip_permission_declined",
  ]);
@@ -564,6 +595,8 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    !!n.resourceId&&permittedSafeguardingIds.has(n.resourceId))
   .filter(n=>n.type!=="calendar_event_invitation"||
    n.resourceType==="calendar_event"&&!!n.resourceId&&calendarInvitationById.has(n.resourceId))
+  .filter(n=>n.type!=="conference_reminder"||
+   n.resourceType==="conference_booking"&&!!n.resourceId&&conferenceById.has(n.resourceId))
   .filter(n=>context.role!=="guardian"||!n.resourceId||
    (pickupNotificationTypes.has(n.type)?pickupStudents.has(n.resourceType+":"+n.resourceId):
     n.resourceType==="attendance_event"?attendanceStudent.has(n.resourceId):
@@ -577,8 +610,26 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     n.resourceType==="submission"?guardianSubmissionById.has(n.resourceId):
     n.resourceType==="action"&&["guardian_grade_follow_up_requested","guardian_grade_follow_up_resolved"].includes(n.type)
       ?verifiedGradeActions.has(n.resourceId):true));
- return visible.map(n=>({id:n.id,title:n.title,body:n.body??"",status:n.status,
-  date:n.createdAt.toISOString(),href:n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
+ return visible.map(n=>{
+  const conference=n.type==="conference_reminder"&&n.resourceId?
+   conferenceById.get(n.resourceId):undefined;
+  const conferenceWhen=conference?
+   new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",
+    timeZone:conference.timezone}).format(conference.startsAt)+
+   " ("+conference.timezone+")":"";
+  return {id:n.id,
+  title:conference?.status==="cancelled"?"Parent-teacher conference cancelled":n.title,
+  body:conference?
+   conference.status==="cancelled"?
+    "This parent-teacher conference was cancelled. Open teacher conferences to review available appointments.":
+   conference.status==="held"?
+    "Your conference was held on "+conferenceWhen+".":
+   conference.status==="no_show"?
+    "The scheduled conference on "+conferenceWhen+" was marked missed. Contact your school if you need to reschedule.":
+   "Your parent-teacher conference is scheduled for "+conferenceWhen+"."
+   :n.body??"",
+  status:n.status,
+  date:n.createdAt.toISOString(),href:conference?"/guardian/experiences?tab=conferences":n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
   n.type==="calendar_event_invitation"&&n.resourceType==="calendar_event"&&n.resourceId&&calendarInvitationById.has(n.resourceId)?
    `/calendar?date=${encodeURIComponent(calendarInvitationById.get(n.resourceId)!)}&event=${encodeURIComponent(n.resourceId)}`:
@@ -634,7 +685,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.type==="pickup_custody_hold_staff_review"&&n.resourceType==="action"&&n.resourceId&&permittedCustodyActions.has(n.resourceId)?"/home#pickup":
    ["operations_action_assigned","operations_action_deadline_changed"].includes(n.type)&&n.resourceType==="action"&&n.resourceId&&permittedAssignedActions.has(n.resourceId)&&hasRegistrarAuthority(context.role)?`/home?action=${encodeURIComponent(n.resourceId)}`:
    n.resourceType==="study_group"&&n.resourceId&&permittedGroups.has(n.resourceId)?(context.role==="teacher"||context.role==="student"?`/groups/${encodeURIComponent(n.resourceId)}`:null):
-   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/groups/${encodeURIComponent(groupBySession.get(n.resourceId)!)}?session=${encodeURIComponent(n.resourceId)}`:null}));
+   context.role==="student"&&n.resourceType==="study_group_session"&&n.resourceId&&groupBySession.has(n.resourceId)?`/groups/${encodeURIComponent(groupBySession.get(n.resourceId)!)}?session=${encodeURIComponent(n.resourceId)}`:null};});
 });
 export const readNotification=createServerFn({method:"POST"})
  .validator((data:unknown)=>z.object({id:z.string().uuid()}).parse(data)).handler(async({data})=>{
