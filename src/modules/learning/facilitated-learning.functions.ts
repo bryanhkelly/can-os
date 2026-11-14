@@ -288,10 +288,9 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
           eq(learnerCourseAttempts.status,"active"),
         )).groupBy(learnerCourseAttempts.deploymentId,
           learnerCourseAttempts.courseVersionId,courses.title).limit(200) : [];
-      const choices=versions.map(version=>({
-        ...version,siteId:visible.find(row=>row.deploymentId===version.deploymentId)!.siteId,
-        deploymentName:visible.find(row=>row.deploymentId===version.deploymentId)!.deploymentName,
-      }));
+      const choices=versions.flatMap(version=>visible.filter(row=>
+        row.deploymentId===version.deploymentId,
+      ).map(site=>({...version,siteId:site.siteId,deploymentName:site.deploymentName})));
       const rooms=await tx.select({
         id:facilitatedLearningSessions.id,
         deploymentId:facilitatedLearningSessions.deploymentId,
@@ -343,7 +342,7 @@ export const startFacilitatedLearningRoom = createServerFn({method:"POST"})
     privateResult();
     const host=await requireCanonicalLabProvider();
     return db.transaction(async tx=>{
-      const access=await authorizedHostDeployment(tx,host,data.deploymentId);
+      const access=await authorizedHostDeployment(tx,host,data.deploymentId,data.siteId);
       const [version]=await tx.select({id:courseVersions.id})
         .from(courseVersions).where(and(
           eq(courseVersions.id,data.courseVersionId),eq(courseVersions.lifecycle,"published"),
