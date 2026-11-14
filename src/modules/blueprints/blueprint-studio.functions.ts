@@ -49,7 +49,7 @@ export const readCanonicalBlueprintHome = createServerFn({ method: "GET" })
     const context = await getCanonicalCommandContext(getRequest());
     return {
       role: context.role,
-      siteId: context.scope.siteIds?.[0] ?? null,
+      siteIds: context.scope.siteIds ?? [],
       organizationId: context.scope.organizationIds?.[0] ?? null,
       referencesEnabled: process.env.CAN_CANONICAL_CATALOG_ENABLED === "true",
     };
