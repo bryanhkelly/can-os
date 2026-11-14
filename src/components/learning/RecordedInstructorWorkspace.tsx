@@ -130,19 +130,9 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         different recorded instruction from other learners in the same Section.
       </p>
       {loading ? <p role="status" className="mt-3 text-sm">Loading recorded instruction...</p> :
-        catalog && catalog.choices.length > 0 ? <div className="mt-4 flex flex-wrap gap-2">
-          {catalog.choices.map(choice => {
-            const selected = choice.trackVersionId === catalog.selection?.trackVersionId;
-            const needsRenewal = selected && choice.policyVersionId !== catalog.selection?.policyVersionId;
-            return <Button key={choice.trackVersionId} size="sm"
-              variant={selected && !needsRenewal ? "default" : "outline"}
-              disabled={pending || (selected && !needsRenewal)}
-              aria-pressed={selected && !needsRenewal}
-              onClick={() => void selectTeacher(choice.trackVersionId)}>
-              {choice.title}{needsRenewal ? " (renew selection)" : selected ? " (selected)" : ""}
-            </Button>;
-          })}
-        </div> : <p className="mt-3 text-sm text-muted-foreground">
+        catalog && catalog.choices.length > 0
+          ? <RecordedInstructorChoices catalog={catalog} pending={pending}
+            onSelect={trackVersionId => void selectTeacher(trackVersionId)}/> : <p className="mt-3 text-sm text-muted-foreground">
           No recorded instructors are available for this course yet.
         </p>}
     </div>
@@ -212,6 +202,27 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
 
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
   </section>;
+}
+
+
+export function RecordedInstructorChoices({ catalog, pending, onSelect }: {
+  catalog: InstructorCatalog;
+  pending: boolean;
+  onSelect: (trackVersionId: string) => void;
+}) {
+  return <div className="mt-4 flex flex-wrap gap-2">
+    {catalog.choices.map(choice => {
+      const selected = choice.trackVersionId === catalog.selection?.trackVersionId;
+      const needsRenewal = selected && choice.policyVersionId !== catalog.selection?.policyVersionId;
+      return <Button key={choice.trackVersionId} size="sm"
+        variant={selected && !needsRenewal ? "default" : "outline"}
+        disabled={pending || (selected && !needsRenewal)}
+        aria-pressed={selected && !needsRenewal}
+        onClick={() => onSelect(choice.trackVersionId)}>
+        {choice.title}{needsRenewal ? " (renew selection)" : selected ? " (selected)" : ""}
+      </Button>;
+    })}
+  </div>;
 }
 
 export function RecordedPracticeHistory({ history }: { history: PracticeHistory }) {
