@@ -97,6 +97,18 @@ export async function executeBlueprintConfiguration(
     if (configurationVersion.lifecycle !== "frozen") {
       throw new DomainError("CONFLICT", "Only a frozen Blueprint configuration can be executed.");
     }
+    // A new draft supersedes the reviewed version. Execution must use the
+    // latest frozen revision, never an obsolete previously approved plan.
+    const [latestConfigurationVersion] = await tx.select({
+      id: blueprintConfigurationVersions.id,
+    }).from(blueprintConfigurationVersions)
+      .where(eq(blueprintConfigurationVersions.configurationId, configurationVersion.configurationId))
+      .orderBy(desc(blueprintConfigurationVersions.revision))
+      .limit(1);
+    if (latestConfigurationVersion?.id !== configurationVersion.id) {
+      throw new DomainError("CONFLICT",
+        "This Blueprint configuration was revised. Submit and review the latest version before execution.");
+    }
 
     const [operation] = await tx.select({
       id: educationOperations.id,
