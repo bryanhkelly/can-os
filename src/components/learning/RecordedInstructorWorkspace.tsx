@@ -215,6 +215,7 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
           <RecordedLessonCompletionAction
             allowed={instruction.canManageProgress}
             completed={currentLesson.progress?.status === "completed"}
+            waived={currentLesson.progress?.status === "waived"}
             pending={pending}
             onComplete={() => void markLessonComplete(currentLesson.id)}
           />
@@ -295,16 +296,17 @@ export function RecordedInstructorChoices({ catalog, pending, onSelect }: {
   </div>;
 }
 
-export function RecordedLessonCompletionAction({ allowed, completed, pending, onComplete }: {
+export function RecordedLessonCompletionAction({ allowed, completed, waived, pending, onComplete }: {
   allowed: boolean;
   completed: boolean;
+  waived: boolean;
   pending: boolean;
   onComplete: () => void;
 }) {
   if (!allowed) return null;
-  return <Button type="button" size="sm" variant={completed ? "secondary" : "default"}
-    disabled={pending || completed} onClick={onComplete}>
-    {completed ? "Lesson completed" : pending ? "Saving..." : "Mark lesson complete"}
+  return <Button type="button" size="sm" variant={completed || waived ? "secondary" : "default"}
+    disabled={pending || completed || waived} onClick={onComplete}>
+    {waived ? "Lesson waived" : completed ? "Lesson completed" : pending ? "Saving..." : "Mark lesson complete"}
   </Button>;
 }
 
