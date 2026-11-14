@@ -17,6 +17,17 @@ database identities that represent the two learners. Their accessible rows must
 match the corresponding Course attempt. Do not use an owner or unrestricted
 application credential for either learner.
 
+Provision each restricted test login against its exact active learner Course
+attempt with `database/canonical/v3.0.1/provision-recorded-learner-role.sql`
+using `psql -v application_role=... -v course_attempt_id=...`. This creates
+no broad learner permissions. The test script selects the dedicated read-only
+`can_v301_recorded_instruction_reader` PostgreSQL role, and its policies
+resolve the **original login**, not a caller-provided learner ID.
+
+This is a database isolation mechanism for acceptance; it does **not**
+replace native authenticated learner-session identity. Do not enable learner
+routes until that separate native identity gate is satisfied.
+
 Set these environment variables in the isolated test environment:
 
 - `APP_ENV=test` and `TEST_DATABASE_URL` (the isolated database for the
