@@ -20,6 +20,13 @@ vi.mock("@/modules/learning/instructional-tracks.functions", () => ({
 }));
 
 describe("recorded instructor learner workspace", () => {
+  it("rekeys all learner-local state on Course attempt changes", () => {
+    const firstAttempt = "10000000-0000-4000-8000-000000000001";
+    const secondAttempt = "10000000-0000-4000-8000-000000000002";
+    expect(RecordedInstructorWorkspace({ courseAttemptId: firstAttempt }).key).toBe(firstAttempt);
+    expect(RecordedInstructorWorkspace({ courseAttemptId: secondAttempt }).key).toBe(secondAttempt);
+  });
+
   it("presents the learner-owned recorded-teacher choice as distinct from official course records", () => {
     const html = renderToStaticMarkup(
       <RecordedInstructorWorkspace courseAttemptId="10000000-0000-4000-8000-000000000001" />,

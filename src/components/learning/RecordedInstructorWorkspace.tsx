@@ -25,6 +25,13 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
  * the canonical Course-attempt progress shared across recorded presenters.
  */
 export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttemptId: string }) {
+  // A router may retain the same component instance while changing the
+  // selected learner/course. Never carry old catalog, media, or answers into
+  // another Course attempt.
+  return <RecordedInstructorCourseSession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+}
+
+function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId: string }) {
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
   const [history, setHistory] = useState<PracticeHistory>([]);
@@ -222,7 +229,7 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         </div>
         {currentLesson.presentations.length ? currentLesson.presentations.map(presentation =>
           <ClassVideoPlayer
-            key={`${instruction.selection.trackVersionId}:${presentation.assetVersionId}`}
+            key={`${courseAttemptId}:${instruction.selection.trackVersionId}:${presentation.assetVersionId}`}
             title={`${currentLesson.title} recording`}
             resourceId={presentation.assetVersionId}
             loadUrl={async () => (await getRecordedInstructionAssetDownload({ data: {
@@ -252,7 +259,7 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
           <p className="text-sm">{material.practice?.instructions}</p>
           {material.practice?.prompts.map(prompt => <label key={prompt.key} className="block space-y-1 text-sm">
             <span className="block font-medium">{prompt.text}</span>
-            <textarea className="min-h-24 w-full border bg-background p-3" required
+            <textarea className="min-h-24 w-full border bg-background p-3" required maxLength={20_000}
               value={answers[`${material.id}:${prompt.key}`] ?? ""}
               disabled={pending} onChange={event => setAnswers(current => ({
                 ...current,
