@@ -5,6 +5,7 @@ import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { normalizeClientError } from "@/lib/client-error";
 import { recordedInstructorSelectionIsCurrent } from "@/domain/instructional-tracks";
 import {
+  completeRecordedCourseLesson,
   getRecordedInstructorPracticeHistory,
   getRecordedInstructionAssetDownload,
   getRecordedLessonInstruction,
@@ -20,7 +21,8 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
 /**
  * Canonical learner workspace. Mount only after the v3.0.1 application-role
  * policies and learner routes are activated. It does not change Section
- * enrollment, official assignments, grades, or canonical lesson progress.
+ * enrollment, official assignments, or grades. Lesson completion updates only
+ * the canonical Course-attempt progress shared across recorded presenters.
  */
 export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttemptId: string }) {
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
@@ -79,6 +81,27 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
       setNotice("Recorded instructor updated. Your course progress and practice history are preserved.");
     } catch (failure) {
       setError(normalizeClientError(failure, "Unable to change recorded instructor.").message);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function markLessonComplete(lessonId: string) {
+    if (!instruction || pending) return;
+    setPending(true);
+    setError("");
+    setNotice("");
+    try {
+      await completeRecordedCourseLesson({ data: {
+        requestId: crypto.randomUUID(),
+        courseAttemptId,
+        lessonId,
+        expectedRevision: instruction.selection.revision,
+      } });
+      await reload();
+      setNotice("Lesson completed. Your progress stays with your course when you switch teachers.");
+    } catch (failure) {
+      setError(normalizeClientError(failure, "Unable to complete this lesson.").message);
     } finally {
       setPending(false);
     }
@@ -186,7 +209,14 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
       </div>
 
       {currentLesson && <div className="space-y-4">
-        <h3 className="font-serif text-xl font-semibold">{currentLesson.title}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-serif text-xl font-semibold">{currentLesson.title}</h3>
+          <RecordedLessonCompletionAction
+            completed={currentLesson.progress?.status === "completed"}
+            pending={pending}
+            onComplete={() => void markLessonComplete(currentLesson.id)}
+          />
+        </div>
         {currentLesson.presentations.length ? currentLesson.presentations.map(presentation =>
           <ClassVideoPlayer
             key={`${instruction.selection.trackVersionId}:${presentation.assetVersionId}`}
@@ -261,6 +291,17 @@ export function RecordedInstructorChoices({ catalog, pending, onSelect }: {
       </Button>;
     })}
   </div>;
+}
+
+export function RecordedLessonCompletionAction({ completed, pending, onComplete }: {
+  completed: boolean;
+  pending: boolean;
+  onComplete: () => void;
+}) {
+  return <Button type="button" size="sm" variant={completed ? "secondary" : "default"}
+    disabled={pending || completed} onClick={onComplete}>
+    {completed ? "Lesson completed" : pending ? "Saving..." : "Mark lesson complete"}
+  </Button>;
 }
 
 export function RecordedOfficialCourseLinks({ sectionId }: { sectionId: string }) {
