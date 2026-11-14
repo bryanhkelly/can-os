@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
+import { CourseLessonNavigation } from "@/components/learning/CourseLessonNavigation";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -219,6 +220,20 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
       </div>
 
       {currentLesson && <div className="space-y-4">
+        <CourseLessonNavigation
+          lessonIndex={instruction.lessons.findIndex(item=>item.id===currentLesson.id)}
+          lessonCount={instruction.lessons.length} completedCount={completedCount}
+          previousLesson={instruction.lessons[instruction.lessons.findIndex(item=>item.id===currentLesson.id)-1]}
+          nextLesson={instruction.lessons[instruction.lessons.findIndex(item=>item.id===currentLesson.id)+1]}
+          renderPrevious={lesson=><button type="button" className="underline"
+            onClick={()=>{setLessonId(lesson.id);setAnswers({});}}>
+            ← Previous: {lesson.title}
+          </button>}
+          renderNext={lesson=><button type="button" className="underline"
+            onClick={()=>{setLessonId(lesson.id);setAnswers({});}}>
+            Next: {lesson.title} →
+          </button>}
+        />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-serif text-xl font-semibold">{currentLesson.title}</h3>
           <RecordedLessonCompletionAction
