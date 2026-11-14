@@ -24,6 +24,7 @@ import {
   saveBlueprintConfigurationInputSchema,
   submitBlueprintConfigurationInputSchema,
   blueprintConfigurationVersionInputSchema,
+  missingRequiredBlueprintComponents,
 } from "@/domain/blueprint-configuration";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -184,17 +185,19 @@ async function assertVersionSelections(
   blueprintVersionId: string,
   input: VersionInput,
 ): Promise<void> {
-  const componentIds = input.components.map((component) => component.componentId);
-  if (componentIds.length > 0) {
-    const components = await tx.select({ id: blueprintComponents.id })
-      .from(blueprintComponents)
-      .where(and(
-        eq(blueprintComponents.blueprintVersionId, blueprintVersionId),
-        inArray(blueprintComponents.id, componentIds),
-      ));
-    if (components.length !== componentIds.length) {
-      throw new DomainError("VALIDATION_FAILED", "A selected component is not part of this Blueprint version.");
-    }
+  const components = await tx.select({
+    id: blueprintComponents.id,
+    requirementMode: blueprintComponents.requirementMode,
+  }).from(blueprintComponents)
+    .where(eq(blueprintComponents.blueprintVersionId, blueprintVersionId));
+  const allowedComponentIds = new Set(components.map(component => component.id));
+  if (input.components.some(component => !allowedComponentIds.has(component.componentId))) {
+    throw new DomainError("VALIDATION_FAILED",
+      "A selected component is not part of this Blueprint version.");
+  }
+  if (missingRequiredBlueprintComponents(components, input.components).length > 0) {
+    throw new DomainError("VALIDATION_FAILED",
+      "All required Blueprint components must remain selected.");
   }
 
   const referenceIds = [...new Set(input.components.flatMap(
