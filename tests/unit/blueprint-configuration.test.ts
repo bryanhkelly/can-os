@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blueprintConfigurationIdentitySchema,
   blueprintConfigurationVersionInputSchema,
+  missingRequiredBlueprintComponents,
   blueprintProgramModelDraftSchema,
   blueprintReferenceSelectionSchema,
   blueprintWeeklyPeriodSchema,
@@ -12,6 +13,24 @@ import {
 } from "@/domain/blueprint-configuration";
 
 describe("canonical Blueprint configuration contracts", () => {
+  it("requires mandatory recipe components on every saved Blueprint version", () => {
+    const catalog = [
+      { id: "academic", requirementMode: "required" },
+      { id: "clubs", requirementMode: "optional" },
+    ];
+    expect(missingRequiredBlueprintComponents(catalog, [
+      { componentId: "academic", selectionStatus: "selected" },
+    ])).toEqual([]);
+    expect(missingRequiredBlueprintComponents(catalog, [
+      { componentId: "academic", selectionStatus: "excluded" },
+      { componentId: "clubs", selectionStatus: "selected" },
+    ])).toEqual(["academic"]);
+    expect(missingRequiredBlueprintComponents(catalog, [
+      { componentId: "clubs", selectionStatus: "selected" },
+    ])).toEqual(["academic"]);
+  });
+
+
   it("keeps self-declared affiliation on the configured Operation, not its host", () => {
     expect(blueprintConfigurationIdentitySchema.parse({
       religiousAffiliationCode: "nonsectarian",
