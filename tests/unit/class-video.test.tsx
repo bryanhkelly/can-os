@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { ClassSupplementForm } from "@/components/learning/ClassSupplementForm";
-import { classVideoFileSchema, classVideoKey, classVideoKeyPattern, hasVideoSignature, resolveClassVideo, videoUploadPolicy } from "@/domain/class-video";
+import { classVideoFileSchema, classVideoKey, classVideoKeyPattern, hasVideoSignature, resolveClassVideo, safeClassVideoSourceLink, videoUploadPolicy } from "@/domain/class-video";
 
 describe("linked class video", () => {
   it.each([
     ["https://www.youtube.com/watch?v=abcdefghijk", "https://www.youtube-nocookie.com/embed/abcdefghijk"],
     ["https://youtu.be/abcdefghijk?si=tracking", "https://www.youtube-nocookie.com/embed/abcdefghijk"],
     ["https://m.youtube.com/shorts/abcdefghijk", "https://www.youtube-nocookie.com/embed/abcdefghijk"],
+    ["https://www.youtube.com/live/abcdefghijk?feature=share", "https://www.youtube-nocookie.com/embed/abcdefghijk"],
     ["https://www.youtube-nocookie.com/embed/abcdefghijk", "https://www.youtube-nocookie.com/embed/abcdefghijk"],
     ["https://vimeo.com/12345", "https://player.vimeo.com/video/12345"],
     ["https://vimeo.com/12345/abc123", "https://player.vimeo.com/video/12345?h=abc123"],
@@ -23,6 +24,27 @@ describe("linked class video", () => {
     "https://example.test/not-a-video", "https://youtu.be:444/abcdefghijk", "not a url",
   ])("does not embed unsafe or unrecognized URL %s", url => {
     expect(resolveClassVideo(url)).toBeNull();
+  });
+  it("links only to normalized HTTPS video sources, even when embedded playback is unavailable", () => {
+    expect(safeClassVideoSourceLink("https://example.test/teacher-video?page=2"))
+      .toBe("https://example.test/teacher-video?page=2");
+    for (const unsafe of [
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "http://example.test/video.mp4",
+      "https://user:password@example.test/video.mp4",
+      "https://example.test:8443/video.mp4",
+      "//example.test/video.mp4",
+      "not a url",
+    ]) {
+      expect(safeClassVideoSourceLink(unsafe)).toBeNull();
+      const html = renderToStaticMarkup(<ClassVideoPlayer title="Unsafe" url={unsafe}/>);
+      expect(html).not.toContain("Open Unsafe at source");
+    }
+    const externalOnly = renderToStaticMarkup(<ClassVideoPlayer
+      title="External lesson" url="https://example.test/teacher-video" declaredVideo={false}/>);
+    expect(externalOnly).toContain("Open External lesson at source");
+    expect(externalOnly).not.toContain("<iframe");
   });
   it("supports direct video files, signed querystrings and explicit stream resources", () => {
     expect(resolveClassVideo("https://media.test/lesson.MP4?signature=abc")).toEqual({

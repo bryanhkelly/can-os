@@ -24,6 +24,18 @@ export function hasVideoSignature(type: string, bytes: Uint8Array) {
     : type === "video/webm" && bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3;
 }
 
+/** A fallback source link is navigation, not permission to load arbitrary URLs. */
+export function safeClassVideoSourceLink(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.port
+      ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Only canonical provider embeds are framed; arbitrary sites remain external links. */
 export function resolveClassVideo(value: string, declaredVideo = false):
   { kind: "embed" | "file"; src: string } | null {
@@ -34,7 +46,7 @@ export function resolveClassVideo(value: string, declaredVideo = false):
   if (["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtube-nocookie.com"].includes(host)) {
     const id = host === "youtu.be" ? url.pathname.slice(1) :
       url.pathname === "/watch" ? url.searchParams.get("v") :
-      /^\/(?:embed|shorts)\/([^/]+)$/.exec(url.pathname)?.[1];
+      /^\/(?:embed|shorts|live)\/([^/]+)$/.exec(url.pathname)?.[1];
     return id && /^[A-Za-z0-9_-]{11}$/.test(id)
       ? { kind: "embed", src: `https://www.youtube-nocookie.com/embed/${id}` } : null;
   }

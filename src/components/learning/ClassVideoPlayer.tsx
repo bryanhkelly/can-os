@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { resolveClassVideo } from "@/domain/class-video";
+import { resolveClassVideo, safeClassVideoSourceLink } from "@/domain/class-video";
 import { normalizeClientError } from "@/lib/client-error";
 import { Play, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,7 @@ export function ClassVideoPlayer({ title, url, loadUrl, resourceId, declaredVide
   }, []);
   const inFlight = useRef(false);
   const video = source ? resolveClassVideo(source, true) : url ? resolveClassVideo(url, declaredVideo) : null;
+  const sourceLink = safeClassVideoSourceLink(url);
   async function open() {
     if (inFlight.current) return;
     inFlight.current = true;
@@ -102,7 +103,7 @@ export function ClassVideoPlayer({ title, url, loadUrl, resourceId, declaredVide
         <Button size="sm" variant="outline" disabled={!ready || Boolean(error)} onClick={changeSpeed} aria-label={`${speed}x, change playback speed, current speed ${speed} times`}>{speed}x</Button>
       </div>}
     </div>}
-    {url && <a href={url} target="_blank" rel="noopener noreferrer" data-learning-resource-id={resourceId}
+    {sourceLink && <a href={sourceLink} target="_blank" rel="noopener noreferrer" data-learning-resource-id={resourceId}
       aria-label={`Open ${presentation === "classroom" ? "video" : title} at source: ${title}`}
       className={presentation === "classroom" ? "block border-t px-4 py-2 text-3xs text-muted-foreground underline" : "block text-xs underline"}>Open {presentation === "classroom" ? "video" : title} at source</a>}
     {error && <div role="alert" className="text-sm"><p>{error}</p>
