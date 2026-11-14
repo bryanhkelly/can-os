@@ -17,6 +17,7 @@ import { authorizeCanonicalCourseAttempt } from "./canonical-course-participatio
 
 const uuid = z.string().uuid();
 const attemptInput = z.object({ courseAttemptId: uuid }).strict();
+const startInput = attemptInput.extend({ clientInstanceId: uuid });
 const sessionInput = attemptInput.extend({ learningSessionId: uuid });
 const eventInput = sessionInput.extend({ event: canonicalLearningEventSchema });
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -57,7 +58,7 @@ function output(session: typeof canonicalLearningSessions.$inferSelect) {
 
 /** Authenticated, attempt-scoped session. Reusing the same login does not create duplicate live rows. */
 export const startCanonicalLearningSession = createServerFn({ method: "POST" })
-  .validator((input: unknown) => attemptInput.parse(input))
+  .validator((input: unknown) => startInput.parse(input))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     return db.transaction(async tx => {
@@ -66,6 +67,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
       const [existing] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId, attempt.id),
         eq(canonicalLearningSessions.accessSessionId, actor.sessionId),
+        eq(canonicalLearningSessions.clientInstanceId, data.clientInstanceId),
         isNull(canonicalLearningSessions.endedAt),
       )).limit(1).for("update");
       if (existing && !learningSessionIsExpired(existing.startedAt, existing.lastInteractionAt, now)) {
@@ -81,11 +83,13 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
       // Serialize browser-tab races through the partial unique live-session index.
       await tx.insert(canonicalLearningSessions).values({
         courseAttemptId: attempt.id, courseVersionId: attempt.courseVersionId,
-        accessSessionId: actor.sessionId, participantPersonId: actor.actorPersonId,
+        accessSessionId: actor.sessionId, clientInstanceId: data.clientInstanceId,
+        participantPersonId: actor.actorPersonId,
       }).onConflictDoNothing();
       const [created] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId,attempt.id),
         eq(canonicalLearningSessions.accessSessionId,actor.sessionId),
+        eq(canonicalLearningSessions.clientInstanceId,data.clientInstanceId),
         isNull(canonicalLearningSessions.endedAt),
       )).limit(1);
       if (!created || created.participantPersonId !== actor.actorPersonId ||
