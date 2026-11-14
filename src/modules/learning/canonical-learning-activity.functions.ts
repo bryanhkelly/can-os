@@ -67,7 +67,7 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
       const now = new Date();
       const [existing] = await tx.select().from(canonicalLearningSessions).where(and(
         eq(canonicalLearningSessions.courseAttemptId, attempt.id),
-        eq(canonicalLearningSessions.accessSessionId, actor.sessionId),
+        eq(canonicalLearningSessions.accessSessionId, sessionId),
         eq(canonicalLearningSessions.clientInstanceId, data.clientInstanceId),
         isNull(canonicalLearningSessions.endedAt),
       )).limit(1).for("update");
