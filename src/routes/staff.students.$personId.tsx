@@ -105,7 +105,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
           <ul className="divide-y">{profile.openActions.map(action => <li key={action.id} className="py-4 first:pt-0">
             <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{action.type==="support_referral"
               ?canOpenReferrals
-                ?<Link to="/support" search={{referral:action.id}} className="hover:underline">{action.title}</Link>
+                ?<Link to={profile.viewerRole === "teacher" ? "/student/support" : "/support"} search={{referral:action.id}} className="hover:underline">{action.title}</Link>
                 :action.title
               :hasRegistrarAuthority(profile.viewerRole)||action.type==="academic_intervention"
                 ?<Link to="/actions/$actionId" params={{actionId:action.id}} className="hover:underline">{action.title}</Link>
@@ -118,7 +118,7 @@ export function Student360View({ profile, tab = "overview" }: { profile: Student
         <WorkspacePanel title="Support referrals">
           <ul className="divide-y">{profile.supportReferrals.map(referral => <li key={referral.id} className="py-4 first:pt-0">
             <div className="flex flex-wrap justify-between gap-3"><h3 className="font-semibold">{canOpenReferrals
-              ?<Link to="/support" search={{referral:referral.id}} className="hover:underline">{referral.title}</Link>
+              ?<Link to={profile.viewerRole === "teacher" ? "/student/support" : "/support"} search={{referral:referral.id}} className="hover:underline">{referral.title}</Link>
               :referral.title}</h3><StatusBadge>{referral.stage.replaceAll("_", " ")}</StatusBadge></div>
             <p className="mt-2 text-sm text-muted-foreground">{referral.category} · Opened {new Date(referral.createdAt).toLocaleDateString()}</p>
           </li>)}</ul>
