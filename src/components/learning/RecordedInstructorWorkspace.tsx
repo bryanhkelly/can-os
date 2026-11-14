@@ -182,8 +182,8 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
     <div className="border bg-card p-4">
       <h2 className="font-serif text-xl font-semibold">Choose your recorded teacher</h2>
       <p className="mt-1 text-sm text-muted-foreground">
-        Your lessons, assignments and grades stay with your course. You may have
-        different recorded instruction from other learners in the same Section.
+        Your learning progress stays with this course when you switch recorded
+        instructors. Official grades and assignments, when applicable, remain unchanged.
       </p>
       {loading ? <p role="status" className="mt-3 text-sm">Loading recorded instruction...</p> :
         catalog && catalog.choices.length > 0
