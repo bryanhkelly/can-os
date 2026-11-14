@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { loadEnvFile } from "node:process";
 import { Pool } from "@neondatabase/serverless";
 import { endpoint } from "./isolated-test-db-guard.mjs";
+import { verifyRecordedInstructorNeonBranch } from "./verify-recorded-instructor-neon-branch.mjs";
 
 async function main() {
   if (existsSync(".env.local")) loadEnvFile(".env.local");
@@ -29,6 +30,7 @@ async function main() {
   let schemaReady = false;
   try {
     await client.query("BEGIN TRANSACTION READ ONLY");
+    await verifyRecordedInstructorNeonBranch(client);
     const { rows } = await client.query(sql);
     if (rows.length !== 10) throw new Error("Recorded-instructor readiness returned an incomplete contract.");
     for (const row of rows) {
