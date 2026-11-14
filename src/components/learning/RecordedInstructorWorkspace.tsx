@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { normalizeClientError } from "@/lib/client-error";
 import { nextRecordedLessonId, recordedInstructorSelectionIsCurrent, resumeRecordedLessonId } from "@/domain/instructional-tracks";
 import {
@@ -203,10 +204,11 @@ function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId:
       {instruction.sectionId && <RecordedOfficialCourseLinks sectionId={instruction.sectionId}/>}
       <div className="border bg-card p-4">
         <h3 className="font-semibold">Course lessons</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {completedCount} of {instruction.lessons.length} lessons completed.
-          Recorded teacher selection does not reset lesson progress.
-        </p>
+        <div className="mt-3">
+          <CourseLessonProgress completed={completedCount} total={instruction.lessons.length}
+            ariaLabel="Recorded course lesson completion"
+            description="Recorded teacher selection never resets course progress. Lesson completion alone is not a grade, noncredit attendance, or certificate." />
+        </div>
         <nav aria-label="Recorded course lessons" className="mt-3 flex flex-wrap gap-2">
           {instruction.lessons.map(lesson => <Button key={lesson.id} size="sm"
             variant={currentLesson?.id === lesson.id ? "secondary" : "outline"}
