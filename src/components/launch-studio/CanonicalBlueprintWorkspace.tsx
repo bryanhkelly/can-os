@@ -13,6 +13,8 @@ import {
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
 import { blueprintEditorialIdentityKeys } from "@/domain/blueprint-configuration";
+import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
+import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
@@ -25,7 +27,7 @@ function readable(value: string): string {
  * Canonical Blueprint preparation. A draft is Organization-owned and anchored
  * to a Site; freezing it requests review, not permission to operate.
  */
-export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
+export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }: { siteId: string; enableReferences?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
   const [name, setName] = useState("");
@@ -35,6 +37,8 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
   >("community_belonging");
   const [religiousAffiliationCode, setReligiousAffiliationCode] = useState("");
   const [selectedComponents, setSelectedComponents] = useState<string[]>([]);
+  const [selectedReferences, setSelectedReferences] = useState<Record<string, string[]>>({});
+  const [referenceCatalog, setReferenceCatalog] = useState<BlueprintReferenceCatalogItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,12 +65,25 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
     return () => { cancelled = true; };
   }, [siteId]);
 
+  useEffect(() => {
+    if (!enableReferences) {
+      setReferenceCatalog([]);
+      return;
+    }
+    let cancelled = false;
+    void exploreBlueprintReferenceCatalog({ data: { siteId } })
+      .then(items => { if (!cancelled) setReferenceCatalog(items); })
+      .catch(() => { if (!cancelled) setReferenceCatalog([]); });
+    return () => { cancelled = true; };
+  }, [siteId, enableReferences]);
+
   const selectedTemplate = workspace?.templates.find(template =>
     template.blueprintVersionId === templateId
   );
 
   function chooseTemplate(template: Template) {
     setTemplateId(template.blueprintVersionId);
+    setSelectedReferences({});
     setSelectedComponents(template.components.filter(component =>
       component.requirementMode === "required"
     ).map(component => component.id));
@@ -86,6 +103,12 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
       setSelectedComponents(result.components
         .filter(component => component.selectionStatus === "selected")
         .map(component => component.componentId));
+      setSelectedReferences(Object.fromEntries(
+        result.components.map(component => [
+          component.componentId,
+          component.referenceItemVersionIds,
+        ])
+      ));
       setTemplateId(result.blueprintVersionId);
       setMessage(null);
     } catch (caught) {
@@ -110,7 +133,7 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
         return {
           componentId: component.id,
           selectionStatus: selected ? "selected" as const : "excluded" as const,
-          referenceItemVersionIds: selected ? current?.referenceItemVersionIds ?? [] : [],
+          referenceItemVersionIds: selected ? selectedReferences[component.id] ?? current?.referenceItemVersionIds ?? [] : [],
           settings: current?.settings && typeof current.settings === "object"
             && !Array.isArray(current.settings) ? current.settings : {},
         };
@@ -284,6 +307,35 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
                 </label>)}
             </div>
           </fieldset>
+          {enableReferences && referenceCatalog.length > 0 && selectedTemplate.components
+            .filter(component => selectedComponents.includes(component.id))
+            .map(component => {
+              const available = referenceCatalog.filter(reference =>
+                reference.kind === component.kind
+              );
+              if (!available.length) return null;
+              return <fieldset key={component.id} className="border p-4" disabled={busy}>
+                <legend className="px-2 font-semibold">
+                  {readable(component.key)} · curated references
+                </legend>
+                <div className="mt-2 grid max-h-52 gap-3 overflow-y-auto sm:grid-cols-2">
+                  {available.map(reference => <label key={reference.versionId}
+                    className="flex items-start gap-3 text-sm">
+                    <input type="checkbox" className="mt-1"
+                      checked={(selectedReferences[component.id] ?? []).includes(reference.versionId)}
+                      onChange={event => setSelectedReferences(current => {
+                        const before = current[component.id] ?? [];
+                        return { ...current, [component.id]: event.target.checked
+                          ? [...before, reference.versionId]
+                          : before.filter(id => id !== reference.versionId) };
+                      })}/>
+                    <span><strong className="block">{reference.title}</strong>
+                      <span className="text-muted-foreground">{reference.summary}</span>
+                    </span>
+                  </label>)}
+                </div>
+              </fieldset>;
+            })}
           <div className="flex flex-wrap gap-3">
             {workspace.canConfigure && <Button type="button" disabled={busy || (!detail && name.trim().length < 2)}
               onClick={() => void save()}>
@@ -297,6 +349,7 @@ export function CanonicalBlueprintWorkspace({ siteId }: { siteId: string }) {
                 setDetail(null);
                 setTemplateId("");
                 setSelectedComponents([]);
+                setSelectedReferences({});
                 setName("");
                 setMessage(null);
               }}>Start a new configuration</Button>}
