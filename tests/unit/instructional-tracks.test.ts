@@ -237,6 +237,13 @@ describe("student-safe practice and stale submissions", () => {
       assertCurrentPracticeSelection({
         ...submission,
         expectedRevision: 2,
+        submittedTrackVersionId: "track-a",
+      }),
+    ).toThrow(/current approved course and track/i);
+    expect(() =>
+      assertCurrentPracticeSelection({
+        ...submission,
+        expectedRevision: 2,
         submittedTrackVersionId: "track-b",
         submittedCourseVersionId: "course-v2",
       }),
