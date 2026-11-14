@@ -107,7 +107,12 @@ describe("authorized notification destinations",()=>{
   });
   it("deep-links a guardian course approval review to its workspace",async()=>{
     notification("action","request","course_registration_guardian_review");
+    state.rows.actions=[{id:"request"}];
     expect((await getNotifications())[0]?.href).toBe("/guardian/course-approvals?action=request");
+  });
+  it("hides a guardian course approval notice when child access has ended",async()=>{
+    notification("action","request","course_registration_guardian_review");
+    expect(await getNotifications()).toEqual([]);
   });
   it("deep-links a field trip permission request to its workspace",async()=>{
     notification("field_trip","trip","field_trip_permission_requested");
