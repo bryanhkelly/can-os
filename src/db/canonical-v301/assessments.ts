@@ -81,6 +81,7 @@ export const assessmentAccess = educationV30.table("assessment_access_grants",{
 });
 export const assessmentAccommodations = educationV30.table("assessment_accommodation_decisions",{
   id:id(),accessGrantId:uuid("access_grant_id").notNull(),revisionNo:integer("revision_no").notNull(),
+  extraAttempts:integer("extra_attempts").notNull().default(0),
   approvalStatus:text("approval_status").notNull(),
 });
 export const assessmentExecutionAttempts = educationV30.table("assessment_attempts",{
