@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { normalizeClientError } from "@/lib/client-error";
+import { recordedInstructorSelectionIsCurrent } from "@/domain/instructional-tracks";
 import {
   getRecordedInstructorPracticeHistory,
   getRecordedInstructionAssetDownload,
@@ -34,7 +35,7 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
   const reload = useCallback(async () => {
     const nextCatalog = await getStudentRecordedInstructors({ data: { courseAttemptId } });
     const [nextInstruction, nextHistory] = await Promise.all([
-      nextCatalog.selection
+      recordedInstructorSelectionIsCurrent(nextCatalog)
         ? getRecordedLessonInstruction({ data: { courseAttemptId } })
         : Promise.resolve(null),
       getRecordedInstructorPracticeHistory({ data: { courseAttemptId } }),
@@ -132,11 +133,13 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         catalog && catalog.choices.length > 0 ? <div className="mt-4 flex flex-wrap gap-2">
           {catalog.choices.map(choice => {
             const selected = choice.trackVersionId === catalog.selection?.trackVersionId;
+            const needsRenewal = selected && choice.policyVersionId !== catalog.selection?.policyVersionId;
             return <Button key={choice.trackVersionId} size="sm"
-              variant={selected ? "default" : "outline"} disabled={pending || selected}
-              aria-pressed={selected}
+              variant={selected && !needsRenewal ? "default" : "outline"}
+              disabled={pending || (selected && !needsRenewal)}
+              aria-pressed={selected && !needsRenewal}
               onClick={() => void selectTeacher(choice.trackVersionId)}>
-              {choice.title}{selected ? " (selected)" : ""}
+              {choice.title}{needsRenewal ? " (renew selection)" : selected ? " (selected)" : ""}
             </Button>;
           })}
         </div> : <p className="mt-3 text-sm text-muted-foreground">
@@ -144,6 +147,11 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         </p>}
     </div>
 
+    {catalog?.selection && !recordedInstructorSelectionIsCurrent(catalog) &&
+      <p role="status" className="border p-3 text-sm">
+        Your recorded-teacher selection needs to be renewed under the current course policy.
+        Choose an approved instructor above to continue your lessons.
+      </p>}
     {error && <p role="alert" className="border p-3 text-sm">{error}</p>}
     {notice && <p role="status" className="border p-3 text-sm">{notice}</p>}
 
