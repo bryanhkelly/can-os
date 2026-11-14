@@ -96,6 +96,13 @@ SELECT format(
  :'author_role')
 \gexec
 
+-- Blueprint planning and execution must bind an Operation to the selected Site.
+-- Restrict the author role to the relationship columns needed for this check.
+SELECT format(
+ 'GRANT SELECT (id,operation_id,site_id,valid_from,valid_through) ON education_v30.education_operation_sites TO %I',
+ :'author_role')
+\gexec
+
 -- Site authoring requires current, verified operator authority.
 SELECT format('GRANT SELECT (id,status) ON education_v30.sites TO %I', :'author_role')
 \gexec
