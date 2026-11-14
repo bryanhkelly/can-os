@@ -379,6 +379,22 @@ export function projectRecordedCourseLessons<
   });
 }
 
+/** Accept one nonempty answer for every published practice prompt, and nothing extra. */
+export function recordedPracticeResponsesComplete(
+  prompts: readonly { key: string }[],
+  responses: readonly { promptKey: string; response: string }[],
+): boolean {
+  if (prompts.length !== responses.length) return false;
+  const allowed = new Set(prompts.map(prompt => prompt.key));
+  const seen = new Set<string>();
+  for (const answer of responses) {
+    if (!allowed.has(answer.promptKey) || seen.has(answer.promptKey) ||
+        !answer.response.trim()) return false;
+    seen.add(answer.promptKey);
+  }
+  return true;
+}
+
 export type RecordedPracticeAnswer = {
   promptKey: string;
   promptText: string;
