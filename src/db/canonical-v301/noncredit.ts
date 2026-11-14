@@ -33,9 +33,14 @@ export const assessmentAdministrations = educationV30.table("assessment_administ
   id:id(),assessmentVersionId:uuid("assessment_version_id").notNull(),
   deploymentId:uuid("deployment_id"),courseVersionId:uuid("course_version_id"),
 });
+export const assessmentAccessGrants = educationV30.table("assessment_access_grants",{
+  id:id(),administrationId:uuid("administration_id").notNull(),
+  learnerId:uuid("learner_id").notNull(),courseAttemptId:uuid("course_attempt_id"),
+  accessStatus:text("access_status").notNull(),
+});
 export const assessmentAttempts = educationV30.table("assessment_attempts",{
   id:id(),administrationId:uuid("administration_id").notNull(),
-  learnerId:uuid("learner_id").notNull(),
+  accessGrantId:uuid("access_grant_id").notNull(),learnerId:uuid("learner_id").notNull(),
 });
 export const assessmentAttemptResults = educationV30.table("assessment_attempt_results",{
   id:id(),attemptId:uuid("attempt_id").notNull(),
