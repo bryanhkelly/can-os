@@ -1,0 +1,172 @@
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { db } from "@/db/client";
+import {
+  assessmentAccess, assessmentExecutionAttempts, assessmentExecutionResults,
+  learnerCourseAttempts, noncreditCompletionDecisions, noncreditCompletionPolicies,
+  noncreditRegistrations, noncreditTrainingVersions, surveyCampaigns,
+  surveyDefinitions, surveyQuestions, surveyResponses, surveyVersions,
+} from "@/db/canonical-v301";
+import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+
+/**
+ * Read-only, organization-scoped index for the native canonical provider lab.
+ * It never returns learner names, survey answers, question text, secure assessment
+ * keys, or cross-provider records. All writes use the existing domain commands.
+ */
+export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handler(async () => {
+  setResponseHeader("Cache-Control", "private, no-store");
+  const actor = await getCanonicalCommandContext(getRequest());
+  if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? ""))
+    throw new AuthorizationError("canonical provider staff");
+  assertCapability(actor, "noncredit.assessment.provision");
+  const orgIds = actor.scope.organizationIds ?? [];
+  if (orgIds.length !== 1) throw new AuthorizationError("single provider organization");
+  const organizationId = orgIds[0]!;
+
+  const trainings = await db.select({
+    id: noncreditTrainingVersions.id,
+    title: noncreditTrainingVersions.title,
+    state: noncreditTrainingVersions.state,
+    requiredMinutes: noncreditTrainingVersions.requiredInstructionMinutes,
+    assessmentVersionId: noncreditTrainingVersions.assessmentVersionId,
+  }).from(noncreditTrainingVersions)
+    .where(eq(noncreditTrainingVersions.providerOrganizationId, organizationId))
+    .orderBy(asc(noncreditTrainingVersions.title)).limit(100);
+
+  const participation = await db.select({
+    courseAttemptId: learnerCourseAttempts.id,
+    courseStatus: learnerCourseAttempts.status,
+    registrationId: noncreditRegistrations.id,
+    registrationStatus: noncreditRegistrations.status,
+    trainingVersionId: noncreditTrainingVersions.id,
+    trainingTitle: noncreditTrainingVersions.title,
+  }).from(learnerCourseAttempts)
+    .innerJoin(noncreditRegistrations,
+      eq(learnerCourseAttempts.noncreditRegistrationId, noncreditRegistrations.id))
+    .innerJoin(noncreditTrainingVersions,
+      eq(noncreditRegistrations.trainingVersionId, noncreditTrainingVersions.id))
+    .where(and(
+      eq(noncreditTrainingVersions.providerOrganizationId, organizationId),
+      isNull(learnerCourseAttempts.enrollmentId),
+      isNull(learnerCourseAttempts.sectionId),
+    ))
+    .orderBy(desc(learnerCourseAttempts.startedAt)).limit(100);
+
+  const courseIds = participation.map(row => row.courseAttemptId);
+  const registrationIds = participation.map(row => row.registrationId);
+  const trainingIds = [...new Set(participation.map(row => row.trainingVersionId))];
+  const grants = courseIds.length
+    ? await db.select({
+      id: assessmentAccess.id, courseAttemptId: assessmentAccess.courseAttemptId,
+      status: assessmentAccess.accessStatus,
+    }).from(assessmentAccess).where(inArray(assessmentAccess.courseAttemptId, courseIds))
+    : [];
+  const grantIds = grants.map(row => row.id);
+  const assessmentAttempts = grantIds.length
+    ? await db.select({
+      id: assessmentExecutionAttempts.id,
+      grantId: assessmentExecutionAttempts.accessGrantId,
+      state: assessmentExecutionAttempts.state,
+      createdAt: assessmentExecutionAttempts.createdAt,
+    }).from(assessmentExecutionAttempts)
+      .where(inArray(assessmentExecutionAttempts.accessGrantId, grantIds))
+      .orderBy(desc(assessmentExecutionAttempts.createdAt))
+    : [];
+  const assessmentAttemptIds = assessmentAttempts.map(row => row.id);
+  const results = assessmentAttemptIds.length
+    ? await db.select({
+      id: assessmentExecutionResults.id,
+      attemptId: assessmentExecutionResults.attemptId,
+      status: assessmentExecutionResults.resultStatus,
+      revision: assessmentExecutionResults.resultRevision,
+      outcome: assessmentExecutionResults.outcome,
+    }).from(assessmentExecutionResults)
+      .where(inArray(assessmentExecutionResults.attemptId, assessmentAttemptIds))
+      .orderBy(desc(assessmentExecutionResults.resultRevision))
+    : [];
+  const policies = trainingIds.length
+    ? await db.select({
+      id: noncreditCompletionPolicies.id,
+      trainingVersionId: noncreditCompletionPolicies.trainingVersionId,
+      version: noncreditCompletionPolicies.policyVersion,
+      minMinutes: noncreditCompletionPolicies.minParticipationMinutes,
+      requiresAssessment: noncreditCompletionPolicies.skillsAssessmentRequired,
+      effectiveAt: noncreditCompletionPolicies.effectiveAt,
+    }).from(noncreditCompletionPolicies)
+      .where(inArray(noncreditCompletionPolicies.trainingVersionId, trainingIds))
+      .orderBy(desc(noncreditCompletionPolicies.policyVersion))
+    : [];
+  const decisions = registrationIds.length
+    ? await db.select({
+      id: noncreditCompletionDecisions.id,
+      registrationId: noncreditCompletionDecisions.registrationId,
+      outcome: noncreditCompletionDecisions.outcome,
+      decidedAt: noncreditCompletionDecisions.decidedAt,
+    }).from(noncreditCompletionDecisions)
+      .where(inArray(noncreditCompletionDecisions.registrationId, registrationIds))
+      .orderBy(desc(noncreditCompletionDecisions.decidedAt))
+    : [];
+  const now = new Date();
+  const attempts = participation.map(row => {
+    const grant = grants.find(item => item.courseAttemptId === row.courseAttemptId);
+    const attempt = assessmentAttempts.find(item => item.grantId === grant?.id);
+    const finalized = results.find(item =>
+      item.attemptId === attempt?.id && item.status === "finalized");
+    const policy = policies.find(item =>
+      item.trainingVersionId === row.trainingVersionId && item.effectiveAt <= now);
+    const decision = decisions.find(item => item.registrationId === row.registrationId);
+    const training = trainings.find(item => item.id === row.trainingVersionId);
+    return {
+      ...row,
+      assessmentVersionId: training?.assessmentVersionId ?? null,
+      assessmentGrantStatus: grant?.status ?? null,
+      assessmentAttemptId: attempt?.id ?? null,
+      assessmentAttemptState: attempt?.state ?? null,
+      finalizedResultId: finalized?.id ?? null,
+      finalizedOutcome: finalized?.outcome ?? null,
+      policyId: policy?.id ?? null,
+      policyVersion: policy?.version ?? null,
+      policyMinMinutes: policy?.minMinutes ?? null,
+      policyRequiresAssessment: policy?.requiresAssessment ?? false,
+      latestDecision: decision?.outcome ?? null,
+    };
+  });
+
+  const campaigns = await db.select({
+    id: surveyCampaigns.id, status: surveyCampaigns.status,
+    mode: surveyCampaigns.responseMode, deploymentId: surveyCampaigns.deploymentId,
+    versionId: surveyVersions.id, versionNo: surveyVersions.versionNo,
+    title: surveyDefinitions.title,
+  }).from(surveyCampaigns)
+    .innerJoin(surveyVersions, eq(surveyCampaigns.surveyVersionId, surveyVersions.id))
+    .innerJoin(surveyDefinitions, eq(surveyVersions.surveyId, surveyDefinitions.id))
+    .where(eq(surveyCampaigns.operatingOrganizationId, organizationId))
+    .orderBy(asc(surveyDefinitions.title)).limit(100);
+  const campaignIds = campaigns.map(row => row.id);
+  const versionIds = [...new Set(campaigns.map(row => row.versionId))];
+  const questionRows = versionIds.length
+    ? await db.select({ versionId: surveyQuestions.surveyVersionId })
+      .from(surveyQuestions).where(inArray(surveyQuestions.surveyVersionId, versionIds))
+    : [];
+  const responseRows = campaignIds.length
+    ? await db.select({ campaignId: surveyResponses.campaignId })
+      .from(surveyResponses).where(inArray(surveyResponses.campaignId, campaignIds))
+    : [];
+  const surveys = campaigns.map(row => ({
+    ...row,
+    questionCount: questionRows.filter(q => q.versionId === row.versionId).length,
+    responseCount: responseRows.filter(response => response.campaignId === row.id).length,
+  }));
+
+  return {
+    organizationId,
+    role: actor.role,
+    trainings,
+    attempts,
+    surveys,
+    limitPerCollection: 100,
+  };
+});

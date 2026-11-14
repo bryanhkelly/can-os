@@ -1,0 +1,18 @@
+import { Link } from "@tanstack/react-router";
+
+const linkClass = "inline-flex min-h-10 items-center border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary";
+const currentClass = "border-primary text-primary";
+const inactiveClass = "border-transparent text-muted-foreground hover:text-foreground";
+
+export function CapabilityLabNav({ current }: {
+  current: "index" | "noncredit" | "surveys";
+}) {
+  return <nav aria-label="Capability Lab sections" className="mt-5 flex flex-wrap gap-2 border-b border-border">
+    <Link to="/canonical/capability-lab" aria-current={current === "index" ? "page" : undefined}
+      className={linkClass + " " + (current === "index" ? currentClass : inactiveClass)}>Overview</Link>
+    <Link to="/canonical/lab/noncredit" aria-current={current === "noncredit" ? "page" : undefined}
+      className={linkClass + " " + (current === "noncredit" ? currentClass : inactiveClass)}>Noncredit testing</Link>
+    <Link to="/canonical/lab/surveys" aria-current={current === "surveys" ? "page" : undefined}
+      className={linkClass + " " + (current === "surveys" ? currentClass : inactiveClass)}>Survey inspection</Link>
+  </nav>;
+}

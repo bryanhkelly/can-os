@@ -292,6 +292,33 @@
       "writeBoundary": "Canonical server functions enforce Site ownership, immutable revisions, evidence-backed review, and planning-only execution; no direct program activation"
     },
     {
+      "file": "src/routes/canonical.capability-lab.tsx",
+      "route": "/canonical/capability-lab",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.lab.noncredit.tsx",
+      "route": "/canonical/lab/noncredit",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.lab.surveys.tsx",
+      "route": "/canonical/lab/surveys",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/church.apply.tsx",
       "route": "/church/apply",
       "owner": "network",
