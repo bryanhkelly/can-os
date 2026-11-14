@@ -10,6 +10,7 @@ import {
   siteOrganizationRoles,
   religiousAffiliationOptions,
   educationOperations,
+  educationOperationSites,
   educationOperationOrganizationRoles,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
@@ -92,7 +93,13 @@ export async function getCanonicalBlueprintWorkspace(
       }).from(educationOperations)
         .innerJoin(educationOperationOrganizationRoles,
           eq(educationOperationOrganizationRoles.operationId, educationOperations.id))
+        .innerJoin(educationOperationSites,
+          eq(educationOperationSites.operationId, educationOperations.id))
         .where(and(
+          eq(educationOperationSites.siteId, siteId),
+          lte(educationOperationSites.validFrom, now),
+          or(isNull(educationOperationSites.validThrough),
+            gt(educationOperationSites.validThrough, now)),
           eq(educationOperationOrganizationRoles.organizationId, operator.organizationId),
           eq(educationOperationOrganizationRoles.roleCode, "operator"),
           eq(educationOperationOrganizationRoles.status, "approved"),
@@ -147,7 +154,7 @@ export async function getCanonicalBlueprintWorkspace(
       canReview: context.capabilities.has("blueprint.review"),
       canExecute: context.capabilities.has("blueprint.execute"),
       affiliations,
-      operations,
+      operations: [...new Map(operations.map(operation => [operation.id, operation])).values()],
       templates: templates.map(template => ({
         ...template,
         components: components
