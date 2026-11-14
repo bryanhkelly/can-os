@@ -8,7 +8,7 @@ export const canonicalLearningEventSchema = z.object({
     "video_opened", "video_played", "video_ended", "engaged_interval",
   ]),
   lessonId: z.string().uuid().nullable(),
-  resourceId: z.string().min(1).max(160).regex(/^[a-zA-Z0-9_./:-]+$/).nullable(),
+  resourceId: z.string().uuid().nullable(),
   occurredAt: z.string().datetime({ offset: true }),
   durationMs: z.number().int().min(1).max(60_000).optional(),
   pageVisible: z.boolean().optional(),
