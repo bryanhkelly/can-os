@@ -165,6 +165,13 @@ try {
   await q("INSERT INTO education_v30.blueprint_outputs " +
     "(blueprint_version_id,execution_batch_id,configuration_version_id,review_id,operation_id) " +
     "VALUES($1,$2,$3,$4,$5)", [bp.recipe_id, ids.batch, ids.version, ids.review, operation]);
+  // A Blueprint execution may propose a Deployment but cannot activate it.
+  await expectPermissionDenied(
+    "INSERT INTO education_v30.program_deployments " +
+    "(id,operation_id,offering_id,code,name,status) " +
+    "VALUES($1,$2,$3,$4,'Unauthorized active demo','active')",
+    [randomUUID(), operation, offering, "blocked-" + ids.version.replaceAll("-", "")],
+  );
   await q("INSERT INTO education_v30.program_deployments " +
     "(id,operation_id,offering_id,code,name,status) " +
     "VALUES($1,$2,$3,$4,'Digital Skills Foundations (demo)','planning')",
