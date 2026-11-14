@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RecordedInstructorWorkspace, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
+import { RecordedInstructorWorkspace, RecordedInstructorChoices, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
 
 vi.mock("@/modules/learning/instructional-tracks.functions", () => ({
   getStudentRecordedInstructors: vi.fn(),
@@ -50,6 +50,34 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Teacher B");
     expect(html).toContain("Foundations");
     expect(html).toContain("Switching teachers does not erase this history");
+  });
+
+  it("enables renewal of the same instructor while disabling an already-current selection", () => {
+    const choice = {
+      trackVersionId: "teacher-a",
+      presenterPersonId: "presenter-a",
+      title: "Teacher A",
+      policyVersionId: "policy-2",
+    };
+    const catalog = {
+      choices: [choice],
+      blocked: [],
+      selection: { trackVersionId: "teacher-a", revision: 1, policyVersionId: "policy-1" },
+    };
+    const renewal = renderToStaticMarkup(
+      <RecordedInstructorChoices catalog={catalog} pending={false} onSelect={vi.fn()}/>,
+    );
+    expect(renewal).toContain("Teacher A (renew selection)");
+    expect(renewal).not.toContain("disabled");
+
+    const current = renderToStaticMarkup(
+      <RecordedInstructorChoices catalog={{
+        ...catalog,
+        selection: { ...catalog.selection, policyVersionId: "policy-2" },
+      }} pending={false} onSelect={vi.fn()}/>,
+    );
+    expect(current).toContain("Teacher A (selected)");
+    expect(current).toContain("disabled");
   });
 
 });
