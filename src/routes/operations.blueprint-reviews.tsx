@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell } from "@/components/workspace";
@@ -11,10 +11,12 @@ import { normalizeClientError } from "@/lib/client-error";
 import {
   decideCanonicalBlueprintReview,
   listCanonicalBlueprintReviews,
+  listCanonicalBlueprintReviewEvidence,
 } from "@/modules/blueprints/blueprint-studio.functions";
 
 type Item = Awaited<ReturnType<typeof listCanonicalBlueprintReviews>>[number];
 type Decision = "approved" | "conditional" | "rejected";
+type Evidence = Awaited<ReturnType<typeof listCanonicalBlueprintReviewEvidence>>[number];
 
 export const Route = createFileRoute("/operations/blueprint-reviews")({
   loader: () => safeLoader(() => listCanonicalBlueprintReviews())(),
@@ -45,9 +47,26 @@ function ReviewEditor({ item }: { item: Item }) {
   const [rationale, setRationale] = useState("");
   const [evidenceVersionId, setEvidenceVersionId] = useState("");
   const [componentEvidence, setComponentEvidence] = useState<Record<string, string>>({});
+  const [evidence, setEvidence] = useState<Evidence[]>([]);
+  const [evidenceLoading, setEvidenceLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!expanded) return;
+    let current = true;
+    setEvidenceLoading(true);
+    void listCanonicalBlueprintReviewEvidence({
+      data: { owningOrganizationId: item.owningOrganizationId },
+    }).then(items => {
+      if (current) setEvidence(items);
+    }).catch(caught => {
+      if (current) setError(normalizeClientError(caught,
+        "Verified review evidence could not be loaded.").message);
+    }).finally(() => { if (current) setEvidenceLoading(false); });
+    return () => { current = false; };
+  }, [expanded, item.owningOrganizationId]);
 
   const approvalComplete = decision !== "approved" || (
     Boolean(evidenceVersionId.trim()) && item.selectedComponents.every(component =>
@@ -105,13 +124,17 @@ function ReviewEditor({ item }: { item: Item }) {
             {component.key.replaceAll("_", " ")} · {component.kind.replaceAll("_", " ")}
             {decision === "approved" && <label className="mt-2 block" htmlFor={`evidence-${component.componentId}`}>
               Component approval evidence version ID
-              <Input id={`evidence-${component.componentId}`} className="mt-1"
-                placeholder="Verified evidence UUID"
+              <Select id={`evidence-${component.componentId}`} className="mt-1"
                 value={componentEvidence[component.componentId] ?? ""}
-                disabled={busy}
+                disabled={busy || evidenceLoading}
                 onChange={event => setComponentEvidence(current => ({
                   ...current, [component.componentId]: event.currentTarget.value,
-                }))}/>
+                }))}>
+                <option value="">Select verified evidence</option>
+                {evidence.map(item => <option key={item.id} value={item.id}>
+                  {item.title} · {item.kind.replaceAll("_", " ")}
+                </option>)}
+              </Select>
             </label>}
           </li>)}
       </ul>
@@ -128,10 +151,14 @@ function ReviewEditor({ item }: { item: Item }) {
       {decision === "approved" && <label className="block text-sm"
         htmlFor={`overall-evidence-${item.configurationVersionId}`}>
         Whole-configuration approval evidence version ID
-        <Input id={`overall-evidence-${item.configurationVersionId}`} className="mt-2"
-          placeholder="Verified evidence UUID"
-          value={evidenceVersionId} disabled={busy}
-          onChange={event => setEvidenceVersionId(event.currentTarget.value)}/>
+        <Select id={`overall-evidence-${item.configurationVersionId}`} className="mt-2"
+          value={evidenceVersionId} disabled={busy || evidenceLoading}
+          onChange={event => setEvidenceVersionId(event.currentTarget.value)}>
+          <option value="">Select verified evidence</option>
+          {evidence.map(evidenceItem => <option key={evidenceItem.id} value={evidenceItem.id}>
+            {evidenceItem.title} · {evidenceItem.kind.replaceAll("_", " ")}
+          </option>)}
+        </Select>
       </label>}
       <label className="block text-sm" htmlFor={`review-rationale-${item.configurationVersionId}`}>
         Review rationale
@@ -139,6 +166,13 @@ function ReviewEditor({ item }: { item: Item }) {
           value={rationale} disabled={busy} maxLength={4000}
           onChange={event => setRationale(event.currentTarget.value)}/>
       </label>
+      {evidenceLoading && <p className="text-sm text-muted-foreground" role="status">
+        Loading verified supporting evidence…
+      </p>}
+      {!evidenceLoading && evidence.length === 0 && <p className="text-sm text-muted-foreground">
+        No verified evidence is available for this Organization. Rejection or a request
+        for changes can still be recorded; approval requires verified evidence.
+      </p>}
       {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
       {message && <p className="text-sm" role="status">{message}</p>}
       <Button type="button" disabled={busy || !approvalComplete || rationale.trim().length < 8}
