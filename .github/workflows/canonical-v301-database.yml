@@ -12,6 +12,14 @@ on:
       - 'scripts/seed-canonical-v301-demo.mjs'
       - 'scripts/isolated-test-db-guard.mjs'
       - '.github/workflows/canonical-v301-database.yml'
+      - 'src/db/canonical-v301/**'
+      - 'src/domain/blueprint-*.ts'
+      - 'src/domain/program-discovery.ts'
+      - 'src/modules/blueprints/**'
+      - 'src/modules/programs/program-discovery.server.ts'
+      - 'src/modules/identity/canonical-command-context.server.ts'
+      - 'src/routes/canonical.blueprints.tsx'
+      - 'src/routes/canonical.blueprint-reviews.tsx'
   push:
     branches:
       - main
@@ -23,6 +31,14 @@ on:
       - 'scripts/seed-canonical-v301-demo.mjs'
       - 'scripts/isolated-test-db-guard.mjs'
       - '.github/workflows/canonical-v301-database.yml'
+      - 'src/db/canonical-v301/**'
+      - 'src/domain/blueprint-*.ts'
+      - 'src/domain/program-discovery.ts'
+      - 'src/modules/blueprints/**'
+      - 'src/modules/programs/program-discovery.server.ts'
+      - 'src/modules/identity/canonical-command-context.server.ts'
+      - 'src/routes/canonical.blueprints.tsx'
+      - 'src/routes/canonical.blueprint-reviews.tsx'
   workflow_dispatch:
 
 permissions:
