@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, gt, lte, or, isNull } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -9,6 +9,7 @@ import { auditEvents, domainEvents, surveyDefinitions, surveyVersions, surveyQue
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { validateCourseSurveyAnswers, type SurveyQuestion } from "@/domain/course-survey";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
+import { evidenceDocumentVersions } from "@/db/canonical-v301";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 
 const id=z.string().uuid();
@@ -77,6 +78,58 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
     .where(eq(surveyResponses.invitationId,invitation.id)).limit(1);
   return {access,campaign,version,invitation,definition,questions,existing};
 }
+/**
+ * Discover published and personally invited feedback surveys for this course
+ * attempt. The campaign's published survey and consent evidence are checked;
+ * neither URLs nor per-organization hardcoding are required.
+ */
+export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({courseAttemptId:id}).strict().parse(raw))
+  .handler(async({data})=>{
+    privateResult();
+    const context=await getInstructionalLearnerContext(getRequest());
+    requireLearner(context);
+    return db.transaction(async tx=>{
+      const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId,true);
+      if(access.source!=="noncredit")throw new AuthorizationError("noncredit course survey participation");
+      const now=new Date();
+      const rows=await tx.select({
+        campaignId:surveyCampaigns.id,title:surveyDefinitions.title,
+        invitationId:surveyInvitations.id,
+      }).from(surveyCampaigns)
+      .innerJoin(surveyInvitations,and(
+        eq(surveyInvitations.campaignId,surveyCampaigns.id),
+        eq(surveyInvitations.invitedPersonId,context.actorPersonId),
+      ))
+      .innerJoin(surveyVersions,and(
+        eq(surveyVersions.id,surveyCampaigns.surveyVersionId),
+        eq(surveyVersions.lifecycle,"published"),
+      ))
+      .innerJoin(surveyDefinitions,and(
+        eq(surveyDefinitions.id,surveyVersions.surveyId),
+        eq(surveyDefinitions.status,"active"),
+        inArray(surveyDefinitions.intendedAudience,["learner","any"]),
+      ))
+      .innerJoin(evidenceDocumentVersions,
+        eq(evidenceDocumentVersions.id,surveyCampaigns.surveyPermissionEvidenceId))
+      .where(and(
+        eq(surveyCampaigns.deploymentId,access.deploymentId),
+        eq(surveyCampaigns.responseMode,"identified"),
+        eq(surveyCampaigns.status,"active"),
+        lte(surveyCampaigns.startsAt,now),
+        or(isNull(surveyCampaigns.endsAt),gt(surveyCampaigns.endsAt,now)),
+        lte(surveyInvitations.sentAt,now),
+        or(isNull(surveyInvitations.dueAt),gt(surveyInvitations.dueAt,now)),
+        lte(evidenceDocumentVersions.verifiedAt,now),
+        or(isNull(evidenceDocumentVersions.validFrom),
+           lte(evidenceDocumentVersions.validFrom,now.toISOString().slice(0,10))),
+        or(isNull(evidenceDocumentVersions.validThrough),
+           gt(evidenceDocumentVersions.validThrough,new Date(now.getTime()-86_400_000).toISOString().slice(0,10))),
+      )).limit(30);
+      return rows.map(row=>({campaignId:row.campaignId,title:row.title}));
+    });
+  });
+
 export const getCourseSurvey=createServerFn({method:"GET"})
   .validator((v:unknown)=>scope.parse(v))
   .handler(async({data})=>{
