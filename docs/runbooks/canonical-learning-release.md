@@ -77,3 +77,55 @@ application/browser acceptance and rollout.
 
 These blockers do **not** invalidate completed test01 or production Neon
 database role checks. They do mean the feature remains unlaunched.
+
+## Verified database acceptance (2026-11-14)
+
+Production Neon `main` has the existing restricted login `can_os_canonical_auth_app`
+(LONG-LIVED login, NOINHERIT and no BYPASSRLS or schema-owner membership).
+It has explicit SET-role memberships in two NOLOGIN purpose roles:
+`can_v30_canonical_auth_reader` and
+`can_v301_credential_learner_reader`. Tested **while logged in as the
+restricted application role**, not as the owner:
+
+- Native auth can invoke only the approved session projection. It cannot
+  directly SELECT sessions, grants or people, and fabricated session hashes
+  resolve to no account.
+- The learner wallet can invoke only the approved list/download projections.
+  It cannot SELECT people, sessions, awards or probe arbitrary credential
+  status. Fabricated session hashes return no awards.
+- The server now rejects a privileged, shared or malformed
+  `CAN_CANONICAL_AUTH_DATABASE_URL`. It must identify the exact restricted
+  `can_os_canonical_auth_app` login and not equal `DATABASE_URL`.
+  Unit tests are committed but CI still needs repair.
+
+On Neon `test01`, the following **committed and repeatable rollback-only SQL
+acceptance files** passed, leaving zero synthetic sessions, grants, attempts
+or rooms behind:
+
+```sh
+psql "$TEST01_SCHEMA_OWNER_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/acceptance-test-native-learner-isolation.sql
+
+psql "$TEST01_SCHEMA_OWNER_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/acceptance-test-facilitated-pairing.sql
+```
+
+The session fixture creates two Organization-scoped learner grants, tests both
+valid sessions, wrong-Organization access, forged hashes, revoked/idle sessions
+and private wallet read isolation. The classroom fixture creates a valid
+temporary course, published Offering, Deployment, learner attempt and room,
+then verifies positive pairing, unrelated learner denial, expired re-pair
+denial, closed-room denial and rollback cleanup. These are real PostgreSQL
+tests, but **not** browser or production-credential sign-in tests.
+
+From the restricted **production auth login**, verify both permitted role
+projections before enabling a flag. The committed
+`verify-production-credential-reader.sql` checks one of the role boundaries.
+
+**Operational limitations:** Netlify returned HTTP 403 when attempting to set
+the production canonical reader URL/pepper, and its most recently published
+`can-os-demo-new` build is from 2026-11-05, not the current `main`.
+The live browser service was also unavailable for the requested run.
+Do not turn on either learning release flag or claim current-build
+end-to-end acceptance until secret configuration, a matching deploy SHA
+and authenticated learner/facilitator Playwright tests have passed.
