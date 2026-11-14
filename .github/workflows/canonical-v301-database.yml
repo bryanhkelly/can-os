@@ -8,6 +8,8 @@ on:
     paths:
       - 'database/canonical/v3.0.1/**'
       - 'scripts/check-canonical-v301-ddl.mjs'
+      - 'scripts/check-canonical-v301-blueprint-flow.mjs'
+      - 'scripts/seed-canonical-v301-demo.mjs'
       - 'scripts/isolated-test-db-guard.mjs'
       - '.github/workflows/canonical-v301-database.yml'
   push:
@@ -226,4 +228,74 @@ jobs:
             echo "- Commit: \`$GITHUB_SHA\`"
             echo "- Disposable PostgreSQL 18 service only; no Neon secrets"
             echo "- The rollback check is not a production migration or app-role deployment approval"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  blueprint-write-acceptance:
+    name: Canonical Blueprint restricted-role write acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_DB: can_v301_blueprint_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: can_v301_ci_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d can_v301_blueprint_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
+    env:
+      APP_ENV: test
+      NODE_ENV: test
+      CAN_TEST_DB_WRITES_ENABLED: 'true'
+      TEST_DATABASE_URL: postgresql://postgres:can_v301_ci_disposable@127.0.0.1:5432/can_v301_blueprint_ci
+      CAN_CANONICAL_TEST_APP_DATABASE_URL: postgresql://can_v30_ci_blueprint_app:ci_v301_blueprint_disposable@127.0.0.1:5432/can_v301_blueprint_ci
+    steps:
+      - name: Checkout the exact commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify checkout SHA
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Install PostgreSQL command-line client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+      - name: Install canonical schema and seed separate Organization fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 -f database/canonical/v3.0.1/schema.sql
+          npm run db:seed:canonical:v301:demo
+          psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -v publisher_organization_id=11110000-0000-4000-8000-000000000003 \
+            -f database/canonical/v3.0.1/seed-blueprint-starters.sql
+          psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -c "CREATE ROLE can_v30_ci_blueprint_app LOGIN NOINHERIT NOBYPASSRLS PASSWORD 'ci_v301_blueprint_disposable'"
+          psql "$TEST_DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+            -v organization_id=11110000-0000-4000-8000-000000000001 \
+            -v application_role=can_v30_ci_blueprint_app \
+            -f database/canonical/v3.0.1/provision-blueprint-roles.sql
+      - name: Verify restricted author and reviewer writes and rollback
+        run: npm run db:test:canonical:v301:blueprint-flow
+      - name: Record Blueprint acceptance evidence
+        if: always()
+        run: |
+          {
+            echo "### Canonical Blueprint restricted-role acceptance"
+            echo "- Commit: `$GITHUB_SHA`"
+            echo "- Disposable PostgreSQL 18; native Valor/Barton fixtures"
+            echo "- Verifies draft, independent approval, planning Deployment, tenant isolation and rollback"
+            echo "- No application/Neon production database writes"
           } >> "$GITHUB_STEP_SUMMARY"
