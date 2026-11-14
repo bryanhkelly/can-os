@@ -6,6 +6,8 @@ const evidencePatch=readFileSync(
   "database/canonical/v3.0.1/patch-noncredit-evidence-and-result-authority.sql","utf8");
 const autoPatch=readFileSync(
   "database/canonical/v3.0.1/patch-auto-noncredit-assessment-access.sql","utf8");
+const feedbackPatch=readFileSync(
+  "database/canonical/v3.0.1/patch-noncredit-feedback-invitations.sql","utf8");
 const access=readFileSync("src/modules/learning/noncredit-assessment.server.ts","utf8");
 const surveys=readFileSync("src/modules/learning/course-surveys.functions.ts","utf8");
 const activities=readFileSync("src/components/learning/NoncreditCourseActivities.tsx","utf8");
@@ -33,6 +35,17 @@ describe("noncredit pilot correctness boundaries",()=>{
       expect(sql).toContain("t.approved_by_person_id IS NOT NULL");
       expect(sql).toContain("ON CONFLICT (administration_id,learner_id,course_attempt_id) DO NOTHING");
       expect(sql).toContain("ca.enrollment_id IS NULL AND ca.section_id IS NULL");
+    }
+  });
+
+  it("invites feedback only through active, approved deployment campaigns",()=>{
+    for(const sql of [canonical,feedbackPatch]){
+      expect(sql).toContain("knowledge_check_submitted");
+      expect(sql).toContain("v301_noncredit_knowledge_feedback");
+      expect(sql).toContain("rule.enabled");
+      expect(sql).toContain("permission.verified_by_person_id IS NOT NULL");
+      expect(sql).toContain("c.deployment_id=participant.deployment_id");
+      expect(sql).toContain("ON CONFLICT (campaign_id,invited_person_id) DO NOTHING");
     }
   });
 
