@@ -7,6 +7,7 @@ import {
   evaluateInstructionalTrackPolicy,
   isVerifiedEvidenceCurrent,
   parseStudentPracticeDefinition,
+  projectRecordedCourseLessons,
   trackContentAvailable,
   instructionalTrackAssetStorageKey,
   type InstructionalTrackPolicyContext,
@@ -320,5 +321,72 @@ describe("policy-scoped learner practice materials", () => {
     expect(canAccessStudentTrackMaterial("instruction", false)).toBe(true);
     expect(canAccessStudentTrackMaterial("reference", false)).toBe(true);
     expect(canAccessStudentTrackMaterial("instruction", true)).toBe(true);
+  });
+});
+
+describe("same Section, independently selected recorded teachers", () => {
+  const sharedCourseLessons = [
+    { id: "lesson-1", courseUnitId: "unit-1", title: "Foundations", lessonOrder: 1 },
+    { id: "lesson-2", courseUnitId: "unit-1", title: "Application", lessonOrder: 2 },
+  ];
+  const teacherA = [{
+    courseLessonId: "lesson-1",
+    assetVersionId: "teacher-a-video",
+    presentationKind: "primary",
+    ordinal: 1,
+    accessibilityNotes: {},
+  }];
+  const teacherB = [{
+    courseLessonId: "lesson-1",
+    assetVersionId: "teacher-b-video",
+    presentationKind: "primary",
+    ordinal: 1,
+    accessibilityNotes: {},
+  }];
+  const learnerOneProgress = [{
+    lessonId: "lesson-1",
+    status: "completed",
+    observedAt: new Date("2026-11-10T12:00:00Z"),
+  }];
+  const learnerTwoProgress = [{
+    lessonId: "lesson-2",
+    status: "in_progress",
+    observedAt: new Date("2026-11-11T12:00:00Z"),
+  }];
+
+  it("shows different approved presenters without sharing lesson progress between learners", () => {
+    const first = projectRecordedCourseLessons({
+      lessons: sharedCourseLessons,
+      progress: learnerOneProgress,
+      presentations: teacherA,
+    });
+    const second = projectRecordedCourseLessons({
+      lessons: sharedCourseLessons,
+      progress: learnerTwoProgress,
+      presentations: teacherB,
+    });
+    expect(first.map(lesson => lesson.id)).toEqual(second.map(lesson => lesson.id));
+    expect(first[0]?.presentations[0]?.assetVersionId).toBe("teacher-a-video");
+    expect(second[0]?.presentations[0]?.assetVersionId).toBe("teacher-b-video");
+    expect(first[0]?.progress?.status).toBe("completed");
+    expect(second[0]?.progress).toBeNull();
+    expect(first[1]?.progress).toBeNull();
+    expect(second[1]?.progress?.status).toBe("in_progress");
+  });
+
+  it("keeps a learner's official progress when changing recorded instructors", () => {
+    const before = projectRecordedCourseLessons({
+      lessons: sharedCourseLessons,
+      progress: learnerOneProgress,
+      presentations: teacherA,
+    });
+    const after = projectRecordedCourseLessons({
+      lessons: sharedCourseLessons,
+      progress: learnerOneProgress,
+      presentations: teacherB,
+    });
+    expect(after.map(lesson => lesson.progress)).toEqual(before.map(lesson => lesson.progress));
+    expect(after.map(lesson => lesson.id)).toEqual(before.map(lesson => lesson.id));
+    expect(after[0]?.presentations[0]?.assetVersionId).toBe("teacher-b-video");
   });
 });
