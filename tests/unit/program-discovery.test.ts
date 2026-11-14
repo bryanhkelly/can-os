@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   projectAvailableOfferings,
+  canPlanOffering,
   programDiscoveryInputSchema,
   type ProgramAvailability,
   type PublishedOffering,
@@ -69,6 +70,20 @@ describe("canonical program discovery", () => {
         { catalogStatus: "review_required" },
       ],
     });
+  });
+
+  it("allows supported or conditional Offering intents, not unavailable programs", () => {
+    const sitePlan = (status: ProgramAvailability["catalogStatus"]) => ({
+      offering: product,
+      availability: [availability("00000000-0000-4000-8000-000000000011", {
+        catalogStatus: status,
+      })],
+      activationEligible: false as const,
+    });
+    expect(canPlanOffering(sitePlan("supported"))).toBe(true);
+    expect(canPlanOffering(sitePlan("conditional"))).toBe(true);
+    expect(canPlanOffering(sitePlan("unavailable"))).toBe(false);
+    expect(canPlanOffering(sitePlan("review_required"))).toBe(false);
   });
 
   it("does not present Blueprint references or unmatched policies as Offerings", () => {
