@@ -166,6 +166,16 @@ async function main() {
         WHERE n.nspname='education_v30'
           AND p.polname LIKE 'blueprint_%') AS scoped_policies,
         (SELECT count(*)::integer
+         FROM pg_policy p
+         JOIN pg_class c ON c.oid=p.polrelid
+         JOIN pg_namespace n ON n.oid=c.relnamespace
+         WHERE n.nspname='education_v30'
+           AND c.relname='education_operation_sites'
+           AND p.polname='blueprint_operation_sites_read'
+           AND p.polcmd='r'
+           AND pg_get_expr(p.polqual,p.polrelid) LIKE '%blueprint_author%')
+         AS scoped_operation_sites_policy,
+        (SELECT count(*)::integer
         FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
         WHERE n.nspname='education_v30'
           AND p.proname='v301_canonical_session_context'
@@ -937,7 +947,8 @@ async function main() {
       rlsCount.rows[0].table_count !== 10 && "Blueprint forced RLS",
       immutableChildTriggerCount.rows[0].trigger_count !== 4 && "Blueprint child immutability",
       (nativeBlueprintSecurity.rows[0].protected_tables !== 16 ||
-        nativeBlueprintSecurity.rows[0].scoped_policies < 20 ||
+        nativeBlueprintSecurity.rows[0].scoped_policies < 21 ||
+        nativeBlueprintSecurity.rows[0].scoped_operation_sites_policy !== 1 ||
         nativeBlueprintSecurity.rows[0].private_session_functions !== 1) &&
         "native Blueprint database and session RLS",
       learningRlsCount.rows[0].table_count !== 19 && "learning forced RLS",
