@@ -10,6 +10,7 @@ import {
   parseStudentPracticeDefinition,
   projectRecordedCourseLessons,
   recordedInstructorSelectionIsCurrent,
+  resumeRecordedLessonId,
   recordedPracticeResponsesComplete,
   snapshotRecordedPracticeAnswers,
   trackContentAvailable,
@@ -446,6 +447,28 @@ describe("recorded instructor policy renewal eligibility", () => {
 });
 
 describe("recorded lesson continuation", () => {
+  it("resumes the same course lesson when the learner switches recorded instructors", () => {
+    const lessons = [
+      { id: "lesson-one", progress: { status: "completed" } },
+      { id: "lesson-two", progress: { status: "in_progress" } },
+      { id: "lesson-three", progress: null },
+    ];
+    expect(resumeRecordedLessonId(lessons, "lesson-three")).toBe("lesson-three");
+    expect(resumeRecordedLessonId(lessons, "lesson-two")).toBe("lesson-two");
+  });
+
+  it("opens the first unfinished lesson, skipping completed and waived lessons", () => {
+    const lessons = [
+      { id: "lesson-one", progress: { status: "completed" } },
+      { id: "lesson-two", progress: { status: "waived" } },
+      { id: "lesson-three", progress: null },
+    ];
+    expect(resumeRecordedLessonId(lessons, null)).toBe("lesson-three");
+    expect(resumeRecordedLessonId(lessons, "not-in-course")).toBe("lesson-three");
+    expect(resumeRecordedLessonId(lessons.slice(0, 2), null)).toBe("lesson-one");
+    expect(resumeRecordedLessonId([], null)).toBe(null);
+  });
+
   const lesson = (id: string, status: string | null) => ({
     id,
     progress: status ? { status } : null,
