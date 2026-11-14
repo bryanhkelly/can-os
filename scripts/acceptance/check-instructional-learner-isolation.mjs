@@ -135,8 +135,6 @@ async function run() {
         "education_v30.formative_practice_attempts", "id", attempts[other]);
       assert(ownPractice.length >= 1 && otherPractice.length === 0,
         "Practice history must stay learner-private.");
-      ownPracticeIds.push(ownPractice[0].id);
-
       const { rows: ownAnswers } = await client.query(`
         SELECT r.practice_attempt_id
         FROM education_v30_secure.formative_practice_responses r
@@ -146,6 +144,7 @@ async function run() {
       `, [attempts[i]]);
       assert(ownAnswers.length >= 1,
         "Each learner must be able to review their own saved practice answers.");
+      ownPracticeIds.push(ownAnswers[0].practice_attempt_id);
 
       console.log(`PASS: restricted learner ${i+1} sees only their Course, recorded selections, and practice.`);
     }
