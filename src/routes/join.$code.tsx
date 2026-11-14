@@ -56,8 +56,14 @@ function JoinSessionPage() {
         </div>
       ) : needsSignIn ? (
         <div className="space-y-4">
-          <p role="alert">Sign in with your learner account to join this classroom.</p>
-          <Button asChild><Link to="/access">Sign in</Link></Button>
+          <p role="alert">Sign in to join this classroom. You will come straight back here afterwards.</p>
+          <Button asChild>
+            <Link to="/access" search={{ returnTo: `/join/${normalized}` }}>Sign in</Link>
+          </Button>
+          <p className="text-sm text-muted-foreground">
+            First time here? Ask your facilitator or site organizer to register your email;
+            you will then be able to sign in and join with this code.
+          </p>
         </div>
       ) : (
         <div className="space-y-4">
