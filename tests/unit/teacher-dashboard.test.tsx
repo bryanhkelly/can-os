@@ -26,6 +26,7 @@ import { TeacherHome } from "@/components/home/TeacherHome";
 const today: Awaited<ReturnType<typeof getTeacherToday>> = {
   connected: true, teacher: { firstName: "Avery" },
   sections: [{ id: "english", title: "English Literature", studentCount: 0, classroom: null }],
+  ungradedCount: 35, missingWorkCount: 28,
   ungraded: [{
     sectionId: "english", assessmentId: "essay", studentProfileId: "learner", studentName: "Synthetic learner",
     assessmentTitle: "Essay", sectionTitle: "English Literature", submittedAt: "2030-01-01T12:00:00Z",
@@ -47,6 +48,10 @@ describe("teacher dashboard migration", () => {
     expect(html).toContain("English Literature");
     expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay"');
     expect(html).toContain('href="/messages"');
+    expect(html).toContain('href="/student/support"');
+    expect(html).toContain("35 submitted items to review");
+    expect(html).toContain("35 submitted work items to review");
+    expect(html).toContain("28");
     expect(html).toContain('href="/calendar?view=agenda"');
     expect(html.indexOf("Authorized teacher schedule")).toBeGreaterThan(html.indexOf("<aside"));
     expect(html.match(/<main\b/g)).toHaveLength(1);
