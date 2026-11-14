@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -8,6 +8,46 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+
+/** Read-only provider scope for test and production policy authoring panels. */
+export const getNoncreditCompletionPolicyCatalog=createServerFn({method:"GET"})
+  .handler(async()=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCanonicalCommandContext(getRequest());
+    if(!actor.actorPersonId||!["registrar","site_admin"].includes(actor.role??""))
+      throw new AuthorizationError("authorized noncredit provider");
+    assertCapability(actor,"noncredit.completion.decide");
+    const organizations=actor.scope.organizationIds??[];
+    if(!organizations.length)throw new AuthorizationError("provider organization scope");
+    const training=await db.select({
+      id:noncreditTrainingVersions.id,title:noncreditTrainingVersions.title,
+      authorPersonId:noncreditTrainingVersions.authorPersonId,
+      providerOrganizationId:noncreditTrainingVersions.providerOrganizationId,
+      assessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
+    }).from(noncreditTrainingVersions).where(
+      inArray(noncreditTrainingVersions.providerOrganizationId,organizations),
+    ).orderBy(noncreditTrainingVersions.title);
+    const ids=training.map(t=>t.id);
+    const rows=ids.length?await db.select().from(noncreditCompletionPolicies)
+      .where(inArray(noncreditCompletionPolicies.trainingVersionId,ids))
+      .orderBy(desc(noncreditCompletionPolicies.policyVersion)):[];
+    return training.filter(t=>t.authorPersonId!==actor.actorPersonId).map(t=>{
+      const latest=rows.find(r=>r.trainingVersionId===t.id);
+      return {
+        trainingVersionId:t.id,title:t.title,
+        hasFinalKnowledgeCheck:!!t.assessmentVersionId,
+        latest:latest?{
+          policyVersion:latest.policyVersion,policyId:latest.id,
+          minParticipationMinutes:latest.minParticipationMinutes,
+          requireAllLessons:latest.requireAllLessons,
+          skillsAssessmentRequired:latest.skillsAssessmentRequired,
+          minimumAssessmentFraction:latest.minimumAssessmentFraction===null
+            ?null:Number(latest.minimumAssessmentFraction),
+          completionMode:latest.completionMode,
+        }:null,
+      };
+    });
+  });
 
 const input=z.object({
   trainingVersionId:z.string().uuid(),
