@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { normalizeClientError } from "@/lib/client-error";
@@ -168,6 +169,11 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
     {notice && <p role="status" className="border p-3 text-sm">{notice}</p>}
 
     {instruction && <>
+      {instruction.sectionId && <nav aria-label="Official course records" className="flex flex-wrap gap-4 border bg-card p-4 text-sm">
+        <Link to="/classes" search={{ section: instruction.sectionId, tab: "lessons" }} className="underline">Official class lessons</Link>
+        <Link to="/student/assignments" search={{ section: instruction.sectionId }} className="underline">Assignments and feedback</Link>
+        <Link to="/student/courses" search={{ section: instruction.sectionId, tab: "grades" }} className="underline">Grades</Link>
+      </nav>}
       <div className="border bg-card p-4">
         <h3 className="font-semibold">Course lessons</h3>
         <p className="mt-1 text-xs text-muted-foreground">
