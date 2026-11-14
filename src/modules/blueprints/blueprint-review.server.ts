@@ -18,6 +18,7 @@ import {
 } from "@/domain/blueprint-review";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { blueprintDatabaseRole, blueprintReadDatabaseRole } from "@/domain/blueprint-database-role";
 
 type ReviewInput = ReturnType<typeof decideBlueprintReviewInputSchema.parse>;
 
@@ -76,7 +77,9 @@ export async function getBlueprintReview(
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.read");
   const { configurationVersionId } = blueprintReviewReadInputSchema.parse(rawInput);
+  const databaseRole = blueprintReadDatabaseRole(context);
   return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
     const [latestReview] = await tx.select({
       id: configurationReviews.id,
@@ -132,7 +135,9 @@ export async function decideBlueprintReview(
   const input = decideBlueprintReviewInputSchema.parse(rawInput);
   const actorPersonId = context.actorPersonId;
 
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
   return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, input.configurationVersionId);
     await tx.select({ id: blueprintConfigurations.id })
       .from(blueprintConfigurations)
