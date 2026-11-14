@@ -11,6 +11,25 @@ describe("canonical v3.0.1 stays net-new", () => {
     expect(handler).not.toContain("getCommandContext(getRequest())");
   });
 
+  it("uses native authorization without a global Blueprint write feature toggle", () => {
+    for (const path of [
+      "src/modules/blueprints/blueprint-studio.functions.ts",
+      "src/modules/blueprints/blueprint-workspace.server.ts",
+      "src/modules/blueprints/blueprint-review-queue.server.ts",
+    ]) {
+      const module = source(path);
+      expect(module).not.toContain("CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED");
+      expect(module).not.toContain("requireCanonicalBlueprintWriteEnabled");
+    }
+    const handlers = source("src/modules/blueprints/blueprint-studio.functions.ts");
+    expect(handlers).toContain("getCanonicalCommandContext(getRequest())");
+    expect(handlers).toContain("requireBlueprintSiteScope");
+    expect(source("src/modules/blueprints/blueprint-workspace.server.ts"))
+      .toContain('blueprintDatabaseRole(context, "blueprint_author")');
+    expect(source("src/modules/blueprints/blueprint-review-queue.server.ts"))
+      .toContain('blueprintDatabaseRole(context, "blueprint_reviewer")');
+  });
+
   it("keeps the author and reviewer pages outside old School Hub and sign-in", () => {
     const author = source("src/routes/canonical.blueprints.tsx");
     const reviewer = source("src/routes/canonical.blueprint-reviews.tsx");
