@@ -30,7 +30,7 @@ ALTER TABLE education_v30.learning_session_events DROP CONSTRAINT IF EXISTS lear
 ALTER TABLE education_v30.learning_session_events ADD CONSTRAINT learning_session_events_evidence_level_ck CHECK (evidence_level IN ('self_reported','client_observed','server_verified','facilitator_attested','independently_assessed'));
 CREATE TABLE IF NOT EXISTS education_v30.site_device_registrations (
 id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-site_id uuid NOT NULL REFERENCES education_v30.catalog_sites(id),
+site_id uuid NOT NULL REFERENCES education_v30.sites(id),
 asset_id uuid REFERENCES education_v30.equipment_assets(id),
 label text NOT NULL,
 device_category text NOT NULL CHECK (device_category IN ('desktop','laptop','tablet','phone','chromebook','other')),
@@ -42,7 +42,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS site_device_registrations_asset_uq ON educatio
 CREATE INDEX IF NOT EXISTS site_device_registrations_site_status_idx ON education_v30.site_device_registrations(site_id,status);
 ALTER TABLE education_v30.site_device_registrations ENABLE ROW LEVEL SECURITY;
 CREATE TABLE IF NOT EXISTS education_v30.site_device_policies (
-site_id uuid PRIMARY KEY REFERENCES education_v30.catalog_sites(id),
+site_id uuid PRIMARY KEY REFERENCES education_v30.sites(id),
 shared_device_required boolean NOT NULL DEFAULT false,
 managed_device_required_for_assessments boolean NOT NULL DEFAULT false,
 kiosk_idle_minutes integer NOT NULL DEFAULT 5 CHECK (kiosk_idle_minutes BETWEEN 1 AND 30),
