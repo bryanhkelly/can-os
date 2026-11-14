@@ -39,7 +39,7 @@ INSERT INTO education_v30.blueprint_versions (
 SELECT b.id,1,'operation',
   jsonb_build_object('source','can_starter','description',
     'Reusable planning recipe; independent approvals and deployment authority are required'),
-  'published',clock_timestamp()
+  'draft',NULL
 FROM education_v30.blueprints b JOIN recipes r ON r.code=b.code
 WHERE b.publisher_organization_id=:'publisher_organization_id'::uuid
 ON CONFLICT(blueprint_id,version_no) DO NOTHING;
@@ -64,8 +64,21 @@ FROM components c JOIN education_v30.blueprints b
   ON b.code=c.recipe_code
   AND b.publisher_organization_id=:'publisher_organization_id'::uuid
 JOIN education_v30.blueprint_versions v ON v.blueprint_id=b.id AND v.version_no=1
-WHERE v.lifecycle='published' AND b.status='active'
+WHERE v.lifecycle='draft' AND b.status='active'
 ON CONFLICT(blueprint_version_id,component_key) DO NOTHING;
+
+-- Publish only after all starter components exist; child immutability then
+-- protects the released recipe from later changes.
+UPDATE education_v30.blueprint_versions v
+SET lifecycle='published', published_at=clock_timestamp()
+FROM education_v30.blueprints b
+WHERE b.id=v.blueprint_id
+  AND b.publisher_organization_id=:'publisher_organization_id'::uuid
+  AND b.code IN ('can.school.starter','can.learning-center.starter')
+  AND v.version_no=1
+  AND v.lifecycle='draft'
+  AND EXISTS (SELECT 1 FROM education_v30.blueprint_components c
+    WHERE c.blueprint_version_id=v.id);
 COMMIT;
 
 -- Reference-library items and Offering adoptions are deliberately not
