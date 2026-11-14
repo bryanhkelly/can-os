@@ -297,6 +297,8 @@ async function main() {
       ["sites", "id, geographic_area_id, status"],
       ["site_organization_roles", "site_id, organization_id, role_code, valid_from, valid_through"],
       ["geographic_areas", "id"],
+      ["blueprint_reference_items", "id, code, reference_kind, category, status, sort_order"],
+      ["blueprint_reference_item_versions", "id, item_id, version_no, title, summary, lifecycle"],
       ["offerings", "id, code, title, status"],
       ["offering_versions", "id, offering_id, version_no, lifecycle"],
       ["qualification_program_fit_policies", "id, status"],
@@ -441,7 +443,17 @@ async function main() {
           AS has_bound_organization,
         education_v30.v28_role_has_purpose('program_catalog') AS has_catalog_purpose,
         (SELECT count(*) FROM education_v30.v30_catalog_program_availability($5, 'onsite'))
-          AS catalog_function_rows
+          AS catalog_function_rows,
+        (SELECT count(*) FROM education_v30.blueprint_reference_items)
+          AS active_reference_count,
+        (SELECT count(*) FROM education_v30.blueprint_reference_item_versions)
+          AS published_reference_count,
+        has_column_privilege(current_user,
+          'education_v30.blueprint_reference_item_versions', 'metadata', 'SELECT')
+          AS can_read_private_reference_metadata,
+        has_table_privilege(current_user,
+          'education_v30.blueprint_reference_items', 'INSERT')
+          AS can_write_reference_library
     `, [catalogRole, authorizedSiteId, otherSiteId, catalogOrganizationId, geographicAreaId]);
     const activeRoleResult = activeRole.rows[0];
     if (!activeRoleResult.expected_role
@@ -451,6 +463,10 @@ async function main() {
       || activeRoleResult.can_update_sites
       || !activeRoleResult.has_bound_organization
       || !activeRoleResult.has_catalog_purpose
+      || activeRoleResult.active_reference_count !== "74"
+      || activeRoleResult.published_reference_count !== "74"
+      || activeRoleResult.can_read_private_reference_metadata
+      || activeRoleResult.can_write_reference_library
       || !/^\d+$/.test(activeRoleResult.catalog_function_rows)) {
       throw new Error("Program-catalog role authorization or least-privilege checks failed.");
     }
