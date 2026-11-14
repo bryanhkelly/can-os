@@ -77,7 +77,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
     </DashboardShortcut>}
    </>}
   rail={ready ? <TeacherDaySchedule sections={data.sections} /> : undefined}
-  actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/support">Student support →</Link><Link to="/profiles">Professional profile →</Link></>}
+  actions={<><Link to="/teacher/missing-work">Missing-work follow-up →</Link><Link to="/student/support">Student support →</Link><Link to="/profiles">Professional profile →</Link></>}
  >
    {!data.connected && <p className="mt-8 border p-4 text-sm" role="status">Neon is not connected. Today's snapshot cannot load.</p>}
 
