@@ -279,14 +279,24 @@ export function RecordedPracticeHistory({ history }: { history: PracticeHistory 
       Switching teachers does not erase this history or change official grades.
     </p>
     <ol className="mt-3 divide-y">
-      {history.map(attempt => <li key={attempt.id} className="flex flex-wrap justify-between gap-2 py-3 text-sm">
-        <span>
-          <strong>{attempt.courseUnitTitle ?? "Course unit"}</strong>
-          <span className="ml-2 text-muted-foreground">· {attempt.trackTitle ?? "Recorded teacher"}</span>
-        </span>
-        <span className="text-xs text-muted-foreground">
-          {new Date(attempt.recordedAt).toISOString().slice(0, 10)}
-        </span>
+      {history.map(attempt => <li key={attempt.id} className="py-3 text-sm">
+        <details>
+          <summary className="cursor-pointer">
+            <strong>{attempt.courseUnitTitle ?? "Course unit"}</strong>
+            <span className="ml-2 text-muted-foreground">· {attempt.trackTitle ?? "Recorded teacher"}</span>
+            <span className="ml-2 text-xs text-muted-foreground">
+              {new Date(attempt.recordedAt).toISOString().slice(0, 10)}
+            </span>
+          </summary>
+          {attempt.answers.length ? <ol className="mt-3 space-y-3 border-l pl-4">
+            {attempt.answers.map((answer, index) => <li key={`${answer.promptKey}:${index}`}>
+              <p className="font-medium">{answer.promptText}</p>
+              <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{answer.response}</p>
+            </li>)}
+          </ol> : <p className="mt-2 text-xs text-muted-foreground">
+            Saved responses are not available for this attempt.
+          </p>}
+        </details>
       </li>)}
     </ol>
   </section>;
