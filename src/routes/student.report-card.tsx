@@ -42,12 +42,14 @@ function StudentReportCardPage() {
         setGrades(reportCard.value.grades);
         setGradesError("");
       } else {
+        setGrades([]);
         setGradesError(studentRecordError(reportCard.reason, "Your report card could not be loaded. Please try again."));
       }
       if (transcriptResult.status === "fulfilled") {
         setTranscript(transcriptResult.value);
         setTranscriptError("");
       } else {
+        setTranscript({ rows: [], issuances: [] });
         setTranscriptError(studentRecordError(transcriptResult.reason, "Your transcript could not be loaded. Please try again."));
       }
       setLoading(false);
