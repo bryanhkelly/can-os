@@ -30,6 +30,7 @@ import {
   learnerProfiles,
   learnerTrackSelections,
   noncreditRegistrations,
+  noncreditParticipationEvents,
   programDeployments,
   trackDistributionAuthorizations,
   trackLessonPresentations,
@@ -1024,6 +1025,18 @@ export async function completeRecordedLesson(
         target: [learnerLessonProgress.courseAttemptId, learnerLessonProgress.lessonId],
         set: { status: "completed", observedAt },
       });
+      if (attempt.noncreditRegistrationId) {
+        // This records a self-marked milestone, not attendance or media proof.
+        // It can never satisfy a verified-minutes requirement.
+        await tx.insert(noncreditParticipationEvents).values({
+          registrationId: attempt.noncreditRegistrationId,
+          eventKind: "lesson_completed",
+          countedMinutes: 0,
+          evidenceVersionId: null,
+          recordedByPersonId: context.actorPersonId!,
+          occurredAt: observedAt,
+        });
+      }
       return {
         courseAttemptId: attempt.id,
         courseVersionId: attempt.courseVersionId,

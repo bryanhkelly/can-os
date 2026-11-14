@@ -15,6 +15,7 @@ export const noncreditCompletionPolicies = educationV30.table("noncredit_complet
   id:id(),trainingVersionId:uuid("training_version_id").notNull(),
   policyVersion:integer("policy_version").notNull(),
   minParticipationMinutes:integer("min_participation_minutes").notNull(),
+  requireAllLessons:boolean("require_all_lessons").notNull().default(false),
   skillsAssessmentRequired:boolean("skills_assessment_required").notNull(),
   minimumAssessmentFraction:numeric("minimum_assessment_fraction",{precision:6,scale:5}),
   effectiveAt:timestamp("effective_at",{withTimezone:true}).notNull(),

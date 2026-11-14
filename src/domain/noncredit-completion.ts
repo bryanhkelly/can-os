@@ -7,6 +7,7 @@ export type NoncreditCompletionPolicy = {
   trainingVersionId: string;
   effectiveAt: Date;
   minParticipationMinutes: number;
+  requireAllLessons: boolean;
   skillsAssessmentRequired: boolean;
   minimumAssessmentFraction: number | null;
 };
@@ -28,8 +29,11 @@ export type NoncreditCompletionReadiness = {
   eligible: boolean;
   countedMinutes: number;
   requiredMinutes: number;
+  completedLessons: number;
+  totalLessons: number;
+  lessonsRequired: boolean;
   assessmentFraction: number | null;
-  blockers: ("registration_inactive" | "policy_unavailable" | "participation_incomplete" | "assessment_incomplete")[];
+  blockers: ("registration_inactive" | "policy_unavailable" | "participation_incomplete" | "lessons_incomplete" | "assessment_incomplete")[];
 };
 
 export function evaluateNoncreditCompletion(input: {
@@ -40,6 +44,8 @@ export function evaluateNoncreditCompletion(input: {
   assessmentVersionId: string | null;
   policy: NoncreditCompletionPolicy | null;
   participation: readonly NoncreditParticipationEvidence[];
+  completedLessonCount: number;
+  totalLessonCount: number;
   assessment: NoncreditAssessmentEvidence | null;
   now: Date;
 }): NoncreditCompletionReadiness {
@@ -65,6 +71,12 @@ export function evaluateNoncreditCompletion(input: {
     return sum + event.countedMinutes;
   }, 0);
   if (p && countedMinutes < p.minParticipationMinutes) blockers.push("participation_incomplete");
+  const completedLessons = Number.isSafeInteger(input.completedLessonCount)
+    && input.completedLessonCount >= 0 ? input.completedLessonCount : 0;
+  const totalLessons = Number.isSafeInteger(input.totalLessonCount)
+    && input.totalLessonCount >= 0 ? input.totalLessonCount : 0;
+  if (p?.requireAllLessons && (totalLessons === 0 || completedLessons !== totalLessons))
+    blockers.push("lessons_incomplete");
   const a = input.assessment;
   const validAssessment = !!a && !!input.learnerId && !!input.assessmentVersionId &&
     a.learnerId === input.learnerId && a.assessmentVersionId === input.assessmentVersionId &&
@@ -77,6 +89,7 @@ export function evaluateNoncreditCompletion(input: {
   return {
     eligible: blockers.length === 0, countedMinutes,
     requiredMinutes: p?.minParticipationMinutes ?? 0,
+    completedLessons, totalLessons, lessonsRequired: p?.requireAllLessons ?? false,
     assessmentFraction, blockers,
   };
 }

@@ -8,6 +8,7 @@ import {
   assessmentAttempts, evidenceDocumentVersions, noncreditCompletionDecisions,
   noncreditCompletionPolicies, noncreditParticipationEvents,
   noncreditRegistrations, noncreditTrainingVersions,
+  learnerLessonProgress, courseLessons,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { evaluateNoncreditCompletion } from "@/domain/noncredit-completion";
@@ -44,6 +45,19 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
         .where(and(eq(noncreditCompletionPolicies.trainingVersionId,registration.trainingVersionId),
           lte(noncreditCompletionPolicies.effectiveAt,now)))
         .orderBy(desc(noncreditCompletionPolicies.policyVersion)).limit(1);
+      const [lessons,progress]=await Promise.all([
+        tx.select({id:courseLessons.id}).from(courseLessons)
+          .where(eq(courseLessons.courseVersionId,authorized.courseVersionId)),
+        tx.select({lessonId:learnerLessonProgress.lessonId})
+          .from(learnerLessonProgress)
+          .where(and(
+            eq(learnerLessonProgress.courseAttemptId,authorized.courseAttemptId),
+            eq(learnerLessonProgress.status,"completed"),
+          )),
+      ]);
+      const lessonIds=new Set(lessons.map(lesson=>lesson.id));
+      const completedLessonCount=new Set(progress.map(row=>row.lessonId)
+        .filter(id=>lessonIds.has(id))).size;
       const events=await tx.select().from(noncreditParticipationEvents)
         .where(eq(noncreditParticipationEvents.registrationId,registration.id));
       const evidenceIds=[...new Set(events.flatMap(e=>e.evidenceVersionId?[e.evidenceVersionId]:[]))];
@@ -103,11 +117,12 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
           trainingVersionId:policy.trainingVersionId,
           effectiveAt:policy.effectiveAt,
           minParticipationMinutes:policy.minParticipationMinutes,
+          requireAllLessons:policy.requireAllLessons,
           skillsAssessmentRequired:policy.skillsAssessmentRequired,
           minimumAssessmentFraction:policy.minimumAssessmentFraction===null
             ?null:Number(policy.minimumAssessmentFraction),
         }:null,
-        participation,assessment,now,
+        participation,completedLessonCount,totalLessonCount:lessonIds.size,assessment,now,
       });
       const [latestDecision]=await tx.select({
         id:noncreditCompletionDecisions.id,
