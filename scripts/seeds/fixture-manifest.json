@@ -2148,6 +2148,61 @@
       "persona": "native v3 independent Blueprint reviewer",
       "fixtureRequired": false,
       "rationale": "Legacy Site and account fixture seeds cannot establish an independent native v3 reviewer or verified evidence. Use the isolated canonical v3.0.1 restricted-role demo and acceptance runner; browser review and decision journeys remain unverified."
+    },
+    "/canonical/capability-lab": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Provider overview of scoped counts and links; no route-level mutation. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/noncredit": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Provider noncredit access provisioning, finalized assessment and completion commands use owned audited server functions. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/surveys": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Read-only provider-owned survey campaign and response counts; no individual answers. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/credentials": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Provider-scoped credential previews only; no credential issuance. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/deployments": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Read-only current approved operator and Site scoped deployment, adoption and aggregate participation inspection. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/readiness": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "Isolated canonical v3.0.1 identities, roles and database fixtures cannot be impersonated by the public-schema demo seed. Read-only provider-owned assessment definitions/versions, without secure answers or learner results. Authenticated canonical browser behavior remains unverified."
+    },
+    "/canonical/lab/site-qualification": {
+      "persona": "native canonical site_admin or registrar",
+      "fixtureRequired": false,
+      "rationale": "The public-schema demo dataset does not establish canonical qualification reviewer authority, Site grants or protected evidence provenance. The temporary page is a read-only inspection of isolated v3.0.1 applicant-owned qualification summaries; live authenticated browser tests remain outstanding."
+    },
+    "/canonical/my-credentials": {
+      "persona": "native canonical learner",
+      "fixtureRequired": false,
+      "rationale": "The public-school demo fixture cannot impersonate native canonical learner identity, recipient-bound award issuances or the protected credential reader feature flag. This is a temporary credential experience until it moves into a production learner route; live browser acceptance is still pending."
+    },
+    "/canonical/content": {
+      "persona": "verified academic_content_creator",
+      "fixtureRequired": false,
+      "rationale": "Independent evidence-backed organization-wide content creator grants, course-specific professional appointments and published canonical Course versions are not supplied by the public demo fixture. Synthetic nonproduction provider identity and current evidence must be provisioned and verified separately."
+    },
+    "/canonical/content/$trackVersionId": {
+      "persona": "verified academic_content_creator draft author",
+      "fixtureRequired": false,
+      "rationale": "The exact author-owned unpublished instructional-track version, approved asset manifests and course appointment require a dedicated authorized canonical-v301/legacy-provider integration fixture. Generic public demo accounts cannot confer these permissions, and the server rejects stale or foreign drafts."
+    },
+    "/canonical/content-reviews": {
+      "persona": "verified academic_content_reviewer",
+      "fixtureRequired": false,
+      "rationale": "Review requires an independent organization-wide reviewer identity, a verified current Course appointment and separately submitted content manifest evidence. Generic demo identity cannot simulate this authority, and live cross-persona review and publication acceptance is outstanding."
     }
   }
 }

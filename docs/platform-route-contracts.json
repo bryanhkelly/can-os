@@ -292,6 +292,105 @@
       "writeBoundary": "Canonical server functions enforce Site ownership, immutable revisions, evidence-backed review, and planning-only execution; no direct program activation"
     },
     {
+      "file": "src/routes/canonical.capability-lab.tsx",
+      "route": "/canonical/capability-lab",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Provider overview of scoped counts and links; no route-level mutation",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
+    },
+    {
+      "file": "src/routes/canonical.content-reviews.tsx",
+      "route": "/canonical/content-reviews",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Independent reviewer sees only submitted manifests under current course-specific appointments, records category decisions and publishes only fully approved tracks",
+      "readBoundary": "Current reviewer organization grant, independently verified course appointment, exclude own author and presenter tracks, no access to learner records",
+      "writeBoundary": "Existing audited review and publish commands require current exact manifest and independent reviews covering academic, rights, accessibility, coverage and safeguarding"
+    },
+    {
+      "file": "src/routes/canonical.content.$trackVersionId.tsx",
+      "route": "/canonical/content/$trackVersionId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Author edits their own unsubmitted track's exact published Course lessons and approved content asset bindings, saves a revision and submits the manifest for independent review",
+      "readBoundary": "Own author draft, current grant, course-scoped capability and appointment revalidated; approved organization asset inventory only; no learner data",
+      "writeBoundary": "Existing save and submit commands revalidate exact revision, publication assets, rights, lesson coverage and audit; submitted manifest freezes editing"
+    },
+    {
+      "file": "src/routes/canonical.content.tsx",
+      "route": "/canonical/content",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Verified organization-scoped instructional creator sees only Courses with current evidence-backed appointments, then creates private recorded-track drafts and resumes owned versions",
+      "readBoundary": "Exact active legacy provider grant plus course-specific professional role appointment, current capability evidence, verified membership; excludes student and other organizations",
+      "writeBoundary": "Draft creation delegated to existing audited provider-owned instructional track command; no student record or publication powers"
+    },
+    {
+      "file": "src/routes/canonical.lab.credentials.tsx",
+      "route": "/canonical/lab/credentials",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Provider-scoped credential previews only; no credential issuance",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
+    },
+    {
+      "file": "src/routes/canonical.lab.deployments.tsx",
+      "route": "/canonical/lab/deployments",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only current approved operator and Site scoped deployment, adoption and aggregate participation inspection",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
+    },
+    {
+      "file": "src/routes/canonical.lab.noncredit.tsx",
+      "route": "/canonical/lab/noncredit",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Provider noncredit access provisioning, finalized assessment and completion commands use owned audited server functions",
+      "writeBoundary": "No direct writes on this route; command-enabled noncredit testing delegates to authorized audited canonical domain commands",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
+    },
+    {
+      "file": "src/routes/canonical.lab.readiness.tsx",
+      "route": "/canonical/lab/readiness",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only provider-owned assessment definitions/versions, without secure answers or learner results",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records; assessment definitions are owned by the session organization",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
+    },
+    {
+      "file": "src/routes/canonical.lab.site-qualification.tsx",
+      "route": "/canonical/lab/site-qualification",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar inspects applicant organization-owned site qualification and program fit evidence summaries in a temporary lab, without granting an opening approval",
+      "readBoundary": "Native canonical session and authorized Site required; qualification applicant and subject must match the session organization, and existing Sites must match the authorized Site",
+      "writeBoundary": "Read-only GET; no qualification review, document write, or opening authorization"
+    },
+    {
+      "file": "src/routes/canonical.lab.surveys.tsx",
+      "route": "/canonical/lab/surveys",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical provider staff inspect owned definitions and operated campaigns, with no respondent identities, private answers or mutation; preflight tests identified noncredit configuration only",
+      "writeBoundary": "Read-only GET; no survey authoring, invitation, publication or response mutation on this page",
+      "readBoundary": "Native canonical session and single provider organization; owned survey definitions and organization-operated campaigns, question definitions, options and aggregate invitation/response counts; no submitted answers or recipient identities"
+    },
+    {
+      "file": "src/routes/canonical.my-credentials.tsx",
+      "route": "/canonical/my-credentials",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Feature-flagged canonical learner views issued noncredit certificates and badges for the authenticated recipient; final production placement is pending",
+      "readBoundary": "Canonical native learner session, credential reader feature flag and subject-bound issuance search; no provider or other recipient records exposed",
+      "writeBoundary": "Download uses a recipient-bound POST with current credential validity check; no issuance or revocation action on this page"
+    },
+    {
       "file": "src/routes/church.apply.tsx",
       "route": "/church/apply",
       "owner": "network",
