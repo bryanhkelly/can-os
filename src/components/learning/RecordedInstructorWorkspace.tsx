@@ -40,7 +40,7 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
 }
 
 function RecordedInstructorCourseSession({ courseAttemptId }: { courseAttemptId: string }) {
-  const { selectLesson, observe } = useCanonicalLearningActivity();
+  const { selectLesson, observe, observeNativeVideo } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
   const [instruction, setInstruction] = useState<SelectedInstruction | null>(null);
   const [history, setHistory] = useState<PracticeHistory>([]);
