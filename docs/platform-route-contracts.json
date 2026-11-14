@@ -301,6 +301,33 @@
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
+      "file": "src/routes/canonical.content_.$trackVersionId.tsx",
+      "route": "/canonical/content_/$trackVersionId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Author edits their own unsubmitted track's exact published Course lessons and approved content asset bindings, saves a revision and submits the manifest for independent review",
+      "readBoundary": "Own author draft, current grant, course-scoped capability and appointment revalidated; approved organization asset inventory only; no learner data",
+      "writeBoundary": "Existing save and submit commands revalidate exact revision, publication assets, rights, lesson coverage and audit; submitted manifest freezes editing"
+    },
+    {
+      "file": "src/routes/canonical.content-reviews.tsx",
+      "route": "/canonical/content-reviews",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Independent reviewer sees only submitted manifests under current course-specific appointments, records category decisions and publishes only fully approved tracks",
+      "readBoundary": "Current reviewer organization grant, independently verified course appointment, exclude own author and presenter tracks, no access to learner records",
+      "writeBoundary": "Existing audited review and publish commands require current exact manifest and independent reviews covering academic, rights, accessibility, coverage and safeguarding"
+    },
+    {
+      "file": "src/routes/canonical.content.tsx",
+      "route": "/canonical/content",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Verified organization-scoped instructional creator sees only Courses with current evidence-backed appointments, then creates private recorded-track drafts and resumes owned versions",
+      "readBoundary": "Exact active legacy provider grant plus course-specific professional role appointment, current capability evidence, verified membership; excludes student and other organizations",
+      "writeBoundary": "Draft creation delegated to existing audited provider-owned instructional track command; no student record or publication powers"
+    },
+    {
       "file": "src/routes/canonical.lab.credentials.tsx",
       "route": "/canonical/lab/credentials",
       "owner": "operations",

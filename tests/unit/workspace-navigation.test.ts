@@ -107,7 +107,7 @@ describe("canonical workspace navigation",()=>{
     expect(workspaceLinks.site_admin.find(item=>item.path==="/sites")?.title).toBe("School profile");
     expect(workspaceLinks.registrar.some(item=>item.path==="/sites")).toBe(false);
   expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school")).toBe("/home");
-  expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school/publish")).toBe("/site-website");
+  expect(getActiveWorkspacePath(workspaceLinks.site_leader,"/sites/school/publish")).toBeUndefined();
   expect(getActiveWorkspacePath(workspaceLinks.registrar,"/classes")).toBeUndefined();
   expect(getActiveWorkspacePath(workspaceLinks.teacher,"/staff/students/person")).toBe("/staff/students");
   expect(getActiveWorkspacePath(workspaceLinks.teacher,"/teacher/unowned")).toBeUndefined();

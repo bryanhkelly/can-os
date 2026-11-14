@@ -3,6 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
+  contentAssets,
   contentAssetVersions,
   contentManifestReviewDecisions,
   contentPublicationManifestItems,
@@ -184,7 +185,7 @@ async function assertDraftOwner(
   });
 }
 
-async function currentDraftRevision(
+export async function currentDraftRevision(
   tx: TrackTransaction,
   bundle: DraftBundle,
 ): Promise<string> {
@@ -862,5 +863,61 @@ export async function withdrawInstructionalTrack(
         revision: currentRevision,
       };
     });
+  });
+}
+
+/** Creator-specific read model for editing one exact unpublished track version.
+ * Mutations retain the existing, independently audited server-side gates.
+ */
+export async function readCreatorTrackDraft(context: AccessContext, trackVersionId: string) {
+  assertAuthenticated(context, "instructional_track.author");
+  const id = uuidSchema.parse(trackVersionId);
+  return db.transaction(async tx => {
+    const bundle = await loadDraftBundle(tx, id);
+    await assertDraftOwner(tx, context, bundle, "instructional_track.author");
+    if (bundle.version.createdByPersonId !== context.actorPersonId ||
+        bundle.version.lifecycle !== "draft" ||
+        bundle.version.submissionManifestHash !== null) {
+      throw new AuthorizationError("own unsubmitted instructional track draft");
+    }
+    const [lessons, presentations, materials, assets] = await Promise.all([
+      tx.select({
+        id: courseLessons.id, title: courseLessons.title,
+        courseUnitId: courseLessons.courseUnitId, lessonOrder: courseLessons.lessonOrder,
+      }).from(courseLessons).where(eq(courseLessons.courseVersionId, bundle.version.courseVersionId))
+        .orderBy(courseLessons.lessonOrder),
+      tx.select({
+        courseLessonId: trackLessonPresentations.courseLessonId,
+        assetVersionId: trackLessonPresentations.assetVersionId,
+        presentationKind: trackLessonPresentations.presentationKind,
+        ordinal: trackLessonPresentations.ordinal,
+        accessibilityNotes: trackLessonPresentations.accessibilityNotes,
+      }).from(trackLessonPresentations)
+        .where(eq(trackLessonPresentations.trackVersionId, id)),
+      tx.select({
+        courseUnitId: instructionalTrackMaterials.courseUnitId,
+        assetVersionId: instructionalTrackMaterials.assetVersionId,
+        materialKind: instructionalTrackMaterials.materialKind,
+        activitySpec: instructionalTrackMaterials.activitySpec,
+      }).from(instructionalTrackMaterials)
+        .where(eq(instructionalTrackMaterials.trackVersionId, id)),
+      tx.select({
+        id: contentAssetVersions.id, title: contentAssets.title,
+        kind: contentAssets.kind, versionNo: contentAssetVersions.versionNo,
+      }).from(contentAssetVersions)
+        .innerJoin(contentAssets, eq(contentAssets.id, contentAssetVersions.assetId))
+        .where(and(
+          eq(contentAssets.ownerOrganizationId, bundle.course.publisherOrganizationId),
+          eq(contentAssetVersions.lifecycle, "published"),
+        )).limit(250),
+    ]);
+    return {
+      trackVersionId: id, trackTitle: bundle.track.title,
+      courseTitle: bundle.course.title, courseVersionId: bundle.version.courseVersionId,
+      trackKind: bundle.version.trackKind,
+      revision: await currentDraftRevision(tx, bundle),
+      lessons, presentations, materials, assets,
+      assetInventoryLimited: assets.length === 250,
+    };
   });
 }

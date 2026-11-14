@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { deriveOnsiteDayReconciliation } from "@/domain/onsite-day-reconciliation";
+import { deriveOnsiteObservedHeadcount } from "@/domain/onsite-physical-headcount";
 import type { listExpectedOnsiteRoster } from "@/modules/attendance/onsite-attendance-workflow.functions";
 import {
   attestOnsiteDayReview, getOnsiteDayReview,
@@ -21,6 +22,7 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
   date:string;roster:Roster;refreshRevision?:number;
 }) {
   const summary=deriveOnsiteDayReconciliation(roster.programs,roster.students);
+  const headcount=deriveOnsiteObservedHeadcount(roster.students);
   const [review,setReview]=useState<Review|null>(null);
   const [loading,setLoading]=useState(true);
   const [confirmed,setConfirmed]=useState(false);
@@ -85,9 +87,13 @@ export function OnsiteDayReconciliationPanel({date,roster,refreshRevision=0}:{
       <p className="mt-3 text-xs text-muted-foreground">{plural(review.custody.deniedAttempts, "denied pickup attempt")} {agree(review.custody.deniedAttempts, "is", "are")} linked to this snapshot. Pending release does not block an attendance-only attestation and never implies departure.</p>
     </div>}
     <p className="mt-3 text-xs text-muted-foreground">
-      {plural(summary.distinctStudentCount, "distinct student")} across {plural(summary.programs.length, "program")}.
-      Counts are program-attendance entries; they are not a physical headcount.
+      {plural(headcount.distinctExpectedStudents, "distinct expected student")} across {plural(summary.programs.length, "program")};
+      { " "}{plural(headcount.observedOnsiteStudents, "distinct student")} with a recorded present/tardy observation;
+      { " "}{plural(summary.expectedEntries, "student-Program attendance entry")}. These are not live building occupancy or release counts.
     </p>
+    {headcount.conflictingObservations>0&&<p role="alert" className="mt-3 rounded border border-warning p-3 text-sm">
+      {plural(headcount.conflictingObservations,"distinct student")} {agree(headcount.conflictingObservations,"has","have")} conflicting onsite and away observations across Programs. Review source records before relying on any attendance summary.
+    </p>}
     {summary.issues.length>0&&<>
       <h3 className="mt-4 font-semibold">Outstanding review items</h3>
       <ul className="mt-2 list-inside list-disc text-sm">

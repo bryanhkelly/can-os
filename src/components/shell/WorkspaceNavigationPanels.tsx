@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ContextTray } from "@/components/workspace";
-import type { WorkspaceNavigationItem } from "./workspace-navigation.registry";
+import type { WorkspaceInstitutionSelection, WorkspaceNavigationItem } from "./workspace-navigation.registry";
 import { SidebarLinks } from "./WorkspaceSidebarLinks";
 
 const NotificationTray = lazy(() => import("./NotificationTray").then(module => ({ default: module.NotificationTray })));
@@ -10,7 +10,7 @@ const AskCanConversation = lazy(() => import("@/components/conversation/AskCanCo
 const focusRingClass = "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, onCloseAccount,
-  changing, onSignOut, menuOpen, onCloseMenu, links, activePath, tray, onCloseTray }: {
+  changing, onSignOut, menuOpen, onCloseMenu, links, activePath, institutionSelection, tray, onCloseTray }: {
   member?: { role: string };
   authenticated: boolean;
   accountOpen: boolean;
@@ -20,6 +20,7 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
   menuOpen: boolean;
   onCloseMenu: () => void;
   links: readonly WorkspaceNavigationItem[];
+  institutionSelection?: WorkspaceInstitutionSelection;
   activePath?: string;
   tray: "notifications" | "ask" | null;
   onCloseTray: () => void;
@@ -35,7 +36,7 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
     </ContextTray>}
     {member && <>
       <ContextTray title="Workspace navigation" open={menuOpen} onClose={onCloseMenu}>
-        <SidebarLinks links={links} activePath={activePath} />
+        <SidebarLinks links={links} activePath={activePath} institutionSelection={institutionSelection} />
         <Link to="/profiles" className={`mt-3 block rounded-lg border-t p-3 text-sm underline ${focusRingClass}`}>My profile</Link>
         <Link to="/account/sessions" className={`block rounded-lg p-3 text-sm underline ${focusRingClass}`}>Account sessions</Link>
       </ContextTray>

@@ -2203,6 +2203,21 @@
       "persona": "native canonical site_admin or registrar",
       "fixtureRequired": false,
       "rationale": "Survey publication requires an approved native provider session, a separately provisioned organization-bound survey_publisher database role and independent review history under protected canonical RLS. Static synthetic public accounts cannot validate these privileges or the immutable publication transition."
+    },
+    "/canonical/content": {
+      "persona": "verified academic_content_creator",
+      "fixtureRequired": false,
+      "rationale": "Independent evidence-backed organization-wide content creator grants, course-specific professional appointments and published canonical Course versions are not supplied by the public demo fixture. Synthetic nonproduction provider identity and current evidence must be provisioned and verified separately."
+    },
+    "/canonical/content/$trackVersionId": {
+      "persona": "verified academic_content_creator draft author",
+      "fixtureRequired": false,
+      "rationale": "The exact author-owned unpublished instructional-track version, approved asset manifests and course appointment require a dedicated authorized canonical-v301/legacy-provider integration fixture. Generic public demo accounts cannot confer these permissions, and the server rejects stale or foreign drafts."
+    },
+    "/canonical/content-reviews": {
+      "persona": "verified academic_content_reviewer",
+      "fixtureRequired": false,
+      "rationale": "Review requires an independent organization-wide reviewer identity, a verified current Course appointment and separately submitted content manifest evidence. Generic demo identity cannot simulate this authority, and live cross-persona review and publication acceptance is outstanding."
     }
   }
 }

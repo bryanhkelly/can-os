@@ -88,6 +88,8 @@ export const Route = createFileRoute("/home")({
     if (error || !session) {
       return { kind: "unavailable", message: error ?? "Unable to load your workspace session. Please try again." } as const;
     }
+    if (session.role === "academic_content_creator") throw redirect({to:"/canonical/content"});
+    if (session.role === "academic_content_reviewer") throw redirect({to:"/canonical/content-reviews"});
     return loadHomeDashboard(session.role, deps);
   },
   component: HomePage,
