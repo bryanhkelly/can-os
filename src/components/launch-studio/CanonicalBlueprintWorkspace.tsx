@@ -128,7 +128,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       setName(result.name);
       setEditorialIdentity(result.identity.editorialIdentity);
       setReligiousAffiliationCode(result.identity.religiousAffiliationCode ?? "");
-      setOfferingAdoptions(result.offeringAdoptions.map(item => ({ ...item, configuration: {} })));
+      setOfferingAdoptions(result.offeringAdoptions);
       setSelectedComponents(result.components
         .filter(component => component.selectionStatus === "selected")
         .map(component => component.componentId));
