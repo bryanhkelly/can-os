@@ -18,6 +18,7 @@ import {
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type KnowledgePhase = "baseline" | "final";
 type Question = {
   id:string; prompt:string; type:"single_choice"|"multiple_choice";
   required:true; min:null; max:null;
@@ -38,7 +39,7 @@ function publicText(raw:Record<string,unknown>,field:string):string {
 }
 
 async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemptId:string,
-  readHistory=false) {
+  readHistory=false,phase:KnowledgePhase="final") {
   requireLearner(context);
   const access=await authorizeCanonicalCourseAttempt(tx,context,courseAttemptId,readHistory);
   if(access.source!=="noncredit"||!access.noncreditRegistrationId)
@@ -49,16 +50,21 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
     throw new AuthorizationError("assessment learner profile linked to registration");
   const [training]=await tx.select().from(noncreditTrainingVersions)
     .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1);
-  if(!training||training.state!=="published"||!training.assessmentVersionId)
+  if(!training||training.state!=="published")
     throw new AuthorizationError("published noncredit knowledge check");
+  const assessmentVersionId=phase==="baseline"
+    ?training.baselineAssessmentVersionId:training.assessmentVersionId;
+  if(!assessmentVersionId)throw new AuthorizationError("configured noncredit assessment phase");
   const [version]=await tx.select().from(assessmentVersions)
-    .where(and(eq(assessmentVersions.id,training.assessmentVersionId),
+    .where(and(eq(assessmentVersions.id,assessmentVersionId),
       eq(assessmentVersions.lifecycle,"published"))).limit(1);
   if(!version||version.courseVersionId!==access.courseVersionId)
     throw new AuthorizationError("matching published assessment version");
   const [definition]=await tx.select().from(assessmentDefinitions)
     .where(eq(assessmentDefinitions.id,version.assessmentId)).limit(1);
-  if(!definition||!["formative","practice","readiness","mastery"].includes(definition.purpose))
+  if(!definition||(phase==="baseline"
+      ?definition.purpose!=="diagnostic"
+      :!["formative","practice","readiness","mastery"].includes(definition.purpose)))
     throw new AuthorizationError("noncredit objective knowledge assessment");
   const rows=await tx.select().from(assessmentFormAdministrations)
     .where(and(
@@ -107,12 +113,31 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
       eq(assessmentFormVersions.assessmentVersionId,version.id),
       eq(assessmentFormVersions.lifecycle,"published"))).limit(1);
   if(!form||form.shuffleQuestions)throw new AuthorizationError("approved fixed assessment form");
-  const canStart=administration.status==="open"&&grant.accessStatus==="approved"&&
+  // A baseline taken after the final assessment cannot support a valid
+  // before/after comparison. Keep its history readable, but prevent starting.
+  let baselineLocked=false;
+  if(phase==="baseline"&&training.assessmentVersionId){
+    const [laterPhase]=await tx.select({id:assessmentExecutionAttempts.id})
+      .from(assessmentExecutionAttempts)
+      .innerJoin(assessmentAccess,eq(
+        assessmentAccess.id,assessmentExecutionAttempts.accessGrantId))
+      .innerJoin(assessmentFormAdministrations,eq(
+        assessmentFormAdministrations.id,assessmentExecutionAttempts.administrationId))
+      .where(and(
+        eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
+        eq(assessmentFormAdministrations.assessmentVersionId,training.assessmentVersionId),
+      )).limit(1);
+    baselineLocked=!!laterPhase;
+  }
+  if(!readHistory&&baselineLocked)
+    throw new AuthorizationError("baseline diagnostic must precede final assessment");
+  const canStart=!baselineLocked&&administration.status==="open"&&grant.accessStatus==="approved"&&
     grant.validFrom<=now&&(!grant.validThrough||grant.validThrough>now)&&
     (!administration.opensAt||administration.opensAt<=now)&&
     (!administration.closesAt||administration.closesAt>now)&&
     access.sectionId===null;
-  return {access,registration,training,administration,form,grant,canStart};
+  return {access,registration,training,administration,form,grant,canStart,
+    phase,assessmentVersionId};
 }
 
 async function loadFormQuestions(tx:Tx,formVersionId:string) {
@@ -225,9 +250,10 @@ async function allowedAttemptCount(tx:Tx,grantId:string,limit:number):Promise<nu
   return limit+(accommodation?.extraAttempts??0);
 }
 
-export async function readNoncreditKnowledgeCheck(context:CommandContext,courseAttemptId:string) {
+export async function readNoncreditKnowledgeCheck(context:CommandContext,courseAttemptId:string,
+  phase:KnowledgePhase="final") {
   return db.transaction(async tx=>{
-    const scope=await loadNoncreditAssessment(tx,context,courseAttemptId,true);
+    const scope=await loadNoncreditAssessment(tx,context,courseAttemptId,true,phase);
     const [participantAttempt]=await tx.select({
       status:learnerCourseAttempts.status,
     }).from(learnerCourseAttempts)
@@ -239,17 +265,17 @@ export async function readNoncreditKnowledgeCheck(context:CommandContext,courseA
     const canStart=scope.canStart&&participantAttempt?.status==="active";
     const historical=(!canStart && details.state==="in_progress")
       ?{...details,state:"closed" as const,questions:[],draftAnswers:[]}:details;
-    return {courseAttemptId,assessmentVersionId:scope.training.assessmentVersionId,
+    return {courseAttemptId,assessmentVersionId:scope.assessmentVersionId,phase,
       canStart,...historical};
   });
 }
 
 /** An authorized grant is required before a learner can start a noncredit check. */
 export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:{
-  courseAttemptId:string;requestId:string;
+  courseAttemptId:string;requestId:string;phase?:KnowledgePhase;
 }) {
   return db.transaction(async tx=>{
-    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId);
+    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId,false,input.phase);
     const [lockedGrant]=await tx.select().from(assessmentAccess)
       .where(eq(assessmentAccess.id,scope.grant.id)).for("update").limit(1);
     if(!lockedGrant||lockedGrant.accessStatus!=="approved")
@@ -292,7 +318,8 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
     const [started]=await tx.select().from(assessmentExecutionAttempts)
       .where(eq(assessmentExecutionAttempts.id,attempt.id)).limit(1);
     const startedPayload={courseAttemptId:scope.access.courseAttemptId,
-      assessmentAttemptId:attempt.id,assessmentVersionId:scope.training.assessmentVersionId};
+      assessmentAttemptId:attempt.id,assessmentVersionId:scope.assessmentVersionId,
+      noncreditPhase:scope.phase};
     await tx.insert(auditEvents).values({
       actorPersonId:context.actorPersonId,
       owningOrganizationId:scope.training.providerOrganizationId,
@@ -315,10 +342,10 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
  */
 export async function saveNoncreditKnowledgeCheckDraft(context:CommandContext,input:{
   courseAttemptId:string;attemptId:string;questionId:string;requestId:string;
-  optionIds:string[];
+  optionIds:string[];phase?:KnowledgePhase;
 }) {
   return db.transaction(async tx=>{
-    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId);
+    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId,false,input.phase);
     const [attempt]=await tx.select().from(assessmentExecutionAttempts)
       .where(and(eq(assessmentExecutionAttempts.id,input.attemptId),
         eq(assessmentExecutionAttempts.accessGrantId,scope.grant.id),
@@ -364,10 +391,10 @@ export async function saveNoncreditKnowledgeCheckDraft(context:CommandContext,in
 
 export async function submitNoncreditKnowledgeCheck(context:CommandContext,input:{
   courseAttemptId:string;attemptId:string;requestId:string;
-  answers:{questionId:string;optionIds:string[]}[];
+  answers:{questionId:string;optionIds:string[]}[];phase?:KnowledgePhase;
 }) {
   return db.transaction(async tx=>{
-    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId);
+    const scope=await loadNoncreditAssessment(tx,context,input.courseAttemptId,false,input.phase);
     const [attempt]=await tx.select().from(assessmentExecutionAttempts)
       .where(and(eq(assessmentExecutionAttempts.id,input.attemptId),
         eq(assessmentExecutionAttempts.accessGrantId,scope.grant.id),
@@ -465,6 +492,7 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
       resultEvidence:{
         engine:NONCREDIT_SCORING_ENGINE,
         courseAttemptId:scope.access.courseAttemptId,
+        noncreditPhase:scope.phase,
         ...(autoFinalize?{noncreditAutoFinalized:"v1"}:{}),
       },
     }).returning({id:assessmentExecutionResults.id});
@@ -477,7 +505,8 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     }
     const submittedPayload={
       courseAttemptId:scope.access.courseAttemptId,assessmentAttemptId:attempt.id,
-      assessmentResultId:result.id,assessmentVersionId:scope.training.assessmentVersionId,
+      assessmentResultId:result.id,assessmentVersionId:scope.assessmentVersionId,
+      noncreditPhase:scope.phase,
       autoFinalized:autoFinalize,
     };
     await tx.insert(auditEvents).values({

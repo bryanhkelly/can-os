@@ -20,6 +20,8 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
   courseAttemptId:string;lessonProgressRevision:number;
 }) {
   const [source,setSource]=useState<"school"|"noncredit"|null>(null);
+  const [hasBaseline,setHasBaseline]=useState(false);
+  const [hasFinal,setHasFinal]=useState(false);
   const [readiness,setReadiness]=useState<Readiness|null>(null);
   const [error,setError]=useState(false);
   const [assessmentRevision,setAssessmentRevision]=useState(0);
@@ -27,7 +29,11 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
     let active=true;
     setSource(null);
     void getLearnerCourseParticipationKind({data:{courseAttemptId}}).then(result=>{
-      if(active)setSource(result.source);
+      if(active){
+        setSource(result.source);
+        setHasBaseline(result.hasBaseline);
+        setHasFinal(result.hasFinal);
+      }
     }).catch(()=>{if(active)setError(true);});
     return ()=>{active=false;};
   },[courseAttemptId]);
@@ -42,8 +48,10 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
   },[courseAttemptId,source,lessonProgressRevision,assessmentRevision]);
   if(source!=="noncredit")return null;
   return <div className="space-y-4" aria-label="Noncredit learning activities">
-    <CourseAssessmentPanel courseAttemptId={courseAttemptId}
-      onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>
+    {hasBaseline&&<CourseAssessmentPanel courseAttemptId={courseAttemptId}
+      phase="baseline" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>}
+    {hasFinal&&<CourseAssessmentPanel courseAttemptId={courseAttemptId}
+      phase="final" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>} 
     <NoncreditCourseSurveys courseAttemptId={courseAttemptId}
       knowledgeCheckRevision={assessmentRevision}/>
     <section className="space-y-2 border bg-card p-4">

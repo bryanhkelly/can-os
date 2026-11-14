@@ -586,6 +586,7 @@ export const noncreditTrainingVersions = educationV30.table("noncredit_training_
   authorPersonId: uuid("author_person_id").notNull(),
   approvedByPersonId: uuid("approved_by_person_id"),
   assessmentVersionId: uuid("assessment_version_id"),
+  baselineAssessmentVersionId: uuid("baseline_assessment_version_id"),
 });
 
 export const noncreditRegistrations = educationV30.table("noncredit_registrations", {
