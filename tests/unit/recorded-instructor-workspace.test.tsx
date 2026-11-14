@@ -1,6 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
+import { RecordedInstructorWorkspace, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
 
 vi.mock("@/modules/learning/instructional-tracks.functions", () => ({
   getStudentRecordedInstructors: vi.fn(),
@@ -22,4 +22,34 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Loading recorded instruction");
     expect(html).not.toContain("Save practice");
   });
+  it("retains separately labeled practice from both recorded instructors", () => {
+    const html = renderToStaticMarkup(<RecordedPracticeHistory history={[
+      {
+        id: "practice-a",
+        courseUnitId: "unit-1",
+        courseUnitTitle: "Foundations",
+        trackVersionId: "track-teacher-a",
+        trackTitle: "Teacher A",
+        policyVersionId: "policy-1",
+        scoreNumeric: null,
+        recordedAt: new Date("2026-11-12T12:00:00Z"),
+      },
+      {
+        id: "practice-b",
+        courseUnitId: "unit-1",
+        courseUnitTitle: "Foundations",
+        trackVersionId: "track-teacher-b",
+        trackTitle: "Teacher B",
+        policyVersionId: "policy-1",
+        scoreNumeric: null,
+        recordedAt: new Date("2026-11-13T12:00:00Z"),
+      },
+    ]}/>);
+    expect(html).toContain("2 saved practice attempts");
+    expect(html).toContain("Teacher A");
+    expect(html).toContain("Teacher B");
+    expect(html).toContain("Foundations");
+    expect(html).toContain("Switching teachers does not erase this history");
+  });
+
 });
