@@ -36,11 +36,14 @@ function TripPermissions({ items }: { items: Trip[] }) {
   const router = useRouter();
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
-  const [acknowledged, setAcknowledged] = useState<Record<string, boolean>>({});
-  async function sign(participantId: string) {
+  const [acknowledged, setAcknowledged] = useState<Record<string, string>>({});
+  async function sign(item: Trip) {
+    if (!item.permissionVersion || !item.permissionText ||
+        acknowledged[item.participantId] !== JSON.stringify([item.permissionVersion, item.permissionText])) return;
     await mutation.run(
       () => signGuardianFieldTripPermission({
-        data: { participantId, acknowledged: true },
+        data: { participantId: item.participantId, acknowledged: true,
+          permissionVersion: item.permissionVersion!, permissionText: item.permissionText! },
       }),
       {
         successMessage: "Your field trip permission was recorded.",
@@ -114,16 +117,19 @@ function TripPermissions({ items }: { items: Trip[] }) {
                     : <>
                         <label className="mt-4 flex items-start gap-3 text-sm">
                           <input type="checkbox" className="mt-1"
-                            checked={acknowledged[item.participantId] ?? false}
+                            checked={!!item.permissionVersion && !!item.permissionText &&
+                              acknowledged[item.participantId] === JSON.stringify([item.permissionVersion, item.permissionText])}
                             onChange={event => setAcknowledged(previous => ({
-                              ...previous, [item.participantId]: event.target.checked,
+                              ...previous, [item.participantId]: event.target.checked
+                                ? JSON.stringify([item.permissionVersion, item.permissionText]) : "",
                             }))} />
                           <span>I am authorized to provide permission for {item.studentName},
                             and I have read and agree to the school's statement above.</span>
                         </label>
-                        <button type="button" disabled={!!busy || !acknowledged[item.participantId]}
+                        <button type="button" disabled={!!busy || !item.permissionVersion || !item.permissionText ||
+                            acknowledged[item.participantId] !== JSON.stringify([item.permissionVersion, item.permissionText])}
                           className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                          onClick={() => void sign(item.participantId)}>Sign permission</button>
+                          onClick={() => void sign(item)}>Sign permission</button>
                         {item.canDecline&&<button type="button" disabled={!!busy}
                           className="ml-3 mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
                           onClick={()=>void decline(item.participantId,item.studentName)}>Decline participation</button>}
