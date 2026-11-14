@@ -320,6 +320,54 @@ export function canAccessStudentTrackMaterial(
   return materialKind !== "practice" || practiceEnabled;
 }
 
+/**
+ * Recorded presenters change per learner; lesson IDs and progress remain
+ * anchored to the canonical Course attempt, not to a presenter's track.
+ */
+export function projectRecordedCourseLessons<
+  L extends { id: string; courseUnitId: string; title: string; lessonOrder: number },
+  P extends { lessonId: string; status: string; observedAt: Date },
+  V extends {
+    courseLessonId: string;
+    assetVersionId: string;
+    presentationKind: string;
+    ordinal: number;
+    accessibilityNotes: unknown;
+  },
+>(input: {
+  lessons: readonly L[];
+  progress: readonly P[];
+  presentations: readonly V[];
+}) {
+  const progressByLesson = new Map(input.progress.map(item => [item.lessonId, item]));
+  const recordingsByLesson = new Map<string, V[]>();
+  for (const recording of input.presentations) {
+    const entries = recordingsByLesson.get(recording.courseLessonId) ?? [];
+    entries.push(recording);
+    recordingsByLesson.set(recording.courseLessonId, entries);
+  }
+  return input.lessons.map(lesson => {
+    const progress = progressByLesson.get(lesson.id);
+    return {
+      id: lesson.id,
+      courseUnitId: lesson.courseUnitId,
+      title: lesson.title,
+      lessonOrder: lesson.lessonOrder,
+      progress: progress
+        ? { status: progress.status, observedAt: progress.observedAt }
+        : null,
+      presentations: [...(recordingsByLesson.get(lesson.id) ?? [])]
+        .sort((left, right) => left.ordinal - right.ordinal)
+        .map(recording => ({
+          assetVersionId: recording.assetVersionId,
+          presentationKind: recording.presentationKind,
+          ordinal: recording.ordinal,
+          accessibilityNotes: recording.accessibilityNotes,
+        })),
+    };
+  });
+}
+
 export type StudentPracticeDefinition = {
   instructions: string;
   prompts: { key: string; text: string }[];
