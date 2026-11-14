@@ -44,7 +44,8 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
   return <div className="space-y-4" aria-label="Noncredit learning activities">
     <CourseAssessmentPanel courseAttemptId={courseAttemptId}
       onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>
-    <NoncreditCourseSurveys courseAttemptId={courseAttemptId}/>
+    <NoncreditCourseSurveys courseAttemptId={courseAttemptId}
+      knowledgeCheckRevision={assessmentRevision}/>
     <section className="space-y-2 border bg-card p-4">
       <h3 className="font-serif text-lg font-semibold">Training completion</h3>
       {readiness?

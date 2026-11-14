@@ -8,11 +8,16 @@ type SurveyListing = Awaited<ReturnType<typeof listNoncreditCourseSurveys>>;
  * Shared completion-feedback collection. The canonical invitation and
  * deployment decide what appears, never a hard-coded partner or route.
  */
-export function NoncreditCourseSurveys({courseAttemptId}:{courseAttemptId:string}) {
-  return <NoncreditSurveySession key={courseAttemptId} courseAttemptId={courseAttemptId}/>;
+export function NoncreditCourseSurveys({courseAttemptId,knowledgeCheckRevision=0}:{
+  courseAttemptId:string;knowledgeCheckRevision?:number;
+}) {
+  return <NoncreditSurveySession key={courseAttemptId}
+    courseAttemptId={courseAttemptId} knowledgeCheckRevision={knowledgeCheckRevision}/>;
 }
 
-function NoncreditSurveySession({courseAttemptId}:{courseAttemptId:string}) {
+function NoncreditSurveySession({courseAttemptId,knowledgeCheckRevision}:{
+  courseAttemptId:string;knowledgeCheckRevision:number;
+}) {
   const [surveys,setSurveys]=useState<SurveyListing>([]);
   const [error,setError]=useState(false);
   useEffect(()=>{
@@ -22,7 +27,7 @@ function NoncreditSurveySession({courseAttemptId}:{courseAttemptId:string}) {
       .then(rows=>{if(current)setSurveys(rows);})
       .catch(()=>{if(current)setError(true);});
     return ()=>{current=false;};
-  },[courseAttemptId]);
+  },[courseAttemptId,knowledgeCheckRevision]);
   if(error)return <p role="status" className="border p-3 text-sm">
     Course feedback is temporarily unavailable.
   </p>;
