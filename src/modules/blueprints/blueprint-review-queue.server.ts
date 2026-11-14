@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   auditEvents,
@@ -18,6 +18,7 @@ import {
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 
 export async function getCanonicalBlueprintReviewQueue(context: CommandContext) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
@@ -28,7 +29,9 @@ export async function getCanonicalBlueprintReviewQueue(context: CommandContext) 
   const organizationIds = context.scope.organizationIds ?? [];
   if (!organizationIds.length) throw new AuthorizationError("Blueprint reviewer Organization scope");
 
+  const databaseRole = blueprintDatabaseRole(context, "blueprint_reviewer");
   return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const versions = await tx.select({
       configurationId: blueprintConfigurations.id,
       name: blueprintConfigurations.name,
