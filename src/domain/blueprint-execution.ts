@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DomainError } from "./errors";
 
 export const executeBlueprintConfigurationInputSchema = z.object({
   configurationVersionId: z.string().uuid(),
@@ -26,4 +27,18 @@ export function blueprintDeploymentCode(
   const componentKey = componentId.replaceAll("-", "");
   const versionKey = offeringVersionId.replaceAll("-", "");
   return `bp-${product || "offering"}-${configurationKey}-${componentKey}-${versionKey}`;
+}
+
+/**
+ * Review and execution refer to an immutable version, but only the latest
+ * version of a configuration can be authorized for new execution.
+ */
+export function assertCurrentBlueprintExecutionVersion(
+  requestedVersionId: string,
+  latestVersionId: string | null | undefined,
+): void {
+  if (latestVersionId !== requestedVersionId) {
+    throw new DomainError("CONFLICT",
+      "This Blueprint configuration was revised. Submit and review the latest version before execution.");
+  }
 }
