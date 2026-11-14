@@ -176,3 +176,38 @@ independence; review outcomes remain constrained by the database's current
 requirement recommendation and override rules. The command is server-only and
 not route-wired pending application-role RLS policies and database-backed
 expiry, revocation, supersession, and override tests.
+
+## Canonical Blueprint Studio integration
+
+The School Launch Academics module can mount `CanonicalBlueprintWorkspace`
+behind `CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED=true` (off by default). Its
+Organization-owned configuration is tied to a chosen canonical Site in the
+version's `config.siteId` planning context. A verified Site operator may
+create a draft from a published recipe, select required or optional components,
+choose approved catalog references, propose local experiences, save immutable
+revisions, and freeze the current revision for independent review. Approval
+and execution remain distinct from permission to operate a school or program.
+
+The canonical review service requires the `blueprint.review` capability, an
+Organization-scoped independent reviewer, and evidence for approved decisions.
+Selected components are approved explicitly in the same transaction as the
+configuration review; decisions, audit events and domain events are recorded
+atomically. The execution service requires that current independent approval
+and emits only planning-level Deployments. The generic reviewer grant
+(`blueprint_reviewer`) is separate from Site administrator authoring and
+execution capabilities; this grant must be provisioned through verified
+identity infrastructure, not inferred from Site membership.
+
+`seed-blueprint-starters.sql` is an optional, idempotent catalog bootstrap for
+an existing canonical publisher Organization. It creates two published recipes:
+a school and a community learning center. Run only on a controlled database
+with `psql -v publisher_organization_id=<existing-uuid> -f
+database/canonical/v3.0.1/seed-blueprint-starters.sql`. Publishing a recipe
+does not create an Operation, an Offering, or operating authority.
+
+**Do not enable canonical Blueprint writes yet.** The current canonical
+forced-RLS schema denies application-role writes until scoped role provisioning,
+read/write policies, exact-commit PostgreSQL acceptance, canonical Site identity
+cutover, reviewer grants and an evidence-picker workflow are completed. The
+legacy PR #281 School Blueprint service uses different tables and cannot be
+enabled alongside the canonical writer as an alternative authority.
