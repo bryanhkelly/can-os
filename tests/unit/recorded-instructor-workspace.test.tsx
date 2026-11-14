@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
-import { RecordedInstructorWorkspace, RecordedInstructorChoices, RecordedOfficialCourseLinks, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
+import { RecordedInstructorWorkspace, RecordedInstructorChoices, RecordedLessonCompletionAction, RecordedOfficialCourseLinks, RecordedPracticeHistory } from "@/components/learning/RecordedInstructorWorkspace";
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ to, search, children, className }: {
@@ -10,6 +10,7 @@ vi.mock("@tanstack/react-router", () => ({
     className={className}>{children}</a>,
 }));
 vi.mock("@/modules/learning/instructional-tracks.functions", () => ({
+  completeRecordedCourseLesson: vi.fn(),
   getStudentRecordedInstructors: vi.fn(),
   getRecordedLessonInstruction: vi.fn(),
   getRecordedInstructorPracticeHistory: vi.fn(),
@@ -29,6 +30,20 @@ describe("recorded instructor learner workspace", () => {
     expect(html).toContain("Loading recorded instruction");
     expect(html).not.toContain("Save practice");
   });
+  it("shows a course-level completion action without tying progress to the instructor", () => {
+    const available = renderToStaticMarkup(
+      <RecordedLessonCompletionAction completed={false} pending={false} onComplete={vi.fn()}/>,
+    );
+    expect(available).toContain("Mark lesson complete");
+    expect(available).not.toContain("disabled");
+
+    const completed = renderToStaticMarkup(
+      <RecordedLessonCompletionAction completed={true} pending={false} onComplete={vi.fn()}/>,
+    );
+    expect(completed).toContain("Lesson completed");
+    expect(completed).toContain("disabled");
+  });
+
   it("keeps class lessons, assignments and grades linked to one canonical Section", () => {
     const html = renderToStaticMarkup(
       <RecordedOfficialCourseLinks sectionId="a1000000-0000-4000-8000-000000000123"/>,
