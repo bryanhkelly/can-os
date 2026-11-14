@@ -2,8 +2,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import { BlueprintOfferingAdoptionPicker } from "@/components/launch-studio/BlueprintOfferingAdoptionPicker";
 
-vi.mock("@/modules/programs/program-discovery.functions", () => ({
-  discoverPrograms: vi.fn(),
+vi.mock("@/modules/blueprints/blueprint-studio.functions", () => ({
+  discoverCanonicalBlueprintOfferings: vi.fn(),
 }));
 
 describe("canonical Blueprint published Offering intent", () => {
