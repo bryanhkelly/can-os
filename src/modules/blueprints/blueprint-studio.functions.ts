@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { getCommandContext } from "@/modules/identity/command-context.server";
+import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { DomainError } from "@/domain/errors";
 import { AuthorizationError } from "@/domain/command-context";
 import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
@@ -43,7 +43,7 @@ export const readCanonicalBlueprintWorkspace = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return getCanonicalBlueprintWorkspace(await getCommandContext(getRequest()), data);
+    return getCanonicalBlueprintWorkspace(await getCanonicalCommandContext(getRequest()), data);
   });
 
 export const readCanonicalBlueprintConfiguration = createServerFn({ method: "GET" })
@@ -51,7 +51,7 @@ export const readCanonicalBlueprintConfiguration = createServerFn({ method: "GET
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    const context = await getCommandContext(getRequest());
+    const context = await getCanonicalCommandContext(getRequest());
     const detail = await getBlueprintConfiguration(context, data.configurationId);
     requireBlueprintSiteScope(context, detail.config);
     return detail;
@@ -62,7 +62,7 @@ export const createCanonicalBlueprintConfiguration = createServerFn({ method: "P
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    const context = await getCommandContext(getRequest());
+    const context = await getCanonicalCommandContext(getRequest());
     requireBlueprintSiteScope(context, data.version.config);
     return createBlueprintConfiguration(context, data);
   });
@@ -72,7 +72,7 @@ export const saveCanonicalBlueprintConfiguration = createServerFn({ method: "POS
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    const context = await getCommandContext(getRequest());
+    const context = await getCanonicalCommandContext(getRequest());
     const siteId = requireBlueprintSiteScope(context, data.version.config);
     const existing = await getBlueprintConfiguration(context, data.configurationId);
     if (requireBlueprintSiteScope(context, existing.config) !== siteId) {
@@ -86,7 +86,7 @@ export const submitCanonicalBlueprintConfiguration = createServerFn({ method: "P
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    const context = await getCommandContext(getRequest());
+    const context = await getCanonicalCommandContext(getRequest());
     const existing = await getBlueprintConfiguration(context, data.configurationId);
     requireBlueprintSiteScope(context, existing.config);
     return submitBlueprintConfiguration(context, data);
@@ -97,14 +97,14 @@ export const listCanonicalBlueprintReviewEvidence = createServerFn({ method: "GE
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return listBlueprintReviewEvidence(await getCommandContext(getRequest()), data);
+    return listBlueprintReviewEvidence(await getCanonicalCommandContext(getRequest()), data);
   });
 
 export const listCanonicalBlueprintReviews = createServerFn({ method: "GET" })
   .handler(async () => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return getCanonicalBlueprintReviewQueue(await getCommandContext(getRequest()));
+    return getCanonicalBlueprintReviewQueue(await getCanonicalCommandContext(getRequest()));
   });
 
 export const readCanonicalBlueprintReview = createServerFn({ method: "GET" })
@@ -112,7 +112,7 @@ export const readCanonicalBlueprintReview = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return getBlueprintReview(await getCommandContext(getRequest()), data);
+    return getBlueprintReview(await getCanonicalCommandContext(getRequest()), data);
   });
 
 export const decideCanonicalBlueprintReview = createServerFn({ method: "POST" })
@@ -120,7 +120,7 @@ export const decideCanonicalBlueprintReview = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return decideBlueprintReview(await getCommandContext(getRequest()), data);
+    return decideBlueprintReview(await getCanonicalCommandContext(getRequest()), data);
   });
 
 export const executeCanonicalBlueprintConfiguration = createServerFn({ method: "POST" })
@@ -128,5 +128,5 @@ export const executeCanonicalBlueprintConfiguration = createServerFn({ method: "
   .handler(async ({ data }) => {
     noStore();
     requireCanonicalBlueprintWriteEnabled();
-    return executeBlueprintConfiguration(await getCommandContext(getRequest()), data);
+    return executeBlueprintConfiguration(await getCanonicalCommandContext(getRequest()), data);
   });
