@@ -82,7 +82,8 @@ function GuardianReportCardsPage() {
       {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
         Student
         <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
-          {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
+          <option value="" disabled>Choose an authorized student</option>
+     {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
         </select>
       </label>}
       <QueryState loading={(loading || loadingStudents) && "Loading report card…"}
