@@ -4,6 +4,7 @@ import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
 import { accessLandingPath, accessReturnCookieHeader, safeAccessReturnTo } from "@/domain/access-navigation";
 import {AuthorizationError} from "@/domain/command-context";
+import {classifySessionDevice} from "@/domain/session-device";
 export const Route=createFileRoute("/access/verify")({
  validateSearch:(search:Record<string,unknown>)=>({returnTo:safeAccessReturnTo(search.returnTo)}),
  server:{handlers:{
@@ -38,9 +39,9 @@ export const Route=createFileRoute("/access/verify")({
    const returnTo=payload&&"returnTo" in payload?safeAccessReturnTo(payload.returnTo)??requestReturnTo:requestReturnTo;
    try{
     const result=payload&&"email" in payload&&typeof payload.email==="string"&&"code" in payload&&typeof payload.code==="string"
-     ?await (await import("@/modules/identity/passwordless-access.server")).redeemLocalDemoAccess(payload.email,payload.code)
+     ?await (await import("@/modules/identity/passwordless-access.server")).redeemLocalDemoAccess(payload.email,payload.code,classifySessionDevice(request))
      :payload&&"token" in payload&&typeof payload.token==="string"
-      ?await (await import("@/modules/identity/passwordless-access.server")).redeemOneTimeAccess(payload.token)
+      ?await (await import("@/modules/identity/passwordless-access.server")).redeemOneTimeAccess(payload.token,classifySessionDevice(request))
       :null;
     if(!result)return nativeForm?formFailure("invalid"):Response.json({error:"Invalid request"},{status:400});
     if(nativeForm){
