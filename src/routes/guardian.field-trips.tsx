@@ -11,6 +11,9 @@ import {
 } from "@/modules/field-trips/guardian-permissions.functions";
 
 export const Route = createFileRoute("/guardian/field-trips")({
+  validateSearch: (search: Record<string, unknown>): { trip?: string } => ({
+    trip: typeof search.trip === "string" ? search.trip : undefined,
+  }),
   loader: safeLoader(() => listGuardianFieldTripPermissions(), {
     authMessage: "Sign in as an authorized guardian to review trip permissions.",
   }),
@@ -28,6 +31,8 @@ function GuardianTrips() {
 }
 
 function TripPermissions({ items }: { items: Trip[] }) {
+  const { trip } = Route.useSearch();
+  const visibleItems = trip ? items.filter(item => item.tripId === trip) : items;
   const router = useRouter();
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
@@ -69,8 +74,10 @@ function TripPermissions({ items }: { items: Trip[] }) {
       actions={<Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
+      {trip && <Link to="/guardian/field-trips" className="mt-5 inline-block text-sm font-semibold underline">View all field trips</Link>}
+      {trip && visibleItems.length === 0 && <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This field trip invitation is no longer available in your authorized family workspace. You can view other trips or contact the school.</p>}
       <div className="mt-7 space-y-4">
-        {items.map(item => <article key={item.participantId} className="rounded-xl border bg-card p-5">
+        {visibleItems.map(item => <article key={item.participantId} className="rounded-xl border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.studentName}</p>
           <h2 className="mt-2 text-xl font-semibold">{item.title}</h2>
           <p className="mt-2 text-sm">{item.destination}</p>
@@ -130,7 +137,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
             must be handled through the school's existing finance process.
           </p>}
         </article>)}
-        {items.length === 0 && <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+        {!trip && items.length === 0 && <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
           No field trip invitations are currently associated with your enrolled children.
         </p>}
       </div>
