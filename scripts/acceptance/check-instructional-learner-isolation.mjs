@@ -16,6 +16,7 @@ import { existsSync } from "node:fs";
 import { loadEnvFile } from "node:process";
 import { Pool } from "@neondatabase/serverless";
 import { endpoint } from "../isolated-test-db-guard.mjs";
+import { verifyRecordedInstructorNeonBranch } from "../verify-recorded-instructor-neon-branch.mjs";
 
 if (existsSync(".env.local")) loadEnvFile(".env.local");
 
@@ -73,6 +74,7 @@ async function run() {
       const client = await pool.connect();
       clients.push(client);
       await client.query("BEGIN TRANSACTION READ ONLY");
+      await verifyRecordedInstructorNeonBranch(client);
       await client.query("SET LOCAL ROLE can_v301_recorded_instruction_reader");
     }
     const contexts = [];
