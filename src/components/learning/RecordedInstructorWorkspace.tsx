@@ -248,12 +248,14 @@ export function RecordedInstructorChoices({ catalog, pending, onSelect }: {
     {catalog.choices.map(choice => {
       const selected = choice.trackVersionId === catalog.selection?.trackVersionId;
       const needsRenewal = selected && choice.policyVersionId !== catalog.selection?.policyVersionId;
+      const switchingLocked = Boolean(catalog.selection && !selected && !choice.allowSwitching);
       return <Button key={choice.trackVersionId} size="sm"
         variant={selected && !needsRenewal ? "default" : "outline"}
-        disabled={pending || (selected && !needsRenewal)}
+        disabled={pending || switchingLocked || (selected && !needsRenewal)}
         aria-pressed={selected && !needsRenewal}
+        title={switchingLocked ? "This course does not permit switching recorded teachers." : undefined}
         onClick={() => onSelect(choice.trackVersionId)}>
-        {choice.title}{needsRenewal ? " (renew selection)" : selected ? " (selected)" : ""}
+        {choice.title}{needsRenewal ? " (renew selection)" : selected ? " (selected)" : switchingLocked ? " (switching unavailable)" : ""}
       </Button>;
     })}
   </div>;
