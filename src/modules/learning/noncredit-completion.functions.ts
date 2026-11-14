@@ -71,7 +71,7 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
       ).map(e=>e.id));
       const participation=events.map(e=>({
         id:e.id,supersedesId:e.supersedesId,eventKind:e.eventKind,
-        countedMinutes:e.countedMinutes,
+        countedMinutes:e.countedMinutes,occurredAt:e.occurredAt,
         evidenceVersionId:e.evidenceVersionId&&validEvidence.has(e.evidenceVersionId)?e.evidenceVersionId:null,
       }));
       let assessment:null | {learnerId:string|null;assessmentVersionId:string;
