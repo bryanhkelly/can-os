@@ -28,8 +28,9 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  const sectionIds=[...new Set((await accessibleClasses(context as Actor)).map(x=>x.id))];
  if(!sectionIds.length)return {connected:true,items:[]};
  const now=new Date();
- const due=await db.select({id:s.assessments.id,title:s.assessments.title,dueAt:s.assessments.dueAt,sectionId:s.assessments.sectionId,course:s.sections.title}).from(s.assessments)
+ const due=await db.select({id:s.assessments.id,title:s.assessments.title,dueAt:s.assessments.dueAt,sectionId:s.assessments.sectionId,course:s.sections.title,timezone:s.sites.timezone}).from(s.assessments)
   .innerJoin(s.sections,eq(s.sections.id,s.assessments.sectionId))
+  .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
   .where(and(inArray(s.assessments.sectionId,sectionIds),inArray(s.assessments.status,["published","closed"]),lt(s.assessments.dueAt,now)));
  if(!due.length)return {connected:true,items:[]};
  const activeProgram=alias(s.enrollments,"missing_work_program_membership");
@@ -59,7 +60,7 @@ export const getTeacherMissingWork=createServerFn({method:"GET"}).handler(async(
  const items=due.flatMap(a=>eligible.filter(student=>student.sectionId===a.sectionId).flatMap(student=>{
   const sub=latest.get(a.id+":"+student.studentId);
   if(sub&&sub.status!=="assigned"&&sub.status!=="returned")return [];
-  return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),studentProfileId:student.studentId,studentPersonId:student.studentPersonId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started"}];
+  return [{assessmentId:a.id,title:a.title,course:a.course,sectionId:a.sectionId,dueAt:a.dueAt!.toISOString(),timezone:a.timezone,studentProfileId:student.studentId,studentPersonId:student.studentPersonId,studentName:student.studentName+" "+student.studentLastName,status:sub?.status??"not_started"}];
  })).sort((a,b)=>a.dueAt.localeCompare(b.dueAt));
  return {connected:true,items};
 });
