@@ -1,0 +1,56 @@
+-- Add a configurable, self-reported lesson milestone to noncredit completion.
+-- Run ONLY on a disposable v3.0.1 database before a reviewed existing-DB upgrade.
+BEGIN;
+SET LOCAL search_path TO education_v30,pg_catalog;
+ALTER TABLE education_v30.noncredit_completion_policies
+ ADD COLUMN IF NOT EXISTS require_all_lessons boolean NOT NULL DEFAULT false;
+CREATE OR REPLACE FUNCTION v28_validate_completion() RETURNS trigger
+LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+DECLARE row_registration record; pol record; minutes_seen bigint; q record;
+BEGIN
+ SELECT r.*,t.assessment_version_id AS training_assessment_id INTO row_registration
+ FROM noncredit_registrations r JOIN noncredit_training_versions t ON t.id=r.training_version_id
+ WHERE r.id=NEW.registration_id FOR SHARE OF r;
+ SELECT * INTO pol FROM noncredit_completion_policies WHERE id=NEW.policy_id;
+ IF pol.training_version_id IS DISTINCT FROM row_registration.training_version_id
+  OR pol.effective_at>NEW.decided_at THEN RAISE EXCEPTION 'Incorrect noncredit completion policy'; END IF;
+ IF NEW.supersedes_id IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM noncredit_completion_decisions d
+  WHERE d.id=NEW.supersedes_id AND d.registration_id=NEW.registration_id
+    AND NOT EXISTS(SELECT 1 FROM noncredit_completion_decisions nx WHERE nx.supersedes_id=d.id))
+ THEN RAISE EXCEPTION 'Completion correction must supersede current decision for this registration'; END IF;
+ IF NEW.outcome<>'completed' THEN RETURN NEW; END IF;
+ SELECT coalesce(sum(e.counted_minutes),0)::bigint INTO minutes_seen FROM noncredit_participation_events e
+  WHERE e.registration_id=NEW.registration_id AND e.event_kind<>'attendance_corrected'
+   AND NOT EXISTS(SELECT 1 FROM noncredit_participation_events newer WHERE newer.supersedes_id=e.id);
+ IF minutes_seen<pol.min_participation_minutes THEN RAISE EXCEPTION 'Noncredit participation below completion threshold'; END IF;
+ -- Configurable learner-marked lessons are separate from evidenced minutes.
+ -- An entire matching Course attempt must contain all published lessons.
+ IF pol.require_all_lessons AND NOT EXISTS (
+   SELECT 1 FROM learner_course_attempts ca
+   JOIN course_lessons l ON l.course_version_id=ca.course_version_id
+   LEFT JOIN learner_lesson_progress lp
+     ON lp.course_attempt_id=ca.id AND lp.lesson_id=l.id AND lp.status='completed'
+   WHERE ca.noncredit_registration_id=NEW.registration_id
+     AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+     AND ca.status IN ('active','completed')
+     AND ca.offering_version_id=row_registration.offering_version_id
+   GROUP BY ca.id
+   HAVING count(l.id)>0 AND count(lp.lesson_id)=count(l.id)
+ ) THEN RAISE EXCEPTION 'Required noncredit lessons are incomplete'; END IF;
+ IF pol.skills_assessment_required THEN
+  SELECT a.learner_id,admin.assessment_version_id,result.result_status,
+     result.points_earned,result.points_possible INTO q
+   FROM assessment_attempt_results result
+   JOIN assessment_attempts a ON a.id=result.attempt_id
+   JOIN assessment_administrations admin ON admin.id=a.administration_id
+   WHERE result.id=NEW.assessment_result_id;
+  IF q.learner_id IS DISTINCT FROM row_registration.learner_id
+    OR q.assessment_version_id IS DISTINCT FROM row_registration.training_assessment_id
+    OR q.result_status<>'finalized' OR q.points_possible<=0 OR
+       q.points_earned/q.points_possible<pol.minimum_assessment_fraction THEN
+   RAISE EXCEPTION 'Skills certificate requires a finalized approved assessment of this participant'; END IF;
+ END IF;
+ RETURN NEW;
+END $$;
+COMMIT;

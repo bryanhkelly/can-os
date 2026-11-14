@@ -6899,6 +6899,7 @@ CREATE TABLE noncredit_completion_policies (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), training_version_id uuid NOT NULL REFERENCES noncredit_training_versions(id),
  policy_version integer NOT NULL CHECK(policy_version>0),
  min_participation_minutes integer NOT NULL CHECK(min_participation_minutes>=0),
+ require_all_lessons boolean NOT NULL DEFAULT false,
  skills_assessment_required boolean NOT NULL DEFAULT false, minimum_assessment_fraction numeric(6,5) CHECK(minimum_assessment_fraction BETWEEN 0 AND 1),
  effective_at timestamptz NOT NULL, approved_by_person_id uuid NOT NULL REFERENCES persons(id),
  published_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -7301,6 +7302,20 @@ BEGIN
   WHERE e.registration_id=NEW.registration_id AND e.event_kind<>'attendance_corrected'
    AND NOT EXISTS(SELECT 1 FROM noncredit_participation_events newer WHERE newer.supersedes_id=e.id);
  IF minutes_seen<pol.min_participation_minutes THEN RAISE EXCEPTION 'Noncredit participation below completion threshold'; END IF;
+ -- Configurable learner-marked lessons are separate from evidenced minutes.
+ -- An entire matching Course attempt must contain all published lessons.
+ IF pol.require_all_lessons AND NOT EXISTS (
+   SELECT 1 FROM learner_course_attempts ca
+   JOIN course_lessons l ON l.course_version_id=ca.course_version_id
+   LEFT JOIN learner_lesson_progress lp
+     ON lp.course_attempt_id=ca.id AND lp.lesson_id=l.id AND lp.status='completed'
+   WHERE ca.noncredit_registration_id=NEW.registration_id
+     AND ca.enrollment_id IS NULL AND ca.section_id IS NULL
+     AND ca.status IN ('active','completed')
+     AND ca.offering_version_id=row_registration.offering_version_id
+   GROUP BY ca.id
+   HAVING count(l.id)>0 AND count(lp.lesson_id)=count(l.id)
+ ) THEN RAISE EXCEPTION 'Required noncredit lessons are incomplete'; END IF;
  IF pol.skills_assessment_required THEN
   SELECT a.learner_id,admin.assessment_version_id,result.result_status,
      result.points_earned,result.points_possible INTO q
