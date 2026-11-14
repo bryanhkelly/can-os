@@ -23,7 +23,7 @@ function TeacherMissingWork() {
 function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof loadMissingWork>> }) {
   const { connected, items } = data;
   const router = useRouter();
-  const [followedUp, setFollowedUp] = useState<Record<string, boolean>>({});
+  const [followedUp, setFollowedUp] = useState<Record<string, string>>({});
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
   const studentCount = new Set(items.map(x => x.studentProfileId)).size;
@@ -48,18 +48,34 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
             <p className="mt-1 text-sm"><Link to="/staff/students/$personId" params={{personId:x.studentPersonId}} className="underline">{x.studentName}</Link> · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
             <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
-            <button
-              disabled={busy || Boolean(followedUp[x.assessmentId + ":" + x.studentProfileId])}
-              className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-              onClick={async () => {
-                await mutation.run(async () => {
-                  const result = await createMissingWorkFollowUp({ data: { assessmentId: x.assessmentId, studentProfileId: x.studentProfileId } });
-                  setFollowedUp(previous => ({...previous, [x.assessmentId + ":" + x.studentProfileId]: true}));
-                  return result;
-                }, { successMessage: result => result.created ? "Follow-up added to Operations." : "An open follow-up already exists.",
-                  commandErrorMessage: "Unable to create follow-up" });
-              }}
-            >{followedUp[x.assessmentId + ":" + x.studentProfileId] ? "Follow-up open" : "Create follow-up"}</button>
+            {followedUp[x.assessmentId + ":" + x.studentProfileId] ? (
+              <Link to="/actions/$actionId"
+                params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId]!}}
+                className="ml-4 inline-block rounded-lg border px-3 py-2 text-xs font-semibold underline">
+                Open follow-up
+              </Link>
+            ) : (
+              <button type="button" disabled={busy}
+                className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                onClick={async () => {
+                  const result=await mutation.run(
+                    () => createMissingWorkFollowUp({data:{
+                      assessmentId:x.assessmentId,studentProfileId:x.studentProfileId,
+                    }}),
+                    {successMessage:value=>value.created
+                      ?"Follow-up added to Operations.":"An open follow-up already exists.",
+                     commandErrorMessage:"Unable to create follow-up"},
+                  );
+                  if(result.status==="saved" || result.status==="refresh-failed"){
+                    setFollowedUp(previous=>({...previous,
+                      [x.assessmentId + ":" + x.studentProfileId]:result.value.actionId,
+                    }));
+                  }
+                }}>
+                Create follow-up
+              </button>
+            )}
+
           </article>
         ))}
         {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}
