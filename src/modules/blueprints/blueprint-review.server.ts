@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   auditEvents,
@@ -8,6 +8,8 @@ import {
   blueprintConfigurationVersions,
   configurationReviews,
   domainEvents,
+  evidenceDocuments,
+  evidenceDocumentVersions,
   type JsonObject,
 } from "@/db/canonical-v301";
 import {
@@ -192,6 +194,32 @@ export async function decideBlueprintReview(
         eq(blueprintConfigurationComponents.selectionStatus, "selected"),
       ));
     assertComponentCoverage(selectedComponents.map(item => item.id), input);
+
+    // A review must cite verified evidence belonging to the Organization under
+    // review; arbitrary document UUIDs are not approval.
+    const evidenceIds = [...new Set([
+      input.evidenceVersionId,
+      ...input.components.map(item => item.evidenceVersionId),
+    ].filter((id): id is string => id !== null))];
+    if (evidenceIds.length > 0) {
+      const allowed = await tx.select({ id: evidenceDocumentVersions.id })
+        .from(evidenceDocumentVersions)
+        .innerJoin(evidenceDocuments,
+          eq(evidenceDocuments.id, evidenceDocumentVersions.documentId))
+        .where(and(
+          inArray(evidenceDocumentVersions.id, evidenceIds),
+          eq(evidenceDocuments.owningOrganizationId, version.owningOrganizationId),
+          isNotNull(evidenceDocumentVersions.verifiedAt),
+          or(isNull(evidenceDocumentVersions.validFrom),
+            lte(evidenceDocumentVersions.validFrom, sql`CURRENT_DATE`)),
+          or(isNull(evidenceDocumentVersions.validThrough),
+            gte(evidenceDocumentVersions.validThrough, sql`CURRENT_DATE`)),
+        ));
+      if (allowed.length !== evidenceIds.length) {
+        throw new DomainError("VALIDATION_FAILED",
+          "Blueprint approval evidence must be verified, current and owned by the review Organization.");
+      }
+    }
 
     if (input.components.length > 0) {
       await tx.insert(blueprintComponentApprovalDecisions).values(input.components.map(item => ({
