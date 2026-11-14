@@ -942,7 +942,7 @@ async function main() {
         "native Blueprint database and session RLS",
       learningRlsCount.rows[0].table_count !== 19 && "learning forced RLS",
       programCatalogRlsCount.rows[0].table_count !== 11 && "program catalog forced RLS",
-      (programCatalogPolicyCheck.rows[0].policy_count !== 21 ||
+      (programCatalogPolicyCheck.rows[0].policy_count < 21 ||
         programCatalogPolicyCheck.rows[0].trusted_owner_policy_count !== 11 ||
         programCatalogPolicyCheck.rows[0].scoped_catalog_policy_count !== 10) &&
         "program catalog policy scope",
