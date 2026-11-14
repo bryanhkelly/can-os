@@ -136,7 +136,7 @@ describe("staff Action detail boundary",()=>{
     state.action!.type="missing_work_follow_up";
     state.action!.ownerPersonId="another-teacher";
     state.action!.metadata={assessmentId:"00000000-0000-4000-8000-000000000002"};
-    await expect(getActionDetail({data:{actionId}})).rejects.toThrow("Action detail scope");
+    await expect(getActionDetail({data:{actionId}})).rejects.toThrow("owning workspace");
     expect(state.authorizeClass).not.toHaveBeenCalled();
     state.action!.ownerPersonId="staff";
     state.select.mockImplementationOnce(()=>({
