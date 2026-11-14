@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { normalizeClientError } from "@/lib/client-error";
 import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
 import type { JsonObject } from "@/db/canonical-v301";
-import { discoverPrograms } from "@/modules/programs/program-discovery.functions";
+import { discoverCanonicalBlueprintOfferings } from "@/modules/blueprints/blueprint-studio.functions";
 
 export type BlueprintOfferingIntent = {
   componentId: string;
@@ -42,7 +42,7 @@ export function BlueprintOfferingAdoptionPicker({
     setLoading(true);
     setError(null);
     try {
-      setOfferings(await discoverPrograms({
+      setOfferings(await discoverCanonicalBlueprintOfferings({
         data: { subject: { kind: "site", siteId }, deliveryContext },
       }));
     } catch (caught) {
