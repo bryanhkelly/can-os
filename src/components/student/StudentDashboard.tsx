@@ -45,7 +45,7 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
   const community = data?.community.ok ? data.community.data : null;
   const events = [...liveData.events].sort((a,b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime());
   const scheduled = events.filter(event => !event.cancelled);
-  const classesToday = scheduled.filter(event => Boolean(event.sectionId));
+  const classesToday = scheduled.filter(event => Boolean(event.sectionId) && dateKeyInTimezone(event.startsAt, timezone) === localDate);
   const visible = assignments.filter(item => filter === "all" ||
     (filter === "due" ? dueIds.has(item.assessmentId) : item.hasDraft && (item.status === "assigned" || item.status === null)));
   const format = (stamp: Date | string, zone = timezone) => new Intl.DateTimeFormat("en-US", {
