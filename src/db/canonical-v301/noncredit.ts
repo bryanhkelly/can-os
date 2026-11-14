@@ -52,3 +52,14 @@ export const assessmentAttemptResults = educationV30.table("assessment_attempt_r
   calculatedAt:timestamp("calculated_at",{withTimezone:true}).notNull(),
   supersedesId:uuid("supersedes_id"),
 });
+
+/** Existing canonical v3.0.1 certificate issuance, not a second award ledger. */
+export const noncreditCompletionCertificates = educationV30.table("noncredit_completion_certificates", {
+  id: id(), decisionId: uuid("decision_id").notNull(),
+  issuerOrganizationId: uuid("issuer_organization_id").notNull(),
+  issuedAt: timestamp("issued_at", { withTimezone: true }).notNull().defaultNow(),
+  issuedByPersonId: uuid("issued_by_person_id").notNull(),
+  certificateReference: text("certificate_reference").notNull(),
+  status: text("status").$type<"issued" | "revoked">().notNull().default("issued"),
+  revocationEvidenceId: uuid("revocation_evidence_id"),
+});
