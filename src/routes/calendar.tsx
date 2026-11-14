@@ -25,7 +25,7 @@ import { Modal } from "@/components/ui/modal";
 
 export const Route = createFileRoute("/calendar")({
   validateSearch:(search:Record<string,unknown>):{date?:string;event?:string;section?:string;source?:CalendarSource;view?:CalendarView;q?:string}=>({
-    date:typeof search.date==="string"?z.string().date().parse(search.date):undefined,
+    date:typeof search.date==="string"&&z.string().date().safeParse(search.date).success?search.date:undefined,
     event:typeof search.event==="string"?search.event:undefined,
     section:typeof search.section==="string"?search.section:undefined,
     source:calendarSources.find(source=>source===search.source),
@@ -683,7 +683,7 @@ function CalendarPage() {
               </h3>
               <ul className="divide-y divide-border">{(byDay.get(day)??[]).map(item=><li key={item.id} className="min-w-0 py-3 text-xs">
                 <Link {...itemDestination(item)} className="block break-words font-semibold text-primary underline">{item.title}</Link>
-                <p className="mt-1 break-words text-muted-foreground">{formatTime(item.startsAt,item.timezone)} · {typeLabel(item)}</p>
+                <p className="mt-1 break-words text-muted-foreground">{formatTime(item.startsAt,item.timezone)} · {typeLabel(item)}{item.cancelled?" · Cancelled":""}</p>
               </li>)}</ul>
               {!byDay.get(day)?.length&&!loading&&<p className="pt-3 text-xs text-muted-foreground">Nothing scheduled.</p>}
             </section>)}
@@ -736,12 +736,12 @@ function CalendarPage() {
                           {...itemDestination(item)}
                           draggable={isTeacher && item.source === "assessment"}
                           onDragStart={(event) => onDragStart(event, item)}
-                          title={`${typeLabel(item)} · ${item.title}`}
-                          className={`block truncate border px-1 py-0.5 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${chipClass()} ${
+                          title={`${item.cancelled?"Cancelled · ":""}${typeLabel(item)} · ${item.title}`}
+                          className={`block truncate border px-1 py-0.5 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-ring ${item.cancelled?"border-danger/50 bg-danger/10 text-danger":chipClass()} ${
                             isTeacher && item.source === "assessment" ? "cursor-grab" : ""
                           }`}
                         >
-                          {typeLabel(item)} · {item.title}
+                          {item.cancelled?"Cancelled · ":""}{typeLabel(item)} · {item.title}
                         </Link>
                       ))}
                     </span>
