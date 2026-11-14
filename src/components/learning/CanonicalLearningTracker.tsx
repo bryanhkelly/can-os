@@ -37,6 +37,9 @@ export function CanonicalLearningTracker({ courseAttemptId, lessonId }: {
       }
       session.current=result.learningSessionId;
       lastInteraction.current=Date.now();
+      if(currentLesson.current && document.visibilityState==="visible"){
+        void send(courseAttemptId,result.learningSessionId,currentLesson.current,"lesson_opened").catch(()=>{});
+      }
     }).catch(()=>{/* Telemetry outage must not block instruction. */});
     const onHidden=()=>{
       needsResume.current=true;
