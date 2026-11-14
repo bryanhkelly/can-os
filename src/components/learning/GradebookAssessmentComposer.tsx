@@ -20,12 +20,12 @@ export const emptyAssessmentContentInput:AssessmentContentInput = {
 };
 
 export function GradebookAssessmentComposer({
-  title,points,due,releaseAt,closeAt,assignmentKind,curriculumLessonId,maxAttempts,instructions,
+  timezone,title,points,due,releaseAt,closeAt,assignmentKind,curriculumLessonId,maxAttempts,instructions,
   newRubric,publishConfirmed,busy,lessonContext,lessons,content,
   onTitleChange,onPointsChange,onDueChange,onReleaseChange,onCloseChange,onKindChange,onLessonChange,
   onAttemptsChange,onInstructionsChange,onRubricChange,onPublishConfirmedChange,onSubmit,onContentChange,
 }: {
-  title:string;points:string;due:string;releaseAt:string;closeAt:string;
+  timezone:string;title:string;points:string;due:string;releaseAt:string;closeAt:string;
   assignmentKind:AssignmentKind;curriculumLessonId:string;maxAttempts:string;instructions:string;
   newRubric:AssessmentCriterionInput[];publishConfirmed:boolean;busy:boolean;
   lessonContext?:string;lessons:readonly Lesson[];content:AssessmentContentInput;
@@ -54,7 +54,7 @@ export function GradebookAssessmentComposer({
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field label="Release date and time (optional)"><Input type="datetime-local" value={releaseAt} onChange={e=>onReleaseChange(e.target.value)}/></Field>
         <Field label="Close submissions (optional)"><Input type="datetime-local" value={closeAt} onChange={e=>onCloseChange(e.target.value)}/></Field>
-        <p className="text-xs text-muted-foreground sm:col-span-2">Times use your device timezone. Publishing without a release time opens work immediately. Work can be submitted after its due date until the close time; no close time leaves submissions open.</p>
+        <p className="text-xs text-muted-foreground sm:col-span-2">Times use your class timezone ({timezone}). Due dates end at 11:59 PM class time. Publishing without a release time opens work immediately. Work can be submitted after its due date until the close time; no close time leaves submissions open.</p>
       </div>
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field label="Class activity type">
