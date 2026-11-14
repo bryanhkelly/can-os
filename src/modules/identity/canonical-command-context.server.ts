@@ -14,7 +14,7 @@ import {
  * A completely native v3.0.1 session. No account, Person, Site, grant or
  * Organization is read from public-schema identity records.
  */
-export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
+export function canonicalSessionDigestFromRequest(request: Request): string {
   const cookie = request.headers.get("cookie") ?? "";
   const raw = cookie.split(";").map(item => item.trim())
     .find(item => item.startsWith(canonicalSessionCookie + "="))
@@ -26,9 +26,12 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
   if (!pepper || pepper.length < 32) {
     throw new AuthorizationError("canonical session configuration");
   }
-  const digest = createHash("sha256")
+  return createHash("sha256")
     .update(pepper).update(":").update(raw).digest("hex");
+}
 
+export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
+  const digest = canonicalSessionDigestFromRequest(request);
   const records = await db.transaction(async tx => {
     // Purpose-specific role may only EXECUTE the SECURE, read-only session
     // projection. It receives no SELECT on raw secret hashes or grants.
@@ -45,7 +48,6 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
   return canonicalSessionRowSchema.parse(records[0]);
 }
 
-/** Domain commands intentionally receive no raw session identifiers. */
 export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
   return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
 }
