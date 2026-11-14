@@ -43,6 +43,20 @@ describe("net-new CAN OS v3.0.1 identity", () => {
     expect(context.scope.siteIds).toEqual([]);
   });
 
+  it("separates independent survey review from provider publication and blueprint review", () => {
+    const reviewer = canonicalSessionRowSchema.parse({...session,role_code:"survey_reviewer",site_id:null});
+    const context = projectCanonicalCommandContext(reviewer);
+    expect(context.capabilities.has("survey.review")).toBe(true);
+    expect(context.capabilities.has("survey.publish")).toBe(false);
+    expect(context.capabilities.has("survey.draft.create")).toBe(false);
+    expect(context.capabilities.has("blueprint.review")).toBe(false);
+    expect(() => projectCanonicalCommandContext(canonicalSessionRowSchema.parse({
+      ...session,role_code:"survey_reviewer",
+    }))).toThrow();
+    const author=projectCanonicalCommandContext(canonicalSessionRowSchema.parse(session));
+    expect(author.capabilities.has("survey.review")).toBe(false);
+    expect(author.capabilities.has("survey.publish")).toBe(true);
+  });
   it("gives a non-Site learner participation but no Blueprint or Site authority", () => {
     const learner = canonicalSessionRowSchema.parse({...session, role_code: "learner", site_id: null});
     const context = projectCanonicalCommandContext(learner);

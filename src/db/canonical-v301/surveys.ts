@@ -1,4 +1,4 @@
-import { boolean, integer, numeric, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, integer, numeric, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
@@ -35,6 +35,15 @@ export const surveyQuestionBranchRules = educationV30.table("survey_question_bra
   sourceQuestionId:uuid("source_question_id").notNull(),
   targetQuestionId:uuid("target_question_id").notNull(),
   sourceOptionId:uuid("source_option_id").notNull(), action:text("action").notNull(),
+});
+export const surveyVersionReviews = educationV30.table("survey_version_reviews", {
+  id: id(),
+  surveyVersionId: uuid("survey_version_id").notNull(),
+  reviewKind: text("review_kind").$type<"academic" | "privacy" | "accessibility" | "safeguarding">().notNull(),
+  reviewerPersonId: uuid("reviewer_person_id").notNull(),
+  decision: text("decision").$type<"approved" | "rejected" | "withdrawn">().notNull(),
+  decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity(),
+  evidenceVersionId: uuid("evidence_version_id"),
 });
 export const surveyCampaigns = educationV30.table("survey_campaigns", {
   id:id(),surveyVersionId:uuid("survey_version_id").notNull(),

@@ -435,3 +435,27 @@ psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
 This verifies role restrictions, RLS policy presence, draft INSERT grants and
 absence of publication, invitation, review and respondent-data privileges.
 It does not replace a transaction-based cross-tenant database test.
+
+### Optional independent survey reviews and publication
+
+After the draft-authoring patch, the trusted schema administrator can apply
+`patch-survey-review-publication.sql` in an **isolated test database**, then
+provision the narrow `survey_reviewer` and `survey_publisher` roles per Organization
+using `provision-survey-review-publication-roles.sql`. This explicitly extends
+native canonical account grants to an **organization-only survey reviewer**;
+the existing Site-scoped provider may publish only after independent privacy,
+accessibility and safeguarding approvals. Existing published-version immutable
+triggers and draft-child gates remain in force. No database patch is automatically
+installed by application deployment.
+
+```sh
+psql "$TEST_DATABASE_URL" -f database/canonical/v3.0.1/patch-survey-review-publication.sql
+psql "$TEST_DATABASE_URL" -v organization_id=YOUR_NATIVE_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_APP_LOGIN \
+  -f database/canonical/v3.0.1/provision-survey-review-publication-roles.sql
+```
+
+Do not enable `CAN_CANONICAL_SURVEY_REVIEW_ENABLED` or
+`CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED` until role and RLS tests,
+cross-tenant denials, and authenticated browser tests pass. Neither role can
+create survey campaigns or invite respondents.
