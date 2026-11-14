@@ -62,8 +62,8 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             value={selected} onChange={event=>setSelected(event.target.value)}>
             <option value="">Choose an authorized course</option>
             {data.choices.map(choice=><option
-              key={choice.deploymentId+":"+choice.courseVersionId}
-              value={choice.deploymentId+":"+choice.courseVersionId}>
+              key={choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId}
+              value={choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId}>
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
             </option>)}
           </select>
