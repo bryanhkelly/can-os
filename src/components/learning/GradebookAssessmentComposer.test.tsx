@@ -4,7 +4,7 @@ import { GradebookAssessmentComposer, emptyAssessmentContentInput } from "./Grad
 
 const noop=()=>{};
 const base={
- title:"Practice quiz",points:"10",due:"",releaseAt:"",closeAt:"",
+ timezone:"America/Los_Angeles",title:"Practice quiz",points:"10",due:"",releaseAt:"",closeAt:"",
  assignmentKind:"quiz" as const,curriculumLessonId:"",maxAttempts:"",instructions:"",
  newRubric:[],publishConfirmed:false,busy:false,lessons:[],content:emptyAssessmentContentInput,
  onTitleChange:noop,onPointsChange:noop,onDueChange:noop,onReleaseChange:noop,onCloseChange:noop,
