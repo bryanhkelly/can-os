@@ -154,11 +154,11 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
 
   const currentLesson = instruction?.lessons.find(lesson => lesson.id === lessonId)
     ?? instruction?.lessons[0];
-  const currentPractice = instruction?.materials.filter(material =>
+  const currentPractice = instruction?.canManageProgress ? instruction.materials.filter(material =>
     material.materialKind === "practice" &&
     material.courseUnitId === currentLesson?.courseUnitId &&
     material.practice !== null
-  ) ?? [];
+  ) : [];
   const currentResources = instruction?.materials.filter(material =>
     material.materialKind !== "practice" &&
     material.courseUnitId === currentLesson?.courseUnitId &&
@@ -212,6 +212,7 @@ export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttempt
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-serif text-xl font-semibold">{currentLesson.title}</h3>
           <RecordedLessonCompletionAction
+            allowed={instruction.canManageProgress}
             completed={currentLesson.progress?.status === "completed"}
             pending={pending}
             onComplete={() => void markLessonComplete(currentLesson.id)}
@@ -293,11 +294,13 @@ export function RecordedInstructorChoices({ catalog, pending, onSelect }: {
   </div>;
 }
 
-export function RecordedLessonCompletionAction({ completed, pending, onComplete }: {
+export function RecordedLessonCompletionAction({ allowed, completed, pending, onComplete }: {
+  allowed: boolean;
   completed: boolean;
   pending: boolean;
   onComplete: () => void;
 }) {
+  if (!allowed) return null;
   return <Button type="button" size="sm" variant={completed ? "secondary" : "default"}
     disabled={pending || completed} onClick={onComplete}>
     {completed ? "Lesson completed" : pending ? "Saving..." : "Mark lesson complete"}
