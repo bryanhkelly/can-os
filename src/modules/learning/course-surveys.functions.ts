@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, gt, lte, or, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, gt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -32,7 +32,7 @@ const privateResult=()=>setResponseHeader("Cache-Control","private, no-store");
  * approved flows. Survey feedback is never an assessment grade.
  */
 async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:string},data:z.infer<typeof scope>) {
-  const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId);
+  const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId,true);
   if(access.source!=="noncredit")throw new AuthorizationError("active noncredit course registration");
   const [campaign]=await tx.select().from(surveyCampaigns)
     .where(and(eq(surveyCampaigns.id,data.campaignId),
@@ -41,6 +41,14 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   if(!campaign||campaign.status!=="active"||campaign.responseMode!=="identified"||
     campaign.startsAt>now||(campaign.endsAt&&campaign.endsAt<=now)||
     !campaign.surveyPermissionEvidenceId)throw new AuthorizationError("active authorized survey campaign");
+  const [permission]=await tx.select().from(evidenceDocumentVersions)
+    .where(eq(evidenceDocumentVersions.id,campaign.surveyPermissionEvidenceId)).limit(1);
+  const today=now.toISOString().slice(0,10);
+  if(!permission||!permission.verifiedAt||!permission.verifiedByPersonId||
+     permission.verifiedAt>now||
+     (permission.validFrom&&permission.validFrom>today)||
+     (permission.validThrough&&permission.validThrough<today))
+    throw new AuthorizationError("current verified permission for identifiable feedback");
   // Lock the invitation before checking its one-response slot. Concurrent
   // submissions then serialize rather than racing the unique invitation key.
   const [invitation]=await tx.select().from(surveyInvitations)
@@ -121,10 +129,11 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
         lte(surveyInvitations.sentAt,now),
         or(isNull(surveyInvitations.dueAt),gt(surveyInvitations.dueAt,now)),
         lte(evidenceDocumentVersions.verifiedAt,now),
+        isNotNull(evidenceDocumentVersions.verifiedByPersonId),
         or(isNull(evidenceDocumentVersions.validFrom),
            lte(evidenceDocumentVersions.validFrom,now.toISOString().slice(0,10))),
         or(isNull(evidenceDocumentVersions.validThrough),
-           gt(evidenceDocumentVersions.validThrough,new Date(now.getTime()-86_400_000).toISOString().slice(0,10))),
+           gte(evidenceDocumentVersions.validThrough,now.toISOString().slice(0,10))),
       )).limit(30);
       return rows.map(row=>({campaignId:row.campaignId,title:row.title}));
     });
