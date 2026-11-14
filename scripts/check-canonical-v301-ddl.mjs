@@ -179,8 +179,8 @@ async function main() {
       "religious_affiliation_options","evidence_documents",
       "evidence_document_versions","blueprint_component_approval_decisions",
       "blueprint_execution_batches","education_operations",
-      "education_operation_organization_roles","program_deployments",
-      "deployment_offering_adoptions",
+      "education_operation_organization_roles","education_operation_sites",
+      "program_deployments","deployment_offering_adoptions",
     ]]);
     const programCatalogRlsCount = await client.query(`
       SELECT count(*)::integer AS table_count
@@ -936,7 +936,7 @@ async function main() {
       affiliationCount.rows[0].item_count !== 25 && "religious affiliation options",
       rlsCount.rows[0].table_count !== 10 && "Blueprint forced RLS",
       immutableChildTriggerCount.rows[0].trigger_count !== 4 && "Blueprint child immutability",
-      (nativeBlueprintSecurity.rows[0].protected_tables !== 15 ||
+      (nativeBlueprintSecurity.rows[0].protected_tables !== 16 ||
         nativeBlueprintSecurity.rows[0].scoped_policies < 20 ||
         nativeBlueprintSecurity.rows[0].private_session_functions !== 1) &&
         "native Blueprint database and session RLS",
