@@ -8,6 +8,22 @@ identifiers. Native canonical sign-in, session scope, PostgreSQL permissions and
 are enforced directly for Blueprint actions. Existing app session code does
 not establish canonical identity.
 
+### Repairing the disposable `test01` branch
+
+The `can-os` Neon branch `test01` was provisioned before the final native
+authentication tables and Blueprint role-purpose values were added to the
+v3.0.1 baseline. Its three missing auth tables and session projection were
+installed from `schema.sql`, and the committed native demo fixtures and
+starter recipes were seeded. Do not reinstall the complete fresh-install
+schema over this partially populated branch.
+
+Before provisioning the restricted Blueprint author/reviewer roles, the
+old role-binding CHECK must accept `blueprint_author` and
+`blueprint_reviewer`. The exact, guarded, transactional repair is in
+`repair-test01-blueprint-purpose-codes.sql`. It modifies a database
+constraint and requires explicit authorization before execution. A fresh
+v3.0.1 install already has the correct constraint.
+
 ### Canonical Blueprint authoring, review, and execution roles
 
 A trusted administrator must provision **two independently scoped PostgreSQL
