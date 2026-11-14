@@ -38,9 +38,6 @@ export async function getCanonicalBlueprintWorkspace(
   if (!context.scope.siteIds?.includes(siteId)) {
     throw new AuthorizationError("Blueprint workspace Site scope");
   }
-  if (process.env.CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED !== "true") {
-    throw new DomainError("UNAVAILABLE", "Canonical Blueprint workspace is not enabled.");
-  }
 
   const databaseRole = blueprintDatabaseRole(context, "blueprint_author");
   return db.transaction(async tx => {
