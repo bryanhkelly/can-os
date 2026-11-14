@@ -17,15 +17,11 @@ import {
   configurationReviews,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
-import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 
 export async function getCanonicalBlueprintReviewQueue(context: CommandContext) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.review");
-  if (process.env.CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED !== "true") {
-    throw new DomainError("UNAVAILABLE", "Canonical Blueprint review is not enabled.");
-  }
   const organizationIds = context.scope.organizationIds ?? [];
   if (!organizationIds.length) throw new AuthorizationError("Blueprint reviewer Organization scope");
 
