@@ -15,6 +15,8 @@ import {
   withdrawInstructionalTrackSchema,
 } from "./instructional-track-authoring.server";
 import {
+  completeRecordedLesson,
+  completeRecordedLessonSchema,
   listAvailableInstructionalTracks,
   getSelectedInstructionalTrackAssetDownload,
   instructionalTrackAssetDownloadSchema,
@@ -102,6 +104,13 @@ export const getRecordedInstructionAssetDownload = createServerFn({ method: "POS
       await getCommandContext(getRequest()),
       data,
     );
+  });
+
+export const completeRecordedCourseLesson = createServerFn({ method: "POST" })
+  .validator((value: unknown) => completeRecordedLessonSchema.parse(value))
+  .handler(async ({ data }) => {
+    privateNoStore();
+    return completeRecordedLesson(await getCommandContext(getRequest()), data);
   });
 
 export const recordRecordedInstructorPractice = createServerFn({ method: "POST" })
