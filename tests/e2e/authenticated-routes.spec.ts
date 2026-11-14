@@ -252,6 +252,45 @@ test("student opens enrolled classroom and assessment detail", async ({ browser 
   });
 });
 
+test("student non-dashboard experiences load and preferences persist", async ({ browser }) => {
+  const secret = roleSecrets.student;
+  if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    for (const [route, heading] of [
+      ["/student/assignments", "Your assignments"],
+      ["/student/report-card", "My report card"],
+      ["/student/my-school", "My School"],
+      ["/student/field-trips", "My field trips"],
+      ["/student/experiences", "Your actions"],
+      ["/student/support", "Get help and follow through."],
+      ["/student/discussions", "Course discussions"],
+      ["/calendar", "Calendar"],
+      ["/notifications", "Notifications"],
+    ] as const) {
+      const response = await page.goto(route);
+      expect(response?.status(), route).toBe(200);
+      await expect(page.getByRole("main").getByRole("heading", { name: heading, exact: true })).toBeVisible();
+    }
+
+    await page.goto("/student/settings");
+    const density = page.getByLabel("Layout density");
+    await expect(density).toBeVisible();
+    const original = await density.inputValue();
+    const updated = original === "compact" ? "comfortable" : "compact";
+    try {
+      await density.selectOption(updated);
+      await page.getByRole("button", { name: "Save preferences" }).click();
+      await expect(page.getByText("Preferences saved.")).toBeVisible();
+      await page.reload();
+      await expect(page.getByLabel("Layout density")).toHaveValue(updated);
+    } finally {
+      await page.getByLabel("Layout density").selectOption(original);
+      await page.getByRole("button", { name: "Save preferences" }).click();
+      await expect(page.getByText("Preferences saved.")).toBeVisible();
+    }
+  });
+});
+
 test("student assignment list links back to enrolled classes", async ({ browser }) => {
   const secret = roleSecrets.student;
   if (!secret || !fixture) throw new Error("Missing synthetic student fixture.");
