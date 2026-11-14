@@ -40,9 +40,12 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   if(!campaign||campaign.status!=="active"||campaign.responseMode!=="identified"||
     campaign.startsAt>now||(campaign.endsAt&&campaign.endsAt<=now)||
     !campaign.surveyPermissionEvidenceId)throw new AuthorizationError("active authorized survey campaign");
+  // Lock the invitation before checking its one-response slot. Concurrent
+  // submissions then serialize rather than racing the unique invitation key.
   const [invitation]=await tx.select().from(surveyInvitations)
     .where(and(eq(surveyInvitations.campaignId,campaign.id),
-      eq(surveyInvitations.invitedPersonId,context.actorPersonId))).limit(1);
+      eq(surveyInvitations.invitedPersonId,context.actorPersonId)))
+    .for("update").limit(1);
   if(!invitation||!invitation.sentAt||(invitation.dueAt&&invitation.dueAt<=now))
     throw new AuthorizationError("current personal survey invitation");
   const [version]=await tx.select().from(surveyVersions)
