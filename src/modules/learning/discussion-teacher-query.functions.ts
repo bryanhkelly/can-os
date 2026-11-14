@@ -5,20 +5,26 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {and,eq,inArray,desc,sql} from "drizzle-orm";
 import {discussionTree} from "@/domain/course-discussions";
 import {publisherLessonChoices} from "@/domain/publisher-course-references";
+import {accessibleClasses} from "./class-access.server";
+import type {Actor} from "@/modules/identity/actors.server";
 
 /** Teacher-specific read model. Never load teacher pages via student-only commands. */
 export const getTeacherCourseDiscussions=createServerFn({method:"GET"}).handler(async()=>{
  const actor=await getCommandContext(getRequest());
  setResponseHeader("Cache-Control","private, no-store");
- if(actor.role!=="teacher"||!actor.actorPersonId||!actor.scope.siteIds?.length)throw new AuthorizationError("teacher discussion access");
+ if(actor.role!=="teacher"||!actor.actorPersonId||!(actor.scope.siteIds?.length||actor.scope.sectionIds?.length))throw new AuthorizationError("teacher discussion access");
  assertCapability(actor,"discussions:moderate");
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
+ // Use the current, qualified teaching assignments and institutional agreements
+ // shared with Class, Teacher Today and Gradebook, including delegated Sections.
+ const authorized=await accessibleClasses(actor as Actor);
+ if(!authorized.length)return {sections:[],threads:[]};
  const sections=await db.select({id:s.sections.id,title:s.sections.title,siteId:s.sections.siteId,
   curriculum:s.courseTemplateVersions.curriculum,contentStatus:s.courseTemplateVersions.status})
   .from(s.sectionTeachers).innerJoin(s.sections,eq(s.sections.id,s.sectionTeachers.sectionId))
   .innerJoin(s.courseTemplateVersions,eq(s.courseTemplateVersions.id,s.sections.courseTemplateVersionId))
-  .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId),inArray(s.sections.siteId,actor.scope.siteIds),
-   inArray(s.sections.programId,actor.scope.programIds??[]),eq(s.sections.active,true)));
+  .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId),
+   inArray(s.sections.id,authorized.map(section=>section.id)),eq(s.sections.active,true)));
  if(!sections.length)return {sections:[],threads:[]};
  const sectionIds=sections.map(x=>x.id);
  const rows=await db.select({id:s.communicationThreads.id,subject:s.communicationThreads.subject,contextId:s.communicationThreads.contextId,metadata:s.communicationThreads.metadata})
