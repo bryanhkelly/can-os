@@ -361,7 +361,7 @@ function TeacherGradebookPage() {
        onReturnForRevision={()=>void returnForRevision(reviewCell.submissionId)} />}
      </WorkspacePanel>
     </div>}
-    <GradebookAssessmentComposer timezone={sectionTimezone} title={title} points={points} due={due}
+    <GradebookAssessmentComposer timezone={gradebook.section.timezone} title={title} points={points} due={due}
       releaseAt={releaseAt} closeAt={closeAt} assignmentKind={assignmentKind}
       curriculumLessonId={curriculumLessonId} maxAttempts={maxAttempts} instructions={instructions}
       newRubric={newRubric} publishConfirmed={publishConfirmed} busy={busy}
@@ -383,7 +383,7 @@ function TeacherGradebookPage() {
        <tr className="border-b text-left">
         <th className="p-3 font-semibold">Student</th>
         {gradebook.assessments.filter(item=>!search.assessment||item.id===search.assessment).map(assessment =>
-         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} sectionId={selected} timezone={sectionTimezone} busy={busy}
+         <GradebookAssessmentHeader key={assessment.id} assessment={assessment} sectionId={selected} timezone={gradebook.section.timezone} busy={busy}
           dueDate={assessmentDueDates[assessment.id]??""}
           onDueDateChange={value=>setAssessmentDueDates(current=>({...current,[assessment.id]:value}))}
           onAction={action=>void changeAssessment(assessment.id,action)}
