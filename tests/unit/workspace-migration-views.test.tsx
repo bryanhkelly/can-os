@@ -165,6 +165,8 @@ describe("family and student profiles", () => {
     expect(html).toContain('href="/guardian/students?student=child-person"');
     expect(html).toContain('href="/guardian/attendance?student=child-person"');
     expect(html).toContain('href="/guardian/report-cards?student=child-person"');
+    expect(html).toContain('href="/guardian/field-trips"');
+    expect(html).toContain('href="/admissions/my-credentials"');
     expect(html).not.toContain("student=child-profile");
   });
   it("shows a named child and exact application stage while enrollment is in progress", () => {
