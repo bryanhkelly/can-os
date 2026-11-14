@@ -89,17 +89,19 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
 }){
  const selectedChild=children.find(child=>child.studentPersonId===student);
  const selectedEnrollment=enrollmentApplications.find(app=>app.studentPersonId===student);
- const visibleChildren=student?(selectedChild?[selectedChild]:[]):children;
+ // Unrecognized child links must not turn an authorized family dashboard into an empty one.
+ const activeStudent=student&&(selectedChild||selectedEnrollment)?student:undefined;
+ const visibleChildren=activeStudent?(selectedChild?[selectedChild]:[]):children;
  const visibleEnrollmentApplications=enrollmentApplications.filter(app=>
   !children.some(child=>child.studentPersonId===app.studentPersonId)&&
-  (!student||app.studentPersonId===student)&&
+  (!activeStudent||app.studentPersonId===activeStudent)&&
   app.applicationStage!=="declined"&&app.applicationStage!=="withdrawn");
  const childCount=new Set([...visibleChildren.map(child=>child.studentPersonId),
   ...visibleEnrollmentApplications.map(app=>app.studentPersonId)]).size;
  // Site-wide notices remain visible; child-specific tasks follow the picker.
- const visibleNeeds=needs.filter(item=>!student||!item.studentPersonId||item.studentPersonId===student);
- const visibleQuestions=gradeFollowUps.filter(question=>!student||question.studentPersonId===student);
- const visibleApprovals=courseApprovals.filter(item=>!student||item.studentPersonId===student);
+ const visibleNeeds=needs.filter(item=>!activeStudent||!item.studentPersonId||item.studentPersonId===activeStudent);
+ const visibleQuestions=gradeFollowUps.filter(question=>!activeStudent||question.studentPersonId===activeStudent);
+ const visibleApprovals=courseApprovals.filter(item=>!activeStudent||item.studentPersonId===activeStudent);
  const approvalNeeds=visibleApprovals.map(item=>({
   id:item.id,
   kind:"course_approval",
@@ -132,7 +134,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   subtitle="Your children, enrollment steps, and school follow-ups in one place."
   shortcuts={<>
   <DashboardShortcut title="Students" description="Released grades and schoolwork" icon={<BookOpen className="size-5" />}><Link to="/guardian/students" search={{student:selectedChild?.studentPersonId}} /></DashboardShortcut>
-   <DashboardShortcut title="Applications & offers" description="Review enrollment next steps" icon={<ClipboardList className="size-5" />}><Link to="/guardian/admission-offers" search={{student:student||undefined}} /></DashboardShortcut>
+   <DashboardShortcut title="Applications & offers" description="Review enrollment next steps" icon={<ClipboardList className="size-5" />}><Link to="/guardian/admission-offers" search={{student:activeStudent}} /></DashboardShortcut>
    <DashboardShortcut title="Calendar" description="Your family's authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
    <DashboardShortcut title="Family inbox" description="Conversations with your school" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
   </>}
@@ -158,7 +160,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
     <div className="flex flex-wrap items-center justify-between gap-3">
      <div><p className="text-xs font-bold uppercase tracking-widest text-primary">Getting started</p>
       <h2 className="mt-1 font-serif text-2xl font-semibold">School enrollment</h2></div>
-     <Link to="/guardian/admission-offers" search={{student:student||undefined}}
+     <Link to="/guardian/admission-offers" search={{student:activeStudent}}
       className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 text-sm font-semibold">View applications and offers</Link>
     </div>
     {enrollmentWarning&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">{enrollmentWarning}</p>}
@@ -186,9 +188,9 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
     </div>}
    </section>}
    {children.length>1&&<nav aria-label="Filter family overview by child" className="mt-6 flex flex-wrap items-center gap-2"><span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Show</span><Link to="/home" search={{action,student:undefined}} aria-current={!selectedChild?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(!selectedChild?"bg-primary text-primary-foreground":"bg-card")}>All children</Link>{children.map(child=><Link key={child.studentPersonId} to="/home" search={{action,student:child.studentPersonId}} aria-current={selectedChild?.studentPersonId===child.studentPersonId?"page":undefined} className={"inline-flex min-h-11 items-center rounded-full border px-4 py-2 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 "+(selectedChild?.studentPersonId===child.studentPersonId?"bg-primary text-primary-foreground":"bg-card")}>{child.displayName}</Link>)}</nav>}
-   {student&&!selectedChild&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
+   {student&&!selectedChild&&!selectedEnrollment&&!loading&&<p role="status" className="mt-4 text-sm text-muted-foreground">That child is not available in this family account. Showing all authorized children.</p>}
    <div className="mt-6 grid gap-3 sm:grid-cols-3">
-    <StatCard label={student?"Selected child":"Your children"} value={childCount}/>
+    <StatCard label={activeStudent?"Selected child":"Your children"} value={childCount}/>
     <StatCard label="Needs your attention" value={needsWarning||courseApprovalsWarning?"Limited":visibleNeeds.length+visibleApprovals.length+schoolworkCount}/>
     <StatCard label="Overdue enrolled-class assignments" value={visibleChildren.reduce((total,child)=>total+child.missingCount,0)}/>
    </div>
