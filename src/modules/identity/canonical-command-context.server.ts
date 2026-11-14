@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { sql } from "drizzle-orm";
-import { db } from "@/db/client";
+import { Pool } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import {
   canonicalAuthReaderDatabaseRole,
@@ -32,17 +31,31 @@ export function canonicalSessionDigestFromRequest(request: Request): string {
 
 export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
   const digest = canonicalSessionDigestFromRequest(request);
-  const records = await db.transaction(async tx => {
-    // Purpose-specific role may only EXECUTE the SECURE, read-only session
-    // projection. It receives no SELECT on raw secret hashes or grants.
-    await tx.execute(sql.raw(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`));
-    const result = await tx.execute(sql`
-      SELECT account_id, session_id, grant_id, person_id,
-        role_code, organization_id, site_id
-      FROM education_v30.v301_canonical_session_context(${digest}::text)
-    `);
-    return result.rows;
-  });
+  // Dedicated restricted login: never switch roles from the app's broad
+  // DATABASE_URL connection. This connection has no raw identity-table reads.
+  const connectionString = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
+  if (!connectionString) throw new AuthorizationError("canonical session reader configuration");
+  const pool = new Pool({ connectionString, max: 1 });
+  const client = await pool.connect();
+  let records: Array<Record<string, unknown>> = [];
+  try {
+    await client.query("BEGIN READ ONLY");
+    await client.query(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`);
+    const result = await client.query(
+      `SELECT account_id, session_id, grant_id, person_id,
+              role_code, organization_id, site_id
+         FROM education_v30.v301_canonical_session_context($1::text)`,
+      [digest],
+    );
+    records = result.rows;
+    await client.query("COMMIT");
+  } catch {
+    try { await client.query("ROLLBACK"); } catch { /* Preserve original denial. */ }
+    throw new AuthorizationError("canonical session reader unavailable");
+  } finally {
+    client.release();
+    await pool.end();
+  }
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
   return canonicalSessionRowSchema.parse(records[0]);
