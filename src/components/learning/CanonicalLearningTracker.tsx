@@ -1,106 +1,183 @@
-import { useEffect, useRef } from "react";
+import {
+  createContext, useCallback, useContext, useEffect, useRef,
+  type ReactNode,
+} from "react";
 import {
   recordCanonicalLearningEvent, setCanonicalLearningSessionState,
   startCanonicalLearningSession,
 } from "@/modules/learning/canonical-learning-activity.functions";
+import type { CanonicalLearningEvent } from "@/domain/canonical-learning-activity";
 
-type EvidenceKind = "lesson_opened" | "lesson_resumed" | "engaged_interval";
-function send(
-  courseAttemptId: string, learningSessionId: string, lessonId: string,
-  kind: EvidenceKind, durationMs?: number,
-) {
-  const event = {
-    clientEventId: crypto.randomUUID(), kind, lessonId, resourceId: null,
-    occurredAt: new Date().toISOString(),
-    ...(kind === "engaged_interval" ? { durationMs, pageVisible: true, windowFocused: true } : {}),
-  };
-  return recordCanonicalLearningEvent({data:{courseAttemptId,learningSessionId,event}});
+type Kind = CanonicalLearningEvent["kind"];
+type ActivityContext = {
+  selectLesson: (id: string | null) => void;
+  observe: (kind: Kind, lessonId: string | null, resourceId?: string | null) => void;
+};
+const Context = createContext<ActivityContext | null>(null);
+
+export function useCanonicalLearningActivity(): ActivityContext {
+  const value = useContext(Context);
+  if (!value) throw new Error("Canonical course activity requires a course session provider");
+  return value;
 }
 
-/** Non-blocking evidence instrument. Does not certify watching, attendance, mastery or credit. */
-export function CanonicalLearningTracker({ courseAttemptId, lessonId }: {
-  courseAttemptId:string; lessonId:string|null;
-}) {
-  const session = useRef<string|null>(null);
-  const currentLesson = useRef<string|null>(lessonId);
+function tabInstanceId(courseAttemptId: string): string {
+  // A non-secret, tab-scoped instance key persists across reloads, never across devices.
+  const key = "can-learning-instance:" + courseAttemptId;
+  try {
+    const saved = window.sessionStorage.getItem(key);
+    if (saved && /^[0-9a-f-]{36}$/i.test(saved)) return saved;
+    const next = crypto.randomUUID();
+    window.sessionStorage.setItem(key, next);
+    return next;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+/**
+ * Evidence is non-authoritative and never grants attendance, credit or completion.
+ * Failing telemetry does not prevent a learner from viewing course content.
+ */
+export function CanonicalLearningActivityProvider({
+  courseAttemptId, children,
+}: { courseAttemptId: string; children: ReactNode }) {
+  const session = useRef<string | null>(null);
+  const lesson = useRef<string | null>(null);
   const lastInteraction = useRef(Date.now());
   const needsResume = useRef(false);
-  useEffect(()=>{
-    let closed=false;
-    session.current=null;
-    void startCanonicalLearningSession({data:{courseAttemptId,clientInstanceId:crypto.randomUUID()}}).then(async result=>{
-      if(closed){
-        await setCanonicalLearningSessionState({data:{
-          courseAttemptId,learningSessionId:result.learningSessionId,action:"end",
-        }}).catch(()=>{});
-        return;
-      }
-      session.current=result.learningSessionId;
-      lastInteraction.current=Date.now();
-      if(currentLesson.current && document.visibilityState==="visible"){
-        void send(courseAttemptId,result.learningSessionId,currentLesson.current,"lesson_opened").catch(()=>{});
-      }
-    }).catch(()=>{/* Telemetry outage must not block instruction. */});
-    const pause=()=>{
-      needsResume.current=true;
-      lastInteraction.current=Date.now();
-      const active=session.current;
-      if(active) void setCanonicalLearningSessionState({data:{
-        courseAttemptId,learningSessionId:active,action:"pause",
-      }}).catch(()=>{});
+  const operation = useRef<Promise<unknown>>(Promise.resolve());
+  const alive = useRef(false);
+  const instance = useRef<string | null>(null);
+
+  const serialize = useCallback((work: () => Promise<unknown>) => {
+    const next = operation.current.catch(() => undefined).then(work);
+    operation.current = next.catch(() => undefined);
+    return next;
+  }, []);
+
+  const postEvent = useCallback((
+    kind: Kind, lessonId: string | null, resourceId: string | null = null,
+    durationMs?: number,
+  ) => serialize(async () => {
+    const id = session.current;
+    if (!id || !alive.current) return;
+    const event = {
+      clientEventId: crypto.randomUUID(),
+      kind, lessonId, resourceId, occurredAt: new Date().toISOString(),
+      ...(kind === "engaged_interval"
+        ? { durationMs, pageVisible: true, windowFocused: true }
+        : {}),
     };
-    const onHidden=()=>{
-      if(document.visibilityState==="visible")onFocus();
+    await recordCanonicalLearningEvent({
+      data: { courseAttemptId, learningSessionId: id, event },
+    });
+  }), [courseAttemptId, serialize]);
+
+  const selectLesson = useCallback((id: string | null) => {
+    if (lesson.current === id) return;
+    lesson.current = id;
+    lastInteraction.current = Date.now();
+    if (id && session.current && document.visibilityState === "visible")
+      void postEvent("lesson_opened", id).catch(() => {});
+  }, [postEvent]);
+
+  const observe = useCallback((kind: Kind, lessonId: string | null, resourceId?: string | null) => {
+    if (!lessonId || !alive.current ||
+      document.visibilityState !== "visible" || !document.hasFocus()) return;
+    if (kind === "engaged_interval" || kind === "lesson_opened" || kind === "lesson_resumed") return;
+    void postEvent(kind, lessonId, resourceId ?? null).catch(() => {});
+  }, [postEvent]);
+
+  useEffect(() => {
+    alive.current = true;
+    let disposed = false;
+    instance.current = tabInstanceId(courseAttemptId);
+    void startCanonicalLearningSession({
+      data: { courseAttemptId, clientInstanceId: instance.current },
+    }).then(result => {
+      if (disposed) return;
+      session.current = result.learningSessionId;
+      lastInteraction.current = Date.now();
+      const id = lesson.current;
+      if (id && document.visibilityState === "visible")
+        void postEvent("lesson_opened", id).catch(() => {});
+    }).catch(() => {/* Course remains accessible when tracking is offline. */});
+
+    const pause = () => {
+      needsResume.current = true;
+      lastInteraction.current = Date.now();
+      void serialize(async () => {
+        if (!session.current || !alive.current) return;
+        await setCanonicalLearningSessionState({
+          data: { courseAttemptId, learningSessionId: session.current, action: "pause" },
+        });
+      }).catch(() => {});
+    };
+    const resume = () => {
+      if (document.visibilityState !== "visible" || !document.hasFocus()) return;
+      void serialize(async () => {
+        if (!session.current || !alive.current) return;
+        const result = await setCanonicalLearningSessionState({
+          data: { courseAttemptId, learningSessionId: session.current, action: "resume" },
+        });
+        if (result.state === "ended") {
+          const renewed = await startCanonicalLearningSession({
+            data: { courseAttemptId, clientInstanceId: instance.current! },
+          });
+          session.current = renewed.learningSessionId;
+        }
+        if (lesson.current) {
+          await recordCanonicalLearningEvent({
+            data: { courseAttemptId, learningSessionId: session.current!, event: {
+              clientEventId: crypto.randomUUID(), kind: "lesson_resumed",
+              lessonId: lesson.current, resourceId: null, occurredAt: new Date().toISOString(),
+            } },
+          });
+        }
+        needsResume.current = false;
+      }).catch(() => {});
+    };
+    const visibility = () => {
+      if (document.visibilityState === "visible") resume();
       else pause();
     };
-    const onFocus=()=>{
-      const active=session.current;
-      if(!active || document.visibilityState!=="visible" || !document.hasFocus())return;
-      void setCanonicalLearningSessionState({data:{
-        courseAttemptId,learningSessionId:active,action:"resume",
-      }}).catch(()=>{});
-    };
-    const onActivity=(event:Event)=>{
-      const active=session.current, lesson=currentLesson.current, target=event.target;
-      if(!active || !lesson || !event.isTrusted || !(target instanceof Element) ||
+    const interact = (event: Event) => {
+      const target = event.target;
+      if (!alive.current || !session.current || !lesson.current || needsResume.current ||
+        !event.isTrusted || !(target instanceof Element) ||
         !target.closest("[data-learning-content]") ||
-        document.visibilityState!=="visible" || !document.hasFocus())return;
-      const now=Date.now();
-      if(needsResume.current){
-        needsResume.current=false;lastInteraction.current=now;
-        void send(courseAttemptId,active,lesson,"lesson_resumed").catch(()=>{});
-        return;
+        document.visibilityState !== "visible" || !document.hasFocus()) return;
+      const now = Date.now(), elapsed = now - lastInteraction.current;
+      if (elapsed < 30_000) return;
+      lastInteraction.current = now;
+      const lessonId = lesson.current;
+      void postEvent("engaged_interval", lessonId, null, Math.min(elapsed, 60_000))
+        .catch(() => {});
+    };
+    document.addEventListener("visibilitychange", visibility);
+    window.addEventListener("blur", pause);
+    window.addEventListener("focus", resume);
+    document.addEventListener("pointerdown", interact, { passive: true });
+    document.addEventListener("keydown", interact);
+    return () => {
+      disposed = true;
+      alive.current = false;
+      document.removeEventListener("visibilitychange", visibility);
+      window.removeEventListener("blur", pause);
+      window.removeEventListener("focus", resume);
+      document.removeEventListener("pointerdown", interact);
+      document.removeEventListener("keydown", interact);
+      // Preserve a live instance across reloads. Server idle timeout is authoritative.
+      const previous = session.current;
+      session.current = null;
+      if (previous) {
+        void setCanonicalLearningSessionState({
+          data: { courseAttemptId, learningSessionId: previous, action: "pause" },
+        }).catch(() => {});
       }
-      if(now-lastInteraction.current<30_000)return;
-      const elapsed=Math.min(now-lastInteraction.current,60_000);
-      lastInteraction.current=now;
-      void send(courseAttemptId,active,lesson,"engaged_interval",elapsed).catch(()=>{});
     };
-    document.addEventListener("visibilitychange",onHidden);
-    window.addEventListener("blur",pause);
-    window.addEventListener("focus",onFocus);
-    document.addEventListener("pointerdown",onActivity,{passive:true});
-    document.addEventListener("keydown",onActivity);
-    return ()=>{
-      closed=true;
-      document.removeEventListener("visibilitychange",onHidden);
-      window.removeEventListener("blur",pause);
-      window.removeEventListener("focus",onFocus);
-      document.removeEventListener("pointerdown",onActivity);
-      document.removeEventListener("keydown",onActivity);
-      const active=session.current;session.current=null;
-      if(active)void setCanonicalLearningSessionState({data:{
-        courseAttemptId,learningSessionId:active,action:"end",
-      }}).catch(()=>{});
-    };
-  },[courseAttemptId]);
-  useEffect(()=>{
-    currentLesson.current=lessonId;
-    const active=session.current;
-    if(active && lessonId && document.visibilityState==="visible"){
-      lastInteraction.current=Date.now();
-      void send(courseAttemptId,active,lessonId,"lesson_opened").catch(()=>{});
-    }
-  },[courseAttemptId,lessonId]);
-  return null;
+  }, [courseAttemptId, postEvent, serialize]);
+
+  return <Context.Provider value={{ selectLesson, observe }}>{children}</Context.Provider>;
 }
