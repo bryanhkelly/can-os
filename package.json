@@ -15,6 +15,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:canonical:v301:rollback-check": "node scripts/check-canonical-v301-ddl.mjs",
     "db:canonical:v301:instructional-readiness": "node scripts/check-recorded-instructor-readiness.mjs",
+    "db:canonical:v301:instructional-isolation": "node scripts/acceptance/check-instructional-learner-isolation.mjs",
     "db:seed:canonical:v301:demo": "node scripts/seed-canonical-v301-demo.mjs",
     "db:test:canonical:v301:blueprint-flow": "node scripts/check-canonical-v301-blueprint-flow.mjs",
     "db:migrate:fullflow": "node scripts/migrate-fullflow-neon.mjs",
