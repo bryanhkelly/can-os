@@ -51,6 +51,26 @@ export function missingRequiredBlueprintComponents(
     .map(component => component.id);
 }
 
+/**
+ * One current published recipe per Blueprint for new plans, plus any
+ * published older versions already used by saved Site configurations.
+ * The input is sorted latest version first.
+ */
+export function selectBlueprintWorkspaceRecipes<
+  T extends { blueprintId: string; blueprintVersionId: string },
+>(recipes: readonly T[], savedVersionIds: ReadonlySet<string>): T[] {
+  const seen = new Set<string>();
+  return recipes.filter(recipe => {
+    if (savedVersionIds.has(recipe.blueprintVersionId)) {
+      seen.add(recipe.blueprintId);
+      return true;
+    }
+    if (seen.has(recipe.blueprintId)) return false;
+    seen.add(recipe.blueprintId);
+    return true;
+  });
+}
+
 export const blueprintComponentSelectionSchema = z.object({
   componentId: z.string().uuid(),
   selectionStatus: z.enum(["selected", "excluded", "proposed"]),
