@@ -4,7 +4,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  credentialDefinitions, credentialDefinitionVersions, credentialIssuances,
+  learningAwardDefinitions, learningAwardDefinitionVersions, learningAwardIssuances,
   learnerAchievementDecisions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -38,22 +38,22 @@ export const listMyNoncreditCredentials = createServerFn({ method: "GET" })
     const personId = await learner();
     return db.transaction(async tx => {
       const awards = await tx.select({
-        id: credentialIssuances.id,
-        title: credentialDefinitionVersions.title,
-        kind: credentialDefinitions.kind,
-        credentialReference: credentialIssuances.credentialReference,
-        issuedAt: credentialIssuances.issuedAt,
-        expiresAt: credentialIssuances.expiresAt,
-      }).from(credentialIssuances)
+        id: learningAwardIssuances.id,
+        title: learningAwardDefinitionVersions.title,
+        kind: learningAwardDefinitions.kind,
+        credentialReference: learningAwardIssuances.credentialReference,
+        issuedAt: learningAwardIssuances.issuedAt,
+        expiresAt: learningAwardIssuances.expiresAt,
+      }).from(learningAwardIssuances)
         .innerJoin(learnerAchievementDecisions,
-          eq(learnerAchievementDecisions.id, credentialIssuances.achievementDecisionId))
-        .innerJoin(credentialDefinitionVersions,
-          eq(credentialDefinitionVersions.id,
+          eq(learnerAchievementDecisions.id, learningAwardIssuances.achievementDecisionId))
+        .innerJoin(learningAwardDefinitionVersions,
+          eq(learningAwardDefinitionVersions.id,
             learnerAchievementDecisions.credentialDefinitionVersionId))
-        .innerJoin(credentialDefinitions,
-          eq(credentialDefinitions.id, credentialDefinitionVersions.definitionId))
+        .innerJoin(learningAwardDefinitions,
+          eq(learningAwardDefinitions.id, learningAwardDefinitionVersions.definitionId))
         .where(eq(learnerAchievementDecisions.recipientPersonId, personId))
-        .orderBy(desc(credentialIssuances.issuedAt)).limit(50);
+        .orderBy(desc(learningAwardIssuances.issuedAt)).limit(50);
       const status = await Promise.all(awards.map(async award => {
         const res = await tx.execute(sql`SELECT education_v30.v301_credential_is_current(
           ${award.id}::uuid) AS current`);
@@ -74,23 +74,23 @@ export const downloadMyNoncreditCredential = createServerFn({ method: "POST" })
     const personId = await learner();
     return db.transaction(async tx => {
       const [record] = await tx.select({
-        issuanceId: credentialIssuances.id,
-        reference: credentialIssuances.credentialReference,
-        issuedAt: credentialIssuances.issuedAt,
-        kind: credentialDefinitions.kind,
-        title: credentialDefinitionVersions.title,
-        description: credentialDefinitionVersions.description,
-        issuerId: credentialIssuances.issuerOrganizationId,
-      }).from(credentialIssuances)
+        issuanceId: learningAwardIssuances.id,
+        reference: learningAwardIssuances.credentialReference,
+        issuedAt: learningAwardIssuances.issuedAt,
+        kind: learningAwardDefinitions.kind,
+        title: learningAwardDefinitionVersions.title,
+        description: learningAwardDefinitionVersions.description,
+        issuerId: learningAwardIssuances.issuerOrganizationId,
+      }).from(learningAwardIssuances)
         .innerJoin(learnerAchievementDecisions,
-          eq(credentialIssuances.achievementDecisionId, learnerAchievementDecisions.id))
-        .innerJoin(credentialDefinitionVersions,
+          eq(learningAwardIssuances.achievementDecisionId, learnerAchievementDecisions.id))
+        .innerJoin(learningAwardDefinitionVersions,
           eq(learnerAchievementDecisions.credentialDefinitionVersionId,
-            credentialDefinitionVersions.id))
-        .innerJoin(credentialDefinitions,
-          eq(credentialDefinitionVersions.definitionId, credentialDefinitions.id))
+            learningAwardDefinitionVersions.id))
+        .innerJoin(learningAwardDefinitions,
+          eq(learningAwardDefinitionVersions.definitionId, learningAwardDefinitions.id))
         .where(and(
-          eq(credentialIssuances.id, data.issuanceId),
+          eq(learningAwardIssuances.id, data.issuanceId),
           eq(learnerAchievementDecisions.recipientPersonId, personId),
         )).for("share").limit(1);
       if (!record) throw new AuthorizationError("credential owned by learner");

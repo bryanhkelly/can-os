@@ -27,7 +27,7 @@ describe("credential patch structural security boundaries", () => {
     expect(sql).toContain("FORCE ROW LEVEL SECURITY");
     expect(sql).toContain("v301_credential_is_current");
     expect(sql).toContain("credential_revocation_provenance");
-    expect(sql).toContain("credential_issuances_immutable");
-    expect(sql).toContain("credential_issuance_events_immutable");
+    expect(sql).toContain("learning_award_issuances_immutable");
+    expect(sql).toContain("learning_award_issuance_events_immutable");
   });
 });

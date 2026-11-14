@@ -15,7 +15,7 @@ CEU approval, microcredential certification, or professional license is implied.
 - The current `noncredit_completion_decisions` remains the noncredit
   completion authority. Existing `noncredit_completion_certificates` remains
   the canonical certificate issuance for that source.
-- The new `credential_issuances.legacy_noncredit_certificate_id` must
+- The new `learning_award_issuances.legacy_noncredit_certificate_id` must
   reference the same already-issued canonical certificate when issuing a
   noncredit completion certificate. A digital badge can use a separate
   published definition linked to the same latest completion decision.
@@ -85,3 +85,16 @@ the canonical verified summer/after-school session bridge. All require database
 installation, restricted RLS/role verification and authorized multi-actor
 integration tests. The new preview Lab can run from the existing provider
 training catalog without querying new tables.
+
+## Compatibility with existing canonical credential tables
+
+The baseline v3.0.1 schema already owns `credential_definitions` and
+`credential_issuances` for academic/external credential records, with
+`credential_id` and `learner_id` fields. The completion-award extension
+**does not replace or modify those tables**. It uses separate
+`learning_award_definitions`, `learning_award_definition_versions`,
+`learner_achievement_decisions`, `learning_award_issuances`,
+`learning_award_issuance_events`, and `learning_award_artifacts`.
+When a verified external professional certification or academic credential
+needs to be recorded, use the existing canonical credential domain; do not
+misclassify it as a noncredit learning award.
