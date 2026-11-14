@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import {
   createInstructionalTrackDraft,
   createInstructionalTrackDraftSchema,
@@ -79,21 +80,21 @@ export const getStudentRecordedInstructors = createServerFn({ method: "GET" })
   .validator((value: unknown) => readInstructionalTrackSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return listAvailableInstructionalTracks(await getCommandContext(getRequest()), data);
+    return listAvailableInstructionalTracks(await getInstructionalLearnerContext(getRequest()), data);
   });
 
 export const selectRecordedInstructor = createServerFn({ method: "POST" })
   .validator((value: unknown) => selectInstructionalTrackSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return selectInstructionalTrack(await getCommandContext(getRequest()), data);
+    return selectInstructionalTrack(await getInstructionalLearnerContext(getRequest()), data);
   });
 
 export const getRecordedLessonInstruction = createServerFn({ method: "GET" })
   .validator((value: unknown) => readInstructionalTrackSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return readSelectedInstructionalTrack(await getCommandContext(getRequest()), data);
+    return readSelectedInstructionalTrack(await getInstructionalLearnerContext(getRequest()), data);
   });
 
 export const getRecordedInstructionAssetDownload = createServerFn({ method: "POST" })
@@ -101,7 +102,7 @@ export const getRecordedInstructionAssetDownload = createServerFn({ method: "POS
   .handler(async ({ data }) => {
     privateNoStore();
     return getSelectedInstructionalTrackAssetDownload(
-      await getCommandContext(getRequest()),
+      await getInstructionalLearnerContext(getRequest()),
       data,
     );
   });
@@ -110,19 +111,19 @@ export const completeRecordedCourseLesson = createServerFn({ method: "POST" })
   .validator((value: unknown) => completeRecordedLessonSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return completeRecordedLesson(await getCommandContext(getRequest()), data);
+    return completeRecordedLesson(await getInstructionalLearnerContext(getRequest()), data);
   });
 
 export const recordRecordedInstructorPractice = createServerFn({ method: "POST" })
   .validator((value: unknown) => recordFormativePracticeSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return recordFormativePractice(await getCommandContext(getRequest()), data);
+    return recordFormativePractice(await getInstructionalLearnerContext(getRequest()), data);
   });
 
 export const getRecordedInstructorPracticeHistory = createServerFn({ method: "GET" })
   .validator((value: unknown) => readInstructionalTrackSchema.parse(value))
   .handler(async ({ data }) => {
     privateNoStore();
-    return readFormativePracticeHistory(await getCommandContext(getRequest()), data);
+    return readFormativePracticeHistory(await getInstructionalLearnerContext(getRequest()), data);
   });

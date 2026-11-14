@@ -265,12 +265,12 @@ CREATE TABLE canonical_account_grants (
  person_id uuid NOT NULL REFERENCES persons(id),
  organization_id uuid NOT NULL REFERENCES organizations(id),
  site_id uuid REFERENCES sites(id),
- role_code text NOT NULL CHECK(role_code IN ('site_admin','registrar','blueprint_reviewer')),
+ role_code text NOT NULL CHECK(role_code IN ('site_admin','registrar','blueprint_reviewer','learner')),
  active boolean NOT NULL DEFAULT true,
  granted_at timestamptz NOT NULL DEFAULT clock_timestamp(),
  revoked_at timestamptz,
  UNIQUE(id,account_id),
- CHECK((role_code='blueprint_reviewer' AND site_id IS NULL)
+ CHECK((role_code IN ('blueprint_reviewer','learner') AND site_id IS NULL)
     OR (role_code IN ('site_admin','registrar') AND site_id IS NOT NULL)),
  CHECK(revoked_at IS NULL OR revoked_at>=granted_at)
 );
@@ -10906,7 +10906,7 @@ SET search_path=education_v30,pg_catalog AS $v301_auth$
    AND s.last_activity_at>clock_timestamp()-interval '30 minutes'
    AND o.status='active'
    AND (
-     (g.role_code='blueprint_reviewer' AND g.site_id IS NULL)
+     (g.role_code IN ('blueprint_reviewer','learner') AND g.site_id IS NULL)
      OR (g.role_code IN ('site_admin','registrar') AND EXISTS (
        SELECT 1 FROM site_organization_roles sor
        JOIN sites st ON st.id=sor.site_id

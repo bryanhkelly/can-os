@@ -575,6 +575,19 @@ export const learnerCourseAttempts = educationV30.table(
   ],
 );
 
+export const noncreditTrainingVersions = educationV30.table("noncredit_training_versions", {
+  id: id(),
+  offeringVersionId: uuid("offering_version_id").notNull(),
+  providerOrganizationId: uuid("provider_organization_id").notNull(),
+  title: text("title").notNull(),
+  requiredInstructionMinutes: integer("required_instruction_minutes").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  state: text("state").$type<"draft" | "published">().notNull(),
+  authorPersonId: uuid("author_person_id").notNull(),
+  approvedByPersonId: uuid("approved_by_person_id"),
+  assessmentVersionId: uuid("assessment_version_id"),
+});
+
 export const noncreditRegistrations = educationV30.table("noncredit_registrations", {
   id: id(),
   deploymentId: uuid("deployment_id").notNull(),
