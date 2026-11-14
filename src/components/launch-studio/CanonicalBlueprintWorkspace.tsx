@@ -6,18 +6,21 @@ import { normalizeClientError } from "@/lib/client-error";
 import {
   createCanonicalBlueprintConfiguration,
   readCanonicalBlueprintConfiguration,
+  readCanonicalBlueprintReview,
   readCanonicalBlueprintWorkspace,
   saveCanonicalBlueprintConfiguration,
   submitCanonicalBlueprintConfiguration,
 } from "@/modules/blueprints/blueprint-studio.functions";
 import type { getCanonicalBlueprintWorkspace } from "@/modules/blueprints/blueprint-workspace.server";
 import type { BlueprintConfigurationDetail } from "@/modules/blueprints/blueprint-configuration.server";
+import type { getBlueprintReview } from "@/modules/blueprints/blueprint-review.server";
 import { blueprintEditorialIdentityKeys } from "@/domain/blueprint-configuration";
 import { exploreBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.functions";
 import type { BlueprintReferenceCatalogItem } from "@/domain/blueprint-reference-catalog";
 
 type Workspace = Awaited<ReturnType<typeof getCanonicalBlueprintWorkspace>>;
 type Template = Workspace["templates"][number];
+type Review = Awaited<ReturnType<typeof getBlueprintReview>>;
 
 function readable(value: string): string {
   return value.replaceAll("_", " ");
@@ -30,6 +33,7 @@ function readable(value: string): string {
 export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }: { siteId: string; enableReferences?: boolean }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [detail, setDetail] = useState<BlueprintConfigurationDetail | null>(null);
+  const [review, setReview] = useState<Review | null>(null);
   const [name, setName] = useState("");
   const [templateId, setTemplateId] = useState("");
   const [editorialIdentity, setEditorialIdentity] = useState<
@@ -54,6 +58,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     let cancelled = false;
     setWorkspace(null);
     setDetail(null);
+    setReview(null);
     setLoading(true);
     setError(null);
     void readCanonicalBlueprintWorkspace({ data: { siteId } })
@@ -88,6 +93,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       component.requirementMode === "required"
     ).map(component => component.id));
     setDetail(null);
+    setReview(null);
     setMessage(null);
   }
 
@@ -97,6 +103,17 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
     try {
       const result = await readCanonicalBlueprintConfiguration({ data: { configurationId } });
       setDetail(result);
+      setReview(null);
+      if (result.lifecycle === "frozen") {
+        try {
+          const currentReview = await readCanonicalBlueprintReview({
+            data: { configurationVersionId: result.versionId },
+          });
+          setReview(currentReview);
+        } catch {
+          // A temporarily unavailable review read must not hide the saved draft.
+        }
+      }
       setName(result.name);
       setEditorialIdentity(result.identity.editorialIdentity);
       setReligiousAffiliationCode(result.identity.religiousAffiliationCode ?? "");
@@ -347,6 +364,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
             {detail && <Button type="button" variant="outline" disabled={busy}
               onClick={() => {
                 setDetail(null);
+                setReview(null);
                 setTemplateId("");
                 setSelectedComponents([]);
                 setSelectedReferences({});
@@ -354,10 +372,20 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 setMessage(null);
               }}>Start a new configuration</Button>}
           </div>
-          {detail && <p className="text-sm text-muted-foreground">
-            Revision {detail.revision} · {detail.lifecycle === "frozen"
-              ? "Submitted for independent review" : "Private planning draft"}
-          </p>}
+          {detail && <div className="text-sm text-muted-foreground">
+            <p>Revision {detail.revision} · {detail.lifecycle === "frozen"
+              ? "Submitted for independent review" : "Private planning draft"}</p>
+            {detail.lifecycle === "frozen" && <>
+              <p className="mt-1">
+                Latest independent review: {review?.latestReview
+                  ? readable(review.latestReview.decision) : "Pending or unavailable"}
+              </p>
+              <Button type="button" variant="outline" disabled={busy}
+                onClick={() => void openConfiguration(detail.configurationId)}>
+                Refresh review status
+              </Button>
+            </>}
+          </div>}
         </>}
       </div>}
     </>}
