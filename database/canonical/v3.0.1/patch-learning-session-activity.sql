@@ -33,8 +33,7 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_session_events (
   request_digest text NOT NULL,
   kind text NOT NULL CHECK (kind IN (
     'lesson_opened','lesson_resumed','resource_opened',
-    'video_started','video_progress','video_completed',
-    'assessment_started','assessment_submitted','survey_submitted','engaged_interval'
+    'video_opened','video_played','video_ended','engaged_interval'
   )),
   lesson_id uuid,
   resource_id text,
