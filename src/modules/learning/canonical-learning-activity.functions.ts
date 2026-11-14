@@ -75,6 +75,13 @@ export const startCanonicalLearningSession = createServerFn({ method: "POST" })
         if (existing.participantPersonId !== actor.actorPersonId ||
             existing.courseVersionId !== attempt.courseVersionId)
           throw new AuthorizationError("current session participant and course version");
+        if (existing.state === "paused") {
+          const [resumed] = await tx.update(canonicalLearningSessions)
+            .set({ state:"active", lastForeground:false, lastLessonId:null })
+            .where(eq(canonicalLearningSessions.id,existing.id)).returning();
+          if(!resumed)throw new Error("Unable to resume course learning");
+          return { ...output(resumed), reused: true };
+        }
         return { ...output(existing), reused: true };
       }
       if (existing) {
