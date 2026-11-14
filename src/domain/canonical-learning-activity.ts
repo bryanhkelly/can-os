@@ -5,8 +5,7 @@ export const canonicalLearningEventSchema = z.object({
   clientEventId: z.string().uuid(),
   kind: z.enum([
     "lesson_opened", "lesson_resumed", "resource_opened",
-    "video_started", "video_progress", "video_completed",
-    "assessment_started", "assessment_submitted", "survey_submitted", "engaged_interval",
+    "video_opened", "video_played", "video_ended", "engaged_interval",
   ]),
   lessonId: z.string().uuid().nullable(),
   resourceId: z.string().min(1).max(160).regex(/^[a-zA-Z0-9_./:-]+$/).nullable(),
@@ -21,9 +20,9 @@ export const canonicalLearningEventSchema = z.object({
   if (event.kind !== "engaged_interval" &&
       (event.durationMs !== undefined || event.pageVisible !== undefined || event.windowFocused !== undefined))
     ctx.addIssue({ code: "custom", message: "Only engaged intervals may report time or visibility." });
-  if (event.kind === "resource_opened" && !event.resourceId)
+  if ((event.kind === "resource_opened" || event.kind.startsWith("video_")) && !event.resourceId)
     ctx.addIssue({ code: "custom", message: "A resource reference is required." });
-  if (event.kind.startsWith("lesson_") && !event.lessonId)
+  if ((event.kind.startsWith("lesson_") || event.kind.startsWith("video_") || event.kind === "resource_opened") && !event.lessonId)
     ctx.addIssue({ code: "custom", message: "A lesson reference is required." });
 });
 export type CanonicalLearningEvent = z.infer<typeof canonicalLearningEventSchema>;
@@ -31,7 +30,7 @@ export const LEARNING_SESSION_IDLE_MS = 30 * 60_000;
 export const LEARNING_SESSION_MAX_MS = 12 * 60 * 60_000;
 export function learningSessionIsExpired(startedAt: Date, lastInteractionAt: Date | null, now: Date): boolean {
   return now.getTime() - startedAt.getTime() > LEARNING_SESSION_MAX_MS ||
-    (lastInteractionAt !== null && now.getTime() - lastInteractionAt.getTime() > LEARNING_SESSION_IDLE_MS);
+    now.getTime() - (lastInteractionAt ?? startedAt).getTime() > LEARNING_SESSION_IDLE_MS;
 }
 export function validateLearningEventTime(occurredAt: string, now: Date): void {
   const skew = now.getTime() - Date.parse(occurredAt);
