@@ -10509,6 +10509,22 @@ BEGIN
  END LOOP;
 END $v30_rls_new_domain$;
 
+-- The native Blueprint service uses narrow roles, never the schema owner.
+-- Enable these additional reference/evidence rows before the owner policy
+-- pass so all FORCE-RLS data remains usable by trusted definer functions.
+DO $v301_blueprint_rls$
+DECLARE t text;
+BEGIN
+ FOREACH t IN ARRAY ARRAY[
+  'blueprints','blueprint_versions','blueprint_components',
+  'religious_affiliation_options','evidence_documents','evidence_document_versions',
+  'blueprint_component_approval_decisions'
+ ] LOOP
+  EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',t);
+  EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',t);
+ END LOOP;
+END $v301_blueprint_rls$;
+
 -- Single canonical RLS owner policy pass, after all tables are created.
 -- Only the trusted schema-owning database role can read/write protected rows inside
 -- SECURITY DEFINER implementations; app roles still need their own scoped policies.
@@ -10524,6 +10540,174 @@ BEGIN
     'can_v30_trusted_owner_access',rec.nspname,rec.relname,trusted_owner);
  END LOOP;
 END $v30_trusted_owner_rls$;
+
+-- Native Blueprint roles: each purpose is explicitly bound to exactly one
+-- Organization through database_role_organization_bindings. This cannot be
+-- bypassed by an application-supplied Organization or Site identifier.
+-- Reading the shared recipe catalog never creates operating authority.
+CREATE POLICY blueprint_recipes_read ON blueprints FOR SELECT USING (
+ status='active'
+ AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer')));
+CREATE POLICY blueprint_recipe_versions_read ON blueprint_versions FOR SELECT USING (
+ lifecycle='published'
+ AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer')));
+CREATE POLICY blueprint_recipe_components_read ON blueprint_components FOR SELECT USING (
+ (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer'))
+ AND EXISTS(SELECT 1 FROM blueprint_versions bv
+   WHERE bv.id=blueprint_components.blueprint_version_id AND bv.lifecycle='published'));
+CREATE POLICY blueprint_affiliations_read ON religious_affiliation_options FOR SELECT USING (
+ active AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer')));
+
+CREATE POLICY blueprint_site_operators_read ON site_organization_roles FOR SELECT USING (
+ role_code='operator' AND valid_from<=clock_timestamp()
+ AND (valid_through IS NULL OR valid_through>clock_timestamp())
+ AND v28_role_can_access_org(organization_id,'blueprint_author'));
+CREATE POLICY blueprint_sites_read ON sites FOR SELECT USING (
+ status<>'closed' AND EXISTS (
+  SELECT 1 FROM site_organization_roles sor WHERE sor.site_id=sites.id
+    AND sor.role_code='operator' AND sor.valid_from<=clock_timestamp()
+    AND (sor.valid_through IS NULL OR sor.valid_through>clock_timestamp())
+    AND v28_role_can_access_org(sor.organization_id,'blueprint_author')));
+
+CREATE POLICY blueprint_catalog_references_read ON blueprint_reference_items FOR SELECT USING (
+ status='active' AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer')));
+CREATE POLICY blueprint_catalog_reference_versions_read ON blueprint_reference_item_versions
+ FOR SELECT USING (lifecycle='published'
+ AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer'))
+ AND EXISTS (SELECT 1 FROM blueprint_reference_items i
+   WHERE i.id=blueprint_reference_item_versions.item_id AND i.status='active'));
+CREATE POLICY blueprint_offerings_read ON offerings FOR SELECT USING (
+ status='active' AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer')));
+CREATE POLICY blueprint_offering_versions_read ON offering_versions FOR SELECT USING (
+ lifecycle='published' AND (v28_role_has_purpose('blueprint_author')
+   OR v28_role_has_purpose('blueprint_reviewer')));
+
+CREATE POLICY blueprint_configurations_read ON blueprint_configurations FOR SELECT USING (
+ owning_organization_id IS NOT NULL
+ AND (v28_role_can_access_org(owning_organization_id,'blueprint_author')
+   OR v28_role_can_access_org(owning_organization_id,'blueprint_reviewer')));
+CREATE POLICY blueprint_configurations_insert ON blueprint_configurations FOR INSERT WITH CHECK (
+ owning_organization_id IS NOT NULL
+ AND v28_role_can_access_org(owning_organization_id,'blueprint_author'));
+CREATE POLICY blueprint_configuration_versions_read ON blueprint_configuration_versions
+ FOR SELECT USING (EXISTS (
+  SELECT 1 FROM blueprint_configurations bc
+  WHERE bc.id=blueprint_configuration_versions.configuration_id
+    AND (v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')
+      OR v28_role_can_access_org(bc.owning_organization_id,'blueprint_reviewer'))));
+CREATE POLICY blueprint_configuration_versions_insert ON blueprint_configuration_versions
+ FOR INSERT WITH CHECK (lifecycle='draft' AND EXISTS (
+  SELECT 1 FROM blueprint_configurations bc
+  WHERE bc.id=blueprint_configuration_versions.configuration_id
+    AND v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')));
+CREATE POLICY blueprint_configuration_versions_freeze ON blueprint_configuration_versions
+ FOR UPDATE
+ USING (lifecycle='draft' AND EXISTS (
+  SELECT 1 FROM blueprint_configurations bc
+  WHERE bc.id=blueprint_configuration_versions.configuration_id
+    AND v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')))
+ WITH CHECK (lifecycle='frozen' AND frozen_at IS NOT NULL AND EXISTS (
+  SELECT 1 FROM blueprint_configurations bc
+  WHERE bc.id=blueprint_configuration_versions.configuration_id
+    AND v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')));
+
+-- Child records are visible only under a configuration belonging to the
+-- caller's bound Organization, and are written only by its Blueprint author.
+DO $v301_blueprint_children$
+DECLARE rec record;
+BEGIN
+ FOR rec IN SELECT unnest(ARRAY[
+  'blueprint_configuration_components',
+  'blueprint_configuration_component_references',
+  'blueprint_configuration_offering_intents',
+  'blueprint_configuration_local_experiences']) AS table_name
+ LOOP
+  EXECUTE format(
+   'CREATE POLICY blueprint_child_read ON education_v30.%I FOR SELECT USING (
+    EXISTS (SELECT 1 FROM education_v30.blueprint_configuration_versions v
+     JOIN education_v30.blueprint_configurations bc ON bc.id=v.configuration_id
+     WHERE v.id=configuration_version_id AND (
+       education_v30.v28_role_can_access_org(bc.owning_organization_id,''blueprint_author'')
+       OR education_v30.v28_role_can_access_org(bc.owning_organization_id,''blueprint_reviewer''))))',
+    rec.table_name);
+  EXECUTE format(
+   'CREATE POLICY blueprint_child_insert ON education_v30.%I FOR INSERT WITH CHECK (
+    EXISTS (SELECT 1 FROM education_v30.blueprint_configuration_versions v
+     JOIN education_v30.blueprint_configurations bc ON bc.id=v.configuration_id
+     WHERE v.id=configuration_version_id AND v.lifecycle=''draft''
+       AND education_v30.v28_role_can_access_org(bc.owning_organization_id,''blueprint_author'')))',
+   rec.table_name);
+ END LOOP;
+END $v301_blueprint_children$;
+
+CREATE POLICY blueprint_reviews_read ON configuration_reviews FOR SELECT USING (
+ EXISTS (SELECT 1 FROM blueprint_configuration_versions v
+  JOIN blueprint_configurations bc ON bc.id=v.configuration_id
+  WHERE v.id=configuration_reviews.configuration_version_id
+    AND (v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')
+      OR v28_role_can_access_org(bc.owning_organization_id,'blueprint_reviewer'))));
+CREATE POLICY blueprint_reviews_insert ON configuration_reviews FOR INSERT WITH CHECK (
+ EXISTS (SELECT 1 FROM blueprint_configuration_versions v
+  JOIN blueprint_configurations bc ON bc.id=v.configuration_id
+  WHERE v.id=configuration_reviews.configuration_version_id
+    AND v.lifecycle='frozen'
+    AND v28_role_can_access_org(bc.owning_organization_id,'blueprint_reviewer')));
+CREATE POLICY blueprint_component_decisions_read ON blueprint_component_approval_decisions
+ FOR SELECT USING (
+ EXISTS (SELECT 1 FROM blueprint_configuration_versions v
+  JOIN blueprint_configurations bc ON bc.id=v.configuration_id
+  WHERE v.id=blueprint_component_approval_decisions.configuration_version_id
+    AND (v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')
+      OR v28_role_can_access_org(bc.owning_organization_id,'blueprint_reviewer'))));
+CREATE POLICY blueprint_component_decisions_insert ON blueprint_component_approval_decisions
+ FOR INSERT WITH CHECK (
+ v28_role_can_access_org(authority_organization_id,'blueprint_reviewer')
+ AND EXISTS (SELECT 1 FROM blueprint_configuration_versions v
+  JOIN blueprint_configurations bc ON bc.id=v.configuration_id
+  WHERE v.id=blueprint_component_approval_decisions.configuration_version_id
+    AND v.lifecycle='frozen'
+    AND bc.owning_organization_id=authority_organization_id));
+
+CREATE POLICY blueprint_review_evidence_read ON evidence_documents FOR SELECT USING (
+ v28_role_can_access_org(owning_organization_id,'blueprint_reviewer'));
+CREATE POLICY blueprint_review_evidence_versions_read ON evidence_document_versions
+ FOR SELECT USING (
+ verified_at IS NOT NULL AND (valid_from IS NULL OR valid_from<=CURRENT_DATE)
+ AND (valid_through IS NULL OR valid_through>=CURRENT_DATE)
+ AND EXISTS (SELECT 1 FROM evidence_documents d
+  WHERE d.id=evidence_document_versions.document_id
+    AND v28_role_can_access_org(d.owning_organization_id,'blueprint_reviewer')));
+
+CREATE POLICY blueprint_audit_read ON audit_events FOR SELECT USING (
+ entity_kind='blueprint_configuration'
+ AND owning_organization_id IS NOT NULL
+ AND (v28_role_can_access_org(owning_organization_id,'blueprint_author')
+   OR v28_role_can_access_org(owning_organization_id,'blueprint_reviewer')));
+CREATE POLICY blueprint_audit_insert ON audit_events FOR INSERT WITH CHECK (
+ entity_kind='blueprint_configuration'
+ AND event_code IN ('blueprint.configuration.created','blueprint.configuration.saved',
+   'blueprint.configuration.submitted','blueprint.configuration.reviewed')
+ AND owning_organization_id IS NOT NULL
+ AND (v28_role_can_access_org(owning_organization_id,'blueprint_author')
+   OR v28_role_can_access_org(owning_organization_id,'blueprint_reviewer'))
+ AND EXISTS (SELECT 1 FROM blueprint_configurations bc
+  WHERE bc.id=audit_events.entity_id
+    AND bc.owning_organization_id=audit_events.owning_organization_id));
+CREATE POLICY blueprint_domain_event_insert ON domain_events FOR INSERT WITH CHECK (
+ aggregate_type='blueprint_configuration'
+ AND event_type IN ('BlueprintConfigurationCreated','BlueprintConfigurationSaved',
+   'BlueprintConfigurationSubmitted','BlueprintConfigurationReviewed')
+ AND EXISTS (SELECT 1 FROM blueprint_configurations bc
+  WHERE bc.id=domain_events.aggregate_id
+    AND (v28_role_can_access_org(bc.owning_organization_id,'blueprint_author')
+      OR v28_role_can_access_org(bc.owning_organization_id,'blueprint_reviewer'))));
 
 -- Read-only bearer session projection; scoped authority is verified server-side.
 CREATE OR REPLACE FUNCTION v301_canonical_session_context(p_secret_hash text)
