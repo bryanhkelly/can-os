@@ -5,6 +5,7 @@ import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { coursePermissionContext } from "@/domain/guardian-permission-context";
 import {
   listGuardianCourseApprovals, decideGuardianCourseApproval,
 } from "@/modules/learning/guardian-course-approval.functions";
@@ -28,8 +29,7 @@ function GuardianCourseApprovals() {
 }
 
 type Approval = Awaited<ReturnType<typeof listGuardianCourseApprovals>>[number];
-const courseConsentContext = (item: Approval) =>
-  JSON.stringify([item.id,item.studentName,item.sectionCode,item.sectionTitle,item.deadline,item.status,item.contentReady]);
+
 
 function CourseApprovalList({ items }: { items: Approval[] }) {
   const router = useRouter();
@@ -40,10 +40,10 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
 
   async function decide(item: Approval, approve: boolean) {
     const requestId = item.id;
-    if(approve && acknowledged[requestId] !== courseConsentContext(item)) return;
+    if(approve && acknowledged[requestId] !== coursePermissionContext(item)) return;
     const outcome = await mutation.run(
       () => decideGuardianCourseApproval({
-        data: { requestId, approve, acknowledge: approve && acknowledged[requestId] === courseConsentContext(item) },
+        data: { requestId, approve, acknowledge: approve && acknowledged[requestId] === coursePermissionContext(item) },
       }),
       {
         successMessage: approve ? "Your approval was recorded. The registrar must still finalize the schedule." : "Your decision to decline was recorded.",
@@ -97,9 +97,9 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
             <label className="mt-4 flex items-start gap-3 text-sm">
               <input
                 type="checkbox"
-                checked={acknowledged[item.id] === courseConsentContext(item)}
+                checked={acknowledged[item.id] === coursePermissionContext(item)}
                 onChange={event => setAcknowledged(previous => ({
-                  ...previous, [item.id]: event.target.checked ? courseConsentContext(item) : "",
+                  ...previous, [item.id]: event.target.checked ? coursePermissionContext(item) : "",
                 }))}
                 className="mt-1"
               />
@@ -109,7 +109,7 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
             <div className="mt-4 flex flex-wrap gap-3">
               <button
                 type="button"
-                disabled={busy || acknowledged[item.id] !== courseConsentContext(item)}
+                disabled={busy || acknowledged[item.id] !== coursePermissionContext(item)}
                 onClick={() => void decide(item, true)}
                 className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
               >
