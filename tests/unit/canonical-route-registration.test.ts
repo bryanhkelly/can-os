@@ -31,6 +31,10 @@ describe("native canonical Blueprint route registration", () => {
     expect(contract?.roleJourney).not.toBe("pending");
     expect(contract?.readBoundary).not.toBe("pending");
     expect(contract?.writeBoundary).not.toBe("pending");
+    const fixture = JSON.parse(readFileSync(resolve("scripts/seeds/fixture-manifest.json"), "utf8"))
+      as { routes: Record<string, { fixtureRequired?: boolean; rationale?: string }> };
+    expect(fixture.routes[route]?.fixtureRequired).toBe(false);
+    expect(fixture.routes[route]?.rationale?.length).toBeGreaterThan(80);
     expect(routeNavigation[route]).toEqual(expect.objectContaining({
       visibility: "hidden",
       personas: [],

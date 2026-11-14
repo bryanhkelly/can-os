@@ -2138,6 +2138,16 @@
         "reject an unavailable or mismatched school"
       ],
       "downstreamRecords": []
+    },
+    "/canonical/blueprints": {
+      "persona": "native v3 Site-scoped Blueprint author",
+      "fixtureRequired": false,
+      "rationale": "The public-schema demo fixtures must not impersonate canonical identities or grant canonical database roles. Canonical demo-seeding and restricted-role authorization are tested only against isolated v3.0.1 databases; authenticated application E2E acceptance remains outstanding."
+    },
+    "/canonical/blueprint-reviews": {
+      "persona": "native v3 independent Blueprint reviewer",
+      "fixtureRequired": false,
+      "rationale": "Legacy Site and account fixture seeds cannot establish an independent native v3 reviewer or verified evidence. Use the isolated canonical v3.0.1 restricted-role demo and acceptance runner; browser review and decision journeys remain unverified."
     }
   }
 }
