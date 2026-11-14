@@ -6,13 +6,14 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   canonicalLearningEvents, canonicalLearningSessions, courseLessons, learnerCourseAttempts,
+  trackLessonPresentations, instructionalTrackMaterials,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import {
   boundedCanonicalActiveMs, canonicalLearningEventSchema,
   learningSessionIsExpired, validateLearningEventTime,
 } from "@/domain/canonical-learning-activity";
-import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 
 const uuid = z.string().uuid();
@@ -23,7 +24,7 @@ const eventInput = sessionInput.extend({ event: canonicalLearningEventSchema });
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function currentLearner(tx: Tx, courseAttemptId: string) {
-  const actor = await getCanonicalCommandContext(getRequest());
+  const actor = await getInstructionalLearnerContext(getRequest());
   if (!actor.sessionId || !actor.actorPersonId) throw new AuthorizationError("authenticated session");
   await authorizeCanonicalCourseAttempt(tx, actor, courseAttemptId);
   const [attempt] = await tx.select({
@@ -153,7 +154,35 @@ export const recordCanonicalLearningEvent = createServerFn({method:"POST"})
         )).limit(1);
         if(!lesson) throw new AuthorizationError("published course lesson");
       }
-      // Resource/media/assessment references are observation hints, not validated academic outcomes.
+      // Media and resource IDs must belong to actual published course-version content.
+      if (data.event.kind.startsWith("video_")) {
+        if (!data.event.resourceId || !data.event.lessonId)
+          throw new AuthorizationError("course video reference");
+        const [presentation] = await tx.select({ id: trackLessonPresentations.id })
+          .from(trackLessonPresentations).where(and(
+            eq(trackLessonPresentations.assetVersionId, data.event.resourceId),
+            eq(trackLessonPresentations.courseLessonId, data.event.lessonId),
+            eq(trackLessonPresentations.courseVersionId, attempt.courseVersionId),
+          )).limit(1);
+        if (!presentation) throw new AuthorizationError("course presentation");
+      }
+      if (data.event.kind === "resource_opened") {
+        if (!data.event.resourceId || !data.event.lessonId)
+          throw new AuthorizationError("course resource reference");
+        const [lessonUnit] = await tx.select({ courseUnitId: courseLessons.courseUnitId })
+          .from(courseLessons).where(and(
+            eq(courseLessons.id, data.event.lessonId),
+            eq(courseLessons.courseVersionId, attempt.courseVersionId),
+          )).limit(1);
+        if (!lessonUnit) throw new AuthorizationError("current lesson");
+        const [resource] = await tx.select({ id: instructionalTrackMaterials.id })
+          .from(instructionalTrackMaterials).where(and(
+            eq(instructionalTrackMaterials.assetVersionId, data.event.resourceId),
+            eq(instructionalTrackMaterials.courseVersionId, attempt.courseVersionId),
+            eq(instructionalTrackMaterials.courseUnitId, lessonUnit.courseUnitId),
+          )).limit(1);
+        if (!resource) throw new AuthorizationError("current lesson resource");
+      }
       const estimatedActiveMs=boundedCanonicalActiveMs({
         event:data.event, previousReceivedAt:session.lastInteractionAt,now,
         previousForeground:session.lastForeground,
