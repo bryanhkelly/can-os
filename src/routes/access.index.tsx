@@ -7,6 +7,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { useHydrated } from "@/lib/use-hydrated";
+import {clearLearnerBrowserState} from "@/domain/session-client";
 export const Route=createFileRoute("/access/")({
  validateSearch:(search:Record<string,unknown>):{email?:string;error?:keyof typeof accessFormErrors;returnTo?:string}=>({
   email:typeof search.email==="string"?search.email:undefined,
@@ -26,7 +27,7 @@ function AccessPage(){
  const verifyAction=search.returnTo
  ?`/access/verify?returnTo=${encodeURIComponent(search.returnTo)}`:"/access/verify";
  async function submit(e:React.FormEvent<HTMLFormElement>){
-  if(isDemoEmail){setBusy(true);return;}
+  if(isDemoEmail){clearLearnerBrowserState();setBusy(true);return;}
   e.preventDefault();setBusy(true);setStatus("");
   try{
    const response=await fetch("/access/request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,returnTo:search.returnTo})});

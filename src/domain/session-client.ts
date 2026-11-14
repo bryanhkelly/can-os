@@ -14,8 +14,14 @@ export function setSharedDeviceMode(enabled:boolean):void {
  try{if(enabled)window.localStorage.setItem(sharedKey,"1");else window.localStorage.removeItem(sharedKey);}catch{}
 }
 export function clearLearnerBrowserState():void {
- try{for(const key of Object.keys(window.sessionStorage))
- if(key==="can-access-client-instance"||key.startsWith("can-learning-"))window.sessionStorage.removeItem(key);}catch{}
+ try{window.sessionStorage.clear();}catch{}
+ // Local storage persists across tabs. Preserve only the kiosk-mode preference.
+ try{
+  const mode=window.localStorage.getItem(sharedKey);
+  for(const key of Object.keys(window.localStorage))
+   if(key.startsWith("can-")&&key!==sharedKey)window.localStorage.removeItem(key);
+  if(mode==="1")window.localStorage.setItem(sharedKey,"1");
+ }catch{}
 }
 export function registerAccessClient():Promise<Response> {
  return fetch("/access/session",{method:"POST",credentials:"same-origin",cache:"no-store",
