@@ -9,6 +9,7 @@ const eventLabels: Record<string, string> = {
   resource_opened: "Resource opened",
   video_opened: "Video player opened",
   video_played: "Native video playback started",
+  video_paused: "Native video playback paused",
   video_ended: "Native video reached its end",
 };
 function dateTime(value: string) {
