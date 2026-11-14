@@ -39,6 +39,10 @@ export const canonicalSessions = educationV30.table("canonical_sessions", {
   lastActivityAt: timestamp("last_activity_at", { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
+  clientInstanceId:uuid("client_instance_id"),deviceCategory:text("device_category"),
+  browserFamily:text("browser_family"),osFamily:text("os_family"),
+  ipAddress:text("ip_address"),networkObservedAt:timestamp("network_observed_at",{withTimezone:true}),
+  sharedDevice:boolean("shared_device").notNull().default(false),
 }, t => [
   uniqueIndex("canonical_sessions_secret_hash_key").on(t.secretHash),
   index("canonical_sessions_account_idx").on(t.accountId).where(isNull(t.revokedAt)),

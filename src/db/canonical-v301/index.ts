@@ -14,3 +14,5 @@ export * from "./surveys";
 export * from "./noncredit";
 export * from "./assessments";
 export * from "./credentials";
+
+export * from "./device-operations";

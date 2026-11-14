@@ -40,6 +40,7 @@ export const canonicalLearningEvents = educationV30.table("learning_session_even
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
   receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
   estimatedActiveMs: integer("estimated_active_ms").notNull().default(0),
+  evidenceLevel:text("evidence_level").$type<"self_reported"|"client_observed"|"server_verified"|"facilitator_attested"|"independently_assessed">().notNull().default("client_observed"),
 }, t => [
   uniqueIndex("canonical_learning_events_dedupe_uq").on(t.learningSessionId, t.clientEventId),
   foreignKey({columns:[t.learningSessionId,t.courseAttemptId],foreignColumns:[canonicalLearningSessions.id,canonicalLearningSessions.courseAttemptId],name:"canonical_learning_events_session_attempt_fk"}),
