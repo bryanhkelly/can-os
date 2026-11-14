@@ -110,8 +110,40 @@ export async function getCanonicalBlueprintWorkspace(
         ))
         .orderBy(asc(educationOperations.name)),
     ]);
+    // Read saved configuration versions before choosing recipe templates. An
+    // existing Site plan must remain openable after CAN publishes a newer
+    // recipe version for the same Blueprint.
+    const versions = configurations.length
+      ? await tx.select({
+          configurationId: blueprintConfigurationVersions.configurationId,
+          id: blueprintConfigurationVersions.id,
+          revision: blueprintConfigurationVersions.revision,
+          lifecycle: blueprintConfigurationVersions.lifecycle,
+          blueprintVersionId: blueprintConfigurationVersions.blueprintVersionId,
+          config: blueprintConfigurationVersions.config,
+        }).from(blueprintConfigurationVersions)
+          .where(inArray(blueprintConfigurationVersions.configurationId,
+            configurations.map(configuration => configuration.id)))
+          .orderBy(desc(blueprintConfigurationVersions.revision))
+      : [];
+    const latestByConfiguration = new Map<string, (typeof versions)[number]>();
+    for (const version of versions) {
+      if (!latestByConfiguration.has(version.configurationId)) {
+        latestByConfiguration.set(version.configurationId, version);
+      }
+    }
+    const savedRecipeVersionIds = new Set(
+      [...latestByConfiguration.values()]
+        .filter(version => version.config && typeof version.config === "object"
+          && !Array.isArray(version.config) && version.config.siteId === siteId)
+        .map(version => version.blueprintVersionId),
+    );
     const seenRecipes = new Set<string>();
     const templates = recipes.filter(recipe => {
+      if (savedRecipeVersionIds.has(recipe.blueprintVersionId)) {
+        seenRecipes.add(recipe.blueprintId);
+        return true;
+      }
       if (seenRecipes.has(recipe.blueprintId)) return false;
       seenRecipes.add(recipe.blueprintId);
       return true;
@@ -128,25 +160,6 @@ export async function getCanonicalBlueprintWorkspace(
             templates.map(template => template.blueprintVersionId)))
           .orderBy(asc(blueprintComponents.componentKey))
       : [];
-
-    const versions = configurations.length
-      ? await tx.select({
-          configurationId: blueprintConfigurationVersions.configurationId,
-          id: blueprintConfigurationVersions.id,
-          revision: blueprintConfigurationVersions.revision,
-          lifecycle: blueprintConfigurationVersions.lifecycle,
-          config: blueprintConfigurationVersions.config,
-        }).from(blueprintConfigurationVersions)
-          .where(inArray(blueprintConfigurationVersions.configurationId,
-            configurations.map(configuration => configuration.id)))
-          .orderBy(desc(blueprintConfigurationVersions.revision))
-      : [];
-    const latestByConfiguration = new Map<string, (typeof versions)[number]>();
-    for (const version of versions) {
-      if (!latestByConfiguration.has(version.configurationId)) {
-        latestByConfiguration.set(version.configurationId, version);
-      }
-    }
     return {
       siteId,
       organizationId: operator.organizationId,
