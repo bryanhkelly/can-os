@@ -9,6 +9,8 @@ import {
   getOpenNoncreditSelfEnrollmentPage,
 } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { normalizeClientError } from "@/lib/client-error";
+import { noncreditRegistrationRoute } from "@/domain/noncredit-seat-policy";
+import { useHydrated } from "@/lib/use-hydrated";
 import {getMyNoncreditWaitlist,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
 export const Route=createFileRoute("/learn/enroll")({
@@ -33,6 +35,7 @@ function PublicSelfEnrollment() {
   const [adult,setAdult]=useState(false);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
+  const [messageError,setMessageError]=useState(false);
   const [enrolled,setEnrolled]=useState<{courseAttemptId:string;alreadyEnrolled:boolean}|null>(null);
   const [waitlisted,setWaitlisted]=useState(false);
   const [searchTerm,setSearchTerm]=useState("");
@@ -57,9 +60,13 @@ function PublicSelfEnrollment() {
   const selected=catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data??undefined;
   const myWaitlist=waiting.data?.find(entry=>entry.releaseId===selected?.id);
   const invited=myWaitlist?.invitationActive===true;
-  const joinQueue=!!selected&&!invited&&
-    (selected.seatsRemaining<=0||selected.hasWaitingQueue);
-  useEffect(()=>{setAccepted(false);setAdult(false);setMessage("");setEnrolled(null);setWaitlisted(false);},[search.release]);
+  const joinQueue=selected?noncreditRegistrationRoute({
+    seatsRemaining:selected.seatsRemaining,
+    hasWaitingQueue:selected.hasWaitingQueue,
+    hasValidInvitation:invited,
+  })==="join_waitlist":false;
+  const waitlistLoading=session?.authenticated===true&&session.role!=="student"&&waiting.isPending;
+  useEffect(()=>{setAccepted(false);setAdult(false);setMessage("");setMessageError(false);setEnrolled(null);setWaitlisted(false);},[search.release]);
 
   const searchParams=new URLSearchParams();
   if(selected)searchParams.set("release",selected.id);
@@ -67,14 +74,14 @@ function PublicSelfEnrollment() {
   const returnTo="/learn/enroll"+(searchParams.size?"?"+searchParams.toString():"");
   async function submit() {
     if(!selected||!accepted||!adult||busy||!session?.authenticated)return;
-    setBusy(true);setMessage("");
+    setBusy(true);setMessage("");setMessageError(false);
     try{
       if(joinQueue){
         const result=await joinNoncreditWaitlist({data:{
           releaseId:selected.id,consentVersion:selected.consentVersion,
           consentSha256:selected.consentSha256,acceptedConsent:true,adultConfirmed:true,
         }});
-        setWaitlisted(true);
+        setWaitlisted(result.status!=="invited");
         setMessage(result.status==="invited"?
           "Your invitation is active. Confirm registration to claim the reserved place.":
           "You are on this course's waiting list. Joining does not reserve a seat or charge a fee.");
@@ -91,6 +98,7 @@ function PublicSelfEnrollment() {
         await client.invalidateQueries({queryKey:["my-noncredit-waitlist"]});
       }
     }catch(error){
+      setMessageError(true);
       setMessage(normalizeClientError(error,
         "We could not register you. Check the current enrollment availability and your verified account.").message);
     }finally{setBusy(false);}
@@ -155,7 +163,8 @@ function PublicSelfEnrollment() {
         {selected && <SelfEnrollmentConfirmation key={selected.id} release={selected}
           signedIn={session?.authenticated===true}
           returnTo={returnTo} accepted={accepted} adult={adult} busy={busy}
-          enrolled={enrolled} message={message} waitlisted={waitlisted}
+          enrolled={enrolled} message={message} messageError={messageError} waitlisted={waitlisted}
+          waitlistLoading={waitlistLoading} isStudent={session?.authenticated===true&&session.role==="student"}
           joinQueue={joinQueue} invited={invited} waitlistStatus={myWaitlist?.status??null}
           onAccepted={setAccepted} onAdult={setAdult} onSubmit={()=>void submit()}/>}
       </div>
@@ -178,12 +187,13 @@ function PublicSelfEnrollment() {
   </WorkspaceShell>;
 }
 
-function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,message,waitlisted,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onSubmit}:{
+function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,message,messageError,waitlisted,waitlistLoading,isStudent,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onSubmit}:{
   release:Release;signedIn:boolean;returnTo:string;accepted:boolean;adult:boolean;busy:boolean;
-  enrolled:{courseAttemptId:string;alreadyEnrolled:boolean}|null;message:string;
-  waitlisted:boolean;joinQueue:boolean;invited:boolean;waitlistStatus:string|null;
+  enrolled:{courseAttemptId:string;alreadyEnrolled:boolean}|null;message:string;messageError:boolean;
+  waitlisted:boolean;waitlistLoading:boolean;isStudent:boolean;joinQueue:boolean;invited:boolean;waitlistStatus:string|null;
   onAccepted:(value:boolean)=>void;onAdult:(value:boolean)=>void;onSubmit:()=>void;
 }) {
+  const hydrated=useHydrated();
   return <section className="border border-border bg-card p-5" aria-labelledby="enroll-course-heading">
     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Enrollment confirmation</p>
     <h2 id="enroll-course-heading" className="mt-2 font-serif text-2xl">{release.title}</h2>
@@ -195,10 +205,13 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     </dl>
     {release.deliveryMode==="facilitated"&&<section className="mt-5 border-t border-border pt-4" aria-label="Class schedule">
       <h3 className="text-sm font-semibold">Scheduled class meetings</h3>
+      <p className="mt-2 text-xs text-muted-foreground">Meeting times are shown in your device\'s timezone. Confirm the onsite schedule with the hosting location.</p>
       {release.sessions.length?
         <ol className="mt-2 space-y-2 text-sm">
           {release.sessions.map((meeting,index)=><li key={index} className="border border-border p-2">
-            {new Date(meeting.startsAt).toLocaleString()} to {new Date(meeting.endsAt).toLocaleTimeString()}
+            <time dateTime={meeting.startsAt}>{hydrated?new Date(meeting.startsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}):"Loading local start time…"}</time>
+            {" to "}
+            <time dateTime={meeting.endsAt}>{hydrated?new Date(meeting.endsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}):"Loading local end time…"}</time>
           </li>)}
         </ol>:
         <p className="mt-2 text-sm text-muted-foreground">No dated meetings have been attached to this cohort. Ask the hosting Site for its schedule before registering.</p>}
@@ -233,13 +246,14 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
       Waitlist: {invited?"Reserved invitation, confirm enrollment before it expires":waitlistStatus}.
       <Link to="/learn/my-courses" className="ml-2 text-primary underline">Manage</Link>
     </p>}
-    {signedIn && !enrolled && <Button type="button" className="mt-5 min-h-11"
-      disabled={!accepted||!adult||busy||waitlisted||
+    {isStudent&&<p role="status" className="mt-4 text-sm text-muted-foreground">Adult self-registration requires an independently verified adult CAN account. Switch to an eligible account to enroll.</p>}
+    {signedIn && !enrolled && !isStudent && <Button type="button" className="mt-5 min-h-11"
+      disabled={!accepted||!adult||busy||waitlisted||waitlistLoading||
         (!!waitlistStatus&&joinQueue&&waitlistStatus==="waiting")}
       onClick={onSubmit}>
-      {busy?"Saving…":joinQueue?"Join waiting list":invited?"Claim my reserved place":"Confirm my registration"}
+      {busy?"Saving…":waitlistLoading?"Checking your waitlist…":joinQueue?"Join waiting list":invited?"Claim my reserved place":"Confirm my registration"}
     </Button>}
-    {message && <p role={enrolled?"status":"alert"} className="mt-4 border border-border bg-muted/20 p-4 text-sm">{message}</p>}
+    {message && <p role={messageError?"alert":"status"} className="mt-4 border border-border bg-muted/20 p-4 text-sm">{message}</p>}
     {enrolled && <div className="mt-4 space-y-2">
       <Link to="/learn/my-courses" className="inline-block font-semibold text-primary underline underline-offset-4">
         Go to my courses
