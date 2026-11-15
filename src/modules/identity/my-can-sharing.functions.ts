@@ -186,30 +186,44 @@ export const readAuthorizedSiteSharedContact = createServerFn({ method: "GET" })
     if (new Set(allPeople.map(row => row.personId)).size !== 1)
       throw new AuthorizationError("unambiguous sharing Person");
 
-    const [share] = await db.select().from(accessSiteContactShareRevisions)
-      .where(and(
-        eq(accessSiteContactShareRevisions.accountId, accountId),
-        eq(accessSiteContactShareRevisions.personId, data.personId),
-        eq(accessSiteContactShareRevisions.siteId, site.id),
-      )).orderBy(desc(accessSiteContactShareRevisions.revisionNo)).limit(1);
-    if (!share || !activeSiteContactShare(share) || share.purpose !== data.purpose)
-      throw new AuthorizationError("current purpose-specific consent");
+    return db.transaction(async tx => {
+      // Revocation uses this same lock. A provider must not authorize a read
+      // against a consent revision that was concurrently revoked.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${accountId+":"+site.id+":contact"}))`);
+      const [share] = await tx.select().from(accessSiteContactShareRevisions)
+        .where(and(
+          eq(accessSiteContactShareRevisions.accountId, accountId),
+          eq(accessSiteContactShareRevisions.personId, data.personId),
+          eq(accessSiteContactShareRevisions.siteId, site.id),
+        )).orderBy(desc(accessSiteContactShareRevisions.revisionNo)).limit(1);
+      if (!share || !activeSiteContactShare(share) || share.purpose !== data.purpose)
+        throw new AuthorizationError("current purpose-specific consent");
 
-    const [contact] = await db.select({
-      preferredName: people.preferredName, firstName: people.legalFirstName,
-      lastName: people.legalLastName, phone: people.phone, active: people.active,
-      email: accessAccounts.emailNormalized,
-    }).from(people).innerJoin(accessAccounts,
-      eq(accessAccounts.id, accountId))
-      .where(and(eq(people.id, data.personId), eq(people.active, true),
-        eq(accessAccounts.disabled, false), isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
-    if (!contact) throw new AuthorizationError("current shared contact");
-    return {
-      personId: data.personId, siteId: site.id, purpose: data.purpose,
-      consentRevision: share.revisionNo,
-      displayName: share.shareName ?
-        (contact.preferredName || [contact.firstName, contact.lastName].join(" ")) : null,
-      email: share.shareEmail ? contact.email : null,
-      phone: share.sharePhone ? contact.phone : null,
-    };
+      const [contact] = await tx.select({
+        preferredName: people.preferredName, firstName: people.legalFirstName,
+        lastName: people.legalLastName, phone: people.phone,
+        email: accessAccounts.emailNormalized,
+      }).from(people).innerJoin(accessAccounts,
+        eq(accessAccounts.id, accountId))
+        .where(and(eq(people.id, data.personId), eq(people.active, true),
+          eq(accessAccounts.disabled, false), isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
+      if (!contact) throw new AuthorizationError("current shared contact");
+      const result = {
+        personId: data.personId, siteId: site.id, purpose: data.purpose,
+        consentRevision: share.revisionNo,
+        displayName: share.shareName ?
+          (contact.preferredName || [contact.firstName, contact.lastName].join(" ")) : null,
+        email: share.shareEmail ? contact.email : null,
+        phone: share.sharePhone ? contact.phone : null,
+      };
+      await writeAudit(tx, actor, {
+        action: "account.site_contact_consent.read",
+        entityType: "person",
+        entityId: data.personId,
+        scope: { siteId: site.id, organizationId: site.organizationId },
+        after: { purpose: data.purpose, consentRevision: share.revisionNo,
+          email: share.shareEmail, name: share.shareName, phone: share.sharePhone },
+      });
+      return result;
+    });
   });
