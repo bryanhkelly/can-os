@@ -1,5 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
+import { accessSessionCookie } from "@/domain/access-tokens";
+import { getCommandContext } from "./command-context.server";
+import { resolveCanonicalSiteStaffFromCan } from "./canonical-can-staff-bridge.server";
 import { Pool, type PoolClient } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import {
@@ -122,7 +125,29 @@ export async function probeCanonicalAuthReader(): Promise<boolean> {
   return pendingReaderProbe;
 }
 
-/** Public command contexts never expose the database session id. */
+/**
+ * One sign-in for CAN school staff. Resolve the verified CAN session first
+ * when its active grant is Site Admin or Registrar, then require independent
+ * Person + Site bridges and a live matching canonical grant. This projection
+ * creates no second bearer cookie and grants no rights for unmapped schools.
+ *
+ * Other canonical roles retain their existing native session handling until
+ * their separately reviewed identity/role mappings are supported. A broken
+ * CAN session must never fall back to a native cookie or silently switch roles.
+ */
 export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
+  const cookies = (request.headers.get("cookie") ?? "").split(";")
+    .map(item => item.trim());
+  const hasCan = cookies.some(item => item.startsWith(accessSessionCookie + "="));
+  const hasNative = cookies.some(item => item.startsWith(canonicalSessionCookie + "="));
+  if (hasCan) {
+    const actor = await getCommandContext(request);
+    if (actor.role === "site_admin" || actor.role === "registrar") {
+      return resolveCanonicalSiteStaffFromCan(actor);
+    }
+    if (!hasNative) {
+      throw new AuthorizationError("native canonical authorization for this role");
+    }
+  }
   return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
 }
