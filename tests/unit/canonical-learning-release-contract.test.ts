@@ -30,11 +30,11 @@ describe("secure canonical learning runtime boundaries", () => {
     expect(provider).toContain("observeNativeVideo: () => undefined");
   });
 
-  it("hides unavailable facilitator and impact routes from the lab navigation", () => {
+  it("keeps facilitated delivery and impact discovery visible without rollout flags", () => {
     const nav = source("src/components/capability-lab/CapabilityLabNav.tsx");
-    expect(nav).toContain('release.data?.facilitated === true');
-    expect(nav).toContain('facilitatedEnabled || current === "facilitated"');
-    expect(nav).toContain('facilitatedEnabled || current === "impact"');
+    expect(nav).toContain('to="/canonical/lab/facilitated"');
+    expect(nav).toContain('to="/canonical/lab/impact"');
+    expect(nav).not.toContain("facilitatedEnabled");
   });
 
   it("enforces the server release gate on every activity endpoint", () => {
