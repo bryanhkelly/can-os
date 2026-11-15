@@ -63,7 +63,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           heroHeadline:"A place to learn. A community to grow.",
           welcomeMessage:"Explore what this learning community could offer.",
           localDescription:"Our learning Site is taking shape. We are exploring educational experiences for our community.",
-          branding:{...emptySiteLocalBranding,templateId:"community" as const,paletteId:"brand-community" as const},
+          branding:{...emptySiteLocalBranding,templateId:"modern" as const,paletteId:"brand-modern" as const},
         };
         const localContent={
           ...copy,
