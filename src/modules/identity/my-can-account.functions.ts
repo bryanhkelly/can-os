@@ -17,6 +17,16 @@ import { publicSiteHost } from "@/domain/public-site-address";
  * Account-level read, independent of the currently selected school Site.
  * A verified active session is mandatory; a bookmark is never a grant.
  */
+function favoriteTableNotInstalled(error: unknown): boolean {
+  let current: unknown = error;
+  for (let i = 0; i < 4 && current && typeof current === "object"; i++) {
+    const details = current as { code?: string; message?: string; cause?: unknown };
+    if (details.code === "42P01" && details.message?.includes("access_account_favorite_sites")) return true;
+    current = details.cause;
+  }
+  return false;
+}
+
 export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async () => {
   setResponseHeader("Cache-Control", "private, no-store");
   const actor = await getCommandContext(getRequest());
@@ -69,7 +79,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
 
   // The first 100 published Sites form a bounded directory; favorites are
   // queried independently so a saved Site is not lost when the directory grows.
-  const places = await db.transaction(async tx => {
+  const placeResult = await db.transaction(async tx => {
     await tx.execute(sql`SELECT set_config('can.account_id', ${accountId}, true)`);
     const directory = await tx.select({
         id: sites.id, name: sites.name, address: sites.address,
@@ -98,7 +108,11 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
       favorite: favoriteIds.has(site.id),
       workspaceSite: siteIds.includes(site.id),
     })).sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name));
-  });
+  }).then(places => ({ places, favoritesReady: true }))
+    .catch((error: unknown) => {
+      if (favoriteTableNotInstalled(error)) return { places: [], favoritesReady: false };
+      throw error;
+    });
 
   return {
     email: account[0].email,
@@ -106,7 +120,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
     displayName: person[0].preferredName || person[0].firstName,
     fullName: [person[0].firstName, person[0].lastName].join(" "),
     demoAccountSwitching,
-    workspaces, places,
+    workspaces, places: placeResult.places, favoritesReady: placeResult.favoritesReady,
     identityNeedsReview: accountPersonNeedsReview(grants, demoAccountSwitching),
   };
 });
