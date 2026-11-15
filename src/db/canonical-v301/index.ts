@@ -26,3 +26,4 @@ export * from "./classroom-projector-controls";
 export * from "./classroom-rehearsal";
 export * from "./facilitated-room-evidence";
 export * from "./classroom-planning";
+export * from "./classroom-assisted-activity";
