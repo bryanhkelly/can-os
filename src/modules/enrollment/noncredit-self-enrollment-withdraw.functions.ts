@@ -11,6 +11,7 @@ import {
   noncreditSelfEnrollmentClaims,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { noncreditSelfWithdrawalDecision } from "@/domain/noncredit-self-enrollment";
 import { requireVerifiedAdultAccount } from "./noncredit-self-enrollment.functions";
 
 /**
@@ -56,8 +57,6 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
         )).for("update").limit(1);
       if(!registration)throw new AuthorizationError("owned noncredit registration");
       if(registration.status==="withdrawn")return {withdrawn:true,alreadyWithdrawn:true};
-      if(!["registered","active"].includes(registration.status))
-        throw new AuthorizationError("only current registration can be withdrawn");
       const [finishedCourse]=await tx.select({id:learnerCourseAttempts.id})
         .from(learnerCourseAttempts).where(and(
           eq(learnerCourseAttempts.noncreditRegistrationId,registration.id),
@@ -68,8 +67,12 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
           eq(noncreditCompletionDecisions.registrationId,registration.id),
           eq(noncreditCompletionDecisions.outcome,"completed"),
         )).limit(1);
-      if(finishedCourse || completedDecision)
-        throw new AuthorizationError("completed training cannot be withdrawn");
+      if(noncreditSelfWithdrawalDecision({
+        registrationStatus:registration.status,
+        hasCompletedAttempt:Boolean(finishedCourse),
+        hasCompletedDecision:Boolean(completedDecision),
+      })!=="withdraw")
+        throw new AuthorizationError("only unfinished active training can be withdrawn");
       const now=new Date();
       const attempts=await tx.select({id:learnerCourseAttempts.id})
         .from(learnerCourseAttempts)
