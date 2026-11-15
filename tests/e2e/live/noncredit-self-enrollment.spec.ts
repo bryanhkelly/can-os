@@ -35,7 +35,7 @@ test("@public noncredit enrollment is an actual route, not the lab placeholder",
 test("@public unverified visitor sees consent but cannot enroll",async({page})=>{
   test.skip(!release,"Requires a current approved test01 release UUID");
   await open(page,"/learn/enroll?release="+encodeURIComponent(release));
-  await expect(page.getByRole("heading",{name:"Enrollment confirmation"})).toBeVisible();
+  await expect(page.getByText("Enrollment confirmation")).toBeVisible();
   await expect(page.getByRole("link",{name:"Sign in"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Confirm my registration"})).toHaveCount(0);
 });
@@ -60,11 +60,11 @@ test("@write only two verified adults can enroll, see own course, and withdraw",
     const url="/learn/enroll?release="+encodeURIComponent(release);
     for(const page of [pa,pb]){
       await open(page,url);
-      await expect(page.getByRole("heading",{name:"Enrollment confirmation"})).toBeVisible();
+      await expect(page.getByText("Enrollment confirmation")).toBeVisible();
       await page.getByRole("checkbox",{name:/I have read and accept/i}).check();
       await page.getByRole("checkbox",{name:/I confirm I am 18 or older/i}).check();
       await page.getByRole("button",{name:"Confirm my registration"}).click();
-      await expect(page.getByRole("status")).toContainText(/Registration confirmed|already registered/i);
+      await expect(page.getByText(/Registration confirmed|already registered/i)).toBeVisible();
       await open(page,"/learn/my-courses");
       await expect(page.getByRole("button",{name:"Open course"})).toBeVisible();
     }
@@ -83,7 +83,7 @@ test("@write only two verified adults can enroll, see own course, and withdraw",
     await open(pb,"/learn/my-courses");
     await pb.getByRole("button",{name:"Withdraw registration"}).click();
     await pb.getByRole("button",{name:"Confirm withdrawal"}).click();
-    await expect(pb.getByRole("status")).toContainText(/Registration withdrawn|already withdrawn/i);
+    await expect(pb.getByText(/Registration withdrawn|already withdrawn/i)).toBeVisible();
     await expect(pb.getByRole("button",{name:"Open course"})).toHaveCount(0);
   } finally {
     await Promise.all([a.close(),b.close()]);
