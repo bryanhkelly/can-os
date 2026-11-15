@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -35,7 +35,6 @@ async function requireVerifiedSharingIdentity() {
   return { accountId, personId: actor.actorPersonId, actor, grants };
 }
 
-type SiteShareRow = typeof accessSiteContactShareRevisions.$inferSelect;
 
 /** Read only the current revision for each Site of this verified CAN account. */
 export const getMyCanContactShares = createServerFn({ method: "GET" }).handler(async () => {
@@ -165,7 +164,7 @@ export const readAuthorizedSiteSharedContact = createServerFn({ method: "GET" })
       !actor.scope.organizationIds?.includes(site.organizationId))
       throw new AuthorizationError("exact authorized Site");
 
-    const [link] = await db.select({
+    const accounts = await db.select({
       accountId: accountPersonGrants.accountId,
     }).from(accountPersonGrants)
       .innerJoin(accessAccounts, and(
@@ -174,12 +173,22 @@ export const readAuthorizedSiteSharedContact = createServerFn({ method: "GET" })
       )).where(and(
         eq(accountPersonGrants.personId, data.personId),
         eq(accountPersonGrants.active, true),
-      )).limit(1);
-    if (!link) throw new AuthorizationError("active verified sharing Person");
+      )).limit(100);
+    const accountIds = [...new Set(accounts.map(row => row.accountId))];
+    if (accountIds.length !== 1) throw new AuthorizationError("unique verified sharing account");
+    const accountId = accountIds[0]!;
+    const allPeople = await db.select({
+      personId: accountPersonGrants.personId,
+    }).from(accountPersonGrants).where(and(
+      eq(accountPersonGrants.accountId, accountId),
+      eq(accountPersonGrants.active, true),
+    )).limit(100);
+    if (new Set(allPeople.map(row => row.personId)).size !== 1)
+      throw new AuthorizationError("unambiguous sharing Person");
 
     const [share] = await db.select().from(accessSiteContactShareRevisions)
       .where(and(
-        eq(accessSiteContactShareRevisions.accountId, link.accountId),
+        eq(accessSiteContactShareRevisions.accountId, accountId),
         eq(accessSiteContactShareRevisions.personId, data.personId),
         eq(accessSiteContactShareRevisions.siteId, site.id),
       )).orderBy(desc(accessSiteContactShareRevisions.revisionNo)).limit(1);
@@ -191,7 +200,7 @@ export const readAuthorizedSiteSharedContact = createServerFn({ method: "GET" })
       lastName: people.legalLastName, phone: people.phone, active: people.active,
       email: accessAccounts.emailNormalized,
     }).from(people).innerJoin(accessAccounts,
-      eq(accessAccounts.id, link.accountId))
+      eq(accessAccounts.id, accountId))
       .where(and(eq(people.id, data.personId), eq(people.active, true),
         eq(accessAccounts.disabled, false), isNotNull(accessAccounts.emailVerifiedAt))).limit(1);
     if (!contact) throw new AuthorizationError("current shared contact");
