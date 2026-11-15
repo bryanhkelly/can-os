@@ -204,6 +204,9 @@ export function SiteFirstLaunch({options}:{options:Options}) {
               Customize website <ArrowRight className="size-4"/>
             </Link>}
             {!options.schoolSetupAdministrator&&<p className="border p-4 text-sm text-muted-foreground">Website customization requires an approved Site Administrator or Site website editor grant. Your private website preview is available now; editing permissions can be assigned separately.</p>}
+            {siteId&&<Link to="/site-identity" search={{mode:"request",siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+              Connect your Site to approved educational operations <ArrowRight className="size-4"/>
+            </Link>}
             {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
               Prepare Site & enrollment <ArrowRight className="size-4"/>
             </Link>}
