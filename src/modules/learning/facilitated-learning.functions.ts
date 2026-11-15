@@ -498,6 +498,10 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
       // not merely an enrollment somewhere in the same Deployment. Noncredit
       // remote participants do not claim physical presence by pairing.
       if(attempt.source==="school") {
+        const [sourceAttempt]=await tx.select({enrollmentId:learnerCourseAttempts.enrollmentId})
+          .from(learnerCourseAttempts)
+          .where(eq(learnerCourseAttempts.id,data.courseAttemptId)).limit(1);
+        if(!sourceAttempt?.enrollmentId)return null;
         const [sitePlacement]=await tx.select({id:classroomEnrollmentSitePlacements.id})
           .from(classroomEnrollmentSitePlacements)
           .innerJoin(classroomDeploymentSites,and(
@@ -506,7 +510,7 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
             eq(classroomDeploymentSites.deploymentId,room.deploymentId),
           ))
           .where(and(
-            eq(classroomEnrollmentSitePlacements.enrollmentId,attempt.enrollmentId!),
+            eq(classroomEnrollmentSitePlacements.enrollmentId,sourceAttempt.enrollmentId!),
             eq(classroomEnrollmentSitePlacements.deploymentId,room.deploymentId),
             lte(classroomEnrollmentSitePlacements.startsAt,now),
             or(isNull(classroomEnrollmentSitePlacements.endsAt),
