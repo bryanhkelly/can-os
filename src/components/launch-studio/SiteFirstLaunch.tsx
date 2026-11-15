@@ -60,7 +60,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
         organizationId,name,slug:suggestedLaunchSlug(name)||"learning-site",timezone,
         stubOnly:true,planningLocation:{city,state},
       }});
-      if(saved.status!=="success")return;
+      if(saved.status==="ignored")return;
       setSiteId(saved.value.siteId);
       setStep(1);
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to establish your Site. Nothing has been published."));}
@@ -96,7 +96,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
             <Field label="City" required><Input required value={city} maxLength={120} onChange={e=>setCity(e.target.value)}/></Field>
             <Field label="State" required><Select required value={state} onChange={e=>setState(e.target.value)}><option value="">Select state</option>{Object.entries(usStatesAndTerritories).map(([code,label])=><option key={code} value={code}>{label}</option>)}</Select></Field>
           </div>
-          <SiteTimezoneField value={timezone} onChange={setTimezone}/>
+          <SiteTimezoneField label="Site time zone" value={timezone} onChange={setTimezone}/>
         </>}
         <fieldset><legend className="mb-3 text-sm font-semibold">How will you deliver learning?</legend>
           <div className="grid gap-3 sm:grid-cols-3">{([
