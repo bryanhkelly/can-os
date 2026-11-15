@@ -518,7 +518,10 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
       const latest=new Map<string,typeof playback[number]>();
       for(const item of playback) if(!latest.has(item.sessionId))latest.set(item.sessionId,item);
       return {choices,rooms:authorizedRooms.map(room=>({
-        ...room,pairedLearners:counts.find(c=>c.id===room.id)?.total??0,
+        ...room,
+        state: facilitatedRoomOperationalState(room, now),
+        expiresAt: new Date(room.startedAt.getTime() + facilitatedRoomMaxMs).toISOString(),
+        pairedLearners:counts.find(c=>c.id===room.id)?.total??0,
         latestPlayback:latest.get(room.id)??null,
         startedAt:room.startedAt.toISOString(),
         pairingExpiresAt:room.pairingExpiresAt.toISOString(),
