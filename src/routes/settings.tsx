@@ -44,7 +44,7 @@ function SettingsHome() {
       description="Your account, verified schools and roles, and favorite published learning locations. These preferences never grant institutional access.">
       <Link className={actionClass} to="/account/">Open My CAN <ArrowRight className="size-4"/></Link>
     </EditDestination>
-    {schoolAdmin && <SchoolSettingsDestinations siteId={siteId}/>} 
+    {schoolAdmin && <SchoolSettingsDestinations siteId={siteId}/>}
     <div className="mt-7 grid gap-4">
       {websiteEditor && <EditDestination title="Website design and content" icon={<Globe className="size-5"/>}
         description="Open the same website editor to change templates, colors, approved imagery, copy or public references. Save a private draft, preview and request publication separately.">
