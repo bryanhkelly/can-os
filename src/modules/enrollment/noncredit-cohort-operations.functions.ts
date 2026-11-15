@@ -1,13 +1,13 @@
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,isNotNull} from "drizzle-orm";
+import {and,desc,eq,inArray,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
   auditEvents,canonicalDeliverySessions,canonicalPersons,domainEvents,
   facilitatedClassroomPlans,facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts,noncreditCompletionDecisions,
-  noncreditRegistrations,noncreditSelfEnrollmentClaims,
+  noncreditRegistrations,noncreditSelfEnrollmentClaims,noncreditReleasedSeats,
   noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
@@ -207,5 +207,68 @@ export const attachClassroomPlanToNoncreditRelease=createServerFn({method:"POST"
         payload,
       });
       return {attached:true,duplicate:false};
+    });
+  });
+
+const seatInput=releaseInput.extend({
+  registrationId:id,reason:z.string().trim().min(15).max(500),
+}).strict();
+
+/** Provider decision only. A learner's self-withdrawal is not permission
+ * to delete the original claim, silently refund a fee, or free the seat.
+ * Serialize with self-enrollment's release-level advisory lock. */
+export const releaseWithdrawnNoncreditSeat=createServerFn({method:"POST"})
+  .validator((v:unknown)=>seatInput.parse(v))
+  .handler(async({data})=>{
+    guard();
+    return db.transaction(async tx=>{
+      const {provider,release}=await scopedRelease(tx,data.releaseId,true);
+      await tx.execute(
+        // Same admission lock used by enrollMyselfInNoncredit.
+        sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+release.id}))`
+      );
+      const [record]=await tx.select({
+        status:noncreditRegistrations.status,
+        registrationId:noncreditRegistrations.id,
+      }).from(noncreditSelfEnrollmentClaims)
+        .innerJoin(noncreditRegistrations,eq(
+          noncreditRegistrations.id,noncreditSelfEnrollmentClaims.registrationId))
+        .where(and(
+          eq(noncreditSelfEnrollmentClaims.releaseId,release.id),
+          eq(noncreditSelfEnrollmentClaims.registrationId,data.registrationId),
+          eq(noncreditRegistrations.registeringOrganizationId,provider.organizationId),
+        )).limit(1);
+      if(!record||!["withdrawn","cancelled"].includes(record.status))
+        throw new AuthorizationError("own withdrawn registration");
+      const [existing]=await tx.select({id:noncreditReleasedSeats.id})
+        .from(noncreditReleasedSeats)
+        .where(eq(noncreditReleasedSeats.registrationId,record.registrationId))
+        .limit(1);
+      if(existing)return {released:true,duplicate:true};
+      const [completion]=await tx.select({id:noncreditCompletionDecisions.id})
+        .from(noncreditCompletionDecisions).where(and(
+          eq(noncreditCompletionDecisions.registrationId,record.registrationId),
+          eq(noncreditCompletionDecisions.outcome,"completed"),
+        )).limit(1);
+      if(completion)throw new AuthorizationError("completed registration history");
+      const [saved]=await tx.insert(noncreditReleasedSeats).values({
+        releaseId:release.id,registrationId:record.registrationId,
+        releasedByPersonId:provider.actor.actorPersonId!,reason:data.reason,
+      }).returning({id:noncreditReleasedSeats.id});
+      if(!saved)throw new Error("Could not save seat release");
+      const payload={releaseId:release.id,registrationId:record.registrationId,
+        reason:data.reason};
+      await tx.insert(auditEvents).values({
+        actorPersonId:provider.actor.actorPersonId!,
+        owningOrganizationId:provider.organizationId,
+        eventCode:"noncredit.enrollment.seat_released",
+        entityKind:"noncredit_released_seat",entityId:saved.id,payload,
+      });
+      await tx.insert(domainEvents).values({
+        eventType:"NoncreditEnrollmentSeatReleased",
+        aggregateType:"noncredit_self_enrollment_release",aggregateId:release.id,
+        actorPersonId:provider.actor.actorPersonId!,payload,
+      });
+      return {released:true,duplicate:false};
     });
   });

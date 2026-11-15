@@ -46,6 +46,20 @@ export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_
   uniqueIndex("noncredit_self_claim_person_release_uq").on(t.releaseId,t.participantPersonId),
 ]);
 
+/** A released seat does not erase an enrollment claim, the learner's history,
+ * consent or completion evidence. The release is an audited one-time decision. */
+export const noncreditReleasedSeats=educationV30.table("noncredit_released_seats",{
+  id:id(),
+  releaseId:uuid("release_id").notNull().references(()=>noncreditSelfEnrollmentReleases.id),
+  registrationId:uuid("registration_id").notNull(),
+  releasedByPersonId:uuid("released_by_person_id").notNull(),
+  reason:text("reason").notNull(),
+  releasedAt:timestamp("released_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("noncredit_released_seats_registration_uq").on(t.registrationId),
+  index("noncredit_released_seats_release_idx").on(t.releaseId),
+]);
+
 /** These are native v3.0.1 Persons, NOT public.people identities. */
 export const canonicalPersons = educationV30.table("persons",{
   id: id(),

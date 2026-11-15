@@ -6,7 +6,7 @@ import {
   canonicalOfferingCourses, courseVersions, courses, deploymentOfferingAdoptions,
   educationOperationOrganizationRoles, educationOperations,
   operationalAuthorizationDecisions,
-  noncreditCompletionPolicies, noncreditSelfEnrollmentClaims,
+  noncreditCompletionPolicies, noncreditSelfEnrollmentClaims,noncreditReleasedSeats,
   noncreditSelfEnrollmentReleases, noncreditTrainingVersions, offeringVersions,
   offerings, programDeployments, classroomDeploymentSites, educationOperationSites,
   siteOrganizationRoles,
@@ -145,10 +145,19 @@ export async function readEligibleSelfEnrollmentReleases(
   }).from(noncreditSelfEnrollmentClaims).where(inArray(
     noncreditSelfEnrollmentClaims.releaseId,rows.map(row=>row.id),
   )).groupBy(noncreditSelfEnrollmentClaims.releaseId):[];
+  // Withdrawals retain their original claim; only an explicit provider-owned,
+  // audited released-seat event makes capacity available again.
+  const seatReleases=rows.length?await executor.select({
+    releaseId:noncreditReleasedSeats.releaseId,places:count(),
+  }).from(noncreditReleasedSeats)
+    .where(inArray(noncreditReleasedSeats.releaseId,rows.map(row=>row.id)))
+    .groupBy(noncreditReleasedSeats.releaseId):[];
+  const returned=new Map(seatReleases.map(row=>[row.releaseId,Number(row.places)]));
   const byRelease = new Map(counts.map(row=>[row.releaseId,Number(row.participants)]));
   return rows.map(row=>({
     ...row,
-    seatsRemaining:Math.max(0,row.maxParticipants-(byRelease.get(row.id)??0)),
+    seatsRemaining:Math.max(0,row.maxParticipants-
+      (byRelease.get(row.id)??0)+(returned.get(row.id)??0)),
     consentSha256:publishedNoncreditConsentHash(row.consentVersion,row.consentText),
   }));
 }
