@@ -29,6 +29,7 @@ export * from "./report-cards";
 export * from "./access";
 export * from "./account-favorites";
 export * from "./account-signups";
+export * from "./account-contact-sharing";
 export * from "./launch-drafts";
 export * from "./demo-school-tenants";
 export * from "./school-setup-signups";
