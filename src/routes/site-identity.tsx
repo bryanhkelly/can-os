@@ -10,13 +10,13 @@ import { listLaunchOptions } from "@/modules/programs/launch.functions";
 import {
   requestSiteIdentityLink, getSiteIdentityLinkStatus,
   confirmCanonicalSiteIdentityLink, listPendingSiteIdentityReviews,
-  reviewSiteIdentityLink,
+  reviewSiteIdentityLink, verifyCANStaffCanonicalPrincipal,
 } from "@/modules/sites/site-identity-links.functions";
 
-type Mode="request"|"confirm"|"review";
+type Mode="request"|"confirm"|"review"|"staff";
 export const Route=createFileRoute("/site-identity")({
   validateSearch:(s:Record<string,unknown>)=>z.object({
-    mode:z.enum(["request","confirm","review"]).optional().catch("request"),
+    mode:z.enum(["request","confirm","review","staff"]).optional().catch("request"),
     siteId:z.string().uuid().optional().catch(undefined),
   }).parse(s),
   component:SiteIdentityWorkspace,
@@ -36,6 +36,11 @@ function SiteIdentityWorkspace(){
   const [target,setTarget]=useState("");
   const [revokeSiteId,setRevokeSiteId]=useState("");
   const [revokeReason,setRevokeReason]=useState("");
+  const [staffAccountId,setStaffAccountId]=useState("");
+  const [staffPublicSiteId,setStaffPublicSiteId]=useState("");
+  const [staffCanonicalPersonId,setStaffCanonicalPersonId]=useState("");
+  const [staffEvidence,setStaffEvidence]=useState("");
+  const [staffAttested,setStaffAttested]=useState(false);
   const sites=useQuery({
     queryKey:["site-identity-own-sites"],
     queryFn:()=>listLaunchOptions(),enabled:mode==="request",retry:false,
@@ -74,6 +79,17 @@ function SiteIdentityWorkspace(){
     void run(()=>confirmCanonicalSiteIdentityLink({data:{publicSiteId:siteId}}),
       "Canonical Site authority confirmed. The independent CAN reviewer can now decide.");
   }
+  function verifyStaff(e:FormEvent){
+    e.preventDefault();
+    if(!staffAttested)return;
+    void run(()=>verifyCANStaffCanonicalPrincipal({data:{
+      publicAccountId:staffAccountId,
+      publicSiteId:staffPublicSiteId,
+      canonicalPersonId:staffCanonicalPersonId,
+      evidenceReference:staffEvidence.trim(),
+      identityVerified:true,
+    }}),"The existing CAN account is now explicitly linked to the verified canonical Person. One CAN sign-in is sufficient for authorized Site operations.");
+  }
   function review(decision:"approve"|"reject"|"revoke",overrideSiteId?:string,overrideReason?:string){
     const publicSiteId=overrideSiteId??target;
     const explanation=overrideReason??reason;
@@ -92,6 +108,7 @@ function SiteIdentityWorkspace(){
         {mode:"request",label:"1 · Request",detail:"Local Site operator"},
         {mode:"confirm",label:"2 · Confirm",detail:"Canonical Site operator"},
         {mode:"review",label:"3 · Review",detail:"Independent CAN reviewer"},
+        {mode:"staff",label:"4 · Connect staff",detail:"One CAN sign-in"},
       ] as const).map(item=><Link key={item.mode} to="/site-identity" search={{mode:item.mode}}
         aria-current={mode===item.mode?"page":undefined}
         className={`inline-flex min-h-11 flex-col justify-center border px-5 py-3 text-sm ${mode===item.mode?"border-primary bg-accent text-primary":"bg-card"}`}>
@@ -133,7 +150,7 @@ function SiteIdentityWorkspace(){
     </section>}
     {mode==="confirm"&&<section className="mt-6 max-w-3xl border bg-card p-6">
       <h2 className="font-serif text-2xl">Confirm canonical Site authority</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Sign in with a native canonical Site administrator or registrar account. Your current Site/organization relationship is checked directly; this cannot be done with the public website account alone.</p>
+      <p className="mt-2 text-sm text-muted-foreground">This is an initial Site setup approval performed by an authorized canonical Site operator. After independent Site and staff identity verification, the Site Admin uses their regular CAN sign-in across workspaces.</p>
       <form onSubmit={confirm} className="mt-5 space-y-4">
         <label className="block text-sm font-semibold">Public Site UUID from the request
           <Input className="mt-2" required value={siteId}
@@ -191,6 +208,56 @@ function SiteIdentityWorkspace(){
           disabled={busy||revokeReason.trim().length<15||!z.string().uuid().safeParse(revokeSiteId).success}
           onClick={()=>review("revoke",revokeSiteId,revokeReason)}>Revoke approved connection</Button>
       </div>
+    </section>}
+    {mode==="staff"&&<section className="mt-6 max-w-3xl border bg-card p-6">
+      <h2 className="font-serif text-2xl">Connect staff to one CAN login</h2>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        An independent CAN institutional reviewer binds an existing CAN Site Admin
+        or Registrar account to the same verified canonical Person. The public
+        Site must already have an approved Site identity connection, and the
+        canonical Person must have an active exact-Site staff grant. Matching
+        names or email addresses does not prove identity.
+      </p>
+      <form className="mt-5 space-y-4" onSubmit={verifyStaff}>
+        <label className="block text-sm font-semibold">CAN staff account UUID
+          <Input className="mt-2" required value={staffAccountId}
+            onChange={e=>setStaffAccountId(e.target.value)}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+        </label>
+        <label className="block text-sm font-semibold">Approved school Site UUID
+          <Input className="mt-2" required value={staffPublicSiteId}
+            onChange={e=>setStaffPublicSiteId(e.target.value)}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+        </label>
+        <label className="block text-sm font-semibold">Verified canonical Person UUID
+          <Input className="mt-2" required value={staffCanonicalPersonId}
+            onChange={e=>setStaffCanonicalPersonId(e.target.value)}
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
+        </label>
+        <label className="block text-sm font-semibold">Independent identity verification evidence
+          <textarea required minLength={25} maxLength={1200} value={staffEvidence}
+            onChange={e=>setStaffEvidence(e.target.value)}
+            placeholder="Document the review reference that confirms these two accounts represent the same individual."
+            className="mt-2 min-h-24 w-full border border-border bg-background p-3 text-sm"/>
+        </label>
+        <label className="flex items-start gap-3 text-sm">
+          <input type="checkbox" className="mt-1" checked={staffAttested}
+            onChange={e=>setStaffAttested(e.target.checked)}/>
+          <span>I independently verified the CAN and canonical Person linkage, and I am not the account holder.</span>
+        </label>
+        <Button type="submit" disabled={busy||!staffAttested||
+          !z.string().uuid().safeParse(staffAccountId).success||
+          !z.string().uuid().safeParse(staffPublicSiteId).success||
+          !z.string().uuid().safeParse(staffCanonicalPersonId).success||
+          staffEvidence.trim().length<25}>
+          Verify staff identity link
+        </Button>
+      </form>
+      <p className="mt-5 text-xs text-muted-foreground">
+        No account or native staff grant is created here. Revocation of the
+        CAN account, either staff grant, canonical principal link, or approved
+        Site connection removes this access on the next request.
+      </p>
     </section>}
   </WorkspaceShell>;
 }
