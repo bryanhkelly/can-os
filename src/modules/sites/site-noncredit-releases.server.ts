@@ -35,7 +35,6 @@ export async function readLinkedSiteNoncreditReleases(
     SELECT canonical_site_id AS "canonicalSiteId"
     FROM public.site_canonical_identity_links
     WHERE public_site_id=${publicSiteId}::uuid AND status='approved'
-    FOR SHARE
   `);
   if(links.rows.length!==1)return [];
   const link=linkedSiteSchema.parse(links.rows[0]);
@@ -47,7 +46,7 @@ export async function readLinkedSiteNoncreditReleases(
       eq(noncreditSelfEnrollmentReleases.deliveryMode,"facilitated"),
       eq(noncreditSelfEnrollmentReleases.status,"published"),
     )).orderBy(noncreditSelfEnrollmentReleases.id)
-    .limit(40).for("share");
+    .limit(40);
 
   const eligible:SiteNoncreditListing[]=[];
   for(const candidate of candidates){
