@@ -46,6 +46,28 @@ export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_
   uniqueIndex("noncredit_self_claim_person_release_uq").on(t.releaseId,t.participantPersonId),
 ]);
 
+/** Waitlist preserves original CAN account/Person references, not a guessed
+ * native canonical learner identity. Invitations reserve seats for 48 hours.
+ * One row represents one person's current queue state with full audit history. */
+export const noncreditEnrollmentWaitlist=educationV30.table("noncredit_enrollment_waitlist",{
+  id:id(),
+  releaseId:uuid("release_id").notNull().references(()=>noncreditSelfEnrollmentReleases.id),
+  accessAccountId:uuid("access_account_id").notNull(),
+  accessPersonId:uuid("access_person_id").notNull(),
+  consentVersion:text("consent_version").notNull(),
+  consentSha256:text("consent_sha256").notNull(),
+  adultAttested:boolean("adult_attested").notNull(),
+  status:text("status").$type<"waiting"|"invited"|"accepted"|"cancelled">().notNull().default("waiting"),
+  joinedAt:timestamp("joined_at",{withTimezone:true}).notNull().defaultNow(),
+  invitedAt:timestamp("invited_at",{withTimezone:true}),
+  inviteExpiresAt:timestamp("invite_expires_at",{withTimezone:true}),
+  acceptedRegistrationId:uuid("accepted_registration_id"),
+  updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("noncredit_waitlist_release_account_uq").on(t.releaseId,t.accessAccountId),
+  index("noncredit_waitlist_queue_idx").on(t.releaseId,t.status,t.joinedAt),
+]);
+
 /** A released seat does not erase an enrollment claim, the learner's history,
  * consent or completion evidence. The release is an audited one-time decision. */
 export const noncreditReleasedSeats=educationV30.table("noncredit_released_seats",{
