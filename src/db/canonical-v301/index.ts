@@ -8,6 +8,7 @@ export * from "./catalog";
 export * from "./learning";
 export * from "./learning-activity";
 export * from "./facilitated-learning";
+export * from "./facilitated-room-feedback";
 export * from "./classroom-site-placements";
 export * from "./public-planning";
 
