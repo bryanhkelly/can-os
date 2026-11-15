@@ -74,6 +74,36 @@ function ImpactLabPage() {
         </table>
       </div>
     </section>
+    <section className="mt-8" aria-label="Optional classroom feedback">
+      <h2 className="font-serif text-xl font-semibold">Classroom feedback</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Optional ratings by registered learners, 1 (low) to 5 (high).
+        Ratings are associated with their own Course registrations. Only
+        aggregates with at least five distinct people are shown here.
+      </p>
+      {data.sessionFeedback.partial && <p role="status" className="mt-3 border border-border p-3 text-sm">
+        Classroom feedback totals are partial because the reporting window exceeds 5,000 rooms.
+      </p>}
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {data.sessionFeedback.questions.map(item => <div key={item.questionKey}
+          className="border border-border bg-card p-4">
+          <h3 className="text-sm font-medium">
+            {item.questionKey==="clarity"?"Lesson clarity":
+             item.questionKey==="technology"?"Technology experience":"Session value"}
+          </h3>
+          {item.averageRating===null ? <p className="mt-3 text-sm text-muted-foreground">
+            At least five respondents are required for an aggregate.
+          </p> : <>
+            <p className="mt-3 font-serif text-3xl font-semibold tabular-nums">
+              {item.averageRating.toFixed(1)}<span className="text-sm font-normal"> / 5</span>
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {item.respondentCount} people · {item.responseCount} session ratings
+            </p>
+          </>}
+        </div>)}
+      </div>
+    </section>
     <section className="mt-8" aria-label="Authoritative noncredit learning outcomes">
       <p className="mb-4 text-sm text-muted-foreground">
         Registration, baseline and final knowledge checks, identified feedback,
