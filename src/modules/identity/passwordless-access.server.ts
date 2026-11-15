@@ -114,9 +114,12 @@ export async function requestSchoolSetupAccess(input:unknown,sender:AccessEmailS
   const accountId=existing?.id??(await tx.insert(accessAccounts).values({emailNormalized:email})
    .returning({id:accessAccounts.id}))[0]?.id;
   if(!accountId)throw new Error("School setup account could not be prepared");
-  const [activeGrant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true))).limit(1);
-  if(activeGrant)return;
+  const existingRoles=await tx.select({role:accountPersonGrants.role}).from(accountPersonGrants)
+   .where(and(eq(accountPersonGrants.accountId,accountId),eq(accountPersonGrants.active,true)));
+  // An existing personal account can become a school founder without
+  // creating a second CAN identity. Existing institutional owners still use
+  // their separately governed school-creation workflow.
+  if(existingRoles.some(grant=>grant.role!=="account_holder"))return;
   const now=new Date();
   const expiresAt=new Date(now.getTime()+CHALLENGE_LIFETIME_MS);
   const [prior]=await tx.select().from(schoolSetupSignups)
@@ -212,7 +215,8 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const returningGrant = grants.find(grant =>
     grant.id === returningOnboarding[0]?.invitationGrantId);
   // Prioritize a freshly accepted invitation over an unrelated existing grant.
-  const activeGrant=[onboardingInvitation,...accepted,returningGrant,...grants]
+  const activeGrant=[onboardingInvitation,...accepted,returningGrant,
+    grants.find(grant=>grant.id===provisionedSchool?.grantId),...grants]
     .find(candidate=>candidate && authorizedGrantIds.has(candidate.id) &&
       Object.hasOwn(roleCapabilities,candidate.role));
   if(!activeGrant)throw new InvalidAccessCredentialError("No supported CAN OS membership");
