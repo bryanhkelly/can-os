@@ -59,7 +59,8 @@ function NoncreditPublicationPage(){
     ].some(site=>site.id===approvedCanonicalSite)));
   const selected=candidates.find(item=>candidateKey(item)===choice);
   const valid=selected&&opensAt&&closesAt&&maxParticipants&&additionalSites.length<=49&&consentVersion.trim().length>=3&&
-    consentText.trim().length>=25&&(deliveryMode==="independent"||siteId);
+    consentText.trim().length>=25&&(deliveryMode==="independent"||siteId)&&
+    (!publicSiteId||(approvedCanonicalSite!==null&&siteId===approvedCanonicalSite));
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();if(!selected||!valid||busy)return;
     setBusy(true);setMessage("");setCreated("");
@@ -161,11 +162,15 @@ function NoncreditPublicationPage(){
             <legend className="text-sm font-semibold">Delivery mode</legend>
             <div className="flex flex-wrap gap-4 text-sm">
               <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
-                checked={deliveryMode==="independent"} onChange={()=>{setDeliveryMode("independent");setSiteId("");setAdditionalSites([]);}}/>
+                checked={deliveryMode==="independent"}
+                disabled={!!publicSiteId&&!!selected&&!selected.digitalSiteOptions.some(s=>s.id===approvedCanonicalSite)}
+                onChange={()=>{setDeliveryMode("independent");setSiteId(publicSiteId&&selected?.digitalSiteOptions.some(s=>s.id===approvedCanonicalSite)?approvedCanonicalSite??"":"");setAdditionalSites([]);}}/>
                 Independent / online
               </label>
               <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
-                checked={deliveryMode==="facilitated"} onChange={()=>{setDeliveryMode("facilitated");setSiteId("");setAdditionalSites([]);}}/>
+                checked={deliveryMode==="facilitated"}
+                disabled={!!publicSiteId&&!!selected&&!selected.siteOptions.some(s=>s.id===approvedCanonicalSite)}
+                onChange={()=>{setDeliveryMode("facilitated");setSiteId(publicSiteId&&selected?.siteOptions.some(s=>s.id===approvedCanonicalSite)?approvedCanonicalSite??"":"");setAdditionalSites([]);}}/>
                 Facilitated at a Site
               </label>
             </div>
@@ -174,7 +179,7 @@ function NoncreditPublicationPage(){
             <label htmlFor="nc-online-site" className="block text-sm font-semibold">Present this online course on a Site website (optional)</label>
             <select id="nc-online-site" value={siteId} onChange={event=>setSiteId(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-              <option value="">No specific Site · provider-wide online offering</option>
+              {!publicSiteId&&<option value="">No specific Site · provider-wide online offering</option>}
               {selected?.digitalSiteOptions.filter(site=>!publicSiteId||site.id===approvedCanonicalSite).map(site=>
                 <option key={site.id} value={site.id}>{site.name}</option>)}
             </select>
