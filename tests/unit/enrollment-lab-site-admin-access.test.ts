@@ -41,7 +41,13 @@ describe("enrollment lab read-only Site Admin preview", () => {
       .toBeLessThan(endpoint.indexOf("getCommandContext(request)"));
     expect(endpoint).not.toContain("getCanonicalCommandContext");
     expect(endpoint).not.toContain("getCanonicalCapabilityLab");
-    expect(page).toContain("getCanonicalCapabilityLab()");
+    expect(page).toContain("getCanonicalEnrollmentLabTrainings()");
+    expect(page).not.toContain("getCanonicalCapabilityLab()");
+    const canonical = readFileSync(resolve(
+      "src/modules/operations/canonical-capability-lab.functions.ts"), "utf8");
+    expect(canonical).toContain("getCanonicalEnrollmentLabTrainings");
+    expect(canonical).toContain("return readProviderTrainingVersions(organizationId)");
+    expect(canonical).toContain("requireCanonicalLabProvider()");
     expect(page).toContain("getLegacyEnrollmentLabPreviewAccess()");
     expect(page).toContain("readOnlySchoolPreview");
   });
