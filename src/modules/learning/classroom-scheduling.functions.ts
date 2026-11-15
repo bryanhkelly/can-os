@@ -198,6 +198,9 @@ export const rescheduleClassroom=createServerFn({method:"POST"})
       const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
       validateClassroomTimes(startsAt,endsAt,new Date());
       await approvedSiteCourse(tx,host,plan.deploymentId,plan.courseVersionId,plan.siteId);
+      if(delivery.startsAt.getTime()===startsAt.getTime() &&
+         delivery.endsAt.getTime()===endsAt.getTime())
+        return {saved:true,unchanged:true};
       await tx.update(canonicalDeliverySessions).set({startsAt,endsAt})
         .where(eq(canonicalDeliverySessions.id,delivery.id));
       await tx.update(facilitatedClassroomPlans).set({updatedAt:new Date()})
@@ -206,7 +209,7 @@ export const rescheduleClassroom=createServerFn({method:"POST"})
         from:delivery.startsAt.toISOString(),to:startsAt.toISOString(),
         end:endsAt.toISOString(),
       });
-      return {saved:true};
+      return {saved:true,unchanged:false};
     });
   });
 export const cancelClassroomPlan=createServerFn({method:"POST"})
