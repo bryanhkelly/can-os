@@ -32,7 +32,7 @@ function guard(){
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
 }
-async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:string){
+export async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:string){
   const [attempt]=await tx.select().from(learnerCourseAttempts).where(and(
     eq(learnerCourseAttempts.id,courseAttemptId),
     eq(learnerCourseAttempts.deploymentId,room.deploymentId),
