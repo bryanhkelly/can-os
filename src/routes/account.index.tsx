@@ -205,6 +205,14 @@ function MyCanAccount() {
         </section>
         <section className="border border-border bg-card p-5">
           <h2 className="font-serif text-2xl">My learning</h2>
+          <nav aria-label="Noncredit learning" className="mt-3 flex flex-col items-start gap-2">
+            <Link to="/learn/my-courses" className={sectionLink}>
+              <BookOpen className="size-4" aria-hidden="true"/> My courses
+            </Link>
+            <Link to="/learn/enroll" search={{}} className={sectionLink}>
+              Explore noncredit training <ArrowRight className="size-4" aria-hidden="true"/>
+            </Link>
+          </nav>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">Your classes, program registrations and history remain with their authorized educational records.</p>
           {session.role === "account_holder" ?
             <Link to="/explore/" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Explore programs and locations</Link> :
