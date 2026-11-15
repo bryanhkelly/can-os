@@ -53,7 +53,7 @@ export function ClassroomConnectQr({ code, expiresAt }: { code: string; expiresA
       </p>
       <p className="mt-3 text-xs text-muted-foreground">
         The QR code opens the existing CAN join form. The pairing secret is in a
-        temporary browser fragment, not the server request path or an analytics URL.
+        temporary browser fragment, not the server request path. The join page removes it on load.
       </p>
     </div>
   </div>;
