@@ -27,7 +27,7 @@ export function ClassroomFacilitatorConsole({
     staleTime: 0, refetchInterval: 8000, retry: false,
   });
   const currentState = room.data?.roomState ?? "unknown";
-  const isLive = currentState === "live";
+  const isLive = room.isSuccess && currentState === "live";
   const active = room.data?.releases.find(item => !item.closed);
 
   async function run(action: () => Promise<void>) {
@@ -66,7 +66,7 @@ export function ClassroomFacilitatorConsole({
     {room.isError && <p role="alert" className="text-sm text-destructive">
       Classroom controls are unavailable. Refresh after verifying the facilitator role.
     </p>}
-    {room.data && <div className="grid gap-3 sm:grid-cols-2">
+    {room.isSuccess && room.data && <div className="grid gap-3 sm:grid-cols-2">
       <div className="border border-border bg-card p-3">
         <p className="text-xs text-muted-foreground">Registered learners with paired devices</p>
         <p className="mt-2 font-serif text-2xl font-semibold tabular-nums">{room.data.pairedCount}</p>
@@ -76,7 +76,7 @@ export function ClassroomFacilitatorConsole({
         <p className="mt-2 font-serif text-2xl font-semibold tabular-nums">{room.data.activeDevicesEstimate}</p>
       </div>
     </div>}
-    {room.data?.partial && <p role="status" className="text-xs text-muted-foreground">
+    {room.isSuccess && room.data?.partial && <p role="status" className="text-xs text-muted-foreground">
       This room exceeded the bounded live summary. The counts shown are partial.
     </p>}
     <p className="text-xs text-muted-foreground">
@@ -84,7 +84,7 @@ export function ClassroomFacilitatorConsole({
       physical attendance, video consumption, academic grades or completion.
     </p>
     {isLive && <ClassroomPlaybackControls facilitatedSessionId={facilitatedSessionId}/>}
-    {room.data && !isLive && <p role="status" className="border border-border p-4 text-sm">
+    {room.isSuccess && room.data && !isLive && <p role="status" className="border border-border p-4 text-sm">
       This classroom is {currentState}. New prompts and playback controls are closed.
     </p>}
     {isLive && <section className="border border-border bg-card p-4" aria-label="Release an activity">
@@ -124,7 +124,7 @@ export function ClassroomFacilitatorConsole({
         {busy ? "Saving…" : "Release to learners"}
       </Button>
     </section>}
-    {room.data && <section className="border border-border bg-card p-4" aria-label="Classroom activity results">
+    {room.isSuccess && room.data && <section className="border border-border bg-card p-4" aria-label="Classroom activity results">
       <h5 className="font-semibold">Released activities</h5>
       {!room.data.releases.length && <p className="mt-2 text-sm text-muted-foreground">
         No classroom activities have been released.
