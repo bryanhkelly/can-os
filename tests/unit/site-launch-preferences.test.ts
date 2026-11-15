@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { siteLaunchPreferencesSchema } from "@/modules/programs/site-launch-preferences.functions";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 
 describe("Site-first Launch Studio interests", () => {
   it("supports multiple program interests without creating enrollment state", () => {
