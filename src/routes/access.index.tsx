@@ -52,6 +52,7 @@ function AccessPage(){
   <div className="mt-6 space-y-4 border-t pt-4">
     <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/access/register" search={search.returnTo ? {returnTo:search.returnTo} : {}}>Create a personal CAN account</Link></Button></p>
     <p className="text-sm"><Button asChild variant="outline" className="w-full"><Link to="/schools/new">Create a school</Link></Button></p>
+    <p className="text-sm"><Link to="/explore/" className="text-primary underline underline-offset-4">Explore programs and locations</Link></p>
    <p className="text-sm text-muted-foreground">For demonstrations, use only synthetic accounts and data. Shared changes may be visible to other participants.</p>
   </div>
  </WorkspacePanel>
