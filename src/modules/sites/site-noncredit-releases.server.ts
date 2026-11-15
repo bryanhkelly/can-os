@@ -1,7 +1,6 @@
-import { and, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { noncreditSelfEnrollmentReleases } from "@/db/canonical-v301";
 import { readEligibleSelfEnrollmentReleases } from "@/modules/enrollment/noncredit-self-enrollment-catalog.server";
 import type { SiteNoncreditListing } from "@/domain/site-noncredit-public";
 
@@ -42,28 +41,23 @@ export async function readLinkedSiteNoncreditReleases(
   if(links.rows.length!==1)return [];
   const link=linkedSiteSchema.parse(links.rows[0]);
 
-  const candidates=await executor.select({id:noncreditSelfEnrollmentReleases.id})
-    .from(noncreditSelfEnrollmentReleases)
-    .where(and(
-      eq(noncreditSelfEnrollmentReleases.siteId,link.canonicalSiteId),
-      eq(noncreditSelfEnrollmentReleases.status,"published"),
-    )).orderBy(noncreditSelfEnrollmentReleases.id)
-    .limit(40);
-
-  const eligible:SiteNoncreditListing[]=[];
-  for(const candidate of candidates){
-    // This service is already the source of truth for the national enrollment
-    // catalog. Its result is not a grant and can become unavailable at any time.
-    const [release]=await readEligibleSelfEnrollmentReleases(executor,candidate.id);
-    if(!release||release.siteId!==link.canonicalSiteId)continue;
-    eligible.push({
+  // The existing eligibility reader already composes every approval,
+  // effective-date, Site relationship, consent and capacity gate. Fetch
+  // the exact canonical Site once and aggregate seats/waitlists in four
+  // bounded queries rather than re-running the entire reader for 40 IDs.
+  // The Site ID predicate is applied INSIDE the database eligibility query.
+  const releases=await readEligibleSelfEnrollmentReleases(executor,undefined,{
+    siteId:link.canonicalSiteId,limit:40,
+  });
+  const eligible:SiteNoncreditListing[]=releases
+    .filter(release=>release.siteId===link.canonicalSiteId)
+    .map(release=>({
       releaseId:release.id,
       title:release.title,
       siteName:release.siteName??"",
       seatsRemaining:release.seatsRemaining,
       waitlistAvailable:release.seatsRemaining<=0 || release.hasWaitingQueue,
-    });
-  }
+    }));
   return eligible;
 }
 
