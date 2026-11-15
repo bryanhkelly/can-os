@@ -1,5 +1,5 @@
 import { alias } from "drizzle-orm/pg-core";
-import { and, count, eq, exists, gt, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
+import { and, count, eq, exists, gt, ilike, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalEnrollmentOrganizations, canonicalEnrollmentSites,
@@ -25,6 +25,7 @@ type Executor = Pick<typeof db, "select">;
 export async function readEligibleSelfEnrollmentReleases(
   executor: Executor = db,
   releaseId?: string,
+  paging?: {after?:string|null;term?:string;limit?:number},
 ) {
   const now = new Date();
   const r = noncreditSelfEnrollmentReleases;
@@ -72,6 +73,12 @@ export async function readEligibleSelfEnrollmentReleases(
     .leftJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,r.siteId))
     .where(and(
       releaseId?eq(r.id,releaseId):undefined,
+      paging?.after?gt(r.id,paging.after):undefined,
+      paging?.term?or(
+        ilike(noncreditTrainingVersions.title,"%"+paging.term+"%"),
+        ilike(canonicalEnrollmentOrganizations.displayName,"%"+paging.term+"%"),
+        ilike(canonicalEnrollmentSites.name,"%"+paging.term+"%"),
+      ):undefined,
       eq(r.status,"published"),lte(r.opensAt,now),gt(r.closesAt,now),
       eq(programDeployments.offeringId,offerings.id),
       eq(programDeployments.status,"active"),
@@ -141,7 +148,7 @@ export async function readEligibleSelfEnrollmentReleases(
             ))),
         ),
       ),
-    )).orderBy(r.closesAt,r.id).limit(releaseId?1:100);
+    )).orderBy(paging?r.id:r.closesAt,r.id).limit(releaseId?1:paging?.limit??100);
   const counts = rows.length?await executor.select({
     releaseId:noncreditSelfEnrollmentClaims.releaseId,participants:count(),
   }).from(noncreditSelfEnrollmentClaims).where(inArray(
