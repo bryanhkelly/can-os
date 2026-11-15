@@ -90,7 +90,7 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
           inArray(noncreditRegistrations.status,["registered","active"]),
           eq(noncreditTrainingVersions.state,"published"),
           isNotNull(noncreditTrainingVersions.approvedByPersonId),
-          inArray(programDeployments.status,["authorized","active"]),
+          eq(programDeployments.status,"active"),
           eq(educationOperations.status,"active"),
           eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
           lte(deploymentOfferingAdoptions.validFrom,now),
