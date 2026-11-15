@@ -46,15 +46,50 @@ function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
       .catch(()=>{if(active)setError(true);});
     return ()=>{active=false;};
   },[courseAttemptId,source,lessonProgressRevision,assessmentRevision]);
+  if(error&&source===null)return <p role="alert" className="border border-border p-4 text-sm">
+    Your learning activities could not be loaded. Refresh to retry; no progress has been changed.
+  </p>;
+  if(source===null)return <p role="status" className="text-sm">Loading your course activities…</p>;
   if(source!=="noncredit")return null;
-  return <div className="space-y-4" aria-label="Noncredit learning activities">
+  return <div className="space-y-5" aria-label="Noncredit learning activities">
+    <section className="border border-border bg-card p-5" aria-label="Your learning journey">
+      <h2 className="font-serif text-2xl">Your learning journey</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Watch your recorded lessons, take the authorized knowledge check, and track
+        your learning progress. Your participation record remains your own even
+        if you switch recorded instructors.
+      </p>
+      <nav aria-label="Training steps" className="mt-4 flex flex-wrap gap-4 text-sm">
+        <a href="#course-recorded-lessons" className="font-semibold text-primary underline">1. Recorded lessons</a>
+        <a href="#course-knowledge-check" className="font-semibold text-primary underline">2. Knowledge checks</a>
+        <a href="#course-progress" className="font-semibold text-primary underline">3. Completion progress</a>
+      </nav>
+      {readiness&&<div className="mt-5">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 text-sm">
+          <strong>Lesson progress</strong>
+          <span className="tabular-nums">{readiness.completedLessons} of {readiness.totalLessons} completed</span>
+        </div>
+        <progress className="mt-2 h-3 w-full accent-primary"
+          value={readiness.completedLessons} max={Math.max(1,readiness.totalLessons)}
+          aria-label="Completed course lessons"/>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {readiness.recordedCompletion?"Training completion confirmed.":
+            readiness.eligible?"Learning requirements met; final completion decision is separate.":
+            "Continue your approved learning and assessment requirements."}
+          {readiness.totalLessons===0?" No published Course lessons are currently available.":""}
+        </p>
+      </div>}
+    </section>
+    <section id="course-knowledge-check" className="space-y-4" aria-label="Course knowledge checks">
+      <h2 className="font-serif text-xl">Knowledge checks and feedback</h2>
     {hasBaseline&&<CourseAssessmentPanel courseAttemptId={courseAttemptId}
       phase="baseline" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>}
     {hasFinal&&<CourseAssessmentPanel courseAttemptId={courseAttemptId}
       phase="final" onAssessmentCompleted={()=>setAssessmentRevision(revision=>revision+1)}/>} 
     <NoncreditCourseSurveys courseAttemptId={courseAttemptId}
       knowledgeCheckRevision={assessmentRevision}/>
-    <section className="space-y-2 border bg-card p-4">
+    </section>
+    <section id="course-progress" className="space-y-2 border bg-card p-4" aria-label="Course completion progress">
       <h3 className="font-serif text-lg font-semibold">Training completion</h3>
       {readiness?.policyVersion&&<p className="text-xs text-muted-foreground">
         Your requirements are locked to completion policy v{readiness.policyVersion}.

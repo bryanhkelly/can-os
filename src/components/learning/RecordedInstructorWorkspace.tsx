@@ -233,7 +233,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
 
     {instruction && <>
       {instruction.sectionId && <RecordedOfficialCourseLinks sectionId={instruction.sectionId}/>}
-      <div className="border bg-card p-4">
+      <div id="course-recorded-lessons" className="border bg-card p-4">
         <h3 className="font-semibold">Course lessons</h3>
         <div className="mt-3">
           <CourseLessonProgress completed={completedCount} total={instruction.lessons.length}
