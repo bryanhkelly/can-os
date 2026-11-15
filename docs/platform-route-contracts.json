@@ -526,6 +526,15 @@
       "writeBoundary": "pending"
     },
     {
+      "file": "src/routes/explore.index.tsx",
+      "route": "/explore/",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Public program-first and location-first approved Site and Program discovery",
+      "readBoundary": "Published Site public catalog only, approved offering metadata, no synthetic fixtures",
+      "writeBoundary": "Read-only; provider application links preserve original enrollment authorization"
+    },
+    {
       "file": "src/routes/family.interest.ts",
       "route": "/family/interest",
       "owner": "enrollment",
