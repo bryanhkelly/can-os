@@ -38,7 +38,7 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
   if (!canonicalRestrictedAuthUrlValid(connectionString, process.env.DATABASE_URL))
     throw new AuthorizationError("dedicated restricted canonical session reader configuration");
   const pool = new Pool({ connectionString, max: 1 });
-  let client: Awaited<ReturnType<Pool["connect"]>> | undefined;
+  let client: PoolClient | undefined;
   let records: Array<Record<string, unknown>> = [];
   try {
     client = await pool.connect();
