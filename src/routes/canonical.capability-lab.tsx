@@ -12,8 +12,14 @@ export const Route = createFileRoute("/canonical/capability-lab")({
 
 const areas = [
   {
+    title: "Publish noncredit enrollment",
+    detail: "Manage approved training release windows, independent or Site-facilitated delivery, capacity and versioned participant consent. This is the real provider enrollment command.",
+    path: "/programs/noncredit/enrollment",
+    status: "Connected enrollment writer",
+  },
+  {
     title: "Enrollment experience",
-    detail: "Preview reusable adult self-registration, group participation and guardian enrollment with actual published training versions. Registration writes are not yet enabled.",
+    detail: "Preview reusable adult, group and guardian journeys. Real noncredit self-registration is now separated at /learn/enroll; this internal preview remains read-only.",
     path: "/canonical/lab/enrollment",
     status: "Connected experience preview",
   },
