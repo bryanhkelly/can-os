@@ -5,6 +5,32 @@ export const facilitatedCodeLength = 10;
 export const facilitatedPairingWindowMs = 15 * 60_000;
 export const facilitatedRoomMaxMs = 8 * 60 * 60_000;
 
+/** A persisted 'live' room is no longer operational after eight hours.
+ * Derived state avoids misleading the facilitator even before archival runs. */
+export function facilitatedRoomOperationalState(
+  room: { state: "live" | "ended"; startedAt: Date; endedAt: Date | null },
+  now: Date,
+): "live" | "ended" | "expired" {
+  if (room.state === "ended" || room.endedAt) return "ended";
+  if (room.startedAt > now ||
+      now.getTime() - room.startedAt.getTime() >= facilitatedRoomMaxMs) return "expired";
+  return "live";
+}
+
+/** A room is only allowed to distribute to its actual, currently eligible
+ * audience. No arbitrary same-deployment Course attempt can supply rights. */
+export function roomMediaAudienceEligible(input: {
+  roomDeploymentId: string; roomCourseVersionId: string;
+  attemptDeploymentId: string; attemptCourseVersionId: string;
+  attemptStatus: string; sourceCurrent: boolean;
+  schoolAttempt: boolean; currentRoomSitePlacement: boolean;
+}): boolean {
+  return input.roomDeploymentId === input.attemptDeploymentId &&
+    input.roomCourseVersionId === input.attemptCourseVersionId &&
+    input.attemptStatus === "active" && input.sourceCurrent &&
+    (!input.schoolAttempt || input.currentRoomSitePlacement);
+}
+
 export const facilitatedStartSchema = z.object({
   deploymentId: z.string().uuid(),
   courseVersionId: z.string().uuid(),
@@ -46,7 +72,7 @@ export function canPairFacilitatedLearning(input: {
 }): boolean {
   return input.sessionState === "live" &&
     input.startedAt <= input.now &&
-    input.now.getTime() - input.startedAt.getTime() <= facilitatedRoomMaxMs &&
+    input.now.getTime() - input.startedAt.getTime() < facilitatedRoomMaxMs &&
     input.pairingExpiresAt > input.now &&
     input.sessionDeploymentId === input.attemptDeploymentId &&
     input.sessionCourseVersionId === input.attemptCourseVersionId;
