@@ -54,7 +54,6 @@ export const getMyCanDiscoverablePrograms = createServerFn({method:"GET"})
           ...(after?[gt(sitePublications.siteId,after)]:[]),
         ))
         .orderBy(asc(sitePublications.siteId)).limit(batchSize);
-      if(candidates.length<batchSize)exhausted=true;
       if(candidates.length===0)break;
       for(const site of candidates){
         after=site.id;
@@ -101,6 +100,8 @@ export const getMyCanDiscoverablePrograms = createServerFn({method:"GET"})
         }
         if(locations.length===pageSize||scanned===maxScanned)break;
       }
+      if(candidates.length<batchSize &&
+        after===candidates[candidates.length-1]?.id)exhausted=true;
     }
     return {
       locations,nextCursor:exhausted?null:after,

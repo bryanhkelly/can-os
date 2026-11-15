@@ -41,6 +41,7 @@ function MyPrograms(){
     enabled:student,retry:false,staleTime:15_000,
   });
   const activeSchool=school.data?.sections.filter(s=>s.enrollmentStatus==="active")??[];
+  const children=family.data?.children??[];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Learning & Programs"
     subtitle="One place to find the learning accessible through your current verified role. Institutional permissions remain separate."
     actions={<Link to="/explore/" className="text-sm font-semibold text-primary underline underline-offset-4">Explore programs</Link>}>
@@ -84,7 +85,7 @@ function MyPrograms(){
       {family.isError&&<p role="alert" className="mt-3 border border-border p-3 text-sm">Family records are unavailable to the current verified guardian.</p>}
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {family.data?.registrations.map(item=>{
-          const child=family.data.children.find(x=>x.studentProfileId===item.studentProfileId);
+          const child=children.find(x=>x.studentProfileId===item.studentProfileId);
           return <article key={item.id} className="border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">{item.status} · {item.startsOn} to {item.endsOn}</p>
             <h3 className="mt-2 font-serif text-xl">{item.offeringName}</h3>
