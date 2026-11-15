@@ -64,8 +64,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
   // queried independently so a saved Site is not lost when the directory grows.
   const places = await db.transaction(async tx => {
     await tx.execute(sql`SELECT set_config('can.account_id', ${accountId}, true)`);
-    const [directory, favorites] = await Promise.all([
-      tx.select({
+    const directory = await tx.select({
         id: sites.id, name: sites.name, address: sites.address,
         organizationName: organizations.name, slug: sitePublications.slug,
       }).from(sitePublications)
@@ -73,8 +72,8 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
         .innerJoin(organizations, eq(sites.organizationId, organizations.id))
         .where(and(eq(sitePublications.status, "published"),
           isNotNull(sitePublications.publishedAt)))
-        .orderBy(asc(sites.name)).limit(100),
-      tx.select({
+        .orderBy(asc(sites.name)).limit(100);
+    const favorites = await tx.select({
         id: sites.id, name: sites.name, address: sites.address,
         organizationName: organizations.name, slug: sitePublications.slug,
       }).from(accessAccountFavoriteSites)
@@ -83,8 +82,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
         .innerJoin(organizations, eq(sites.organizationId, organizations.id))
         .where(and(eq(accessAccountFavoriteSites.accountId, accountId),
           eq(sitePublications.status, "published"), isNotNull(sitePublications.publishedAt)))
-        .orderBy(asc(sites.name)).limit(100),
-    ]);
+        .orderBy(asc(sites.name)).limit(100);
     const favoriteIds = new Set(favorites.map(row => row.id));
     const bySite = new Map([...directory, ...favorites].map(row => [row.id, row]));
     return [...bySite.values()].map(site => ({
