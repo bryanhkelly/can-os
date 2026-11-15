@@ -47,7 +47,11 @@ test("@privacy unverified visitor cannot read My Courses or publisher controls",
   await expect(page.getByRole("button",{name:"Publish self-enrollment"})).toHaveCount(0);
 });
 
-test("@write only two verified adults can enroll, see own course, and withdraw",async({browser})=>{
+test("@write only two verified adults can enroll, see own course, and withdraw",async({browser},testInfo)=>{
+  // Both viewport projects run the read-only smoke tests. Run the mutating
+  // journey exactly once so mobile does not consume the same release seats.
+  test.skip(testInfo.project.name!=="desktop-chromium",
+    "Mutation journey runs once; mobile is read-only");
   test.skip(!allowWrite||!first||!second||!release,
     "Requires explicit isolated QA write approval, two actual verified CAN sessions and an unused test-only release");
   const a=await browser.newContext({baseURL:base});
