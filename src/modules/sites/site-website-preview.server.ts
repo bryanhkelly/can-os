@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
-import { readLinkedSiteNoncreditReleases } from "./site-noncredit-releases.server";
+import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
@@ -78,7 +78,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     }:{}),
     ...(parentExtras ?? {}),
   });
-  const noncreditReleases = host ? await readLinkedSiteNoncreditReleases(site.id) : [];
+  const noncreditReleases = host ? await readOptionalSiteNoncreditReleases(site.id) : [];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
