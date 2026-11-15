@@ -1,15 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  courseLessons, facilitatedLearningParticipants, facilitatedLearningSessions,
+  courseLessons, learnerCourseAttempts, noncreditSelfEnrollmentClaims,
+  facilitatedLearningParticipants, facilitatedLearningSessions,
   facilitatedRoomActivityReleases, facilitatedRoomActivityResponses,
   facilitatedRoomPresenceEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
+import {assignedClassroomRelease,attemptInAssignedClassroomRelease} from "./classroom-release-boundary.server";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
@@ -270,15 +271,41 @@ export const getClassroomHostActivity = createServerFn({ method: "GET" })
     const host = await requireCanonicalFacilitator();
     return db.transaction(async tx => {
       const room = await ownedRoom(tx, host, data.facilitatedSessionId);
+      const releaseScope=await assignedClassroomRelease(tx,room);
       const releases = await tx.select().from(facilitatedRoomActivityReleases)
         .where(eq(facilitatedRoomActivityReleases.facilitatedSessionId, room.id))
         .orderBy(desc(facilitatedRoomActivityReleases.releasedAt)).limit(51);
       const paired = await tx.select({
         courseAttemptId: facilitatedLearningParticipants.courseAttemptId,
+        participantPersonId: facilitatedLearningParticipants.participantPersonId,
       }).from(facilitatedLearningParticipants).where(and(
         eq(facilitatedLearningParticipants.facilitatedSessionId, room.id),
         isNull(facilitatedLearningParticipants.leftAt),
       )).limit(501);
+      // Historical pairings created before a room was associated with a
+      // release are never counted as this cohort's current participants.
+      const allowed=new Set(paired.map(p=>p.courseAttemptId));
+      if(releaseScope){
+        allowed.clear();
+        const claims=paired.length?await tx.select({
+          attemptId:learnerCourseAttempts.id,
+          personId:noncreditSelfEnrollmentClaims.participantPersonId,
+        }).from(noncreditSelfEnrollmentClaims)
+          .innerJoin(learnerCourseAttempts,eq(
+            learnerCourseAttempts.noncreditRegistrationId,
+            noncreditSelfEnrollmentClaims.registrationId,
+          ))
+          .where(and(
+            eq(noncreditSelfEnrollmentClaims.releaseId,releaseScope),
+            eq(noncreditSelfEnrollmentClaims.siteId,room.siteId),
+            inArray(learnerCourseAttempts.id,paired.map(p=>p.courseAttemptId)),
+          )):[];
+        const identities=new Set(paired.map(
+          p=>p.courseAttemptId+":"+p.participantPersonId,
+        ));
+        for(const claim of claims)if(identities.has(claim.attemptId+":"+claim.personId))
+          allowed.add(claim.attemptId);
+      }
       const responses = await tx.select({
         activityReleaseId: facilitatedRoomActivityResponses.activityReleaseId,
         courseAttemptId: facilitatedRoomActivityResponses.courseAttemptId,
@@ -302,11 +329,12 @@ export const getClassroomHostActivity = createServerFn({ method: "GET" })
       const active = new Set([...latest.values()].filter(event =>
         ["joined", "heartbeat"].includes(event.eventKind) &&
         nowMs - event.receivedAt.getTime() < 90_000,
-      ).map(event => event.courseAttemptId));
+      ).map(event => event.courseAttemptId).filter(id=>allowed.has(id)));
       return {
         roomState: facilitatedRoomOperationalState(room, new Date(nowMs)),
         releases: releases.slice(0, 50).map(r => {
-          const answers = responses.filter(a => a.activityReleaseId === r.id);
+          const answers = responses.filter(a => a.activityReleaseId === r.id &&
+            allowed.has(a.courseAttemptId));
           const counts = r.answerType === "single_choice"
             ? r.choices.map((_, i) => answers.filter(a => a.answerChoice === i).length) : [];
           return {
@@ -318,7 +346,7 @@ export const getClassroomHostActivity = createServerFn({ method: "GET" })
             choiceCounts: counts,
           };
         }),
-        pairedCount: paired.length,
+        pairedCount: allowed.size,
         activeDevicesEstimate: active.size,
         partial: releases.length > 50 || paired.length > 500 ||
           responses.length > 1500 || presence.length > 2000,
