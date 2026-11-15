@@ -9,7 +9,8 @@ import {
   canonicalEnrollmentSites, canonicalEnrollmentOrganizations, siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { getCanonicalSessionRow } from "@/modules/identity/canonical-command-context.server";
+import { projectCanonicalCommandContext } from "@/domain/canonical-access";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -109,7 +110,10 @@ export const confirmCanonicalSiteIdentityLink=createServerFn({method:"POST"})
   .validator((v:unknown)=>siteIdentityConfirmationSchema.parse(v))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const actor=await getCanonicalCommandContext(getRequest());
+    // Initial Site verification predates the approved public/native Site link.
+    // Bootstrap must use independently authenticated native authority; the
+    // ordinary single CAN login starts only after independent link approval.
+    const actor=projectCanonicalCommandContext(await getCanonicalSessionRow(getRequest()));
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
       throw new AuthorizationError("canonical Site administrator or registrar");
     const orgId=actor.scope.organizationIds?.length===1?actor.scope.organizationIds[0]:null;
