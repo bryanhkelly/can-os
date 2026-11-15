@@ -119,7 +119,9 @@ export async function readSessionGrants(accountId: string, email: string, reader
   const adminAccount =
     accountId === LOCAL_DEMO_ADMIN.accountId || normalizedEmail === LOCAL_DEMO_ADMIN.email;
   const ownGrants = (await listActiveAccountGrants(accountId, reader))
-    .filter(grant => grant.accountId === accountId);
+    .filter(grant => grant.accountId === accountId &&
+      (grant.role !== "account_holder" ||
+        (grant.organizationId === null && grant.siteId === null)));
 
   const valorAccount = LOCAL_DEMO_ACCOUNTS.some(account => account.accountId === accountId) ||
     normalizedEmail.endsWith("@valorschool.demo");
