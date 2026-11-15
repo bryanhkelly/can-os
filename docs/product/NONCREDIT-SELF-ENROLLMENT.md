@@ -30,6 +30,14 @@ and over-capacity were rejected; one registration and its attempt were
 withdrawn without releasing its seat or deleting its claim. The savepoint then
 rolled back all learner identities, registrations, attempts and claims.
 A subsequent read confirmed **zero residual synthetic learner data**.
+The exact published-release eligibility predicates (active operation/deployment,
+approved adoption, evidence-backed noncredit stage authorization, Site
+placement, provider role, published completion policy and Course) returned
+**both synthetic releases**. An actual connection using
+`can_os_canonical_auth_app` succeeded, but raw SELECT against the claims,
+releases and legacy-to-canonical identity bridge was denied by PostgreSQL
+(`42501`). These are genuine test01 DB role checks, not simulated account
+or HTTP authorization tests.
 
 The test initially failed on the existing database's independent
 `register_noncredit` authorization gate. Both public discovery and the
