@@ -1300,6 +1300,15 @@
       "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
     },
     {
+      "file": "src/routes/site-identity.tsx",
+      "route": "/site-identity",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Request public-to-native Site identity association, confirm through active native Site operator role, and independently approve by CAN institutional reviewer",
+      "writeBoundary": "Separate authenticated role-scoped server functions; requester cannot approve; native operator must hold exact canonical Site/organization grant; approvals require current evidence and audit",
+      "readBoundary": "Local registrar sees own Site relationship; CAN institutional reviewer sees pending proposals; native confirmation accepts only exact requested Site ID under canonical membership"
+    },
+    {
       "file": "src/routes/site-website.tsx",
       "route": "/site-website",
       "owner": "sites",
