@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
 import {
   getClassroomHostActivity, releaseClassroomActivity, closeClassroomActivity,
   attestClassroomAttendance, attachClassroomSurvey,
@@ -45,6 +46,7 @@ export function ClassroomFacilitatorConsole({ facilitatedSessionId }: { facilita
       Keep this console private. The presentation is a separate, projector-friendly screen.
     </p>
     {state.isError&&<p role="alert" className="mt-3 text-sm">Room controls unavailable.</p>}
+    <ClassroomPlaybackControls facilitatedSessionId={facilitatedSessionId}/>
     <div className="mt-3 grid gap-3 sm:grid-cols-3">
       <p className="border border-border p-3 text-sm">Paired attempts: {state.data?.pairedCount??"…"}</p>
       <p className="border border-border p-3 text-sm">Active device estimate: {state.data?.activeDevicesEstimate??"…"}</p>

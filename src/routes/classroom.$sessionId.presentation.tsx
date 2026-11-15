@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { FacilitatedRoomPlayer } from "@/components/learning/FacilitatedRoomPlayer";
+import { ClassroomProjectorPlayer } from "@/components/learning/ClassroomProjectorPlayer";
 import { getClassroomHostActivity } from "@/modules/learning/classroom-evidence.functions";
 import { Button } from "@/components/ui/button";
 
@@ -31,7 +31,7 @@ function ClassroomPresentation(){
     {room.isError&&<p role="alert" className="mt-6">This presentation is unavailable or you do not have current facilitator access.</p>}
     {room.data&&<div className="mx-auto mt-6 max-w-6xl">
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_18rem]">
-        <div><FacilitatedRoomPlayer facilitatedSessionId={sessionId}/></div>
+        <div><ClassroomProjectorPlayer facilitatedSessionId={sessionId}/></div>
         <aside className="border border-border bg-card p-5" aria-label="Current classroom activity">
           <h2 className="font-serif text-2xl font-semibold">Current activity</h2>
           {active?<div className="mt-4">
