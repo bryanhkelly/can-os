@@ -18,8 +18,13 @@ export type CanonicalSessionRow = z.infer<typeof canonicalSessionRowSchema>;
 export const canonicalSessionCookie = "__Host-can_os_v3_session";
 export const canonicalAuthReaderDatabaseRole = "can_v30_canonical_auth_reader";
 
-/** Authority comes from a current native session, never user-submitted roles. */
-export function projectCanonicalCommandContext(row: CanonicalSessionRow): CommandContext {
+/**
+ * A verified native grant or an independently linked CAN staff grant can be
+ * projected into the same narrowly scoped canonical authorization context.
+ * Neither caller can provide these fields from a browser payload.
+ */
+export function projectCanonicalPrincipalContext(row: Pick<CanonicalSessionRow,
+  "person_id" | "role_code" | "organization_id" | "site_id">): CommandContext {
   if (["blueprint_reviewer", "survey_reviewer"].includes(row.role_code) && row.site_id !== null) {
     throw new AuthorizationError("organization-only independent reviewer");
   }
@@ -47,4 +52,9 @@ export function projectCanonicalCommandContext(row: CanonicalSessionRow): Comman
       siteIds: row.site_id ? [row.site_id] : [],
     },
   };
+}
+
+/** Native session projection shares exact role/capability rules with CAN SSO. */
+export function projectCanonicalCommandContext(row: CanonicalSessionRow): CommandContext {
+  return projectCanonicalPrincipalContext(row);
 }
