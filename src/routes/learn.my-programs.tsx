@@ -21,7 +21,7 @@ export const Route=createFileRoute("/learn/my-programs")({
 
 function MyPrograms(){
   const {session}=useWorkspaceSession();
-  const role=session?.role;
+  const role=session?.authenticated ? session.role : undefined;
   const guardian=role==="guardian";
   const student=role==="student";
   const adult=role==="account_holder"||guardian;
@@ -44,13 +44,13 @@ function MyPrograms(){
   const children=family.data?.children??[];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Learning & Programs"
     subtitle="One place to find the learning accessible through your current verified role. Institutional permissions remain separate."
-    actions={<Link to="/explore/" className="text-sm font-semibold text-primary underline underline-offset-4">Explore programs</Link>}>
+    actions={<Link to="/explore" className="text-sm font-semibold text-primary underline underline-offset-4">Explore programs</Link>}>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Your account, your approved relationships</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         You can participate at several learning centers with one CAN account. Staff access,
         guardianship, academic records and private rosters are verified separately by each provider.
-        Change your active institutional role in <Link to="/account/" className="underline text-primary">My CAN</Link>.
+        Change your active institutional role in <Link to="/account" className="underline text-primary">My CAN</Link>.
       </p>
     </section>
     {adult&&<section className="mt-6" aria-label="Personal training registrations">
@@ -124,7 +124,7 @@ function MyPrograms(){
     {!adult&&!guardian&&!student&&<section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Your authorized workspaces</h2>
       <p className="mt-2 text-sm text-muted-foreground">Open My CAN to select an independently verified learning, guardian or staff role. This workspace does not acquire another person's permissions automatically.</p>
-      <Link to="/account/" className="mt-3 inline-block text-sm font-semibold text-primary underline">Manage my workspaces</Link>
+      <Link to="/account" className="mt-3 inline-block text-sm font-semibold text-primary underline">Manage my workspaces</Link>
     </section>}
   </WorkspaceShell>;
 }
