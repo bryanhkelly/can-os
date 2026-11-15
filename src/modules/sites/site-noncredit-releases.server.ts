@@ -46,7 +46,6 @@ export async function readLinkedSiteNoncreditReleases(
     .from(noncreditSelfEnrollmentReleases)
     .where(and(
       eq(noncreditSelfEnrollmentReleases.siteId,link.canonicalSiteId),
-      eq(noncreditSelfEnrollmentReleases.deliveryMode,"facilitated"),
       eq(noncreditSelfEnrollmentReleases.status,"published"),
     )).orderBy(noncreditSelfEnrollmentReleases.id)
     .limit(40);
@@ -56,7 +55,7 @@ export async function readLinkedSiteNoncreditReleases(
     // This service is already the source of truth for the national enrollment
     // catalog. Its result is not a grant and can become unavailable at any time.
     const [release]=await readEligibleSelfEnrollmentReleases(executor,candidate.id);
-    if(!release||release.siteId!==link.canonicalSiteId||release.deliveryMode!=="facilitated")continue;
+    if(!release||release.siteId!==link.canonicalSiteId)continue;
     eligible.push({
       releaseId:release.id,
       title:release.title,
