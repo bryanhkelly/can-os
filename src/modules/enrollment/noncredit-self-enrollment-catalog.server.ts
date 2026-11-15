@@ -8,6 +8,7 @@ import {
   noncreditCompletionPolicies, noncreditSelfEnrollmentClaims,
   noncreditSelfEnrollmentReleases, noncreditTrainingVersions, offeringVersions,
   offerings, programDeployments, classroomDeploymentSites, educationOperationSites,
+  siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
 
@@ -69,7 +70,7 @@ export async function readEligibleSelfEnrollmentReleases(
       releaseId?eq(r.id,releaseId):undefined,
       eq(r.status,"published"),lte(r.opensAt,now),gt(r.closesAt,now),
       eq(programDeployments.offeringId,offerings.id),
-      inArray(programDeployments.status,["authorized","active"]),
+      eq(programDeployments.status,"active"),
       eq(educationOperations.status,"active"),
       eq(offerings.status,"active"),
       eq(offeringVersions.lifecycle,"published"),
@@ -105,6 +106,15 @@ export async function readEligibleSelfEnrollmentReleases(
               lte(educationOperationSites.validFrom,now),
               or(isNull(educationOperationSites.validThrough),
                 gt(educationOperationSites.validThrough,now)),
+            ))),
+          exists(executor.select({id:siteOrganizationRoles.id})
+            .from(siteOrganizationRoles).where(and(
+              eq(siteOrganizationRoles.siteId,r.siteId),
+              eq(siteOrganizationRoles.organizationId,r.registeringOrganizationId),
+              inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+              lte(siteOrganizationRoles.validFrom,now),
+              or(isNull(siteOrganizationRoles.validThrough),
+                gt(siteOrganizationRoles.validThrough,now)),
             ))),
           exists(executor.select({id:classroomDeploymentSites.id})
             .from(classroomDeploymentSites).where(and(
