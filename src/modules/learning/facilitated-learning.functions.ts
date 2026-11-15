@@ -23,7 +23,6 @@ import { DomainError } from "@/domain/errors";
 import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
 import { resolveClassVideo } from "@/domain/class-video";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
-import { assertFacilitatedInstructionalDelivery } from "./student-instructional-tracks.server";
 import {
   canPairFacilitatedLearning, facilitatedCodeAlphabet, facilitatedCodeLength,
   facilitatedPairSchema, facilitatedPairingWindowMs, facilitatedPlaybackSchema,
@@ -371,6 +370,9 @@ async function assertRoomMediaRightsForAudience(
   tx: Tx, audience: Array<typeof learnerCourseAttempts.$inferSelect>,
   trackVersionId: string, lessonId: string, assetVersionId: string,
 ): Promise<void> {
+  // Load the protected track-rights implementation inside the server-side
+  // authorization path, not as a client-reachable module-level import.
+  const { assertFacilitatedInstructionalDelivery } = await import("./student-instructional-tracks.server");
   // All current adoptions must independently permit this asset. Sharing a
   // Course version never implies identical policies or content rights.
   for (const attempt of audience) {
