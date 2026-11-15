@@ -67,6 +67,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/account.index.tsx",
+      "route": "/account/",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "Authenticated holders navigate verified roles across schools and save approved public sites",
+      "writeBoundary": "Account- and site-scoped favorite command; never creates role grants or enrollment",
+      "readBoundary": "Verified signed-in account; published sites only; explicit memberships only"
+    },
+    {
       "file": "src/routes/account.sessions.tsx",
       "route": "/account/sessions",
       "owner": "identity",
@@ -353,6 +362,15 @@
       "roleJourney": "Native canonical Site Admin registers and manages site equipment; registrar can inspect only authorized Site equipment. Temporary lab; no student or guardian device management.",
       "readBoundary": "A verified canonical Site-scoped session with exactly one organization and Site; queries filter to that Site ID and return at most 100 latest devices; never expose browser fingerprints or IPs.",
       "writeBoundary": "Only canonical site_admin may create an owned site equipment record, change Site-owned device status or persist Site-scoped device policies. No grade/attendance credit or hardware attestation derived from registration."
+    },
+    {
+      "file": "src/routes/canonical.lab.enrollment.tsx",
+      "route": "/canonical/lab/enrollment",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Internal provider-only preview; not public or writable registration",
+      "writeBoundary": "No registration writes enabled",
+      "readBoundary": "Verified canonical provider capability lab"
     },
     {
       "file": "src/routes/canonical.lab.facilitated.tsx",
