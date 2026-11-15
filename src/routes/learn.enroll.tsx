@@ -123,7 +123,11 @@ function PublicSelfEnrollment() {
           {catalog.isPending && <p role="status" className="mt-5 text-sm">Loading published enrollment opportunities…</p>}
           {catalog.isError && <p role="alert" className="mt-5 text-sm">Enrollment availability is temporarily unavailable. <button type="button" onClick={()=>void catalog.refetch()} className="font-semibold text-primary underline">Try again</button></p>}
           {catalog.data && catalog.data.items.length===0 && <p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
-            No noncredit programs are accepting self-registration right now. Your CAN account is still available, and the provider must publish its course and enrollment release before registration can open.
+            {catalog.data.nextCursor
+              ? "No available training was found in this segment. Select More training to continue browsing approved opportunities."
+              : term
+                ? "No available training matches this search. Try another program, provider or location."
+                : "No noncredit programs are accepting self-registration right now. Providers must publish their courses and enrollment releases before registration can open."}
           </p>}
           {catalog.data && catalog.data.items.length>0 && <div className="mt-4">
             <label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</label>
