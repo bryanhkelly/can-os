@@ -859,6 +859,33 @@
       "readBoundary": "Verified exact-Site editor; approved public projection plus the Site's private self-reported setup context"
     },
     {
+      "file": "src/routes/learn.course.$courseAttemptId.tsx",
+      "route": "/learn/course/$courseAttemptId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Own canonical course playback, activities, progress and assessment",
+      "readBoundary": "Bound to own bridged registration plus native canonical Person/course authorization",
+      "writeBoundary": "Canonical activity, feedback and assessment commands retain independent native policy and RLS"
+    },
+    {
+      "file": "src/routes/learn.enroll.tsx",
+      "route": "/learn/enroll",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Public approved noncredit release discovery, verified adult sign-in, explicit consent, self-registration",
+      "readBoundary": "Only published and currently approved release, provider and capacity projections",
+      "writeBoundary": "Single verified legacy session maps to a new native Person only after explicit consent; participant IDs are server-derived"
+    },
+    {
+      "file": "src/routes/learn.my-courses.tsx",
+      "route": "/learn/my-courses",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Account-owned active noncredit registrations and native learner-session renewal",
+      "readBoundary": "Cross-schema explicit account/person bridge plus verified legacy account",
+      "writeBoundary": "Only an existing owned active canonical Course attempt can renew its learner session"
+    },
+    {
       "file": "src/routes/messages.tsx",
       "route": "/messages",
       "owner": "communication",
@@ -1145,6 +1172,15 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/programs.noncredit.enrollment.tsx",
+      "route": "/programs/noncredit/enrollment",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Native provider publishes/closes approved enrollment windows for online and facilitated training",
+      "readBoundary": "Native Site-scoped operator role and only approved adoption, published course, training and current policy",
+      "writeBoundary": "Immutable release consent/version/capacity; provider operation-Site scope and canonical audit"
     },
     {
       "file": "src/routes/published-site.$page.ts",
