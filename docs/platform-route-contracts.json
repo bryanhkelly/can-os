@@ -31,6 +31,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/access.register.tsx",
+      "route": "/access/register",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "Independent personal CAN signup followed by verified email redemption",
+      "readBoundary": "Public signup; generic account-existence response and origin restriction",
+      "writeBoundary": "Anonymous rate limiting, provisional signup only, no institutional grants until independent authorization"
+    },
+    {
       "file": "src/routes/access.request.ts",
       "route": "/access/request",
       "owner": "identity",
