@@ -35,7 +35,7 @@ function EnrollmentLabContent({ trainings }: {
 
   return <WorkspaceShell width="wide" eyebrow="Internal · Enrollment experience"
     title="Enrollment" subtitle="One registration experience for noncredit training, adult education, community programs and youth learning. School admission remains a separate verified family journey.">
-    <CapabilityLabNav current="noncredit"/>
+    <CapabilityLabNav current="enrollment"/>
     <section className="mt-6 border border-border bg-card p-5">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Experience design · Not live registration</p>
       <h2 className="mt-2 font-serif text-2xl">Who is learning?</h2>
