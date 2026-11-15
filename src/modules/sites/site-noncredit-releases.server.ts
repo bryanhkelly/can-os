@@ -66,3 +66,19 @@ export async function readLinkedSiteNoncreditReleases(
   }
   return eligible;
 }
+
+/** Optional content must never take down an otherwise approved Site website
+ * if a restricted canonical reader loses permissions or its connection fails.
+ * The registration endpoint remains independently fail-closed.
+ */
+export async function readOptionalSiteNoncreditReleases(
+  publicSiteId:string,executor:Reader=db,
+):Promise<SiteNoncreditListing[]> {
+  try{return await readLinkedSiteNoncreditReleases(publicSiteId,executor);}
+  catch(error){
+    console.error("Optional Site noncredit catalog unavailable",{
+      errorType:error instanceof Error?error.name:"unknown",
+    });
+    return [];
+  }
+}
