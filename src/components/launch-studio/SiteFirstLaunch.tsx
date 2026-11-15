@@ -195,25 +195,36 @@ export function SiteFirstLaunch({options}:{options:Options}) {
             {networkChoice==="independent"?"Independent operation.":networkCode?"Network code entered but not submitted or approved.":"Network affiliation is not verified."} A code does not unlock network-owned programs.
           </p>
           <hr/>
-          <h4 className="font-semibold">Continue your launch</h4>
+          <h4 className="font-semibold">What would you like to do next?</h4>
           <div className="space-y-3">
-            <Link to="/canonical/blueprints" search={{}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">
-              Build programs & Offerings <ArrowRight className="size-4"/>
-            </Link>
-            {siteId&&options.schoolSetupAdministrator&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+            {siteId&&options.schoolSetupAdministrator&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">
               Customize website <ArrowRight className="size-4"/>
             </Link>}
-            {!options.schoolSetupAdministrator&&<p className="border p-4 text-sm text-muted-foreground">Website customization requires an approved Site Administrator or Site website editor grant. Your private website preview is available now; editing permissions can be assigned separately.</p>}
-            {siteId&&<Link to="/site-identity" search={{mode:"request",siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
-              Connect your Site to approved educational operations <ArrowRight className="size-4"/>
-            </Link>}
-            {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
-              Prepare Site & enrollment <ArrowRight className="size-4"/>
+            {!options.schoolSetupAdministrator&&<p className="border p-4 text-sm text-muted-foreground">To customize your Site website, ask an authorized Site Administrator to assign website editing access. You can still explore your private preview.</p>}
+            <Link to="/programs/noncredit/enrollment" className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+              Make programs enrollable <ArrowRight className="size-4"/>
+            </Link>
+            {siteId&&options.schoolSetupAdministrator&&<Link to="/sites/$siteId/publish" params={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+              Share or publish your Site <ArrowRight className="size-4"/>
             </Link>}
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
-            Blueprint Studio checks its own canonical account and Site memberships. It will ask you to choose an authorized canonical Site. Website Studio has separate editor permissions. No Site or Program rights are granted by these links.
+            You can keep designing without publishing. Enrollment and public sharing
+            require separately approved offerings, current Site authority and publication.
+            The next workspace will verify your permissions.
           </p>
+          <details className="border p-4 text-xs">
+            <summary className="cursor-pointer font-semibold text-primary">Advanced setup and approvals</summary>
+            <div className="mt-3 space-y-3">
+              <p className="text-muted-foreground">For operators managing existing canonical education records, these governed workspaces are available without changing your initial Site plans.</p>
+              {siteId&&<Link to="/site-identity" search={{mode:"request",siteId}}
+                className="block font-semibold text-primary underline">Verify existing Site identity connection</Link>}
+              <Link to="/canonical/blueprints" search={{}}
+                className="block font-semibold text-primary underline">Manage approved educational blueprints</Link>
+              {siteId&&<Link to="/launch/hub/school" search={{siteId}}
+                className="block font-semibold text-primary underline">School-specific readiness</Link>}
+            </div>
+          </details>
         </aside>
       </div>
     </section>}
