@@ -2,9 +2,69 @@
 
 **Implementation:** GitHub `main`  
 **Database migration:** `database/canonical/v3.0.1/patch-noncredit-self-enrollment.sql`  
-**Test database:** `sweet-hall-62441909`, test01 `br-bitter-feather-ar0u63x7` (migration installed, zero published courses)  
+**Test database:** `sweet-hall-62441909`, test01 `br-bitter-feather-ar0u63x7` (migration applied; two synthetic QA-only open releases and separate stage authorization evidence)  
 **Production database:** `br-restless-sea-ar9ooo55` (migration **not yet applied**)  
-**Release state:** Source committed; build, route generation, real learner journey, provider E2E and restricted-principal tests **not yet executed**. Do not call this production released merely because the code is in main.
+**Release state:** Source committed. Test01 SQL registration/consent/capacity/Site/withdrawal integration **passed**, with all synthetic learner rows rolled back. TypeScript/build, live session-based provider/learner E2E, restricted-principal login tests and deployed browser tests **not yet executed**. Do not call this production released merely because the code is in main.
+
+## Reproducible test01 fixtures and verified integration
+
+The `test01` branch contains a strictly synthetic provider, operation, two QA Sites,
+two short metadata-only published training versions, associated published Course
+versions, active deployments, approved offering adoptions, effective completion
+policies and **separate evidence-backed noncredit registration authorization**.
+This is not real instruction, accreditation, a credential or an approved COGIC course.
+
+- `database/canonical/v3.0.1/seed-noncredit-self-enrollment-test01.sql` (applied only to test01)
+- `database/canonical/v3.0.1/accept-noncredit-self-enrollment-test01.sql` (transaction rollback suite)
+- `scripts/acceptance/test-noncredit-self-enrollment-test01.mjs` (guarded runnable suite)
+
+Test01 releases are `aa230000-0000-4000-8000-000000000001` (independent,
+capacity 2) and `aa230000-0000-4000-8000-000000000002` (Site A facilitated,
+capacity 1; Site B has no deployment permission). They have a limited open
+window and must never be advertised as real instruction.
+
+The 46-statement rollback test ran successfully via Neon on test01: three
+synthetic verified account/Person/native learner linkages created three
+registrations and claims; wrong Site, wrong consent, mismatched native Account,
+and over-capacity were rejected; one registration and its attempt were
+withdrawn without releasing its seat or deleting its claim. The savepoint then
+rolled back all learner identities, registrations, attempts and claims.
+A subsequent read confirmed **zero residual synthetic learner data**.
+
+The test initially failed on the existing database's independent
+`register_noncredit` authorization gate. Both public discovery and the
+provider release publisher now check current, approved, effective,
+non-superseded **operational authorization decisions** for the registering
+organization and operation/deployment. The synthetic fixture supplies distinct
+TEST ONLY evidence and approval rows. The database remains the final
+authorization authority.
+
+To repeat the database suite with a restricted disposable test target:
+
+```sh
+APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true \
+  TEST_DATABASE_URL="$TEST_DATABASE_URL" \
+  npm run db:canonical:noncredit:integration
+```
+
+For on-demand browser acceptance against an **exact-commit deployed test preview**:
+
+```sh
+CAN_RELEASE_E2E_URL="https://<your-test-preview>" \
+  CAN_RELEASE_SOURCE_SHA="<main-sha>" \
+  CAN_RELEASE_DEPLOYED_SHA="<matching-deployed-sha>" \
+  CAN_NONCREDIT_QA_RELEASE_ID="aa230000-0000-4000-8000-000000000001" \
+  npm run test:e2e:noncredit
+```
+
+Only set `CAN_NONCREDIT_E2E_WRITES=1` with `APP_ENV=test`,
+`CAN_TEST_DB_WRITES_ENABLED=true`, and two separately verified,
+already-provisioned nonproduction CAN session secrets in
+`CAN_NONCREDIT_QA_CAN_SESSION_1` and `CAN_NONCREDIT_QA_CAN_SESSION_2`.
+Browser mutations consume real capacity in the designated isolated
+test database; use fresh disposable releases for repeated runs.
+The Playwright suite has been committed but **not executed** because the
+Netlify deploy does not include this branch's source commits.
 
 ## Product model
 
@@ -60,7 +120,7 @@ For facilitated claims, **room pairing and room-status reads** check the exact r
 
 1. Run `npm run typecheck`, `npm run test -- tests/unit/noncredit-self-enrollment.test.ts`, `npm run build`; regenerate TanStack file routes during normal build.
 2. With isolated TEST_DATABASE_URL and APP_ENV=test, run `npm run db:canonical:noncredit-self-enrollment` for migrations, RLS, least privilege, required FKs and immutability.
-3. Seed **synthetic test01 only** via actual governed provider authoring: two published trainings, current effective completion policies, Courses, Offering versions, authorized deployments and active operator relationships. **No such ready rows existed** on either branch as inspected.
+3. Test01 has the strictly synthetic two-release fixture and the rollback-only database integration suite has passed. Repeat using the guarded npm command; do not mistake a metadata-only QA course for a ready real pilot.
 4. Test concurrent last-seat registrations, duplicate click/retry, consent revision mismatch, closed/expired/premature release, withdrawn learner, restricted canonical reader outage, preexisting native email collision, revoked source membership and cross-account/course isolation. Exercise owner-only confirmed withdrawal, idempotent retries, completed-outcome denial and immediate room-access removal.
 5. Test independent, facilitated Site A vs Site B, revocation during pairing, expired room behavior, guardian/student denial, native session expiration and verified interactive renewal. Test at least two real distinct CAN accounts.
 6. Verify production environment secret/reader permissions and deploy a successful current GitHub `main` build; Netlify's previously inspected production deploy was stale, so build/real-site acceptance must precede production schema migration.
