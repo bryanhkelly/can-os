@@ -6,7 +6,8 @@ import { and, asc, countDistinct, desc, eq, gt, inArray, isNull, lte, or } from 
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  catalogSites, contentAssetVersions, courseLessons, courseVersions, courses,
+  auditEvents, catalogSites, contentAssetVersions, courseLessons, courseVersions, courses,
+  domainEvents,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
   facilitatedPairingRateLimits,
@@ -54,6 +55,39 @@ function generatePairingCode() {
   return code;
 }
 function displayCode(code: string) { return code.slice(0, 5) + "-" + code.slice(5); }
+
+/**
+ * Canonical audit + domain-event pair for facilitated room lifecycle actions,
+ * following the noncredit completion convention. Audit rows carry the host
+ * organization; domain events stay reprocessable through the outbox.
+ */
+async function recordRoomAuditAndEvent(
+  tx: Tx,
+  input: {
+    actorPersonId: string;
+    organizationId: string;
+    eventCode: string;
+    eventType: string;
+    sessionId: string;
+    payload: Record<string, string>;
+  },
+) {
+  await tx.insert(auditEvents).values({
+    actorPersonId: input.actorPersonId,
+    owningOrganizationId: input.organizationId,
+    eventCode: input.eventCode,
+    entityKind: "facilitated_learning_session",
+    entityId: input.sessionId,
+    payload: input.payload,
+  });
+  await tx.insert(domainEvents).values({
+    eventType: input.eventType,
+    aggregateType: "facilitated_learning_session",
+    aggregateId: input.sessionId,
+    actorPersonId: input.actorPersonId,
+    payload: input.payload,
+  });
+}
 
 /** A site membership is not enough. Require an active operation-site relationship
  * AND a current host/operator organization relationship at that same Site.
@@ -371,6 +405,12 @@ export const startFacilitatedLearningRoom = createServerFn({method:"POST"})
         pairingExpiresAt:new Date(now.getTime()+facilitatedPairingWindowMs),
       }).returning({id:facilitatedLearningSessions.id});
       if(!created)throw new Error("Could not create facilitated room");
+      await recordRoomAuditAndEvent(tx,{
+        actorPersonId:host.actor.actorPersonId!,organizationId:host.organizationId,
+        eventCode:"learning.facilitated.room.started",eventType:"FacilitatedLearningRoomStarted",
+        sessionId:created.id,
+        payload:{deploymentId:data.deploymentId,courseVersionId:data.courseVersionId,siteId:access.siteId},
+      });
       return {facilitatedSessionId:created.id, pairingCode:displayCode(code),
         pairingExpiresAt:new Date(now.getTime()+facilitatedPairingWindowMs).toISOString()};
     });
@@ -390,6 +430,11 @@ export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
       await tx.update(facilitatedLearningSessions).set({
         pairingCodeDigest:digestCode(code),pairingExpiresAt:expiresAt,
       }).where(eq(facilitatedLearningSessions.id,room.id));
+      await recordRoomAuditAndEvent(tx,{
+        actorPersonId:host.actor.actorPersonId!,organizationId:host.organizationId,
+        eventCode:"learning.facilitated.pairing.renewed",eventType:"FacilitatedLearningPairingRenewed",
+        sessionId:room.id,payload:{pairingExpiresAt:expiresAt.toISOString()},
+      });
       return {facilitatedSessionId:room.id,pairingCode:displayCode(code),
         pairingExpiresAt:expiresAt.toISOString()};
     });
@@ -407,6 +452,11 @@ export const endFacilitatedLearningRoom = createServerFn({method:"POST"})
       await tx.update(facilitatedLearningSessions)
         .set({state:"ended",endedAt:new Date()})
         .where(eq(facilitatedLearningSessions.id,room.id));
+      await recordRoomAuditAndEvent(tx,{
+        actorPersonId:host.actor.actorPersonId!,organizationId:host.organizationId,
+        eventCode:"learning.facilitated.room.ended",eventType:"FacilitatedLearningRoomEnded",
+        sessionId:room.id,payload:{fromState:"live"},
+      });
       return {ended:true,alreadyEnded:false};
     });
   });
@@ -499,6 +549,12 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
           facilitatedLearningParticipants.courseAttemptId],
         set:{lastPairedAt:now,leftAt:null},
       });
+      await recordRoomAuditAndEvent(tx,{
+        actorPersonId:personId,organizationId:room.hostOrganizationId,
+        eventCode:"learning.facilitated.room.paired",
+        eventType:"FacilitatedLearningRoomPaired",sessionId:room.id,
+        payload:{courseAttemptId:data.courseAttemptId},
+      });
       return {facilitatedSessionId:room.id,paired:true,
         note:"Pairing records a device connection, not attendance or verified watch time."};
     });
@@ -515,6 +571,11 @@ export const leaveFacilitatedRoom = createServerFn({method:"POST"})
     if(!actor.actorPersonId)throw new AuthorizationError("authenticated learner");
     return db.transaction(async tx=>{
       await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId,true);
+      const [room]=await tx.select({
+        hostOrganizationId:facilitatedLearningSessions.hostOrganizationId,
+      }).from(facilitatedLearningSessions)
+        .where(eq(facilitatedLearningSessions.id,data.facilitatedSessionId)).limit(1);
+      if(!room)return {left:false};
       const [saved]=await tx.update(facilitatedLearningParticipants).set({leftAt:new Date()})
         .where(and(
           eq(facilitatedLearningParticipants.facilitatedSessionId,data.facilitatedSessionId),
@@ -522,6 +583,13 @@ export const leaveFacilitatedRoom = createServerFn({method:"POST"})
           eq(facilitatedLearningParticipants.participantPersonId,actor.actorPersonId!),
           isNull(facilitatedLearningParticipants.leftAt),
         )).returning({id:facilitatedLearningParticipants.id});
+      if(saved)await recordRoomAuditAndEvent(tx,{
+        actorPersonId:actor.actorPersonId!,organizationId:room.hostOrganizationId,
+        eventCode:"learning.facilitated.room.left",
+        eventType:"FacilitatedLearningRoomLeft",
+        sessionId:data.facilitatedSessionId,
+        payload:{courseAttemptId:data.courseAttemptId},
+      });
       return {left:!!saved};
     });
   });
