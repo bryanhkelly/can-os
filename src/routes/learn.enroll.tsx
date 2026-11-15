@@ -14,6 +14,8 @@ export const Route=createFileRoute("/learn/enroll")({
     release:typeof search.release==="string"&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.release)
       ?search.release:undefined,
+    ref:typeof search.ref==="string"&&/^[a-zA-Z0-9_-]{1,64}$/.test(search.ref)
+      ?search.ref:undefined,
   }),
   component:PublicSelfEnrollment,
 });
@@ -36,7 +38,10 @@ function PublicSelfEnrollment() {
   const selected=catalog.data?.find(item=>item.id===search.release);
   useEffect(()=>{setAccepted(false);setAdult(false);setMessage("");setEnrolled(null);},[search.release]);
 
-  const returnTo="/learn/enroll"+(selected?"?release="+encodeURIComponent(selected.id):"");
+  const searchParams=new URLSearchParams();
+  if(selected)searchParams.set("release",selected.id);
+  if(search.ref)searchParams.set("ref",search.ref);
+  const returnTo="/learn/enroll"+(searchParams.size?"?"+searchParams.toString():"");
   async function submit() {
     if(!selected||!accepted||!adult||busy||!session?.authenticated)return;
     setBusy(true);setMessage("");
@@ -44,6 +49,7 @@ function PublicSelfEnrollment() {
       const result=await enrollMyselfInNoncredit({data:{
         releaseId:selected.id,consentVersion:selected.consentVersion,
         consentSha256:selected.consentSha256,acceptedConsent:true,adultConfirmed:true,
+        ...(search.ref?{referralCode:search.ref}:{}),
       }});
       setEnrolled(result);
       setMessage(result.alreadyEnrolled?"You are already registered for this course.":
@@ -71,7 +77,7 @@ function PublicSelfEnrollment() {
           {catalog.data && catalog.data.length>0 && <div className="mt-4">
             <label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</label>
             <select id="noncredit-release" value={search.release??""}
-              onChange={event=>void router.navigate({to:"/learn/enroll",search:{release:event.target.value||undefined}})}
+              onChange={event=>void router.navigate({to:"/learn/enroll",search:{release:event.target.value||undefined,ref:search.ref}})}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose a training</option>
               {catalog.data.map(item=><option key={item.id} value={item.id}>
@@ -80,7 +86,7 @@ function PublicSelfEnrollment() {
             </select>
             {!selected && <div className="mt-4 grid gap-2">
               {catalog.data.map(item=><button type="button" key={item.id}
-                onClick={()=>void router.navigate({to:"/learn/enroll",search:{release:item.id}})}
+                onClick={()=>void router.navigate({to:"/learn/enroll",search:{release:item.id,ref:search.ref}})}
                 className="border border-border bg-background p-4 text-left focus-visible:outline-2 focus-visible:outline-primary">
                 <strong className="block text-sm">{item.title}</strong>
                 <span className="mt-2 block text-xs text-muted-foreground">{item.provider} · {item.deliveryMode==="facilitated"?"Facilitated at "+(item.siteName??"approved Site"):"Learn independently"}</span>
