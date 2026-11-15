@@ -464,5 +464,7 @@ test("companion without a verified course attempt exposes no room information", 
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("alert")).toContainText("Join with a current facilitator code first.");
     await expect(page.getByText("Connected to facilitated learning")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "How was your session?" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /out of 5:/ })).toHaveCount(0);
   });
 });
