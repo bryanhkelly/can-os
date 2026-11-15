@@ -18,7 +18,7 @@ export class AccessInfrastructureError extends Error {
 
 /** Never log raw authentication errors: drivers may include credentials or SQL values. */
 export function logAuthenticationUnavailable(
-  stage: "admission" | "verification" | "rejection_audit" | "email_request",
+  stage: "admission" | "verification" | "rejection_audit" | "email_request" | "personal_registration",
   error?: unknown,
 ) {
   console.error("Authentication temporarily unavailable", {
