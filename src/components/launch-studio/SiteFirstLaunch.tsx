@@ -58,7 +58,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
     try {
       const saved=await siteMutation.submit({data:{
         organizationId,name,slug:suggestedLaunchSlug(name)||"learning-site",timezone,
-        stubOnly:true,planningLocation:{city,state},
+        stubOnly:false,planningLocation:{city,state},
       }});
       if(saved.status==="ignored")return;
       setSiteId(saved.value.siteId);
