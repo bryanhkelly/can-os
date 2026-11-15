@@ -285,7 +285,7 @@ async function currentRoomMediaAudience(
       eq(facilitatedLearningParticipants.facilitatedSessionId, room.id),
       isNull(facilitatedLearningParticipants.leftAt),
     )).limit(501);
-  if (!paired.length || paired.length > 500)
+  if (paired.length > 500)
     throw new AuthorizationError("bounded active room audience required for media");
   const now = new Date();
   const eligibleAdoptions = new Map<string, typeof learnerCourseAttempts.$inferSelect>();
@@ -374,6 +374,10 @@ export const getFacilitatedRoomMedia = createServerFn({method:"GET"})
       )).where(eq(trackLessonPresentations.courseVersionId,room.courseVersionId))
         .orderBy(asc(courseLessons.lessonOrder)).limit(25);
       const audience = await currentRoomMediaAudience(tx, room);
+      if (!audience.length) return {
+        facilitatedSessionId:room.id, media:[] as typeof candidates, truncated:false,
+        note:"Ask at least one eligible learner to pair a device before playing shared-screen instruction.",
+      };
       const approved:typeof candidates=[];
       for(const candidate of candidates){
         try {
@@ -408,6 +412,7 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
         tx,room.courseVersionId,data.lessonId,data.assetVersionId,
       );
       const audience = await currentRoomMediaAudience(tx, room);
+      if (!audience.length) throw new AuthorizationError("paired current learner required for playback");
       await assertRoomMediaRightsForAudience(
         tx, audience, trackVersionId, data.lessonId, data.assetVersionId,
       );
@@ -636,6 +641,7 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
         tx,room.courseVersionId,data.lessonId,data.assetVersionId,
       );
       const audience = await currentRoomMediaAudience(tx, room);
+      if (!audience.length) throw new AuthorizationError("paired current learner required for playback");
       await assertRoomMediaRightsForAudience(
         tx, audience, trackVersionId, data.lessonId, data.assetVersionId,
       );
