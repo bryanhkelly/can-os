@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import {
   closeNoncreditSelfEnrollment,getNoncreditEnrollmentPublisher,
-  publishNoncreditSelfEnrollment,
+  publishNoncreditSelfEnrollment,publishNoncreditAcrossAuthorizedSites,
 } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditReleaseOperations";
@@ -29,6 +29,7 @@ function NoncreditPublicationPage(){
   const [choice,setChoice]=useState("");
   const [deliveryMode,setDeliveryMode]=useState<"independent"|"facilitated">("independent");
   const [siteId,setSiteId]=useState("");
+  const [additionalSites,setAdditionalSites]=useState<string[]>([]);
   const [opensAt,setOpensAt]=useState("");
   const [closesAt,setClosesAt]=useState("");
   const [maxParticipants,setMaxParticipants]=useState("");
@@ -39,22 +40,32 @@ function NoncreditPublicationPage(){
   const [created,setCreated]=useState("");
   const [managedRelease,setManagedRelease]=useState<string|null>(null);
   const selected=query.data?.candidates.find(item=>candidateKey(item)===choice);
-  const valid=selected&&opensAt&&closesAt&&maxParticipants&&consentVersion.trim().length>=3&&
+  const valid=selected&&opensAt&&closesAt&&maxParticipants&&additionalSites.length<=49&&consentVersion.trim().length>=3&&
     consentText.trim().length>=25&&(deliveryMode==="independent"||siteId);
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();if(!selected||!valid||busy)return;
     setBusy(true);setMessage("");setCreated("");
     try{
-      const result=await publishNoncreditSelfEnrollment({data:{
+      const base={
         deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
         trainingVersionId:selected.trainingVersionId,courseVersionId:selected.courseVersionId,
-        deliveryMode,siteId:deliveryMode==="facilitated"?siteId:null,
         opensAt:new Date(opensAt).toISOString(),closesAt:new Date(closesAt).toISOString(),
         maxParticipants:Number(maxParticipants),consentVersion:consentVersion.trim(),
         consentText:consentText.trim(),
-      }});
-      setCreated(result.releaseId);
-      setMessage("Enrollment release published. It will appear to learners only inside its published registration window.");
+      };
+      if(deliveryMode==="facilitated"&&additionalSites.length){
+        const result=await publishNoncreditAcrossAuthorizedSites({data:{
+          ...base,siteIds:[siteId,...additionalSites],
+        }});
+        setCreated(result.releases[0]?.releaseId??"");
+        setMessage(result.releases.length+" independently authorized Site releases published. Each Site has its own capacity and cohort sessions.");
+      }else{
+        const result=await publishNoncreditSelfEnrollment({data:{
+          ...base,deliveryMode,siteId:deliveryMode==="facilitated"?siteId:null,
+        }});
+        setCreated(result.releaseId);
+        setMessage("Enrollment release published. It will appear to learners only inside its published registration window.");
+      }
       await client.invalidateQueries({queryKey:["noncredit-publisher-releases"]});
       await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
     }catch(error){setMessage(normalizeClientError(error,
@@ -95,7 +106,7 @@ function NoncreditPublicationPage(){
           <div>
             <label htmlFor="nc-candidate" className="block text-sm font-semibold">Approved training / deployment</label>
             <select id="nc-candidate" required value={choice}
-              onChange={event=>{setChoice(event.target.value);setSiteId("");}}
+              onChange={event=>{setChoice(event.target.value);setSiteId("");setAdditionalSites([]);}}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose an approved program release</option>
               {query.data.candidates.map(item=><option key={candidateKey(item)} value={candidateKey(item)}>
@@ -107,7 +118,7 @@ function NoncreditPublicationPage(){
             <legend className="text-sm font-semibold">Delivery mode</legend>
             <div className="flex flex-wrap gap-4 text-sm">
               <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
-                checked={deliveryMode==="independent"} onChange={()=>{setDeliveryMode("independent");setSiteId("");}}/>
+                checked={deliveryMode==="independent"} onChange={()=>{setDeliveryMode("independent");setSiteId("");setAdditionalSites([]);}}/>
                 Independent / online
               </label>
               <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
@@ -118,7 +129,7 @@ function NoncreditPublicationPage(){
           </fieldset>
           {deliveryMode==="facilitated"&&<div>
             <label htmlFor="nc-site" className="block text-sm font-semibold">Authorized hosting Site</label>
-            <select id="nc-site" required value={siteId} onChange={event=>setSiteId(event.target.value)}
+            <select id="nc-site" required value={siteId} onChange={event=>{setSiteId(event.target.value);setAdditionalSites([]);}}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose a deployment Site</option>
               {selected?.siteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
@@ -126,6 +137,20 @@ function NoncreditPublicationPage(){
             {!selected?.siteOptions.length&&<p className="mt-2 text-xs text-muted-foreground">
               This deployment has no currently authorized hosting Site in your scope.
             </p>}
+            {siteId&&selected?.siteOptions.some(site=>site.id!==siteId)&&
+              <fieldset className="mt-4 border border-border p-3">
+                <legend className="text-sm font-semibold">Additional authorized delivery Sites</legend>
+                <p className="mb-3 text-xs text-muted-foreground">Every selected location gets its own approved registration release, seats and classroom calendar. This does not add new Site permissions.</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {selected.siteOptions.filter(site=>site.id!==siteId).map(site=>
+                    <label key={site.id} className="flex items-center gap-2 text-sm">
+                      <input type="checkbox" checked={additionalSites.includes(site.id)}
+                        onChange={event=>setAdditionalSites(current=>
+                          event.target.checked?[...current,site.id]:current.filter(id=>id!==site.id))}/>
+                      {site.name}
+                    </label>)}
+                </div>
+              </fieldset>}
           </div>}
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold">Registration opens
@@ -157,7 +182,7 @@ function NoncreditPublicationPage(){
             Publication is immediate when the window is open. You can close a release, but changing
             its terms, delivery, course or capacity requires a new release.
           </p>
-          <Button type="submit" disabled={!valid||busy}>{busy?"Publishing…":"Publish self-enrollment"}</Button>
+          <Button type="submit" disabled={!valid||busy}>{busy?"Publishing…":additionalSites.length?"Publish at selected Sites":"Publish self-enrollment"}</Button>
         </form>}
         {message&&<p role="status" className="mt-4 border border-border bg-muted/20 p-4 text-sm">{message}</p>}
         {created&&<Link to="/learn/enroll" search={{release:created}}

@@ -1,7 +1,7 @@
 import { alias } from "drizzle-orm/pg-core";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, exists, gt, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
+import { and, asc, eq, exists, gt, inArray, isNotNull, isNull, lte, notExists, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -244,5 +244,104 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
         payload:{closed:true},
       });
       return {closed:true};
+    });
+  });
+
+/** A current operating organization may publish the SAME approved training
+ * at several of its OWN currently authorized deployment Sites. This does
+ * not appoint a network role, approve a Site, or authorize a different
+ * independent host organization. Each Site keeps its own release, seats
+ * and learner records.
+ */
+const multiSitePublishInput=z.object({
+  deploymentId:z.string().uuid(),adoptionId:z.string().uuid(),
+  trainingVersionId:z.string().uuid(),courseVersionId:z.string().uuid(),
+  siteIds:z.array(z.string().uuid()).min(2).max(50),
+  opensAt:z.string().datetime({offset:true}),
+  closesAt:z.string().datetime({offset:true}),
+  maxParticipants:z.number().int().min(1).max(1000000),
+  consentVersion:z.string().trim().min(3).max(80),
+  consentText:z.string().trim().min(25).max(4000),
+}).strict().refine(x=>new Date(x.opensAt)<new Date(x.closesAt),{
+  message:"Registration closing must follow opening",
+});
+
+export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"})
+  .validator((v:unknown)=>multiSitePublishInput.parse(v))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const provider=await requireCanonicalLabProvider();
+    if(new Date(data.closesAt)<=new Date())
+      throw new AuthorizationError("future registration closing");
+    const ids=[...new Set(data.siteIds)];
+    if(ids.length!==data.siteIds.length)
+      throw new AuthorizationError("unique authorized hosting Sites");
+    return db.transaction(async tx=>{
+      // Serialize equivalent launches from this operating organization.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"noncredit-multisite:"+provider.organizationId+":"+data.deploymentId}))`);
+      const candidates=await listReleaseCandidates(provider,tx);
+      const selected=candidates.find(row=>
+        row.deploymentId===data.deploymentId &&
+        row.adoptionId===data.adoptionId &&
+        row.trainingVersionId===data.trainingVersionId &&
+        row.courseVersionId===data.courseVersionId);
+      if(!selected || !ids.every(siteId=>
+        selected.siteOptions.some(option=>option.id===siteId)))
+        throw new AuthorizationError("approved training at each authorized host Site");
+      const released:{siteId:string;releaseId:string;alreadyPublished:boolean}[]=[];
+      for(const siteId of ids){
+        const existing=await tx.select().from(noncreditSelfEnrollmentReleases)
+          .where(and(
+            eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
+            eq(noncreditSelfEnrollmentReleases.deploymentId,selected.deploymentId),
+            eq(noncreditSelfEnrollmentReleases.trainingVersionId,selected.trainingVersionId),
+            eq(noncreditSelfEnrollmentReleases.adoptionId,selected.adoptionId),
+            eq(noncreditSelfEnrollmentReleases.courseVersionId,selected.courseVersionId),
+            eq(noncreditSelfEnrollmentReleases.siteId,siteId),
+            eq(noncreditSelfEnrollmentReleases.opensAt,new Date(data.opensAt)),
+          )).limit(1);
+        if(existing.length){
+          const prior=existing[0]!;
+          if(prior.closesAt.getTime()!==new Date(data.closesAt).getTime()||
+            prior.maxParticipants!==data.maxParticipants||
+            prior.consentVersion!==data.consentVersion||
+            prior.consentText!==data.consentText||
+            prior.status!=="published")
+            throw new AuthorizationError("existing cohort differs; close and create a new registration window");
+          released.push({siteId,releaseId:prior.id,alreadyPublished:true});
+          continue;
+        }
+        const [row]=await tx.insert(noncreditSelfEnrollmentReleases).values({
+          deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
+          trainingVersionId:selected.trainingVersionId,
+          courseVersionId:selected.courseVersionId,
+          offeringVersionId:selected.offeringVersionId,
+          providerOrganizationId:selected.providerOrganizationId,
+          registeringOrganizationId:provider.organizationId,
+          siteId,deliveryMode:"facilitated",status:"published",
+          opensAt:new Date(data.opensAt),closesAt:new Date(data.closesAt),
+          maxParticipants:data.maxParticipants,
+          consentVersion:data.consentVersion,consentText:data.consentText,
+          publishedByPersonId:provider.actor.actorPersonId!,
+        }).returning({id:noncreditSelfEnrollmentReleases.id});
+        if(!row)throw new Error("Could not publish Site cohort");
+        const payload={siteId,releaseId:row.id,
+          consentSha256:publishedNoncreditConsentHash(data.consentVersion,data.consentText),
+          trainingVersionId:selected.trainingVersionId};
+        await tx.insert(canonicalAuditEvents).values({
+          actorPersonId:provider.actor.actorPersonId!,
+          owningOrganizationId:provider.organizationId,
+          eventCode:"noncredit.self_enrollment.site_release_published",
+          entityKind:"noncredit_self_enrollment_release",entityId:row.id,payload,
+        });
+        await tx.insert(canonicalDomainEvents).values({
+          eventType:"NoncreditSiteEnrollmentReleasePublished",
+          aggregateType:"noncredit_self_enrollment_release",
+          aggregateId:row.id,actorPersonId:provider.actor.actorPersonId!,
+          payload,
+        });
+        released.push({siteId,releaseId:row.id,alreadyPublished:false});
+      }
+      return {releases:released};
     });
   });
