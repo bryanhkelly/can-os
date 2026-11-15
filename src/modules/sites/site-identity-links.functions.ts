@@ -349,9 +349,11 @@ export const verifyCANStaffCanonicalPrincipal = createServerFn({ method: "POST" 
         email: accessAccounts.emailNormalized,
       }).from(accessAccounts)
         .where(eq(accessAccounts.id, data.publicAccountId)).limit(1);
-      if (!account || account.disabled ||
-          (!account.verifiedAt && !isDemoAccountEmail(account.email))) {
-        throw new AuthorizationError("verified target CAN staff account");
+      // Shared-code demo accounts are public synthetic personas; they cannot
+      // establish a verified human identity for privileged canonical SSO.
+      if (!account || account.disabled || !account.verifiedAt ||
+          isDemoAccountEmail(account.email)) {
+        throw new AuthorizationError("verified non-demo CAN staff account");
       }
 
       const activeGrants = await tx.select({
