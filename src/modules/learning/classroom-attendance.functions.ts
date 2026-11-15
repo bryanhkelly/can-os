@@ -5,6 +5,8 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   auditEvents, classroomPersons, domainEvents, enrollments,
+  facilitatedClassroomPlans, noncreditSelfEnrollmentClaims,
+  noncreditSelfEnrollmentReleases,
   facilitatedLearningParticipants, facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
 } from "@/db/canonical-v301";
@@ -32,7 +34,44 @@ function guard(){
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
 }
-export async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:string){
+/** A room with an assigned noncredit release is NOT a generic Course/Site
+ * classroom: other releases at the same Site remain separate cohorts. */
+export async function classroomRoomReleaseScope(tx:Tx, room:Room):Promise<string|null>{
+  const [plan]=await tx.select({
+    releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
+    state:facilitatedClassroomPlans.state,
+    deploymentId:facilitatedClassroomPlans.deploymentId,
+    courseVersionId:facilitatedClassroomPlans.courseVersionId,
+    siteId:facilitatedClassroomPlans.siteId,
+    hostOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
+  }).from(facilitatedClassroomPlans).where(
+    eq(facilitatedClassroomPlans.facilitatedSessionId,room.id),
+  ).limit(1);
+  if(!plan)return null;
+  if(plan.state!=="started" || plan.deploymentId!==room.deploymentId ||
+     plan.courseVersionId!==room.courseVersionId ||
+     plan.siteId!==room.siteId ||
+     plan.hostOrganizationId!==room.hostOrganizationId)
+    throw new AuthorizationError("current matching classroom schedule");
+  if(!plan.releaseId)return null;
+  const [release]=await tx.select({id:noncreditSelfEnrollmentReleases.id})
+    .from(noncreditSelfEnrollmentReleases).where(and(
+      eq(noncreditSelfEnrollmentReleases.id,plan.releaseId),
+      eq(noncreditSelfEnrollmentReleases.deploymentId,room.deploymentId),
+      eq(noncreditSelfEnrollmentReleases.courseVersionId,room.courseVersionId),
+      eq(noncreditSelfEnrollmentReleases.siteId,room.siteId),
+      eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,room.hostOrganizationId),
+      eq(noncreditSelfEnrollmentReleases.deliveryMode,"facilitated"),
+    )).limit(1);
+  if(!release)throw new AuthorizationError("valid Site enrollment release for classroom");
+  return release.id;
+}
+
+export async function registeredRoomParticipant(
+  tx:Tx,room:Room,courseAttemptId:string, releaseScope?:string|null,
+){
+  const releaseId=releaseScope===undefined
+    ? await classroomRoomReleaseScope(tx,room):releaseScope;
   const [attempt]=await tx.select().from(learnerCourseAttempts).where(and(
     eq(learnerCourseAttempts.id,courseAttemptId),
     eq(learnerCourseAttempts.deploymentId,room.deploymentId),
@@ -42,6 +81,7 @@ export async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:
   if(!attempt||Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId))
     throw new AuthorizationError("current registered classroom Course attempt");
   if(attempt.enrollmentId){
+    if(releaseId)throw new AuthorizationError("noncredit enrollment release participant");
     const [school]=await tx.select({
       personId:learnerProfiles.personId,
     }).from(enrollments).innerJoin(learnerProfiles,
@@ -69,6 +109,16 @@ export async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:
   if(!registration||!await selfEnrolledNoncreditRoomSitePermitted(tx,{
     source:"noncredit",noncreditRegistrationId:registration.registrationId,
   },room.siteId))throw new AuthorizationError("active noncredit registration for Site");
+  if(releaseId){
+    const [claim]=await tx.select({id:noncreditSelfEnrollmentClaims.id})
+      .from(noncreditSelfEnrollmentClaims).where(and(
+        eq(noncreditSelfEnrollmentClaims.releaseId,releaseId),
+        eq(noncreditSelfEnrollmentClaims.registrationId,registration.registrationId),
+        eq(noncreditSelfEnrollmentClaims.participantPersonId,registration.personId),
+        eq(noncreditSelfEnrollmentClaims.siteId,room.siteId),
+      )).limit(1);
+    if(!claim)throw new AuthorizationError("participant of this specific enrollment release");
+  }
   return {personId:registration.personId,source:"noncredit" as const};
 }
 export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
@@ -77,40 +127,62 @@ export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
-      const attempts=await tx.select({id:learnerCourseAttempts.id})
-        .from(learnerCourseAttempts).where(and(
-          eq(learnerCourseAttempts.deploymentId,room.deploymentId),
-          eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
-          eq(learnerCourseAttempts.status,"active"),
-        )).limit(301);
+      const releaseScope=await classroomRoomReleaseScope(tx,room);
+      // Scope the SQL BEFORE LIMIT: other cohorts must not crowd out this roster.
+      const attempts=releaseScope
+        ? await tx.select({id:learnerCourseAttempts.id})
+            .from(learnerCourseAttempts)
+            .innerJoin(noncreditRegistrations,eq(
+              noncreditRegistrations.id,learnerCourseAttempts.noncreditRegistrationId,
+            ))
+            .innerJoin(noncreditSelfEnrollmentClaims,and(
+              eq(noncreditSelfEnrollmentClaims.registrationId,noncreditRegistrations.id),
+              eq(noncreditSelfEnrollmentClaims.releaseId,releaseScope),
+              eq(noncreditSelfEnrollmentClaims.participantPersonId,
+                noncreditRegistrations.participantPersonId),
+              eq(noncreditSelfEnrollmentClaims.siteId,room.siteId),
+            ))
+            .where(and(
+              eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+              eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+              eq(learnerCourseAttempts.status,"active"),
+              inArray(noncreditRegistrations.status,["registered","active"]),
+            )).limit(301)
+        : await tx.select({id:learnerCourseAttempts.id})
+            .from(learnerCourseAttempts).where(and(
+              eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+              eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+              eq(learnerCourseAttempts.status,"active"),
+            )).limit(301);
       const eligible:{id:string;personId:string;source:"school"|"noncredit"}[]=[];
       for(const attempt of attempts.slice(0,300)){
         try {
-          const person=await registeredRoomParticipant(tx,room,attempt.id);
+          const person=await registeredRoomParticipant(tx,room,attempt.id,releaseScope);
           eligible.push({id:attempt.id,...person});
         }catch(error) {
           if(!(error instanceof AuthorizationError))throw error;
         }
       }
       const ids=eligible.map(x=>x.id);
-      const [pairs,attestations,persons]=await Promise.all([
-        ids.length?tx.select({
-          attemptId:facilitatedLearningParticipants.courseAttemptId,
-        }).from(facilitatedLearningParticipants).where(and(
-          eq(facilitatedLearningParticipants.facilitatedSessionId,room.id),
-          inArray(facilitatedLearningParticipants.courseAttemptId,ids),
-          isNull(facilitatedLearningParticipants.leftAt),
-        )):Promise.resolve([]),
-        tx.select().from(facilitatedRoomAttendanceAssertions)
-          .where(eq(facilitatedRoomAttendanceAssertions.facilitatedSessionId,room.id))
-          .orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
-            desc(facilitatedRoomAttendanceAssertions.id)).limit(1001),
-        eligible.length?tx.select({
-          id:classroomPersons.id,first:classroomPersons.legalFirstName,
-          last:classroomPersons.legalLastName,preferred:classroomPersons.preferredName,
-        }).from(classroomPersons).where(inArray(classroomPersons.id,eligible.map(x=>x.personId)))
-        :Promise.resolve([]),
-      ]);
+      // One Neon transaction connection cannot execute concurrent queries.
+      const pairs=ids.length?await tx.select({
+        attemptId:facilitatedLearningParticipants.courseAttemptId,
+      }).from(facilitatedLearningParticipants).where(and(
+        eq(facilitatedLearningParticipants.facilitatedSessionId,room.id),
+        inArray(facilitatedLearningParticipants.courseAttemptId,ids),
+        isNull(facilitatedLearningParticipants.leftAt),
+      )):[];
+      const attestations=await tx.select()
+        .from(facilitatedRoomAttendanceAssertions)
+        .where(eq(facilitatedRoomAttendanceAssertions.facilitatedSessionId,room.id))
+        .orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
+          desc(facilitatedRoomAttendanceAssertions.id)).limit(1001);
+      const persons=eligible.length?await tx.select({
+        id:classroomPersons.id,first:classroomPersons.legalFirstName,
+        last:classroomPersons.legalLastName,preferred:classroomPersons.preferredName,
+      }).from(classroomPersons).where(inArray(
+        classroomPersons.id,eligible.map(x=>x.personId),
+      )):[];
       const paired=new Set(pairs.map(x=>x.attemptId));
       const name=new Map(persons.map(x=>[x.id,
         [x.preferred||x.first,x.last].filter(Boolean).join(" ").trim(),
