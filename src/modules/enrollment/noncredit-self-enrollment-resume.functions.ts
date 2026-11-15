@@ -12,9 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
-import {
-  issueNativeLearnerSession, requireVerifiedAdultAccount,
-} from "./noncredit-self-enrollment.functions";
+import { issueNativeLearnerSession } from "./noncredit-self-enrollment.functions";
 
 /** Native session renewal is only for this verified Person's existing live
  * noncredit Course attempt. A registration reference from another account or
@@ -25,6 +23,7 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
   }).strict().parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure learning access is temporarily unavailable");
