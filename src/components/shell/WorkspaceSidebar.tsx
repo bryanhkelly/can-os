@@ -46,8 +46,8 @@ function FocusedWorkspaceSidebar({ links, activePath, institutionSelection, expa
       <div id="classroom-primary-links" className="flex min-h-0 flex-1 flex-col">
         <SidebarLinks links={links} activePath={activePath} collapsed={!expanded} institutionSelection={institutionSelection}/>
       </div>
-      <Link to="/account/sessions" aria-label="Account sessions" title="Account sessions" className="flex justify-center border-t p-4 text-muted-foreground">
-        <Settings className="size-4" aria-hidden="true"/><span className="sr-only">Account sessions</span>
+      <Link to="/account/" aria-label="My CAN account" title="Account sessions" className="flex justify-center border-t p-4 text-muted-foreground">
+        <Settings className="size-4" aria-hidden="true"/><span className="sr-only">My CAN account</span>
       </Link>
     </aside>
     <Modal open={expanded && mobile} onClose={() => onToggle?.()} label="Workspace navigation"
@@ -82,6 +82,9 @@ function ExpandedWorkspaceSidebar({ member, links, activePath, institutionSelect
       <SidebarLinks links={links} activePath={activePath} collapsed={collapsed} institutionSelection={institutionSelection} />
     </div>
     <div className="mt-auto border-t p-4">
+      <Link to="/account/" {...footer("My CAN account")}>
+        <Users className="size-4" aria-hidden="true" /><span className={collapsed ? "sr-only" : "font-semibold"}>My CAN</span>
+      </Link>
       <Link to="/profiles" {...footer("My profile")}>
         <Users className="size-4" aria-hidden="true" /><span className={collapsed ? "sr-only" : "font-semibold"}>My profile</span>
       </Link>
