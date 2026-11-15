@@ -2,6 +2,9 @@ import { getRequest } from "@tanstack/react-start/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, people } from "@/db/schema";
+import { canonicalSessions } from "@/db/canonical-v301";
+import { canonicalSessionCookie } from "@/domain/canonical-access";
+import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -40,3 +43,22 @@ export async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollm
     emailVerifiedAt:account.verified};
 }
 
+
+const NATIVE_SESSION_SECONDS = 12 * 60 * 60;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/** Only the server may issue a privileged native learning session cookie. */
+export async function issueNativeLearnerSession(tx:Tx, accountId:string, grantId:string, now:Date) {
+  const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
+  if(!pepper||pepper.length<32)
+    throw new Error("Native learning session is temporarily unavailable");
+  const token=issueOpaqueSecret();
+  const [session]=await tx.insert(canonicalSessions).values({
+    accountId,activeGrantId:grantId,
+    secretHash:hashAccessSecret(token,pepper),
+    expiresAt:new Date(now.getTime()+NATIVE_SESSION_SECONDS*1000),
+    lastActivityAt:now,
+  }).returning({id:canonicalSessions.id});
+  if(!session)throw new Error("Could not start verified learning session");
+  return `${canonicalSessionCookie}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${NATIVE_SESSION_SECONDS}`;
+}
