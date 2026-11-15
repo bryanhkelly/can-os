@@ -19,3 +19,9 @@ export * from "./credentials";
 
 export * from "./device-operations";
 export * from "./self-enrollment";
+
+export * from "./classroom-offering-courses";
+export * from "./classroom-persons";
+export * from "./classroom-projector-controls";
+export * from "./classroom-rehearsal";
+export * from "./facilitated-room-evidence";
