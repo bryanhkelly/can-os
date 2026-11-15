@@ -61,7 +61,7 @@ function NoncreditPublicationPage(){
         setMessage(result.releases.length+" independently authorized Site releases published. Each Site has its own capacity and cohort sessions.");
       }else{
         const result=await publishNoncreditSelfEnrollment({data:{
-          ...base,deliveryMode,siteId:deliveryMode==="facilitated"?siteId:null,
+          ...base,deliveryMode,siteId:siteId||null,
         }});
         setCreated(result.releaseId);
         setMessage("Enrollment release published. It will appear to learners only inside its published registration window.");
@@ -122,11 +122,21 @@ function NoncreditPublicationPage(){
                 Independent / online
               </label>
               <label className="flex items-center gap-2"><input type="radio" name="nc-delivery"
-                checked={deliveryMode==="facilitated"} onChange={()=>setDeliveryMode("facilitated")}/>
+                checked={deliveryMode==="facilitated"} onChange={()=>{setDeliveryMode("facilitated");setSiteId("");setAdditionalSites([]);}}/>
                 Facilitated at a Site
               </label>
             </div>
           </fieldset>
+          {deliveryMode==="independent"&&<div>
+            <label htmlFor="nc-online-site" className="block text-sm font-semibold">Present this online course on a Site website (optional)</label>
+            <select id="nc-online-site" value={siteId} onChange={event=>setSiteId(event.target.value)}
+              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              <option value="">No specific Site · provider-wide online offering</option>
+              {selected?.digitalSiteOptions.map(site=>
+                <option key={site.id} value={site.id}>{site.name}</option>)}
+            </select>
+            <p className="mt-2 text-xs text-muted-foreground">A virtual or physical Site may present an online offering. This does not turn it into facilitated classroom instruction. Only current authorized Site relationships are available.</p>
+          </div>}
           {deliveryMode==="facilitated"&&<div>
             <label htmlFor="nc-site" className="block text-sm font-semibold">Authorized hosting Site</label>
             <select id="nc-site" required value={siteId} onChange={event=>{setSiteId(event.target.value);setAdditionalSites([]);}}
