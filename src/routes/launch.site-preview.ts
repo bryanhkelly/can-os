@@ -10,7 +10,7 @@ import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.s
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/sites/site-local-content.server";
-import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalContent, siteLocalImagePublicationGaps } from "@/domain/site-local-content";
+import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
 import { renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
@@ -58,7 +58,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           readLocalContentHistory(site.id),
         ]);
         const stored=history[0]?.content ?? published?.content;
-        const copy=stored ? normalizeSiteLocalContent(stored,{allowIncompleteImage:true}) : {
+        const copy:SiteLocalContent=stored ? normalizeSiteLocalContent(stored,{allowIncompleteImage:true}) : {
           ...emptySiteLocalContent,
           heroHeadline:"A place to learn. A community to grow.",
           welcomeMessage:"Explore what this learning community could offer.",
