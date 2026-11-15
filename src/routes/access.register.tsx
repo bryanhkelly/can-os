@@ -48,6 +48,7 @@ function RegisterPersonalAccount() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [adultConfirmed, setAdultConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const hydrated = useHydrated();
@@ -58,7 +59,7 @@ function RegisterPersonalAccount() {
       const response = await fetch("/access/register", {
         method: "POST", credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ firstName, lastName, email,
+        body: JSON.stringify({ firstName, lastName, email, adultConfirmed,
           ...(returnTo ? { returnTo } : {}) }),
       });
       if (response.status === 429) setMessage("Too many requests. Please try again later.");
@@ -80,6 +81,12 @@ function RegisterPersonalAccount() {
         </div>
         <Field label="Email address" required><Input name="email" type="email" autoComplete="email"
           required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} /></Field>
+        <label className="flex items-start gap-3 text-sm leading-6">
+          <input type="checkbox" required checked={adultConfirmed}
+            onChange={event => setAdultConfirmed(event.target.checked)}
+            className="mt-1 size-4 accent-primary"/>
+          I am at least 18 years old. Student accounts for minors are set up through an authorized school or guardian.
+        </label>
         <p className="text-sm leading-6 text-muted-foreground">We'll email you a single-use link. Your details stay in CAN OS; joining a participating organization requires a separate registration or invitation.</p>
         <Button type="submit" disabled={!hydrated || busy} className="w-full">
           {busy ? "Sending verification…" : "Continue with email"}
