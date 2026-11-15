@@ -26,6 +26,8 @@ export type AccessContext = CommandContext & {
 
 /** Capability mapping is centralized; domain-specific relationship checks are still required. */
 const baseRoleCapabilities = {
+ // Account-wide identity only: zero Site, enrollment, student, staff or admin capabilities.
+ account_holder: [],
  // Course-content roles are provider scoped and receive no learner-record powers.
  academic_content_creator: ["instructional_track.author"],
  academic_content_reviewer: ["instructional_track.review", "instructional_track.publish", "instructional_track.withdraw"],
