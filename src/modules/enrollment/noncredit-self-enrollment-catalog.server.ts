@@ -1,10 +1,11 @@
 import { alias } from "drizzle-orm/pg-core";
-import { and, count, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, count, eq, exists, gt, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalEnrollmentOrganizations, canonicalEnrollmentSites,
   canonicalOfferingCourses, courseVersions, courses, deploymentOfferingAdoptions,
   educationOperationOrganizationRoles, educationOperations,
+  operationalAuthorizationDecisions,
   noncreditCompletionPolicies, noncreditSelfEnrollmentClaims,
   noncreditSelfEnrollmentReleases, noncreditTrainingVersions, offeringVersions,
   offerings, programDeployments, classroomDeploymentSites, educationOperationSites,
@@ -28,6 +29,7 @@ export async function readEligibleSelfEnrollmentReleases(
   const policy = noncreditCompletionPolicies;
   const operator = educationOperationOrganizationRoles;
   const registeringOrg = alias(canonicalEnrollmentOrganizations,"self_enroll_registering_org");
+  const supersedingPermission=alias(operationalAuthorizationDecisions,"self_enroll_permission_superseding");
   const rows = await executor.select({
     id:r.id, title:noncreditTrainingVersions.title,
     requiredMinutes:noncreditTrainingVersions.requiredInstructionMinutes,
@@ -88,6 +90,20 @@ export async function readEligibleSelfEnrollmentReleases(
         eq(policy.trainingVersionId,r.trainingVersionId),
         lte(policy.effectiveAt,now),lte(policy.publishedAt,now),
       ))),
+      exists(executor.select({id:operationalAuthorizationDecisions.id})
+        .from(operationalAuthorizationDecisions).where(and(
+          eq(operationalAuthorizationDecisions.stageCode,"register_noncredit"),
+          eq(operationalAuthorizationDecisions.decision,"approved"),
+          eq(operationalAuthorizationDecisions.authorityOrganizationId,r.registeringOrganizationId),
+          or(eq(operationalAuthorizationDecisions.operationId,programDeployments.operationId),
+            eq(operationalAuthorizationDecisions.deploymentId,r.deploymentId)),
+          lte(operationalAuthorizationDecisions.validFrom,now),
+          or(isNull(operationalAuthorizationDecisions.validThrough),
+            gt(operationalAuthorizationDecisions.validThrough,now)),
+          notExists(executor.select({id:supersedingPermission.id})
+            .from(supersedingPermission)
+            .where(eq(supersedingPermission.supersedesId,operationalAuthorizationDecisions.id))),
+        ))),
       exists(executor.select({id:operator.id}).from(operator).where(and(
         eq(operator.operationId,programDeployments.operationId),
         eq(operator.organizationId,r.registeringOrganizationId),
