@@ -79,6 +79,11 @@ function MyNoncreditCourses(){
                 : "Independent online learning"}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">Registered {new Date(course.registeredAt).toLocaleDateString()}</p>
+            {course.upcomingSessions.length>0&&
+              <p className="mt-2 text-xs text-muted-foreground">
+                Next meeting: {new Date(course.upcomingSessions[0]!.startsAt).toLocaleString()}
+                {course.upcomingSessions.length>1?" · "+course.upcomingSessions.length+" upcoming meetings":""}
+              </p>}
           </div>
           <div className="flex flex-col items-start gap-3">
             {["registered","active"].includes(course.registrationStatus)&&course.attemptStatus==="active"?

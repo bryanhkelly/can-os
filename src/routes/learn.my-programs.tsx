@@ -71,6 +71,9 @@ function MyPrograms(){
             <MapPin size={14} aria-hidden="true"/>
             {item.deliveryMode==="facilitated"?item.siteName??"Approved learning center":"Independent online"}
           </p>
+          {item.upcomingSessions.length>0&&<p className="mt-2 text-xs text-muted-foreground">
+            Next meeting: {new Date(item.upcomingSessions[0]!.startsAt).toLocaleString()}
+          </p>}
           <Link to="/learn/my-courses" className="mt-4 inline-block text-sm font-semibold underline text-primary">Manage registration</Link>
         </article>)}
         {noncredit.isSuccess&&!noncredit.data?.length&&<p className="border border-border bg-card p-4 text-sm">No personal trainings yet. Browse open opportunities to get started.</p>}

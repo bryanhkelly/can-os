@@ -342,7 +342,7 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
         isNotNull(canonicalAccounts.emailVerifiedAt),
       )).limit(1);
     if(!native)return [];
-    return db.select({
+    const registrations=await db.select({
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
       registrationId:noncreditRegistrations.id,
       courseAttemptId:learnerCourseAttempts.id,
@@ -370,4 +370,23 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
         eq(noncreditSelfEnrollmentClaims.participantPersonId,link.canonicalPersonId),
         eq(noncreditRegistrations.participantPersonId,link.canonicalPersonId),
       )).orderBy(desc(noncreditRegistrations.registeredAt)).limit(100);
+    const releaseIds=[...new Set(registrations.map(r=>r.releaseId))];
+    const plans=releaseIds.length?await db.select({
+      releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
+      startsAt:canonicalDeliverySessions.startsAt,
+      endsAt:canonicalDeliverySessions.endsAt,
+    }).from(facilitatedClassroomPlans)
+      .innerJoin(canonicalDeliverySessions,eq(
+        canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
+      .where(and(
+        inArray(facilitatedClassroomPlans.enrollmentReleaseId,releaseIds),
+        inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
+      )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
+    return registrations.map(r=>({
+      ...r,upcomingSessions:plans.filter(p=>p.releaseId===r.releaseId &&
+        p.endsAt.getTime()>Date.now()).slice(0,20).map(p=>({
+          startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
+        })),
+      schedulePartial:plans.length>1000,
+    }));
   });
