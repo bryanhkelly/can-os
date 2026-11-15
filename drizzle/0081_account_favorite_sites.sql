@@ -9,7 +9,16 @@ CREATE INDEX IF NOT EXISTS access_account_favorite_sites_site_idx
   ON public.access_account_favorite_sites (site_id);
 -- Defence in depth: account ID is set only inside a verified server transaction.
 ALTER TABLE public.access_account_favorite_sites ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS account_favorites_own_only ON public.access_account_favorite_sites;
-CREATE POLICY account_favorites_own_only ON public.access_account_favorite_sites
-  USING (account_id = NULLIF(current_setting('can.account_id', true), '')::uuid)
-  WITH CHECK (account_id = NULLIF(current_setting('can.account_id', true), '')::uuid);
+DO $
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+     WHERE schemaname = 'public' AND tablename = 'access_account_favorite_sites'
+       AND policyname = 'account_favorites_own_only'
+  ) THEN
+    CREATE POLICY account_favorites_own_only ON public.access_account_favorite_sites
+      USING (account_id = NULLIF(current_setting('can.account_id', true), '')::uuid)
+      WITH CHECK (account_id = NULLIF(current_setting('can.account_id', true), '')::uuid);
+  END IF;
+END;
+$;
