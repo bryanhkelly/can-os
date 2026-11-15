@@ -170,10 +170,24 @@ SET search_path=education_v30,pg_catalog AS $self_claim_scope$
 DECLARE release_row record;
 DECLARE registration_row record;
 DECLARE linked_account record;
+DECLARE claimed_seats integer;
 BEGIN
+  -- The release row is the mutex for all registrations competing for its
+  -- capacity. A second transaction must observe the first claim's commit
+  -- before evaluating remaining seats, not trust a client-side count.
   SELECT * INTO release_row
   FROM noncredit_self_enrollment_releases
-  WHERE id=NEW.release_id;
+  WHERE id=NEW.release_id FOR UPDATE;
+  IF release_row.id IS NULL OR release_row.status <> 'published'
+     OR release_row.opens_at > clock_timestamp()
+     OR release_row.closes_at <= clock_timestamp() THEN
+    RAISE EXCEPTION 'Self-enrollment release is not open';
+  END IF;
+  SELECT count(*) INTO claimed_seats
+    FROM noncredit_self_enrollment_claims WHERE release_id=NEW.release_id;
+  IF claimed_seats >= release_row.max_participants THEN
+    RAISE EXCEPTION 'Self-enrollment release has reached capacity';
+  END IF;
   SELECT * INTO registration_row
   FROM noncredit_registrations
   WHERE id=NEW.registration_id;
@@ -184,6 +198,18 @@ BEGIN
   IF release_row.id IS NULL OR registration_row.id IS NULL
      OR linked_account.canonical_account_id IS NULL THEN
     RAISE EXCEPTION 'Self-enrollment requires a verified CAN-to-canonical principal link';
+  END IF;
+  IF NOT EXISTS(
+    SELECT 1 FROM canonical_accounts ca
+      JOIN public.access_accounts legacy ON legacy.id=linked_account.access_account_id
+    WHERE ca.id=NEW.canonical_account_id
+      AND ca.email_normalized=legacy.email_normalized
+      AND ca.email_verified_at IS NOT NULL
+      AND ca.disabled_at IS NULL
+      AND legacy.email_verified_at IS NOT NULL
+      AND legacy.disabled=false
+  ) THEN
+    RAISE EXCEPTION 'Self-enrollment identity link must have matching current verified accounts';
   END IF;
   IF NEW.participant_person_id IS DISTINCT FROM registration_row.participant_person_id
      OR NEW.site_id IS DISTINCT FROM release_row.site_id
