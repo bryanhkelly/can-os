@@ -699,11 +699,25 @@ async function selfEnrolledNoncreditRoomSitePermitted(
   roomSiteId:string,
 ):Promise<boolean> {
   if(access.source!=="noncredit"||!access.noncreditRegistrationId)return true;
-  const [claim]=await tx.select({siteId:noncreditSelfEnrollmentClaims.siteId})
-    .from(noncreditSelfEnrollmentClaims)
-    .where(eq(noncreditSelfEnrollmentClaims.registrationId,access.noncreditRegistrationId))
-    .limit(1);
-  return !claim || claim.siteId===null || claim.siteId===roomSiteId;
+  try {
+    const [claim]=await tx.select({siteId:noncreditSelfEnrollmentClaims.siteId})
+      .from(noncreditSelfEnrollmentClaims)
+      .where(eq(noncreditSelfEnrollmentClaims.registrationId,access.noncreditRegistrationId))
+      .limit(1);
+    return !claim || claim.siteId===null || claim.siteId===roomSiteId;
+  } catch(error) {
+    // Existing classroom services can be deployed before the additive
+    // enrollment migration reaches production. No self-enrollment claim
+    // can exist there yet, so preserve legacy canonical pairing behavior.
+    let cause:unknown=error;
+    for(let depth=0;depth<4 && cause && typeof cause==="object";depth++){
+      const item=cause as {code?:string;message?:string;cause?:unknown};
+      if(item.code==="42P01" && item.message?.includes("noncredit_self_enrollment_claims"))
+        return true;
+      cause=item.cause;
+    }
+    throw error;
+  }
 }
 
 export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
