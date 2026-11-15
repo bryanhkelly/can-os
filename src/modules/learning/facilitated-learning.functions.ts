@@ -270,13 +270,10 @@ async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string
  * A withdrawn/relocated paired learner blocks playback until the room audience
  * is reconciled; we never silently skip an ineligible connected device.
  */
-async function assertRoomMediaAudience(
+async function currentRoomMediaAudience(
   tx: Tx,
   room: typeof facilitatedLearningSessions.$inferSelect,
-  trackVersionId: string,
-  lessonId: string,
-  assetVersionId: string,
-): Promise<void> {
+): Promise<Array<typeof learnerCourseAttempts.$inferSelect>> {
   const paired = await tx.select({
     attempt: learnerCourseAttempts,
     participantPersonId: facilitatedLearningParticipants.participantPersonId,
@@ -291,7 +288,7 @@ async function assertRoomMediaAudience(
   if (!paired.length || paired.length > 500)
     throw new AuthorizationError("bounded active room audience required for media");
   const now = new Date();
-  const approvedAdoptions = new Set<string>();
+  const eligibleAdoptions = new Map<string, typeof learnerCourseAttempts.$inferSelect>();
   for (const { attempt, participantPersonId } of paired) {
     let sourceCurrent = false;
     let currentRoomSitePlacement = false;
@@ -331,14 +328,23 @@ async function assertRoomMediaAudience(
       currentRoomSitePlacement,
     })) throw new AuthorizationError("current registered audience at hosting Site");
 
-    // All current adoptions must independently permit this asset. Sharing a
-    // Course version does not imply matching adoption or distribution rights.
-    if (!approvedAdoptions.has(attempt.adoptionId)) {
-      await assertFacilitatedInstructionalDelivery(
-        tx, attempt, trackVersionId, lessonId, assetVersionId,
-      );
-      approvedAdoptions.add(attempt.adoptionId);
-    }
+    // A distinct adoption is sufficient to represent an identical delivery
+    // policy; every paired Person is still checked for current eligibility.
+    eligibleAdoptions.set(attempt.adoptionId, attempt);
+  }
+  return [...eligibleAdoptions.values()];
+}
+
+async function assertRoomMediaRightsForAudience(
+  tx: Tx, audience: Array<typeof learnerCourseAttempts.$inferSelect>,
+  trackVersionId: string, lessonId: string, assetVersionId: string,
+): Promise<void> {
+  // All current adoptions must independently permit this asset. Sharing a
+  // Course version never implies identical policies or content rights.
+  for (const attempt of audience) {
+    await assertFacilitatedInstructionalDelivery(
+      tx, attempt, trackVersionId, lessonId, assetVersionId,
+    );
   }
 }
 const roomMediaInput=roomIdInput.extend({
@@ -367,11 +373,12 @@ export const getFacilitatedRoomMedia = createServerFn({method:"GET"})
         eq(courseLessons.courseVersionId,room.courseVersionId),
       )).where(eq(trackLessonPresentations.courseVersionId,room.courseVersionId))
         .orderBy(asc(courseLessons.lessonOrder)).limit(25);
+      const audience = await currentRoomMediaAudience(tx, room);
       const approved:typeof candidates=[];
       for(const candidate of candidates){
         try {
-          await assertRoomMediaAudience(
-            tx, room, candidate.trackVersionId, candidate.lessonId, candidate.assetVersionId,
+          await assertRoomMediaRightsForAudience(
+            tx, audience, candidate.trackVersionId, candidate.lessonId, candidate.assetVersionId,
           );
           approved.push(candidate);
         }catch(error){
@@ -400,8 +407,9 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
       const trackVersionId=await validateRoomVideo(
         tx,room.courseVersionId,data.lessonId,data.assetVersionId,
       );
-      await assertRoomMediaAudience(
-        tx, room, trackVersionId, data.lessonId, data.assetVersionId,
+      const audience = await currentRoomMediaAudience(tx, room);
+      await assertRoomMediaRightsForAudience(
+        tx, audience, trackVersionId, data.lessonId, data.assetVersionId,
       );
       const [asset]=await tx.select({
         storageReference:contentAssetVersions.storageReference,
@@ -627,8 +635,9 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
       const trackVersionId=await validateRoomVideo(
         tx,room.courseVersionId,data.lessonId,data.assetVersionId,
       );
-      await assertRoomMediaAudience(
-        tx, room, trackVersionId, data.lessonId, data.assetVersionId,
+      const audience = await currentRoomMediaAudience(tx, room);
+      await assertRoomMediaRightsForAudience(
+        tx, audience, trackVersionId, data.lessonId, data.assetVersionId,
       );
       const [existing]=await tx.select().from(facilitatedLearningPlayback)
         .where(and(
