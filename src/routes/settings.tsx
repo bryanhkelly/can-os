@@ -40,7 +40,11 @@ function SettingsHome() {
   const staff = ["teacher","room_facilitator","site_staff","site_leader","specialist","counselor","paraeducator"].includes(role);
   return <WorkspaceShell eyebrow="Your workspace" title="Settings" width="wide"
     subtitle="Return to the same authorized records whenever your school's information or your preferences change. No second onboarding record is created.">
-    {schoolAdmin && <SchoolSettingsDestinations siteId={siteId}/>}
+    <EditDestination title="My CAN account" icon={<UserRound className="size-5"/>}
+      description="Your account, verified schools and roles, and favorite published learning locations. These preferences never grant institutional access.">
+      <Link className={actionClass} to="/account/">Open My CAN <ArrowRight className="size-4"/></Link>
+    </EditDestination>
+    {schoolAdmin && <SchoolSettingsDestinations siteId={siteId}/>} 
     <div className="mt-7 grid gap-4">
       {websiteEditor && <EditDestination title="Website design and content" icon={<Globe className="size-5"/>}
         description="Open the same website editor to change templates, colors, approved imagery, copy or public references. Save a private draft, preview and request publication separately.">
