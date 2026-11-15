@@ -125,8 +125,8 @@ function MyCanAccount() {
               <h2 id="places-heading" className="font-serif text-2xl">My places</h2>
               <span className="text-xs text-muted-foreground">{favoriteCount} saved</span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Bookmark published learning sites for easy return. Saving one never enrolls you or shares your profile.</p>
-            <label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a published location</label>
+            <p className="mt-1 text-sm text-muted-foreground">Save published learning locations and schools where you have verified access. Favorites never enroll you or share your profile.</p>
+            <label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a location</label>
             <input id="place-search" type="search" value={search}
               onChange={event => setSearch(event.target.value)} placeholder="Search site, organization or city"
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
@@ -141,8 +141,9 @@ function MyCanAccount() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <a href={place.url} target="_blank" rel="noopener noreferrer" className={sectionLink}
+                {place.url ? <a href={place.url} target="_blank" rel="noopener noreferrer" className={sectionLink}
                   aria-label={"Visit " + place.name}>Visit <ExternalLink className="size-3" aria-hidden="true"/></a>
+                  : <span className="text-xs text-muted-foreground">Workspace-only</span>}
                 <Button variant={place.favorite ? "secondary" : "outline"} size="sm"
                   disabled={busy !== null} aria-pressed={place.favorite}
                   aria-label={(place.favorite ? "Remove " : "Save ") + place.name + (place.favorite ? " from favorites" : " to favorites")}
@@ -153,7 +154,7 @@ function MyCanAccount() {
               </div>
             </article>)}
             {!visiblePlaces.length && <p className="p-5 text-sm text-muted-foreground">
-              {search ? "No published locations match your search." : "No published learning sites are available yet."}
+              {search ? "No available locations match your search." : "No published sites or authorized school locations are available yet."}
             </p>}
           </div>
         </section>
