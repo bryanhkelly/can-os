@@ -47,10 +47,23 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
     guard();
     return db.transaction(async tx=>{
       const {provider,release}=await scopedRelease(tx,data.releaseId);
-      const waitingEntries=await tx.select({status:noncreditEnrollmentWaitlist.status,
+      const waitingEntries=await tx.select({id:noncreditEnrollmentWaitlist.id,
+        status:noncreditEnrollmentWaitlist.status,
         inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt})
         .from(noncreditEnrollmentWaitlist)
         .where(eq(noncreditEnrollmentWaitlist.releaseId,release.id)).limit(1001);
+      const deliveryRows=waitingEntries.length?await tx.select({
+        waitlistId:noncreditWaitlistEmailDeliveries.waitlistId,
+        invitationExpiresAt:noncreditWaitlistEmailDeliveries.invitationExpiresAt,
+        status:noncreditWaitlistEmailDeliveries.status,
+      }).from(noncreditWaitlistEmailDeliveries).where(inArray(
+        noncreditWaitlistEmailDeliveries.waitlistId,
+        waitingEntries.map(item=>item.id),
+      )).limit(3001):[];
+      const currentDeliveries=deliveryRows.filter(row=>waitingEntries.some(entry=>
+        entry.id===row.waitlistId&&entry.inviteExpiresAt!==null&&
+        entry.inviteExpiresAt.getTime()===row.invitationExpiresAt.getTime() &&
+        entry.status==="invited"));
       const [eligibleRelease]=await readEligibleSelfEnrollmentReleases(tx,release.id);
       const [title]=await tx.select({title:noncreditTrainingVersions.title})
         .from(noncreditTrainingVersions)
@@ -164,8 +177,12 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           waiting:waitingEntries.filter(p=>p.status==="waiting"||
             (p.status==="invited"&&!!p.inviteExpiresAt&&p.inviteExpiresAt<=new Date())).length,
           invitations:waitingEntries.filter(p=>p.status==="invited"&&!!p.inviteExpiresAt&&p.inviteExpiresAt>new Date()).length,
+          emailQueued:currentDeliveries.filter(d=>["pending","processing"].includes(d.status)).length,
+          emailProviderAccepted:currentDeliveries.filter(d=>d.status==="accepted").length,
+          emailFailed:currentDeliveries.filter(d=>d.status==="failed").length,
+          emailSuppressed:currentDeliveries.filter(d=>d.status==="suppressed").length,
         },
-        partial:claims.length>500||plans.length>300||waitingEntries.length>1000||
+        partial:claims.length>500||plans.length>300||waitingEntries.length>1000||deliveryRows.length>3000||
           decisions.length>2000||attestations.length>3000,
         evidenceNote:"Facilitator-attested presence covers linked rooms only; pairing, video playback and enrollment are not attendance. Completion uses the latest noncredit decision, not a certificate claim.",
       };
