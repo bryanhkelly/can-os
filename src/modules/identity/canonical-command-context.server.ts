@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
-import { Pool } from "@neondatabase/serverless";
+import { Pool, type PoolClient } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import {
   canonicalAuthReaderDatabaseRole,
@@ -82,7 +82,7 @@ async function runCanonicalReaderProbe(): Promise<boolean> {
   if (!canonicalRestrictedAuthUrlValid(url, process.env.DATABASE_URL) ||
       (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) < 32) return false;
   let pool: Pool | undefined;
-  let client: Awaited<ReturnType<Pool["connect"]>> | undefined;
+  let client: PoolClient | undefined;
   try {
     pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 3000 });
     client = await pool.connect();
