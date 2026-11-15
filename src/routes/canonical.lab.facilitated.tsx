@@ -89,7 +89,8 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       <p className="mt-2 font-mono text-3xl tracking-widest" aria-live="polite">{code.code}</p>
       <p className="mt-2 text-sm text-muted-foreground">
         Valid until {new Date(code.expiresAt).toLocaleTimeString()}.
-        Learners sign in and pair from their existing course. Do not treat this as headcount.
+        Learners can sign in at <a href="/join" className="underline">/join</a> and
+        select their existing course. Do not treat device pairing as headcount.
       </p>
     </section>}
     <section className="mt-7" aria-label="Facilitated rooms">
