@@ -16,7 +16,7 @@ async function siteClassAdministrator(): Promise<Actor> {
   const actor = await requireActor(["site_admin"]);
   assertCapability(actor, "program.read");
   if (actor.grantSiteId === null || !(actor.scope.siteIds?.includes(actor.grantSiteId)) ||
-      !actor.scope.organizationIds?.length || !actor.scope.programIds?.length) {
+      !actor.scope.organizationIds?.length) {
     throw new AuthorizationError("active school Site and Program administration");
   }
   return actor;
@@ -37,7 +37,7 @@ export const getSiteAdminClasses = createServerFn({ method: "GET" }).handler(asy
   }).from(s.sections).where(and(
     eq(s.sections.active, true),
     eq(s.sections.siteId, actor.grantSiteId!),
-    inArray(s.sections.programId, actor.scope.programIds!),
+    inArray(s.sections.programId, actor.scope.programIds ?? []),
   )).orderBy(s.sections.title);
   return { classes };
 });
@@ -57,7 +57,7 @@ export const getSiteAdminClassRoster = createServerFn({ method: "GET" })
         eq(s.sections.id, data.sectionId),
         eq(s.sections.active, true),
         eq(s.sections.siteId, actor.grantSiteId!),
-        inArray(s.sections.programId, actor.scope.programIds!),
+        inArray(s.sections.programId, actor.scope.programIds ?? []),
       )).limit(1);
     if (!section) throw new AuthorizationError("class at authorized Site");
     const programMembership = alias(s.enrollments, "admin_class_program_membership");
