@@ -23,7 +23,6 @@ import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
-import { readSessionGrants } from "@/modules/identity/session-grants.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -45,6 +44,9 @@ export async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollm
   }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
   if (!account || account.disabled || !account.verified || isDemoAccountEmail(account.email))
     throw new AuthorizationError("verified independent CAN account");
+  // Load session-grant authorization only on the server. A static import here
+  // would expose a .server module to the client route graph in Vite.
+  const { readSessionGrants } = await import("@/modules/identity/session-grants.server");
   const { grants, demoAccountSwitching } =
     await readSessionGrants(actor.accountId,account.email);
   if(demoAccountSwitching || new Set(grants.map(g=>g.personId)).size!==1 ||
