@@ -130,6 +130,78 @@ CREATE TRIGGER v301_freeze_noncredit_claim
  BEFORE UPDATE OR DELETE ON education_v30.noncredit_self_enrollment_claims
  FOR EACH ROW EXECUTE FUNCTION education_v30.v301_freeze_noncredit_enrollment_claim();
 
+-- The trusted migration owner is explicitly scoped under FORCE RLS.
+-- No anonymous, facilitator, native auth-reader, or shared DB login inherits
+-- direct SELECT/INSERT/UPDATE/DELETE on enrollment PII or consent records.
+DO $self_enrollment_rls$
+DECLARE object_name text;
+DECLARE object_schema text;
+DECLARE trusted_role text := current_user;
+BEGIN
+  FOR object_schema,object_name IN
+    SELECT 'public','access_account_noncredit_principals'
+    UNION ALL SELECT 'education_v30','noncredit_self_enrollment_releases'
+    UNION ALL SELECT 'education_v30','noncredit_self_enrollment_claims'
+  LOOP
+    EXECUTE format('ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY',object_schema,object_name);
+    IF NOT EXISTS(
+      SELECT 1 FROM pg_policies WHERE schemaname=object_schema
+        AND tablename=object_name AND policyname='v301_noncredit_trusted_owner_access'
+    ) THEN
+      EXECUTE format(
+        'CREATE POLICY v301_noncredit_trusted_owner_access ON %I.%I FOR ALL TO %I USING (true) WITH CHECK (true)',
+        object_schema,object_name,trusted_role
+      );
+    END IF;
+  END LOOP;
+END $self_enrollment_rls$;
+
+-- A claim cannot associate a learner with a different Person, adoption,
+-- Course, Site, training version or operator organization than the registration
+-- and immutable enrollment release actually authorize.
+ALTER TABLE education_v30.noncredit_self_enrollment_claims
+  ADD CONSTRAINT noncredit_self_claim_registration_person_fk
+  FOREIGN KEY(registration_id,participant_person_id)
+  REFERENCES education_v30.noncredit_registrations(id,participant_person_id);
+
+CREATE OR REPLACE FUNCTION education_v30.v301_validate_noncredit_self_enrollment_claim()
+RETURNS trigger LANGUAGE plpgsql
+SET search_path=education_v30,pg_catalog AS $self_claim_scope$
+DECLARE release_row record;
+DECLARE registration_row record;
+DECLARE linked_account record;
+BEGIN
+  SELECT * INTO release_row
+  FROM noncredit_self_enrollment_releases
+  WHERE id=NEW.release_id;
+  SELECT * INTO registration_row
+  FROM noncredit_registrations
+  WHERE id=NEW.registration_id;
+  SELECT * INTO linked_account
+  FROM public.access_account_noncredit_principals
+  WHERE canonical_account_id=NEW.canonical_account_id
+    AND canonical_person_id=NEW.participant_person_id;
+  IF release_row.id IS NULL OR registration_row.id IS NULL
+     OR linked_account.canonical_account_id IS NULL THEN
+    RAISE EXCEPTION 'Self-enrollment requires a verified CAN-to-canonical principal link';
+  END IF;
+  IF NEW.participant_person_id IS DISTINCT FROM registration_row.participant_person_id
+     OR NEW.site_id IS DISTINCT FROM release_row.site_id
+     OR NEW.consent_version IS DISTINCT FROM release_row.consent_version
+     OR NEW.adult_attested IS DISTINCT FROM true
+     OR registration_row.deployment_id IS DISTINCT FROM release_row.deployment_id
+     OR registration_row.adoption_id IS DISTINCT FROM release_row.adoption_id
+     OR registration_row.offering_version_id IS DISTINCT FROM release_row.offering_version_id
+     OR registration_row.training_version_id IS DISTINCT FROM release_row.training_version_id
+     OR registration_row.registering_organization_id IS DISTINCT FROM release_row.registering_organization_id THEN
+    RAISE EXCEPTION 'Self-enrollment claim must match its approved release and registration';
+  END IF;
+  RETURN NEW;
+END $self_claim_scope$;
+CREATE TRIGGER v301_validate_noncredit_self_enrollment_claim
+ BEFORE INSERT ON education_v30.noncredit_self_enrollment_claims
+ FOR EACH ROW EXECUTE FUNCTION education_v30.v301_validate_noncredit_self_enrollment_claim();
+
 -- Tables are intentionally not globally readable under a learner DB login.
 -- Public offering projection and registration use explicit server-side
 -- policy/identity guards; existing instructional activity RLS remains intact.
