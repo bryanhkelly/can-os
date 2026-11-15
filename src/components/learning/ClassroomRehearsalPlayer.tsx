@@ -23,7 +23,7 @@ export function ClassroomRehearsalPlayer({scope,onClose}:{scope:Scope;onClose:()
       setSelected(v.media[0]?v.media[0].lessonId+":"+v.media[0].assetVersionId:"");
     }).catch(()=>{if(alive)setError("Rehearsal requires a published course with approved distribution rights.");});
     return ()=>{alive=false;};
-  },[scope.deploymentId,scope.courseVersionId,scope.siteId]);
+  },[scope]);
   const current=data?.media.find(m=>m.lessonId+":"+m.assetVersionId===selected);
   return <section aria-label="Private rehearsal" className="mt-4 border border-border bg-card p-5">
     <div className="flex justify-between gap-3">

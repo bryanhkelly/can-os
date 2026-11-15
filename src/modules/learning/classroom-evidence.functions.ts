@@ -214,13 +214,20 @@ export const recordClassroomPresence = createServerFn({method:"POST"})
     guard();
     return db.transaction(async tx=>{
       const {room,personId}=await learnerRoom(tx,data.courseAttemptId,data.facilitatedSessionId);
-      const [existing]=await tx.select({id:facilitatedRoomPresenceEvents.id})
+      const [existing]=await tx.select({id:facilitatedRoomPresenceEvents.id,
+        eventKind:facilitatedRoomPresenceEvents.eventKind,
+        clientInstanceId:facilitatedRoomPresenceEvents.clientInstanceId,
+        participantPersonId:facilitatedRoomPresenceEvents.participantPersonId})
         .from(facilitatedRoomPresenceEvents).where(and(
           eq(facilitatedRoomPresenceEvents.facilitatedSessionId,room.id),
           eq(facilitatedRoomPresenceEvents.courseAttemptId,data.courseAttemptId),
           eq(facilitatedRoomPresenceEvents.clientEventId,data.clientEventId),
         )).limit(1);
-      if(existing)return {recorded:true,duplicate:true};
+      if(existing){
+        if(existing.eventKind!==data.eventKind || existing.clientInstanceId!==data.clientInstanceId ||
+          existing.participantPersonId!==personId)throw new Error("Conflicting classroom presence retry");
+        return {recorded:true,duplicate:true};
+      }
       // Server-side suppression prevents abusive clients from flooding telemetry.
       if(data.eventKind==="heartbeat"){
         const [recent]=await tx.select({id:facilitatedRoomPresenceEvents.id})
@@ -261,12 +268,23 @@ export const attestClassroomAttendance = createServerFn({method:"POST"})
           eq(facilitatedLearningParticipants.courseAttemptId,data.courseAttemptId),
         )).limit(1);
       if(!paired)throw new AuthorizationError("registered classroom participant");
-      await tx.insert(facilitatedRoomAttendanceAssertions).values({
+      const [saved]=await tx.insert(facilitatedRoomAttendanceAssertions).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         facilitatorPersonId:host.actor.actorPersonId!,requestId:data.requestId,
         status:data.status,method:data.method,evidenceNote:data.evidenceNote,
-      }).onConflictDoNothing();
-      return {saved:true,evidenceLevel:"facilitator_attested" as const};
+      }).onConflictDoNothing().returning({id:facilitatedRoomAttendanceAssertions.id});
+      if(!saved){
+        const [existing]=await tx.select().from(facilitatedRoomAttendanceAssertions).where(and(
+          eq(facilitatedRoomAttendanceAssertions.facilitatedSessionId,room.id),
+          eq(facilitatedRoomAttendanceAssertions.requestId,data.requestId),
+        )).limit(1);
+        if(!existing || existing.courseAttemptId!==data.courseAttemptId ||
+          existing.facilitatorPersonId!==host.actor.actorPersonId ||
+          existing.status!==data.status || existing.method!==data.method ||
+          existing.evidenceNote!==data.evidenceNote)
+          throw new Error("Conflicting attendance assertion retry");
+      }
+      return {saved:true,duplicate:!saved,evidenceLevel:"facilitator_attested" as const};
     });
   });
 
