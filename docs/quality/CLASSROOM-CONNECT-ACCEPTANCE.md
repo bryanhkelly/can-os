@@ -207,6 +207,55 @@ reader credentials are also unconfigured due Netlify permission denial.
 No broad production rollout or sponsor-facing claims should be based solely on
 the anonymous QR smoke tests or source-code checks.
 
+## Release 3: scheduled, accountable classroom (2026-11-14)
+
+Source-level Release 3 has been committed to `main`. New additive
+canonical tables `facilitated_classroom_plans` and
+`facilitated_room_assisted_activity_evidence` have been installed on
+Neon `test01` and `main`. Both are forced-RLS, owner-only-policy
+relations without PUBLIC SELECT grants, and all ten expected Phase 2/3
+classroom indexes were verified on both branches. No existing learner
+rows or academic decisions were changed.
+
+**Built:**
+
+- Authoritative `delivery_sessions` calendar and separate Course/host
+  overlay; schedule, reschedule, cancel, and start during the permitted
+  15-minute early window. Starting reuses the existing audited room
+  creation path and current Site/Deployment authority.
+- Private, bounded active Course roster; explicit in-person/remote
+  facilitator attestations; no-device fallback using existing course
+  identity; append-only 48-hour correction with notes, audit events
+  and retry-safe request IDs.
+- Independent facilitator-attributed paper, verbal, and shared-device
+  formative activity records, without creating learner-submitted responses,
+  new enrollment, official grade, certificates or completion.
+- Centrally published, active, permission-verified survey campaign
+  linkage, current personal invitation checks, and existing canonical
+  identified noncredit course survey submission. Entry, pulse and exit
+  stages remain separate from operational quick ratings.
+
+**Focused tests authored:** `tests/unit/classroom-release3.test.ts`
+covers calendar duration and start boundaries, attendance correction expiry,
+required no-device notes, distinct response provenance, forced RLS contracts
+and invitation/consent/stage checks. The read-only schema checker
+`npm run db:canonical:classroom-schema` now includes the new relations.
+
+**Not verified as passing:** full TypeScript compilation, unit tests,
+production build, signed-in browser flow or current SHA deployment.
+The earlier Netlify deployment and restricted runtime credentials blockers
+have not been confirmed resolved.
+
+**Additional two-Site negative browser acceptance:** unauthorized plan
+creation/start/reschedule; concurrent schedule retry; Site B roster leakage;
+no-device name/registered Course mismatch; no-device correction without
+note; duplicate request IDs with conflicting content; paper activity not
+reported as a personal device response; survey campaign with missing
+permission, revoked invitation, wrong Deployment or confidential mode;
+post-room entry/pulse/exit boundaries; and no PII projected.
+
+Read the [Release 3 operator guide](../product/classroom-connect-release-3-operator.md).
+
 ## Flag-free product availability (2026-11-14)
 
 Learning and facilitated-delivery handlers no longer consult environment
