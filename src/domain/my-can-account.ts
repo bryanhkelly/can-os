@@ -10,6 +10,15 @@ export function canSavePublishedSite(
     Number.isFinite(publication.publishedAt.getTime());
 }
 
+/** Bookmark permission does not create or expand any access grant. */
+export function canBookmarkSite(input: {
+  siteId: string;
+  authorizedSiteIds: ReadonlySet<string>;
+  publication: { status: string; publishedAt: Date | null } | null | undefined;
+}): boolean {
+  return input.authorizedSiteIds.has(input.siteId) || canSavePublishedSite(input.publication);
+}
+
 /** Different canonical Persons cannot be silently merged under the same login. */
 export function accountPersonNeedsReview(
   grants: readonly { personId: string }[],
