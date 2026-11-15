@@ -80,3 +80,22 @@ P1. Optional brand, marketing, events and outreach modules.
 - Browser Back, draft reload, multi-Site switching and in-flight edits never silently change Site or Program context.
 
 Release gates: exact-main source SHA, typecheck/test/build, test01 canonical migration/security checks, real role-scoped browser E2E and deployed SHA verification. This specification does not claim those checks have passed.
+
+## Multi-select program and curriculum discovery
+
+On Step 4 (Your Programs), allow multiple selected program formats (afterschool, summer/breaks, training, enrichment) and grade-band academic tracks (6–8, 9–12); schedule tags (weekday, weekend, evening, flexible) and audiences (youth, adult, senior) are not mutually exclusive. Never use a single-select program-type enum to represent all three dimensions. Senior is an adult-oriented audience descriptor; actual age eligibility belongs to the versioned enrollment policy. Multiple audiences may be served by the Site, but enrollment eligibility is checked separately for each Offering/release.
+
+Introduce user-facing multi-select **Curriculum approach** and **Content focus** chips after program/audience choice, with options conditional on context:
+
+- Approach examples: standards-aligned / college-prep, classical, project-based, competency/mastery-based, Montessori/self-directed, inquiry-based, personalized/adaptive. These are combinable descriptors and do not independently imply accreditation, academic level or approval.
+- Content focus examples: core academics, STEM/robotics, arts/humanities, digital skills/AI, career/technical, financial literacy, health/wellness, languages/ESL, faith/biblical studies, leadership/life skills, civics/service, literacy/numeracy. STEM and CTE are **content focus/pathway** terms even if marketing catalogs sometimes call them approaches.
+- Keep religious affiliation / network editorial identity separate from curriculum approach or accreditation. An independent or nonsectarian Site must not inherit denominational content based solely on a network code.
+- Preserve curriculum publisher, license, rights, course level, target audience, jurisdiction approvals, instructional delivery and grade/credit classification as distinct validated attributes, not mere tags.
+
+Use these choices to filter/rank **existing published Blueprint versions and approved Offering versions**, including rights and verified network visibility. The engine must not mint new Blueprints automatically for every chip combination or imply that a matching reference item is a deployable offering. Allow multiple independent Blueprint/Offering selections, each with a separate Site adoption and readiness review. Keep the site classification rule: only the presence of an actual grades 6–12 academic curriculum (not an afterschool audience of that age or selecting the 'core academics' focus chip) enables the CAN OS school experience. The existence of such a curriculum never substitutes for independent academic, safety, operational or jurisdictional approval.
+
+UX: grouped multi-select rectangular chips (6.1), selected state with visible checkmark, clear-all per group, selection summary and suggested matches. Permit zero optional approaches/focus selections with a broad catalog default; do not require a one-to-one taxonomy match to discover legitimate programs. Derive readiness and program registration from final authorized records, not chip state.
+
+Current source note: `src/domain/blueprint-configuration.ts` includes `blueprintProgramModelDraftSchema` with `kind`, `gradeRange` and `deliveryModel`, but no first-class approach/focus taxonomy. The `blueprintEditorialIdentityKeys` (including `classical_humanities`) are editorial branding/identity, **not** a curriculum taxonomy. Canonical `blueprint_versions.target_kind` supports offering / operation / composite. Any normalized taxonomy schema change must be explicitly designed, versioned, migrated on test01 first and regression tested; don't reinterpret editorial identity as curriculum choice.
+
+Acceptance: select several program formats, audiences, approaches and content focuses; review ranked candidates and distinct adoption intents; remove one chip without deleting already-authorized offerings or enrolling anybody; school experience only when actual 6–12 academic curriculum is selected; no unauthorized network items in matches.
