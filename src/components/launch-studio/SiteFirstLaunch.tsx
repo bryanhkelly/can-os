@@ -186,11 +186,10 @@ export function SiteFirstLaunch({options}:{options:Options}) {
           <p className="text-sm text-muted-foreground">{siteCity}{siteCity&&siteState?", ":""}{siteState} · {delivery==="both"?"Physical and digital":delivery==="physical"?"Physical":"Digital"}</p>
           <p className="text-xs text-muted-foreground">{networkChoice==="independent"?"Operating independently":networkCode?"Network code captured in this preview only; verification pending":"Network affiliation not verified"}</p>
           <hr/><h4 className="font-semibold">Continue your launch</h4>
-          <p className="text-sm text-muted-foreground">The existing Website & Brand Studio manages the actual saved design. The Hub lets you prepare legitimate programs and enrollment.</p>
+          <p className="text-sm text-muted-foreground">Website & Brand Studio manages the saved design. The existing Launch Hub is the next preparation workspace; individual program and enrollment activations still require their own authorization.</p>
           <div className="space-y-3">
             {siteId&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border border-primary px-4 text-sm font-semibold text-primary">Customize website <ArrowRight className="size-4"/></Link>}
             {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">Continue to Launch Hub <ArrowRight className="size-4"/></Link>}
-            <Link to="/programs/noncredit/enrollment" className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">Explore noncredit enrollment tools <ArrowRight className="size-4"/></Link>
           </div>
           <p className="border-l-2 border-warning bg-muted p-4 text-xs leading-5">Your delivery choices and program interests are saved as private Site planning data. A network code is not saved or verified here. This concept is not an active website or registration page.</p>
         </aside>
