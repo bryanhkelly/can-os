@@ -192,7 +192,7 @@ export const readAuthorizedSiteSharedContact = createServerFn({ method: "GET" })
         eq(accessSiteContactShareRevisions.personId, data.personId),
         eq(accessSiteContactShareRevisions.siteId, site.id),
       )).orderBy(desc(accessSiteContactShareRevisions.revisionNo)).limit(1);
-    if (!activeSiteContactShare(share) || share?.purpose !== data.purpose)
+    if (!share || !activeSiteContactShare(share) || share.purpose !== data.purpose)
       throw new AuthorizationError("current purpose-specific consent");
 
     const [contact] = await db.select({
