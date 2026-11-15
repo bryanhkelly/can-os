@@ -10,6 +10,8 @@ import {
   surveyInvitations, surveyResponses, surveyVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { classroomFeedbackOpen } from "@/domain/classroom-feedback";
+import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
@@ -104,6 +106,8 @@ export const attachClassroomSurvey=createServerFn({method:"POST"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
+      if(!classroomFeedbackOpen(room,new Date()))
+        throw new AuthorizationError("recent classroom survey linkage window");
       await approvedCampaign(tx,host.organizationId,room.deploymentId,data.surveyCampaignId);
       const [saved]=await tx.insert(facilitatedRoomSurveyCampaigns).values({
         facilitatedSessionId:room.id,surveyCampaignId:data.surveyCampaignId,
@@ -146,8 +150,10 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
       const access=await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId,true);
       if(access.source!=="noncredit")
         throw new AuthorizationError("governed noncredit Course survey");
-      const [pair]=await tx.select({id:facilitatedLearningParticipants.id})
-        .from(facilitatedLearningParticipants)
+      const [pair]=await tx.select({
+        id:facilitatedLearningParticipants.id,
+        leftAt:facilitatedLearningParticipants.leftAt,
+      }).from(facilitatedLearningParticipants)
         .where(and(
           eq(facilitatedLearningParticipants.facilitatedSessionId,data.facilitatedSessionId),
           eq(facilitatedLearningParticipants.courseAttemptId,data.courseAttemptId),
@@ -167,6 +173,11 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
         .limit(30);
       const results=[];
       for(const link of links){
+        const roomState=facilitatedRoomOperationalState(room,new Date());
+        // Exit surveys appear only after an actual leave or room closure.
+        // Pulse surveys are available only during the active classroom.
+        if(link.stage==="exit"&&roomState==="live"&&!pair.leftAt)continue;
+        if(link.stage==="pulse"&&roomState!=="live")continue;
         try{
           const approved=await approvedCampaign(tx,room.hostOrganizationId,
             room.deploymentId,link.id);
