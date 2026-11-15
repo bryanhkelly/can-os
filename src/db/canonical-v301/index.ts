@@ -30,3 +30,4 @@ export * from "./classroom-planning";
 export * from "./classroom-assisted-activity";
 
 export * from "./community-benefits";
+export * from "./classes";
