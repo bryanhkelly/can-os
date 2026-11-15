@@ -1,16 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
+import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import {
   canonicalLearningRuntimeReady, facilitatedLearningRuntimeReady,
 } from "@/modules/learning/canonical-learning-release.server";
 
-/** Exposes only deploy readiness, never credentials, grants or session details.
- * With valid configuration, individual command permissions still apply. */
+/** Report verified restricted reader connectivity + projection execution, never
+ * just environment string shape. Individual request authorization still applies. */
 export const getCanonicalLearningReleaseAvailability = createServerFn({ method: "GET" })
   .handler(async () => {
     setResponseHeader("Cache-Control", "private, no-store");
+    const configured = canonicalLearningRuntimeReady();
+    const readerReady = configured && await probeCanonicalAuthReader();
     return {
-      activity: canonicalLearningRuntimeReady(),
-      facilitated: facilitatedLearningRuntimeReady(),
+      activity: readerReady,
+      facilitated: readerReady && facilitatedLearningRuntimeReady(),
     };
   });
