@@ -65,11 +65,16 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
     }catch{setError("Playback observation was not saved. The command remains auditable.");}
   }
   useEffect(()=>{
-    if(roomState && roomState!=="live"){
+    if(command.isError || (roomState && roomState!=="live")){
       setLoaded(null);
       setEnabled(false);
     }
-  },[roomState]);
+  },[roomState,command.isError]);
+  if(command.isError) return <section
+    className="border border-border bg-card p-6" aria-label="Classroom projector">
+    <p role="alert">Projector command authorization is unavailable.
+      Playback has been stopped until the secure connection is restored.</p>
+  </section>;
   if(roomState&&roomState!=="live")return <section
     className="border border-border bg-card p-6" aria-label="Classroom projector">
     <p role="status">{roomState==="expired"?
