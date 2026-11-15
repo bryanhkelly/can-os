@@ -30,11 +30,15 @@ DO $links$
 BEGIN
   IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='can_v30_public_site_app') THEN
     EXECUTE 'GRANT SELECT ON public.site_canonical_identity_links TO can_v30_public_site_app';
-    EXECUTE 'CREATE POLICY site_identity_links_public_site_app_read ON public.site_canonical_identity_links FOR SELECT TO can_v30_public_site_app USING (status = ''approved'')';
+    IF NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='site_canonical_identity_links' AND policyname='site_identity_links_public_site_app_read') THEN
+      EXECUTE 'CREATE POLICY site_identity_links_public_site_app_read ON public.site_canonical_identity_links FOR SELECT TO can_v30_public_site_app USING (status = ''approved'')';
+    END IF;
   END IF;
   IF EXISTS(SELECT 1 FROM pg_roles WHERE rolname='can_v30_public_site_reader') THEN
     EXECUTE 'GRANT SELECT ON public.site_canonical_identity_links TO can_v30_public_site_reader';
-    EXECUTE 'CREATE POLICY site_identity_links_reader_read ON public.site_canonical_identity_links FOR SELECT TO can_v30_public_site_reader USING (status = ''approved'')';
+    IF NOT EXISTS(SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='site_canonical_identity_links' AND policyname='site_identity_links_reader_read') THEN
+      EXECUTE 'CREATE POLICY site_identity_links_reader_read ON public.site_canonical_identity_links FOR SELECT TO can_v30_public_site_reader USING (status = ''approved'')';
+    END IF;
   END IF;
 END $links$;
 -- No INSERT/UPDATE/DELETE role grant. Reviewers use the existing
