@@ -10,7 +10,7 @@ import {
 import { normalizeClientError } from "@/lib/client-error";
 
 export const Route=createFileRoute("/learn/enroll")({
-  validateSearch:(search:Record<string,unknown>)=>({
+  validateSearch:(search:Record<string,unknown>):{release?:string;ref?:string}=>({
     release:typeof search.release==="string"&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.release)
       ?search.release:undefined,
