@@ -3,8 +3,9 @@ import {classifySessionDevice,learningEvidenceLevel} from "@/domain/session-devi
 describe("session-device evidence",()=>{
  it("requires an explicitly trusted edge header",()=>{
  const r=new Request("https://example.test",{headers:{"x-forwarded-for":"192.0.2.10","x-nf-client-connection-ip":"203.0.113.7"}});
- expect(classifySessionDevice(r,"x-forwarded-for").ipAddress).toBeNull();
- expect(classifySessionDevice(r,"x-nf-client-connection-ip").ipAddress).toBe("203.0.113.7");
+ expect(classifySessionDevice(r).ipAddress).toBeNull();
+ expect(classifySessionDevice(r,"203.0.113.7").ipAddress).toBe("203.0.113.7");
+ expect(classifySessionDevice(r,"not-an-address").ipAddress).toBeNull();
  });
  it("classifies coarse devices",()=>{
  const r=new Request("https://example.test",{headers:{"user-agent":"Mozilla/5.0 (iPhone; CPU iPhone OS 18_0) AppleWebKit Safari/604"}});

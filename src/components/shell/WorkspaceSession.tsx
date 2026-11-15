@@ -3,7 +3,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query";
 import { getWorkspaceSession, type WorkspaceSessionResult } from "@/modules/identity/workspace-session.functions";
 import { defaultStudentDisplayPreferences } from "@/domain/student-display-preferences";
 import { WorkspaceSessionContext } from "./workspace-session-context";
-import {registerAccessClient,isSharedDeviceMode,clearLearnerBrowserState} from "@/domain/session-client";
+import {registerAccessClient,isSharedDeviceMode,clearLearnerBrowserState,observeSessionHandoffs} from "@/domain/session-client";
 
 export { useActiveWorkspaceMember } from "./workspace-session-context";
 
@@ -55,6 +55,10 @@ export function WorkspaceSessionProvider({ initial, children }: {
     let lastSentAt=0;
     let lastInteractionAt=Date.now();
     let closing=false;
+    const stopObserving=observeSessionHandoffs(()=>{
+      if(closing)return;
+      closing=true;window.location.assign("/access");
+    });
     // Registration never extends idle expiry; only actual trusted interaction does.
     void registerAccessClient().catch(()=>{});
     const guard=window.setInterval(()=>{
@@ -87,6 +91,7 @@ export function WorkspaceSessionProvider({ initial, children }: {
     document.addEventListener("keydown", onInteraction);
     return () => {
       window.clearInterval(guard);
+      stopObserving();
       document.removeEventListener("pointerdown", onInteraction);
       document.removeEventListener("keydown", onInteraction);
     };

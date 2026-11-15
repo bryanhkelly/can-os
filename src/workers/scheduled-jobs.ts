@@ -6,6 +6,7 @@ import { processSchoolFamilyOutboundDeliveries } from "@/modules/communication/s
 import { processPendingDomainEvents } from "./domain-event-worker";
 import { processScheduledReminders } from "./reminder-worker";
 import { processInterestEventEmailDeliveries } from "./interest-event-email-worker";
+import {runSessionDeviceRetention} from "./session-device-retention";
 
 /**
  * Existing periodic processor for restricted safeguarding handoffs and the outbox.
@@ -28,6 +29,7 @@ export async function runScheduledJobs(): Promise<{
   expiredSectionOffers: number;
   scheduledReminders: { delivered: number; failed: number };
   interestEventEmails: { accepted: number; failed: number; cancelled: number };
+  sessionDeviceRetention: boolean;
 }> {
   const safeguarding = await escalateOverdueSafeguardingConcerns();
   const schoolFamilyDeliveries = await processSchoolFamilyOutboundDeliveries();
@@ -41,5 +43,6 @@ export async function runScheduledJobs(): Promise<{
   const escalated = await escalateTerminalDeliveryFailures();
   const digests = await processWeeklyDigests();
   const expiredSectionOffers = await expireOutstandingSectionOffers();
-  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, schoolFamilyDeliveries, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails };
+  const sessionDeviceRetention=await runSessionDeviceRetention();
+  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, schoolFamilyDeliveries, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
 }
