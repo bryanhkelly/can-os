@@ -55,6 +55,14 @@ describe("authenticated school full-page preview", () => {
     expect(fullPage).not.toContain('href="/about"');
   });
 
+  it("uses Site-neutral wording for Site-first quick previews", () => {
+    const html = '<html><head><title>Sample</title></head><body></body></html>';
+    const result = renderPrivateWebsitePreviewHtml(html, siteId, [], false, "site");
+    expect(result).toContain("Private Site website preview");
+    expect(result).toContain("Unsaved Site starter");
+    expect(result).not.toContain("Private school website preview");
+  });
+
   it("does not authorize missing or unconfigured pages", () => {
     const html = '<!doctype html><html><head><title>School</title></head><body><a href="/contact">Contact</a><a href="/about">About</a><a href="#main-content">Skip</a></body></html>';
     const preview = renderPrivateWebsitePreviewHtml(html,siteId,["/","/about"]);
