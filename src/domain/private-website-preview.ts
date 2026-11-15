@@ -29,6 +29,7 @@ export function renderPrivateWebsitePreviewHtml(
   siteId: string,
   availablePages: readonly string[],
   saved = true,
+  kind: "site" | "school" = "school",
 ): string {
   const links = new Set(availablePages.filter(isPublicSitePagePath));
   const converted = html.replace(/href="(\/[a-z-]*)"/g, (_match, path: string) =>
