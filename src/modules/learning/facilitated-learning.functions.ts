@@ -689,7 +689,7 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
     const actor=await getInstructionalLearnerContext(getRequest());
     if(!actor.actorPersonId)throw new AuthorizationError("authenticated learner");
     return db.transaction(async tx=>{
-      const access=await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId,true);
+      const access=await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId);
       const now=new Date();
       const rows=await tx.select({
         roomId:facilitatedLearningSessions.id,
