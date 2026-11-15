@@ -59,7 +59,9 @@
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
     "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "test:classroom:unit": "vitest run tests/unit/facilitated-learning.test.ts tests/unit/canonical-learning-activity.test.ts tests/unit/classroom-priority-fixes.test.ts tests/unit/canonical-learning-release-contract.test.ts tests/unit/canonical-learning-release-readiness.test.ts",
-    "test:classroom:unconfigured": "playwright test --config playwright.authenticated-routes.config.ts --grep 'classroom join fails closed|learner and guardian cannot use facilitator|companion without a verified'"
+    "test:classroom:unconfigured": "playwright test --config playwright.authenticated-routes.config.ts --grep 'classroom join fails closed|learner and guardian cannot use facilitator|companion without a verified'",
+    "db:canonical:noncredit-self-enrollment": "node scripts/acceptance/check-noncredit-self-enrollment.mjs",
+    "test:enrollment:unit": "vitest run tests/unit/noncredit-self-enrollment.test.ts tests/unit/personal-can-identity.test.ts tests/unit/personal-can-access-boundary.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
