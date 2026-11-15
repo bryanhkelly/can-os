@@ -1,4 +1,8 @@
 import { createHash, randomBytes } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import { accessAccounts, accessAccountNoncreditPrincipals } from "@/db/schema";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 import { accessSessionCookie } from "@/domain/access-tokens";
 import { getCommandContext } from "./command-context.server";
@@ -145,9 +149,43 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     if (actor.role === "site_admin" || actor.role === "registrar") {
       return resolveCanonicalSiteStaffFromCan(actor);
     }
-    if (!hasNative) {
-      throw new AuthorizationError("native canonical authorization for this role");
+    if (!hasNative || !actor.actorPersonId || actor.sessionAccountId) {
+      throw new AuthorizationError("authorized canonical identity for active CAN account");
     }
+
+    // Adult noncredit learners can retain their existing native course-session
+    // cookie without a second interactive sign-in. Both active credentials
+    // must resolve to the SAME previously consented person/account pair.
+    // A native staff/reviewer cookie cannot be combined with an unrelated
+    // CAN student, guardian, or personal session to switch identities.
+    const native = await getCanonicalSessionRow(request);
+    if (native.role_code !== "learner" || native.site_id !== null) {
+      throw new AuthorizationError("canonical role does not match CAN login");
+    }
+    const [source] = await db.select({
+      email: accessAccounts.emailNormalized,
+      verified: accessAccounts.emailVerifiedAt,
+      disabled: accessAccounts.disabled,
+    }).from(accessAccounts)
+      .where(eq(accessAccounts.id, actor.accountId)).limit(1);
+    if (!source?.verified || source.disabled || isDemoAccountEmail(source.email)) {
+      throw new AuthorizationError("current verified CAN learner account");
+    }
+    const links = await db.select({
+      personId: accessAccountNoncreditPrincipals.accessPersonId,
+      nativeAccountId: accessAccountNoncreditPrincipals.canonicalAccountId,
+      nativePersonId: accessAccountNoncreditPrincipals.canonicalPersonId,
+    }).from(accessAccountNoncreditPrincipals)
+      .where(and(
+        eq(accessAccountNoncreditPrincipals.accessAccountId, actor.accountId),
+        eq(accessAccountNoncreditPrincipals.accessPersonId, actor.actorPersonId),
+      )).limit(2);
+    if (links.length !== 1 ||
+        links[0]?.nativeAccountId !== native.account_id ||
+        links[0]?.nativePersonId !== native.person_id) {
+      throw new AuthorizationError("one verified CAN-to-canonical learner identity");
+    }
+    return projectCanonicalCommandContext(native);
   }
   return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
 }
