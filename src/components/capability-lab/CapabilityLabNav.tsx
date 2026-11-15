@@ -1,6 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { getCanonicalLearningReleaseAvailability } from "@/modules/learning/canonical-learning-release.functions";
 
 const linkClass = "inline-flex min-h-10 items-center border-b-2 px-3 text-sm font-medium focus-visible:outline-2 focus-visible:outline-primary";
 const currentClass = "border-primary text-primary";
@@ -11,13 +9,6 @@ export function CapabilityLabNav({ current, surveyDraftEnabled = false, surveyPu
   surveyDraftEnabled?: boolean;
   surveyPublicationEnabled?: boolean;
 }) {
-  const release = useQuery({
-    queryKey: ["canonical-learning-release"],
-    queryFn: () => getCanonicalLearningReleaseAvailability(),
-    staleTime: 60_000,
-    retry: false,
-  });
-  const facilitatedEnabled = release.data?.facilitated === true;
   return <nav aria-label="Capability Lab sections" className="mt-5 flex flex-wrap gap-2 border-b border-border">
     <Link to="/canonical/capability-lab" aria-current={current === "index" ? "page" : undefined}
       className={linkClass + " " + (current === "index" ? currentClass : inactiveClass)}>Overview</Link>
@@ -27,12 +18,12 @@ export function CapabilityLabNav({ current, surveyDraftEnabled = false, surveyPu
       className={linkClass + " " + (current === "site-qualification" ? currentClass : inactiveClass)}>Site qualification</Link>
     <Link to="/canonical/lab/readiness" aria-current={current === "readiness" ? "page" : undefined}
       className={linkClass + " " + (current === "readiness" ? currentClass : inactiveClass)}>Assessment catalog</Link>
-    {(facilitatedEnabled || current === "facilitated") && <Link to="/canonical/lab/facilitated"
+    <Link to="/canonical/lab/facilitated"
       aria-current={current === "facilitated" ? "page" : undefined}
-      className={linkClass + " " + (current === "facilitated" ? currentClass : inactiveClass)}>Facilitated delivery</Link>}
-    {(facilitatedEnabled || current === "impact") && <Link to="/canonical/lab/impact"
+      className={linkClass + " " + (current === "facilitated" ? currentClass : inactiveClass)}>Facilitated delivery</Link>
+    <Link to="/canonical/lab/impact"
       aria-current={current === "impact" ? "page" : undefined}
-      className={linkClass + " " + (current === "impact" ? currentClass : inactiveClass)}>Participation evidence</Link>}
+      className={linkClass + " " + (current === "impact" ? currentClass : inactiveClass)}>Participation evidence</Link>
     <Link to="/canonical/lab/devices" aria-current={current === "devices" ? "page" : undefined}
       className={linkClass + " " + (current === "devices" ? currentClass : inactiveClass)}>Site devices</Link>
     <Link to="/canonical/lab/enrollment" aria-current={current === "enrollment" ? "page" : undefined}
