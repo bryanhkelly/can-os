@@ -91,9 +91,6 @@ export const getClassroomSurveyOptions=createServerFn({method:"GET"})
           if(!(error instanceof AuthorizationError))throw error;
         }
       }
-      if(!await attemptInAssignedClassroomRelease(
-        tx,room,access.courseAttemptId,personId,
-      ))throw new AuthorizationError("own classroom enrollment release");
       const links=await tx.select({
         surveyCampaignId:facilitatedRoomSurveyCampaigns.surveyCampaignId,
         stage:facilitatedRoomSurveyCampaigns.stage,
@@ -170,6 +167,9 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
         room.courseVersionId!==access.courseVersionId ||
         !await roomHostIsCurrent(tx,room,new Date()))
         throw new AuthorizationError("own registered classroom survey");
+      if(!await attemptInAssignedClassroomRelease(
+        tx,room,access.courseAttemptId,personId,
+      ))throw new AuthorizationError("own classroom enrollment release");
       const links=await tx.select({
         id:facilitatedRoomSurveyCampaigns.surveyCampaignId,
         stage:facilitatedRoomSurveyCampaigns.stage,
