@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
@@ -8,6 +8,7 @@ import {
   enrollMyselfInNoncredit, getOpenNoncreditSelfEnrollment,
 } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { normalizeClientError } from "@/lib/client-error";
+import {getMyNoncreditWaitlist,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
 export const Route=createFileRoute("/learn/enroll")({
   validateSearch:(search:Record<string,unknown>):{release?:string;ref?:string}=>({
@@ -24,6 +25,7 @@ type Release=Awaited<ReturnType<typeof getOpenNoncreditSelfEnrollment>>[number];
 
 function PublicSelfEnrollment() {
   const router=useRouter();
+  const client=useQueryClient();
   const search=Route.useSearch();
   const {session}=useWorkspaceSession();
   const [accepted,setAccepted]=useState(false);
@@ -31,12 +33,22 @@ function PublicSelfEnrollment() {
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const [enrolled,setEnrolled]=useState<{courseAttemptId:string;alreadyEnrolled:boolean}|null>(null);
+  const [waitlisted,setWaitlisted]=useState(false);
   const catalog=useQuery({
     queryKey:["noncredit-open-releases"],
     queryFn:()=>getOpenNoncreditSelfEnrollment(),retry:false,staleTime:30_000,
   });
+  const waiting=useQuery({
+    queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),
+    enabled:session?.authenticated===true&&session.role!=="student",
+    retry:false,staleTime:15_000,
+  });
   const selected=catalog.data?.find(item=>item.id===search.release);
-  useEffect(()=>{setAccepted(false);setAdult(false);setMessage("");setEnrolled(null);},[search.release]);
+  const myWaitlist=waiting.data?.find(entry=>entry.releaseId===selected?.id);
+  const invited=myWaitlist?.invitationActive===true;
+  const joinQueue=!!selected&&!invited&&
+    (selected.seatsRemaining<=0||selected.hasWaitingQueue);
+  useEffect(()=>{setAccepted(false);setAdult(false);setMessage("");setEnrolled(null);setWaitlisted(false);},[search.release]);
 
   const searchParams=new URLSearchParams();
   if(selected)searchParams.set("release",selected.id);
@@ -46,14 +58,27 @@ function PublicSelfEnrollment() {
     if(!selected||!accepted||!adult||busy||!session?.authenticated)return;
     setBusy(true);setMessage("");
     try{
-      const result=await enrollMyselfInNoncredit({data:{
-        releaseId:selected.id,consentVersion:selected.consentVersion,
-        consentSha256:selected.consentSha256,acceptedConsent:true,adultConfirmed:true,
-        ...(search.ref?{referralCode:search.ref}:{}),
-      }});
-      setEnrolled(result);
-      setMessage(result.alreadyEnrolled?"You are already registered for this course.":
-        "Registration confirmed. Your personal learning record has been created.");
+      if(joinQueue){
+        const result=await joinNoncreditWaitlist({data:{
+          releaseId:selected.id,consentVersion:selected.consentVersion,
+          consentSha256:selected.consentSha256,acceptedConsent:true,adultConfirmed:true,
+        }});
+        setWaitlisted(true);
+        setMessage(result.status==="invited"?
+          "Your invitation is active. Confirm registration to claim the reserved place.":
+          "You are on this course's waiting list. Joining does not reserve a seat or charge a fee.");
+        await client.invalidateQueries({queryKey:["my-noncredit-waitlist"]});
+      }else{
+        const result=await enrollMyselfInNoncredit({data:{
+          releaseId:selected.id,consentVersion:selected.consentVersion,
+          consentSha256:selected.consentSha256,acceptedConsent:true,adultConfirmed:true,
+          ...(search.ref?{referralCode:search.ref}:{}),
+        }});
+        setEnrolled(result);
+        setMessage(result.alreadyEnrolled?"You are already registered for this course.":
+          "Registration confirmed. Your personal learning record has been created.");
+        await client.invalidateQueries({queryKey:["my-noncredit-waitlist"]});
+      }
     }catch(error){
       setMessage(normalizeClientError(error,
         "We could not register you. Check the current enrollment availability and your verified account.").message);
@@ -98,7 +123,8 @@ function PublicSelfEnrollment() {
         {selected && <SelfEnrollmentConfirmation key={selected.id} release={selected}
           signedIn={session?.authenticated===true}
           returnTo={returnTo} accepted={accepted} adult={adult} busy={busy}
-          enrolled={enrolled} message={message}
+          enrolled={enrolled} message={message} waitlisted={waitlisted}
+          joinQueue={joinQueue} invited={invited} waitlistStatus={myWaitlist?.status??null}
           onAccepted={setAccepted} onAdult={setAdult} onSubmit={()=>void submit()}/>}
       </div>
       <aside className="border border-border bg-card p-5 self-start">
@@ -120,9 +146,10 @@ function PublicSelfEnrollment() {
   </WorkspaceShell>;
 }
 
-function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,message,onAccepted,onAdult,onSubmit}:{
+function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,message,waitlisted,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onSubmit}:{
   release:Release;signedIn:boolean;returnTo:string;accepted:boolean;adult:boolean;busy:boolean;
   enrolled:{courseAttemptId:string;alreadyEnrolled:boolean}|null;message:string;
+  waitlisted:boolean;joinQueue:boolean;invited:boolean;waitlistStatus:string|null;
   onAccepted:(value:boolean)=>void;onAdult:(value:boolean)=>void;onSubmit:()=>void;
 }) {
   return <section className="border border-border bg-card p-5" aria-labelledby="enroll-course-heading">
@@ -170,9 +197,16 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
         </Link>
       </div>
     </div>}
+    {waitlistStatus&&<p role="status" className="mt-4 text-sm text-muted-foreground">
+      Waitlist: {invited?"Reserved invitation, confirm enrollment before it expires":waitlistStatus}.
+      <Link to="/learn/my-courses" className="ml-2 text-primary underline">Manage</Link>
+    </p>}
     {signedIn && !enrolled && <Button type="button" className="mt-5 min-h-11"
-      disabled={!accepted||!adult||busy||release.seatsRemaining<=0}
-      onClick={onSubmit}>{busy?"Registering…":"Confirm my registration"}</Button>}
+      disabled={!accepted||!adult||busy||waitlisted||
+        (!!waitlistStatus&&joinQueue&&waitlistStatus==="waiting")}
+      onClick={onSubmit}>
+      {busy?"Saving…":joinQueue?"Join waiting list":invited?"Claim my reserved place":"Confirm my registration"}
+    </Button>}
     {message && <p role={enrolled?"status":"alert"} className="mt-4 border border-border bg-muted/20 p-4 text-sm">{message}</p>}
     {enrolled && <div className="mt-4 space-y-2">
       <Link to="/learn/my-courses" className="inline-block font-semibold text-primary underline underline-offset-4">

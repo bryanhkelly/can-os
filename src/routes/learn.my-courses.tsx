@@ -8,6 +8,7 @@ import { getMyNoncreditSelfEnrollments } from "@/modules/enrollment/noncredit-se
 import { openMyNoncreditCourse } from "@/modules/enrollment/noncredit-self-enrollment-resume.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
 import { normalizeClientError } from "@/lib/client-error";
+import {getMyNoncreditWaitlist,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
 export const Route=createFileRoute("/learn/my-courses")({
   loader:async({context,location})=>{
@@ -20,11 +21,13 @@ export const Route=createFileRoute("/learn/my-courses")({
 function MyNoncreditCourses(){
   const client=useQueryClient();
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
+  const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
   const [withdrawBusy,setWithdrawBusy]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
   const query=useQuery({queryKey:["my-noncredit-self-enrollments"],
     queryFn:()=>getMyNoncreditSelfEnrollments(),retry:false,staleTime:15_000});
   const [busy,setBusy]=useState<string|null>(null);
+  const waiting=useQuery({queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),retry:false,staleTime:15_000});
   const [error,setError]=useState("");
   async function open(courseAttemptId:string) {
     if(busy)return;
@@ -65,6 +68,35 @@ function MyNoncreditCourses(){
     </p>}
     {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-4 border border-border bg-card p-4 text-sm">{notice}</p>}
+    {waiting.isSuccess&&waiting.data.length>0&&<section className="mt-6 border border-border bg-card p-5" aria-label="My training waiting lists">
+      <h2 className="font-serif text-2xl">Waiting lists and reserved invitations</h2>
+      <p className="mt-2 text-sm text-muted-foreground">A waiting place is not enrollment. Reserved invitations expire and require you to confirm your registration personally.</p>
+      <div className="mt-3 divide-y divide-border">
+        {waiting.data.map(item=><article key={item.releaseId} className="py-4">
+          <h3 className="font-semibold text-sm">{item.title}</h3>
+          <p className="mt-2 text-sm">{item.invitationActive?"A seat is reserved for you":item.status==="expired"?"Invitation expired":"Waiting for an available place"}</p>
+          {item.invitationActive&&<p className="mt-1 text-xs text-muted-foreground">Claim before {item.inviteExpiresAt?new Date(item.inviteExpiresAt).toLocaleString():"the invitation expires"}</p>}
+          <div className="mt-3 flex flex-wrap gap-3">
+            {item.invitationActive&&<Link to="/learn/enroll" search={{release:item.releaseId}} className="text-sm underline text-primary">Claim reserved place</Link>}
+            {cancelWaitlist===item.releaseId?
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="destructive" disabled={busy!==null}
+                  onClick={()=>void (async()=>{
+                    setBusy(item.releaseId);
+                    try{
+                      await cancelMyNoncreditWaitlist({data:{releaseId:item.releaseId}});
+                      await client.invalidateQueries({queryKey:["my-noncredit-waitlist"]});
+                      setCancelWaitlist(null);
+                    }catch(e){setError(normalizeClientError(e,"Unable to cancel your waitlist entry.").message);}
+                    finally{setBusy(null);}
+                  })()}>Confirm leave waitlist</Button>
+                <Button type="button" variant="outline" size="sm" onClick={()=>setCancelWaitlist(null)}>Keep my place</Button>
+              </div>:
+              <button type="button" className="text-sm underline text-muted-foreground" onClick={()=>setCancelWaitlist(item.releaseId)}>Leave waiting list</button>}
+          </div>
+        </article>)}
+      </div>
+    </section>}
     {query.data && <div className="mt-6 space-y-3">
       {query.data.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className="border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
