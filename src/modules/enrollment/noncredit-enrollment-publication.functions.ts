@@ -1,3 +1,4 @@
+import { alias } from "drizzle-orm/pg-core";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
@@ -24,6 +25,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
   const now=new Date();
   const org=provider.organizationId, siteIds=provider.siteIds;
   const operator=educationOperationOrganizationRoles;
+  const registeringOrg=alias(canonicalEnrollmentOrganizations,"self_enroll_registering_org");
   const available=await executor.select({
     deploymentId:programDeployments.id,
     deploymentName:programDeployments.name,
@@ -45,6 +47,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
       noncreditTrainingVersions.offeringVersionId,offeringVersions.id))
     .innerJoin(canonicalEnrollmentOrganizations,eq(
       canonicalEnrollmentOrganizations.id,noncreditTrainingVersions.providerOrganizationId))
+    .innerJoin(registeringOrg,eq(registeringOrg.id,org))
     .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
     .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
     .where(and(
@@ -59,6 +62,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
       isNotNull(noncreditTrainingVersions.publishedAt),
       isNotNull(noncreditTrainingVersions.approvedByPersonId),
       eq(canonicalEnrollmentOrganizations.status,"active"),
+      eq(registeringOrg.status,"active"),
       eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
       exists(executor.select({id:operator.id}).from(operator).where(and(
         eq(operator.operationId,programDeployments.operationId),
