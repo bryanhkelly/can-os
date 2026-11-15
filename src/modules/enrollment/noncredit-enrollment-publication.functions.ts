@@ -11,6 +11,7 @@ import {
   educationOperationOrganizationRoles,educationOperationSites,educationOperations,
   noncreditCompletionPolicies,noncreditSelfEnrollmentReleases,
   noncreditTrainingVersions,offeringVersions,offerings,programDeployments,
+  siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { noncreditPublishCommand, publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
@@ -51,7 +52,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
     .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
     .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
     .where(and(
-      inArray(programDeployments.status,["authorized","active"]),
+      eq(programDeployments.status,"active"),
       eq(educationOperations.status,"active"),
       eq(offerings.status,"active"),
       eq(offeringVersions.lifecycle,"published"),isNotNull(offeringVersions.publishedAt),
@@ -102,6 +103,15 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
       inArray(classroomDeploymentSites.deploymentId,available.map(row=>row.deploymentId)),
       inArray(classroomDeploymentSites.siteId,siteIds),
       eq(canonicalEnrollmentSites.status,"active"),
+      exists(executor.select({id:siteOrganizationRoles.id})
+        .from(siteOrganizationRoles).where(and(
+          eq(siteOrganizationRoles.siteId,classroomDeploymentSites.siteId),
+          eq(siteOrganizationRoles.organizationId,org),
+          inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+          lte(siteOrganizationRoles.validFrom,now),
+          or(isNull(siteOrganizationRoles.validThrough),
+            gt(siteOrganizationRoles.validThrough,now)),
+        ))),
     )).limit(200):[];
   return available.map(row=>({
     ...row,
