@@ -19,7 +19,7 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
   });
   const current=command.data?.latest??null;
   const identity=current?current.lessonId+":"+current.assetVersionId:"";
-  const resolved=loaded&&loaded.key===identity?resolveClassVideo(loaded.src):null;
+  const resolved=loaded&&loaded.key===identity?resolveClassVideo(loaded.src,true):null;
   useEffect(()=>{
     if(!enabled||!current||command.data?.roomState!=="live"||!identity||loaded?.key===identity)return;
     let active=true;
@@ -63,6 +63,10 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
       }});
     }catch{setError("Playback observation was not saved. The command remains auditable.");}
   }
+  if(command.data?.roomState==="ended")return <section
+    className="border border-border bg-card p-6" aria-label="Classroom projector">
+    <p role="status">This facilitated room has ended. Projector playback is closed.</p>
+  </section>;
   return <section className="border border-border bg-card p-4" aria-label="Classroom projector">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h2 className="font-serif text-xl font-semibold">Projector playback</h2>
