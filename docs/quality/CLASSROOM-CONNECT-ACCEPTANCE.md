@@ -2,7 +2,7 @@
 
 **Updated:** 2026-11-14
 **Scope:** canonical facilitated-learning foundation and privacy-safe join/companion routes on `main`.
-**Status:** implementation committed; enabled-feature release **BLOCKED** pending executed acceptance.
+**Status:** flag-free implementation committed; live rollout **BLOCKED** by Netlify configuration permissions, missing restricted credentials and unverified current-main deployment.
 
 ## Evidence actually observed
 
@@ -34,26 +34,26 @@ The existing guarded Playwright config requires:
 Do not run fixture-writing tests against the Neon `main` branch, production,
 or a shared learner database.
 
-### Closed-release regression commands
+### Unconfigured-runtime regression commands
 
 ```sh
 npm run test:classroom:unit
-npm run test:classroom:closed
+npm run test:classroom:unconfigured
 npm run typecheck
 npm run lint
 npm run build
 node scripts/check-platform-route-contracts.mjs --check
 ```
 
-Tests are **authored**, not marked passing. The closed-release browser checks
-verify that the disabled feature exposes neither eligible courses nor
-facilitator controls to synthetic student/guardian sessions.
+Tests are **authored**, not marked passing. The unconfigured-runtime browser
+checks verify that missing restricted authentication does not expose eligible
+courses or facilitator controls to synthetic student/guardian sessions.
+There are no deployment feature flags.
 
 ## Required enabled-feature acceptance matrix
 
-Before enabling either `CAN_FACILITATED_LEARNING_ENABLED` or
-`CAN_CANONICAL_ACTIVITY_ENABLED` outside synthetic QA, record the exact SHA,
-build, DB branch/role, actor identity, command, result and error evidence for
+Before real learner/facilitator production use, record the exact SHA, build,
+database branch/role, actor identity, command, result and error evidence for
 each of the following.
 
 | ID | Scenario | Required outcome |
@@ -75,7 +75,7 @@ each of the following.
 
 The first twelve scenarios cover the merged foundation; A13–A14 are still
 part of the unmerged larger Phase 2 work. Do not promote that PR wholesale,
-declare success from code inspection, or switch feature flags on without
+declare success from code inspection, or claim production acceptance without
 executed scoped runtime and browser evidence.
 
 ## Release decision
@@ -85,3 +85,15 @@ a usable learner-facing path in source, but current main has not passed
 runtime, enabled-feature, browser, or deployment verification. The original
 Phase 2 PR #291 was closed without merge; its activity-response, attestation,
 projector and rehearsal functionality must be ported and accepted separately.
+
+## Flag-free product availability (2026-11-14)
+
+Learning and facilitated-delivery handlers no longer consult environment
+rollout flags, and the capability-lab navigation always exposes the rooms and
+participation evidence links. The secure canonical-auth URL and signing secrets
+remain mandatory runtime configuration, not feature-selection switches.
+
+The current Netlify site lacks these credentials. Attempted production secret
+provisioning through the connected Netlify integration returned **HTTP 403**.
+A site administrator must authorize provisioning and trigger/enable a current
+build. These obstacles prevent honest live-site acceptance claims.
