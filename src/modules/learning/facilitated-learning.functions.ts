@@ -734,7 +734,7 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
  * independently registered online learners may attend an approved Site room
  * without creating a second registration or resetting learning progress.
  */
-async function selfEnrolledNoncreditRoomSitePermitted(
+export async function selfEnrolledNoncreditRoomSitePermitted(
   tx:Tx, access:{source:"school"|"noncredit";noncreditRegistrationId:string|null},
   roomSiteId:string,
 ):Promise<boolean> {
