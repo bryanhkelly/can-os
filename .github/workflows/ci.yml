@@ -33,6 +33,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Validate committed Drizzle snapshot chain
+        run: node scripts/check-drizzle-snapshot-chain.mjs
+
       - name: Check documentation references
         run: npm run docs:check
 
