@@ -25,6 +25,7 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
     if (!actor.actorPersonId || !["student", "learner"].includes(actor.role ?? "")) {
       throw new AuthorizationError("authenticated course learner");
     }
+    const personId = actor.actorPersonId;
     return db.transaction(async tx => {
       const common = {
         courseAttemptId: learnerCourseAttempts.id,
