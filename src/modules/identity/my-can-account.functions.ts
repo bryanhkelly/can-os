@@ -8,6 +8,7 @@ import {
   sitePublications, sites,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
+import { accountPersonNeedsReview, canSavePublishedSite } from "@/domain/my-can-account";
 import { getCommandContext } from "./command-context.server";
 import { readSessionGrants } from "./session-grants.server";
 import { publicSiteHost } from "@/domain/public-site-address";
@@ -101,6 +102,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
     fullName: [person[0].firstName, person[0].lastName].join(" "),
     demoAccountSwitching,
     workspaces, places,
+    identityNeedsReview: accountPersonNeedsReview(grants, demoAccountSwitching),
   };
 });
 
@@ -120,12 +122,10 @@ export const setMyCanFavoriteSite = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       await tx.execute(sql`SELECT set_config('can.account_id', ${accountId}, true)`);
       if (data.favorite) {
-        const [published] = await tx.select({ id: sitePublications.siteId })
+        const [published] = await tx.select({ id: sitePublications.siteId, status: sitePublications.status, publishedAt: sitePublications.publishedAt })
           .from(sitePublications)
-          .where(and(eq(sitePublications.siteId, data.siteId),
-            eq(sitePublications.status, "published"),
-            isNotNull(sitePublications.publishedAt))).limit(1);
-        if (!published) throw new AuthorizationError("published Site");
+          .where(eq(sitePublications.siteId, data.siteId)).limit(1);
+        if (!canSavePublishedSite(published)) throw new AuthorizationError("published Site");
         await tx.insert(accessAccountFavoriteSites).values({
           accountId, siteId: published.id,
         }).onConflictDoNothing();
