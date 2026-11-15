@@ -11,6 +11,7 @@ import {
   requestSiteIdentityLink, getSiteIdentityLinkStatus,
   confirmCanonicalSiteIdentityLink, listPendingSiteIdentityReviews,
   reviewSiteIdentityLink, verifyCANStaffCanonicalPrincipal,
+  revokeCANStaffCanonicalPrincipal,
 } from "@/modules/sites/site-identity-links.functions";
 
 type Mode="request"|"confirm"|"review"|"staff";
@@ -41,6 +42,8 @@ function SiteIdentityWorkspace(){
   const [staffCanonicalPersonId,setStaffCanonicalPersonId]=useState("");
   const [staffEvidence,setStaffEvidence]=useState("");
   const [staffAttested,setStaffAttested]=useState(false);
+  const [revokeStaffAccountId,setRevokeStaffAccountId]=useState("");
+  const [revokeStaffReason,setRevokeStaffReason]=useState("");
   const sites=useQuery({
     queryKey:["site-identity-own-sites"],
     queryFn:()=>listLaunchOptions(),enabled:mode==="request",retry:false,
@@ -89,6 +92,13 @@ function SiteIdentityWorkspace(){
       evidenceReference:staffEvidence.trim(),
       identityVerified:true,
     }}),"The existing CAN account is now explicitly linked to the verified canonical Person. One CAN sign-in is sufficient for authorized Site operations.");
+  }
+  function revokeStaffLink(e:FormEvent){
+    e.preventDefault();
+    void run(()=>revokeCANStaffCanonicalPrincipal({data:{
+      publicAccountId:revokeStaffAccountId,
+      reason:revokeStaffReason.trim(),
+    }}),"Any active canonical staff identity link for this CAN account has been revoked.");
   }
   function review(decision:"approve"|"reject"|"revoke",overrideSiteId?:string,overrideReason?:string){
     const publicSiteId=overrideSiteId??target;
@@ -253,6 +263,24 @@ function SiteIdentityWorkspace(){
           Verify staff identity link
         </Button>
       </form>
+      <div className="mt-8 border-t border-border pt-6">
+        <h3 className="font-semibold">Revoke a verified staff identity link</h3>
+        <p className="mt-2 text-sm text-muted-foreground">An independent institutional reviewer can revoke the correspondence without deleting the CAN account, the canonical Person, or historical audit evidence.</p>
+        <form className="mt-4 space-y-4" onSubmit={revokeStaffLink}>
+          <label className="block text-sm font-semibold">CAN account UUID
+            <Input className="mt-2" required value={revokeStaffAccountId}
+              onChange={e=>setRevokeStaffAccountId(e.target.value)}/>
+          </label>
+          <label className="block text-sm font-semibold">Reason for revocation
+            <textarea required minLength={25} maxLength={1200} value={revokeStaffReason}
+              onChange={e=>setRevokeStaffReason(e.target.value)}
+              className="mt-2 min-h-24 w-full border border-border bg-background p-3 text-sm"/>
+          </label>
+          <Button variant="outline" type="submit" disabled={busy||
+            !z.string().uuid().safeParse(revokeStaffAccountId).success||
+            revokeStaffReason.trim().length<25}>Revoke staff identity link</Button>
+        </form>
+      </div>
       <p className="mt-5 text-xs text-muted-foreground">
         No account or native staff grant is created here. Revocation of the
         CAN account, either staff grant, canonical principal link, or approved
