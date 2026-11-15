@@ -417,3 +417,54 @@ test("student dashboard class links open the enrolled classroom directory", asyn
     await expect(page.getByRole("main").getByRole("heading", { name: "My classes" })).toBeVisible();
   });
 });
+
+
+/**
+ * Classroom Connect release-closed checks. These run through the real guarded
+ * app and synthetic identities, not mocked route handlers. A separate enabled
+ * matrix is required before the release flags can be changed.
+ */
+test("classroom join never exposes course choices while the pilot gate is off", async ({ browser }) => {
+  if (process.env.CAN_FACILITATED_LEARNING_ENABLED === "true") {
+    throw new Error("Release-closed classroom regression requires CAN_FACILITATED_LEARNING_ENABLED off.");
+  }
+  for (const role of ["student", "guardian"] as const) {
+    const secret = roleSecrets[role];
+    if (!secret) throw new Error("Missing synthetic persona " + role);
+    await withAuthenticatedPage(browser, secret, async ({ page }) => {
+      const response = await page.goto("/join");
+      expect(response?.status()).toBe(200);
+      await expect(page.getByRole("heading", { name: "Join a facilitator-led classroom" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Pair my device" })).toHaveCount(0);
+      await expect(page.getByRole("combobox", { name: "Your course" })).toHaveCount(0);
+      await expect(page.getByRole("alert")).toBeVisible();
+      expect(page.url()).not.toMatch(/pairingCode=|code=/i);
+    });
+  }
+});
+
+test("learner and guardian cannot use facilitator controls in the closed release", async ({ browser }) => {
+  if (process.env.CAN_FACILITATED_LEARNING_ENABLED === "true") {
+    throw new Error("Release-closed classroom regression requires CAN_FACILITATED_LEARNING_ENABLED off.");
+  }
+  for (const role of ["student", "guardian"] as const) {
+    const secret = roleSecrets[role];
+    if (!secret) throw new Error("Missing synthetic persona " + role);
+    await withAuthenticatedPage(browser, secret, async ({ page }) => {
+      await page.goto("/canonical/lab/facilitated");
+      await expect(page.getByRole("button", { name: "Start facilitator room" })).toHaveCount(0);
+      await expect(page.getByText(/Pairing code|Learners with paired devices/i)).toHaveCount(0);
+    });
+  }
+});
+
+test("companion without a verified course attempt exposes no room information", async ({ browser }) => {
+  const secret = roleSecrets.guardian;
+  if (!secret) throw new Error("Missing synthetic guardian");
+  await withAuthenticatedPage(browser, secret, async ({ page }) => {
+    const response = await page.goto("/classroom/companion");
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole("alert")).toContainText("Join with a current facilitator code first.");
+    await expect(page.getByText("Connected to facilitated learning")).toHaveCount(0);
+  });
+});
