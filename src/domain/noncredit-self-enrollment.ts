@@ -23,8 +23,7 @@ export const noncreditPublishCommand = z.object({
   consentVersion:z.string().trim().min(3).max(80),
   consentText:z.string().trim().min(25).max(4000),
 }).strict().refine(x=>new Date(x.opensAt)<new Date(x.closesAt),{message:"Enrollment close must follow opening"})
-  .refine(x=>(x.deliveryMode==="independent"&&x.siteId===null)||
-   (x.deliveryMode==="facilitated"&&x.siteId!==null),{message:"Facilitated registration requires a Site"});
+  .refine(x=>x.deliveryMode!=="facilitated"||x.siteId!==null,{message:"Facilitated registration requires a Site"});
 
 /** Consent is bound to the exact server published text and revision, not a
  * mutable browser/localStorage copy. */
