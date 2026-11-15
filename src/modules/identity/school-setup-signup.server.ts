@@ -33,29 +33,41 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   }).returning({ id: sites.id });
   if (!site) throw new Error("School Site could not be created");
 
-  const [person] = await tx.insert(people).values({
+  const associated=await tx.select({
+    personId: accountPersonGrants.personId,
+    role: accountPersonGrants.role,
+  }).from(accountPersonGrants).where(and(
+    eq(accountPersonGrants.accountId, accountId),
+    eq(accountPersonGrants.active, true),
+  ));
+  if (associated.some(grant=>grant.role!=="account_holder") ||
+      new Set(associated.map(grant=>grant.personId)).size>1)
+    throw new Error("School founder identity needs verification before reuse");
+  const existingPersonId=associated[0]?.personId;
+  const [createdPerson] = existingPersonId ? [null] : await tx.insert(people).values({
     legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
   }).returning({ id: people.id });
-  if (!person) throw new Error("School administrator identity could not be created");
+  const personId=existingPersonId??createdPerson?.id;
+  if (!personId) throw new Error("School administrator identity could not be created");
 
   const [grant] = await tx.insert(accountPersonGrants).values({
-    accountId, personId: person.id, role: "site_admin",
+    accountId, personId, role: "site_admin",
     organizationId: organization.id, siteId: site.id, active: true,
   }).returning({ id: accountPersonGrants.id });
   if (!grant) throw new Error("Initial Site Admin grant could not be created");
 
   await tx.insert(memberships).values({
-    personId: person.id, organizationId: organization.id, title: "Site Administrator",
+    personId, organizationId: organization.id, title: "Site Administrator",
   });
   await tx.insert(roleAssignments).values({
-    personId: person.id, organizationId: organization.id, siteId: site.id,
+    personId, organizationId: organization.id, siteId: site.id,
     roleKey: "site_admin", capabilities: ["profiles.credentials.verify", "profiles.catalog.create",
       "staffing.policy.publish", "curriculum.publish", "program.opening.handoff.manage",
       "site.publication.manage"],
   });
 
   await writeAudit(tx, {
-    actorPersonId: person.id, action: "school.setup", resourceType: "organization",
+    actorPersonId: personId, action: "school.setup", resourceType: "organization",
     resourceId: organization.id, scope: { organizationId: organization.id, siteId: site.id },
     after: { schoolName: signup.schoolName, initialGrantId: grant.id,
       source: "verified_email_school_setup" },
@@ -64,13 +76,13 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   });
   await emitEvent(tx, {
     eventType: EventTypes.SchoolSetupCompleted, aggregateType: "organization",
-    aggregateId: organization.id, actorPersonId: person.id,
+    aggregateId: organization.id, actorPersonId: personId,
     organizationId: organization.id, siteId: site.id,
     payload: { source: "verified_email_school_setup" },
   });
   await emitEvent(tx, {
     eventType: EventTypes.SiteCreated, aggregateType: "site", aggregateId: site.id,
-    actorPersonId: person.id, organizationId: organization.id, siteId: site.id,
+    actorPersonId: personId, organizationId: organization.id, siteId: site.id,
     payload: { name: signup.schoolName, timezone: DEFAULT_SITE_TIMEZONE },
   });
 
