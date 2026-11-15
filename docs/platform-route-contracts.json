@@ -463,6 +463,15 @@
       "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
     },
     {
+      "file": "src/routes/classroom.companion.tsx",
+      "route": "/classroom/companion",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/enrichment_.$seasonId.tsx",
       "route": "/enrichment/$seasonId",
       "owner": "activities",
@@ -673,6 +682,15 @@
       "file": "src/routes/interest-event.ts",
       "route": "/interest-event",
       "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/join.tsx",
+      "route": "/join",
+      "owner": "learning",
       "verification": "pending",
       "roleJourney": "pending",
       "writeBoundary": "pending",
