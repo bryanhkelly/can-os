@@ -92,13 +92,24 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
         .where(and(eq(sitePublications.status, "published"),
           isNotNull(sitePublications.publishedAt)))
         .orderBy(asc(sites.name)).limit(100);
-    const savedIds = await tx.select({ id: accessAccountFavoriteSites.siteId })
-      .from(accessAccountFavoriteSites)
+    const savedSites = await tx.select({
+      id: sites.id, name: sites.name, address: sites.address,
+      organizationName: organizations.name, slug: sitePublications.slug,
+      status: sitePublications.status, publishedAt: sitePublications.publishedAt,
+    }).from(accessAccountFavoriteSites)
+      .innerJoin(sites, eq(accessAccountFavoriteSites.siteId, sites.id))
+      .innerJoin(organizations, eq(sites.organizationId, organizations.id))
+      .leftJoin(sitePublications, eq(sites.id, sitePublications.siteId))
       .where(eq(accessAccountFavoriteSites.accountId, accountId)).limit(500);
-    const favoriteIds = new Set(savedIds.map(row => row.id));
-    // Verified private workspace Sites are visible to their members, but no one
-    // else; public directory listings still require approved publication.
-    const bySite = new Map([...directory, ...workspaceSites].map(row => [row.id, row]));
+    const favoriteIds = new Set(savedSites.map(row => row.id));
+    // Show favorites outside the first page of public results, but never
+    // expose an unpublished private Site after the last verified grant ends.
+    const allowedSaved = savedSites.filter(row =>
+      siteIds.includes(row.id) || canSavePublishedSite({
+        status: row.status ?? "", publishedAt: row.publishedAt,
+      }));
+    const bySite = new Map([...directory, ...workspaceSites, ...allowedSaved]
+      .map(row => [row.id, row]));
     return [...bySite.values()].map(site => ({
       id: site.id, name: site.name, organizationName: site.organizationName,
       city: typeof site.address?.city === "string" ? site.address.city : null,
