@@ -106,7 +106,7 @@ export async function resolveCanonicalSiteStaffFromCan(
       typeof approvedSites.rows[0]?.canonicalSiteId !== "string") {
     throw new AuthorizationError("independently reviewed Site identity");
   }
-  const canonicalSiteId = approvedSites.rows[0].canonicalSiteId;
+  const canonicalSiteId = String(approvedSites.rows[0].canonicalSiteId);
   const now = new Date();
   const role = actor.role === "site_admin" ? "site_admin" : "registrar";
 
