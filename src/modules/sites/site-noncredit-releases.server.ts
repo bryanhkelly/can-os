@@ -3,15 +3,11 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { readEligibleSelfEnrollmentReleases } from "@/modules/enrollment/noncredit-self-enrollment-catalog.server";
 import type { SiteNoncreditListing } from "@/domain/site-noncredit-public";
+import {siteCatalogReaderAccessible,type SiteNoncreditPreflight} from "@/domain/site-noncredit-bridge";
 
 type Reader=Pick<typeof db,"select"|"execute">;
 const linkedSiteSchema=z.object({canonicalSiteId:z.string().uuid()}).strict();
 
-type SiteNoncreditPreflight={
-  mappingReady:boolean;releasesReady:boolean;
-  publicSchema:boolean;nativeSchema:boolean;
-  mappingRead:boolean;releaseRead:boolean;
-};
 /** Probe actual runtime connection privileges, never credential-string shape.
  * The restricted native-session reader is deliberately not the public Site
  * catalog reader. Approved mapping and CAN's full eligibility rules still
@@ -36,12 +32,6 @@ export async function probeSiteNoncreditCatalogReader(
   if(!row)throw new Error("Site enrollment reader readiness unavailable");
   return row;
 }
-export function siteCatalogReaderAccessible(value:SiteNoncreditPreflight):boolean{
-  return value.mappingReady&&value.releasesReady&&value.publicSchema&&
-    value.nativeSchema&&value.mappingRead&&value.releaseRead;
-}
-
-
 /**
  * Website-safe, opt-in cross-schema projection.
  *
