@@ -6,7 +6,8 @@ import { and, asc, countDistinct, desc, eq, gt, inArray, isNull, lte, or } from 
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents, catalogSites, contentAssetVersions, courseLessons, courseVersions, courses,
+  auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants,
+  contentAssetVersions, courseLessons, courseVersions, courses,
   domainEvents,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
@@ -175,7 +176,24 @@ async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.
       eq(programDeployments.id,room.deploymentId),
       eq(programDeployments.status,"active"),
     )).limit(1);
-  return !!host;
+  if(!host)return false;
+  // Room ownership alone does not preserve a revoked facilitator's ability
+  // to recruit or expose learner activity after their native grant is removed.
+  const [grant] = await tx.select({id:canonicalAccountGrants.id})
+    .from(canonicalAccountGrants)
+    .innerJoin(canonicalAccounts,and(
+      eq(canonicalAccounts.id,canonicalAccountGrants.accountId),
+      isNull(canonicalAccounts.disabledAt),
+    ))
+    .where(and(
+      eq(canonicalAccountGrants.personId,room.facilitatorPersonId),
+      eq(canonicalAccountGrants.organizationId,room.hostOrganizationId),
+      eq(canonicalAccountGrants.siteId,room.siteId),
+      inArray(canonicalAccountGrants.roleCode,["room_facilitator","site_admin","registrar"]),
+      eq(canonicalAccountGrants.active,true),
+      isNull(canonicalAccountGrants.revokedAt),
+    )).limit(1);
+  return !!grant;
 }
 async function schoolAttemptIsPlacedAtSite(
   tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,
