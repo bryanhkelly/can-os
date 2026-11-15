@@ -30,7 +30,7 @@ type VerifiedSelfEnrollmentActor = {
   preferredName: string | null; emailVerifiedAt: Date;
 };
 
-async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollmentActor> {
+export async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollmentActor> {
   const actor = await getCommandContext(getRequest());
   // Synthetic demo switching is not acceptable evidence of a unique adult.
   if (actor.sessionAccountId || !actor.actorPersonId)
@@ -135,7 +135,7 @@ async function requireLearnerGrant(tx:Tx, accountId:string, personId:string, org
   return created.id;
 }
 
-async function issueNativeLearnerSession(tx:Tx, accountId:string, grantId:string, now:Date) {
+export async function issueNativeLearnerSession(tx:Tx, accountId:string, grantId:string, now:Date) {
   const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
   if(!pepper||pepper.length<32)
     throw new Error("Native learning session is temporarily unavailable");
