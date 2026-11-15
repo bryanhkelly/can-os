@@ -126,6 +126,9 @@ function MyCanAccount() {
               <span className="text-xs text-muted-foreground">{favoriteCount} saved</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">Save published learning locations and schools where you have verified access. Favorites never enroll you or share your profile.</p>
+            {!account.favoritesReady && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
+              Saved locations are not yet available in this database. Your school access remains unchanged.
+            </p>}
             <label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a location</label>
             <input id="place-search" type="search" value={search}
               onChange={event => setSearch(event.target.value)} placeholder="Search site, organization or city"
@@ -145,7 +148,7 @@ function MyCanAccount() {
                   aria-label={"Visit " + place.name}>Visit <ExternalLink className="size-3" aria-hidden="true"/></a>
                   : <span className="text-xs text-muted-foreground">Workspace-only</span>}
                 <Button variant={place.favorite ? "secondary" : "outline"} size="sm"
-                  disabled={busy !== null} aria-pressed={place.favorite}
+                  disabled={busy !== null || !account.favoritesReady} aria-pressed={place.favorite}
                   aria-label={(place.favorite ? "Remove " : "Save ") + place.name + (place.favorite ? " from favorites" : " to favorites")}
                   onClick={() => void toggleFavorite(place.id, !place.favorite)}>
                   {place.favorite ? <Check className="size-4" aria-hidden="true"/> : <Star className="size-4" aria-hidden="true"/>}
