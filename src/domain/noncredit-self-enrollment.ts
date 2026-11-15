@@ -49,3 +49,18 @@ export function assertCanSelfEnroll(input:{
     throw new Error("This training is not currently open for self-enrollment");
   if(input.remainingSeats<=0)throw new Error("This registration has reached capacity");
 }
+
+
+/** Course withdrawal must not erase a finalized noncredit outcome.
+ * An already-withdrawn registration is idempotent, not a new transition. */
+export function noncreditSelfWithdrawalDecision(input:{
+  registrationStatus:"registered"|"active"|"completed"|"withdrawn"|"cancelled";
+  hasCompletedAttempt:boolean;
+  hasCompletedDecision:boolean;
+}):"withdraw"|"already_withdrawn"|"deny" {
+  if(input.registrationStatus==="withdrawn")return "already_withdrawn";
+  if(input.registrationStatus!=="registered"&&input.registrationStatus!=="active")
+    return "deny";
+  if(input.hasCompletedAttempt||input.hasCompletedDecision)return "deny";
+  return "withdraw";
+}
