@@ -355,6 +355,24 @@
       "writeBoundary": "Only canonical site_admin may create an owned site equipment record, change Site-owned device status or persist Site-scoped device policies. No grade/attendance credit or hardware attestation derived from registration."
     },
     {
+      "file": "src/routes/canonical.lab.facilitated.tsx",
+      "route": "/canonical/lab/facilitated",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Canonical room_facilitator or site_admin hosts a facilitated learning room in the temporary lab workspace; never exposed to student, guardian or teacher navigation; Room start/renew/end and facilitator playback commands use owned audited canonical domain commands",
+      "readBoundary": "Native canonical session with a facilitator grant (room_facilitator/site_admin/registrar and capability learning.room.facilitate) bound to the host organization/Site; workspace read models only",
+      "writeBoundary": "No direct writes on this route; room lifecycle and playback delegate to authorized audited canonical facilitated-learning server functions"
+    },
+    {
+      "file": "src/routes/canonical.lab.impact.tsx",
+      "route": "/canonical/lab/impact",
+      "owner": "operations",
+      "verification": "pending",
+      "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only participation evidence report (site delivery, pairing, assessment activity, verified training decisions reported as separate measures)",
+      "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records; delivery counts capped at 5,000 rooms with partial-results notice",
+      "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
+    },
+    {
       "file": "src/routes/canonical.lab.noncredit.tsx",
       "route": "/canonical/lab/noncredit",
       "owner": "operations",
