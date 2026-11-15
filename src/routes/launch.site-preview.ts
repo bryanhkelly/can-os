@@ -8,9 +8,10 @@ import { AuthorizationError } from "@/domain/command-context";
 import { readAcademicProgramCatalog } from "@/modules/sites/academic-program-catalog.server";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
+import { publicSiteHost } from "@/domain/public-site-address";
 import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/sites/site-local-content.server";
 import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalContent, siteLocalImagePublicationGaps } from "@/domain/site-local-content";
-import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
+import { renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { renderSiteFirstPrivatePlan, siteFirstPreviewHeaders } from "@/domain/site-first-preview";
@@ -73,7 +74,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           },
         };
         const page:PublicSitePage={
-          host:publication.slug+".can-os.com",
+          host:publicSiteHost(publication.slug),
           site:{name:site.name,organizationName:site.organizationName},
           academicPrograms:academics,
           offerings:enrichment.map(toPublicSiteEnrichment),
@@ -83,7 +84,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const rendered=renderPublicSiteHtml(page,{path:"/",localPreview:true});
         const planned=renderSiteFirstPrivatePlan(rendered,parsed.success?parsed.data:null);
         const html=renderPrivateWebsitePreviewHtml(
-          planned,site.id,availablePublicSitePaths(page),Boolean(history.length),"site",
+          planned,site.id,[],Boolean(history.length),"site",
         );
         return new Response(html,{status:200,headers:siteFirstPreviewHeaders});
       }catch(error){
