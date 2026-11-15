@@ -1,36 +1,44 @@
-# My CAN universal account: first implemented slice
+# My CAN universal account, school relationships and discovery
 
-## Product contract
+**Code branch:** `main`  
+**Runtime acceptance:** not yet verified end-to-end  
+**Design authority:** CAN OS V6.1, with square corners, operational type and the shared workspace shell
 
-One CAN login is the person's persistent entry into schools, community programs, learning centers, and staff workspaces. A Site favorite is a personal bookmark, not an institutional relationship.
+## Core contract
 
-- **Account**: verified sign-in and account-wide security sessions.
-- **Person**: canonical human identity. Different Person IDs under a non-demo login are flagged, never auto-merged.
-- **Workspace**: a verified, scoped grant. School/student/guardian/staff access is still authorized by the existing membership switch service.
-- **Favorite Site**: independent account-owned preference. Saving a Site does not issue a role, membership, enrollment, consent, or grant access to private records.
-- **Location**: a physical or online service context, distinct from organization affiliation and delivery session.
+A person has one CAN account for learning, staff work, guardianship and schools. A school or site favorite is **not** a membership, registration, staff appointment, guardian relationship, admission offer, Section, or security grant. One can register for multiple offerings at different locations without creating more user accounts.
 
-## Implemented in main
+The account and Person record live outside school-bound relationship records. Formal decisions remain with their authoritative program and institution. Personally editable preferred name/phone is not an official legal name, child verification, health record, credential or staff identity check.
 
-- `/account/` My CAN hub using the V6.1 shared workspace shell, square-corner panels, DM Sans operational text, restrained serif headings, cool-neutral surfaces and primary actions.
-- Account reader uses the existing server-verified session and grants, returns active/alternative workspaces and account holder summary.
-- Workspace changes reuse `switchVerifiedMembership`; the browser cannot manufacture a role or Site assignment.
-- Published Site directory (bounded), separately authorized private Site locations, favorite save/remove and approved public website links. Unpublished locations are never advertised publicly.
-- `access_account_favorite_sites` is keyed by `(account_id,site_id)`, not Person or Site memberships.
-- RLS policy uses transaction-local `can.account_id`; app server sets it only after validating the account session.
-- Favorite commands are idempotent. One account may keep bookmarks while switching verified roles.
-- Account menu, sidebar and Settings link to My CAN. Existing school/student/family home pages are retained.
-- Migration `drizzle/0081_account_favorite_sites.sql` added to the Drizzle journal. Test01 migration applied; production database not changed in this pass.
-- Pure unit tests added for actual Site publication and account Person-identity mismatch.
-- Missing favorites migration leaves account/workspace summary accessible with explicit unavailable state.
+## Built in main
 
-## Remaining before full universal identity rollout
+- `/access/register`: independent personal signup using the existing one-time verified-email link, anonymous global rate limiting, single-use challenge and safe same-origin return path. Provisional names are not a logged-in Person until verified.
+- The `account_holder` role has **zero** institutional capabilities, organization IDs or site IDs. It lands at `/account/`.
+- Email-link redemption transaction provisions a self-declared Person and a personal grant only when the existing account has no active verified institutional grant. Concurrent or repeated unverified submissions do not override an active name in a pending signup.
+- Existing school founder signup reuses a verified personal Person rather than inserting a duplicate. Existing staff invitation issuance rejects ambiguous real-person identities; family verification already reuses a uniquely linked Person and independently verifies guardian authority.
+- `/account/`: verified-account workspaces, role switching, personal contact preferences, favorite locations, account security. The personal contact write is scoped to a single active real Person, audited without raw values, and refuses ambiguous Person/account or demo identities.
+- `/explore/`: read-only program-first and place-first discovery using existing approved, publicly published Site and program/extended-learning read models. Listings exclude demo fixtures, do not infer permission to open or enroll, and lead to the already-authorized school/extended-learning published Site workflow. Current discovery is bounded to the first 20 Sites.
+- `/canonical/lab/enrollment`: internal provider enrollment preview remains informational; it does **not** submit canonical noncredit registrations.
+- My CAN links are in the account menu, sidebar, Settings, sign-in, and public program explorer.
+- Account favorite Site storage and RLS from `0081`; provisional personal signups and RLS from `0082`. Both migrations applied to `test01` and production/default Neon branches, with table presence, RLS flags and favorites policy count inspected. No new rows were inserted for test accounts.
+- Unit tests committed for personal role/capabilities, signup validation, account/Person consistency, favorite-publication checks, favorite scope, and contact validation. These have not yet run in a complete repository environment.
 
-1. **Account-only onboarding**: users with no accepted membership must be able to create and sign into CAN without an institutional grant. Current passwordless flow requires membership or approved invitation.
-2. **Verified profile portability**: schools/programs may request only necessary fields with recorded, versioned disclosure/consent; do not sync private school records by default.
-3. **Registration integration**: adult self-registration, group sessions, minors and parent-managed school admissions should all reuse one verified account while preserving their separate eligibility and decision authorities.
-4. **Account/person reconciliation**: operator-reviewed, auditable reconciliation when legacy grants reference distinct real Person IDs. Never merge automatically based on email.
-5. **Discovery scale**: searchable, paginated public locations and offering/session matching instead of the first 100 published locations.
-6. **Acceptance**: local typecheck, route inventory gate, unit/e2e coverage, dual-account RLS isolation under restricted principals, mobile/keyboard/200% zoom, actual deployment to production, then the approved production migration.
+## Current flow
 
-No change to official grades, records ownership, guardian authority, staff delegation, educational enrollments or CAN v3.0.1 course participation was made for this slice.
+1. A person may explore published schools/programs before logging in.
+2. They register a personal CAN account or sign in to an existing email.
+3. A single-use verified email token creates the Person and personal account grant if the account is new.
+4. My CAN presents authorized workspaces and saved locations. Saving a Site never conveys access.
+5. On joining a published school program or receiving a staff invitation, the existing authorized intake service reuses the account and single known Person when it can verify that identity; it never infers legal guardianship or employment.
+6. Specific program/student/guardian/staff relationships remain owned by the institution. A published listing links to those independently governed flows.
+
+## Remaining critical engineering
+
+- **Native v3.0.1 noncredit adult self-registration:** must create an authorized `noncredit_registration` plus `learner_course_attempt` only through a published/approved adoption/deployment and a verified canonical Person/grant. Canonical accounts and sessions are independent of the legacy `public` account tables; the existing operator-verified crosswalk is not an automatic login bridge. **Do not link Persons by email or mint canonical learner grants from favorites.**
+- **Facilitated groups:** publish per-site cohorts/locations and use invitations and room attendance without creating duplicate individual registrations.
+- **Portability/consent:** versioned, scoped disclosure consent and an authorized provider reader for specific shared contact fields. No automatic sharing of sensitive institutional records.
+- **Youth and staff:** verify one real Person across multiple existing school/student/guardian/staff roles with independently approved relationships; reconcile legacy duplicate Persons under operator review, not auto-merge.
+- **Discovery scale:** server-side query filters, pagination and indexes; the first 20 published Sites are not a complete national search.
+- **Release gates:** checkout/install, TanStack route generation, TypeScript/build, unit tests, route inventory, restricted-principal RLS, dual-account/cross-Site privacy, Playwright for personal signup, existing school/guardian/staff enrollment and mobile/V6.1. Check actual deployment commit before claiming the site is live.
+
+No new feature flags were added. A commit to `main` is not proof of a successful deploy or CI.
