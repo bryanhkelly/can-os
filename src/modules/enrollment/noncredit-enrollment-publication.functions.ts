@@ -1,7 +1,7 @@
 import { alias } from "drizzle-orm/pg-core";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, exists, gt, inArray, isNotNull, isNull, lte, notExists, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -9,6 +9,7 @@ import {
   canonicalEnrollmentOrganizations,canonicalEnrollmentSites,canonicalOfferingCourses,
   classroomDeploymentSites,courseVersions,deploymentOfferingAdoptions,
   educationOperationOrganizationRoles,educationOperationSites,educationOperations,
+  operationalAuthorizationDecisions,
   noncreditCompletionPolicies,noncreditSelfEnrollmentReleases,
   noncreditTrainingVersions,offeringVersions,offerings,programDeployments,
   siteOrganizationRoles,
@@ -27,6 +28,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
   const org=provider.organizationId, siteIds=provider.siteIds;
   const operator=educationOperationOrganizationRoles;
   const registeringOrg=alias(canonicalEnrollmentOrganizations,"self_enroll_registering_org");
+  const supersedingPermission=alias(operationalAuthorizationDecisions,"self_enroll_permission_superseding");
   const available=await executor.select({
     deploymentId:programDeployments.id,
     deploymentName:programDeployments.name,
@@ -65,6 +67,20 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
       eq(canonicalEnrollmentOrganizations.status,"active"),
       eq(registeringOrg.status,"active"),
       eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
+      exists(executor.select({id:operationalAuthorizationDecisions.id})
+        .from(operationalAuthorizationDecisions).where(and(
+          eq(operationalAuthorizationDecisions.stageCode,"register_noncredit"),
+          eq(operationalAuthorizationDecisions.decision,"approved"),
+          eq(operationalAuthorizationDecisions.authorityOrganizationId,org),
+          or(eq(operationalAuthorizationDecisions.operationId,programDeployments.operationId),
+            eq(operationalAuthorizationDecisions.deploymentId,programDeployments.id)),
+          lte(operationalAuthorizationDecisions.validFrom,now),
+          or(isNull(operationalAuthorizationDecisions.validThrough),
+            gt(operationalAuthorizationDecisions.validThrough,now)),
+          notExists(executor.select({id:supersedingPermission.id})
+            .from(supersedingPermission)
+            .where(eq(supersedingPermission.supersedesId,operationalAuthorizationDecisions.id))),
+        ))),
       exists(executor.select({id:operator.id}).from(operator).where(and(
         eq(operator.operationId,programDeployments.operationId),
         eq(operator.organizationId,org),eq(operator.roleCode,"operator"),
