@@ -7,6 +7,7 @@ import {
   educationOperationOrganizationRoles, educationOperations,
   operationalAuthorizationDecisions,
   noncreditCompletionPolicies, noncreditSelfEnrollmentClaims,noncreditReleasedSeats,
+  noncreditEnrollmentWaitlist,
   noncreditSelfEnrollmentReleases, noncreditTrainingVersions, offeringVersions,
   offerings, programDeployments, classroomDeploymentSites, educationOperationSites,
   siteOrganizationRoles,
@@ -153,11 +154,33 @@ export async function readEligibleSelfEnrollmentReleases(
     .where(inArray(noncreditReleasedSeats.releaseId,rows.map(row=>row.id)))
     .groupBy(noncreditReleasedSeats.releaseId):[];
   const returned=new Map(seatReleases.map(row=>[row.releaseId,Number(row.places)]));
+  const nowForQueue=new Date();
+  const [invites,waiting]=rows.length?await Promise.all([
+    executor.select({
+      releaseId:noncreditEnrollmentWaitlist.releaseId,holds:count(),
+    }).from(noncreditEnrollmentWaitlist)
+      .where(and(
+        inArray(noncreditEnrollmentWaitlist.releaseId,rows.map(row=>row.id)),
+        eq(noncreditEnrollmentWaitlist.status,"invited"),
+        gt(noncreditEnrollmentWaitlist.inviteExpiresAt,nowForQueue),
+      )).groupBy(noncreditEnrollmentWaitlist.releaseId),
+    executor.select({
+      releaseId:noncreditEnrollmentWaitlist.releaseId,waiting:count(),
+    }).from(noncreditEnrollmentWaitlist)
+      .where(and(
+        inArray(noncreditEnrollmentWaitlist.releaseId,rows.map(row=>row.id)),
+        eq(noncreditEnrollmentWaitlist.status,"waiting"),
+      )).groupBy(noncreditEnrollmentWaitlist.releaseId),
+  ]):[[],[]];
+  const holds=new Map(invites.map(row=>[row.releaseId,Number(row.holds)]));
+  const waiters=new Set(waiting.map(row=>row.releaseId));
   const byRelease = new Map(counts.map(row=>[row.releaseId,Number(row.participants)]));
   return rows.map(row=>({
     ...row,
     seatsRemaining:Math.max(0,row.maxParticipants-
-      (byRelease.get(row.id)??0)+(returned.get(row.id)??0)),
+      (byRelease.get(row.id)??0)+(returned.get(row.id)??0)-
+      (holds.get(row.id)??0)),
+    hasWaitingQueue:waiters.has(row.id),
     consentSha256:publishedNoncreditConsentHash(row.consentVersion,row.consentText),
   }));
 }
