@@ -1,4 +1,5 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
+import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { randomInt, createHmac } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -326,6 +327,9 @@ async function currentRoomMediaAudience(
         )).limit(1);
       sourceCurrent = !!registration;
     }
+    if(!await attemptInAssignedClassroomRelease(
+      tx,room,attempt.id,participantPersonId,
+    ))throw new AuthorizationError("current enrolled audience in linked cohort");
     if (!roomMediaAudienceEligible({
       roomDeploymentId: room.deploymentId,
       roomCourseVersionId: room.courseVersionId,
@@ -736,7 +740,7 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
  * independently registered online learners may attend an approved Site room
  * without creating a second registration or resetting learning progress.
  */
-export async function selfEnrolledNoncreditRoomSitePermitted(
+export export async function selfEnrolledNoncreditRoomSitePermitted(
   tx:Tx, access:{source:"school"|"noncredit";noncreditRegistrationId:string|null},
   roomSiteId:string,
 ):Promise<boolean> {
@@ -809,6 +813,9 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
         tx,attempt.courseAttemptId,room.deploymentId,room.siteId,now,
       )) return null;
       if (!await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId)) return null;
+      if(!await attemptInAssignedClassroomRelease(
+        tx,room,attempt.courseAttemptId,personId,
+      )) return null;
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
@@ -901,6 +908,9 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
           tx,access.courseAttemptId,row.deploymentId,row.siteId,now,
         ))continue;
         if(!await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
+        if(!await attemptInAssignedClassroomRelease(
+          tx,room,access.courseAttemptId,actor.actorPersonId!,
+        ))continue;
         recent.push(row);
       }
       const ids=recent.map(row=>row.roomId);
