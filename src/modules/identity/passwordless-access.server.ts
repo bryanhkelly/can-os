@@ -48,13 +48,19 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
    eq(people.active,true)));
  // Existing memberships must not hide newly invited synthetic-school grants.
  const pendingInvitations=await listPendingStaffInvitations(db,account.id);
- const [personalSignup]=await db.select({accountId:accessAccountSignups.accountId})
-  .from(accessAccountSignups).where(and(eq(accessAccountSignups.accountId,account.id),
-   isNull(accessAccountSignups.consumedAt),gt(accessAccountSignups.expiresAt,new Date()))).limit(1);
  const [schoolSignup]=await db.select({id:schoolSetupSignups.id}).from(schoolSetupSignups)
   .where(and(eq(schoolSetupSignups.accountId,account.id),isNull(schoolSetupSignups.consumedAt),
    gt(schoolSetupSignups.expiresAt,new Date()))).limit(1);
- if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length&&!schoolSignup&&!personalSignup)return "ineligible";
+ // Keep existing institutional sign-in independent of the additive personal
+ // signup migration. Only new unbound accounts need the provisional lookup.
+ const hasEstablishedAccess=memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))||
+   pendingInvitations.length>0||!!schoolSignup;
+ if(!hasEstablishedAccess){
+  const [personalSignup]=await db.select({accountId:accessAccountSignups.accountId})
+   .from(accessAccountSignups).where(and(eq(accessAccountSignups.accountId,account.id),
+    isNull(accessAccountSignups.consumedAt),gt(accessAccountSignups.expiresAt,new Date()))).limit(1);
+  if(!personalSignup)return "ineligible";
+ }
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  // Serialize concurrent requests for the same account before enforcing cooldown.
