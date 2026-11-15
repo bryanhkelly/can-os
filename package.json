@@ -57,7 +57,9 @@
     "lint": "eslint . && node scripts/check-design-system.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
+    "test:classroom:unit": "vitest run tests/unit/facilitated-learning.test.ts tests/unit/canonical-learning-activity.test.ts",
+    "test:classroom:closed": "playwright test --config playwright.authenticated-routes.config.ts --grep 'classroom join never|learner and guardian cannot use facilitator|companion without a verified'"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
