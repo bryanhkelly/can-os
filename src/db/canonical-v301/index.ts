@@ -21,3 +21,5 @@ export * from "./credentials";
 export * from "./device-operations";
 
 export * from "./classroom-rehearsal";
+
+export * from "./classroom-projector-controls";
