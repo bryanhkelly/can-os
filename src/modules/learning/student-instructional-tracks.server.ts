@@ -102,6 +102,8 @@ export const recordFormativePracticeSchema = z.object({
 
 type SelectionSource = "learner" | "guardian";
 type CourseAttempt = typeof learnerCourseAttempts.$inferSelect;
+type FacilitatedDeliveryScope = Pick<CourseAttempt,
+  "deploymentId" | "adoptionId" | "offeringVersionId" | "courseVersionId">;
 type AuthorizedParticipant = {
   selectionSource: SelectionSource;
   participantPersonId: string;
@@ -252,7 +254,7 @@ async function loadCoursePublisherOrganizationId(
 
 async function loadCurrentPolicy(
   tx: TrackTransaction,
-  attempt: CourseAttempt,
+  attempt: FacilitatedDeliveryScope,
   source: SelectionSource,
   action: "student_choice" | "practice" | "delivery",
 ) {
@@ -339,7 +341,7 @@ async function assertCurrentRightsEvidence(
 
 async function assertTrackAvailable(
   tx: TrackTransaction,
-  attempt: CourseAttempt,
+  attempt: FacilitatedDeliveryScope,
   trackVersionId: string,
   source: SelectionSource,
   action: "student_choice" | "practice" | "delivery",
@@ -1225,6 +1227,23 @@ export async function readFormativePracticeHistory(
  * reviewer and withdrawal guards for facilitator-operated room playback.
  * The caller must separately establish current Site/room host authority.
  */
+
+/** Pure deployment/Offering preview scope. No fabricated learner, enrollment or grades. */
+export async function assertFacilitatedInstructionalPreview(
+  tx: TrackTransaction,
+  scope: FacilitatedDeliveryScope,
+  trackVersionId: string,
+  lessonId: string,
+  assetVersionId: string,
+): Promise<void> {
+  const eligible = await assertTrackAvailable(
+    tx,scope,trackVersionId,"learner","delivery",null,
+  );
+  if(!eligible.presentations.some(p =>
+    p.courseLessonId===lessonId && p.assetVersionId===assetVersionId))
+    throw new AuthorizationError("approved rehearsal presentation");
+}
+
 export async function assertFacilitatedInstructionalDelivery(
   tx: TrackTransaction,
   attempt: CourseAttempt,

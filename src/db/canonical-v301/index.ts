@@ -10,6 +10,7 @@ export * from "./learning-activity";
 export * from "./facilitated-learning";
 export * from "./facilitated-room-evidence";
 export * from "./classroom-persons";
+export * from "./classroom-offering-courses";
 export * from "./public-planning";
 
 export * from "./surveys";
@@ -18,3 +19,5 @@ export * from "./assessments";
 export * from "./credentials";
 
 export * from "./device-operations";
+
+export * from "./classroom-rehearsal";
