@@ -11,6 +11,29 @@ import {
 import { requireCanonicalLabProvider } from "./canonical-capability-lab-access.server";
 import { selectNoncreditLabAssessmentEvidence } from "@/domain/canonical-capability-lab";
 
+async function readProviderTrainingVersions(organizationId: string) {
+  return db.select({
+    id: noncreditTrainingVersions.id,
+    title: noncreditTrainingVersions.title,
+    state: noncreditTrainingVersions.state,
+    requiredMinutes: noncreditTrainingVersions.requiredInstructionMinutes,
+    assessmentVersionId: noncreditTrainingVersions.assessmentVersionId,
+  }).from(noncreditTrainingVersions)
+    .where(eq(noncreditTrainingVersions.providerOrganizationId, organizationId))
+    .orderBy(asc(noncreditTrainingVersions.title)).limit(100);
+}
+
+/**
+ * Enrollment experience preview needs training titles only, not participation,
+ * assessment evidence, completion decisions or survey response metadata.
+ */
+export const getCanonicalEnrollmentLabTrainings = createServerFn({ method: "GET" })
+  .handler(async () => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const { organizationId } = await requireCanonicalLabProvider();
+    return readProviderTrainingVersions(organizationId);
+  });
+
 /**
  * Read-only, organization-scoped index for the native canonical provider lab.
  * It never returns learner names, survey answers, question text, secure assessment
@@ -20,15 +43,7 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
   setResponseHeader("Cache-Control", "private, no-store");
   const { actor, organizationId } = await requireCanonicalLabProvider();
 
-  const trainings = await db.select({
-    id: noncreditTrainingVersions.id,
-    title: noncreditTrainingVersions.title,
-    state: noncreditTrainingVersions.state,
-    requiredMinutes: noncreditTrainingVersions.requiredInstructionMinutes,
-    assessmentVersionId: noncreditTrainingVersions.assessmentVersionId,
-  }).from(noncreditTrainingVersions)
-    .where(eq(noncreditTrainingVersions.providerOrganizationId, organizationId))
-    .orderBy(asc(noncreditTrainingVersions.title)).limit(100);
+  const trainings = await readProviderTrainingVersions(organizationId);
 
   const participation = await db.select({
     courseAttemptId: learnerCourseAttempts.id,
