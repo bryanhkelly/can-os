@@ -9,7 +9,7 @@ import {
 import {
   auditEvents,domainEvents,noncreditEnrollmentWaitlist,
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
-  noncreditTrainingVersions,
+  noncreditTrainingVersions,noncreditWaitlistEmailDeliveries,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {noncreditEnrollCommand} from "@/domain/noncredit-self-enrollment";
@@ -104,6 +104,7 @@ export const getMyNoncreditWaitlist=createServerFn({method:"GET"})
     const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     const rows=await db.select({
+      waitlistId:noncreditEnrollmentWaitlist.id,
       releaseId:noncreditEnrollmentWaitlist.releaseId,
       status:noncreditEnrollmentWaitlist.status,
       inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt,
@@ -120,8 +121,19 @@ export const getMyNoncreditWaitlist=createServerFn({method:"GET"})
         eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId),
         inArray(noncreditEnrollmentWaitlist.status,["waiting","invited"]),
       )).limit(100);
+    const deliveries=rows.length?await db.select({
+      waitlistId:noncreditWaitlistEmailDeliveries.waitlistId,
+      invitationExpiresAt:noncreditWaitlistEmailDeliveries.invitationExpiresAt,
+      status:noncreditWaitlistEmailDeliveries.status,
+    }).from(noncreditWaitlistEmailDeliveries)
+      .where(inArray(noncreditWaitlistEmailDeliveries.waitlistId,
+        rows.map(row=>row.waitlistId))):[];
     return rows.map(row=>({
       releaseId:row.releaseId,title:row.title,
+      emailDeliveryStatus:row.status==="invited"&&row.inviteExpiresAt
+        ? deliveries.find(item=>item.waitlistId===row.waitlistId&&
+          item.invitationExpiresAt.getTime()===row.inviteExpiresAt!.getTime())?.status??"not_queued"
+        : null,
       status:row.status==="invited" && row.inviteExpiresAt &&
         row.inviteExpiresAt<=new Date()?"expired" as const:row.status,
       invitationActive:row.status==="invited"&&
