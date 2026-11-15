@@ -4,6 +4,8 @@ import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
+import { ClassroomRehearsalPlayer } from "@/components/learning/ClassroomRehearsalPlayer";
+import { getClassroomRehearsalChoices } from "@/modules/learning/classroom-rehearsal.functions";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -36,6 +38,21 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     const timer = window.setInterval(() => setClockMs(Date.now()), 15_000);
     return () => window.clearInterval(timer);
   }, []);
+  const [rehearsalOptions,setRehearsalOptions] =
+    useState<Awaited<ReturnType<typeof getClassroomRehearsalChoices>> | null>(null);
+  const [rehearsalFailed,setRehearsalFailed]=useState(false);
+  const [rehearsalChoice,setRehearsalChoice]=useState("");
+  const [rehearsalOpen,setRehearsalOpen]=useState(false);
+  useEffect(()=>{
+    let live=true;
+    void getClassroomRehearsalChoices().then(value=>{
+      if(live)setRehearsalOptions(value);
+    }).catch(()=>{if(live)setRehearsalFailed(true);});
+    return ()=>{live=false;};
+  },[]);
+  const rehearsal = rehearsalOptions?.choices.find(choice=>
+    rehearsalChoice===choice.deploymentId+":"+choice.adoptionId+":"+
+    choice.courseVersionId+":"+choice.siteId);
   const [selected,setSelected]=useState("");
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
@@ -92,6 +109,39 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
         No active published courses are currently available to this Site. Check deployment
         and learner participation authority before starting a room.
       </p>}
+    </section>
+    <section className="mt-5 border border-border bg-card p-5" aria-label="Practice a course before opening a room">
+      <h2 className="font-serif text-xl font-semibold">Facilitator rehearsal</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Preview an approved course before any learner joins. Rehearsal uses
+        its own rights-checked media and never creates a fake enrollment,
+        pairing, attendance, learner work or course completion.
+      </p>
+      <div className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="min-w-72 flex-1 text-sm font-medium">
+          Approved Site course
+          <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+            value={rehearsalChoice}
+            onChange={e=>{setRehearsalChoice(e.target.value);setRehearsalOpen(false);}}>
+            <option value="">Choose a course to rehearse</option>
+            {rehearsalOptions?.choices.map(choice=><option
+              key={choice.deploymentId+":"+choice.adoptionId+":"+choice.courseVersionId+":"+choice.siteId}
+              value={choice.deploymentId+":"+choice.adoptionId+":"+choice.courseVersionId+":"+choice.siteId}>
+              {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
+            </option>)}
+          </select>
+        </label>
+        <Button type="button" variant="outline" disabled={!rehearsal}
+          onClick={()=>setRehearsalOpen(true)}>Preview approved media</Button>
+      </div>
+      {rehearsalFailed&&<p role="alert" className="mt-3 text-sm text-destructive">
+        Authorized preview courses could not be loaded.
+      </p>}
+      {rehearsalOptions?.partial&&<p role="status" className="mt-3 text-xs text-muted-foreground">
+        The Site preview list is limited. Narrow the authorized deployment before rehearsing additional courses.
+      </p>}
+      {rehearsalOpen&&rehearsal&&<ClassroomRehearsalPlayer
+        scope={rehearsal} onClose={()=>setRehearsalOpen(false)}/>}
     </section>
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
     {code && Date.parse(code.expiresAt) > clockMs &&
