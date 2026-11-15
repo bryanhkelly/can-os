@@ -8,7 +8,7 @@ import {
   sitePublications, sites,
 } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
-import { accountPersonNeedsReview, canSavePublishedSite } from "@/domain/my-can-account";
+import { accountPersonNeedsReview, canBookmarkSite, canSavePublishedSite } from "@/domain/my-can-account";
 import { getCommandContext } from "./command-context.server";
 import { readSessionGrants } from "./session-grants.server";
 import { publicSiteHost } from "@/domain/public-site-address";
@@ -155,7 +155,7 @@ export const setMyCanFavoriteSite = createServerFn({ method: "POST" })
         const [published] = await tx.select({ id: sitePublications.siteId, status: sitePublications.status, publishedAt: sitePublications.publishedAt })
           .from(sitePublications)
           .where(eq(sitePublications.siteId, data.siteId)).limit(1);
-        if (!authorizedSites.has(data.siteId) && !canSavePublishedSite(published))
+        if (!canBookmarkSite({ siteId: data.siteId, authorizedSiteIds: authorizedSites, publication: published }))
           throw new AuthorizationError("published or authorized Site");
         await tx.insert(accessAccountFavoriteSites).values({
           accountId, siteId: published.id,
