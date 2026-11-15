@@ -4,6 +4,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { FacilitatedRoomPlayer } from "@/components/learning/FacilitatedRoomPlayer";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
+import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -130,6 +131,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             </div>
           </dl>
           {room.state==="live"&&<FacilitatedRoomPlayer facilitatedSessionId={room.id}/>}
+          {room.state==="live"&&<ClassroomFacilitatorConsole facilitatedSessionId={room.id}/>}
           {room.state==="live"&&<div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" disabled={busy}
               onClick={()=>void run(async()=>{

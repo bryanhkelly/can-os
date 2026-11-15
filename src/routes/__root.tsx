@@ -75,11 +75,14 @@ function RootComponent() {
   const pathname = useLocation({ select: location => location.pathname });
   const standalone = isLaunchStudioPath(pathname);
   const engagement = isEngagementPath(pathname);
+  const presentation = /^\\/classroom\\/[0-9a-f-]{36}\\/presentation$/i.test(pathname);
 
   return (
     <QueryClientProvider client={queryClient}>
       <WorkspaceSessionProvider initial={session}>
-        {engagement
+        {presentation
+          ? <AccessReturnRecovery><Outlet /></AccessReturnRecovery>
+          : engagement
           ? <EngagementChrome><Outlet /></EngagementChrome>
           : standalone
             ? <LaunchStudioChrome><AccessReturnRecovery><Outlet /></AccessReturnRecovery></LaunchStudioChrome>

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { ClassroomCompanionRoom } from "@/components/learning/ClassroomCompanionRoom";
 import { getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 
 export const Route = createFileRoute("/classroom/companion")({
@@ -35,6 +36,7 @@ function ClassroomCompanion() {
       <p className="mt-2 text-xs text-muted-foreground">
         Device pairing is not proof of attendance, media viewing or course completion.
       </p>
+      <ClassroomCompanionRoom courseAttemptId={courseAttemptId} facilitatedSessionId={item.facilitatedSessionId}/>
     </section>) : room.isSuccess && <p role="status">You are not currently paired to an active room.</p>}
     <div className="mt-4 flex gap-2">
       <Button asChild variant="outline"><Link to="/join">Join another room</Link></Button>
