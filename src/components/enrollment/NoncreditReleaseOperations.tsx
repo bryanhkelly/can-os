@@ -49,7 +49,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       await client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]});
       await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
       setMessage(result.invited?
-        "Next waiting adult has a reserved place for up to 48 hours. The invitation is visible in their CAN account; no outbound message has been sent.":
+        "Next waiting adult has a reserved place for up to 48 hours. The invitation is visible in their CAN account, and an email delivery has been queued. Provider acceptance is tracked separately.":
         "There are no eligible waiting participants to invite.");
     }catch(cause){
       setMessage(normalizeClientError(cause,"Could not reserve the next waiting place.").message);
@@ -96,6 +96,13 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
         <p className="mt-2 text-sm text-muted-foreground">
           {query.data.metrics.waiting} waiting · {query.data.metrics.invitations} active invitations · {query.data.seatsAvailable} unheld seats.
           Invitations follow queue order and reserve capacity temporarily. The participant must accept personally.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Email queued: {query.data.metrics.emailQueued}
+          {" · "}Accepted by provider: {query.data.metrics.emailProviderAccepted}
+          {" · "}Failed or retrying: {query.data.metrics.emailFailed}
+          {" · "}Suppressed: {query.data.metrics.emailSuppressed}.
+          Provider acceptance does not mean the email was opened or a seat accepted.
         </p>
         <Button type="button" className="mt-3" variant="outline" disabled={busy!==null||
           query.data.metrics.waiting===0||query.data.seatsAvailable<=0}
