@@ -73,7 +73,6 @@ export const getClassroomSurveyOptions=createServerFn({method:"GET"})
   .validator((raw:unknown)=>roomInput.parse(raw))
   .handler(async({data})=>{
     guard();const host=await requireCanonicalFacilitator();
-    const personId = actor.actorPersonId;
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       const rows=await tx.select({id:surveyCampaigns.id})
@@ -147,6 +146,7 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
     const actor=await getInstructionalLearnerContext(getRequest());
     if(actor.role!=="learner"||!actor.actorPersonId)
       throw new AuthorizationError("identified noncredit learner survey");
+    const personId = actor.actorPersonId;
     return db.transaction(async tx=>{
       const access=await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId,true);
       if(access.source!=="noncredit")
