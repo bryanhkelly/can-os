@@ -386,9 +386,9 @@
       "route": "/canonical/lab/facilitated",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Canonical Site facilitator starts and manages rooms, rehearses approved content, shares ephemeral QR/typed pairing and releases formative activities in the V6.1 console",
-      "readBoundary": "Native canonical session, current operation/Site and facilitator grant; rehearsal uses independently approved Offering adoption with no fake learner",
-      "writeBoundary": "Authorized room, projector, activity and rehearsal APIs recheck Site, adoption, expiry and current audience; no direct route writes"
+      "roleJourney": "Native Site facilitator schedules a classroom meeting, starts the authorized room, directs recorded teaching, releases activities, records independent attendance and no-device practice, and links approved surveys",
+      "readBoundary": "Current Site/operation/facilitator grant; calendar plans and active registered learner roster remain private; names, direct evidence and survey invitation scope are never returned to a projector",
+      "writeBoundary": "Scoped server commands enforce a canonical delivery session, published Site Course, append-only attendance/evidence with audit, personally invited governed surveys and no direct grade/attendance bypass"
     },
     {
       "file": "src/routes/canonical.lab.impact.tsx",
@@ -503,9 +503,9 @@
       "route": "/classroom/companion",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "An independently authorized learner sees shared-room playback status, responds to facilitator activities, observes connection and gives optional quick feedback",
-      "writeBoundary": "Append-only formative response and device observation events; optional bounded ratings; official grades, attendance and completion unchanged",
-      "readBoundary": "Current own Course attempt and actively paired room, with per-person feedback history only; no other learner answers"
+      "roleJourney": "Authenticated learner connects to their own Course, responds to formative prompts, leaves, rates the session and completes approved personally invited noncredit surveys",
+      "writeBoundary": "Distinct learner-device formative responses, optional quick ratings and canonical governed surveys; no facilitator impersonation or official grade changes",
+      "readBoundary": "Per-person Course attempt, verified pairing or personal invited survey, current Site and native grant; no cross-person responses"
     },
     {
       "file": "src/routes/enrichment.tsx",
