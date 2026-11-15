@@ -5,8 +5,10 @@ import {db} from "@/db/client";
  * RUN ONCE per day even when the Netlify maintenance job executes every 5 minutes.
  * The lease and pruning are a single transaction to avoid multiple workers racing.
  */
-export async function runSessionDeviceRetention():Promise<boolean>{
- if(process.env.CAN_SESSION_DEVICE_RETENTION_ENABLED!=="1")return false;
+export async function runSessionDeviceRetention(
+ enabled=process.env.CAN_SESSION_DEVICE_RETENTION_ENABLED==="1",
+):Promise<boolean>{
+ if(!enabled)return false;
  return db.transaction(async tx=>{
   const lease=await tx.execute(sql`
    INSERT INTO public.session_device_retention_state(task_key,last_run_at)

@@ -25,4 +25,9 @@ describe("security metadata retention",()=>{
   expect(await runSessionDeviceRetention()).toBe(false);
   expect(state.queries).toBe(1);
  });
+ it("permits the Cloudflare cron's trusted enabled flag",async()=>{
+  vi.stubEnv("CAN_SESSION_DEVICE_RETENTION_ENABLED","0");
+  expect(await runSessionDeviceRetention(true)).toBe(true);
+  expect(state.queries).toBe(4);
+ });
 });
