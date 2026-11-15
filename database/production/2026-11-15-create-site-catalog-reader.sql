@@ -14,6 +14,17 @@ END $site_reader_role$;
 GRANT USAGE ON SCHEMA public TO can_v30_public_site_reader;
 GRANT SELECT ON public.site_canonical_identity_links TO can_v30_public_site_reader;
 
+-- Neon may implicitly grant role membership with SET FALSE to the creating
+-- role. Explicitly allow only the reviewed table owner to exercise the
+-- read-only role for RLS acceptance checks. No login is created.
+DO $site_reader_owner$
+DECLARE owner_name text;
+BEGIN
+  SELECT pg_get_userbyid(relowner) INTO owner_name FROM pg_class
+    WHERE oid='public.site_canonical_identity_links'::regclass;
+  EXECUTE format('GRANT can_v30_public_site_reader TO %I WITH SET TRUE, INHERIT FALSE',owner_name);
+END $site_reader_owner$;
+
 DO $site_reader_policy$
 BEGIN
  IF NOT EXISTS(SELECT 1 FROM pg_policies
