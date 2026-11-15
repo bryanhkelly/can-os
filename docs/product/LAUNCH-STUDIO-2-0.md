@@ -1,75 +1,81 @@
-# Launch Studio 2.0: launch schools, centers, programs, and networks
+# Launch Studio 2.0: Site-first onboarding and program activation
 
-Status: proposed product / engineering design. Source reviewed on main, 2026-11-14. Not implemented or browser accepted.
+Status: proposed product / engineering design, updated 2026-11-14. This document is not an implementation or browser acceptance result.
 
-## Principle
+## Governing principle
 
-Launch Studio turns an authorized organization, location, and educational offering into an operating service. A school is one supported operation, not the root abstraction. Do not replace domain objects with a generic Launch object or conflate Site, operation, Program, Offering, Blueprint, Deployment, enrollment release, or network relationship.
+Start with a Site, not a menu of school / center / program / network launch templates. The initial interaction is a Site establishment or selection journey. Ask about supported modes of delivery, optional network affiliation, and only then programs. A school's distinctive academic and legal requirements are derived from the programs / operation it intends to offer, not a forced school-only entry route.
 
-## Entry experiences
+Site establishment, Program/Offering definition, and Site-specific delivery / deployment remain separate independently governed lifecycles. A Site may support multiple Programs and a Program may be delivered at multiple Sites. Reuse canonical Organization, operation, Site, Blueprint, Offering, deployment, cohorts/sessions and enrollment releases. Do not create duplicate 'launch records' as sources of truth.
 
-1. Launch a school: a Site and school operation, academics, admissions, compliance and opening governance.
-2. Launch a community learning center: local host/organization, qualified Site, age-specific safeguarding and insurance, programs, facilitated or online delivery.
-3. Launch a program or class: select existing authorized organization, operation, and Site(s), then adopt an approved Offering and configure delivery/enrollment.
-4. Roll out across a network: network publisher prepares governed content and eligible Sites opt in or receive appropriately delegated adoption; verify authorization per Site. No membership grants automatic Site authority.
-5. Continue a saved launch or open an operating workspace.
+## Primary operator journey: five steps
 
-Family, student, learner and staff onboarding are not operator-launch choices. Route them from an independent 'Join or participate' entry, school invitation, /learn/enroll or account home. One CAN account remains person-owned. A favorite Site never grants access.
+1. **Your Site.** Ask for Site name and responsible organization, select an existing authorized Site when possible, and establish a minimal new Site identity only with proper authority. Gather geography and contact information appropriate to the proposed delivery model. Do not publish a website, create a Program, assert a legal school status, or imply a Site is qualified at this step.
+2. **How will you deliver learning?** Select **Physical**, **Digital**, or **Both**. This expresses the Site's intended capabilities, not a permanent restriction on Program delivery and not a cohort/session modality. Physical requires facility details and facility qualification for relevant offerings. Digital requires technology, content access, service/support and privacy readiness, but does not create a fictional street address. Both supports separate in-person and online enrollments, capacities and sessions. Investigate and represent a true digital-only operating context without fabricating a physical Site: existing canonical independent noncredit enrollment releases use site_id=NULL. Validate the canonical site_kind / relationship model before any schema migration.
+3. **Network affiliation (optional).** Show existing verified network relationships, an invitation/code entry, 'Find a network', and 'Operate independently'. A code is a request or invitation to establish a relationship; it never by itself grants a membership, enrollment privilege, program adoption, branding, funding entitlement, or Site approval. Review and independently authorize network ties and roles. If no affiliation, allow the user to proceed normally. Some networks may supply governed programs, site standards or onboarding questions once membership is actually approved.
+4. **Your Programs.** Show (a) approved offerings available to this operator/Site, including network programs if verified, (b) programs already adopted by this Site, (c) independent CAN catalog offerings, and (d) request/create a new Program or Blueprint where authorized. Configure exact Site(s) or independent digital delivery, cohorts, sessions, capacity, facilitators, consent and enrollment windows. Do not conflate an educational Blueprint (recipe), published Offering (approved product), deployment (where/how delivered), or an enrollment release (registration authority). School programs trigger school academic/admissions and regulatory preparation. Youth programs trigger applicable safeguarding.
+5. **Readiness and activation.** Generate specific tasks based on the Site, delivery modes, intended participants, programs, operating relationships, location and network requirements. Separate Site qualification from Program review, adoption, deployment, public publication and enrollment release. Where independently authorized, activate the first delivery and transition to Site operations. A successful Site onboarding does not mean any Program is approved or open for enrollment.
 
-## Milestones
+Guidance is progressive: avoid an up-front giant requirements form. Save partial progress at each step. If a person already operates a Site, Launch Studio opens its Site context and starts at delivery / programs without recreating the Site or restarting its qualifications.
 
-1. Establish: determine actor authorization, choose existing or create minimal Organization/Site/operation as permitted; record legal vs hosting vs operator vs network roles; select launch goal and intended audience. Never fabricate a Program, Site permission or publication.
-2. Design: select suitable versioned approved Blueprint, construct or adopt offering, choose modality, cohorts/sessions, completion policy, staffing, course/content and exact Site placement. School-specific academic structure appears only for school operations.
-3. Prepare: versioned facility qualification and supporting documents, capacity/devices, protection for minors when relevant, insurance, accessibility, staff qualifications, reviewer decisions, regulatory eligibility, communications/website assets. Dynamic evidence gates based on jurisdiction, learner population and activity. An adult course does not need a K-12 school opening gate.
-4. Activate: independently authorize deployment, adoption, public publication and enrollment release; configure exact session dates, registrations, consents, capacities and site placements; run preflight and open the appropriate operational dashboard. Website publication is neither sufficient nor always necessary.
+## Post-launch returns
 
-Milestones are navigation, not one aggregate approval state. Independently authoritative status comes from canonical services; 'Unavailable' is never 'Ready'. Save draft buffers separately from domain mutations. Preserve exact Site, Program and role context, including on Back.
+- Site workspace: facilities, delivery capabilities, team, equipment, site safety/qualification, site settings, multiple program deliveries.
+- Program workspace: approved Offering/Blueprint, delivery, cohorts, rosters, attendance, assessments, completion, reporting.
+- Network workspace: relationships, governed catalogs, delegation and cross-site aggregates (restricted and authorized).
+- Existing operating Sites go to Run by default; Site setup remains accessible in Settings. Launch a new Program from Run without repeating Site creation or network onboarding.
 
-## Three-level workspace
+## Network and privacy guardrails
 
-Organization/network view: partnerships, governed blueprints, distributions, delegated Sites and consolidated reporting.
-Site view: facility readiness, people, resources, on-site schedules, safeguarding, communication.
-Program delivery view: approved Offering/deployment, cohort, session, enrollment release, participant roster, attendance and completion.
+Network affiliation is optional; an unaffiliated provider must be fully functional. Network invitations/codes are scoped, expiring, verifiable relationship proposals, not bearer authorization. A favorite Site is not membership, and membership is not automatically a Program license. Network program distribution requires separate Site/operator adoption approvals and scoped data-sharing rules. National network impact reports default to approved aggregates; identifiable local records require separately granted scope.
 
-One Site may deliver multiple Programs; one Program may be delivered across multiple Sites. Network rollout must not replicate schools. Independent online delivery must not fabricate a Site. Reuse canonical organization, operation, Site, blueprint, offering, deployment, enrollment release and existing permissions.
+## Product model and example
 
-## Canonical integration and migration
+A church establishes 'Barton Community Learning Center' once, selects Both, submits a COGIC invitation code, and (after verified authorization) sees eligible national offerings. It chooses the four-week digital skills course, selects a Site facilitator, four dated sessions, capacity and a registration release; readiness requests only requirements applicable to the program, audience and location. Later the same church can add summer learning or a different course without creating a second Site, retaking unrelated surveys or reentering network affiliation.
 
-Current school launch entry: src/components/launch-studio/LaunchStudioEntry.tsx
-School Hub and module definitions: src/components/launch-studio/SchoolLaunchHub.tsx and src/domain/school-launch-hub.ts
-School stub creation: src/components/launch-studio/CreateSchoolProfile.tsx
-Canonical Blueprint authoring: src/routes/canonical.blueprints.tsx
-Site qualification: src/routes/canonical.lab.site-qualification.tsx (diagnostic, not a completed applicant workflow)
-Production source for noncredit publisher: src/routes/programs.noncredit.enrollment.tsx
-Enrollment release contract: docs/product/NONCREDIT-SELF-ENROLLMENT.md
+A standalone operator follows the identical journey and chooses 'Operate independently'. A digital-only provider can configure an online delivery relationship without asserting a physical facility. A national network administrator's provider program publishing experience is a distinct authorized workspace, not another first-step Site creation choice.
 
-Do not casually route legacy Site context into canonical Blueprint Studio: public-schema identity and canonical membership are separate and the bridge must be independently authorized. An existing school's legacy Hub must remain functional while corresponding modules are replaced with canonical-backed launch workspaces. Never redirect a live school from Run to Launch. Retire legacy module routes only after actual production replacement, tests and redirects.
+## Source map (reviewed on main)
 
-## Proposed UI (design system 6.1)
+- Current entry is school-oriented: src/components/launch-studio/LaunchStudioEntry.tsx
+- School Hub: src/components/launch-studio/SchoolLaunchHub.tsx, src/domain/school-launch-hub.ts
+- School profile creation: src/components/launch-studio/CreateSchoolProfile.tsx
+- Canonical site-specific Blueprint workspace: src/routes/canonical.blueprints.tsx
+- Site qualification diagnostic: src/routes/canonical.lab.site-qualification.tsx (not a fully proven applicant workflow)
+- Noncredit publisher: src/routes/programs.noncredit.enrollment.tsx
+- Noncredit identity and delivery rules: docs/product/NONCREDIT-SELF-ENROLLMENT.md
 
-Rectilinear cards and inputs, no decorative rounding, wallpaper hero only when useful; clear next action and real record-derived statuses. Landing offers launch goals and 'Continue launch'. Once authorized, header shows Organization / Site / Program context with switcher; left rail shows four milestones, center shows incomplete work and actions, right summary shows evidence, blockers and opening/registration readiness. Use 'school' only in school flows. Website & Brand is an optional workstream with independent publication state, not the default first step.
+The legacy school Site identities and canonical v3.0.1 accounts/roles are not interchangeable. Do not bridge Site selection from legacy Launch into canonical authoring by client supplied IDs. Verify exact authenticated canonical authority, Site/operation relationship and reviewer separation.
 
-## Incremental implementation
+## 6.1 design requirements
 
-P0: Canonical-aware Launch Studio home with launch goal routing, authorized context selection and separate participant onboarding. Preserve existing school paths.
-P0: Community center setup with canonical Site/operation context, qualification, approved blueprint, site-adopted training, cohorts, enrollment release and run handoff.
-P0: Site and program readiness computed from independent canonical authorizations; no global feature flags or simulated completion.
-P1: School journey migrated to the shared milestone shell while retaining admissions, academics and opening gates.
-P1: Network template rollout and Site-level adoption/delegation, reporting and repeatable program launches.
-P1: Marketing, recruitment, website and event utilities as optional tasks, never preconditions for all activities.
+Start with 'Establish your Site' or 'Continue with an existing Site', not a grid of launch types. Use rectilinear controls and cards, concise explanatory text, progressive disclosure and step navigation. Step labels: Your Site / Delivery / Network / Programs / Get Ready. If affiliation is optional, make 'Continue independently' a first-class choice rather than a hidden skip. Clearly differentiate 'Site saved', 'Network pending', 'Program approved', 'Site qualified' and 'Registration open'. Show an actionable specific next step rather than a fake aggregate green Launch status.
 
-## Acceptance matrix
+Website & Brand, campaigns, events, communications and reporting remain available shared capabilities, not universally required gates or automatic redirects. Do not redirect Site creation straight to Website Studio.
 
-- Standalone community center with adult training and no school.
-- Existing church adds one approved training without creating another Site.
-- School adds an afterschool or summer Program without relaunching itself.
-- Network offers one program to multiple authorized Sites; unauthorized Site cannot activate it.
-- One Site launches two different offerings with independent cohorts, room facilitators and registration releases.
-- Independent online training with no physical Site.
-- Young learners enforce applicable safeguards; adult-only delivery does not inherit irrelevant school admissions.
-- Account favorite has no authorization effect.
-- Reviewer cannot self-approve; Site author cannot see another Site; wrong-account legacy-to-canonical transition denied.
-- Existing live school dashboard remains Run; setup available in Settings.
-- Draft recovery, expired/closed sessions, missing data, denied browser access, and unavailable canonical readers fail closed.
+## Implementation sequence
 
-Release gate: typecheck, tests, build, test01 migrations, role-isolated API and browser E2E and exact deployed SHA before calling production ready.
+P0. Replace the school-first Launch landing with authorized Site selection/creation and five-step stateful navigation; preserve old routes until replaced and tested.
+P0. Add delivery capability selection with supported canonical physical/digital/both semantics; do not modify production DB before validating site_kind and independent delivery.
+P0. Add optional independently verified network invitation/request UI and existing relationship selection. Do not grant authority from a code alone.
+P0. Connect program selection to canonical approved offerings, Blueprint authoring where authorized, Site adoption/deployment, session/cohort scheduling and enrollment release. Make actual readiness conditional.
+P0. Launch-to-Run handoff and post-launch 'Add a program' on the same Site.
+P1. School-only academic/admissions/opening requirements as conditional program/institution steps, not the entire product's default UI.
+P1. Network-assisted catalogs, multi-Site rollout and aggregate impact reporting.
+P1. Optional brand, marketing, events and outreach modules.
+
+## Acceptance
+
+- An independent physical Site can complete onboarding and add an authorized adult course without school setup.
+- A mixed physical/digital Site supports separately governed on-site and online deliveries.
+- Digital-only onboarding does not fabricate a physical address or forced facility approval.
+- A network code cannot independently issue grants, membership or adoption; authorized approval makes appropriate catalog access visible.
+- An independent operator completes the flow without a network code.
+- An existing Site adds a second program without Site recreation or irrelevant repeated checks.
+- A school adds an afterschool program without relaunching the school.
+- A single approved national Offering can be adopted by multiple eligible Sites with separate release capacities, sessions and reporting.
+- Cross-Site and cross-Person requests are denied by server/database authorization; author cannot self-review.
+- Missing reader access, inactive membership or unavailable services fail closed, not 'Ready'.
+- Browser Back, draft reload, multi-Site switching and in-flight edits never silently change Site or Program context.
+
+Release gates: exact-main source SHA, typecheck/test/build, test01 canonical migration/security checks, real role-scoped browser E2E and deployed SHA verification. This specification does not claim those checks have passed.
