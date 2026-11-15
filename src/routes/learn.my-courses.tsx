@@ -66,7 +66,7 @@ function MyNoncreditCourses(){
     {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-4 border border-border bg-card p-4 text-sm">{notice}</p>}
     {query.data && <div className="mt-6 space-y-3">
-      {query.data.map(course=><article key={course.courseAttemptId} className="border border-border bg-card p-5">
+      {query.data.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className="border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
