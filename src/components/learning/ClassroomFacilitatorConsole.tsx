@@ -28,7 +28,6 @@ export function ClassroomFacilitatorConsole({
   });
   const currentState = room.data?.roomState ?? "unknown";
   const isLive = room.isSuccess && currentState === "live";
-  const active = room.data?.releases.find(item => !item.closed);
 
   async function run(action: () => Promise<void>) {
     if (busy) return;
