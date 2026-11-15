@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FacilitatedRoomPlayer } from "@/components/learning/FacilitatedRoomPlayer";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
+import { ClassroomRehearsalPlayer } from "@/components/learning/ClassroomRehearsalPlayer";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -29,6 +30,7 @@ type Workspace = Awaited<ReturnType<typeof getFacilitatedHostWorkspace>>;
 function FacilitatedLabContent({data}:{data:Workspace}) {
   const router=useRouter();
   const [selected,setSelected]=useState("");
+  const [rehearsal,setRehearsal]=useState<{deploymentId:string;siteId:string;courseVersionId:string}|null>(null);
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const [code,setCode]=useState<{
@@ -70,7 +72,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             </option>)}
           </select>
         </label>
-        <Button disabled={busy||!available} type="button" onClick={()=>void run(async()=>{
+        <Button disabled={busy||!available||!available.hasRegisteredLearners} type="button" onClick={()=>void run(async()=>{
           if(!available)return;
           const created=await startFacilitatedLearningRoom({data:{
             deploymentId:available.deploymentId,courseVersionId:available.courseVersionId,
@@ -79,12 +81,17 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           setCode({roomId:created.facilitatedSessionId,
             code:created.pairingCode,expiresAt:created.pairingExpiresAt});
         })}>Start facilitator room</Button>
+        <Button disabled={busy||!available} type="button" variant="outline" onClick={()=>{
+          if(available)setRehearsal({deploymentId:available.deploymentId,
+            siteId:available.siteId,courseVersionId:available.courseVersionId});
+        }}>Rehearse without enrollment</Button>
       </div>
       {!data.choices.length&&<p role="status" className="mt-3 text-sm text-muted-foreground">
         No active published courses are currently available to this Site. Check deployment
         and learner participation authority before starting a room.
       </p>}
     </section>
+    {rehearsal&&<ClassroomRehearsalPlayer scope={rehearsal} onClose={()=>setRehearsal(null)}/>}
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
     {code&&<section className="mt-5 border border-border bg-card p-5" aria-label="Current device pairing code">
       <p className="text-sm font-semibold">Share this code with enrolled learners in your room</p>

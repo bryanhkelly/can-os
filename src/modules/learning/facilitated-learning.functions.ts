@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   catalogSites, contentAssets, contentAssetVersions, courseLessons, courseVersions, courses,
+  deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
   facilitatedPairingRateLimits,
@@ -63,7 +64,7 @@ function displayCode(code: string) { return code.slice(0, 5) + "-" + code.slice(
  * AND a current host/operator organization relationship at that same Site.
  * A separate network/denomination affiliation is never required.
  */
-async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
+export async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
   const now = new Date();
   const [deployment] = await tx.select({
     id: programDeployments.id, operationId: programDeployments.operationId,
@@ -308,9 +309,40 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
           eq(learnerCourseAttempts.status,"active"),
         )).groupBy(learnerCourseAttempts.deploymentId,
           learnerCourseAttempts.courseVersionId,courses.title).limit(200) : [];
-      const choices=versions.flatMap(version=>visible.filter(row=>
-        row.deploymentId===version.deploymentId,
-      ).map(site=>({...version,siteId:site.siteId,deploymentName:site.deploymentName})));
+      const catalog=deploymentIds.length ? await tx.select({
+        deploymentId:deploymentOfferingAdoptions.deploymentId,
+        courseVersionId:classroomOfferingCourses.courseVersionId,
+        courseTitle:courses.title,
+      }).from(deploymentOfferingAdoptions)
+        .innerJoin(offeringVersions,and(
+          eq(deploymentOfferingAdoptions.offeringVersionId,offeringVersions.id),
+          eq(offeringVersions.lifecycle,"published"),
+        ))
+        .innerJoin(classroomOfferingCourses,eq(
+          classroomOfferingCourses.offeringVersionId,offeringVersions.id,
+        ))
+        .innerJoin(courseVersions,and(
+          eq(courseVersions.id,classroomOfferingCourses.courseVersionId),
+          eq(courseVersions.lifecycle,"published"),
+        ))
+        .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+        .where(and(
+          inArray(deploymentOfferingAdoptions.deploymentId,deploymentIds),
+          eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
+          lte(deploymentOfferingAdoptions.validFrom,now),
+          or(isNull(deploymentOfferingAdoptions.validThrough),
+            gt(deploymentOfferingAdoptions.validThrough,now)),
+        )).groupBy(deploymentOfferingAdoptions.deploymentId,
+          classroomOfferingCourses.courseVersionId,courses.title).limit(200) : [];
+      const activeKey=new Set(versions.map(v=>v.deploymentId+":"+v.courseVersionId));
+      const courseChoices=new Map<string,typeof catalog[number]>();
+      for(const version of catalog)courseChoices.set(version.deploymentId+":"+version.courseVersionId,version);
+      const choices=[...courseChoices.values()].flatMap(version=>visible.filter(site=>
+        site.deploymentId===version.deploymentId,
+      ).map(site=>({...version,siteId:site.siteId,
+        deploymentName:site.deploymentName,
+        hasRegisteredLearners:activeKey.has(version.deploymentId+":"+version.courseVersionId),
+      })));
       const rooms=await tx.select({
         id:facilitatedLearningSessions.id,
         deploymentId:facilitatedLearningSessions.deploymentId,
