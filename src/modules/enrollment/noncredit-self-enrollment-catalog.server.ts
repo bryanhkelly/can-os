@@ -25,7 +25,7 @@ type Executor = Pick<typeof db, "select">;
 export async function readEligibleSelfEnrollmentReleases(
   executor: Executor = db,
   releaseId?: string,
-  paging?: {after?:string|null;term?:string;limit?:number},
+  paging?: {after?:string|null;term?:string;limit?:number;siteId?:string},
 ) {
   const now = new Date();
   const r = noncreditSelfEnrollmentReleases;
@@ -73,6 +73,7 @@ export async function readEligibleSelfEnrollmentReleases(
     .leftJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,r.siteId))
     .where(and(
       releaseId?eq(r.id,releaseId):undefined,
+      paging?.siteId?eq(r.siteId,paging.siteId):undefined,
       paging?.after?gt(r.id,paging.after):undefined,
       paging?.term?or(
         ilike(noncreditTrainingVersions.title,"%"+paging.term+"%"),
