@@ -4,9 +4,10 @@ import { myCanContactInput, accountProfileCanEdit } from "@/domain/can-account-p
 
 describe("Personal CAN account boundaries", () => {
   it("requires name and normalized email, not an institutional role", () => {
-    expect(personalCanSignupSchema.parse({firstName:" Ann ",lastName:" Lee ",email:"ANN@EXAMPLE.COM"})
+    expect(personalCanSignupSchema.parse({firstName:" Ann ",lastName:" Lee ",email:"ANN@EXAMPLE.COM",adultConfirmed:true})
       .email).toBe("ann@example.com");
-    expect(personalCanSignupSchema.safeParse({firstName:"",lastName:"Lee",email:"user@example.com"}).success).toBe(false);
+    expect(personalCanSignupSchema.safeParse({firstName:"",lastName:"Lee",email:"user@example.com",adultConfirmed:true}).success).toBe(false);
+    expect(personalCanSignupSchema.safeParse({firstName:"Min",lastName:"Lee",email:"child@example.com",adultConfirmed:false}).success).toBe(false);
   });
   it("a personal role never carries an organization or Site", () => {
     expect(isAccountOnlyGrant({role:"account_holder",organizationId:null,siteId:null})).toBe(true);
