@@ -45,6 +45,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
   const [chosen,setChosen] = useState<string[]>([]);
   const [error,setError] = useState("");
   const [savingPreferences,setSavingPreferences] = useState(false);
+  const [previewKey,setPreviewKey] = useState(0);
   const siteMutation=useWorkspaceMutation({mutationFn:createLaunchSite});
   const known=options.sites.find(s=>s.id===siteId);
   const siteName=known?.name??name;
@@ -168,7 +169,10 @@ export function SiteFirstLaunch({options}:{options:Options}) {
           <h2 className="mt-1 font-serif text-3xl">Your Site is taking shape.</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">This uses your Site's actual website design engine and saved plans. Proposed interests are marked as such. Your Site is not published and enrollment is not open by default.</p>
         </div>
-        <Button type="button" variant="outline" onClick={backward}>Edit interests</Button>
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" onClick={()=>setPreviewKey(k=>k+1)}>Refresh website</Button>
+          <Button type="button" variant="outline" onClick={backward}>Edit interests</Button>
+        </div>
       </div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <section className="overflow-hidden border bg-card" aria-label="Real private website preview">
@@ -176,7 +180,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
             <span>Canonical website preview · {siteName}</span>
             <span className="font-semibold text-warning">Private · not published</span>
           </div>
-          {siteId ? <iframe title={`Private rendered website preview for ${siteName}`}
+          {siteId ? <iframe key={previewKey} title={`Private rendered website preview for ${siteName}`}
             src={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
             className="block min-h-[820px] w-full border-0 bg-white"
             sandbox="allow-same-origin" referrerPolicy="no-referrer"
