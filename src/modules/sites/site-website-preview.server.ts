@@ -1,5 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
+import { readLinkedSiteNoncreditReleases } from "./site-noncredit-releases.server";
+import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
 import { sitePublications, sites } from "@/db/schema";
@@ -70,8 +72,13 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
+    ...(noncreditReleases.length?{
+      noncreditReleases,
+      enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
+    }:{}),
     ...(parentExtras ?? {}),
   });
+  const noncreditReleases = host ? await readLinkedSiteNoncreditReleases(site.id) : [];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
