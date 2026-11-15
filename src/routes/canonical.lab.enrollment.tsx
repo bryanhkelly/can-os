@@ -5,9 +5,27 @@ import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
 import { getCanonicalCapabilityLab } from "@/modules/operations/canonical-capability-lab.functions";
+import { getLegacyEnrollmentLabPreviewAccess } from "@/modules/operations/enrollment-lab-preview.functions";
 
 export const Route = createFileRoute("/canonical/lab/enrollment")({
-  loader: () => safeLoader(() => getCanonicalCapabilityLab())(),
+  loader: async () => {
+    const canonical = await safeLoader(() => getCanonicalCapabilityLab())();
+    if (canonical.ok) {
+      return { ok: true as const, data: {
+        trainings: canonical.data.trainings, readOnlySchoolPreview: false,
+      } };
+    }
+    // Existing CAN school Site Admin and registrar sessions can inspect this
+    // static design preview. This fallback never returns canonical records.
+    const schoolPreview = await safeLoader(() => getLegacyEnrollmentLabPreviewAccess())();
+    if (schoolPreview.ok) {
+      return { ok: true as const, data: {
+        trainings: [] as Awaited<ReturnType<typeof getCanonicalCapabilityLab>>["trainings"],
+        readOnlySchoolPreview: true,
+      } };
+    }
+    return canonical;
+  },
   component: EnrollmentLabPage,
 });
 
@@ -21,11 +39,13 @@ const audienceOptions: { id: Audience; title: string; description: string }[] = 
 function EnrollmentLabPage() {
   const result = Route.useLoaderData();
   if (!result.ok) return <CanonicalBlueprintLoadError title="Enrollment" message={result.message}/>;
-  return <EnrollmentLabContent trainings={result.data.trainings}/>;
+  return <EnrollmentLabContent trainings={result.data.trainings}
+    readOnlySchoolPreview={result.data.readOnlySchoolPreview}/>;
 }
 
-function EnrollmentLabContent({ trainings }: {
+function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
   trainings: Awaited<ReturnType<typeof getCanonicalCapabilityLab>>["trainings"];
+  readOnlySchoolPreview: boolean;
 }) {
   const [audience, setAudience] = useState<Audience>("adult");
   const [selected, setSelected] = useState("");
@@ -36,13 +56,24 @@ function EnrollmentLabContent({ trainings }: {
   return <WorkspaceShell width="wide" eyebrow="Internal · Enrollment experience"
     title="Enrollment" subtitle="One registration experience for noncredit training, adult education, community programs and youth learning. School admission remains a separate verified family journey.">
     <CapabilityLabNav current="enrollment"/>
+    {readOnlySchoolPreview && <section role="status"
+      className="mt-5 border border-border bg-card p-5">
+      <h2 className="font-serif text-xl">Site Admin design preview</h2>
+      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+        Your current school Site Admin or registrar session allows you to inspect
+        this read-only enrollment experience. Canonical training records, participant
+        rosters and publishing commands remain protected by separate native canonical
+        Site grants. They are not loaded in this preview.
+      </p>
+    </section>}
     <section className="mt-5 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Production enrollment is separate from this preview</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         The live provider release command, published enrollment windows, independent account registration and My courses now have their own routes. This lab remains a read-only design preview.
       </p>
       <div className="mt-4 flex flex-wrap gap-5 text-sm">
-        <Link to="/programs/noncredit/enrollment" className="font-semibold text-primary underline underline-offset-4">Manage provider enrollment releases</Link>
+        {!readOnlySchoolPreview &&
+          <Link to="/programs/noncredit/enrollment" className="font-semibold text-primary underline underline-offset-4">Manage provider enrollment releases</Link>}
         <Link to="/learn/enroll" search={{}} className="font-semibold text-primary underline underline-offset-4">Open learner registration</Link>
       </div>
     </section>
@@ -79,7 +110,14 @@ function EnrollmentLabContent({ trainings }: {
           <div className="border border-border p-3"><span className="block text-muted-foreground">Instruction</span><strong>{current.requiredMinutes} minutes</strong></div>
           <div className="border border-border p-3"><span className="block text-muted-foreground">Knowledge check</span><strong>{current.assessmentVersionId ? "Configured" : "Not attached"}</strong></div>
         </div>}
-        {published.length === 0 && <p role="status" className="mt-4 text-sm text-muted-foreground">No published training is available in the current provider scope.</p>}
+        {readOnlySchoolPreview
+          ? <p className="mt-4 text-sm text-muted-foreground">
+            Published training choices are only available with a native canonical
+            provider session. This Site Admin view is for experience review.
+          </p>
+          : published.length === 0 && <p role="status" className="mt-4 text-sm text-muted-foreground">
+              No published training is available in the current provider scope.
+            </p>}
       </section>
       <section className="mt-5 border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">{audience === "group" ? "Group delivery" : "Participation preference"}</h2>
