@@ -92,6 +92,7 @@ export const routeNavigation = {
   "/settings": page("/settings", [...all, "academic_content_creator", "academic_content_reviewer"]),
   "/settings/school/$module": page("/settings", admins),
   "/site-website": page({site_website_editor:"/site-website",site_admin:"/settings"}, ["site_website_editor", "site_admin"]),
+  "/release-fingerprint": endpoint,
   "/site-identity": hidden("Site identity request, canonical confirmation and independent CAN review", ["registrar", "site_admin", "can_network_steward"]),
   "/student": hidden("Student layout redirect", ["student"]),
   "/support": page("/support", ["specialist", "counselor"]),
