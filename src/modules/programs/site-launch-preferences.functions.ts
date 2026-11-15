@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sites } from "@/db/schema";
@@ -9,19 +10,6 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { writeAudit } from "@/platform/mutation";
-
-export const siteLaunchInterestIds = [
-  "grades-6-8", "grades-9-12", "afterschool", "weekend",
-  "summer", "evening", "adult", "senior",
-] as const;
-
-export const siteLaunchPreferencesSchema = z.object({
-  delivery: z.enum(["physical", "digital", "both"]),
-  interestIds: z.array(z.enum(siteLaunchInterestIds)).max(8)
-    .refine(ids => new Set(ids).size === ids.length, "Duplicate interests are not allowed"),
-}).strict();
-
-export type SiteLaunchPreferences = z.infer<typeof siteLaunchPreferencesSchema>;
 
 /**
  * Saves only Site-scoped planning intent. This is not a Program, Offering,
