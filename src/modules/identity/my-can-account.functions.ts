@@ -44,6 +44,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
       firstName: people.legalFirstName,
       lastName: people.legalLastName,
       preferredName: people.preferredName,
+      phone: people.phone,
     }).from(people).where(and(eq(people.id, actor.actorPersonId), eq(people.active, true))).limit(1),
   ]);
   if (!account[0] || !person[0]) throw new AuthorizationError("active verified identity");
@@ -119,6 +120,7 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
     verified: !!account[0].emailVerifiedAt,
     displayName: person[0].preferredName || person[0].firstName,
     fullName: [person[0].firstName, person[0].lastName].join(" "),
+    profile: { preferredName: person[0].preferredName ?? "", phone: person[0].phone ?? "" },
     demoAccountSwitching,
     workspaces, places: placeResult.places, favoritesReady: placeResult.favoritesReady,
     identityNeedsReview: accountPersonNeedsReview(grants, demoAccountSwitching),
@@ -158,7 +160,7 @@ export const setMyCanFavoriteSite = createServerFn({ method: "POST" })
         if (!canBookmarkSite({ siteId: data.siteId, authorizedSiteIds: authorizedSites, publication: published }))
           throw new AuthorizationError("published or authorized Site");
         await tx.insert(accessAccountFavoriteSites).values({
-          accountId, siteId: published.id,
+          accountId, siteId: data.siteId,
         }).onConflictDoNothing();
       } else {
         await tx.delete(accessAccountFavoriteSites).where(and(
