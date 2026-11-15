@@ -1,5 +1,5 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Check, ExternalLink, MapPin, Settings, ShieldCheck, Star, Users } from "lucide-react";
 import { WorkspaceShell } from "@/components/workspace";
@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useWorkspaceSession, workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import { switchVerifiedMembership } from "@/lib/workspace-membership-switch";
 import { getMyCanAccount, setMyCanFavoriteSite } from "@/modules/identity/my-can-account.functions";
+import { saveMyCanContact } from "@/modules/identity/my-can-profile.functions";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 
 /**
@@ -119,7 +120,7 @@ function MyCanAccount() {
             Demo switching may show different test people. Production accounts only display independently verified account memberships.
           </p>}
         </section>
-        <section aria-labelledby="places-heading" className="border border-border bg-card">
+        <section id="my-can-places" aria-labelledby="places-heading" className="border border-border bg-card">
           <header className="border-b border-border px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 id="places-heading" className="font-serif text-2xl">My places</h2>
@@ -172,13 +173,19 @@ function MyCanAccount() {
             {account.verified ? "Email verified" : "Email verification not recorded"}
           </p>
           <div className="mt-5 border-t border-border pt-4">
-            <Link to="/profiles" className={sectionLink}>Open my profile <ArrowRight className="size-4" aria-hidden="true"/></Link>
+            <AccountContactEditor profile={account.profile} editable={account.verified &&
+              !account.identityNeedsReview && !account.demoAccountSwitching}/>
+            {session.role !== "account_holder" && <div className="mt-5 border-t border-border pt-4">
+              <Link to="/profiles" className={sectionLink}>My institutional profile <ArrowRight className="size-4" aria-hidden="true"/></Link>
+            </div>}
           </div>
         </section>
         <section className="border border-border bg-card p-5">
           <h2 className="font-serif text-2xl">My learning</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">Your classes, program registrations and history remain with their authorized educational records.</p>
-          <Link to="/home" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Open current learning workspace</Link>
+          {session.role === "account_holder" ?
+            <a href="#my-can-places" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Explore learning locations</a> :
+            <Link to="/home" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Open current learning workspace</Link>}
         </section>
         <section className="border border-border bg-muted/30 p-5">
           <h2 className="font-semibold text-sm">Identity is not authority</h2>
@@ -187,4 +194,52 @@ function MyCanAccount() {
       </aside>
     </div>}
   </WorkspaceShell>;
+}
+
+/** Edit only portable personal contact preferences, never institutional records. */
+function AccountContactEditor({ profile, editable }: {
+  profile: { preferredName: string; phone: string };
+  editable: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [preferredName, setPreferredName] = useState(profile.preferredName);
+  const [phone, setPhone] = useState(profile.phone);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!editable || saving) return;
+    setSaving(true); setFeedback("");
+    try {
+      await saveMyCanContact({ data: { preferredName, phone } });
+      await queryClient.invalidateQueries({ queryKey: ["my-can-account"] });
+      setFeedback("Your CAN contact preferences were saved.");
+    } catch (cause) {
+      setFeedback(mutationErrorMessage(cause, "Unable to save your contact information."));
+    } finally { setSaving(false); }
+  }
+  return <form onSubmit={submit} className="space-y-3">
+    <h3 className="text-sm font-semibold">Personal contact preferences</h3>
+    <p className="text-xs leading-5 text-muted-foreground">
+      Your verified email and official institutional records are managed separately.
+      Sharing with a new school still requires its own application or invitation.
+    </p>
+    <label className="block text-xs font-semibold" htmlFor="my-can-preferred-name">Preferred name</label>
+    <input id="my-can-preferred-name" value={preferredName} maxLength={80}
+      disabled={!editable || saving} onChange={event => setPreferredName(event.target.value)}
+      autoComplete="nickname"
+      className="min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
+    <label className="block text-xs font-semibold" htmlFor="my-can-phone">Contact phone</label>
+    <input id="my-can-phone" value={phone} maxLength={30} type="tel"
+      disabled={!editable || saving} onChange={event => setPhone(event.target.value)}
+      autoComplete="tel"
+      className="min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
+    <Button type="submit" size="sm" disabled={!editable || saving}>
+      {saving ? "Saving…" : "Save contact preferences"}
+    </Button>
+    {!editable && <p className="text-xs text-muted-foreground">
+      Personal edits are unavailable for shared demo accounts or identities needing review.
+    </p>}
+    {feedback && <p role="status" aria-live="polite" className="text-sm">{feedback}</p>}
+  </form>;
 }
