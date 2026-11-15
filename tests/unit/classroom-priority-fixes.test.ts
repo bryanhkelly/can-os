@@ -30,7 +30,7 @@ describe("Classroom Connect P1 authorization and feedback boundaries", () => {
     expect(route).toContain("effectiveRoomState(room, clockMs)");
     expect(route).toContain("setInterval(() => setClockMs(Date.now()), 15_000)");
     expect(route).toContain('roomState==="expired"?"Expired":"Live"');
-    expect(route).toContain('roomState==="live"&&<FacilitatedRoomPlayer');
+    expect(route).toContain('roomState==="live"&&<ClassroomFacilitatorConsole');
   });
 
   it("exposes live availability only when the restricted session reader is callable", () => {
