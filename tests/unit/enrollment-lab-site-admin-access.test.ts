@@ -37,8 +37,8 @@ describe("enrollment lab read-only Site Admin preview", () => {
     const endpoint = readFileSync(resolve(
       "src/modules/operations/enrollment-lab-preview.functions.ts"), "utf8");
     const page = readFileSync(resolve("src/routes/canonical.lab.enrollment.tsx"), "utf8");
-    expect(endpoint.indexOf("canonicalSessionCookie + \"=\""))
-      .toBeLessThan(endpoint.indexOf("getCommandContext(request)"));
+    expect(endpoint).toContain("getCommandContext(request)");
+    expect(endpoint).not.toContain("canonicalSessionCookie");
     expect(endpoint).not.toContain("getCanonicalCommandContext");
     expect(endpoint).not.toContain("getCanonicalCapabilityLab");
     expect(page).toContain("getCanonicalEnrollmentLabTrainings()");
