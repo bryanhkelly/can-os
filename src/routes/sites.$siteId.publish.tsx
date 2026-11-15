@@ -197,9 +197,10 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         <p><strong>Site website:</strong> {handoff.website.status} · {handoff.website.diagnostic}</p>
         <p><strong>CAN registration application:</strong> {handoff.application.status} · {handoff.application.diagnostic}</p>
         <p><strong>Registration route:</strong> {handoff.application.routeStatus}</p>
+        <p><strong>Noncredit catalog:</strong> {handoff.noncredit.status} · {handoff.noncredit.eligibleReleaseCount} currently eligible offering(s)</p>
         <p><strong>Live source revision:</strong> <code>{handoff.application.deployedSourceRevision??"Not independently reported"}</code></p>
         <p className="font-semibold">{handoff.ready
-          ?"Published host, enrollment destination and exact source revision verified."
+          ?"Published host, real noncredit offering, enrollment destination and exact source revision verified."
           :"Release not accepted. Review the failed or incomplete checks above."}</p>
       </div>}
     </section>
