@@ -6,6 +6,7 @@ export const personalCanSignupSchema = z.object({
   firstName: z.string().trim().min(1).max(80).refine(v => !/[<>\x00-\x1f]/.test(v)),
   lastName: z.string().trim().min(1).max(80).refine(v => !/[<>\x00-\x1f]/.test(v)),
   email: z.string().trim().transform(normalizeAccessEmail),
+  adultConfirmed: z.literal(true),
   returnTo: z.string().optional(),
 }).strict();
 
