@@ -37,7 +37,7 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
         .innerJoin(courseVersions, eq(learnerCourseAttempts.courseVersionId, courseVersions.id))
         .innerJoin(courses, eq(courseVersions.courseId, courses.id))
         .where(and(
-          eq(learnerProfiles.personId, actor.actorPersonId),
+          eq(learnerProfiles.personId, personId),
           eq(enrollments.status, "active"),
           eq(learnerCourseAttempts.status, "active"),
         ))
@@ -48,7 +48,7 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
         .innerJoin(courseVersions, eq(learnerCourseAttempts.courseVersionId, courseVersions.id))
         .innerJoin(courses, eq(courseVersions.courseId, courses.id))
         .where(and(
-          eq(noncreditRegistrations.participantPersonId, actor.actorPersonId),
+          eq(noncreditRegistrations.participantPersonId, personId),
           inArray(noncreditRegistrations.status, ["registered", "active"]),
           eq(learnerCourseAttempts.status, "active"),
         ))
