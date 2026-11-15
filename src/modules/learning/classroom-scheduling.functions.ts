@@ -9,6 +9,9 @@ import {
   domainEvents, facilitatedClassroomPlans, offeringVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import {
+  validClassroomScheduleWindow, canOpenScheduledClassroom,
+} from "@/domain/classroom-scheduling";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   authorizedHostDeployment, createFacilitatedRoomForHost,
@@ -27,11 +30,7 @@ const planInput=z.object({planId:id}).strict();
 const rescheduleInput=planInput.extend({startsAt:time,endsAt:time}).strict();
 
 export function validateClassroomTimes(start:Date,end:Date,now:Date) {
-  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||
-     start.getTime()<now.getTime()+5*60_000 ||
-     start.getTime()>now.getTime()+180*24*60*60_000 ||
-     end.getTime()-start.getTime()<15*60_000 ||
-     end.getTime()-start.getTime()>8*60*60_000)
+  if(!validClassroomScheduleWindow(start,end,now))
     throw new AuthorizationError("future classroom window between 15 minutes and eight hours");
 }
 function guard(){
@@ -237,8 +236,7 @@ export const openScheduledClassroom=createServerFn({method:"POST"})
           alreadyStarted:true};
       if(plan.state!=="scheduled")throw new AuthorizationError("active scheduled classroom");
       const now=new Date();
-      if(now.getTime()<delivery.startsAt.getTime()-15*60_000 ||
-         now>=delivery.endsAt)
+      if(!canOpenScheduledClassroom(delivery.startsAt,delivery.endsAt,now))
         throw new AuthorizationError("start within 15 minutes of the scheduled time");
       const created=await createFacilitatedRoomForHost(tx,host,{
         deploymentId:plan.deploymentId,courseVersionId:plan.courseVersionId,
