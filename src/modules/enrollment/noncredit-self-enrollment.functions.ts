@@ -8,6 +8,7 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons, canonicalSessions,
+  canonicalEnrollmentSites,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
   noncreditCompletionPolicies, noncreditTrainingVersions,
@@ -328,10 +329,16 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
       registrationId:noncreditRegistrations.id,
       courseAttemptId:learnerCourseAttempts.id,
       trainingTitle:noncreditTrainingVersions.title,
+      deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
+      siteName:canonicalEnrollmentSites.name,
       registrationStatus:noncreditRegistrations.status,
       attemptStatus:learnerCourseAttempts.status,
       registeredAt:noncreditRegistrations.registeredAt,
     }).from(noncreditSelfEnrollmentClaims)
+      .innerJoin(noncreditSelfEnrollmentReleases,eq(
+        noncreditSelfEnrollmentReleases.id,noncreditSelfEnrollmentClaims.releaseId))
+      .leftJoin(canonicalEnrollmentSites,eq(
+        canonicalEnrollmentSites.id,noncreditSelfEnrollmentReleases.siteId))
       .innerJoin(noncreditRegistrations,eq(
         noncreditSelfEnrollmentClaims.registrationId,noncreditRegistrations.id))
       .innerJoin(learnerCourseAttempts,and(
