@@ -137,6 +137,69 @@ async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string
   if (!authorizedSite) throw new AuthorizationError("current operator/host at deployment Site");
   return {deployment, siteId:authorizedSite.siteId};
 }
+/**
+ * Recheck current hosting and school placement on every pairing/read, including
+ * after a facilitator or Site relationship has been withdrawn. Failed checks
+ * disclose neither the room nor its playback activity to a learner.
+ */
+async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.$inferSelect, now:Date) {
+  const [host] = await tx.select({id:educationOperationSites.siteId})
+    .from(programDeployments)
+    .innerJoin(educationOperationOrganizationRoles,and(
+      eq(educationOperationOrganizationRoles.operationId,programDeployments.operationId),
+      eq(educationOperationOrganizationRoles.organizationId,room.hostOrganizationId),
+      eq(educationOperationOrganizationRoles.roleCode,"operator"),
+      eq(educationOperationOrganizationRoles.status,"approved"),
+      lte(educationOperationOrganizationRoles.validFrom,now),
+      or(isNull(educationOperationOrganizationRoles.validThrough),
+        gt(educationOperationOrganizationRoles.validThrough,now)),
+    ))
+    .innerJoin(educationOperationSites,and(
+      eq(educationOperationSites.operationId,programDeployments.operationId),
+      eq(educationOperationSites.siteId,room.siteId),
+      lte(educationOperationSites.validFrom,now),
+      or(isNull(educationOperationSites.validThrough),
+        gt(educationOperationSites.validThrough,now)),
+    ))
+    .innerJoin(siteOrganizationRoles,and(
+      eq(siteOrganizationRoles.siteId,room.siteId),
+      eq(siteOrganizationRoles.organizationId,room.hostOrganizationId),
+      inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+      lte(siteOrganizationRoles.validFrom,now),
+      or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+    ))
+    .innerJoin(catalogSites,and(
+      eq(catalogSites.id,room.siteId),eq(catalogSites.status,"active"),
+    ))
+    .where(and(
+      eq(programDeployments.id,room.deploymentId),
+      eq(programDeployments.status,"active"),
+    )).limit(1);
+  return !!host;
+}
+async function schoolAttemptIsPlacedAtSite(
+  tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,
+) {
+  const [placement] = await tx.select({id:classroomEnrollmentSitePlacements.id})
+    .from(classroomEnrollmentSitePlacements)
+    .innerJoin(classroomDeploymentSites,and(
+      eq(classroomDeploymentSites.id,classroomEnrollmentSitePlacements.deploymentSiteId),
+      eq(classroomDeploymentSites.deploymentId,deploymentId),
+      eq(classroomDeploymentSites.siteId,siteId),
+    ))
+    .innerJoin(learnerCourseAttempts,and(
+      eq(learnerCourseAttempts.enrollmentId,classroomEnrollmentSitePlacements.enrollmentId),
+      eq(learnerCourseAttempts.deploymentId,classroomEnrollmentSitePlacements.deploymentId),
+    ))
+    .where(and(
+      eq(learnerCourseAttempts.id,courseAttemptId),
+      eq(classroomEnrollmentSitePlacements.deploymentId,deploymentId),
+      lte(classroomEnrollmentSitePlacements.startsAt,now),
+      or(isNull(classroomEnrollmentSitePlacements.endsAt),
+        gt(classroomEnrollmentSitePlacements.endsAt,now)),
+    )).limit(1);
+  return !!placement;
+}
 async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   const query = tx.select().from(facilitatedLearningSessions).where(and(
     eq(facilitatedLearningSessions.id,id),
@@ -542,31 +605,11 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
         sessionDeploymentId:room.deploymentId,sessionCourseVersionId:room.courseVersionId,
         attemptDeploymentId:attempt.deploymentId,attemptCourseVersionId:attempt.courseVersionId,
       }))return null;
-      // A shared Course and Deployment do not establish physical Site access.
-      // Noncredit remote participation is intentionally independent of school
-      // placement; a school Enrollment must have a current placement at the
-      // exact hosting Site. A denial is returned so the attempt limiter commits.
-      if (attempt.source === "school") {
-        const [placement] = await tx.select({id:classroomEnrollmentSitePlacements.id})
-          .from(classroomEnrollmentSitePlacements)
-          .innerJoin(classroomDeploymentSites,and(
-            eq(classroomDeploymentSites.id,classroomEnrollmentSitePlacements.deploymentSiteId),
-            eq(classroomDeploymentSites.deploymentId,room.deploymentId),
-            eq(classroomDeploymentSites.siteId,room.siteId),
-          ))
-          .innerJoin(learnerCourseAttempts,and(
-            eq(learnerCourseAttempts.enrollmentId,classroomEnrollmentSitePlacements.enrollmentId),
-            eq(learnerCourseAttempts.deploymentId,classroomEnrollmentSitePlacements.deploymentId),
-          ))
-          .where(and(
-            eq(learnerCourseAttempts.id,attempt.courseAttemptId),
-            eq(classroomEnrollmentSitePlacements.deploymentId,room.deploymentId),
-            lte(classroomEnrollmentSitePlacements.startsAt,now),
-            or(isNull(classroomEnrollmentSitePlacements.endsAt),
-              gt(classroomEnrollmentSitePlacements.endsAt,now)),
-          )).limit(1);
-        if (!placement) return null;
-      }
+      // Denials return null so the per-person rate limiter still commits.
+      if (!await roomHostIsCurrent(tx,room,now)) return null;
+      if (attempt.source==="school" && !await schoolAttemptIsPlacedAtSite(
+        tx,attempt.courseAttemptId,room.deploymentId,room.siteId,now,
+      )) return null;
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
@@ -628,12 +671,14 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
     const actor=await getInstructionalLearnerContext(getRequest());
     if(!actor.actorPersonId)throw new AuthorizationError("authenticated learner");
     return db.transaction(async tx=>{
-      await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId,true);
+      const access=await authorizeCanonicalCourseAttempt(tx,actor,data.courseAttemptId,true);
+      const now=new Date();
       const rows=await tx.select({
         roomId:facilitatedLearningSessions.id,
         state:facilitatedLearningSessions.state,
         startedAt:facilitatedLearningSessions.startedAt,
         siteId:facilitatedLearningSessions.siteId,
+        deploymentId:facilitatedLearningSessions.deploymentId,
         leftAt:facilitatedLearningParticipants.leftAt,
       }).from(facilitatedLearningParticipants)
         .innerJoin(facilitatedLearningSessions,eq(
@@ -645,8 +690,19 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
           isNull(facilitatedLearningParticipants.leftAt),
           eq(facilitatedLearningSessions.state,"live"),
         )).orderBy(desc(facilitatedLearningSessions.startedAt)).limit(5);
-      const recent=rows.filter(row=>
-        Date.now()-row.startedAt.getTime()<=facilitatedRoomMaxMs);
+      const recent:typeof rows=[];
+      for(const row of rows) {
+        if(row.startedAt>now || now.getTime()-row.startedAt.getTime()>facilitatedRoomMaxMs)continue;
+        // A revoked Site relationship or moved school learner must lose access
+        // to subsequent shared-room status, not merely new pairing attempts.
+        const [room]=await tx.select().from(facilitatedLearningSessions)
+          .where(eq(facilitatedLearningSessions.id,row.roomId)).limit(1);
+        if(!room || !await roomHostIsCurrent(tx,room,now))continue;
+        if(access.source==="school" && !await schoolAttemptIsPlacedAtSite(
+          tx,access.courseAttemptId,row.deploymentId,row.siteId,now,
+        ))continue;
+        recent.push(row);
+      }
       const ids=recent.map(row=>row.roomId);
       const events=ids.length?await tx.select({
         roomId:facilitatedLearningPlayback.facilitatedSessionId,
