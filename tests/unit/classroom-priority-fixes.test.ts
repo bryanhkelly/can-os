@@ -55,6 +55,11 @@ describe("Classroom Connect P1 authorization and feedback boundaries", () => {
     expect(feedback).toContain("classroomFeedbackOpen(row.room, new Date())");
     expect(feedback).toContain("onConflictDoUpdate");
     expect(mapping).toContain('educationV30.table("facilitated_room_feedback"');
+    const migration = read("database/canonical/v3.0.1/patch-facilitated-room-feedback.sql");
+    expect(migration).toContain("CREATE TABLE IF NOT EXISTS education_v30.facilitated_room_feedback");
+    expect(migration).toContain("FORCE ROW LEVEL SECURITY");
+    expect(migration).toContain("facilitated_evidence_owner_only");
+    expect(migration).toContain("REVOKE ALL ON TABLE education_v30.facilitated_room_feedback FROM PUBLIC");
     expect(companion).toContain("getRecentClassroomFeedback");
     expect(companion).toContain("submitClassroomFeedback");
     expect(companion).toContain('aria-pressed={room.ratings[questionKey] === rating}');
