@@ -579,3 +579,16 @@ No PUBLIC execution privileges were granted; both databases passed the
 read-only function ACL and execution-search-path check. The additive source
 patches and fresh-install `schema.sql` contain the corresponding security
 configuration. The noncredit release checker now enforces these properties.
+
+
+## Site-first Launch Studio: public ↔ canonical Site identity bridge
+
+Apply `patch-site-identity-links.sql` **after** the public-schema Site and v3.0.1 canonical Site tables exist. This additive, evidence-based mapping is not a migration that copies, equates or renames Site IDs. It was applied to `test01` on 2026-11-14; there are no approved correspondences there.
+
+A privileged operator must first verify that the exact legacy public Site and canonical v3.0.1 Site represent the same authorized physical service location, then record an evidence reference, a requesting Person ID, and an independent reviewer Person ID with approval date. Codes, matching names, or membership in the same network do not constitute a verified link. Do not create an approved link in a seed or automated migration.
+
+The public website adapter projects only currently eligible facilitated noncredit releases at a linked Site, and only after the Site's independent publication gate. Even a verified link cannot create a learner entitlement, Program adoption, noncredit release or enrollment claim. In the test01 environment, 1 published facilitated release and 1 published independent online release were found; neither has a verified public Site link.
+
+**Role/permissions caution:** `can_v30_public_site_app` has no direct `public` or `education_v30` schema USAGE privileges on test01. The adapter detects restricted roles and omits cross-schema cards rather than widening privileges or failing the whole Site website. Confirm the actual runtime database role and its eligibility reader before enabling the projection in a deployed environment.
+
+Also ensure `CAN_ACCESS_PUBLIC_ORIGIN` is the real HTTPS CAN application origin. No register link should be displayed without a current, valid release and working destination. Production migration, build, browser acceptance, hosting and reviewer-approved mapping are separate release gates.
