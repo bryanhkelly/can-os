@@ -8,6 +8,7 @@ import { db } from "@/db/client";
 import {
   auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants,
   contentAssetVersions, courseLessons, courseVersions, courses,
+  enrollments, learnerProfiles, noncreditRegistrations,
   domainEvents,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
@@ -25,7 +26,7 @@ import {
   canPairFacilitatedLearning, facilitatedCodeAlphabet, facilitatedCodeLength,
   facilitatedPairSchema, facilitatedPairingWindowMs, facilitatedPlaybackSchema,
   facilitatedRoomMaxMs, facilitatedStartSchema, normalizeFacilitatedPairingCode,
-  nextFacilitatedPairingLimit,
+  nextFacilitatedPairingLimit, facilitatedRoomOperationalState, roomMediaAudienceEligible,
 } from "@/domain/facilitated-learning";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
@@ -232,8 +233,7 @@ async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   return room;
 }
 function assertRoomLive(room: typeof facilitatedLearningSessions.$inferSelect, now:Date) {
-  if(room.state!=="live" || room.endedAt || room.startedAt>now ||
-    now.getTime()-room.startedAt.getTime()>facilitatedRoomMaxMs)
+  if(facilitatedRoomOperationalState(room,now)!=="live")
     throw new AuthorizationError("current facilitated room");
 }
 async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string,assetVersionId:string) {
@@ -259,16 +259,87 @@ async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string
   return presentation.trackVersionId;
 }
 
-/** Permission checks for a room use a real active Course attempt with a current
- * Deployment adoption, never a fabricated facilitator enrollment. */
-async function representativeAttempt(tx: Tx, deploymentId:string, courseVersionId:string) {
-  const [attempt] = await tx.select().from(learnerCourseAttempts).where(and(
-    eq(learnerCourseAttempts.deploymentId,deploymentId),
-    eq(learnerCourseAttempts.courseVersionId,courseVersionId),
-    eq(learnerCourseAttempts.status,"active"),
-  )).limit(1);
-  if(!attempt) throw new AuthorizationError("active registered course delivery");
-  return attempt;
+/**
+ * Every active device currently paired to this room must still be allowed
+ * this recording under its OWN Course adoption, not a random learner anywhere
+ * in the Deployment. A school learner must be CURRENTLY placed at this Site.
+ * Remote noncredit participants use their own current registration instead.
+ *
+ * A room without a paired audience may be opened and advertised, but cannot
+ * obtain private video URLs or record playback until an authorized learner pairs.
+ * A withdrawn/relocated paired learner blocks playback until the room audience
+ * is reconciled; we never silently skip an ineligible connected device.
+ */
+async function assertRoomMediaAudience(
+  tx: Tx,
+  room: typeof facilitatedLearningSessions.$inferSelect,
+  trackVersionId: string,
+  lessonId: string,
+  assetVersionId: string,
+): Promise<void> {
+  const paired = await tx.select({
+    attempt: learnerCourseAttempts,
+    participantPersonId: facilitatedLearningParticipants.participantPersonId,
+  }).from(facilitatedLearningParticipants)
+    .innerJoin(learnerCourseAttempts, eq(
+      learnerCourseAttempts.id, facilitatedLearningParticipants.courseAttemptId,
+    ))
+    .where(and(
+      eq(facilitatedLearningParticipants.facilitatedSessionId, room.id),
+      isNull(facilitatedLearningParticipants.leftAt),
+    )).limit(501);
+  if (!paired.length || paired.length > 500)
+    throw new AuthorizationError("bounded active room audience required for media");
+  const now = new Date();
+  const approvedAdoptions = new Set<string>();
+  for (const { attempt, participantPersonId } of paired) {
+    let sourceCurrent = false;
+    let currentRoomSitePlacement = false;
+    if (attempt.enrollmentId) {
+      const [school] = await tx.select({ id: enrollments.id }).from(enrollments)
+        .innerJoin(learnerProfiles, eq(enrollments.learnerId, learnerProfiles.id))
+        .where(and(
+          eq(enrollments.id, attempt.enrollmentId),
+          eq(enrollments.deploymentId, room.deploymentId),
+          eq(enrollments.status, "active"),
+          eq(learnerProfiles.personId, participantPersonId),
+        )).limit(1);
+      sourceCurrent = !!school;
+      if (sourceCurrent) currentRoomSitePlacement = await schoolAttemptIsPlacedAtSite(
+        tx, attempt.id, room.deploymentId, room.siteId, now,
+      );
+    } else if (attempt.noncreditRegistrationId) {
+      const [registration] = await tx.select({ id: noncreditRegistrations.id })
+        .from(noncreditRegistrations).where(and(
+          eq(noncreditRegistrations.id, attempt.noncreditRegistrationId),
+          eq(noncreditRegistrations.deploymentId, room.deploymentId),
+          eq(noncreditRegistrations.adoptionId, attempt.adoptionId),
+          eq(noncreditRegistrations.offeringVersionId, attempt.offeringVersionId),
+          eq(noncreditRegistrations.participantPersonId, participantPersonId),
+          inArray(noncreditRegistrations.status, ["registered", "active"]),
+        )).limit(1);
+      sourceCurrent = !!registration;
+    }
+    if (!roomMediaAudienceEligible({
+      roomDeploymentId: room.deploymentId,
+      roomCourseVersionId: room.courseVersionId,
+      attemptDeploymentId: attempt.deploymentId,
+      attemptCourseVersionId: attempt.courseVersionId,
+      attemptStatus: attempt.status,
+      sourceCurrent,
+      schoolAttempt: !!attempt.enrollmentId,
+      currentRoomSitePlacement,
+    })) throw new AuthorizationError("current registered audience at hosting Site");
+
+    // All current adoptions must independently permit this asset. Sharing a
+    // Course version does not imply matching adoption or distribution rights.
+    if (!approvedAdoptions.has(attempt.adoptionId)) {
+      await assertFacilitatedInstructionalDelivery(
+        tx, attempt, trackVersionId, lessonId, assetVersionId,
+      );
+      approvedAdoptions.add(attempt.adoptionId);
+    }
+  }
 }
 const roomMediaInput=roomIdInput.extend({
   lessonId:z.string().uuid(),assetVersionId:z.string().uuid(),
@@ -287,7 +358,6 @@ export const getFacilitatedRoomMedia = createServerFn({method:"GET"})
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       assertRoomLive(room,new Date());
-      const attempt=await representativeAttempt(tx,room.deploymentId,room.courseVersionId);
       const candidates=await tx.select({
         lessonId:courseLessons.id,lessonTitle:courseLessons.title,
         assetVersionId:trackLessonPresentations.assetVersionId,
@@ -300,8 +370,8 @@ export const getFacilitatedRoomMedia = createServerFn({method:"GET"})
       const approved:typeof candidates=[];
       for(const candidate of candidates){
         try {
-          await assertFacilitatedInstructionalDelivery(
-            tx,attempt,candidate.trackVersionId,candidate.lessonId,candidate.assetVersionId,
+          await assertRoomMediaAudience(
+            tx, room, candidate.trackVersionId, candidate.lessonId, candidate.assetVersionId,
           );
           approved.push(candidate);
         }catch(error){
@@ -330,9 +400,8 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
       const trackVersionId=await validateRoomVideo(
         tx,room.courseVersionId,data.lessonId,data.assetVersionId,
       );
-      const attempt=await representativeAttempt(tx,room.deploymentId,room.courseVersionId);
-      await assertFacilitatedInstructionalDelivery(
-        tx,attempt,trackVersionId,data.lessonId,data.assetVersionId,
+      await assertRoomMediaAudience(
+        tx, room, trackVersionId, data.lessonId, data.assetVersionId,
       );
       const [asset]=await tx.select({
         storageReference:contentAssetVersions.storageReference,
@@ -555,9 +624,8 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
       const trackVersionId=await validateRoomVideo(
         tx,room.courseVersionId,data.lessonId,data.assetVersionId,
       );
-      const attempt=await representativeAttempt(tx,room.deploymentId,room.courseVersionId);
-      await assertFacilitatedInstructionalDelivery(
-        tx,attempt,trackVersionId,data.lessonId,data.assetVersionId,
+      await assertRoomMediaAudience(
+        tx, room, trackVersionId, data.lessonId, data.assetVersionId,
       );
       const [existing]=await tx.select().from(facilitatedLearningPlayback)
         .where(and(
