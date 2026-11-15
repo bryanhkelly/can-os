@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "description": "Route ownership and acceptance tracking. All 'pending' fields are unverified until source and role journey review; this inventory is not proof of safety.",
-  "generatedFromBranch": "feature/classroom-connect-join-codes",
+  "generatedFromBranch": "main",
   "routes": [
     {
       "file": "src/routes/__root.tsx",
@@ -344,6 +344,15 @@
       "roleJourney": "Canonical site_admin or registrar uses an authenticated temporary, read-only/testing provider workspace; never exposed to student, guardian or teacher navigation; Read-only current approved operator and Site scoped deployment, adoption and aggregate participation inspection",
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records",
       "writeBoundary": "Read-only GET; no new mutation or lifecycle command"
+    },
+    {
+      "file": "src/routes/canonical.lab.devices.tsx",
+      "route": "/canonical/lab/devices",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "Native canonical Site Admin registers and manages site equipment; registrar can inspect only authorized Site equipment. Temporary lab; no student or guardian device management.",
+      "readBoundary": "A verified canonical Site-scoped session with exactly one organization and Site; queries filter to that Site ID and return at most 100 latest devices; never expose browser fingerprints or IPs.",
+      "writeBoundary": "Only canonical site_admin may create an owned site equipment record, change Site-owned device status or persist Site-scoped device policies. No grade/attendance credit or hardware attestation derived from registration."
     },
     {
       "file": "src/routes/canonical.lab.noncredit.tsx",
@@ -1480,5 +1489,5 @@
       "readBoundary": "current verified grantSiteId must match exact Site UUID; canonical website editor relationship and draft-read capability enforced on server; cache private no-store; noindex"
     }
   ],
-  "generatedFromCommit": "10ddc8646a253847d524b16a521ed71ec54c41be"
+  "generatedFromCommit": "6b127086bfe661df8c96430e1c1579b403eac9d1"
 }

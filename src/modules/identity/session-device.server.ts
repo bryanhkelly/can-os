@@ -4,11 +4,11 @@ import {accessSessions,accessSessionSignals} from "@/db/schema";
 import type {AccessContext} from "@/domain/access-context";
 import {AuthorizationError} from "@/domain/command-context";
 import {sessionIdleCutoff} from "@/domain/access-tokens";
-import {classifySessionDevice} from "@/domain/session-device";
+import {readTrustedSessionDevice} from "./trusted-session-device.server";
 /** Descriptive tab metadata, never an authorization factor. */
 export async function registerSessionDevice(actor:AccessContext,request:Request,input:{clientInstanceId:string;sharedDevice:boolean}){
  const accountId=actor.sessionAccountId??actor.accountId;
- const now=new Date(),device=classifySessionDevice(request);
+ const now=new Date(),device=await readTrustedSessionDevice(request);
  return db.transaction(async tx=>{
   const [session]=await tx.select().from(accessSessions).where(and(
    eq(accessSessions.id,actor.sessionId),eq(accessSessions.accountId,accountId),

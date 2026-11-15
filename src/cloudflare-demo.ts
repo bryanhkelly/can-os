@@ -3,6 +3,7 @@ import type {PhotoWorkerEnv} from "./platform/photography/cloudflare-production.
 import { withRequestDatabase } from "./db/client";
 import { classifyPublicSiteRequest } from "./domain/public-site-host-routing";
 import { publicSiteDomain } from "./domain/public-site-address";
+import {withTrustedCloudflareIngress} from "./modules/identity/trusted-session-device.server";
 
 interface RateLimiter {
   limit(input: { key: string }): Promise<{ success: boolean }>;
@@ -14,6 +15,7 @@ interface DemoEnvironment extends PhotoWorkerEnv {
   CAN_PUBLIC_SITE_DOMAIN?: string;
   CAN_PUBLIC_SITE_HOSTING_ENABLED?: string;
   DATABASE_URL?: string;
+  CAN_SESSION_IP_COLLECTION_ENABLED?: string;
 }
 
 const securityHeaders = {
@@ -90,9 +92,17 @@ export default {
 
     // Workerd disallows WebSocket I/O from a pool created in a different
     // request. This encompasses SSR, server functions, and their queries.
-    const response = await withRequestDatabase(
-      async () => await handler.fetch(routedRequest),
-      env.DATABASE_URL ?? process.env.DATABASE_URL,
+    // Cloudflare owns CF-Connecting-IP at the external Workers.dev edge.
+    // Trust this value only for the exact test hostname and only here, before
+    // propagating it to nested server functions via AsyncLocalStorage.
+    const edgeIp=url.hostname==="can-os.bryanhkelly.workers.dev" &&
+      env.CAN_SESSION_IP_COLLECTION_ENABLED==="1"
+      ? request.headers.get("CF-Connecting-IP") : null;
+    const response = await withTrustedCloudflareIngress(edgeIp,
+      () => withRequestDatabase(
+        async () => await handler.fetch(routedRequest),
+        env.DATABASE_URL ?? process.env.DATABASE_URL,
+      ),
     );
     const headers = new Headers(response.headers);
     for (const [name, value] of Object.entries(securityHeaders)) {

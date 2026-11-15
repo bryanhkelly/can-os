@@ -96,7 +96,11 @@ function AccountSessionsPage() {
      const response=await registerAccessClient();
      if(!response.ok)throw new Error("Registration failed");
      await loadSessions();
-    }catch{setError("Unable to synchronize shared-device mode.");}
+    }catch{
+     setSharedDeviceMode(!enabled);
+     setShared(!enabled);
+     setError("Unable to synchronize shared-device mode.");
+    }
    }}/>
    Shared learning-center device (five-minute inactivity sign-out)
   </label>

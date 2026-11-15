@@ -12,6 +12,12 @@ export const Route = createFileRoute("/canonical/capability-lab")({
 
 const areas = [
   {
+    title: "Enrollment experience",
+    detail: "Preview reusable adult self-registration, group participation and guardian enrollment with actual published training versions. Registration writes are not yet enabled.",
+    path: "/canonical/lab/enrollment",
+    status: "Connected experience preview",
+  },
+  {
     title: "Survey publication",
     detail: "Confirm independent privacy, accessibility and safeguarding approvals before publishing immutable survey versions.",
     path: "/canonical/lab/survey-publications",
