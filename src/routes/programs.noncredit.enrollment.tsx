@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
+import {getSiteIdentityLinkStatus} from "@/modules/sites/site-identity-links.functions";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import {
@@ -12,6 +13,11 @@ import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditRel
 import { NoncreditNetworkReportPanel } from "@/components/enrollment/NoncreditNetworkReportPanel";
 
 export const Route=createFileRoute("/programs/noncredit/enrollment")({
+  validateSearch:(search:Record<string,unknown>):{publicSiteId?:string}=>({
+    publicSiteId:typeof search.publicSiteId==="string"&&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(search.publicSiteId)
+      ?search.publicSiteId:undefined,
+  }),
   component:NoncreditPublicationPage,
 });
 type Publisher=Awaited<ReturnType<typeof getNoncreditEnrollmentPublisher>>;
@@ -24,6 +30,14 @@ function candidateKey(candidate:Candidate){
 /** Actual provider enrollment release, not the Capability Lab prototype. */
 function NoncreditPublicationPage(){
   const client=useQueryClient();
+  const {publicSiteId}=Route.useSearch();
+  const linkedSite=useQuery({
+    queryKey:["enrollment-site-identity",publicSiteId],
+    queryFn:()=>getSiteIdentityLinkStatus({data:{publicSiteId:publicSiteId!}}),
+    enabled:!!publicSiteId,retry:false,staleTime:15_000,
+  });
+  const approvedCanonicalSite=linkedSite.data?.status==="approved"
+    ?linkedSite.data.canonicalSiteId:null;
   const query=useQuery({queryKey:["noncredit-publisher-releases"],
     queryFn:()=>getNoncreditEnrollmentPublisher(),retry:false,staleTime:15_000});
   const [choice,setChoice]=useState("");
@@ -39,7 +53,11 @@ function NoncreditPublicationPage(){
   const [message,setMessage]=useState("");
   const [created,setCreated]=useState("");
   const [managedRelease,setManagedRelease]=useState<string|null>(null);
-  const selected=query.data?.candidates.find(item=>candidateKey(item)===choice);
+  const candidates=(query.data?.candidates??[]).filter(candidate=>
+    !publicSiteId||(approvedCanonicalSite!==null&&[
+      ...candidate.siteOptions,...candidate.digitalSiteOptions,
+    ].some(site=>site.id===approvedCanonicalSite)));
+  const selected=candidates.find(item=>candidateKey(item)===choice);
   const valid=selected&&opensAt&&closesAt&&maxParticipants&&additionalSites.length<=49&&consentVersion.trim().length>=3&&
     consentText.trim().length>=25&&(deliveryMode==="independent"||siteId);
   async function submit(event:FormEvent<HTMLFormElement>){
@@ -85,6 +103,20 @@ function NoncreditPublicationPage(){
   }
   return <WorkspaceShell eyebrow="Program operations" title="Noncredit enrollment"
     width="wide" subtitle="Publish authorized enrollment windows for an approved training and delivery. Each learner registers themselves with their own verified CAN identity.">
+    {publicSiteId&&<section className="mt-5 border border-border bg-card p-4" aria-label="Site enrollment handoff">
+      <h2 className="font-serif text-xl">Your Site enrollment handoff</h2>
+      {linkedSite.isPending&&<p className="mt-2 text-sm">Checking the independently approved canonical Site connection…</p>}
+      {(linkedSite.isError||!approvedCanonicalSite)&&!linkedSite.isPending&&<>
+        <p className="mt-2 text-sm">This Site does not yet have a verified approved identity connection.
+          Choose or publish training only after the Site operator confirms the canonical relationship and CAN approves it.</p>
+        <Link to="/site-identity" search={{mode:"request",siteId:publicSiteId}}
+          className="mt-3 inline-block text-sm font-semibold text-primary underline">Review Site identity approval</Link>
+      </>}
+      {approvedCanonicalSite&&<p className="mt-2 text-sm">
+        Approved Site linked. Only authorized program candidates for this exact
+        canonical Site are available below. Your Site interests do not grant program adoption or enrollment authority.
+      </p>}
+    </section>}
     {query.isPending&&<p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your provider-scoped training and deployment authority…</p>}
     {query.isError&&<p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
       Enrollment management is unavailable for this Site. Your existing CAN sign-in is sufficient once its Person and Site links are independently verified and the matching canonical staff grant is active.
@@ -98,18 +130,29 @@ function NoncreditPublicationPage(){
           published Course, approved completion policy and your verified operator role are all required.
           Enrollment terms are versioned and immutable after publication.
         </p>
-        {query.data.candidates.length===0&&<p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
-          No eligible training/adoption combination is available in your current operator and Site scope.
+        {candidates.length===0&&<p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
+          No eligible training/adoption combination is available in your current operator and Site scope. A new Site must first have an approved canonical identity link, active deployment, approved Offering adoption and registration authorization.
           Finalize the curriculum, completion policy and deployment approval first.
         </p>}
-        {query.data.candidates.length>0&&<form onSubmit={event=>void submit(event)} className="mt-5 space-y-5">
+        {candidates.length>0&&<form onSubmit={event=>void submit(event)} className="mt-5 space-y-5">
           <div>
             <label htmlFor="nc-candidate" className="block text-sm font-semibold">Approved training / deployment</label>
             <select id="nc-candidate" required value={choice}
-              onChange={event=>{setChoice(event.target.value);setSiteId("");setAdditionalSites([]);}}
+              onChange={event=>{
+                const value=event.target.value;
+                const candidate=candidates.find(item=>candidateKey(item)===value);
+                const allowedPhysical=!!approvedCanonicalSite&&
+                  candidate?.siteOptions.some(site=>site.id===approvedCanonicalSite);
+                const allowedDigital=!!approvedCanonicalSite&&
+                  candidate?.digitalSiteOptions.some(site=>site.id===approvedCanonicalSite);
+                setChoice(value);
+                setSiteId(allowedPhysical||allowedDigital?approvedCanonicalSite!:"");
+                setDeliveryMode(allowedPhysical?"facilitated":"independent");
+                setAdditionalSites([]);
+              }}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose an approved program release</option>
-              {query.data.candidates.map(item=><option key={candidateKey(item)} value={candidateKey(item)}>
+              {candidates.map(item=><option key={candidateKey(item)} value={candidateKey(item)}>
                 {item.trainingTitle} · {item.deploymentName} · {item.providerName}
               </option>)}
             </select>
@@ -132,7 +175,7 @@ function NoncreditPublicationPage(){
             <select id="nc-online-site" value={siteId} onChange={event=>setSiteId(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">No specific Site · provider-wide online offering</option>
-              {selected?.digitalSiteOptions.map(site=>
+              {selected?.digitalSiteOptions.filter(site=>!publicSiteId||site.id===approvedCanonicalSite).map(site=>
                 <option key={site.id} value={site.id}>{site.name}</option>)}
             </select>
             <p className="mt-2 text-xs text-muted-foreground">A virtual or physical Site may present an online offering. This does not turn it into facilitated classroom instruction. Only current authorized Site relationships are available.</p>
@@ -142,12 +185,12 @@ function NoncreditPublicationPage(){
             <select id="nc-site" required value={siteId} onChange={event=>{setSiteId(event.target.value);setAdditionalSites([]);}}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose a deployment Site</option>
-              {selected?.siteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+              {selected?.siteOptions.filter(site=>!publicSiteId||site.id===approvedCanonicalSite).map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
             </select>
             {!selected?.siteOptions.length&&<p className="mt-2 text-xs text-muted-foreground">
               This deployment has no currently authorized hosting Site in your scope.
             </p>}
-            {siteId&&selected?.siteOptions.some(site=>site.id!==siteId)&&
+            {!publicSiteId&&siteId&&selected?.siteOptions.some(site=>site.id!==siteId)&&
               <fieldset className="mt-4 border border-border p-3">
                 <legend className="text-sm font-semibold">Additional authorized delivery Sites</legend>
                 <p className="mb-3 text-xs text-muted-foreground">Every selected location gets its own approved registration release, seats and classroom calendar. This does not add new Site permissions.</p>

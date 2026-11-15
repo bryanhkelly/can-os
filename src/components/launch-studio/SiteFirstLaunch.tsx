@@ -201,7 +201,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
               Customize website <ArrowRight className="size-4"/>
             </Link>}
             {!options.schoolSetupAdministrator&&<p className="border p-4 text-sm text-muted-foreground">To customize your Site website, ask an authorized Site Administrator to assign website editing access. You can still explore your private preview.</p>}
-            <Link to="/programs/noncredit/enrollment" className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+            <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
               Make programs enrollable <ArrowRight className="size-4"/>
             </Link>
             {siteId&&options.schoolSetupAdministrator&&<Link to="/sites/$siteId/publish" params={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
