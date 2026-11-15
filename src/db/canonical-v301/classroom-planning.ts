@@ -29,6 +29,7 @@ export const facilitatedClassroomPlans = educationV30.table("facilitated_classro
   hostOrganizationId: uuid("host_organization_id").notNull(),
   facilitatorPersonId: uuid("facilitator_person_id").notNull(),
   requestId: uuid("request_id").notNull(),
+  enrollmentReleaseId: uuid("enrollment_release_id"),
   state: text("state").$type<"scheduled"|"started"|"cancelled">().notNull().default("scheduled"),
   facilitatedSessionId: uuid("facilitated_session_id")
     .references(()=>facilitatedLearningSessions.id),
@@ -40,4 +41,5 @@ export const facilitatedClassroomPlans = educationV30.table("facilitated_classro
   uniqueIndex("facilitated_plans_live_room_uq").on(t.facilitatedSessionId),
   index("facilitated_plans_facilitator_idx").on(t.hostOrganizationId,t.facilitatorPersonId,t.state),
   index("facilitated_plans_site_course_idx").on(t.siteId,t.courseVersionId),
+  index("facilitated_plans_release_idx").on(t.enrollmentReleaseId,t.state),
 ]);
