@@ -57,7 +57,9 @@
     "lint": "eslint . && node scripts/check-design-system.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy"
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
+    "db:canonical:classroom-schema": "node scripts/acceptance/check-classroom-pilot-schema.mjs",
+    "test:classroom:unit": "vitest run tests/unit/classroom-connect.test.ts tests/unit/classroom-connect-route-contract.test.ts tests/unit/classroom-media-provider-contract.test.ts tests/unit/classroom-pilot-guards.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
