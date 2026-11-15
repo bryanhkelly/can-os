@@ -24,9 +24,12 @@ export async function readLinkedSiteNoncreditReleases(
   // Do not break their existing published Site websites.
   const [presence]=((await executor.execute(sql`
     SELECT to_regclass('public.site_canonical_identity_links') IS NOT NULL AS "mappingReady",
-      to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady"
-  `)).rows as Array<{mappingReady:boolean;releasesReady:boolean}>);
-  if(!presence?.mappingReady||!presence.releasesReady)return [];
+      to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady",
+      CASE WHEN to_regclass('public.site_canonical_identity_links') IS NOT NULL
+        THEN has_table_privilege(current_user,'public.site_canonical_identity_links','SELECT')
+        ELSE false END AS "canReadLink"
+  `)).rows as Array<{mappingReady:boolean;releasesReady:boolean;canReadLink:boolean}>);
+  if(!presence?.mappingReady||!presence.releasesReady||!presence.canReadLink)return [];
 
   const links=await executor.execute(sql`
     SELECT canonical_site_id AS "canonicalSiteId"
