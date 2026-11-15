@@ -49,6 +49,7 @@ function MyCanAccount() {
     staleTime: 30_000,
   });
   if (!session?.authenticated) return null;
+  const verifiedSession = session;
   const account = query.data;
   const visiblePlaces = account?.places.filter(place => {
     const q = search.toLowerCase().trim();
@@ -56,7 +57,7 @@ function MyCanAccount() {
       .filter(Boolean).some(value => value?.toLowerCase().includes(q));
   }) ?? [];
   const favoriteCount = account?.places.filter(place => place.favorite).length ?? 0;
-  const grantsById = new Set(session.grants.map(grant => grant.id));
+  const grantsById = new Set(verifiedSession.grants.map(grant => grant.id));
 
   async function toggleFavorite(siteId: string, favorite: boolean) {
     if (busy) return;
@@ -77,8 +78,8 @@ function MyCanAccount() {
     setBusy(grantId);
     try {
       await switchVerifiedMembership({
-        grants: session.grants,
-        activeGrantId: session.activeGrantId,
+        grants: verifiedSession.grants,
+        activeGrantId: verifiedSession.activeGrantId,
         grantId,
         queryClient,
       });
@@ -136,7 +137,7 @@ function MyCanAccount() {
               <span className="text-xs text-muted-foreground">{favoriteCount} saved</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">Save published learning locations and schools where you have verified access. Favorites never enroll you or share your profile.</p>
-            <Link to="/explore/" className={sectionLink}>Discover programs at more locations <ArrowRight className="size-4" aria-hidden="true"/></Link>
+            <Link to="/explore" className={sectionLink}>Discover programs at more locations <ArrowRight className="size-4" aria-hidden="true"/></Link>
             {sharingQuery.isError && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
               Contact sharing is unavailable right now. No data has been shared from this page.
             </p>}
@@ -175,7 +176,7 @@ function MyCanAccount() {
                 current={sharingQuery.data?.find(item => item.siteId === place.id)}
                 available={sharingQuery.isSuccess && account.verified &&
                   !account.identityNeedsReview && !account.demoAccountSwitching}
-                grantAllowed={!session.grants.some(grant => grant.role === "student")}
+                grantAllowed={!verifiedSession.grants.some(grant => grant.role === "student")}
                 onChanged={async () => {
                   await queryClient.invalidateQueries({ queryKey: ["my-can-site-contact-consent"] });
                 }}/>
@@ -215,7 +216,7 @@ function MyCanAccount() {
           </nav>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">Your classes, program registrations and history remain with their authorized educational records.</p>
           {session.role === "account_holder" ?
-            <Link to="/explore/" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Explore programs and locations</Link> :
+            <Link to="/explore" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Explore programs and locations</Link> :
             <Link to="/home" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Open current learning workspace</Link>}
         </section>
         <section className="border border-border bg-muted/30 p-5">
