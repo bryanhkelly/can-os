@@ -59,6 +59,7 @@ export const routeNavigation = {
   "/explore": publicPage,
   "/learn/enroll": publicPage,
   "/learn/my-courses": hidden("Own verified noncredit learner registrations, outside school Site navigation", []),
+  "/learn/my-programs": hidden("Verified participant-specific learning across authorized adult, guardian and student workspaces", []),
   "/learn/course/$courseAttemptId": hidden("Own authorized noncredit Course attempt and private progress", []),
   "/programs/noncredit/enrollment": hidden("Native provider release management, separate from public registration", []),
   "/enrichment/$seasonId": hidden("Extended-learning offering detail"),

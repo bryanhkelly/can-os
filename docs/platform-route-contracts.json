@@ -886,6 +886,15 @@
       "writeBoundary": "Only an existing owned active canonical Course attempt can renew its learner session"
     },
     {
+      "file": "src/routes/learn.my-programs.tsx",
+      "route": "/learn/my-programs",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/messages.tsx",
       "route": "/messages",
       "owner": "communication",

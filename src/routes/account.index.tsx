@@ -206,8 +206,8 @@ function MyCanAccount() {
         <section className="border border-border bg-card p-5">
           <h2 className="font-serif text-2xl">My learning</h2>
           <nav aria-label="Noncredit learning" className="mt-3 flex flex-col items-start gap-2">
-            <Link to="/learn/my-courses" className={sectionLink}>
-              <BookOpen className="size-4" aria-hidden="true"/> My courses
+            <Link to="/learn/my-programs" className={sectionLink}>
+              <BookOpen className="size-4" aria-hidden="true"/> My Learning & Programs
             </Link>
             <Link to="/learn/enroll" search={{}} className={sectionLink}>
               Explore noncredit training <ArrowRight className="size-4" aria-hidden="true"/>
