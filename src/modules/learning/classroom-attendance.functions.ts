@@ -5,13 +5,13 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   auditEvents, classroomPersons, domainEvents, enrollments,
-  facilitatedClassroomPlans, noncreditSelfEnrollmentClaims,
-  noncreditSelfEnrollmentReleases,
+  noncreditSelfEnrollmentClaims,
   facilitatedLearningParticipants, facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { classroomAttestationOpen, classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
+import {assignedClassroomRelease,attemptInAssignedClassroomRelease} from "./classroom-release-boundary.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   ownedRoom, schoolAttemptIsPlacedAtSite,
@@ -36,42 +36,11 @@ function guard(){
 }
 /** A room with an assigned noncredit release is NOT a generic Course/Site
  * classroom: other releases at the same Site remain separate cohorts. */
-export async function classroomRoomReleaseScope(tx:Tx, room:Room):Promise<string|null>{
-  const [plan]=await tx.select({
-    releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
-    state:facilitatedClassroomPlans.state,
-    deploymentId:facilitatedClassroomPlans.deploymentId,
-    courseVersionId:facilitatedClassroomPlans.courseVersionId,
-    siteId:facilitatedClassroomPlans.siteId,
-    hostOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
-  }).from(facilitatedClassroomPlans).where(
-    eq(facilitatedClassroomPlans.facilitatedSessionId,room.id),
-  ).limit(1);
-  if(!plan)return null;
-  if(plan.state!=="started" || plan.deploymentId!==room.deploymentId ||
-     plan.courseVersionId!==room.courseVersionId ||
-     plan.siteId!==room.siteId ||
-     plan.hostOrganizationId!==room.hostOrganizationId)
-    throw new AuthorizationError("current matching classroom schedule");
-  if(!plan.releaseId)return null;
-  const [release]=await tx.select({id:noncreditSelfEnrollmentReleases.id})
-    .from(noncreditSelfEnrollmentReleases).where(and(
-      eq(noncreditSelfEnrollmentReleases.id,plan.releaseId),
-      eq(noncreditSelfEnrollmentReleases.deploymentId,room.deploymentId),
-      eq(noncreditSelfEnrollmentReleases.courseVersionId,room.courseVersionId),
-      eq(noncreditSelfEnrollmentReleases.siteId,room.siteId),
-      eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,room.hostOrganizationId),
-      eq(noncreditSelfEnrollmentReleases.deliveryMode,"facilitated"),
-    )).limit(1);
-  if(!release)throw new AuthorizationError("valid Site enrollment release for classroom");
-  return release.id;
-}
-
 export async function registeredRoomParticipant(
   tx:Tx,room:Room,courseAttemptId:string, releaseScope?:string|null,
 ){
   const releaseId=releaseScope===undefined
-    ? await classroomRoomReleaseScope(tx,room):releaseScope;
+    ? await assignedClassroomRelease(tx,room):releaseScope;
   const [attempt]=await tx.select().from(learnerCourseAttempts).where(and(
     eq(learnerCourseAttempts.id,courseAttemptId),
     eq(learnerCourseAttempts.deploymentId,room.deploymentId),
@@ -118,6 +87,9 @@ export async function registeredRoomParticipant(
         eq(noncreditSelfEnrollmentClaims.siteId,room.siteId),
       )).limit(1);
     if(!claim)throw new AuthorizationError("participant of this specific enrollment release");
+    if(!await attemptInAssignedClassroomRelease(
+      tx,room,attempt.id,registration.personId,releaseId,
+    ))throw new AuthorizationError("verified participant of this exact classroom release");
   }
   return {personId:registration.personId,source:"noncredit" as const};
 }
@@ -127,7 +99,7 @@ export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
-      const releaseScope=await classroomRoomReleaseScope(tx,room);
+      const releaseScope=await assignedClassroomRelease(tx,room);
       // Scope the SQL BEFORE LIMIT: other cohorts must not crowd out this roster.
       const attempts=releaseScope
         ? await tx.select({id:learnerCourseAttempts.id})
