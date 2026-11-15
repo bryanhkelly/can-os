@@ -4,6 +4,7 @@ import {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {
   attachClassroomPlanToNoncreditRelease,getNoncreditReleaseOperations,
+  releaseWithdrawnNoncreditSeat,
 } from "@/modules/enrollment/noncredit-cohort-operations.functions";
 import {normalizeClientError} from "@/lib/client-error";
 
@@ -11,6 +12,8 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
   const client=useQueryClient();
   const [busy,setBusy]=useState<string|null>(null);
   const [message,setMessage]=useState("");
+  const [seatTarget,setSeatTarget]=useState<string|null>(null);
+  const [seatReason,setSeatReason]=useState("");
   const query=useQuery({
     queryKey:["noncredit-cohort-ops",releaseId],
     queryFn:()=>getNoncreditReleaseOperations({data:{releaseId}}),
@@ -25,6 +28,21 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       setMessage("This scheduled meeting now belongs to the selected cohort.");
     }catch(cause){
       setMessage(normalizeClientError(cause,"Could not assign the meeting to this enrollment release.").message);
+    }finally{setBusy(null);}
+  }
+  async function releaseSeat(registrationId:string){
+    if(busy||seatReason.trim().length<15)return;
+    setBusy(registrationId);setMessage("");
+    try{
+      await releaseWithdrawnNoncreditSeat({data:{
+        releaseId,registrationId,reason:seatReason.trim(),
+      }});
+      setSeatTarget(null);setSeatReason("");
+      await client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]});
+      await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
+      setMessage("Capacity reconciliation recorded. The original registration, consent and audit history were retained.");
+    }catch(cause){
+      setMessage(normalizeClientError(cause,"Could not release the withdrawn seat.").message);
     }finally{setBusy(null);}
   }
   return <section className="mt-5 border border-border bg-card p-5" aria-label="Cohort management">
@@ -79,7 +97,31 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           <tbody>
             {query.data.roster.map(person=><tr key={person.registrationId} className="border-b border-border">
               <td className="p-3">{person.displayName}</td>
-              <td className="p-3">{person.status}</td>
+              <td className="p-3">
+                {person.status}
+                {person.seatReleased&&<p className="text-xs text-muted-foreground">Seat released</p>}
+                {["withdrawn","cancelled"].includes(person.status)&&!person.seatReleased&&
+                  person.completionOutcome!=="completed"&&
+                  <div className="mt-2">
+                    <button type="button" className="text-xs text-primary underline"
+                      onClick={()=>{setSeatTarget(person.registrationId);setSeatReason("");}}>
+                      Review capacity release
+                    </button>
+                    {seatTarget===person.registrationId&&<div className="mt-2 space-y-2 border border-border p-2">
+                      <label className="block text-xs font-medium">Reason for releasing the seat
+                        <textarea value={seatReason} maxLength={500} onChange={event=>setSeatReason(event.target.value)}
+                          className="mt-2 w-full min-w-48 border border-border bg-background p-2" rows={2}
+                          placeholder="Describe verified withdrawal and seat-release reason"/>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" disabled={busy!==null||seatReason.trim().length<15}
+                          onClick={()=>void releaseSeat(person.registrationId)}>Confirm release</Button>
+                        <Button size="sm" variant="outline" disabled={busy!==null}
+                          onClick={()=>setSeatTarget(null)}>Cancel</Button>
+                      </div>
+                    </div>}
+                  </div>}
+              </td>
               <td className="p-3">{person.attendedLinkedSession?"Present at linked session":"Not verified"}</td>
               <td className="p-3">{person.completionOutcome??"No final decision"}</td>
             </tr>)}

@@ -78,6 +78,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
         displayName:canonicalPersons.preferredName,
         first:canonicalPersons.legalFirstName,last:canonicalPersons.legalLastName,
         status:noncreditRegistrations.status,
+        releasedSeatId:noncreditReleasedSeats.id,
         registeredAt:noncreditRegistrations.registeredAt,
         courseAttemptId:learnerCourseAttempts.id,
         attemptStatus:learnerCourseAttempts.status,
@@ -89,6 +90,8 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
         .leftJoin(learnerCourseAttempts,and(
           eq(learnerCourseAttempts.noncreditRegistrationId,noncreditRegistrations.id),
           eq(learnerCourseAttempts.courseVersionId,release.courseVersionId)))
+        .leftJoin(noncreditReleasedSeats,eq(
+          noncreditReleasedSeats.registrationId,noncreditRegistrations.id))
         .where(and(
           eq(noncreditSelfEnrollmentClaims.releaseId,release.id),
           eq(noncreditRegistrations.registeringOrganizationId,provider.organizationId),
@@ -137,6 +140,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           displayName:[x.displayName??x.first??"Registered learner",x.last]
             .filter(Boolean).join(" "),
           status:x.status,attemptStatus:x.attemptStatus,
+          seatReleased:x.releasedSeatId!==null,
           registeredAt:x.registeredAt.toISOString(),
           attendedLinkedSession:x.courseAttemptId?present.has(x.courseAttemptId):false,
           completionOutcome:latestDecision.get(x.registrationId)??null,
@@ -145,6 +149,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           registrations:roster.length,
           active:roster.filter(x=>["registered","active"].includes(x.status)).length,
           withdrawn:roster.filter(x=>x.status==="withdrawn").length,
+          seatsReleased:roster.filter(x=>x.releasedSeatId!==null).length,
           completed:roster.filter(x=>latestDecision.get(x.registrationId)==="completed").length,
           verifiedAttendees:roster.filter(x=>x.courseAttemptId && present.has(x.courseAttemptId)).length,
           linkedSessions:plans.filter(p=>p.linkedReleaseId===release.id && p.state!=="cancelled").length,
