@@ -15,10 +15,11 @@ describe("Classroom Connect P1 authorization and feedback boundaries", () => {
     expect(api).toContain("eq(noncreditRegistrations.participantPersonId, participantPersonId)");
     expect(api).toContain("eligibleAdoptions.set(attempt.adoptionId, attempt)");
     expect(api).toContain("assertRoomMediaRightsForAudience");
+    expect(api.split("assertAuthorizedFacilitatedRoomMedia(").length - 1).toBe(3);
     // Media lists, signed URLs, and playback event writes all pass through
     // the same current audience / adoption enforcement, not a stale token.
-    expect(api.split("currentRoomMediaAudience(tx, room)").length - 1).toBe(3);
-    expect(api.split("assertRoomMediaRightsForAudience(").length - 1).toBe(4);
+    expect(api.split("currentRoomMediaAudience(tx, room)").length - 1).toBe(2);
+    expect(api.split("assertRoomMediaRightsForAudience(").length - 1).toBe(3);
   });
 
   it("derives operational expiry on the server and updates the open browser", () => {
