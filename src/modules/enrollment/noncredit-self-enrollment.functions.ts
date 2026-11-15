@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
@@ -8,7 +8,7 @@ import {
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons, canonicalSessions,
-  canonicalEnrollmentSites,
+  canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
   noncreditCompletionPolicies, noncreditTrainingVersions,
@@ -297,6 +297,18 @@ export const getOpenNoncreditSelfEnrollment = createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","public, max-age=30");
     const releases=await readEligibleSelfEnrollmentReleases();
+    // A scheduled cohort is a set of approved Classroom Connect delivery
+    // sessions explicitly attached to a published enrollment release.
+    const plans=releases.length?await db.select({
+      releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
+      startsAt:canonicalDeliverySessions.startsAt,
+      endsAt:canonicalDeliverySessions.endsAt,
+    }).from(facilitatedClassroomPlans).innerJoin(canonicalDeliverySessions,
+      eq(canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
+      .where(and(
+        inArray(facilitatedClassroomPlans.enrollmentReleaseId,releases.map(r=>r.id)),
+        inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
+      )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
     return releases.map(row=>({
       id:row.id,title:row.title,provider:row.organizationName,
       deploymentName:row.deploymentName,siteName:row.siteName,
@@ -305,6 +317,12 @@ export const getOpenNoncreditSelfEnrollment = createServerFn({method:"GET"})
       closesAt:row.closesAt.toISOString(),
       consentVersion:row.consentVersion,consentText:row.consentText,
       consentSha256:row.consentSha256,
+      sessions:plans.filter(p=>p.releaseId===row.id)
+        .slice(0,20).map(p=>({
+          startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
+        })),
+      schedulePartial:plans.length>1000||
+        plans.filter(p=>p.releaseId===row.id).length>20,
     }));
   });
 

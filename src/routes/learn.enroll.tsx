@@ -134,6 +134,17 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
       <div><dt className="text-xs text-muted-foreground">Instruction</dt><dd className="font-medium">{release.requiredMinutes} minutes</dd></div>
       <div><dt className="text-xs text-muted-foreground">Remaining places</dt><dd className="font-medium">{release.seatsRemaining}</dd></div>
     </dl>
+    {release.deliveryMode==="facilitated"&&<section className="mt-5 border-t border-border pt-4" aria-label="Class schedule">
+      <h3 className="text-sm font-semibold">Scheduled class meetings</h3>
+      {release.sessions.length?
+        <ol className="mt-2 space-y-2 text-sm">
+          {release.sessions.map((meeting,index)=><li key={index} className="border border-border p-2">
+            {new Date(meeting.startsAt).toLocaleString()} to {new Date(meeting.endsAt).toLocaleTimeString()}
+          </li>)}
+        </ol>:
+        <p className="mt-2 text-sm text-muted-foreground">No dated meetings have been attached to this cohort. Ask the hosting Site for its schedule before registering.</p>}
+      {release.schedulePartial&&<p className="mt-2 text-xs text-muted-foreground">Additional meeting dates are available from the Site.</p>}
+    </section>}
     <div className="mt-5 border-t border-border pt-5">
       <h3 className="text-sm font-semibold">Participation and data-use terms · {release.consentVersion}</h3>
       <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{release.consentText}</p>

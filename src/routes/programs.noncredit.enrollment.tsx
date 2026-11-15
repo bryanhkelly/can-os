@@ -8,6 +8,7 @@ import {
   publishNoncreditSelfEnrollment,
 } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 import { normalizeClientError } from "@/lib/client-error";
+import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditReleaseOperations";
 
 export const Route=createFileRoute("/programs/noncredit/enrollment")({
   component:NoncreditPublicationPage,
@@ -35,6 +36,7 @@ function NoncreditPublicationPage(){
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const [created,setCreated]=useState("");
+  const [managedRelease,setManagedRelease]=useState<string|null>(null);
   const selected=query.data?.candidates.find(item=>candidateKey(item)===choice);
   const valid=selected&&opensAt&&closesAt&&maxParticipants&&consentVersion.trim().length>=3&&
     consentText.trim().length>=25&&(deliveryMode==="independent"||siteId);
@@ -175,6 +177,10 @@ function NoncreditPublicationPage(){
             <div className="flex flex-wrap gap-3">
               <Link to="/learn/enroll" search={{release:row.id}}
                 className="text-xs font-semibold text-primary underline underline-offset-4">Learner link</Link>
+              <button type="button" className="text-xs font-semibold text-primary underline underline-offset-4"
+                onClick={()=>setManagedRelease(id=>id===row.id?null:row.id)}>
+                {managedRelease===row.id?"Hide roster":"Roster & sessions"}
+              </button>
               {row.status==="published"&&<button type="button" disabled={busy}
                 onClick={()=>void close(row.id)}
                 className="text-xs font-semibold text-destructive underline underline-offset-4">Close registration</button>}
@@ -184,5 +190,6 @@ function NoncreditPublicationPage(){
         </div>
       </section>
     </div>}
+    {managedRelease&&<NoncreditReleaseOperations key={managedRelease} releaseId={managedRelease}/>}
   </WorkspaceShell>;
 }
