@@ -21,6 +21,12 @@ describe("Account-only identity has no school privilege", () => {
     expect(access.scope.organizationIds).toEqual([]);
     expect(access.scope.siteIds).toEqual([]);
     expect(access.actorPersonId).toBe(personId);
+    expect(() => resolveAccessContext({
+      accountId, sessionId: "session", activeGrantId: grant.id,
+    }, [{...grant, organizationId: "forbidden-organization"}])).toThrow();
+    expect(() => resolveAccessContext({
+      accountId, sessionId: "session", activeGrantId: grant.id,
+    }, [{...grant, siteId: "forbidden-site"}])).toThrow();
   });
   it("preserves only internal return URLs", () => {
     expect(safeAccessReturnTo("/account/")).toBe("/account/");
