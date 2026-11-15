@@ -41,9 +41,11 @@ describe("Noncredit adult self-enrollment authority", () => {
     expect(noncreditPublishCommand.safeParse({
       ...publication, deliveryMode: "facilitated", siteId: adoptionId,
     }).success).toBe(true);
+    // Independent online training may belong to a Site. The publishing
+    // service independently checks the exact current operating relationship.
     expect(noncreditPublishCommand.safeParse({
       ...publication, deliveryMode: "independent", siteId: adoptionId,
-    }).success).toBe(false);
+    }).success).toBe(true);
     expect(noncreditPublishCommand.safeParse({
       ...publication, closesAt: "2026-11-01T18:00:00Z",
     }).success).toBe(false);
