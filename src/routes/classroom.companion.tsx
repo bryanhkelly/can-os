@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { ClassroomCompanionRoom } from "@/components/learning/ClassroomCompanionRoom";
+import { ClassroomGovernedLearnerSurveys } from "@/components/learning/ClassroomGovernedLearnerSurveys";
 import { Button } from "@/components/ui/button";
 import { getLearnerFacilitatedRoom, leaveFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 import {
@@ -142,6 +143,9 @@ function ClassroomCompanionPage() {
             </Button>)}
           </div>
         </fieldset>)}
+        <ClassroomGovernedLearnerSurveys
+          courseAttemptId={courseAttemptId}
+          facilitatedSessionId={room.facilitatedSessionId}/>
       </div>)}
     </section>}
 
