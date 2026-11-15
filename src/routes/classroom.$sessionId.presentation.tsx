@@ -43,7 +43,7 @@ function ClassroomPresentation() {
     }),
     refetchInterval: 8000, staleTime: 0, retry: false,
   });
-  const live = state.data?.roomState === "live";
+  const live = state.isSuccess && state.data?.roomState === "live";
 
   return <main className="min-h-screen bg-background px-4 py-6 md:px-10"
     aria-label="Shared-screen classroom presentation">
@@ -70,10 +70,10 @@ function ClassroomPresentation() {
     {state.isError && <p role="alert" className="mt-6">
       This classroom presentation is unavailable. Sign in as its authorized facilitator.
     </p>}
-    {state.data && !live && <p role="status" className="mt-6 border border-border p-5">
+    {state.isSuccess && state.data && !live && <p role="status" className="mt-6 border border-border p-5">
       This room is {state.data.roomState}. The presentation is closed.
     </p>}
-    {state.data && live && <div className="mx-auto mt-6 grid max-w-screen-2xl gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+    {state.isSuccess && state.data && live && <div className="mx-auto mt-6 grid max-w-screen-2xl gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
       <div><ClassroomProjectorPlayer facilitatedSessionId={sessionId}/></div>
       <aside className="space-y-4">
         {pair ? <section className="border border-border bg-card p-4"
