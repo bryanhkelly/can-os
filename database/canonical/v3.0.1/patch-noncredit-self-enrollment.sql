@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS education_v30.noncredit_self_enrollment_releases (
   training_version_id uuid NOT NULL,
   course_version_id uuid NOT NULL REFERENCES education_v30.course_versions(id) ON DELETE RESTRICT,
   provider_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
+  registering_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
   site_id uuid REFERENCES education_v30.sites(id) ON DELETE RESTRICT,
   delivery_mode text NOT NULL CHECK (delivery_mode IN ('independent','facilitated')),
   status text NOT NULL DEFAULT 'published' CHECK (status IN ('published','closed')),
@@ -62,7 +63,7 @@ CREATE INDEX IF NOT EXISTS noncredit_self_enroll_published_idx
  ON education_v30.noncredit_self_enrollment_releases(opens_at, closes_at)
  WHERE status='published';
 CREATE INDEX IF NOT EXISTS noncredit_self_enroll_provider_idx
- ON education_v30.noncredit_self_enrollment_releases(provider_organization_id,status,created_at DESC);
+ ON education_v30.noncredit_self_enrollment_releases(registering_organization_id,status,created_at DESC);
 CREATE INDEX IF NOT EXISTS noncredit_self_enroll_delivery_idx
  ON education_v30.noncredit_self_enrollment_releases(deployment_id,training_version_id,course_version_id);
 ALTER TABLE education_v30.noncredit_self_enrollment_releases ENABLE ROW LEVEL SECURITY;
@@ -86,6 +87,39 @@ CREATE INDEX IF NOT EXISTS noncredit_self_claim_by_person_idx
 CREATE INDEX IF NOT EXISTS noncredit_self_claim_capacity_idx
  ON education_v30.noncredit_self_enrollment_claims(release_id);
 ALTER TABLE education_v30.noncredit_self_enrollment_claims ENABLE ROW LEVEL SECURITY;
+
+-- Published release attributes cannot be rewritten after participants have
+-- seen the consent. Closing is permitted, reopening is not. If a provider
+-- changes copy/capacity/curriculum they must publish another release.
+CREATE OR REPLACE FUNCTION education_v30.v301_freeze_noncredit_enrollment_release()
+RETURNS trigger LANGUAGE plpgsql AS $self_release_immutability$
+BEGIN
+ IF NEW IS DISTINCT FROM OLD THEN
+  IF OLD.status <> 'published' OR NEW.status <> 'closed'
+     OR ROW(NEW.deployment_id,NEW.adoption_id,NEW.offering_version_id,
+            NEW.training_version_id,NEW.course_version_id,
+            NEW.provider_organization_id,NEW.registering_organization_id,
+            NEW.site_id,NEW.delivery_mode,NEW.opens_at,NEW.closes_at,
+            NEW.max_participants,NEW.consent_version,NEW.consent_text,
+            NEW.published_by_person_id,NEW.published_at,NEW.created_at)
+        IS DISTINCT FROM
+        ROW(OLD.deployment_id,OLD.adoption_id,OLD.offering_version_id,
+            OLD.training_version_id,OLD.course_version_id,
+            OLD.provider_organization_id,OLD.registering_organization_id,
+            OLD.site_id,OLD.delivery_mode,OLD.opens_at,OLD.closes_at,
+            OLD.max_participants,OLD.consent_version,OLD.consent_text,
+            OLD.published_by_person_id,OLD.published_at,OLD.created_at)
+     OR NEW.closed_at IS NULL THEN
+    RAISE EXCEPTION 'Published noncredit enrollment release is immutable';
+  END IF;
+ END IF;
+ RETURN NEW;
+END $self_release_immutability$;
+DROP TRIGGER IF EXISTS v301_freeze_noncredit_release
+ ON education_v30.noncredit_self_enrollment_releases;
+CREATE TRIGGER v301_freeze_noncredit_release
+ BEFORE UPDATE ON education_v30.noncredit_self_enrollment_releases
+ FOR EACH ROW EXECUTE FUNCTION education_v30.v301_freeze_noncredit_enrollment_release();
 
 -- Tables are intentionally not globally readable under a learner DB login.
 -- Public offering projection and registration use explicit server-side
