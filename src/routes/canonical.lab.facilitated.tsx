@@ -1,5 +1,5 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { FacilitatedRoomPlayer } from "@/components/learning/FacilitatedRoomPlayer";
@@ -24,8 +24,17 @@ function FacilitatedLearningLabPage() {
 }
 
 type Workspace = Awaited<ReturnType<typeof getFacilitatedHostWorkspace>>;
+function effectiveRoomState(room: Workspace["rooms"][number], nowMs: number) {
+  return room.state === "live" && Date.parse(room.expiresAt) <= nowMs
+    ? "expired" : room.state;
+}
 function FacilitatedLabContent({data}:{data:Workspace}) {
   const router=useRouter();
+  const [clockMs, setClockMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockMs(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const [selected,setSelected]=useState("");
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
@@ -96,7 +105,9 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     <section className="mt-7" aria-label="Facilitated rooms">
       <h2 className="font-serif text-xl font-semibold">Your rooms</h2>
       <div className="mt-3 grid gap-4">
-        {data.rooms.map(room=><article key={room.id} className="border border-border bg-card p-5">
+        {data.rooms.map(room => {
+          const roomState = effectiveRoomState(room, clockMs);
+          return <article key={room.id} className="border border-border bg-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-semibold">
@@ -109,7 +120,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               </p>
             </div>
             <span className="border border-border px-3 py-1 text-sm">
-              {room.state==="ended"?"Ended":"Live"}
+              {roomState==="ended"?"Ended":roomState==="expired"?"Expired":"Live"}
             </span>
           </div>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -126,14 +137,14 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             <div>
               <dt className="text-xs text-muted-foreground">Pairing window</dt>
               <dd className="mt-1 text-sm font-medium">
-                {room.state==="live"?
+                {roomState==="live"?
                   (new Date(room.pairingExpiresAt)>new Date()?"Open":"Expired"):
                   "Closed"}
               </dd>
             </div>
           </dl>
-          {room.state==="live"&&<FacilitatedRoomPlayer facilitatedSessionId={room.id}/>}
-          {room.state==="live"&&<div className="mt-4 flex flex-wrap gap-2">
+          {roomState==="live"&&<FacilitatedRoomPlayer facilitatedSessionId={room.id}/>}
+          {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" disabled={busy}
               onClick={()=>void run(async()=>{
                 const renewed=await renewFacilitatedLearningPairing({
@@ -148,7 +159,8 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
                 if(code?.roomId===room.id)setCode(null);
               });}}>End room</Button>
           </div>}
-        </article>)}
+        </article>;
+        })}
         {!data.rooms.length&&<p className="border border-border p-5 text-sm text-muted-foreground">
           No facilitated learning rooms have been started under your current Site permissions.
         </p>}
