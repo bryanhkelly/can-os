@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { organizations, sites } from "@/db/schema";
@@ -23,6 +23,32 @@ type LinkRow={
   reviewedByPersonId:string|null;
 };
 const siteUuid=z.string().uuid();
+
+/** Enforce the database RLS write boundary even when the normal app pool
+ * connects as an owner/BYPASSRLS role. The caller's real account is checked
+ * before entering this function. Only the narrowly authorized write SQL
+ * executes as the non-login role; audit and reads run under normal context.
+ *
+ * The role is granted to the reviewed runtime DB login during migration.
+ * Missing grants fail closed and leave the identity link unchanged.
+ */
+async function executeReviewedIdentityMutation(
+  tx:Pick<typeof db,"execute">,
+  action:"request"|"confirm"|"review",
+  verifiedActorPersonId:string,
+  statement:SQL,
+):Promise<void>{
+  await tx.execute(sql`SELECT set_config('can.site_identity_action',${action},true)`);
+  await tx.execute(sql`SELECT set_config('can.site_identity_actor',${verifiedActorPersonId},true)`);
+  await tx.execute(sql.raw("SET LOCAL ROLE can_v30_site_identity_writer"));
+  try {
+    await tx.execute(statement);
+  } finally {
+    // An error causes the outer transaction to roll back; RESET may itself
+    // fail in an aborted transaction, so do not mask the original failure.
+    await tx.execute(sql.raw("RESET ROLE")).catch(()=>{});
+  }
+}
 
 /** A link is an explicit, three-party verification, NOT an ownership grant.
  * Public registrar requests; native canonical Site operator confirms;
@@ -57,7 +83,7 @@ export const requestSiteIdentityLink=createServerFn({method:"POST"})
           return {status:"pending" as const};
         throw new AuthorizationError("Site identity is already under review or linked");
       }
-      await tx.execute(sql`
+      await executeReviewedIdentityMutation(tx,"request",actor.actorPersonId!,sql`
         INSERT INTO public.site_canonical_identity_links(
           public_site_id,canonical_site_id,evidence_reference,requested_by_person_id)
         VALUES (${site.id}::uuid,${data.canonicalSiteId}::uuid,
@@ -114,7 +140,7 @@ export const confirmCanonicalSiteIdentityLink=createServerFn({method:"POST"})
           return {status:"confirmed" as const};
         throw new AuthorizationError("already confirmed by another canonical operator");
       }
-      await tx.execute(sql`
+      await executeReviewedIdentityMutation(tx,"confirm",actor.actorPersonId!,sql`
         UPDATE public.site_canonical_identity_links
         SET confirmed_by_canonical_person_id=${actor.actorPersonId}::uuid,
           confirmed_at=now(),updated_at=now()
@@ -241,7 +267,7 @@ export const reviewSiteIdentityLink=createServerFn({method:"POST"})
         }))throw new AuthorizationError("independent native confirmation and current Site authority required");
       }
       const nextStatus=data.decision==="approve"?"approved":data.decision==="reject"?"rejected":"revoked";
-      await tx.execute(sql`
+      await executeReviewedIdentityMutation(tx,"review",actor.actorPersonId!,sql`
         UPDATE public.site_canonical_identity_links
         SET status=${nextStatus},reviewed_by_person_id=${actor.actorPersonId!}::uuid,
           reviewed_at=now(),updated_at=now()
