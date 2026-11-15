@@ -88,6 +88,7 @@ function MyCanAccount() {
       <Button className="mt-4" variant="outline" onClick={() => void query.refetch()}>Try again</Button>
     </section>}
     {error && <p role="alert" className="mt-5 border border-destructive bg-card p-4 text-sm">{error}</p>}
+    {account?.identityNeedsReview && <p role="status" className="mt-6 border border-border bg-card p-4 text-sm">This login is linked to more than one Person record. CAN staff must verify and reconcile the identities before profile information is reused across schools. No records have been merged.</p>}
     {account && <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(16rem,1fr)]">
       <div className="min-w-0 space-y-6">
         <section aria-labelledby="workspaces-heading" className="border border-border bg-card">
