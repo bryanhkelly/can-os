@@ -96,7 +96,7 @@ async function recordRoomAuditAndEvent(
  * AND a current host/operator organization relationship at that same Site.
  * A separate network/denomination affiliation is never required.
  */
-async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
+export async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
   const now = new Date();
   const [deployment] = await tx.select({
     id: programDeployments.id, operationId: programDeployments.operationId,
@@ -144,7 +144,7 @@ async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string
  * after a facilitator or Site relationship has been withdrawn. Failed checks
  * disclose neither the room nor its playback activity to a learner.
  */
-async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.$inferSelect, now:Date) {
+export async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.$inferSelect, now:Date) {
   const [host] = await tx.select({id:educationOperationSites.siteId})
     .from(programDeployments)
     .innerJoin(educationOperationOrganizationRoles,and(
@@ -196,7 +196,7 @@ async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.
     )).limit(1);
   return !!grant;
 }
-async function schoolAttemptIsPlacedAtSite(
+export async function schoolAttemptIsPlacedAtSite(
   tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,
 ) {
   const [placement] = await tx.select({id:classroomEnrollmentSitePlacements.id})
@@ -219,7 +219,7 @@ async function schoolAttemptIsPlacedAtSite(
     )).limit(1);
   return !!placement;
 }
-async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
+export async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   const query = tx.select().from(facilitatedLearningSessions).where(and(
     eq(facilitatedLearningSessions.id,id),
     eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
@@ -346,6 +346,23 @@ async function assertRoomMediaRightsForAudience(
       tx, attempt, trackVersionId, lessonId, assetVersionId,
     );
   }
+}
+/** Apply the same room/asset/audience authorization to remote projector controls,
+ * signed media URLs and recorded playback evidence. Never authorize through an
+ * unrelated active learner in the Deployment. */
+export async function assertAuthorizedFacilitatedRoomMedia(
+  tx: Tx,
+  room: typeof facilitatedLearningSessions.$inferSelect,
+  lessonId: string,
+  assetVersionId: string,
+): Promise<void> {
+  assertRoomLive(room, new Date());
+  const trackVersionId = await validateRoomVideo(
+    tx, room.courseVersionId, lessonId, assetVersionId,
+  );
+  const audience = await currentRoomMediaAudience(tx, room);
+  if (!audience.length) throw new AuthorizationError("paired current learner required for playback");
+  await assertRoomMediaRightsForAudience(tx, audience, trackVersionId, lessonId, assetVersionId);
 }
 const roomMediaInput=roomIdInput.extend({
   lessonId:z.string().uuid(),assetVersionId:z.string().uuid(),
