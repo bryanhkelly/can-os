@@ -6,7 +6,7 @@ import { and, asc, countDistinct, desc, eq, gt, inArray, isNull, lte, or } from 
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  catalogSites, contentAssetVersions, courseLessons, courseVersions, courses,
+  catalogSites, contentAssets, contentAssetVersions, courseLessons, courseVersions, courses,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
   facilitatedPairingRateLimits,
@@ -14,6 +14,7 @@ import {
   siteOrganizationRoles, trackLessonPresentations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { resolveClassVideo } from "@/domain/class-video";
 import { DomainError } from "@/domain/errors";
 import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
@@ -223,18 +224,28 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
       );
       const [asset]=await tx.select({
         storageReference:contentAssetVersions.storageReference,
-      }).from(contentAssetVersions).where(and(
-        eq(contentAssetVersions.id,data.assetVersionId),
-        eq(contentAssetVersions.lifecycle,"published"),
-      )).limit(1);
+        externalUrl:contentAssets.externalUrl,
+      }).from(contentAssetVersions).innerJoin(contentAssets,
+        eq(contentAssetVersions.assetId,contentAssets.id))
+        .where(and(
+          eq(contentAssetVersions.id,data.assetVersionId),
+          eq(contentAssetVersions.lifecycle,"published"),
+        )).limit(1);
+      if(!asset)throw new AuthorizationError("approved video resource");
       const expectedKey=instructionalTrackAssetStorageKey(data.assetVersionId);
-      if(!asset||asset.storageReference!==expectedKey||
-        !protectedMediaKey.test(asset.storageReference))
-        throw new AuthorizationError("approved private video resource");
-      return {downloadUrl:signPrivateObjectUrl({
-        method:"GET",key:asset.storageReference,
-        keyPattern:protectedMediaKey,expiresSeconds:30,
-      }),expiresInSeconds:30};
+      if(asset.storageReference===expectedKey &&
+          protectedMediaKey.test(asset.storageReference)) {
+        return {downloadUrl:signPrivateObjectUrl({
+          method:"GET",key:asset.storageReference,
+          keyPattern:protectedMediaKey,expiresSeconds:30,
+        }),expiresInSeconds:30};
+      }
+      // An external video must pass the same track reviews and rights as R2.
+      // Only the allowlisted YouTube/Vimeo embed formats are eligible here.
+      const resolved=asset.externalUrl?resolveClassVideo(asset.externalUrl):null;
+      if(!resolved || resolved.kind!=="embed")
+        throw new AuthorizationError("approved and allowlisted video resource");
+      return {downloadUrl:asset.externalUrl!,expiresInSeconds:0};
     });
   });
 

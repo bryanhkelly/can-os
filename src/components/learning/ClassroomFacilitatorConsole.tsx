@@ -108,10 +108,10 @@ export function ClassroomFacilitatorConsole({ facilitatedSessionId }: { facilita
         device or heartbeat is not evidence of physical presence. These are room attestations,
         not changes to official school attendance.
       </p>
-      {state.data?.participants.map((person,i)=><div key={person.courseAttemptId}
+      {state.data?.participants.map(person=><div key={person.courseAttemptId}
         className="mt-2 flex flex-wrap items-center justify-between gap-2 border border-border p-3">
         <div>
-          <p className="text-sm font-medium">Participant {i+1}</p>
+          <p className="text-sm font-medium">{person.displayName}</p>
           <p className="text-xs text-muted-foreground">
             Attempt {person.courseAttemptId.slice(0,8)} · {person.deviceActive?"Device seen recently":"Not recently observed"}
             {" · "}Attendance: {person.attendance}

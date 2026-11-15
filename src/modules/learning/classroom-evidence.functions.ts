@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, isNull, lt, gt, lte, or } from "drizzle-orm";
+import { and, desc, eq, isNull, gt, lte, or, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -11,6 +11,7 @@ import {
   surveyCampaigns, learnerCourseAttempts,
 } from "@/db/canonical-v301";
 import { classroomDeploymentSites, classroomEnrollmentSitePlacements } from "@/db/canonical-v301/classroom-site-placements";
+import { classroomPersons } from "@/db/canonical-v301/classroom-persons";
 import { AuthorizationError } from "@/domain/command-context";
 import { facilitatedRoomMaxMs } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
@@ -84,6 +85,12 @@ export const getClassroomLearnerActivities = createServerFn({method:"GET"})
       const releases=await tx.select().from(facilitatedRoomActivityReleases)
         .where(eq(facilitatedRoomActivityReleases.facilitatedSessionId,data.facilitatedSessionId))
         .orderBy(desc(facilitatedRoomActivityReleases.releasedAt)).limit(30);
+      const people=paired.length ? await tx.select({
+        id:classroomPersons.id,firstName:classroomPersons.legalFirstName,
+        lastName:classroomPersons.legalLastName,preferredName:classroomPersons.preferredName,
+      }).from(classroomPersons).where(inArray(classroomPersons.id,paired.map(p=>p.personId))) : [];
+      const names=new Map(people.map(p=>[p.id,
+        [p.preferredName||p.firstName,p.lastName].filter(Boolean).join(" ").trim()]));
       const responses=await tx.select({
         activityReleaseId:facilitatedRoomActivityResponses.activityReleaseId,
         submittedAt:facilitatedRoomActivityResponses.submittedAt,
@@ -273,7 +280,8 @@ export const getClassroomHostActivity = createServerFn({method:"GET"})
       const releases=await tx.select().from(facilitatedRoomActivityReleases)
         .where(eq(facilitatedRoomActivityReleases.facilitatedSessionId,room.id))
         .orderBy(desc(facilitatedRoomActivityReleases.releasedAt)).limit(40);
-      const paired=await tx.select({courseAttemptId:facilitatedLearningParticipants.courseAttemptId})
+      const paired=await tx.select({courseAttemptId:facilitatedLearningParticipants.courseAttemptId,
+        personId:facilitatedLearningParticipants.participantPersonId})
         .from(facilitatedLearningParticipants).where(and(
           eq(facilitatedLearningParticipants.facilitatedSessionId,room.id),
           isNull(facilitatedLearningParticipants.leftAt),
@@ -313,6 +321,7 @@ export const getClassroomHostActivity = createServerFn({method:"GET"})
         })),
         participants:paired.map(p=>({
           courseAttemptId:p.courseAttemptId,
+          displayName:names.get(p.personId)??"Unnamed learner",
           deviceActive:live.has(p.courseAttemptId),
           attendance:latest.get(p.courseAttemptId)?.status??"unknown",
         })),

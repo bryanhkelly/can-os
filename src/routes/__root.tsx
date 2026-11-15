@@ -75,7 +75,7 @@ function RootComponent() {
   const pathname = useLocation({ select: location => location.pathname });
   const standalone = isLaunchStudioPath(pathname);
   const engagement = isEngagementPath(pathname);
-  const presentation = /^\\/classroom\\/[0-9a-f-]{36}\\/presentation$/i.test(pathname);
+  const presentation = pathname.startsWith("/classroom/") && pathname.endsWith("/presentation");
 
   return (
     <QueryClientProvider client={queryClient}>
