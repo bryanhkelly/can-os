@@ -52,8 +52,8 @@ export async function finalizeNoncreditKnowledgeCheck(context:CommandContext,inp
     const [administration]=await tx.select().from(assessmentFormAdministrations)
       .where(eq(assessmentFormAdministrations.id,attempt.administrationId)).limit(1);
     const baseline=administration?.assessmentVersionId===training.baselineAssessmentVersionId;
-    const final=administration?.assessmentVersionId===training.assessmentVersionId;
-    if(!administration||(!baseline&&!final)||
+    const isFinalAssessment=administration?.assessmentVersionId===training.assessmentVersionId;
+    if(!administration||(!baseline&&!isFinalAssessment)||
       administration.deploymentId!==courseAttempt.deploymentId||
       administration.courseVersionId!==courseAttempt.courseVersionId||
       administration.administeringOrganizationId!==training.providerOrganizationId)
