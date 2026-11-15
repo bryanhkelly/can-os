@@ -125,7 +125,7 @@ function assertRoomLive(room: typeof facilitatedLearningSessions.$inferSelect, n
     now.getTime()-room.startedAt.getTime()>facilitatedRoomMaxMs)
     throw new AuthorizationError("current facilitated room");
 }
-async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string,assetVersionId:string) {
+export async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string,assetVersionId:string) {
   const [presentation] = await tx.select({
     id:trackLessonPresentations.id,
     trackVersionId:trackLessonPresentations.trackVersionId,
@@ -150,7 +150,7 @@ async function validateRoomVideo(tx: Tx, courseVersionId:string, lessonId:string
 
 /** Permission checks for a room use a real active Course attempt with a current
  * Deployment adoption, never a fabricated facilitator enrollment. */
-async function representativeAttempt(tx: Tx, deploymentId:string, courseVersionId:string) {
+export async function representativeAttempt(tx: Tx, deploymentId:string, courseVersionId:string) {
   const [attempt] = await tx.select().from(learnerCourseAttempts).where(and(
     eq(learnerCourseAttempts.deploymentId,deploymentId),
     eq(learnerCourseAttempts.courseVersionId,courseVersionId),
