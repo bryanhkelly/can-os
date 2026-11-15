@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, lte, notInArray, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, lte, notInArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import {
@@ -7,6 +7,7 @@ import {
 } from "@/db/canonical-v301";
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 
 const LEASE_MS=120_000;
 const MAX_ATTEMPTS=5;
@@ -68,6 +69,7 @@ export async function processNoncreditWaitlistEmailDeliveries(
     try{
       const [record]=await db.select({
         delivery:noncreditWaitlistEmailDeliveries,
+        releaseId:noncreditEnrollmentWaitlist.releaseId,
         accountId:noncreditEnrollmentWaitlist.accessAccountId,
         personId:noncreditEnrollmentWaitlist.accessPersonId,
         waitlistStatus:noncreditEnrollmentWaitlist.status,
@@ -89,6 +91,12 @@ export async function processNoncreditWaitlistEmailDeliveries(
          record.actualExpiry<=clock() || record.releaseClosesAt<=clock() ||
          record.releaseStatus!=="published"){
         await suppress("invitation_no_longer_active");continue;
+      }
+      // A published row is not automatically an authorized enrollment.
+      // Reuse the exact current release/Offering/operation/Site policy.
+      const [eligibleRelease]=await readEligibleSelfEnrollmentReleases(db,record.releaseId);
+      if(!eligibleRelease){
+        await suppress("release_eligibility_revoked");continue;
       }
       if(await isDemoTenantOrganization(record.organizationId)){
         await suppress("demo_tenant_external_delivery");continue;
@@ -112,6 +120,18 @@ export async function processNoncreditWaitlistEmailDeliveries(
         )).limit(1);
       if(!recipient?.email){
         await suppress("verified_account_person_unavailable");continue;
+      }
+      const activeGrants=await db.select({
+        personId:accountPersonGrants.personId,
+        role:accountPersonGrants.role,
+      }).from(accountPersonGrants).where(and(
+        eq(accountPersonGrants.accountId,record.accountId),
+        eq(accountPersonGrants.active,true),
+      )).limit(101);
+      if(!activeGrants.length || activeGrants.length>100 ||
+        activeGrants.some(grant=>grant.personId!==record.personId ||
+          grant.role==="student")){
+        await suppress("adult_person_identity_reconciliation_required");continue;
       }
       const sendAt=clock(),renewedUntil=new Date(sendAt.getTime()+LEASE_MS);
       const renewed=await db.update(noncreditWaitlistEmailDeliveries).set({
