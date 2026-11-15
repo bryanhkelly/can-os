@@ -5,6 +5,9 @@ import { Button } from "@/components/ui/button";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { ClassroomRehearsalPlayer } from "@/components/learning/ClassroomRehearsalPlayer";
+import { ClassroomSchedulePanel } from "@/components/learning/ClassroomSchedulePanel";
+import { ClassroomAttendancePanel } from "@/components/learning/ClassroomAttendancePanel";
+import { ClassroomSurveyManager } from "@/components/learning/ClassroomSurveyManager";
 import { getClassroomRehearsalChoices } from "@/modules/learning/classroom-rehearsal.functions";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
@@ -148,6 +151,11 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       {rehearsalScope&&<ClassroomRehearsalPlayer
         scope={rehearsalScope} onClose={()=>setRehearsalScope(null)}/>}
     </section>
+    <ClassroomSchedulePanel choices={rehearsalOptions?.choices??[]}
+      onRoomStarted={async value=>{
+        setCode({roomId:value.roomId,code:value.pairingCode,expiresAt:value.pairingExpiresAt});
+        await router.invalidate();
+      }}/>
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
     {code && Date.parse(code.expiresAt) > clockMs &&
       data.rooms.some(room => room.id === code.roomId &&
@@ -208,6 +216,8 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
             </div>
           </dl>
           {roomState==="live"&&<ClassroomFacilitatorConsole facilitatedSessionId={room.id}/>}
+          <ClassroomAttendancePanel facilitatedSessionId={room.id}/>
+          <ClassroomSurveyManager facilitatedSessionId={room.id}/>
           {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" disabled={busy}
               onClick={()=>void run(async()=>{
