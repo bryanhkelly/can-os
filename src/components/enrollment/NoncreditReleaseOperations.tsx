@@ -4,7 +4,7 @@ import {useState} from "react";
 import {Button} from "@/components/ui/button";
 import {
   attachClassroomPlanToNoncreditRelease,getNoncreditReleaseOperations,
-  releaseWithdrawnNoncreditSeat,
+  releaseWithdrawnNoncreditSeat,inviteNextNoncreditWaitlist,
 } from "@/modules/enrollment/noncredit-cohort-operations.functions";
 import {normalizeClientError} from "@/lib/client-error";
 
@@ -28,6 +28,19 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       setMessage("This scheduled meeting now belongs to the selected cohort.");
     }catch(cause){
       setMessage(normalizeClientError(cause,"Could not assign the meeting to this enrollment release.").message);
+    }finally{setBusy(null);}
+  }
+  async function invite(){
+    if(busy)return;setBusy("invite");setMessage("");
+    try{
+      const result=await inviteNextNoncreditWaitlist({data:{releaseId}});
+      await client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]});
+      await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
+      setMessage(result.invited?
+        "Next waiting adult has a reserved place for up to 48 hours. The invitation is visible in their CAN account; no outbound message has been sent.":
+        "There are no eligible waiting participants to invite.");
+    }catch(cause){
+      setMessage(normalizeClientError(cause,"Could not reserve the next waiting place.").message);
     }finally{setBusy(null);}
   }
   async function releaseSeat(registrationId:string){
@@ -65,6 +78,16 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           <div className="font-serif text-3xl">{value}</div>
           <div className="text-xs text-muted-foreground">{label}</div>
         </div>)}
+      </div>
+      <div className="mt-5 border-t border-border pt-4">
+        <h3 className="text-base font-semibold">Waiting list</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {query.data.metrics.waiting} waiting · {query.data.metrics.invitations} active invitations · {query.data.seatsAvailable} unheld seats.
+          Invitations follow queue order and reserve capacity temporarily. The participant must accept personally.
+        </p>
+        <Button type="button" className="mt-3" variant="outline" disabled={busy!==null||
+          query.data.metrics.waiting===0||query.data.seatsAvailable<=0}
+          onClick={()=>void invite()}>{busy==="invite"?"Reserving…":"Invite next waiting adult"}</Button>
       </div>
       <h3 className="mt-7 text-base font-semibold">Dated classroom sessions</h3>
       <p className="mt-2 text-sm text-muted-foreground">

@@ -51,6 +51,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
         inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt})
         .from(noncreditEnrollmentWaitlist)
         .where(eq(noncreditEnrollmentWaitlist.releaseId,release.id)).limit(1001);
+      const [eligibleRelease]=await readEligibleSelfEnrollmentReleases(tx,release.id);
       const [title]=await tx.select({title:noncreditTrainingVersions.title})
         .from(noncreditTrainingVersions)
         .where(eq(noncreditTrainingVersions.id,release.trainingVersionId)).limit(1);
@@ -141,6 +142,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
         releaseId:release.id,title:title?.title??"Approved training",
         deliveryMode:release.deliveryMode,
         siteId:release.siteId,registrationStatus:release.status,
+        seatsAvailable:eligibleRelease?.seatsRemaining??0,
         sessions,roster:roster.map(x=>({
           registrationId:x.registrationId,courseAttemptId:x.courseAttemptId,
           displayName:[x.displayName??x.first??"Registered learner",x.last]
