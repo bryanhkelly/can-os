@@ -97,7 +97,7 @@ function MyCanAccount() {
               <h2 id="workspaces-heading" className="font-serif text-2xl">My workspaces</h2>
               <span className="text-xs text-muted-foreground">{account.workspaces.length} verified role{account.workspaces.length === 1 ? "" : "s"}</span>
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Schools, programs and organizations where you have an active role.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Your personal account and verified roles at schools, programs and organizations.</p>
           </header>
           <div className="divide-y divide-border">
             {account.workspaces.map(workspace => <div key={workspace.grantId}
