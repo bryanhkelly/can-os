@@ -10,6 +10,7 @@ import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { writeAudit } from "@/platform/mutation";
+import { ensureExistingSitePublicationDraftForLaunch } from "@/modules/sites/site-public-provisioning.server";
 
 /**
  * Saves only Site-scoped planning intent. This is not a Program, Offering,
@@ -29,6 +30,11 @@ export const saveSiteLaunchPreferences = createServerFn({method:"POST"})
       const [site]=await tx.select().from(sites)
         .where(eq(sites.id,data.siteId)).for("update").limit(1);
       assertSiteSetupScope(actor,site,"program.launch.start");
+      // Reuse an existing Site website address or reserve one in the same
+      // verified transaction. Never alter an already published address.
+      await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
+        id:site.id,organizationId:site.organizationId,slug:site.slug,
+      });
       const previous=site.metadata.launchPreferences;
       if(JSON.stringify(previous)===JSON.stringify(data.preferences))
         return {siteId:site.id,updated:false};
