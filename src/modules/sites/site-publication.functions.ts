@@ -6,6 +6,7 @@ import { changeSitePublication, changeSitePublicIdentity, getSitePublicationDraf
 import { changeAcademicProgramPublication } from "./academic-program-publication.server";
 import { checkPublishedSiteReachability } from "./public-host-reachability";
 import { checkEnrollmentAppReachability } from "./app-enrollment-reachability.server";
+import { inspectSiteNoncreditReadiness } from "./site-noncredit-releases.server";
 
 const uuid = z.string().uuid();
 
@@ -96,7 +97,7 @@ export const verifySiteEnrollmentHandoff = createServerFn({method:"POST"})
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
     const draft=await getSitePublicationDraft(await getCommandContext(getRequest()),data.siteId);
-    const [website,application]=await Promise.all([
+    const [website,application,noncredit]=await Promise.all([
       checkPublishedSiteReachability({
         host:draft.address?.host??null,
         published:draft.address?.status==="published",
@@ -106,9 +107,10 @@ export const verifySiteEnrollmentHandoff = createServerFn({method:"POST"})
         configuredOrigin:process.env.CAN_ACCESS_PUBLIC_ORIGIN,
         expectedSourceRevision:data.expectedSourceRevision??null,
       }),
+      inspectSiteNoncreditReadiness(data.siteId),
     ]);
     return {
-      website,application,
-      ready:website.status==="live"&&application.status==="verified",
+      website,application,noncredit,
+      ready:website.status==="live"&&application.status==="verified"&&noncredit.status==="ready",
     };
   });
