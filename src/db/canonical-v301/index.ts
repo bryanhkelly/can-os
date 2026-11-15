@@ -25,3 +25,4 @@ export * from "./classroom-persons";
 export * from "./classroom-projector-controls";
 export * from "./classroom-rehearsal";
 export * from "./facilitated-room-evidence";
+export * from "./classroom-planning";
