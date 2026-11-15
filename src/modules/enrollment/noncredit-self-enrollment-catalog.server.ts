@@ -1,4 +1,5 @@
-import { and, count, eq, exists, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import { and, count, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalEnrollmentOrganizations, canonicalEnrollmentSites,
@@ -6,7 +7,7 @@ import {
   educationOperationOrganizationRoles, educationOperations,
   noncreditCompletionPolicies, noncreditSelfEnrollmentClaims,
   noncreditSelfEnrollmentReleases, noncreditTrainingVersions, offeringVersions,
-  offerings, programDeployments, classroomDeploymentSites,
+  offerings, programDeployments, classroomDeploymentSites, educationOperationSites,
 } from "@/db/canonical-v301";
 import { publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
 
@@ -25,6 +26,7 @@ export async function readEligibleSelfEnrollmentReleases(
   const r = noncreditSelfEnrollmentReleases;
   const policy = noncreditCompletionPolicies;
   const operator = educationOperationOrganizationRoles;
+  const registeringOrg = alias(canonicalEnrollmentOrganizations,"self_enroll_registering_org");
   const rows = await executor.select({
     id:r.id, title:noncreditTrainingVersions.title,
     requiredMinutes:noncreditTrainingVersions.requiredInstructionMinutes,
@@ -55,6 +57,7 @@ export async function readEligibleSelfEnrollmentReleases(
       eq(noncreditTrainingVersions.providerOrganizationId,r.providerOrganizationId),
     ))
     .innerJoin(canonicalEnrollmentOrganizations,eq(canonicalEnrollmentOrganizations.id,r.providerOrganizationId))
+    .innerJoin(registeringOrg,eq(registeringOrg.id,r.registeringOrganizationId))
     .innerJoin(courseVersions,eq(courseVersions.id,r.courseVersionId))
     .innerJoin(canonicalOfferingCourses,and(
       eq(canonicalOfferingCourses.offeringVersionId,r.offeringVersionId),
@@ -78,6 +81,7 @@ export async function readEligibleSelfEnrollmentReleases(
       isNotNull(noncreditTrainingVersions.publishedAt),
       isNotNull(noncreditTrainingVersions.approvedByPersonId),
       eq(canonicalEnrollmentOrganizations.status,"active"),
+      eq(registeringOrg.status,"active"),
       eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
       exists(executor.select({id:policy.id}).from(policy).where(and(
         eq(policy.trainingVersionId,r.trainingVersionId),
@@ -94,6 +98,14 @@ export async function readEligibleSelfEnrollmentReleases(
         and(eq(r.deliveryMode,"independent"),isNull(r.siteId)),
         and(eq(r.deliveryMode,"facilitated"),isNotNull(r.siteId),
           eq(canonicalEnrollmentSites.status,"active"),
+          exists(executor.select({id:educationOperationSites.id})
+            .from(educationOperationSites).where(and(
+              eq(educationOperationSites.operationId,programDeployments.operationId),
+              eq(educationOperationSites.siteId,r.siteId),
+              lte(educationOperationSites.validFrom,now),
+              or(isNull(educationOperationSites.validThrough),
+                gt(educationOperationSites.validThrough,now)),
+            ))),
           exists(executor.select({id:classroomDeploymentSites.id})
             .from(classroomDeploymentSites).where(and(
               eq(classroomDeploymentSites.deploymentId,r.deploymentId),
