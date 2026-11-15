@@ -10,6 +10,7 @@ import {
   surveyInvitations, surveyResponses, surveyVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { classroomFeedbackOpen } from "@/domain/classroom-feedback";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
@@ -90,6 +91,9 @@ export const getClassroomSurveyOptions=createServerFn({method:"GET"})
           if(!(error instanceof AuthorizationError))throw error;
         }
       }
+      if(!await attemptInAssignedClassroomRelease(
+        tx,room,access.courseAttemptId,personId,
+      ))throw new AuthorizationError("own classroom enrollment release");
       const links=await tx.select({
         surveyCampaignId:facilitatedRoomSurveyCampaigns.surveyCampaignId,
         stage:facilitatedRoomSurveyCampaigns.stage,
