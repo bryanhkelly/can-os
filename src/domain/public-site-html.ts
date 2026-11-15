@@ -1,4 +1,5 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
+import { renderSiteNoncreditOfferings, type SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
 import { templateDefaultImage, templateSampleImage } from "./template-sample-images";
@@ -28,6 +29,9 @@ export type PublicSitePage = {
   localContent?: SiteLocalContent | null;
   /** Site-scoped, rights-reviewed media, selected automatically by the shared engine. */
   media?: PublicSchoolSiteMedia;
+  /** Explicitly eligible canonical noncredit enrollment releases from reviewed Site identity link. */
+  noncreditReleases?: readonly SiteNoncreditListing[];
+  enrollmentAppOrigin?: string | null;
 };
 
 /** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
@@ -916,7 +920,7 @@ ${composePublicSiteChrome(templateId, {
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual students or facilities of this school.</p>` : ""}
-  ${pageContent[path]}\n</main>`,
+  ${pageContent[path]}\n  ${path === "/" ? renderSiteNoncreditOfferings(page.noncreditReleases ?? [], page.enrollmentAppOrigin) : ""}\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
 })}
 </body>
