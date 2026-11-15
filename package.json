@@ -67,7 +67,8 @@
     "db:canonical:noncredit:integration": "node scripts/acceptance/test-noncredit-self-enrollment-test01.mjs",
     "test:e2e:noncredit": "playwright test --config=playwright.noncredit-self-enrollment.config.ts",
     "db:check:main": "node scripts/acceptance/check-production-drizzle-parity.mjs",
-    "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs"
+    "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
+    "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
