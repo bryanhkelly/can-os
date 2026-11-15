@@ -46,7 +46,7 @@ function FocusedWorkspaceSidebar({ links, activePath, institutionSelection, expa
       <div id="classroom-primary-links" className="flex min-h-0 flex-1 flex-col">
         <SidebarLinks links={links} activePath={activePath} collapsed={!expanded} institutionSelection={institutionSelection}/>
       </div>
-      <Link to="/account/" aria-label="My CAN account" title="Account sessions" className="flex justify-center border-t p-4 text-muted-foreground">
+      <Link to="/account/" aria-label="My CAN account" title="My CAN account" className="flex justify-center border-t p-4 text-muted-foreground">
         <Settings className="size-4" aria-hidden="true"/><span className="sr-only">My CAN account</span>
       </Link>
     </aside>
@@ -59,7 +59,7 @@ function FocusedWorkspaceSidebar({ links, activePath, institutionSelection, expa
   </>;
 }
 
-const footerLinkClass = "flex items-center gap-3 rounded-lg py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+const footerLinkClass = "flex items-center gap-3 py-2 text-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 function ExpandedWorkspaceSidebar({ member, links, activePath, institutionSelection, expanded = true, onToggle }: WorkspaceSidebarProps) {
   const collapsed = !expanded;
@@ -74,7 +74,7 @@ function ExpandedWorkspaceSidebar({ member, links, activePath, institutionSelect
         {collapsed ? <PanelLeftOpen aria-hidden="true"/> : <PanelLeftClose aria-hidden="true"/>}
       </Button>}
       {!collapsed && <div className="flex min-w-0 flex-col justify-center">
-        <Link to="/" activeOptions={{ exact: true }} className="self-start rounded-sm font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>
+        <Link to="/" activeOptions={{ exact: true }} className="self-start font-serif text-xl font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">CAN OS</Link>
         <p className="mt-0.5 whitespace-nowrap text-3xs font-semibold uppercase tracking-wider text-muted-foreground">Church Academy Network</p>
       </div>}
     </div>
