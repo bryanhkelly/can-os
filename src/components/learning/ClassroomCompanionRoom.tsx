@@ -69,10 +69,10 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
     {state.isError&&<p role="alert">Activities are temporarily unavailable. Your room connection may have ended.</p>}
     {state.isSuccess&&state.data.activities.length===0&&
       <p className="border border-border p-4 text-sm">Waiting for the facilitator to release an activity.</p>}
-    {state.data?.truncated&&<p role="status" className="text-xs text-muted-foreground">
+    {state.isSuccess&&state.data?.truncated&&<p role="status" className="text-xs text-muted-foreground">
       This room has more activity history than is displayed. Earlier submissions remain saved.
     </p>}
-    {state.data?.activities.map(activity=><article key={activity.id} className="border border-border bg-card p-4">
+    {state.isSuccess&&state.data?.activities.map(activity=><article key={activity.id} className="border border-border bg-card p-4">
       <p className="font-medium">{activity.prompt}</p>
       <p className="mt-1 text-xs text-muted-foreground">
         {activity.closed?"Closed":"Open for responses"} · {activity.responded?"Response saved":"Not yet answered"}
