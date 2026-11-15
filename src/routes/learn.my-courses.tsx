@@ -48,6 +48,11 @@ function MyNoncreditCourses(){
               {course.registrationStatus} · {course.attemptStatus}
             </p>
             <h2 className="mt-2 font-serif text-2xl">{course.trainingTitle}</h2>
+            <p className="mt-2 text-xs text-muted-foreground">
+              {course.deliveryMode==="facilitated"
+                ? "Facilitated at "+(course.siteName??"an approved learning center")
+                : "Independent online learning"}
+            </p>
             <p className="mt-2 text-xs text-muted-foreground">Registered {new Date(course.registeredAt).toLocaleDateString()}</p>
           </div>
           {["registered","active"].includes(course.registrationStatus)&&course.attemptStatus==="active"?
