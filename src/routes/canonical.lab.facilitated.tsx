@@ -7,6 +7,7 @@ import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { ClassroomRehearsalPlayer } from "@/components/learning/ClassroomRehearsalPlayer";
 import { ClassroomSchedulePanel } from "@/components/learning/ClassroomSchedulePanel";
 import { ClassroomAttendancePanel } from "@/components/learning/ClassroomAttendancePanel";
+import { ClassroomAssistedActivityPanel } from "@/components/learning/ClassroomAssistedActivityPanel";
 import { ClassroomSurveyManager } from "@/components/learning/ClassroomSurveyManager";
 import { getClassroomRehearsalChoices } from "@/modules/learning/classroom-rehearsal.functions";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
@@ -217,6 +218,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           </dl>
           {roomState==="live"&&<ClassroomFacilitatorConsole facilitatedSessionId={room.id}/>}
           <ClassroomAttendancePanel facilitatedSessionId={room.id}/>
+          <ClassroomAssistedActivityPanel facilitatedSessionId={room.id}/>
           <ClassroomSurveyManager facilitatedSessionId={room.id}/>
           {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" disabled={busy}
