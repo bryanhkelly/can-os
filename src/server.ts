@@ -31,6 +31,27 @@ export default {
         type:error instanceof Error?error.name:"unknown",
         message:error instanceof Error?error.message.slice(0,130):"unknown",
       })));
+    // The same durable outbox is also handled by the Node maintenance runner.
+    // DB row leases make both paths safe if they overlap. Mail is sent only
+    // after the invitation transaction has committed and is reauthorized.
+    if(env.DATABASE_URL){
+      ctx.waitUntil(withRequestDatabase(
+        async()=>{
+          const {processNoncreditWaitlistEmailDeliveries}=await import(
+            "./modules/enrollment/noncredit-waitlist-delivery.server"
+          );
+          return processNoncreditWaitlistEmailDeliveries();
+        },
+        env.DATABASE_URL,
+      ).then(result=>{
+        if(result.accepted||result.failed||result.suppressed)
+          console.info("CAN waitlist email dispatch",result);
+      }).catch(error=>{
+        console.error("CAN waitlist email dispatch failed",{
+          type:error instanceof Error?error.name:"unknown",
+        });
+      }));
+    }
     // Independent of photography. A Neon transaction lease prevents more
     // than one actual cleanup per 24 hours on the once-a-minute Worker cron.
     if(env.CAN_SESSION_DEVICE_RETENTION_ENABLED==="1"){
