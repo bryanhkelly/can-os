@@ -172,6 +172,7 @@ function MyCanAccount() {
                 current={sharingQuery.data?.find(item => item.siteId === place.id)}
                 available={sharingQuery.isSuccess && account.verified &&
                   !account.identityNeedsReview && !account.demoAccountSwitching}
+                grantAllowed={!session.grants.some(grant => grant.role === "student")}
                 onChanged={async () => {
                   await queryClient.invalidateQueries({ queryKey: ["my-can-site-contact-consent"] });
                 }}/>
@@ -273,11 +274,12 @@ const consentPurposes = [
  * Consent is explicit and independent from favoriting. Neither action creates
  * any enrollment, membership, school application or staff invitation.
  */
-function SiteContactSharing({ siteId, siteName, current, available, onChanged }: {
+function SiteContactSharing({ siteId, siteName, current, available, grantAllowed, onChanged }: {
   siteId: string;
   siteName: string;
   current: SiteConsentView | undefined;
   available: boolean;
+  grantAllowed: boolean;
   onChanged: () => Promise<void>;
 }) {
   const [expanded, setExpanded] = useState(false);
@@ -286,7 +288,7 @@ function SiteContactSharing({ siteId, siteName, current, available, onChanged }:
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   async function decide(decision: "grant" | "revoke") {
-    if (!available || saving) return;
+    if (!available || saving || (decision === "grant" && !grantAllowed)) return;
     setSaving(true); setMessage("");
     try {
       await setMyCanSiteContactShare({ data: {
@@ -310,7 +312,7 @@ function SiteContactSharing({ siteId, siteName, current, available, onChanged }:
         onClick={() => void decide("revoke")}>Stop sharing</Button>
     </div> : <>
       <button type="button" className="text-xs font-semibold text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary"
-        disabled={!available || saving} aria-expanded={expanded}
+        disabled={!available || !grantAllowed || saving} aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}>
         Share my contact with this location
       </button>
@@ -333,6 +335,7 @@ function SiteContactSharing({ siteId, siteName, current, available, onChanged }:
           onClick={() => void decide("grant")}>{saving ? "Saving…" : "Allow contact sharing"}</Button>
       </div>}
     </>}
+    {!grantAllowed && !current?.active && <p className="mt-2 text-xs text-muted-foreground">Student-linked accounts require a verified guardian-managed sharing flow.</p>}
     {message && <p role="status" aria-live="polite" className="mt-2 text-xs">{message}</p>}
   </div>;
 }
