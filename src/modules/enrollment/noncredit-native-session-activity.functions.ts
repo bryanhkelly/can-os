@@ -8,7 +8,6 @@ import { canonicalSessions, learnerCourseAttempts, noncreditRegistrations,
   noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { getCanonicalSessionRow } from "@/modules/identity/canonical-command-context.server";
-import { requireVerifiedAdultAccount } from "./noncredit-self-enrollment.functions";
 
 /**
  * Only real trusted user interaction may extend the native 30-minute idle
@@ -21,6 +20,7 @@ export const touchMyNoncreditLearningSession = createServerFn({method:"POST"})
   }).strict().parse(input))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     const canonical=await getCanonicalSessionRow(getRequest());
     if(canonical.role_code!=="learner"||canonical.site_id!==null)
