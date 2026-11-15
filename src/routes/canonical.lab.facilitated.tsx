@@ -42,7 +42,9 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     useState<Awaited<ReturnType<typeof getClassroomRehearsalChoices>> | null>(null);
   const [rehearsalFailed,setRehearsalFailed]=useState(false);
   const [rehearsalChoice,setRehearsalChoice]=useState("");
-  const [rehearsalOpen,setRehearsalOpen]=useState(false);
+  const [rehearsalScope,setRehearsalScope]=useState<{
+    deploymentId:string;adoptionId:string;courseVersionId:string;siteId:string;
+  } | null>(null);
   useEffect(()=>{
     let live=true;
     void getClassroomRehearsalChoices().then(value=>{
@@ -122,7 +124,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           Approved Site course
           <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
             value={rehearsalChoice}
-            onChange={e=>{setRehearsalChoice(e.target.value);setRehearsalOpen(false);}}>
+            onChange={e=>{setRehearsalChoice(e.target.value);setRehearsalScope(null);}}>
             <option value="">Choose a course to rehearse</option>
             {rehearsalOptions?.choices.map(choice=><option
               key={choice.deploymentId+":"+choice.adoptionId+":"+choice.courseVersionId+":"+choice.siteId}
@@ -132,7 +134,10 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           </select>
         </label>
         <Button type="button" variant="outline" disabled={!rehearsal}
-          onClick={()=>setRehearsalOpen(true)}>Preview approved media</Button>
+          onClick={()=>{if(rehearsal)setRehearsalScope({
+            deploymentId:rehearsal.deploymentId,adoptionId:rehearsal.adoptionId,
+            courseVersionId:rehearsal.courseVersionId,siteId:rehearsal.siteId,
+          });}}>Preview approved media</Button>
       </div>
       {rehearsalFailed&&<p role="alert" className="mt-3 text-sm text-destructive">
         Authorized preview courses could not be loaded.
@@ -140,8 +145,8 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       {rehearsalOptions?.partial&&<p role="status" className="mt-3 text-xs text-muted-foreground">
         The Site preview list is limited. Narrow the authorized deployment before rehearsing additional courses.
       </p>}
-      {rehearsalOpen&&rehearsal&&<ClassroomRehearsalPlayer
-        scope={rehearsal} onClose={()=>setRehearsalOpen(false)}/>}
+      {rehearsalScope&&<ClassroomRehearsalPlayer
+        scope={rehearsalScope} onClose={()=>setRehearsalScope(null)}/>}
     </section>
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
     {code && Date.parse(code.expiresAt) > clockMs &&
