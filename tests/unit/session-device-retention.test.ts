@@ -1,19 +1,28 @@
-import {describe,expect,it,vi} from "vitest";
-const state=vi.hoisted(()=>({calls:0,queries:[] as string[]}));
+import {afterEach,describe,expect,it,vi} from "vitest";
+const state=vi.hoisted(()=>({calls:0,queries:0,lease:true}));
 vi.mock("@/db/client",()=>({db:{transaction:async(fn:(tx:unknown)=>Promise<unknown>)=>{
  state.calls++;
- return fn({execute:async(query:unknown)=>{
-  state.queries.push(String(query));
-  return {rows:state.queries.length===1?[{task_key:"security_metadata"}]:[]};
- }});
+ return fn({execute:async()=>({
+  rows:++state.queries===1&&state.lease?[{task_key:"security_metadata"}]:[]
+ })});
 }}}));
 import {runSessionDeviceRetention} from "@/workers/session-device-retention";
+afterEach(()=>{vi.unstubAllEnvs();state.calls=0;state.queries=0;state.lease=true;});
 describe("security metadata retention",()=>{
- it("never runs without explicit opt-in",async()=>{
+ it("never runs without opt-in",async()=>{
   vi.stubEnv("CAN_SESSION_DEVICE_RETENTION_ENABLED","");
-  state.calls=0;
   expect(await runSessionDeviceRetention()).toBe(false);
   expect(state.calls).toBe(0);
-  vi.unstubAllEnvs();
+ });
+ it("performs three retention statements after acquiring daily lease",async()=>{
+  vi.stubEnv("CAN_SESSION_DEVICE_RETENTION_ENABLED","1");
+  expect(await runSessionDeviceRetention()).toBe(true);
+  expect(state.queries).toBe(4);
+ });
+ it("does no cleanup if lease not acquired",async()=>{
+  vi.stubEnv("CAN_SESSION_DEVICE_RETENTION_ENABLED","1");
+  state.lease=false;
+  expect(await runSessionDeviceRetention()).toBe(false);
+  expect(state.queries).toBe(1);
  });
 });
