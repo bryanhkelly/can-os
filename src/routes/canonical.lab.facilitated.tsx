@@ -2,7 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
-import { FacilitatedRoomPlayer } from "@/components/learning/FacilitatedRoomPlayer";
+import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
@@ -146,7 +146,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               </dd>
             </div>
           </dl>
-          {roomState==="live"&&<FacilitatedRoomPlayer facilitatedSessionId={room.id}/>}
+          {roomState==="live"&&<ClassroomFacilitatorConsole facilitatedSessionId={room.id}/>}
           {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="outline" disabled={busy}
               onClick={()=>void run(async()=>{
