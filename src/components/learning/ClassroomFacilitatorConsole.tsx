@@ -4,7 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import {
   getClassroomHostActivity, releaseClassroomActivity, closeClassroomActivity,
-  attestClassroomAttendance,
+  attestClassroomAttendance, attachClassroomSurvey,
 } from "@/modules/learning/classroom-evidence.functions";
 
 /** Private host controls: never display learners' individual answers on the projector. */
@@ -14,6 +14,9 @@ export function ClassroomFacilitatorConsole({ facilitatedSessionId }: { facilita
   const [type,setType]=useState<"single_choice"|"text">("single_choice");
   const [options,setOptions]=useState("Yes\nNo");
   const [busy,setBusy]=useState(false);
+  const [attendanceMethod,setAttendanceMethod]=useState<"in_person_roll_call"|"remote_live_check">("in_person_roll_call");
+  const [surveyId,setSurveyId]=useState("");
+  const [surveyStage,setSurveyStage]=useState<"entry"|"pulse"|"exit">("exit");
   const [error,setError]=useState("");
   const state=useQuery({
     queryKey:["facilitated-host-activity",facilitatedSessionId],
@@ -108,6 +111,14 @@ export function ClassroomFacilitatorConsole({ facilitatedSessionId }: { facilita
         device or heartbeat is not evidence of physical presence. These are room attestations,
         not changes to official school attendance.
       </p>
+      <label className="mt-3 block text-sm">How attendance was checked
+        <select className="mt-1 block border border-border bg-background px-3 py-2"
+          value={attendanceMethod} onChange={event=>setAttendanceMethod(
+            event.target.value as typeof attendanceMethod)}>
+          <option value="in_person_roll_call">In-person roll call</option>
+          <option value="remote_live_check">Remote live check</option>
+        </select>
+      </label>
       {state.data?.participants.map(person=><div key={person.courseAttemptId}
         className="mt-2 flex flex-wrap items-center justify-between gap-2 border border-border p-3">
         <div>
@@ -121,17 +132,48 @@ export function ClassroomFacilitatorConsole({ facilitatedSessionId }: { facilita
           <Button size="sm" variant="outline" disabled={busy} onClick={()=>void run(()=>
             attestClassroomAttendance({data:{
               facilitatedSessionId,courseAttemptId:person.courseAttemptId,requestId:crypto.randomUUID(),
-              status:"present",method:"in_person_roll_call",evidenceNote:null,
+              status:"present",method:attendanceMethod,evidenceNote:null,
             }}))}>Attest present</Button>
           <Button size="sm" variant="outline" disabled={busy} onClick={()=>void run(()=>
             attestClassroomAttendance({data:{
               facilitatedSessionId,courseAttemptId:person.courseAttemptId,requestId:crypto.randomUUID(),
-              status:"absent",method:"in_person_roll_call",evidenceNote:null,
+              status:"absent",method:attendanceMethod,evidenceNote:null,
             }}))}>Absent</Button>
         </div>
       </div>)}
       {!state.data?.participants.length&&<p className="mt-2 text-xs text-muted-foreground">
         No paired learners yet.</p>}
     </section>
+    <form className="mt-5 space-y-3 border-t border-border pt-4" onSubmit={event=>{
+      event.preventDefault();
+      void run(async()=>{
+        await attachClassroomSurvey({data:{
+          facilitatedSessionId,surveyCampaignId:surveyId,stage:surveyStage,
+        }});
+        setSurveyId("");
+      });
+    }}>
+      <h5 className="text-sm font-semibold">Link an approved pilot survey</h5>
+      <p className="text-xs text-muted-foreground">
+        Link an existing approved survey campaign scoped to this host organization and Deployment.
+        Questions, consent and confidential responses remain governed by the survey system.
+      </p>
+      <label className="block text-sm">Survey campaign ID
+        <input className="mt-1 w-full border border-border bg-background p-2"
+          value={surveyId} onChange={e=>setSurveyId(e.target.value.trim())}
+          placeholder="UUID" required/>
+      </label>
+      <label className="block text-sm">Pilot stage
+        <select className="mt-1 w-full border border-border bg-background p-2"
+          value={surveyStage} onChange={e=>setSurveyStage(e.target.value as typeof surveyStage)}>
+          <option value="entry">Entry</option>
+          <option value="pulse">Mid-course pulse</option>
+          <option value="exit">Exit</option>
+        </select>
+      </label>
+      <Button type="submit" variant="outline" disabled={busy||!/^[0-9a-f-]{36}$/i.test(surveyId)}>
+        Link survey evidence
+      </Button>
+    </form>
   </section>;
 }

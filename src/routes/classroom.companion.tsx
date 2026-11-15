@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { WorkspaceShell } from "@/components/workspace";
+import { accessClientInstance } from "@/domain/session-client";
+import { recordClassroomPresence } from "@/modules/learning/classroom-evidence.functions";
 import { Button } from "@/components/ui/button";
 import { ClassroomCompanionRoom } from "@/components/learning/ClassroomCompanionRoom";
-import { getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
+import { getLearnerFacilitatedRoom, leaveFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 
 export const Route = createFileRoute("/classroom/companion")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/classroom/companion")({
 });
 function ClassroomCompanion() {
   const { courseAttemptId } = Route.useSearch();
+  const queryClient=useQueryClient();
   const room = useQuery({
     queryKey: ["classroom-companion", courseAttemptId],
     queryFn: () => getLearnerFacilitatedRoom({ data: { courseAttemptId } }),
@@ -37,6 +40,21 @@ function ClassroomCompanion() {
         Device pairing is not proof of attendance, media viewing or course completion.
       </p>
       <ClassroomCompanionRoom courseAttemptId={courseAttemptId} facilitatedSessionId={item.facilitatedSessionId}/>
+      <Button type="button" variant="outline" size="sm" className="mt-4" onClick={()=>{
+        void (async()=>{
+          try {
+            await recordClassroomPresence({data:{
+              facilitatedSessionId:item.facilitatedSessionId,courseAttemptId,
+              clientInstanceId:accessClientInstance(),clientEventId:crypto.randomUUID(),
+              eventKind:"left",
+            }});
+            await leaveFacilitatedRoom({data:{
+              facilitatedSessionId:item.facilitatedSessionId,courseAttemptId,
+            }});
+            await queryClient.invalidateQueries({queryKey:["classroom-companion",courseAttemptId]});
+          } catch { /* The active pairing is retained if departure fails. */ }
+        })();
+      }}>Leave classroom</Button>
     </section>) : room.isSuccess && <p role="status">You are not currently paired to an active room.</p>}
     <div className="mt-4 flex gap-2">
       <Button asChild variant="outline"><Link to="/join">Join another room</Link></Button>
