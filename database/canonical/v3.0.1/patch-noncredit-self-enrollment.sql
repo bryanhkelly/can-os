@@ -188,6 +188,7 @@ BEGIN
   IF NEW.participant_person_id IS DISTINCT FROM registration_row.participant_person_id
      OR NEW.site_id IS DISTINCT FROM release_row.site_id
      OR NEW.consent_version IS DISTINCT FROM release_row.consent_version
+     OR NEW.consent_sha256 IS DISTINCT FROM encode(public.digest(release_row.consent_version || E'\n' || release_row.consent_text, 'sha256'),'hex')
      OR NEW.adult_attested IS DISTINCT FROM true
      OR registration_row.deployment_id IS DISTINCT FROM release_row.deployment_id
      OR registration_row.adoption_id IS DISTINCT FROM release_row.adoption_id
