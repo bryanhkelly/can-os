@@ -171,9 +171,13 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const provisionedSchool=signup
    ? await (await import("./school-setup-signup.server")).provisionVerifiedSchoolSignup(tx,signup,account.id,account.email,now)
    : null;
-  // A personal account needs no institution. Provision it only after the
-  // single-use email token has been redeemed and other invitations processed.
-  await (await import("./personal-account-signup.server"))
+  // A personal account needs no institution. Only an unbound verified
+  // account may take this additive path; existing school sign-ins do not
+  // depend on the personal signup migration.
+  const [existingGrant]=await tx.select({id:accountPersonGrants.id}).from(accountPersonGrants)
+   .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true)))
+   .limit(1);
+  if(!existingGrant) await (await import("./personal-account-signup.server"))
     .provisionVerifiedPersonalCanAccount(tx,account.id,account.email,now);
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
