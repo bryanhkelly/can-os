@@ -75,6 +75,11 @@ export const setMyCanSiteContactShare = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
     const owner = await requireVerifiedSharingIdentity();
+    // A student relationship may represent a minor. Without independent
+    // age/guardian verification, direct contact sharing is restricted; any
+    // previously issued consent can still be revoked.
+    if (data.decision === "grant" && owner.grants.some(grant => grant.role === "student"))
+      throw new AuthorizationError("student profile sharing requires guardian authority");
     return db.transaction(async tx => {
       // Revision allocation is serialized for one account and Site.
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${owner.accountId+":"+data.siteId+":contact"}))`);
@@ -179,12 +184,15 @@ export const readAuthorizedSiteSharedContact = createServerFn({ method: "GET" })
     const accountId = accountIds[0]!;
     const allPeople = await db.select({
       personId: accountPersonGrants.personId,
+      role: accountPersonGrants.role,
     }).from(accountPersonGrants).where(and(
       eq(accountPersonGrants.accountId, accountId),
       eq(accountPersonGrants.active, true),
     )).limit(100);
     if (new Set(allPeople.map(row => row.personId)).size !== 1)
       throw new AuthorizationError("unambiguous sharing Person");
+    if (allPeople.some(row => row.role === "student"))
+      throw new AuthorizationError("guardian-managed student sharing");
 
     return db.transaction(async tx => {
       // Revocation uses this same lock. A provider must not authorize a read
