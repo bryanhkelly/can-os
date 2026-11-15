@@ -1,7 +1,7 @@
 # CAN OS Classroom Connect
 
 **Product capability specification and Phase 2 pilot plan**  
-**Status:** Product target and pilot requirements; partial canonical foundation merged into `main`, not production-enabled  
+**Status:** Releases 1–2 source integrated on `main`; runtime/browser acceptance and production deployment remain unverified  
 **Date:** November 13, 2026  
 **Primary use case:** COGIC Phase 2 four-week training pilot  
 **Broader applicability:** Churches, microschools, community learning centers, afterschool and summer programs, adult/workforce education, and grades 6–12
@@ -20,7 +20,26 @@ This document defines the **target product experience**. It is not a claim that 
 - The `/canonical/lab/facilitated` host workspace and `FacilitatedLearnerPairing` component are the integration points for the classroom QR / learner join UX. Preserve native canonical authentication, per-Course authorization and the 6.1 right-angle design system.
 - Classroom Connect and learning sessions are normal product capabilities in `main`, with no environment rollout flags. Protected operations require restricted native-auth credentials, current grants, Site/Course eligibility and content rights. Source and schema acceptance are not a substitute for authenticated browser tests or a current successful deployment.
 
-**Implementation boundary:** The PR #291 branch should become an incremental, UI-first integration on top of `main`: QR/projector pairing and typed join entry; **no new database tables or independent join server**. Facilitator activity release, learner response persistence, evidenced attendance, consent/fallback workflows and four-week reporting remain future workstreams with separate acceptance gates.
+**Implementation update (2026-11-14):** The QR/projector/typed join flow, private facilitator console,
+remote media commands, independent rights-checked rehearsal, learner activity release/close,
+idempotent formative response writing and observed device presence are now integrated directly
+into `main`. The previously unmerged PR #291 was a source reference; it was not wholesale
+merged. The existing Neon `main` and `test01` databases already contain the required
+additive tables, forced row-level security and report views. Reproducible SQL files and
+a read-only schema acceptance script have been restored to GitHub.
+
+The existing `/join` form handles code entry. QR handoff carries the code in a disposable
+URL fragment, which is cleared when consumed. Classroom video playback rechecks every
+currently paired learner and each current Course adoption, including Site placement,
+instead of the old `representativeAttempt` shortcut. The projector receives only
+current prompts/choices and commands, not the learner roster or private responses.
+Both R2 recordings and allowlisted YouTube/Vimeo embeds require approved content
+distribution rights; provider embeds may require manual player controls.
+
+**Still incomplete:** Site scheduling, attendance/fallback, governed survey delivery
+through room UI, four-week Site/network evidence exports, full two-Site synthetic
+browser acceptance, typecheck/build verification and a current-production deployment.
+There are no runtime environment feature flags.
 
 **Pre-release acceptance:** Verify a real current-commit preview against dedicated test learner/facilitator/cross-site accounts. The primary successful path is authorized Site → active Deployment → published Course → active Course attempt → 15-minute pairing code → learner's explicit pairing → playback. Negative paths must reject foreign learners, withdrawn/expired registration, stale/revoked codes, role bypass and cross-Site access. Manual/QR joining must not generate attendance, watch time, grades or completion.
 
