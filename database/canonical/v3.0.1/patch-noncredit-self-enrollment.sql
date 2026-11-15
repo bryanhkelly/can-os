@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS education_v30.noncredit_self_enrollment_releases (
 CREATE INDEX IF NOT EXISTS noncredit_self_enroll_published_idx
  ON education_v30.noncredit_self_enrollment_releases(opens_at, closes_at)
  WHERE status='published';
-CREATE INDEX IF NOT EXISTS noncredit_self_enroll_provider_idx
+CREATE INDEX IF NOT EXISTS noncredit_self_enroll_registering_idx
  ON education_v30.noncredit_self_enrollment_releases(registering_organization_id,status,created_at DESC);
 CREATE INDEX IF NOT EXISTS noncredit_self_enroll_delivery_idx
  ON education_v30.noncredit_self_enrollment_releases(deployment_id,training_version_id,course_version_id);
@@ -115,8 +115,6 @@ BEGIN
  END IF;
  RETURN NEW;
 END $self_release_immutability$;
-DROP TRIGGER IF EXISTS v301_freeze_noncredit_release
- ON education_v30.noncredit_self_enrollment_releases;
 CREATE TRIGGER v301_freeze_noncredit_release
  BEFORE UPDATE ON education_v30.noncredit_self_enrollment_releases
  FOR EACH ROW EXECUTE FUNCTION education_v30.v301_freeze_noncredit_enrollment_release();
