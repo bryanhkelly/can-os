@@ -62,7 +62,8 @@
     "test:classroom:unconfigured": "playwright test --config playwright.authenticated-routes.config.ts --grep 'classroom join fails closed|learner and guardian cannot use facilitator|companion without a verified'",
     "db:canonical:noncredit-self-enrollment": "node scripts/acceptance/check-noncredit-self-enrollment.mjs",
     "test:enrollment:unit": "vitest run tests/unit/noncredit-self-enrollment.test.ts tests/unit/personal-can-identity.test.ts tests/unit/personal-can-access-boundary.test.ts",
-    "db:canonical:classroom-schema": "node scripts/acceptance/check-classroom-pilot-schema.mjs"
+    "db:canonical:classroom-schema": "node scripts/acceptance/check-classroom-pilot-schema.mjs",
+    "test:classroom:browser": "playwright test tests/e2e/classroom-connect.spec.ts --config=playwright.authenticated-routes.config.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
