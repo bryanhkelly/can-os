@@ -38,6 +38,8 @@ export const accessAccountCanonicalPrincipals = pgTable("access_account_canonica
 }, t => [
  uniqueIndex("access_account_canonical_principals_active_account_uq")
   .on(t.accountId).where(sql`${t.revokedAt} IS NULL`),
+ uniqueIndex("access_account_canonical_principals_active_person_uq")
+  .on(t.canonicalPrincipalId).where(sql`${t.revokedAt} IS NULL`),
  index("access_account_canonical_principals_principal_idx").on(t.canonicalPrincipalId),
  check("access_account_canonical_principals_not_self_verified", sql`${t.accountId} <> ${t.verifiedByAccountId}`),
  check("access_account_canonical_principals_revocation_after_verification", sql`${t.revokedAt} IS NULL OR ${t.revokedAt} >= ${t.verifiedAt}`),
