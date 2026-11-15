@@ -82,3 +82,38 @@ export async function readOptionalSiteNoncreditReleases(
     return [];
   }
 }
+
+export type SiteNoncreditReadiness={
+  status:"migration_missing"|"reader_permission_missing"|"link_not_approved"|
+    "no_enrollable_release"|"ready"|"reader_unavailable";
+  eligibleReleaseCount:number;
+};
+
+/** One verification result for launch readiness. Publishing and actual
+ * enrollment remain independently authorized; a Site link is not a grant.
+ */
+export async function inspectSiteNoncreditReadiness(
+  publicSiteId:string,executor:Reader=db,
+):Promise<SiteNoncreditReadiness>{
+  const no=(status:SiteNoncreditReadiness["status"]):SiteNoncreditReadiness=>
+    ({status,eligibleReleaseCount:0});
+  try{
+    const result=await executor.execute(sql`
+      SELECT to_regclass('public.site_canonical_identity_links') IS NOT NULL AS "mappingReady",
+        to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releaseReady",
+        has_schema_privilege(current_user,'public','USAGE') AS "publicSchema",
+        has_schema_privilege(current_user,'education_v30','USAGE') AS "nativeSchema"
+    `);
+    const item=result.rows[0] as Record<string,unknown>|undefined;
+    if(!item?.mappingReady||!item?.releaseReady)return no("migration_missing");
+    if(!item.publicSchema||!item.nativeSchema)return no("reader_permission_missing");
+    const link=await executor.execute(sql`
+      SELECT 1 FROM public.site_canonical_identity_links
+      WHERE public_site_id=${publicSiteId}::uuid AND status='approved' LIMIT 1
+    `);
+    if(!link.rows.length)return no("link_not_approved");
+    const eligible=await readLinkedSiteNoncreditReleases(publicSiteId,executor);
+    return {status:eligible.length?"ready":"no_enrollable_release",
+      eligibleReleaseCount:eligible.length};
+  }catch{return no("reader_unavailable");}
+}
