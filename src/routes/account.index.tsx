@@ -137,6 +137,9 @@ function MyCanAccount() {
             </div>
             <p className="mt-1 text-sm text-muted-foreground">Save published learning locations and schools where you have verified access. Favorites never enroll you or share your profile.</p>
             <Link to="/explore/" className={sectionLink}>Discover programs at more locations <ArrowRight className="size-4" aria-hidden="true"/></Link>
+            {sharingQuery.isError && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
+              Contact sharing is unavailable right now. No data has been shared from this page.
+            </p>}
             {!account.favoritesReady && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
               Saved locations are not yet available in this database. Your school access remains unchanged.
             </p>}
