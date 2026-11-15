@@ -12,6 +12,7 @@ import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { usStatesAndTerritories } from "@/domain/site-setup-configuration";
+import { readSiteLaunchPreferences, saveSiteLaunchPreferences } from "@/modules/programs/site-launch-preferences.functions";
 
 type Options = Awaited<ReturnType<typeof listLaunchOptions>>;
 type Delivery = "physical" | "digital" | "both";
@@ -43,6 +44,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
   const [networkChoice,setNetworkChoice] = useState<"independent"|"code">("independent");
   const [chosen,setChosen] = useState<string[]>([]);
   const [error,setError] = useState("");
+  const [savingPreferences,setSavingPreferences] = useState(false);
   const siteMutation=useWorkspaceMutation({mutationFn:createLaunchSite});
   const known=options.sites.find(s=>s.id===siteId);
   const siteName=known?.name??name;
@@ -54,7 +56,14 @@ export function SiteFirstLaunch({options}:{options:Options}) {
     e.preventDefault();
     if(siteMutation.isSubmitting)return;
     setError("");
-    if(siteId) {setStep(1);return;}
+    if(siteId) {
+      try {
+        const preferences=await readSiteLaunchPreferences({data:{siteId}});
+        if(preferences){setDelivery(preferences.delivery);setChosen(preferences.interestIds);}
+        setStep(1);
+      } catch(cause) {setError(mutationErrorMessage(cause,"Unable to read this Site’s saved launch preferences."));}
+      return;
+    }
     try {
       const saved=await siteMutation.submit({data:{
         organizationId,name,slug:suggestedLaunchSlug(name)||"learning-site",timezone,
@@ -67,6 +76,15 @@ export function SiteFirstLaunch({options}:{options:Options}) {
   }
 
   const forward=()=>setStep(current=>Math.min(3,current+1) as Step);
+  async function revealSite(){
+    if(!siteId||savingPreferences)return;
+    setSavingPreferences(true);setError("");
+    try {
+      await saveSiteLaunchPreferences({data:{siteId,preferences:{delivery,interestIds:chosen}}});
+      setStep(3);
+    }catch(cause){setError(mutationErrorMessage(cause,"Unable to save program interests. The Site remains private."));}
+    finally{setSavingPreferences(false);}
+  }
   const backward=()=>setStep(current=>Math.max(0,current-1) as Step);
   return <PageFrame width="wide" className="launch-studio-page">
     <PageHeader eyebrow="Launch Studio / Site setup" title="Bring your Site to life."
@@ -141,7 +159,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
         </button>;
       })}</div>
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3"><span className="text-sm text-muted-foreground">{chosen.length} interests selected. Refine curriculum sources, schedules and offerings later.</span>
-        <div className="flex gap-3"><Button variant="outline" onClick={backward}><ArrowLeft/> Back</Button><Button onClick={forward}>See your Site preview <Sparkles/></Button></div>
+        <div className="flex gap-3"><Button variant="outline" onClick={backward}><ArrowLeft/> Back</Button><Button disabled={savingPreferences} onClick={()=>void revealSite()}>{savingPreferences?"Saving interests…":"See your Site preview"} <Sparkles/></Button></div>
       </div>
     </section>}
     {step===3&&<section className="mt-6 space-y-5">
@@ -174,7 +192,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
             {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">Continue to Launch Hub <ArrowRight className="size-4"/></Link>}
             <Link to="/programs/noncredit/enrollment" className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">Explore noncredit enrollment tools <ArrowRight className="size-4"/></Link>
           </div>
-          <p className="border-l-2 border-warning bg-muted p-4 text-xs leading-5">Interest selections and network code in this preview are not yet persisted. Do not treat this private concept as an active website or registration page.</p>
+          <p className="border-l-2 border-warning bg-muted p-4 text-xs leading-5">Your delivery choices and program interests are saved as private Site planning data. A network code is not saved or verified here. This concept is not an active website or registration page.</p>
         </aside>
       </div>
     </section>}
