@@ -4,15 +4,15 @@ import { WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
-import { getCanonicalCapabilityLab } from "@/modules/operations/canonical-capability-lab.functions";
+import { getCanonicalEnrollmentLabTrainings } from "@/modules/operations/canonical-capability-lab.functions";
 import { getLegacyEnrollmentLabPreviewAccess } from "@/modules/operations/enrollment-lab-preview.functions";
 
 export const Route = createFileRoute("/canonical/lab/enrollment")({
   loader: async () => {
-    const canonical = await safeLoader(() => getCanonicalCapabilityLab())();
+    const canonical = await safeLoader(() => getCanonicalEnrollmentLabTrainings())();
     if (canonical.ok) {
       return { ok: true as const, data: {
-        trainings: canonical.data.trainings, readOnlySchoolPreview: false,
+        trainings: canonical.data, readOnlySchoolPreview: false,
       } };
     }
     // Existing CAN school Site Admin and registrar sessions can inspect this
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/canonical/lab/enrollment")({
     const schoolPreview = await safeLoader(() => getLegacyEnrollmentLabPreviewAccess())();
     if (schoolPreview.ok) {
       return { ok: true as const, data: {
-        trainings: [] as Awaited<ReturnType<typeof getCanonicalCapabilityLab>>["trainings"],
+        trainings: [] as Awaited<ReturnType<typeof getCanonicalEnrollmentLabTrainings>>,
         readOnlySchoolPreview: true,
       } };
     }
@@ -44,7 +44,7 @@ function EnrollmentLabPage() {
 }
 
 function EnrollmentLabContent({ trainings, readOnlySchoolPreview }: {
-  trainings: Awaited<ReturnType<typeof getCanonicalCapabilityLab>>["trainings"];
+  trainings: Awaited<ReturnType<typeof getCanonicalEnrollmentLabTrainings>>;
   readOnlySchoolPreview: boolean;
 }) {
   const [audience, setAudience] = useState<Audience>("adult");
