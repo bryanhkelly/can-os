@@ -595,44 +595,55 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
     });
   });
 
+/** Shared atomic native room start. The scheduling path and the immediate-start
+ * path both execute exactly this audit, Site and course authorization logic.
+ * Called only after requireCanonicalFacilitator() under the transaction.
+ */
+export async function createFacilitatedRoomForHost(
+  tx: Tx, host: Host,
+  data: {deploymentId:string;courseVersionId:string;siteId:string},
+) {
+  const access=await authorizedHostDeployment(tx,host,data.deploymentId,data.siteId);
+  const [version]=await tx.select({id:courseVersions.id})
+    .from(courseVersions).where(and(
+      eq(courseVersions.id,data.courseVersionId),
+      eq(courseVersions.lifecycle,"published"),
+    )).limit(1);
+  const [activeAttempt]=await tx.select({id:learnerCourseAttempts.id})
+    .from(learnerCourseAttempts).where(and(
+      eq(learnerCourseAttempts.deploymentId,data.deploymentId),
+      eq(learnerCourseAttempts.courseVersionId,data.courseVersionId),
+      eq(learnerCourseAttempts.status,"active"),
+    )).limit(1);
+  if(!version||!activeAttempt)
+    throw new AuthorizationError("active published course for deployment");
+  const code=generatePairingCode();
+  const now=new Date();
+  const pairingExpiresAt=new Date(now.getTime()+facilitatedPairingWindowMs);
+  const [created]=await tx.insert(facilitatedLearningSessions).values({
+    deploymentId:data.deploymentId,courseVersionId:data.courseVersionId,
+    siteId:access.siteId,hostOrganizationId:host.organizationId,
+    facilitatorPersonId:host.actor.actorPersonId!,
+    pairingCodeDigest:digestCode(code),pairingExpiresAt,
+  }).returning({id:facilitatedLearningSessions.id});
+  if(!created)throw new Error("Could not create facilitated room");
+  await recordRoomAuditAndEvent(tx,{
+    actorPersonId:host.actor.actorPersonId!,organizationId:host.organizationId,
+    eventCode:"learning.facilitated.room.started",eventType:"FacilitatedLearningRoomStarted",
+    sessionId:created.id,
+    payload:{deploymentId:data.deploymentId,courseVersionId:data.courseVersionId,siteId:access.siteId},
+  });
+  return {facilitatedSessionId:created.id,pairingCode:displayCode(code),
+    pairingExpiresAt:pairingExpiresAt.toISOString()};
+}
+
 export const startFacilitatedLearningRoom = createServerFn({method:"POST"})
   .validator((value:unknown)=>facilitatedStartSchema.parse(value))
   .handler(async({data})=>{
     requireFacilitatedLearningEnabled();
     privateResult();
     const host=await requireCanonicalFacilitator();
-    return db.transaction(async tx=>{
-      const access=await authorizedHostDeployment(tx,host,data.deploymentId,data.siteId);
-      const [version]=await tx.select({id:courseVersions.id})
-        .from(courseVersions).where(and(
-          eq(courseVersions.id,data.courseVersionId),eq(courseVersions.lifecycle,"published"),
-        )).limit(1);
-      const [activeAttempt]=await tx.select({id:learnerCourseAttempts.id})
-        .from(learnerCourseAttempts).where(and(
-          eq(learnerCourseAttempts.deploymentId,data.deploymentId),
-          eq(learnerCourseAttempts.courseVersionId,data.courseVersionId),
-          eq(learnerCourseAttempts.status,"active"),
-        )).limit(1);
-      if(!version||!activeAttempt)throw new AuthorizationError("active published course for deployment");
-      const code=generatePairingCode();
-      const now=new Date();
-      const [created]=await tx.insert(facilitatedLearningSessions).values({
-        deploymentId:data.deploymentId, courseVersionId:data.courseVersionId,
-        siteId:access.siteId, hostOrganizationId:host.organizationId,
-        facilitatorPersonId:host.actor.actorPersonId!,
-        pairingCodeDigest:digestCode(code),
-        pairingExpiresAt:new Date(now.getTime()+facilitatedPairingWindowMs),
-      }).returning({id:facilitatedLearningSessions.id});
-      if(!created)throw new Error("Could not create facilitated room");
-      await recordRoomAuditAndEvent(tx,{
-        actorPersonId:host.actor.actorPersonId!,organizationId:host.organizationId,
-        eventCode:"learning.facilitated.room.started",eventType:"FacilitatedLearningRoomStarted",
-        sessionId:created.id,
-        payload:{deploymentId:data.deploymentId,courseVersionId:data.courseVersionId,siteId:access.siteId},
-      });
-      return {facilitatedSessionId:created.id, pairingCode:displayCode(code),
-        pairingExpiresAt:new Date(now.getTime()+facilitatedPairingWindowMs).toISOString()};
-    });
+    return db.transaction(async tx=>createFacilitatedRoomForHost(tx,host,data));
   });
 
 export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
