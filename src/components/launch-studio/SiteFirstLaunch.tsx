@@ -200,9 +200,10 @@ export function SiteFirstLaunch({options}:{options:Options}) {
             <Link to="/canonical/blueprints" search={{}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">
               Build programs & Offerings <ArrowRight className="size-4"/>
             </Link>
-            {siteId&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+            {siteId&&options.schoolSetupAdministrator&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
               Customize website <ArrowRight className="size-4"/>
             </Link>}
+            {!options.schoolSetupAdministrator&&<p className="border p-4 text-sm text-muted-foreground">Website customization requires an approved Site Administrator or Site website editor grant. Your private website preview is available now; editing permissions can be assigned separately.</p>}
             {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
               Prepare Site & enrollment <ArrowRight className="size-4"/>
             </Link>}
