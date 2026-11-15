@@ -42,6 +42,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The hosted deployment uses a distinct Vite environment and import
+      # protection graph. A generic build cannot certify Cloudflare readiness.
+      - name: Build Cloudflare production target
+        run: npm run build:cloudflare
+
       # TanStack generates src/routeTree.gen.ts during Vite build. Static route
       # contracts cannot run on a clean checkout before this build.
       - name: Build application and generate route graph
