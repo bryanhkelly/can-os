@@ -180,3 +180,23 @@ The aha moment is the early, beautiful, accurate preview. The second aha moment 
 - Revisit chips after preview; preview updates without recreating Site or overwriting customized content.
 - No intent chip creates a Program or bestows school classification, legal authorization or a live Register CTA.
 - Exact selected/approved Offering and separately authorized enrollment release produce the appropriate real enroll/apply affordance with current constraints.
+
+
+## First code slice committed to main (2026-11-14)
+
+Implemented in source, **not yet build/CI/browser-verified or deployed**:
+- New operator path `/launch/site`, rendered by `SiteFirstLaunch`.
+- Launch landing now prioritizes Site setup while retaining participant and legacy Hub routes.
+- Authorized registrar can create or select a Site. New Site creation reserves a private Site-publication address, not a public webpage.
+- Physical / digital / both and lightweight multi-select program interests; server-side private planning persistence in Site metadata with Site-grant checks and schema validation.
+- Optional network code input explicitly *does not* verify or persist affiliation; independent operation remains available.
+- Quick concept preview immediately after choices, clearly labeled private and not enrollable.
+- Handoff links into actual existing Website & Brand Studio and legacy Launch Hub.
+- Pure validation unit test added, but execution in CI is unverified.
+
+Important gaps to finish before calling the requested full experience wired:
+1. Make the quick Site concept preview use the canonical Website Studio renderer and saved Site draft rather than a standalone React approximation, while preserving preview vs publication distinction.
+2. Introduce authorized invitation redemption and approved network association; remove temporary code-only input when real validation is available.
+3. Connect selected intentions to Blueprint/Offering discovery and adoption, then Site deployment, session/cohort setup, enrollment releases, and approved live website cards.
+4. Generalize the legacy school-labeled Launch Hub and website content/navigation based on actual academic curriculum and program presence.
+5. Apply site-first readiness and integration tests; ensure generated route contract, TS compilation, build, role-isolated browser acceptance, active database and deployed SHA verification. No test or production deployment is asserted by this entry.
