@@ -149,3 +149,14 @@ SQL migrations are committed but not applied or validated here; production
 deployment, current browser acceptance, settlement processing, cross-provider
 network delegation and transfer workflows remain unverified or incomplete.
 See [Community Program Participation](COMMUNITY-PROGRAM-PARTICIPATION.md).
+
+
+## Optional Site attribution for independent online courses (2026-11-15)
+
+**Current source and test01 change:** `education_v30.noncredit_self_enrollment_releases.site_id` may now reference an authorized `physical`, `virtual`, or `mobile` Site even when `delivery_mode='independent'`. `site_id=NULL` remains valid for provider-wide online training. Facilitated delivery still requires a non-null Site and the separately authorized classroom relationship. The constraint change is `database/canonical/v3.0.1/patch-noncredit-site-associated-online.sql`, applied and verified on `test01` only.
+
+The publisher offers an optional currently authorized Site for independent online release, checks the operation-to-Site and operator/host relationships before publishing, and stores the Site on the release. The public enrollment catalog rechecks those relationships and the current Site status; it does not require a physical classroom for independent online delivery. Self-enrollment claims preserve the exact Site from the verified release. **Learner account grants remain organization-scoped (`site_id=NULL`), which is correct and separate from Site association of an offering.**
+
+Where a public Website Site maps by an independently reviewed Site identity correspondence to the canonical Site, the existing public Site renderer may show a current approved noncredit release and link to the existing `/learn/enroll?release=...` route. A mapping never creates publication, registration, content license or attendance authorization.
+
+As of this documentation update, no canonical/native Site identity has been approved on `test01`. The schema changes have not been applied to production. The source changes require a successful build/typecheck, isolated real-session integration/browser regression, exact deployed commit verification, and public hostname/TLS/restricted-reader acceptance before release-ready status.
