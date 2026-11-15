@@ -456,14 +456,8 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
     const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
-      assertRoomLive(room,new Date());
-      const trackVersionId=await validateRoomVideo(
-        tx,room.courseVersionId,data.lessonId,data.assetVersionId,
-      );
-      const audience = await currentRoomMediaAudience(tx, room);
-      if (!audience.length) throw new AuthorizationError("paired current learner required for playback");
-      await assertRoomMediaRightsForAudience(
-        tx, audience, trackVersionId, data.lessonId, data.assetVersionId,
+      await assertAuthorizedFacilitatedRoomMedia(
+        tx, room, data.lessonId, data.assetVersionId,
       );
       const [asset]=await tx.select({
         storageReference:contentAssetVersions.storageReference,
@@ -697,14 +691,8 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
     const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
-      assertRoomLive(room,new Date());
-      const trackVersionId=await validateRoomVideo(
-        tx,room.courseVersionId,data.lessonId,data.assetVersionId,
-      );
-      const audience = await currentRoomMediaAudience(tx, room);
-      if (!audience.length) throw new AuthorizationError("paired current learner required for playback");
-      await assertRoomMediaRightsForAudience(
-        tx, audience, trackVersionId, data.lessonId, data.assetVersionId,
+      await assertAuthorizedFacilitatedRoomMedia(
+        tx, room, data.lessonId, data.assetVersionId,
       );
       const [existing]=await tx.select().from(facilitatedLearningPlayback)
         .where(and(
