@@ -420,14 +420,13 @@ test("student dashboard class links open the enrolled classroom directory", asyn
 
 
 /**
- * Classroom Connect release-closed checks. These run through the real guarded
- * app and synthetic identities, not mocked route handlers. A separate enabled
- * matrix is required before the release flags can be changed.
+ * Classroom Connect unconfigured-runtime checks. These exercise synthetic
+ * identities in a local test app without restricted canonical auth credentials.
+ * Deployed environments use no release flags; authorization remains mandatory.
  */
-test("classroom join never exposes course choices while the pilot gate is off", async ({ browser }) => {
-  if (process.env.CAN_FACILITATED_LEARNING_ENABLED === "true") {
-    throw new Error("Release-closed classroom regression requires CAN_FACILITATED_LEARNING_ENABLED off.");
-  }
+test("classroom join fails closed when canonical authentication is unconfigured", async ({ browser }) => {
+  test.skip(!!process.env.CAN_CANONICAL_AUTH_DATABASE_URL,
+    "This regression covers a local test runtime without canonical credentials.");
   for (const role of ["student", "guardian"] as const) {
     const secret = roleSecrets[role];
     if (!secret) throw new Error("Missing synthetic persona " + role);
@@ -443,10 +442,9 @@ test("classroom join never exposes course choices while the pilot gate is off", 
   }
 });
 
-test("learner and guardian cannot use facilitator controls in the closed release", async ({ browser }) => {
-  if (process.env.CAN_FACILITATED_LEARNING_ENABLED === "true") {
-    throw new Error("Release-closed classroom regression requires CAN_FACILITATED_LEARNING_ENABLED off.");
-  }
+test("learner and guardian cannot use facilitator controls without canonical authentication", async ({ browser }) => {
+  test.skip(!!process.env.CAN_CANONICAL_AUTH_DATABASE_URL,
+    "This regression covers a local test runtime without canonical credentials.");
   for (const role of ["student", "guardian"] as const) {
     const secret = roleSecrets[role];
     if (!secret) throw new Error("Missing synthetic persona " + role);
