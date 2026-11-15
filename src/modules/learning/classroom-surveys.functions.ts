@@ -73,6 +73,7 @@ export const getClassroomSurveyOptions=createServerFn({method:"GET"})
   .validator((raw:unknown)=>roomInput.parse(raw))
   .handler(async({data})=>{
     guard();const host=await requireCanonicalFacilitator();
+    const personId = actor.actorPersonId;
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       const rows=await tx.select({id:surveyCampaigns.id})
@@ -157,7 +158,7 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
         .where(and(
           eq(facilitatedLearningParticipants.facilitatedSessionId,data.facilitatedSessionId),
           eq(facilitatedLearningParticipants.courseAttemptId,data.courseAttemptId),
-          eq(facilitatedLearningParticipants.participantPersonId,actor.actorPersonId),
+          eq(facilitatedLearningParticipants.participantPersonId,personId),
         )).limit(1);
       const [room]=await tx.select().from(facilitatedLearningSessions)
         .where(eq(facilitatedLearningSessions.id,data.facilitatedSessionId)).limit(1);
@@ -185,7 +186,7 @@ export const getClassroomLearnerSurveys=createServerFn({method:"GET"})
           const [invitation]=await tx.select({id:surveyInvitations.id})
             .from(surveyInvitations).where(and(
               eq(surveyInvitations.campaignId,link.id),
-              eq(surveyInvitations.invitedPersonId,actor.actorPersonId),
+              eq(surveyInvitations.invitedPersonId,personId),
               lte(surveyInvitations.sentAt,now),
               or(isNull(surveyInvitations.dueAt),gt(surveyInvitations.dueAt,now)),
             )).limit(1);
