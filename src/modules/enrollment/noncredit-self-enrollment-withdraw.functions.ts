@@ -7,6 +7,7 @@ import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import {
   auditEvents as canonicalAuditEvents, canonicalAccounts, domainEvents as canonicalDomainEvents,
   facilitatedLearningParticipants, learnerCourseAttempts, noncreditRegistrations,
+  noncreditCompletionDecisions,
   noncreditSelfEnrollmentClaims,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -57,6 +58,18 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
       if(registration.status==="withdrawn")return {withdrawn:true,alreadyWithdrawn:true};
       if(!["registered","active"].includes(registration.status))
         throw new AuthorizationError("only current registration can be withdrawn");
+      const [finishedCourse]=await tx.select({id:learnerCourseAttempts.id})
+        .from(learnerCourseAttempts).where(and(
+          eq(learnerCourseAttempts.noncreditRegistrationId,registration.id),
+          eq(learnerCourseAttempts.status,"completed"),
+        )).limit(1);
+      const [completedDecision]=await tx.select({id:noncreditCompletionDecisions.id})
+        .from(noncreditCompletionDecisions).where(and(
+          eq(noncreditCompletionDecisions.registrationId,registration.id),
+          eq(noncreditCompletionDecisions.outcome,"completed"),
+        )).limit(1);
+      if(finishedCourse || completedDecision)
+        throw new AuthorizationError("completed training cannot be withdrawn");
       const now=new Date();
       const attempts=await tx.select({id:learnerCourseAttempts.id})
         .from(learnerCourseAttempts)
