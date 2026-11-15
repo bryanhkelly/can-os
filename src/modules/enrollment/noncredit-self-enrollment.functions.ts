@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { z } from "zod";
@@ -8,7 +8,7 @@ import {
   accountPersonGrants,
 } from "@/db/schema";
 import {
-  canonicalAccounts, canonicalAccountGrants, canonicalPersons, canonicalSessions,
+  canonicalAccounts, canonicalAccountGrants, canonicalPersons,
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
@@ -17,14 +17,11 @@ import {
   auditEvents as canonicalAuditEvents, domainEvents as canonicalDomainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { canonicalSessionCookie } from "@/domain/canonical-access";
-import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-const NATIVE_SESSION_SECONDS = 12 * 60 * 60;
 type VerifiedSelfEnrollmentActor = {
   accountId: string; personId: string; email: string;
   preferredName: string | null; emailVerifiedAt: Date;
@@ -108,20 +105,6 @@ async function requireLearnerGrant(tx:Tx, accountId:string, personId:string, org
   return created.id;
 }
 
-export async function issueNativeLearnerSession(tx:Tx, accountId:string, grantId:string, now:Date) {
-  const pepper=process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER;
-  if(!pepper||pepper.length<32)
-    throw new Error("Native learning session is temporarily unavailable");
-  const token=issueOpaqueSecret();
-  const [session]=await tx.insert(canonicalSessions).values({
-    accountId,activeGrantId:grantId,
-    secretHash:hashAccessSecret(token,pepper),
-    expiresAt:new Date(now.getTime()+NATIVE_SESSION_SECONDS*1000),
-    lastActivityAt:now,
-  }).returning({id:canonicalSessions.id});
-  if(!session)throw new Error("Could not start verified learning session");
-  return `${canonicalSessionCookie}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${NATIVE_SESSION_SECONDS}`;
-}
 
 /**
  * One atomic, verified account-bound enrollment. A borrower may never supply
@@ -131,7 +114,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
   .validator((value:unknown)=>noncreditEnrollCommand.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
+    const { requireVerifiedAdultAccount, issueNativeLearnerSession } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure native learning access is temporarily unavailable");
@@ -356,6 +339,7 @@ export const getOpenNoncreditSelfEnrollmentById=createServerFn({method:"GET"})
 export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     const [link]=await db.select().from(accessAccountNoncreditPrincipals)
       .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId)).limit(1);
