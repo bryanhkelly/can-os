@@ -37,8 +37,8 @@ export function renderPrivateWebsitePreviewHtml(
       ? `href="${privateWebsitePreviewUrl(siteId, path)}"` : 'aria-disabled="true"');
   const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&returnToHub=true&step=preview`;
   const banner = `<aside class="can-private-preview" role="status">
-  <strong>Private school website preview</strong>
-  <span>${saved ? "Saved design" : "Unsaved school starter · illustrative only"} · not published · sign-in required</span>
+  <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>
+  <span>${saved ? "Saved design" : kind === "site" ? "Unsaved Site starter · illustrative only" : "Unsaved school starter · illustrative only"} · not published · sign-in required</span>
   <a href="${editor}">Return to Website &amp; Brand Studio</a>
   </aside>`;
   const style = `<style>
