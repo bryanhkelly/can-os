@@ -128,7 +128,7 @@ function PublicSelfEnrollment() {
               </option>)}
             </select>
             {!selected && <div className="mt-4 grid gap-2">
-              {catalog.data.map(item=><button type="button" key={item.id}
+              {catalog.data.items.map(item=><button type="button" key={item.id}
                 onClick={()=>void router.navigate({to:"/learn/enroll",search:{release:item.id,ref:search.ref}})}
                 className="border border-border bg-background p-4 text-left focus-visible:outline-2 focus-visible:outline-primary">
                 <strong className="block text-sm">{item.title}</strong>
