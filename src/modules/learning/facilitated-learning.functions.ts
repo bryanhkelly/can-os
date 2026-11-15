@@ -593,7 +593,10 @@ export const renewFacilitatedLearningPairing = createServerFn({method:"POST"})
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
       const now=new Date(); assertRoomLive(room,now);
       const code=generatePairingCode();
-      const expiresAt=new Date(now.getTime()+facilitatedPairingWindowMs);
+      const expiresAt=new Date(Math.min(
+        now.getTime()+facilitatedPairingWindowMs,
+        room.startedAt.getTime()+facilitatedRoomMaxMs,
+      ));
       await tx.update(facilitatedLearningSessions).set({
         pairingCodeDigest:digestCode(code),pairingExpiresAt:expiresAt,
       }).where(eq(facilitatedLearningSessions.id,room.id));
