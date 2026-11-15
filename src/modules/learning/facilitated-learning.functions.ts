@@ -105,7 +105,7 @@ async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string
   if (!authorizedSite) throw new AuthorizationError("current operator/host at deployment Site");
   return {deployment, siteId:authorizedSite.siteId};
 }
-async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
+export async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   const query = tx.select().from(facilitatedLearningSessions).where(and(
     eq(facilitatedLearningSessions.id,id),
     eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
