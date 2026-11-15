@@ -247,12 +247,17 @@ export const inviteStaffMember = createServerFn({ method: "POST" })
               OR ${accountPersonGrants.siteId} IS DISTINCT FROM ${siteId}::uuid)`)).limit(1);
         if (foreign.length) throw new DomainError("FORBIDDEN", "An existing identity belongs to another school");
       }
-      const [existingPersonGrant] = await tx.select({ personId: accountPersonGrants.personId })
+      const linkedPeople = await tx.select({ personId: accountPersonGrants.personId })
         .from(accountPersonGrants).where(and(
           eq(accountPersonGrants.accountId, account!.id),
           ...(syntheticSchool ? [eq(accountPersonGrants.organizationId, organizationId), eq(accountPersonGrants.siteId, siteId)] : []),
-        )).limit(1);
-      let personId = existingPersonGrant?.personId;
+        )).limit(100);
+      const distinctPeople = [...new Set(linkedPeople.map(grant => grant.personId))];
+      // A verified mailbox alone cannot resolve multiple different real Person
+      // records. Require operator review instead of choosing an arbitrary one.
+      if (!syntheticSchool && distinctPeople.length > 1)
+        throw new DomainError("CONFLICT", "This account has multiple Person records. Reconcile identity before inviting staff.");
+      let personId = distinctPeople[0];
       if (!personId) {
         const [person] = await tx.insert(people).values({
           legalFirstName: data.firstName, legalLastName: data.lastName, email: emailNormalized,
