@@ -40,9 +40,12 @@ export async function resolveCanonicalSiteStaffFromCan(
     disabled: accessAccounts.disabled,
   }).from(accessAccounts)
     .where(eq(accessAccounts.id, actor.accountId)).limit(1);
-  if (!sourceAccount || sourceAccount.disabled ||
-      (!sourceAccount.verifiedAt && !isDemoAccountEmail(sourceAccount.email))) {
-    throw new AuthorizationError("current verified CAN account");
+  // Public shared-code .demo identities do not prove who the human is.
+  // They can inspect the existing static enrollment preview, but must not
+  // acquire native administrative commands through a principal crosswalk.
+  if (!sourceAccount || sourceAccount.disabled || !sourceAccount.verifiedAt ||
+      isDemoAccountEmail(sourceAccount.email)) {
+    throw new AuthorizationError("current verified non-demo CAN staff account");
   }
 
   // Accounts that switch among different Persons require a separately
