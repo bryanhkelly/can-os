@@ -37,7 +37,7 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
   }, [error, open]);
 
   return <ContextTray title="Switch workspace" open={open} onClose={close}>
-    <div className="mb-5 rounded-2xl bg-muted/50 p-4">
+    <div className="mb-5 bg-muted/50 p-4">
       <p className="font-serif text-2xl font-semibold">{current?.firstName} {current?.lastName}</p>
       <p className="mt-1 text-sm capitalize text-muted-foreground">
         {current?.role.replaceAll("_", " ")} · {current ? getWorkspaceScopeLabel(current, session.sites) : "Workspace unavailable"}
@@ -52,7 +52,7 @@ export function WorkspaceContextSwitcher({ session, open, changing, error, onClo
     <Label htmlFor="workspace-switcher-search" className="mb-2 block">Search workspaces</Label>
     <Input id="workspace-switcher-search" type="search" autoComplete="off" value={query}
       onChange={event => setQuery(event.target.value)} placeholder="Search people, roles, or schools…"
-      className="mb-5 min-h-11 rounded-xl" />
+      className="mb-5 min-h-11 rounded-none" />
     <div className="space-y-2" aria-busy={changing}>
       {grants.map(grant => {
         const active = grant.id === session.activeGrantId;
