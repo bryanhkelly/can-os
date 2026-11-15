@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { z } from "zod";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
   accountPersonGrants, people,
@@ -310,39 +311,74 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
       alreadyEnrolled:outcome.alreadyEnrolled};
   });
 
-/** Public discovery does not disclose learners or private Site records. */
-export const getOpenNoncreditSelfEnrollment = createServerFn({method:"GET"})
+/** Public projections disclose only current approved releases and schedules,
+ * never named participants, internal authorizations or other Sites' rosters. */
+async function projectPublicSelfEnrollment(
+  releases:Awaited<ReturnType<typeof readEligibleSelfEnrollmentReleases>>,
+){
+  const plans=releases.length?await db.select({
+    releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
+    startsAt:canonicalDeliverySessions.startsAt,
+    endsAt:canonicalDeliverySessions.endsAt,
+  }).from(facilitatedClassroomPlans).innerJoin(canonicalDeliverySessions,
+    eq(canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
+    .where(and(
+      inArray(facilitatedClassroomPlans.enrollmentReleaseId,releases.map(r=>r.id)),
+      inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
+    )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
+  return releases.map(row=>({
+    id:row.id,title:row.title,provider:row.organizationName,
+    deploymentName:row.deploymentName,siteName:row.siteName,
+    deliveryMode:row.deliveryMode,requiredMinutes:row.requiredMinutes,
+    seatsRemaining:row.seatsRemaining,opensAt:row.opensAt.toISOString(),
+    closesAt:row.closesAt.toISOString(),
+    consentVersion:row.consentVersion,consentText:row.consentText,
+    consentSha256:row.consentSha256,hasWaitingQueue:row.hasWaitingQueue,
+    sessions:plans.filter(p=>p.releaseId===row.id).slice(0,20).map(p=>({
+      startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
+    })),
+    schedulePartial:plans.length>1000||
+      plans.filter(p=>p.releaseId===row.id).length>20,
+  }));
+}
+
+/** Legacy first-page API retained for existing clients and QA consumers.
+ * The public discovery UI now uses the paginated endpoint below. */
+export const getOpenNoncreditSelfEnrollment=createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","public, max-age=30");
-    const releases=await readEligibleSelfEnrollmentReleases();
-    // A scheduled cohort is a set of approved Classroom Connect delivery
-    // sessions explicitly attached to a published enrollment release.
-    const plans=releases.length?await db.select({
-      releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
-      startsAt:canonicalDeliverySessions.startsAt,
-      endsAt:canonicalDeliverySessions.endsAt,
-    }).from(facilitatedClassroomPlans).innerJoin(canonicalDeliverySessions,
-      eq(canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
-      .where(and(
-        inArray(facilitatedClassroomPlans.enrollmentReleaseId,releases.map(r=>r.id)),
-        inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
-      )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
-    return releases.map(row=>({
-      id:row.id,title:row.title,provider:row.organizationName,
-      deploymentName:row.deploymentName,siteName:row.siteName,
-      deliveryMode:row.deliveryMode,requiredMinutes:row.requiredMinutes,
-      seatsRemaining:row.seatsRemaining,opensAt:row.opensAt.toISOString(),
-      closesAt:row.closesAt.toISOString(),
-      consentVersion:row.consentVersion,consentText:row.consentText,
-      consentSha256:row.consentSha256,
-      hasWaitingQueue:row.hasWaitingQueue,
-      sessions:plans.filter(p=>p.releaseId===row.id)
-        .slice(0,20).map(p=>({
-          startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
-        })),
-      schedulePartial:plans.length>1000||
-        plans.filter(p=>p.releaseId===row.id).length>20,
-    }));
+    return projectPublicSelfEnrollment(await readEligibleSelfEnrollmentReleases());
+  });
+
+const pageInput=z.object({
+  cursor:z.string().uuid().nullable().default(null),
+  term:z.string().trim().max(100).default(""),
+}).strict();
+
+/** Keyset pagination over approved, published adult training, including
+ * independent online and Site-facilitated releases across organizations. */
+export const getOpenNoncreditSelfEnrollmentPage=createServerFn({method:"GET"})
+  .validator((v:unknown)=>pageInput.parse(v))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","public, max-age=30");
+    const rows=await readEligibleSelfEnrollmentReleases(db,undefined,{
+      after:data.cursor,term:data.term,limit:31,
+    });
+    const pageRows=rows.slice(0,30);
+    return {
+      items:await projectPublicSelfEnrollment(pageRows),
+      nextCursor:rows.length>30?pageRows[pageRows.length-1]!.id:null,
+    };
+  });
+
+/** Exact deep link remains valid independently of whichever page was loaded. */
+export const getOpenNoncreditSelfEnrollmentById=createServerFn({method:"GET"})
+  .validator((v:unknown)=>z.object({releaseId:z.string().uuid()}).strict().parse(v))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","public, max-age=30");
+    const rows=await readEligibleSelfEnrollmentReleases(db,data.releaseId);
+    const publicRows=await projectPublicSelfEnrollment(rows);
+    return publicRows[0]??null;
   });
 
 /** Only the signed-in Person's explicitly bridged canonical Course history. */

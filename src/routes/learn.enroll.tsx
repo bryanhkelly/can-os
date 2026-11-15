@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import {
-  enrollMyselfInNoncredit, getOpenNoncreditSelfEnrollment,
+  enrollMyselfInNoncredit, getOpenNoncreditSelfEnrollmentById,
+  getOpenNoncreditSelfEnrollmentPage,
 } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {getMyNoncreditWaitlist,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
@@ -21,7 +22,7 @@ export const Route=createFileRoute("/learn/enroll")({
   component:PublicSelfEnrollment,
 });
 
-type Release=Awaited<ReturnType<typeof getOpenNoncreditSelfEnrollment>>[number];
+type Release=Awaited<ReturnType<typeof getOpenNoncreditSelfEnrollmentPage>>["items"][number];
 
 function PublicSelfEnrollment() {
   const router=useRouter();
@@ -34,16 +35,26 @@ function PublicSelfEnrollment() {
   const [message,setMessage]=useState("");
   const [enrolled,setEnrolled]=useState<{courseAttemptId:string;alreadyEnrolled:boolean}|null>(null);
   const [waitlisted,setWaitlisted]=useState(false);
+  const [searchTerm,setSearchTerm]=useState("");
+  const [cursor,setCursor]=useState<string|null>(null);
+  const [history,setHistory]=useState<(string|null)[]>([]);
+  const term=useDeferredValue(searchTerm.trim());
   const catalog=useQuery({
-    queryKey:["noncredit-open-releases"],
-    queryFn:()=>getOpenNoncreditSelfEnrollment(),retry:false,staleTime:30_000,
+    queryKey:["noncredit-open-releases",term,cursor],
+    queryFn:()=>getOpenNoncreditSelfEnrollmentPage({data:{term,cursor}}),
+    retry:false,staleTime:30_000,
+  });
+  const linkedRelease=useQuery({
+    queryKey:["noncredit-open-release",search.release],
+    queryFn:()=>getOpenNoncreditSelfEnrollmentById({data:{releaseId:search.release!}}),
+    enabled:!!search.release,retry:false,staleTime:30_000,
   });
   const waiting=useQuery({
     queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),
     enabled:session?.authenticated===true&&session.role!=="student",
     retry:false,staleTime:15_000,
   });
-  const selected=catalog.data?.find(item=>item.id===search.release);
+  const selected=catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data??undefined;
   const myWaitlist=waiting.data?.find(entry=>entry.releaseId===selected?.id);
   const invited=myWaitlist?.invitationActive===true;
   const joinQueue=!!selected&&!invited&&
@@ -94,18 +105,25 @@ function PublicSelfEnrollment() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Only current, provider-approved noncredit releases appear. Courses can be independent or hosted at an authorized community learning location.
           </p>
+          <label htmlFor="noncredit-search" className="mt-4 block text-sm font-semibold">
+            Search training, provider, or hosting Site
+            <input id="noncredit-search" type="search" value={searchTerm} maxLength={100}
+              onChange={event=>{setSearchTerm(event.target.value);setCursor(null);setHistory([]);}}
+              placeholder="Digital skills, church, city…"
+              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+          </label>
           {catalog.isPending && <p role="status" className="mt-5 text-sm">Loading published enrollment opportunities…</p>}
           {catalog.isError && <p role="alert" className="mt-5 text-sm">Enrollment availability is temporarily unavailable. <button type="button" onClick={()=>void catalog.refetch()} className="font-semibold text-primary underline">Try again</button></p>}
-          {catalog.data && catalog.data.length===0 && <p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
+          {catalog.data && catalog.data.items.length===0 && <p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
             No noncredit programs are accepting self-registration right now. Your CAN account is still available, and the provider must publish its course and enrollment release before registration can open.
           </p>}
-          {catalog.data && catalog.data.length>0 && <div className="mt-4">
+          {catalog.data && catalog.data.items.length>0 && <div className="mt-4">
             <label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</label>
             <select id="noncredit-release" value={search.release??""}
               onChange={event=>void router.navigate({to:"/learn/enroll",search:{release:event.target.value||undefined,ref:search.ref}})}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose a training</option>
-              {catalog.data.map(item=><option key={item.id} value={item.id}>
+              {catalog.data.items.map(item=><option key={item.id} value={item.id}>
                 {item.title} · {item.provider}
               </option>)}
             </select>
@@ -119,6 +137,20 @@ function PublicSelfEnrollment() {
               </button>)}
             </div>}
           </div>}
+          {catalog.data&&<nav aria-label="Training discovery pages" className="mt-4 flex flex-wrap gap-3">
+            <Button type="button" variant="outline" disabled={catalog.isFetching||history.length===0}
+              onClick={()=>{
+                setCursor(history[history.length-1]??null);
+                setHistory(h=>h.slice(0,-1));
+              }}>Previous</Button>
+            <Button type="button" variant="outline" disabled={catalog.isFetching||!catalog.data.nextCursor}
+              onClick={()=>{
+                if(!catalog.data?.nextCursor)return;
+                setHistory(h=>[...h,cursor]);setCursor(catalog.data.nextCursor);
+              }}>More training</Button>
+          </nav>}
+          {search.release&&linkedRelease.isError&&
+            <p role="alert" className="mt-4 text-sm">This specific training could not be checked for current availability.</p>}
         </section>
         {selected && <SelfEnrollmentConfirmation key={selected.id} release={selected}
           signedIn={session?.authenticated===true}
