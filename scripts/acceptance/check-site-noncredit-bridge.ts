@@ -12,8 +12,9 @@ import { sql } from "drizzle-orm";
 import { db } from "../../src/db/client";
 import {
   inspectSiteNoncreditReadiness,probeSiteNoncreditCatalogReader,
-  readLinkedSiteNoncreditReleases,siteCatalogReaderAccessible,
+  readLinkedSiteNoncreditReleases,
 } from "../../src/modules/sites/site-noncredit-releases.server";
+import {siteCatalogReaderAccessible} from "../../src/domain/site-noncredit-bridge";
 
 async function main(){
   assert.equal(process.env.CAN_SITE_BRIDGE_VALIDATION,"1",
