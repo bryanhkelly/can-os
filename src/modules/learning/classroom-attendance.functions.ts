@@ -9,7 +9,7 @@ import {
   learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { facilitatedRoomMaxMs } from "@/domain/facilitated-learning";
+import { classroomAttestationOpen, classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   ownedRoom, schoolAttemptIsPlacedAtSite,
@@ -27,22 +27,10 @@ const attendanceInput=roomInput.extend({
   method:z.enum(["in_person_roll_call","remote_live_check"]),
   evidenceNote:z.string().trim().max(250).nullable(),
 }).strict();
-const correctionMs=48*60*60_000;
-
 function guard(){
   requireFacilitatedLearningEnabled();
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
-}
-/** A paused/ended room does not erase witnessed in-person attendance. Allow
- * authorized, auditable corrections for 48h after actual/derived session end. */
-export function classroomAttestationOpen(
-  room:{startedAt:Date;endedAt:Date|null},now:Date,
-){
-  const expectedEnd=room.startedAt.getTime()+facilitatedRoomMaxMs;
-  const recordedEnd=room.endedAt
-    ? Math.min(expectedEnd,room.endedAt.getTime()):expectedEnd;
-  return now>=room.startedAt && now.getTime() < recordedEnd+correctionMs;
 }
 async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:string){
   const [attempt]=await tx.select().from(learnerCourseAttempts).where(and(
@@ -193,7 +181,10 @@ export const attestClassroomParticipation=createServerFn({method:"POST"})
         desc(facilitatedRoomAttendanceAssertions.id)).limit(1);
       const correction=!!previous &&
         (previous.status!==data.status || previous.method!==data.method);
-      if((!paired || correction) && (!data.evidenceNote || data.evidenceNote.length<15))
+      if(classroomAttendanceNeedsExplanation({
+        pairedDevice:!!paired,previousStatus:previous?.status,
+        previousMethod:previous?.method,nextStatus:data.status,nextMethod:data.method,
+      }) && (!data.evidenceNote || data.evidenceNote.length<15))
         throw new AuthorizationError(
           "document direct verification for no-device participation and corrections",
         );
