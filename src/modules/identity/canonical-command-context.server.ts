@@ -81,9 +81,10 @@ async function runCanonicalReaderProbe(): Promise<boolean> {
   const url = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
   if (!canonicalRestrictedAuthUrlValid(url, process.env.DATABASE_URL) ||
       (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) < 32) return false;
-  const pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 3000 });
+  let pool: Pool | undefined;
   let client: Awaited<ReturnType<Pool["connect"]>> | undefined;
   try {
+    pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 3000 });
     client = await pool.connect();
     await client.query("BEGIN READ ONLY");
     await client.query(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`);
@@ -102,7 +103,7 @@ async function runCanonicalReaderProbe(): Promise<boolean> {
     return false;
   } finally {
     client?.release();
-    await pool.end().catch(() => { /* probe still fails closed */ });
+    if (pool) await pool.end().catch(() => { /* probe still fails closed */ });
   }
 }
 
