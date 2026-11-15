@@ -1,11 +1,12 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, countDistinct, eq, exists, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, countDistinct, eq, exists, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   educationOperationSites, educationOperationOrganizationRoles,
   facilitatedLearningParticipants, facilitatedLearningPlayback, facilitatedLearningSessions,
+  facilitatedRoomFeedback,
   programDeployments, siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
@@ -91,6 +92,26 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
         inArray(facilitatedLearningPlayback.facilitatedSessionId,roomIds),
         eq(facilitatedLearningPlayback.kind,"played"),
       )).groupBy(facilitatedLearningPlayback.facilitatedSessionId):[];
+      // Identified raw ratings never leave this report. Suppress any average
+      // until at least five distinct people contributed to the question.
+      const feedback=roomIds.length ? await tx.select({
+        questionKey:facilitatedRoomFeedback.questionKey,
+        respondents:countDistinct(facilitatedRoomFeedback.participantPersonId),
+        submissions:sql<number>`count(*)`,
+        mean:sql<string>`avg(${facilitatedRoomFeedback.rating})`,
+      }).from(facilitatedRoomFeedback)
+        .where(inArray(facilitatedRoomFeedback.facilitatedSessionId,roomIds))
+        .groupBy(facilitatedRoomFeedback.questionKey) : [];
+      const feedbackQuestions=(["clarity","technology","value"] as const).map(key=>{
+        const row=feedback.find(r=>r.questionKey===key);
+        const people=Number(row?.respondents??0);
+        return {
+          questionKey:key,
+          respondentCount:people>=5?people:null,
+          responseCount:people>=5?Number(row?.submissions??0):null,
+          averageRating:people>=5?Math.round(Number(row?.mean??0)*10)/10:null,
+        };
+      });
       const perDeployment=new Map<string,{
         deploymentId:string;siteId:string;rooms:number;pairedDeviceSessions:number;
         playbackStarts:number;
@@ -117,11 +138,15 @@ export const getFacilitatedImpactReport = createServerFn({method:"GET"})
           playbackStarts:plays.reduce((sum,row)=>sum+Number(row.played),0),
           byDeployment:[...perDeployment.values()],
         },
+        sessionFeedback:{
+          partial:partialSiteDelivery,minimumRespondents:5,questions:feedbackQuestions,
+        },
         limitations:[
           "Device pairing is not proof of site attendance or watched minutes.",
           "Reported provider outcomes may occur outside the hosted room.",
           "Site delivery totals are partial if more than 5,000 rooms are in the selected window.",
-          "Final completion decisions, scores and verified feedback come from the existing noncredit pilot reporting service.",
+          "Classroom ratings are optional, identified feedback and suppressed below five people; they are not grades or verified learning outcomes.",
+          "Final completion decisions, scores and separately governed training surveys come from the noncredit pilot reporting service.",
         ],
       };
     });
