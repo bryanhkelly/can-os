@@ -70,6 +70,8 @@ export const routeNavigation = {
   "/home": page("/home", all),
   "/interest-event": publicPage,
   "/launch": publicPage,
+  "/launch/site": hidden("Authorized Site-first setup and website reveal", admins),
+  "/launch/site-preview": endpoint,
   "/launch/hub/school/new": hidden("Minimal school profile creation", admins),
   "/launch/hub/school": hidden("Standalone school Launch Hub", admins),
   "/launch/hub/school/$module": hidden("School Launch Hub module home", admins),
