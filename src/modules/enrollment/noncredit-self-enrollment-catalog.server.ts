@@ -156,23 +156,23 @@ export async function readEligibleSelfEnrollmentReleases(
     .groupBy(noncreditReleasedSeats.releaseId):[];
   const returned=new Map(seatReleases.map(row=>[row.releaseId,Number(row.places)]));
   const nowForQueue=new Date();
-  const [invites,waiting]=rows.length?await Promise.all([
-    executor.select({
-      releaseId:noncreditEnrollmentWaitlist.releaseId,holds:count(),
-    }).from(noncreditEnrollmentWaitlist)
-      .where(and(
-        inArray(noncreditEnrollmentWaitlist.releaseId,rows.map(row=>row.id)),
-        eq(noncreditEnrollmentWaitlist.status,"invited"),
-        gt(noncreditEnrollmentWaitlist.inviteExpiresAt,nowForQueue),
-      )).groupBy(noncreditEnrollmentWaitlist.releaseId),
-    executor.select({
-      releaseId:noncreditEnrollmentWaitlist.releaseId,waiting:count(),
-    }).from(noncreditEnrollmentWaitlist)
-      .where(and(
-        inArray(noncreditEnrollmentWaitlist.releaseId,rows.map(row=>row.id)),
-        eq(noncreditEnrollmentWaitlist.status,"waiting"),
-      )).groupBy(noncreditEnrollmentWaitlist.releaseId),
-  ]):[[],[]];
+  // Run sequentially. This query is also invoked inside a single Neon
+  // transaction; concurrent commands on that transaction are not supported.
+  const invites=rows.length?await executor.select({
+    releaseId:noncreditEnrollmentWaitlist.releaseId,holds:count(),
+  }).from(noncreditEnrollmentWaitlist)
+    .where(and(
+      inArray(noncreditEnrollmentWaitlist.releaseId,rows.map(row=>row.id)),
+      eq(noncreditEnrollmentWaitlist.status,"invited"),
+      gt(noncreditEnrollmentWaitlist.inviteExpiresAt,nowForQueue),
+    )).groupBy(noncreditEnrollmentWaitlist.releaseId):[];
+  const waiting=rows.length?await executor.select({
+    releaseId:noncreditEnrollmentWaitlist.releaseId,waiting:count(),
+  }).from(noncreditEnrollmentWaitlist)
+    .where(and(
+      inArray(noncreditEnrollmentWaitlist.releaseId,rows.map(row=>row.id)),
+      eq(noncreditEnrollmentWaitlist.status,"waiting"),
+    )).groupBy(noncreditEnrollmentWaitlist.releaseId):[];
   const holds=new Map(invites.map(row=>[row.releaseId,Number(row.holds)]));
   const waiters=new Set(waiting.map(row=>row.releaseId));
   const byRelease = new Map(counts.map(row=>[row.releaseId,Number(row.participants)]));
