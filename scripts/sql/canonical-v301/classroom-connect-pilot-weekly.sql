@@ -23,7 +23,7 @@ SELECT e.site_id,e.deployment_id,e.course_version_id,e.week_start,
      WHERE s2.site_id=e.site_id AND s2.deployment_id=e.deployment_id
        AND s2.course_version_id=e.course_version_id
        AND date_trunc('week',s2.started_at)=e.week_start) AS unique_responding_learners,
-  (SELECT count(DISTINCT a.course_attempt_id)
+  (SELECT count(DISTINCT a.id)
      FROM education_v30.learner_course_attempts a
      JOIN education_v30.facilitated_learning_participants p ON p.course_attempt_id=a.id
      JOIN education_v30.facilitated_learning_sessions s2 ON s2.id=p.facilitated_session_id
