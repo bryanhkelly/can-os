@@ -127,6 +127,7 @@ function MyCanAccount() {
               <span className="text-xs text-muted-foreground">{favoriteCount} saved</span>
             </div>
             <p className="mt-1 text-sm text-muted-foreground">Save published learning locations and schools where you have verified access. Favorites never enroll you or share your profile.</p>
+            <Link to="/explore/" className={sectionLink}>Discover programs at more locations <ArrowRight className="size-4" aria-hidden="true"/></Link>
             {!account.favoritesReady && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
               Saved locations are not yet available in this database. Your school access remains unchanged.
             </p>}
@@ -184,7 +185,7 @@ function MyCanAccount() {
           <h2 className="font-serif text-2xl">My learning</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">Your classes, program registrations and history remain with their authorized educational records.</p>
           {session.role === "account_holder" ?
-            <a href="#my-can-places" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Explore learning locations</a> :
+            <Link to="/explore/" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Explore programs and locations</Link> :
             <Link to="/home" className={sectionLink}><BookOpen className="size-4" aria-hidden="true"/> Open current learning workspace</Link>}
         </section>
         <section className="border border-border bg-muted/30 p-5">
