@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
@@ -8,7 +8,7 @@ import {
   auditEvents as canonicalAuditEvents, canonicalAccountGrants,canonicalAccounts,
   canonicalEnrollmentOrganizations,courseVersions,deploymentOfferingAdoptions,
   educationOperations,learnerCourseAttempts,noncreditRegistrations,
-  noncreditSelfEnrollmentClaims,offeringVersions,programDeployments,
+  noncreditSelfEnrollmentClaims,noncreditTrainingVersions,offeringVersions,programDeployments,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
@@ -60,6 +60,7 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
           eq(deploymentOfferingAdoptions.offeringVersionId,learnerCourseAttempts.offeringVersionId),
         ))
         .innerJoin(offeringVersions,eq(offeringVersions.id,learnerCourseAttempts.offeringVersionId))
+        .innerJoin(noncreditTrainingVersions,eq(noncreditTrainingVersions.id,noncreditRegistrations.trainingVersionId))
         .innerJoin(courseVersions,eq(courseVersions.id,learnerCourseAttempts.courseVersionId))
         .innerJoin(canonicalAccountGrants,and(
           eq(canonicalAccountGrants.accountId,bridge.canonicalAccountId),
@@ -86,8 +87,10 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
           eq(learnerCourseAttempts.id,data.courseAttemptId),
           eq(learnerCourseAttempts.status,"active"),
           eq(noncreditRegistrations.participantPersonId,bridge.canonicalPersonId),
-          eq(noncreditRegistrations.status,"registered"),
-          eq(programDeployments.status,"active"),
+          inArray(noncreditRegistrations.status,["registered","active"]),
+          eq(noncreditTrainingVersions.state,"published"),
+          isNotNull(noncreditTrainingVersions.approvedByPersonId),
+          inArray(programDeployments.status,["authorized","active"]),
           eq(educationOperations.status,"active"),
           eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
           lte(deploymentOfferingAdoptions.validFrom,now),
