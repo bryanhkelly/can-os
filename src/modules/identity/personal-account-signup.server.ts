@@ -9,6 +9,7 @@ import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { requestOneTimeAccess } from "./passwordless-access.server";
 import { sendAccessLinkViaResend, type AccessEmailSender } from "./resend-access-mail.server";
+import { writeAudit } from "@/platform/mutation";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const SIGNUP_LIFETIME_MS = 20 * 60_000;
@@ -84,6 +85,11 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
   }
   const [person] = await tx.insert(people).values({
     legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+    metadata: {
+      origin: "verified_email_personal_signup",
+      nameEvidence: "self_declared",
+      legalNameVerified: false,
+    },
   }).returning({ id: people.id });
   if (!person) throw new Error("Personal profile could not be initialized");
   const [grant] = await tx.insert(accountPersonGrants).values({
@@ -91,6 +97,20 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
     organizationId: null, siteId: null, active: true,
   }).returning({ id: accountPersonGrants.id });
   if (!grant) throw new Error("Personal CAN access could not be initialized");
+  await writeAudit(tx, {
+    actorPersonId: person.id,
+    action: "identity.personal_account.created",
+    resourceType: "access_account",
+    resourceId: accountId,
+    scope: {},
+    after: {
+      personalGrantId: grant.id,
+      emailVerified: true,
+      nameEvidence: "self_declared",
+      institutionGranted: false,
+    },
+    context: { accountId, source: "single_use_email_verification" },
+  });
   await tx.update(accessAccountSignups).set({ consumedAt: now })
     .where(eq(accessAccountSignups.accountId, accountId));
   return grant.id;
