@@ -7,12 +7,16 @@ function source(path: string) {
 }
 
 /** Static release contract; browser and restricted-role acceptance remain separate. */
-describe("optional canonical learning release boundaries", () => {
-  it("defaults both activity collectors to closed unless explicitly enabled", () => {
-    const gates = source("src/modules/learning/canonical-learning-release.server.ts");
-    expect(gates).toContain('CAN_CANONICAL_ACTIVITY_ENABLED !== "true"');
-    expect(gates).toContain('CAN_FACILITATED_LEARNING_ENABLED !== "true"');
-    expect(gates).toContain("throw new AuthorizationError");
+describe("secure canonical learning runtime boundaries", () => {
+  it("uses restricted readiness rather than optional deployment feature flags", () => {
+    const guards = source("src/modules/learning/canonical-learning-release.server.ts");
+    const availability = source("src/modules/learning/canonical-learning-release.functions.ts");
+    expect(guards).not.toContain('process.env.CAN_CANONICAL_ACTIVITY_ENABLED');
+    expect(guards).not.toContain('process.env.CAN_FACILITATED_LEARNING_ENABLED');
+    expect(guards).toContain("canonicalRestrictedAuthUrlValid");
+    expect(guards).toContain("CAN_FACILITATED_PAIRING_PEPPER");
+    expect(availability).toContain("canonicalLearningRuntimeReady()");
+    expect(availability).toContain("facilitatedLearningRuntimeReady()");
   });
 
   it("preserves recorded lessons while telemetry is disabled", () => {
