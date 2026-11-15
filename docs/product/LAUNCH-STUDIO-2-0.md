@@ -99,3 +99,49 @@ UX: grouped multi-select rectangular chips (6.1), selected state with visible ch
 Current source note: `src/domain/blueprint-configuration.ts` includes `blueprintProgramModelDraftSchema` with `kind`, `gradeRange` and `deliveryModel`, but no first-class approach/focus taxonomy. The `blueprintEditorialIdentityKeys` (including `classical_humanities`) are editorial branding/identity, **not** a curriculum taxonomy. Canonical `blueprint_versions.target_kind` supports offering / operation / composite. Any normalized taxonomy schema change must be explicitly designed, versioned, migrated on test01 first and regression tested; don't reinterpret editorial identity as curriculum choice.
 
 Acceptance: select several program formats, audiences, approaches and content focuses; review ranked candidates and distinct adoption intents; remove one chip without deleting already-authorized offerings or enrolling anybody; school experience only when actual 6–12 academic curriculum is selected; no unauthorized network items in matches.
+
+## Time-to-first-website: the primary product outcome
+
+The product's first aha moment is a **compelling, Site-specific website preview that already shows the educational experiences the operator wants to offer**, reached immediately after minimal Site information, delivery capability, optional network indication, and lightweight multi-select program/audience/interest choices. Do not make a full curriculum source selection, facility survey, staffing plan, website photo workflow, brand exercise, or every review a prerequisite to experiencing this preview.
+
+### Progressive fast path
+
+1. Establish/select Site and responsible Organization using current authorized identity, name and essential location/digital context.
+2. Capture Physical / Digital / Both as intended Site delivery capabilities.
+3. Optionally identify existing approved network association, submit network code/request, or Continue independently. A pending code must not prevent private preview; network-only brand and content are never presumed authorized.
+4. Multi-select initial program formats, academic grade-band curricula, audiences and optional content interests using concise chips. Explain that selections are intentions, not published programs. Curriculum publisher/source, license and detailed pedagogy are later decisions.
+5. **Generate private Site website preview immediately.** Use the Site name, authorized network branding if verified, an appropriate neutral default template, concise editable introductory copy, and clearly labeled **proposed** program cards. Use rights-safe media (or tasteful non-photographic placeholders) and no invented claims, fictional programs presented as real, fees, address, staff, dates or availability. If actual approved offerings are present, show them with their real publication eligibility.
+6. Offer only three obvious next actions: **Customize website**, **Make programs enrollable**, **Share/publish Site** (last action shown only with independent Site publication permission). Existing six-step Website Studio becomes an *optional refinement workspace*, not a blocker before first visual payoff.
+
+Site website identity should be created once; later adding a Program or Offering updates the same Site website's draft/catalog projection. An authorized Site operator can preview and confirm publishable program presentation; promotion of unapproved or unreviewed content into public pages must never happen silently. No duplicate CMS, site or program records.
+
+### Readiness is not a single boolean
+
+Distinguish:
+- **Private preview ready**: authenticated Site editor can see their proposed site; no claims of enrollment or public reachability.
+- **Site published**: public website has been independently approved; proposed offerings may appear as clearly labeled planned/interest only *if an authorized public-interest policy and consent path permit it*.
+- **Enrollment open**: at least one specific approved Offering/deployment has a valid enrollment release and operational authorization, cohort/session/capacity/terms as applicable. Only those Offerings get a real Register/Apply CTA. School applications and noncredit registration remain distinct and existing server-owned flows.
+
+Do not render a clickable Register CTA to a nonexistent application or enrollment release, nor infer enrollment permission from a visually finished website. The first private preview may display a disabled/annotated example CTA in design preview only; public site displays safe 'Coming soon' or approved interest CTA until registration can truthfully open. A Site can be public while zero Programs are enrollable and can be enrollable for one Program while another is still in preparation.
+
+### Existing capabilities to reuse
+
+- `src/modules/sites/site-public-provisioning.server.ts` creates Site/public-address draft reservations without publishing.
+- `src/components/launch-studio/CreateSchoolProfile.tsx` currently sends a new Site to `/launch/website`; replace this orientation with the Site preview aha moment after lightweight program intentions.
+- `docs/product/WEBSITE-STUDIO.md`: seven saved design systems, versioned draft, private preview, distinct publication stages, and authorized claims.
+- `src/modules/sites/site-public-catalog.server.ts`: public site catalog independently checks Site publication and program eligibility.
+- `src/modules/sites/site-publication.server.ts`: reviewed Site and Program public projection and publisher authorization.
+- `src/routes/programs.noncredit.enrollment.tsx`: noncredit enrollment release publisher; live capacity, sessions and enrollment remain independently governed.
+
+### Outcome and acceptance criteria
+
+- An authorized local Site operator can see a polished, accurate private Site website after only essential setup choices and no mandatory six-step design wizard.
+- Site creation does not force a school identity; website language/sections adapt to selected offerings.
+- Multi-select categories create suggestions/plans, not new canonical Blueprints/Offerings or false claims of approval.
+- Program addition is reflected in the **same** Site website's draft/authorized public projections without duplicating a Site or website.
+- Program publication/release authorization alone controls real Apply/Register CTA, not website creation or network code.
+- A previously published Site retains its existing design, operator revisions and address when new programs are introduced.
+- Independent/no-network Site enjoys same first-website moment. Pending code cannot confer partner brand or exclusive catalog entitlement.
+- Publish failures, pending permissions, unavailable restricted database reader and contradictory eligibility lead to explicit 'Not yet open', never fake enrollment.
+
+North-star measurement: proportion of authorized first-time Site operators who reach a meaningful private website preview, then progress to their **first real enrollable offering**. Measure these as distinct funnel milestones; do not reward fake enrollment or fabricated publish states.
