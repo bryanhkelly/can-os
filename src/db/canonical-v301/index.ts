@@ -19,6 +19,7 @@ export * from "./credentials";
 
 export * from "./device-operations";
 export * from "./self-enrollment";
+export * from "./noncredit-waitlist-delivery";
 
 export * from "./classroom-offering-courses";
 export * from "./classroom-persons";
