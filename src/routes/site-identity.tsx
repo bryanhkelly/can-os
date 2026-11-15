@@ -35,6 +35,7 @@ function SiteIdentityWorkspace(){
   const [error,setError]=useState("");
   const [target,setTarget]=useState("");
   const [revokeSiteId,setRevokeSiteId]=useState("");
+  const [revokeReason,setRevokeReason]=useState("");
   const sites=useQuery({
     queryKey:["site-identity-own-sites"],
     queryFn:()=>listLaunchOptions(),enabled:mode==="request",retry:false,
@@ -73,11 +74,12 @@ function SiteIdentityWorkspace(){
     void run(()=>confirmCanonicalSiteIdentityLink({data:{publicSiteId:siteId}}),
       "Canonical Site authority confirmed. The independent CAN reviewer can now decide.");
   }
-  function review(decision:"approve"|"reject"|"revoke",overrideSiteId?:string){
+  function review(decision:"approve"|"reject"|"revoke",overrideSiteId?:string,overrideReason?:string){
     const publicSiteId=overrideSiteId??target;
-    if(!publicSiteId||reason.trim().length<15)return;
+    const explanation=overrideReason??reason;
+    if(!publicSiteId||explanation.trim().length<15)return;
     void run(()=>reviewSiteIdentityLink({data:{
-      publicSiteId,decision,reason:reason.trim(),
+      publicSiteId,decision,reason:explanation.trim(),
     }}),"Review decision recorded. No enrollment or publication grant was created.");
   }
 
@@ -179,9 +181,15 @@ function SiteIdentityWorkspace(){
           <Input className="mt-2" value={revokeSiteId}
             onChange={e=>setRevokeSiteId(e.target.value)} placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"/>
         </label>
+        <label className="mt-4 block text-sm font-semibold">Revocation reason
+          <textarea minLength={15} maxLength={1200} value={revokeReason}
+            onChange={e=>setRevokeReason(e.target.value)}
+            className="mt-2 min-h-24 w-full border border-border bg-background p-3 text-sm"
+            placeholder="Explain why this Site relationship must no longer be trusted."/>
+        </label>
         <Button className="mt-3" variant="outline"
-          disabled={busy||reason.trim().length<15||!z.string().uuid().safeParse(revokeSiteId).success}
-          onClick={()=>review("revoke",revokeSiteId)}>Revoke approved connection</Button>
+          disabled={busy||revokeReason.trim().length<15||!z.string().uuid().safeParse(revokeSiteId).success}
+          onClick={()=>review("revoke",revokeSiteId,revokeReason)}>Revoke approved connection</Button>
       </div>
     </section>}
   </WorkspaceShell>;
