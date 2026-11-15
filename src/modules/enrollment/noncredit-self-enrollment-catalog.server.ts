@@ -13,6 +13,7 @@ import {
   siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
+import {noncreditSeatsAvailable} from "@/domain/noncredit-seat-policy";
 
 type Executor = Pick<typeof db, "select">;
 
@@ -177,9 +178,11 @@ export async function readEligibleSelfEnrollmentReleases(
   const byRelease = new Map(counts.map(row=>[row.releaseId,Number(row.participants)]));
   return rows.map(row=>({
     ...row,
-    seatsRemaining:Math.max(0,row.maxParticipants-
-      (byRelease.get(row.id)??0)+(returned.get(row.id)??0)-
-      (holds.get(row.id)??0)),
+    seatsRemaining:noncreditSeatsAvailable({
+      capacity:row.maxParticipants,claims:byRelease.get(row.id)??0,
+      released:returned.get(row.id)??0,
+      activeInvitations:holds.get(row.id)??0,
+    }),
     hasWaitingQueue:waiters.has(row.id),
     consentSha256:publishedNoncreditConsentHash(row.consentVersion,row.consentText),
   }));
