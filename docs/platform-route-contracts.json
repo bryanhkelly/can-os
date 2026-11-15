@@ -1300,6 +1300,15 @@
       "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
     },
     {
+      "file": "src/routes/release-fingerprint.ts",
+      "route": "/release-fingerprint",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "Anonymous GET returns only immutable deployed source commit fingerprint; operator uses it to compare expected main source SHA",
+      "writeBoundary": "GET only; no mutation, no configuration or secrets",
+      "readBoundary": "Fixed application name and embedded build-time SHA, cache no-store, noindex; tenant host gate never exposes app endpoints to tenant origins"
+    },
+    {
       "file": "src/routes/site-identity.tsx",
       "route": "/site-identity",
       "owner": "sites",
