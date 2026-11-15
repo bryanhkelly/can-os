@@ -28,6 +28,7 @@ export * from "./study-groups";
 export * from "./report-cards";
 export * from "./access";
 export * from "./account-favorites";
+export * from "./account-signups";
 export * from "./launch-drafts";
 export * from "./demo-school-tenants";
 export * from "./school-setup-signups";
