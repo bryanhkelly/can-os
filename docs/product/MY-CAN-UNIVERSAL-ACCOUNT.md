@@ -12,7 +12,7 @@ The account and Person record live outside school-bound relationship records. Fo
 
 ## Built in main
 
-- `/access/register`: independent personal signup using the existing one-time verified-email link, anonymous global rate limiting, single-use challenge and safe same-origin return path. Provisional names are not a logged-in Person until verified.
+- `/access/register`: **adult self-signup** (18+ self-attestation) using the existing one-time verified-email link, anonymous global rate limiting, single-use challenge and safe same-origin return path. Provisional names are not a logged-in Person until verified. A minor joins through an authorized school or guardian flow; age verification beyond self-attestation needs its own governed policy.
 - The `account_holder` role has **zero** institutional capabilities, organization IDs or site IDs. It lands at `/account/`.
 - Email-link redemption transaction provisions a self-declared Person and a personal grant only when the existing account has no active verified institutional grant. Concurrent or repeated unverified submissions do not override an active name in a pending signup.
 - Existing school founder signup reuses a verified personal Person rather than inserting a duplicate. Existing staff invitation issuance rejects ambiguous real-person identities; family verification already reuses a uniquely linked Person and independently verifies guardian authority.
@@ -20,8 +20,10 @@ The account and Person record live outside school-bound relationship records. Fo
 - `/explore/`: read-only program-first and place-first discovery using existing approved, publicly published Site and program/extended-learning read models. Listings exclude demo fixtures, do not infer permission to open or enroll, and lead to the already-authorized school/extended-learning published Site workflow. Current discovery is bounded to the first 20 Sites.
 - `/canonical/lab/enrollment`: internal provider enrollment preview remains informational; it does **not** submit canonical noncredit registrations.
 - My CAN links are in the account menu, sidebar, Settings, sign-in, and public program explorer.
-- Account favorite Site storage and RLS from `0081`; provisional personal signups and RLS from `0082`. Both migrations applied to `test01` and production/default Neon branches, with table presence, RLS flags and favorites policy count inspected. No new rows were inserted for test accounts.
-- Unit tests committed for personal role/capabilities, signup validation, account/Person consistency, favorite-publication checks, favorite scope, and contact validation. These have not yet run in a complete repository environment.
+- Account favorite Site storage and RLS from `0081`; provisional personal signups and RLS from `0082`.
+- `0083_account_site_contact_consent` adds append-only, purpose-bound, revocable sharing of verified email, CAN display name and optional contact phone to a specifically identified Site. My CAN presents grant and revoke actions separate from favorites. Only an authorized same-Site `site_admin` or `registrar` can request a particular Person's shared contact for the exact authorized purpose. Provider reads are audited and serialized with revocations. Student-linked accounts cannot directly grant contact sharing until an authorized guardian-managed pathway exists.
+- Migrations 0081–0083 applied to `test01` and production/default Neon branches, with table presence, RLS flags and policy counts inspected. No test users or enrollment records were inserted.
+- Unit test sources committed for personal role/capabilities, adult signup validation, account/Person consistency, favorite-publication checks, favorite scope, contact validation, consent purpose and revocation. These have not yet run in a complete repository environment.
 
 ## Current flow
 
@@ -36,7 +38,7 @@ The account and Person record live outside school-bound relationship records. Fo
 
 - **Native v3.0.1 noncredit adult self-registration:** must create an authorized `noncredit_registration` plus `learner_course_attempt` only through a published/approved adoption/deployment and a verified canonical Person/grant. Canonical accounts and sessions are independent of the legacy `public` account tables; the existing operator-verified crosswalk is not an automatic login bridge. **Do not link Persons by email or mint canonical learner grants from favorites.**
 - **Facilitated groups:** publish per-site cohorts/locations and use invitations and room attendance without creating duplicate individual registrations.
-- **Portability/consent:** versioned, scoped disclosure consent and an authorized provider reader for specific shared contact fields. No automatic sharing of sensitive institutional records.
+- **Portability/consent:** the explicit purpose-scoped contact read and revocation are built; next connect the consented fields into authorized provider application/intake forms, implement guardian-managed student disclosure and ensure each Site records its separately governed admission or employment data. No automatic sharing of sensitive institutional records.
 - **Youth and staff:** verify one real Person across multiple existing school/student/guardian/staff roles with independently approved relationships; reconcile legacy duplicate Persons under operator review, not auto-merge.
 - **Discovery scale:** server-side query filters, pagination and indexes; the first 20 published Sites are not a complete national search.
 - **Release gates:** checkout/install, TanStack route generation, TypeScript/build, unit tests, route inventory, restricted-principal RLS, dual-account/cross-Site privacy, Playwright for personal signup, existing school/guardian/staff enrollment and mobile/V6.1. Check actual deployment commit before claiming the site is live.
