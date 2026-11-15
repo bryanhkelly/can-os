@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
+import { ClassroomCompanionRoom } from "@/components/learning/ClassroomCompanionRoom";
 import { Button } from "@/components/ui/button";
 import { getLearnerFacilitatedRoom, leaveFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 import {
@@ -100,6 +101,8 @@ function ClassroomCompanionPage() {
           ? "Latest facilitator playback: " + room.latestPlayback.kind
           : "Waiting for the facilitator to start playback."}
       </p>
+      <ClassroomCompanionRoom courseAttemptId={courseAttemptId}
+        facilitatedSessionId={room.facilitatedSessionId}/>
       <Button className="mt-4" type="button" variant="outline" disabled={busy}
         onClick={() => void leave(room.facilitatedSessionId)}>Leave room</Button>
     </section>)}
