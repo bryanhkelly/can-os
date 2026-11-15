@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     queryFn:()=>getClassroomSchedule(),
     staleTime:0,refetchInterval:60_000,retry:false,
   });
+  const requestIds=useRef<Record<string,string>>({});
   const [selected,setSelected]=useState("");
   const [startsAt,setStartsAt]=useState("");
   const [endsAt,setEndsAt]=useState("");
@@ -95,11 +96,15 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
         if(!choice)return;
         const begin=iso(startsAt),end=iso(endsAt);
         if(!begin||!end)throw new Error("Invalid calendar times");
+        const key=[choice.deploymentId,choice.courseVersionId,
+          choice.siteId,begin,end].join(":");
+        const requestId=requestIds.current[key]??crypto.randomUUID();
+        requestIds.current[key]=requestId;
         await scheduleClassroom({data:{
           deploymentId:choice.deploymentId,courseVersionId:choice.courseVersionId,
-          siteId:choice.siteId,startsAt:begin,endsAt:end,
-          requestId:crypto.randomUUID(),
+          siteId:choice.siteId,startsAt:begin,endsAt:end,requestId,
         }});
+        delete requestIds.current[key];
       })}>{busy==="new"?"Saving…":"Schedule classroom meeting"}</Button>
     <div className="mt-6 border-t border-border pt-4">
       <h3 className="font-semibold">Upcoming and recent meetings</h3>
