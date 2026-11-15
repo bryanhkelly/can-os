@@ -15,7 +15,7 @@ import {
   facilitatedPairingRateLimits,
   facilitatedLearningSessions, learnerCourseAttempts, programDeployments,
   classroomDeploymentSites, classroomEnrollmentSitePlacements,
-  siteOrganizationRoles, trackLessonPresentations,
+  siteOrganizationRoles, trackLessonPresentations, noncreditSelfEnrollmentClaims,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -688,6 +688,24 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
     });
   });
 
+/**
+ * A self-enrolled facilitated adult is registered at one exact hosting Site.
+ * Legacy noncredit registrations with no explicit Site claim are unaffected;
+ * independently registered online learners may attend an approved Site room
+ * without creating a second registration or resetting learning progress.
+ */
+async function selfEnrolledNoncreditRoomSitePermitted(
+  tx:Tx, access:{source:"school"|"noncredit";noncreditRegistrationId:string|null},
+  roomSiteId:string,
+):Promise<boolean> {
+  if(access.source!=="noncredit"||!access.noncreditRegistrationId)return true;
+  const [claim]=await tx.select({siteId:noncreditSelfEnrollmentClaims.siteId})
+    .from(noncreditSelfEnrollmentClaims)
+    .where(eq(noncreditSelfEnrollmentClaims.registrationId,access.noncreditRegistrationId))
+    .limit(1);
+  return !claim || claim.siteId===null || claim.siteId===roomSiteId;
+}
+
 export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
   .validator((value:unknown)=>joinInput.parse(value))
   .handler(async({data})=>{
@@ -734,6 +752,7 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
       if (attempt.source==="school" && !await schoolAttemptIsPlacedAtSite(
         tx,attempt.courseAttemptId,room.deploymentId,room.siteId,now,
       )) return null;
+      if (!await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId)) return null;
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
@@ -825,6 +844,7 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
         if(access.source==="school" && !await schoolAttemptIsPlacedAtSite(
           tx,access.courseAttemptId,row.deploymentId,row.siteId,now,
         ))continue;
+        if(!await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
         recent.push(row);
       }
       const ids=recent.map(row=>row.roomId);
