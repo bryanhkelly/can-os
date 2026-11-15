@@ -594,3 +594,52 @@ The public website adapter projects only currently eligible Site-linked noncredi
 Apply `patch-site-identity-confirmation.sql` after `patch-site-identity-links.sql`, and `patch-noncredit-site-associated-online.sql` after the noncredit enrollment tables exist. The second patch was applied to `test01` on 2026-11-15 and verified to allow independent noncredit releases with optional Site association. Use `/site-identity` for request, native confirmation, independent review and revocation; no test Site mapping was approved automatically.
 
 Also ensure `CAN_ACCESS_PUBLIC_ORIGIN` is the real HTTPS CAN application origin. No register link should be displayed without a current, valid release and working destination. Production migration, build, browser acceptance, hosting and reviewer-approved mapping are separate release gates.
+
+### November 15: Site catalog reader, classroom cohort scope, waitlist delivery
+
+The public Site-to-canonical enrollment adapter now tests the actual
+runtime database connection's schema/table privileges and executes harmless
+zero-row reads before reporting readiness. It still needs an independently
+approved Site identity correspondence and a currently eligible published
+noncredit enrollment release. The Site's canonical auth-session reader is
+**not** a substitute for the authorized server catalog reader; no public,
+owner, or BYPASSRLS grants were broadened.
+
+Run the opt-in, **read-only**, branch-verified test against a known
+`test01` QA fixture containing a real three-party-approved Site link and
+published eligible release:
+
+```sh
+APP_ENV=test NODE_ENV=test CAN_SITE_BRIDGE_VALIDATION=1 \
+  CAN_EXPECTED_NEON_BRANCH_ID=br-bitter-feather-ar0u63x7 \
+  DATABASE_URL="$TEST_DATABASE_URL" npm run test:site:enrollment-bridge
+```
+
+The script refuses production `main`, a missing/mismatched TEST_DATABASE_URL,
+zero approved Site links, and zero eligible releases; it does not fabricate
+Site approvals. As of this change, test01 has two published releases but no
+approved public-to-canonical Site correspondence. Production also has no
+approved links or published releases. A successful positive Site-to-enrollment
+journey is therefore still gated on an authorized nonproduction fixture and
+a matching deployed app build.
+
+`patch-noncredit-waitlist-email-deliveries.sql` was applied additively on
+Neon `test01` and `main`. It creates a forced-RLS, owner-only,
+no-PUBLIC-access table with a unique receipt for each 48-hour waitlist
+invitation. It contains no email addresses or access tokens. The provider
+invitation command writes the receipt in the same transaction as the hold.
+The existing scheduled-job runner and Cloudflare scheduled handler use
+leased, retryable, idempotent Resend sends **after commit**, with current
+release authorization, verified adult identity and expiry rechecks.
+Provider acceptance is not evidence of the learner opening the email or
+accepting the seat. Working external email requires real runtime mail
+credentials and a running Cloudflare deployment; source/migration success
+alone does not establish live notification delivery.
+
+Release-linked classrooms now restrict pairings, learner activity, survey
+access, media and facilitator roster/evidence summaries to the actual
+enrollment release's Person and Course claim. The roster SQL filters by
+release **before LIMIT**. Native roster reads execute sequentially inside
+one Neon transaction. Unlinked classrooms preserve the existing Site/Course
+registration policy.
+
