@@ -43,11 +43,17 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
     throw new AuthorizationError("active account membership");
   }
 
-  const siteIds = [...new Set(grants.map(grant => grant.siteId).filter((id): id is string => !!id))];
+  const siteIds = [...new Set([...grants.map(grant => grant.siteId), ...(actor.scope.siteIds ?? [])].filter((id): id is string => !!id))];
   const organizationIds = [...new Set(grants.map(grant => grant.organizationId).filter((id): id is string => !!id))];
   const [workspaceSites, workspaceOrgs] = await Promise.all([
-    siteIds.length ? db.select({ id: sites.id, name: sites.name })
-      .from(sites).where(inArray(sites.id, siteIds)) : Promise.resolve([]),
+    siteIds.length ? db.select({
+      id: sites.id, name: sites.name, address: sites.address,
+      organizationName: organizations.name, slug: sitePublications.slug,
+      status: sitePublications.status, publishedAt: sitePublications.publishedAt,
+    }).from(sites)
+      .innerJoin(organizations, eq(sites.organizationId, organizations.id))
+      .leftJoin(sitePublications, eq(sites.id, sitePublications.siteId))
+      .where(inArray(sites.id, siteIds)) : Promise.resolve([]),
     organizationIds.length ? db.select({ id: organizations.id, name: organizations.name })
       .from(organizations).where(inArray(organizations.id, organizationIds)) : Promise.resolve([]),
   ]);
@@ -68,30 +74,29 @@ export const getMyCanAccount = createServerFn({ method: "GET" }).handler(async (
     const directory = await tx.select({
         id: sites.id, name: sites.name, address: sites.address,
         organizationName: organizations.name, slug: sitePublications.slug,
+        status: sitePublications.status, publishedAt: sitePublications.publishedAt,
       }).from(sitePublications)
         .innerJoin(sites, eq(sitePublications.siteId, sites.id))
         .innerJoin(organizations, eq(sites.organizationId, organizations.id))
         .where(and(eq(sitePublications.status, "published"),
           isNotNull(sitePublications.publishedAt)))
         .orderBy(asc(sites.name)).limit(100);
-    const favorites = await tx.select({
-        id: sites.id, name: sites.name, address: sites.address,
-        organizationName: organizations.name, slug: sitePublications.slug,
-      }).from(accessAccountFavoriteSites)
-        .innerJoin(sitePublications, eq(accessAccountFavoriteSites.siteId, sitePublications.siteId))
-        .innerJoin(sites, eq(sitePublications.siteId, sites.id))
-        .innerJoin(organizations, eq(sites.organizationId, organizations.id))
-        .where(and(eq(accessAccountFavoriteSites.accountId, accountId),
-          eq(sitePublications.status, "published"), isNotNull(sitePublications.publishedAt)))
-        .orderBy(asc(sites.name)).limit(100);
-    const favoriteIds = new Set(favorites.map(row => row.id));
-    const bySite = new Map([...directory, ...favorites].map(row => [row.id, row]));
+    const savedIds = await tx.select({ id: accessAccountFavoriteSites.siteId })
+      .from(accessAccountFavoriteSites)
+      .where(eq(accessAccountFavoriteSites.accountId, accountId)).limit(500);
+    const favoriteIds = new Set(savedIds.map(row => row.id));
+    // Verified private workspace Sites are visible to their members, but no one
+    // else; public directory listings still require approved publication.
+    const bySite = new Map([...directory, ...workspaceSites].map(row => [row.id, row]));
     return [...bySite.values()].map(site => ({
       id: site.id, name: site.name, organizationName: site.organizationName,
       city: typeof site.address?.city === "string" ? site.address.city : null,
       region: typeof site.address?.region === "string" ? site.address.region : null,
-      url: `https://${publicSiteHost(site.slug)}/`,
+      url: site.slug && canSavePublishedSite({
+        status: site.status ?? "", publishedAt: site.publishedAt,
+      }) ? `https://${publicSiteHost(site.slug)}/` : null,
       favorite: favoriteIds.has(site.id),
+      workspaceSite: siteIds.includes(site.id),
     })).sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.name.localeCompare(b.name));
   });
 
@@ -119,13 +124,25 @@ export const setMyCanFavoriteSite = createServerFn({ method: "POST" })
     const actor = await getCommandContext(getRequest());
     const accountId = actor.sessionAccountId ?? actor.accountId;
     if (!actor.actorPersonId) throw new AuthorizationError("verified account holder");
+    const [account] = await db.select({ email: accessAccounts.emailNormalized })
+      .from(accessAccounts).where(and(eq(accessAccounts.id, accountId),
+        eq(accessAccounts.disabled, false))).limit(1);
+    if (!account) throw new AuthorizationError("active account");
+    const { grants } = await readSessionGrants(accountId, account.email);
+    if (!grants.some(grant => grant.id === actor.grantId && grant.active))
+      throw new AuthorizationError("active membership");
+    const authorizedSites = new Set([
+      ...(actor.scope.siteIds ?? []),
+      ...grants.map(grant => grant.siteId).filter((id): id is string => !!id),
+    ]);
     return db.transaction(async tx => {
       await tx.execute(sql`SELECT set_config('can.account_id', ${accountId}, true)`);
       if (data.favorite) {
         const [published] = await tx.select({ id: sitePublications.siteId, status: sitePublications.status, publishedAt: sitePublications.publishedAt })
           .from(sitePublications)
           .where(eq(sitePublications.siteId, data.siteId)).limit(1);
-        if (!canSavePublishedSite(published)) throw new AuthorizationError("published Site");
+        if (!authorizedSites.has(data.siteId) && !canSavePublishedSite(published))
+          throw new AuthorizationError("published or authorized Site");
         await tx.insert(accessAccountFavoriteSites).values({
           accountId, siteId: published.id,
         }).onConflictDoNothing();
