@@ -34,6 +34,20 @@ test("@public sign-in shows an accessible email input", async ({ page }) => {
 test("@public create-school entry point renders without sending data", async ({ page }) => {
   await expectHealthyPage(page, "/schools/new");
   await expect(page.getByRole("heading", { name: /Create a school/i })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Real school" })).toBeChecked();
+  await page.getByRole("radio", { name: "Demo school" }).check();
+  await expect(page.getByRole("textbox", { name: "School demo domain" })).toBeVisible();
+  await expect(page.getByText("I will use synthetic data only.", { exact: false })).toBeVisible();
+});
+
+test("@public sign-in prefill and error correction are accessible without submitting", async ({ page }) => {
+  await expectHealthyPage(page, "/access?email=qa%40example.com&error=invalid&returnTo=%2Flearn%2Fenroll");
+  const email = page.getByRole("textbox", { name: "Email" });
+  await expect(email).toHaveValue("qa@example.com");
+  await expect(page.getByRole("alert").filter({ hasText: "Unable to sign in" })).toBeVisible();
+  await email.fill("corrected@example.com");
+  await expect(page.getByRole("alert").filter({ hasText: "Unable to sign in" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Email me an access link" })).toBeEnabled();
 });
 
 for (const path of ["/guardian/students", "/student/courses", "/calendar", "/canonical",
