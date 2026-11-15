@@ -68,3 +68,47 @@ On `test01`, separately installed the two missing noncredit waitlist and release
 - GitHub Actions runs continue to report `startup_failure` with no executed CI jobs. No successful complete typecheck, Drizzle generator check, unit test, browser test or Cloudflare deployment has been observed for this change.
 - Cloudflare's actual `DATABASE_URL` role, DNS/TLS and registration application origin still require read-only production runtime verification. The non-login Site mapping reader is not a substitute for an audited, supported production noncredit eligibility reader.
 - Application tables/columns in `public` and `education_v30`: Neon `main` is a superset of `test01`. Do not re-copy `test01` or archived `education_v24` schemas.
+
+
+## Site catalog / cohort privacy / waitlist dispatch follow-up
+
+Source changes committed on November 15, 2026:
+
+- The Site noncredit catalog now probes the actual database connection's
+  schema/table permissions and performs zero-row relation SELECTs; the
+  independent three-party-approved Site link and full canonical release
+  eligibility checks remain mandatory. No broader canonical reader privileges
+  were granted.
+- Added an explicit, **read-only test01 integration gate**:
+  `npm run test:site:enrollment-bridge`, with
+  `CAN_SITE_BRIDGE_VALIDATION=1`, matching isolated `TEST_DATABASE_URL` and
+  `CAN_EXPECTED_NEON_BRANCH_ID`. This gate cannot pass without an approved
+  Site correspondence and eligible published release. No production identities
+  were manufactured or auto-approved.
+- Current production inspection: **0 approved Site links, 0 published noncredit
+  releases**, therefore **no positive production enrollment handoff is
+  demonstrated**. Test01 contains 2 published noncredit releases but currently
+  **0 approved public↔canonical Site links**.
+- Release-linked classroom rooms now require an exact
+  `noncredit_self_enrollment_claims.release_id` and matching real Person,
+  registration and Site in the QR, companion, media, learner activity, survey,
+  roster, attendance and assisted response pathways. Historic out-of-cohort
+  pairings no longer affect facilitator response/device summary counts.
+  Roster SQL filters before its 301-row cap, and Neon transaction reads are
+  sequential.
+- `patch-noncredit-waitlist-email-deliveries.sql` was installed additively on
+  **test01 and main**. Verified FORCE RLS, owner-only policy and no PUBLIC SELECT
+  on both branches. The canonical restricted auth login cannot read the table
+  directly on test01.
+- Provider invitations now transactionally queue an idempotent email receipt.
+  The existing scheduled-maintenance runner and Cloudflare minute cron process
+  leased, retryable mail through Resend, rechecking current eligible releases,
+  invitation expiry and recipient account/Person authorization. An accepted
+  provider response **does not** mean the learner received/opened the email or
+  accepted enrollment. The operator and learner surfaces show transport status.
+
+**Unverified release gates:** Current Cloudflare deployment source SHA and
+runtime credentials, actual external mail transport acceptance, an authorized
+approved public Site link, complete test01 end-to-end Site registration, a
+passing typecheck/build and authenticated browser QA. No synthetic approvals,
+learning enrollments or waitlist recipients were written to production.
