@@ -119,6 +119,17 @@ CREATE TRIGGER v301_freeze_noncredit_release
  BEFORE UPDATE ON education_v30.noncredit_self_enrollment_releases
  FOR EACH ROW EXECUTE FUNCTION education_v30.v301_freeze_noncredit_enrollment_release();
 
+-- A consent claim is evidence. Corrections require a new authorized
+-- revision design; an UPDATE or DELETE must not erase prior acceptance.
+CREATE OR REPLACE FUNCTION education_v30.v301_freeze_noncredit_enrollment_claim()
+RETURNS trigger LANGUAGE plpgsql AS $self_claim_immutability$
+BEGIN
+ RAISE EXCEPTION 'Noncredit self-enrollment consent claim is immutable';
+END $self_claim_immutability$;
+CREATE TRIGGER v301_freeze_noncredit_claim
+ BEFORE UPDATE OR DELETE ON education_v30.noncredit_self_enrollment_claims
+ FOR EACH ROW EXECUTE FUNCTION education_v30.v301_freeze_noncredit_enrollment_claim();
+
 -- Tables are intentionally not globally readable under a learner DB login.
 -- Public offering projection and registration use explicit server-side
 -- policy/identity guards; existing instructional activity RLS remains intact.
