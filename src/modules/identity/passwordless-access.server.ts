@@ -1,6 +1,6 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
-import { accessAccounts,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs,schoolSetupSignups } from "@/db/schema";
+import { accessAccounts,accessAccountSignups,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs,schoolSetupSignups } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
@@ -48,10 +48,13 @@ async function issueOneTimeAccess(rawEmail:string, sender:AccessEmailSender, ret
    eq(people.active,true)));
  // Existing memberships must not hide newly invited synthetic-school grants.
  const pendingInvitations=await listPendingStaffInvitations(db,account.id);
+ const [personalSignup]=await db.select({accountId:accessAccountSignups.accountId})
+  .from(accessAccountSignups).where(and(eq(accessAccountSignups.accountId,account.id),
+   isNull(accessAccountSignups.consumedAt),gt(accessAccountSignups.expiresAt,new Date()))).limit(1);
  const [schoolSignup]=await db.select({id:schoolSetupSignups.id}).from(schoolSetupSignups)
   .where(and(eq(schoolSetupSignups.accountId,account.id),isNull(schoolSetupSignups.consumedAt),
    gt(schoolSetupSignups.expiresAt,new Date()))).limit(1);
- if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length&&!schoolSignup)return "ineligible";
+ if(!memberships.some(g=>Object.hasOwn(roleCapabilities,g.role))&&!pendingInvitations.length&&!schoolSignup&&!personalSignup)return "ineligible";
  const accessOrigin=publicOrigin();
  secretPepper(); // Fail before recording a challenge if sign-in is not configured.
  // Serialize concurrent requests for the same account before enforcing cooldown.
@@ -162,6 +165,10 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
   const provisionedSchool=signup
    ? await (await import("./school-setup-signup.server")).provisionVerifiedSchoolSignup(tx,signup,account.id,account.email,now)
    : null;
+  // A personal account needs no institution. Provision it only after the
+  // single-use email token has been redeemed and other invitations processed.
+  await (await import("./personal-account-signup.server"))
+    .provisionVerifiedPersonalCanAccount(tx,account.id,account.email,now);
   const grants=await tx.select({id:accountPersonGrants.id,role:accountPersonGrants.role}).from(accountPersonGrants)
    .innerJoin(people,eq(people.id,accountPersonGrants.personId))
    .where(and(eq(accountPersonGrants.accountId,account.id),eq(accountPersonGrants.active,true),
