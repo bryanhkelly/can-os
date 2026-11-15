@@ -26,7 +26,10 @@ export async function readLinkedSiteNoncreditReleases(
     SELECT to_regclass('public.site_canonical_identity_links') IS NOT NULL AS "mappingReady",
       to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady",
       CASE WHEN to_regclass('public.site_canonical_identity_links') IS NOT NULL
-        THEN has_table_privilege(current_user,'public.site_canonical_identity_links','SELECT')
+        THEN has_schema_privilege(current_user,'public','USAGE')
+          AND has_schema_privilege(current_user,'education_v30','USAGE')
+          AND has_table_privilege(current_user,'public.site_canonical_identity_links','SELECT')
+          AND has_table_privilege(current_user,'education_v30.noncredit_self_enrollment_releases','SELECT')
         ELSE false END AS "canReadLink"
   `)).rows as Array<{mappingReady:boolean;releasesReady:boolean;canReadLink:boolean}>);
   if(!presence?.mappingReady||!presence.releasesReady||!presence.canReadLink)return [];
