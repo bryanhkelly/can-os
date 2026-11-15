@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 import { Pool } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
@@ -64,6 +64,61 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
   return canonicalSessionRowSchema.parse(records[0]);
+}
+
+/**
+ * Readiness requires an actual restricted login, SET ROLE, and execution of
+ * the same canonical session projection used by authenticated requests.
+ * Never test with the general/owner database URL or a real user's token.
+ *
+ * A brief cache avoids opening a new connection for every page visit.
+ * No credentials, SQL errors or account information enter the response.
+ */
+let readerProbeCache: { until: number; ready: boolean } = { until: 0, ready: false };
+let pendingReaderProbe: Promise<boolean> | null = null;
+
+async function runCanonicalReaderProbe(): Promise<boolean> {
+  const url = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
+  if (!canonicalRestrictedAuthUrlValid(url, process.env.DATABASE_URL) ||
+      (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) < 32) return false;
+  const pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 3000 });
+  let client: Awaited<ReturnType<Pool["connect"]>> | undefined;
+  try {
+    client = await pool.connect();
+    await client.query("BEGIN READ ONLY");
+    await client.query(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`);
+    const result = await client.query(
+      "SELECT account_id FROM education_v30.v301_canonical_session_context($1::text)",
+      [randomBytes(32).toString("hex")],
+    );
+    await client.query("ROLLBACK");
+    // The random digest must match no session. Success proves the restricted
+    // projection is callable, not that a privileged DB role can SELECT tables.
+    return result.rows.length === 0;
+  } catch {
+    if (client) {
+      try { await client.query("ROLLBACK"); } catch { /* fail closed */ }
+    }
+    return false;
+  } finally {
+    client?.release();
+    await pool.end().catch(() => { /* probe still fails closed */ });
+  }
+}
+
+export async function probeCanonicalAuthReader(): Promise<boolean> {
+  if (!canonicalRestrictedAuthUrlValid(
+    process.env.CAN_CANONICAL_AUTH_DATABASE_URL, process.env.DATABASE_URL,
+  ) || (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) < 32) return false;
+  const now = Date.now();
+  if (readerProbeCache.until > now) return readerProbeCache.ready;
+  if (!pendingReaderProbe) {
+    pendingReaderProbe = runCanonicalReaderProbe().then(ready => {
+      readerProbeCache = { ready, until: Date.now() + (ready ? 60_000 : 15_000) };
+      return ready;
+    }).finally(() => { pendingReaderProbe = null; });
+  }
+  return pendingReaderProbe;
 }
 
 /** Public command contexts never expose the database session id. */
