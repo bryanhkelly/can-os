@@ -200,3 +200,20 @@ Important gaps to finish before calling the requested full experience wired:
 3. Connect selected intentions to Blueprint/Offering discovery and adoption, then Site deployment, session/cohort setup, enrollment releases, and approved live website cards.
 4. Generalize the legacy school-labeled Launch Hub and website content/navigation based on actual academic curriculum and program presence.
 5. Apply site-first readiness and integration tests; ensure generated route contract, TS compilation, build, role-isolated browser acceptance, active database and deployed SHA verification. No test or production deployment is asserted by this entry.
+
+
+## Second implementation slice: real private renderer on main (2026-11-14)
+
+Source commits (no claim of deployment or passing CI):
+- `src/routes/launch.site-preview.ts` performs exact-Site authorization using a current registrar launch grant; renders the **same canonical public Site HTML engine** with the Site's real approved legacy academic/enrichment catalog and authorized current draft / published brand content. The endpoint is private, nonindexed, read-only and same-origin frameable, with forms disabled.
+- `src/domain/site-first-preview.ts` adds an escaped, private-only `PROPOSED · NOT ENROLLING` section from the saved program-interest chips. This section is **never** part of anonymous published Site pages and cannot make a Program or enrollment release exist.
+- `src/components/launch-studio/SiteFirstLaunch.tsx` now embeds this real renderer and offers Refresh Website, Build Programs & Offerings (the independently authenticated `/canonical/blueprints` workspace), Customize Website, and the existing Launch Hub. A canonical Site is explicitly reselected by the canonical account; a public-schema Site ID is never passed as if it were a native v3.0.1 grant.
+- `src/modules/programs/site-launch-preferences.functions.ts` persists lightweight preferences and reserves a private web address for existing Sites in the authorized transaction.
+- `src/components/shell/route-navigation.ts` and `docs/platform-route-contracts.json` now register `/launch/site` and `/launch/site-preview`.
+- Unit tests added for escaping, private plans, preview banners, security headers and multi-select preferences.
+
+**Verified by source inspection, not by execution:** The existing website engine already derives public academic and enrichment cards from independently approved legacy Program records; the private Site-first preview reuses those exact readers. The real public host still requires independent Site and program publication. The canonical v3.0.1 Blueprint/Offering/enrollment release model uses separate accounts/Sites and **has no independently authorized Site identity mapping to the public-schema website** in this implementation. Therefore a canonical noncredit release is not automatically reflected on the legacy public Site website yet. Bridging this requires explicit approved Site/organization identities and RLS-reviewed read models, not matching names or passing browser IDs. Avoid a blanket web link that implies an authorized Site Offering.
+
+**Release blockers:** GitHub Actions push runs for recent main commits reported `startup_failure` (not successful tests). No completed TypeScript/build/browser acceptance or production migration test has been observed. The `CAN_CANONICAL_CATALOG_ENABLED` environment gate remains present in existing catalog discovery and may block Blueprint references; it was not removed without verifying target DB roles. The selected network code is still an unsubmitted UI placeholder (not a grant).
+
+**Next safe integration bite:** Add an explicit cross-schema Site mapping and independently governed native-release-to-public-catalog projection only after exact identity verification. Then add read-only publicly eligible noncredit release cards linking to `/learn/enroll?release=<approved release UUID>`, with a separate valid current Site publication and authorized privacy policy. Independently test withdrawn/expired/waitlisted releases, mismatched Sites/organizations and no unauthorized CTA before production.
