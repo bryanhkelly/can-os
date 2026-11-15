@@ -8,6 +8,7 @@ import {
 import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
+import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
 
 const LEASE_MS=120_000;
 const MAX_ATTEMPTS=5;
@@ -86,10 +87,13 @@ export async function processNoncreditWaitlistEmailDeliveries(
         ))
         .where(owned()).limit(1);
       if(!record)continue;
-      if(record.waitlistStatus!=="invited" || !record.actualExpiry ||
-         record.actualExpiry.getTime()!==record.delivery.invitationExpiresAt.getTime() ||
-         record.actualExpiry<=clock() || record.releaseClosesAt<=clock() ||
-         record.releaseStatus!=="published"){
+      if(!currentWaitlistEmailOpportunity({
+        waitlistStatus:record.waitlistStatus,
+        invitationExpiresAt:record.actualExpiry,
+        deliveryInvitationExpiresAt:record.delivery.invitationExpiresAt,
+        releaseStatus:record.releaseStatus,releaseClosesAt:record.releaseClosesAt,
+        now:clock(),
+      })){
         await suppress("invitation_no_longer_active");continue;
       }
       // A published row is not automatically an authorized enrollment.
