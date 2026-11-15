@@ -1,0 +1,227 @@
+import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client";
+import {
+  auditEvents, classroomPersons, domainEvents, enrollments,
+  facilitatedLearningParticipants, facilitatedRoomAttendanceAssertions,
+  learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
+} from "@/db/canonical-v301";
+import { AuthorizationError } from "@/domain/command-context";
+import { facilitatedRoomMaxMs } from "@/domain/facilitated-learning";
+import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
+import {
+  ownedRoom, schoolAttemptIsPlacedAtSite,
+  selfEnrolledNoncreditRoomSitePermitted,
+} from "./facilitated-learning.functions";
+import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
+
+type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Room=Awaited<ReturnType<typeof ownedRoom>>;
+const id=z.string().uuid();
+const roomInput=z.object({facilitatedSessionId:id}).strict();
+const attendanceInput=roomInput.extend({
+  courseAttemptId:id,requestId:id,
+  status:z.enum(["present","absent","unknown"]),
+  method:z.enum(["in_person_roll_call","remote_live_check"]),
+  evidenceNote:z.string().trim().max(250).nullable(),
+}).strict();
+const correctionMs=48*60*60_000;
+
+function guard(){
+  requireFacilitatedLearningEnabled();
+  setResponseHeader("Cache-Control","private, no-store");
+  setResponseHeader("Referrer-Policy","no-referrer");
+}
+/** A paused/ended room does not erase witnessed in-person attendance. Allow
+ * authorized, auditable corrections for 48h after actual/derived session end. */
+export function classroomAttestationOpen(
+  room:{startedAt:Date;endedAt:Date|null},now:Date,
+){
+  const expectedEnd=room.startedAt.getTime()+facilitatedRoomMaxMs;
+  const recordedEnd=room.endedAt
+    ? Math.min(expectedEnd,room.endedAt.getTime()):expectedEnd;
+  return now>=room.startedAt && now.getTime() < recordedEnd+correctionMs;
+}
+async function registeredRoomParticipant(tx:Tx,room:Room,courseAttemptId:string){
+  const [attempt]=await tx.select().from(learnerCourseAttempts).where(and(
+    eq(learnerCourseAttempts.id,courseAttemptId),
+    eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+    eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+    eq(learnerCourseAttempts.status,"active"),
+  )).limit(1);
+  if(!attempt||Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId))
+    throw new AuthorizationError("current registered classroom Course attempt");
+  if(attempt.enrollmentId){
+    const [school]=await tx.select({
+      personId:learnerProfiles.personId,
+    }).from(enrollments).innerJoin(learnerProfiles,
+      eq(learnerProfiles.id,enrollments.learnerId))
+      .where(and(
+        eq(enrollments.id,attempt.enrollmentId),
+        eq(enrollments.deploymentId,room.deploymentId),
+        eq(enrollments.status,"active"),
+      )).limit(1);
+    if(!school || !await schoolAttemptIsPlacedAtSite(
+      tx,attempt.id,room.deploymentId,room.siteId,new Date(),
+    ))throw new AuthorizationError("current school enrollment at this Site");
+    return {personId:school.personId,source:"school" as const};
+  }
+  const [registration]=await tx.select({
+    personId:noncreditRegistrations.participantPersonId,
+    registrationId:noncreditRegistrations.id,
+  }).from(noncreditRegistrations).where(and(
+    eq(noncreditRegistrations.id,attempt.noncreditRegistrationId!),
+    eq(noncreditRegistrations.deploymentId,room.deploymentId),
+    eq(noncreditRegistrations.adoptionId,attempt.adoptionId),
+    eq(noncreditRegistrations.offeringVersionId,attempt.offeringVersionId),
+    inArray(noncreditRegistrations.status,["registered","active"]),
+  )).limit(1);
+  if(!registration||!await selfEnrolledNoncreditRoomSitePermitted(tx,{
+    source:"noncredit",noncreditRegistrationId:registration.registrationId,
+  },room.siteId))throw new AuthorizationError("active noncredit registration for Site");
+  return {personId:registration.personId,source:"noncredit" as const};
+}
+export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
+  .validator((v:unknown)=>roomInput.parse(v))
+  .handler(async({data})=>{
+    guard();const host=await requireCanonicalFacilitator();
+    return db.transaction(async tx=>{
+      const room=await ownedRoom(tx,host,data.facilitatedSessionId);
+      const attempts=await tx.select({id:learnerCourseAttempts.id})
+        .from(learnerCourseAttempts).where(and(
+          eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+          eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+          eq(learnerCourseAttempts.status,"active"),
+        )).limit(301);
+      const eligible:{id:string;personId:string;source:"school"|"noncredit"}[]=[];
+      for(const attempt of attempts.slice(0,300)){
+        try {
+          const person=await registeredRoomParticipant(tx,room,attempt.id);
+          eligible.push({id:attempt.id,...person});
+        }catch(error) {
+          if(!(error instanceof AuthorizationError))throw error;
+        }
+      }
+      const ids=eligible.map(x=>x.id);
+      const [pairs,attestations,persons]=await Promise.all([
+        ids.length?tx.select({
+          attemptId:facilitatedLearningParticipants.courseAttemptId,
+        }).from(facilitatedLearningParticipants).where(and(
+          eq(facilitatedLearningParticipants.facilitatedSessionId,room.id),
+          inArray(facilitatedLearningParticipants.courseAttemptId,ids),
+          isNull(facilitatedLearningParticipants.leftAt),
+        )):Promise.resolve([]),
+        tx.select().from(facilitatedRoomAttendanceAssertions)
+          .where(eq(facilitatedRoomAttendanceAssertions.facilitatedSessionId,room.id))
+          .orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
+            desc(facilitatedRoomAttendanceAssertions.id)).limit(1001),
+        eligible.length?tx.select({
+          id:classroomPersons.id,first:classroomPersons.legalFirstName,
+          last:classroomPersons.legalLastName,preferred:classroomPersons.preferredName,
+        }).from(classroomPersons).where(inArray(classroomPersons.id,eligible.map(x=>x.personId)))
+        :Promise.resolve([]),
+      ]);
+      const paired=new Set(pairs.map(x=>x.attemptId));
+      const name=new Map(persons.map(x=>[x.id,
+        [x.preferred||x.first,x.last].filter(Boolean).join(" ").trim(),
+      ]));
+      const latest=new Map<string,typeof attestations[number]>();
+      for(const a of attestations)if(!latest.has(a.courseAttemptId))
+        latest.set(a.courseAttemptId,a);
+      return {
+        facilitatedSessionId:room.id,
+        attestationsOpen:classroomAttestationOpen(room,new Date()),
+        members:eligible.map(x=>({
+          courseAttemptId:x.id,displayName:name.get(x.personId)??"Registered learner",
+          source:x.source,pairedDevice:paired.has(x.id),
+          latestStatus:latest.get(x.id)?.status??"unknown",
+          latestMethod:latest.get(x.id)?.method??null,
+          lastAssertedAt:latest.get(x.id)?.assertedAt.toISOString()??null,
+        })),
+        partial:attempts.length>300 || attestations.length>1000,
+        notice:"Registered learners, paired devices and facilitator attestation are separate evidence levels. This does not create official school attendance.",
+      };
+    });
+  });
+
+/**
+ * A no-device participant has no phantom facilitated_learning_participant row.
+ * Their existing active Course attempt and exact Site authorization are still
+ * mandatory. The host attests direct observation with an explicit explanation.
+ * Corrections are append-only and preserve all previous assertions.
+ */
+export const attestClassroomParticipation=createServerFn({method:"POST"})
+  .validator((v:unknown)=>attendanceInput.parse(v))
+  .handler(async({data})=>{
+    guard();const host=await requireCanonicalFacilitator();
+    return db.transaction(async tx=>{
+      const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
+      if(!classroomAttestationOpen(room,new Date()))
+        throw new AuthorizationError("attestation window is closed");
+      const subject=await registeredRoomParticipant(tx,room,data.courseAttemptId);
+      const [paired]=await tx.select({
+        personId:facilitatedLearningParticipants.participantPersonId,
+      }).from(facilitatedLearningParticipants).where(and(
+        eq(facilitatedLearningParticipants.facilitatedSessionId,room.id),
+        eq(facilitatedLearningParticipants.courseAttemptId,data.courseAttemptId),
+        isNull(facilitatedLearningParticipants.leftAt),
+      )).limit(1);
+      if(paired && paired.personId!==subject.personId)
+        throw new AuthorizationError("mismatched paired classroom identity");
+      const [sameRequest]=await tx.select().from(facilitatedRoomAttendanceAssertions)
+        .where(and(
+          eq(facilitatedRoomAttendanceAssertions.facilitatedSessionId,room.id),
+          eq(facilitatedRoomAttendanceAssertions.requestId,data.requestId),
+        )).limit(1);
+      if(sameRequest){
+        if(sameRequest.courseAttemptId!==data.courseAttemptId ||
+          sameRequest.facilitatorPersonId!==host.actor.actorPersonId ||
+          sameRequest.status!==data.status || sameRequest.method!==data.method ||
+          sameRequest.evidenceNote!==data.evidenceNote)
+          throw new Error("Conflicting attendance evidence retry");
+        return {saved:true,duplicate:true,noDeviceEvidence:!paired};
+      }
+      const [previous]=await tx.select({
+        status:facilitatedRoomAttendanceAssertions.status,
+        method:facilitatedRoomAttendanceAssertions.method,
+      }).from(facilitatedRoomAttendanceAssertions).where(and(
+        eq(facilitatedRoomAttendanceAssertions.facilitatedSessionId,room.id),
+        eq(facilitatedRoomAttendanceAssertions.courseAttemptId,data.courseAttemptId),
+      )).orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
+        desc(facilitatedRoomAttendanceAssertions.id)).limit(1);
+      const correction=!!previous &&
+        (previous.status!==data.status || previous.method!==data.method);
+      if((!paired || correction) && (!data.evidenceNote || data.evidenceNote.length<15))
+        throw new AuthorizationError(
+          "document direct verification for no-device participation and corrections",
+        );
+      const [saved]=await tx.insert(facilitatedRoomAttendanceAssertions).values({
+        facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
+        facilitatorPersonId:host.actor.actorPersonId!,requestId:data.requestId,
+        status:data.status,method:data.method,evidenceNote:data.evidenceNote,
+      }).returning({id:facilitatedRoomAttendanceAssertions.id});
+      if(!saved)throw new Error("Could not record attendance verification");
+      const payload={
+        facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
+        status:data.status,method:data.method,noDevice:!paired,
+        correction,
+      };
+      await tx.insert(auditEvents).values({
+        actorPersonId:host.actor.actorPersonId!,
+        owningOrganizationId:host.organizationId,
+        eventCode:correction?"learning.classroom.attendance.corrected":
+          "learning.classroom.attendance.attested",
+        entityKind:"facilitated_room_attendance_assertion",entityId:saved.id,
+        payload,
+      });
+      await tx.insert(domainEvents).values({
+        eventType:correction?"ClassroomAttendanceCorrected":"ClassroomAttendanceAttested",
+        aggregateType:"facilitated_room_attendance_assertion",aggregateId:saved.id,
+        actorPersonId:host.actor.actorPersonId!,payload,
+      });
+      return {saved:true,duplicate:false,noDeviceEvidence:!paired,corrected:correction,
+        notice:"Independent facilitator attestation, not official academic attendance or grant eligibility."};
+    });
+  });
