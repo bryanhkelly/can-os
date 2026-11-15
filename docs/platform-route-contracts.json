@@ -814,6 +814,24 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/launch.site.tsx",
+      "route": "/launch/site",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "Verified registrar chooses or creates a Site; delivery, network option and private program interest chips lead to the real website preview",
+      "writeBoundary": "New Site creation and private preferences use existing verified organization and Site-scoped commands; no Program, network or enrollment grants",
+      "readBoundary": "Existing Site list is scoped to the active registrar grant; preferences are read and saved for exact authorized Site"
+    },
+    {
+      "file": "src/routes/launch.site-preview.ts",
+      "route": "/launch/site-preview",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Authorized Site operator sees a private iframe preview rendered by the canonical Site website engine with proposed interests visibly distinguished from approved offerings",
+      "writeBoundary": "GET only; no Site publication, Program mutation, enrollment or form submission",
+      "readBoundary": "Exact Site and verified registrar membership, owned Site publication reservation; approved-only Program catalogs and private Site-owned design; no-store noindex and same-origin frame"
+    },
+    {
       "file": "src/routes/launch.school.tsx",
       "route": "/launch/school",
       "owner": "programs",
