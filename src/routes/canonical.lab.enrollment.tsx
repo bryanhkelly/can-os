@@ -36,6 +36,16 @@ function EnrollmentLabContent({ trainings }: {
   return <WorkspaceShell width="wide" eyebrow="Internal · Enrollment experience"
     title="Enrollment" subtitle="One registration experience for noncredit training, adult education, community programs and youth learning. School admission remains a separate verified family journey.">
     <CapabilityLabNav current="enrollment"/>
+    <section className="mt-5 border border-border bg-card p-5">
+      <h2 className="font-serif text-xl">Production enrollment is separate from this preview</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        The live provider release command, published enrollment windows, independent account registration and My courses now have their own routes. This lab remains a read-only design preview.
+      </p>
+      <div className="mt-4 flex flex-wrap gap-5 text-sm">
+        <Link to="/programs/noncredit/enrollment" className="font-semibold text-primary underline underline-offset-4">Manage provider enrollment releases</Link>
+        <Link to="/learn/enroll" search={{}} className="font-semibold text-primary underline underline-offset-4">Open learner registration</Link>
+      </div>
+    </section>
     <section className="mt-6 border border-border bg-card p-5">
       <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Experience design · Not live registration</p>
       <h2 className="mt-2 font-serif text-2xl">Who is learning?</h2>
