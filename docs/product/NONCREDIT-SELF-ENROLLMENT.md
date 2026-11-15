@@ -8,7 +8,7 @@
 
 ## Product model
 
-A CAN account is the single person-owned identity, independent of school admissions. A provider creates an explicit, versioned, public **enrollment release** from an independently approved canonical deployment, adopted Offering version, published training/Course version and effective provider-approved completion policy.
+A CAN account is the single person-owned identity, independent of school admissions. A provider creates an explicit, versioned, public **enrollment release** from an independently approved **active** canonical deployment, adopted Offering version, published training/Course version and effective provider-approved completion policy.
 
 For the proposed partner pilots, the one-hour leadership session and four-week digital-skills course are **two trainings and two enrollment releases**, not two registration applications. The same registration workflow works for any future adult, workforce, veterans or community noncredit program. Do not create fixture pilots in production.
 
@@ -36,7 +36,7 @@ One canonical learner grant is added **only** for the releasing registering/oper
 
 The self-registration server obtains actor and Person from the trusted server session, never the request body. It serializes each release's capacity and each CAN account's native mapping, then locks the release and rechecks:
 
-1. Current published release, inside its registration window, under the same exact deployment/adoption/offering/training/Course.
+1. Current published release, inside its registration window, under the same exact **active** deployment/adoption/offering/training/Course.
 2. Active operation, provider and registering Organization, authorized deployment, current approved adoption, published Offering/Course and independently approved published training.
 3. Active approved registering-Organization operator relationship, and, for facilitated releases, active Site with a valid deployment + operation Site relationship.
 4. Published effective immutable completion policy; a release-specific capacity slot; consent version/text SHA matches the server projection.
@@ -50,8 +50,8 @@ For facilitated claims, **room pairing and room-status reads** check the exact r
 
 ## Security and validation
 
-- Both new canonical release and claim tables, and the legacy/canonical bridge, have RLS enabled. The restricted native auth reader has no raw SELECT to any of them.
-- Consent is a signed-in, timestamped **record of user acceptance** of the immutable displayed terms, not a cryptographic user signature. Email verification proves mailbox access, not legal age or identity.
+- Both new canonical release and claim tables, and the legacy/canonical bridge, have **forced RLS** with a restricted trusted-owner policy. The restricted native auth reader has no raw SELECT to any of them.
+- Consent is a signed-in, timestamped **record of user acceptance** that is also database-verified against the immutable text/version SHA of the immutable displayed terms, not a cryptographic user signature. Email verification proves mailbox access, not legal age or identity.
 - Native session default expiry is 12 h with a 30-minute idle check; only actual trusted pointer/keyboard interaction can extend idle life. Page rendering, timers and video position alone cannot extend it.
 - GETs are no-store for private data; published course catalog is public cached briefly. A valid logged-in Person sees only their own linked registration. Reopening a course requires current source registration/adoption/deployment authority.
 - Operator-published release, capacity and consent evidence is separate from network affiliation, Site favorites and sponsored referral attribution.
