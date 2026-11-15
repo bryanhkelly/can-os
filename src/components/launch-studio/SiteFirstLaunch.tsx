@@ -50,7 +50,6 @@ export function SiteFirstLaunch({options}:{options:Options}) {
   const siteName=known?.name??name;
   const siteCity=known?.planningLocation?.city??city;
   const siteState=known?.planningLocation?.state??state;
-  const previews=interests.filter(x=>chosen.includes(x.id));
 
   async function saveSite(e:FormEvent) {
     e.preventDefault();
@@ -164,34 +163,49 @@ export function SiteFirstLaunch({options}:{options:Options}) {
     </section>}
     {step===3&&<section className="mt-6 space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border bg-card p-5">
-        <div><p className="text-xs font-bold uppercase tracking-wider text-primary">Private concept preview</p><h2 className="mt-1 font-serif text-3xl">Your Site is taking shape.</h2>
-          <p className="mt-2 text-sm text-muted-foreground">This is a private concept based on your choices. It is not the published website or an open enrollment catalog.</p></div>
-        <button type="button" onClick={backward} className="text-sm font-semibold text-primary underline">Edit interests</button>
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-primary">Live Site renderer · private preview</p>
+          <h2 className="mt-1 font-serif text-3xl">Your Site is taking shape.</h2>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">This uses your Site's actual website design engine and saved plans. Proposed interests are marked as such. Your Site is not published and enrollment is not open by default.</p>
+        </div>
+        <Button type="button" variant="outline" onClick={backward}>Edit interests</Button>
       </div>
       <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <div className="overflow-hidden border bg-card">
-          <div className="flex items-center justify-between gap-2 border-b bg-muted px-5 py-3 text-xs"><span>Private preview · {siteName}</span><span className="font-semibold text-warning">Not published</span></div>
-          <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-5"><strong className="font-serif text-2xl">{siteName}</strong><span className="text-xs text-muted-foreground">About · Programs · Community · Contact</span></header>
-          <div className="bg-[#183D35] p-8 text-white sm:p-12"><p className="text-xs font-semibold uppercase tracking-widest text-[#EAD9A6]">Learn · Grow · Belong</p>
-            <h3 className="mt-5 max-w-lg font-serif text-4xl leading-tight sm:text-5xl">A place to learn and grow together.</h3>
-            <p className="mt-4 max-w-md text-sm leading-6 text-white/85">Learning and opportunity for your community. Explore the experiences this Site is considering.</p>
-            <span className="mt-6 inline-block border border-[#EAD9A6] px-5 py-3 text-xs font-bold text-[#EAD9A6]">Explore proposed programs</span>
+        <section className="overflow-hidden border bg-card" aria-label="Real private website preview">
+          <div className="flex items-center justify-between border-b bg-muted px-5 py-3 text-xs">
+            <span>Canonical website preview · {siteName}</span>
+            <span className="font-semibold text-warning">Private · not published</span>
           </div>
-          <div className="p-6 sm:p-8"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Your learning community</p><h3 className="mt-2 font-serif text-3xl">What we're exploring</h3>
-            {previews.length?<div className="mt-5 grid gap-3 sm:grid-cols-2">{previews.map(item=><article key={item.id} className="border p-5"><item.icon className="size-5 text-primary"/><h4 className="mt-4 font-semibold">{item.title}</h4><p className="mt-2 text-xs text-muted-foreground">{item.detail}</p><span className="mt-4 inline-block text-xs font-semibold text-muted-foreground">Proposed · Not enrolling</span></article>)}</div>
-              :<p className="mt-4 text-sm text-muted-foreground">Programs will appear as you select them in your workspace.</p>}
-          </div>
-        </div>
-        <aside className="space-y-4 border bg-card p-6"><p className="text-xs font-bold uppercase tracking-widest text-primary">Your Site</p><h3 className="font-serif text-3xl">{siteName}</h3>
+          {siteId ? <iframe title={`Private rendered website preview for ${siteName}`}
+            src={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
+            className="block min-h-[820px] w-full border-0 bg-white"
+            sandbox="allow-same-origin" referrerPolicy="no-referrer"
+          /> : <p role="alert" className="p-6">Save a Site before opening its website preview.</p>}
+        </section>
+        <aside className="self-start space-y-5 border bg-card p-6">
+          <p className="text-xs font-bold uppercase tracking-widest text-primary">Your Site</p>
+          <h3 className="font-serif text-3xl">{siteName}</h3>
           <p className="text-sm text-muted-foreground">{siteCity}{siteCity&&siteState?", ":""}{siteState} · {delivery==="both"?"Physical and digital":delivery==="physical"?"Physical":"Digital"}</p>
-          <p className="text-xs text-muted-foreground">{networkChoice==="independent"?"Operating independently":networkCode?"Network code captured in this preview only; verification pending":"Network affiliation not verified"}</p>
-          <hr/><h4 className="font-semibold">Continue your launch</h4>
-          <p className="text-sm text-muted-foreground">Website & Brand Studio manages the saved design. The existing Launch Hub is the next preparation workspace; individual program and enrollment activations still require their own authorization.</p>
+          <p className="text-sm text-muted-foreground">{chosen.length} proposed interests selected. Adding real approved Offerings is a separate step.</p>
+          <p className="border-l-2 border-warning bg-muted p-4 text-xs">
+            {networkChoice==="independent"?"Independent operation.":networkCode?"Network code entered but not submitted or approved.":"Network affiliation is not verified."} A code does not unlock network-owned programs.
+          </p>
+          <hr/>
+          <h4 className="font-semibold">Continue your launch</h4>
           <div className="space-y-3">
-            {siteId&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border border-primary px-4 text-sm font-semibold text-primary">Customize website <ArrowRight className="size-4"/></Link>}
-            {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">Continue to Launch Hub <ArrowRight className="size-4"/></Link>}
+            <Link to="/canonical/blueprints" search={{}} className="flex min-h-11 items-center justify-between border bg-primary px-4 text-sm font-semibold text-primary-foreground">
+              Build programs & Offerings <ArrowRight className="size-4"/>
+            </Link>
+            {siteId&&<Link to="/launch/website" search={{siteId,returnToHub:true}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+              Customize website <ArrowRight className="size-4"/>
+            </Link>}
+            {siteId&&<Link to="/launch/hub/school" search={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
+              Prepare Site & enrollment <ArrowRight className="size-4"/>
+            </Link>}
           </div>
-          <p className="border-l-2 border-warning bg-muted p-4 text-xs leading-5">Your delivery choices and program interests are saved as private Site planning data. A network code is not saved or verified here. This concept is not an active website or registration page.</p>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Blueprint Studio checks its own canonical account and Site memberships. It will ask you to choose an authorized canonical Site. Website Studio has separate editor permissions. No Site or Program rights are granted by these links.
+          </p>
         </aside>
       </div>
     </section>}
