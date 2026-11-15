@@ -7,6 +7,7 @@ import { processPendingDomainEvents } from "./domain-event-worker";
 import { processScheduledReminders } from "./reminder-worker";
 import { processInterestEventEmailDeliveries } from "./interest-event-email-worker";
 import {runSessionDeviceRetention} from "./session-device-retention";
+import {processNoncreditWaitlistEmailDeliveries} from "@/modules/enrollment/noncredit-waitlist-delivery.server";
 
 /**
  * Existing periodic processor for restricted safeguarding handoffs and the outbox.
@@ -23,6 +24,7 @@ export async function runScheduledJobs(): Promise<{
   reminders: number;
   deliveries: number;
   schoolFamilyDeliveries: number;
+  noncreditWaitlistEmails: { accepted:number; suppressed:number; failed:number };
   digests: number;
   recovered: number;
   escalated: number;
@@ -33,6 +35,7 @@ export async function runScheduledJobs(): Promise<{
 }> {
   const safeguarding = await escalateOverdueSafeguardingConcerns();
   const schoolFamilyDeliveries = await processSchoolFamilyOutboundDeliveries();
+  const noncreditWaitlistEmails = await processNoncreditWaitlistEmailDeliveries();
   const scheduledReminders = await processScheduledReminders();
   const interestEventEmails = await processInterestEventEmailDeliveries();
   const missing = await markOverdueSubmissionsMissing();
@@ -44,5 +47,5 @@ export async function runScheduledJobs(): Promise<{
   const digests = await processWeeklyDigests();
   const expiredSectionOffers = await expireOutstandingSectionOffers();
   const sessionDeviceRetention=await runSessionDeviceRetention();
-  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, schoolFamilyDeliveries, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
+  return { safeguardingEscalated: safeguarding.escalatedCases, safeguardingUnroutable: safeguarding.unroutableCases, missing, processed, recovered, reminders, deliveries, schoolFamilyDeliveries, noncreditWaitlistEmails, digests, escalated, expiredSectionOffers, scheduledReminders, interestEventEmails, sessionDeviceRetention };
 }
