@@ -72,18 +72,21 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const parentInformation = projectApprovedParentInformation({
     site: { name: site.name, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
-    ...(noncreditReleases.length?{
-      noncreditReleases,
-      enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
-    }:{}),
     ...(parentExtras ?? {}),
   });
+  // Canonical release cards belong to the Site renderer, not the parent
+  // information projection. Fetch only after independently approved data
+  // is assembled; the optional read fails closed without breaking preview.
   const noncreditReleases = host ? await readOptionalSiteNoncreditReleases(site.id) : [];
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
     parentInformation, media,
+    ...(noncreditReleases.length ? {
+      noncreditReleases,
+      enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
+    } : {}),
   } : null;
   const previewPages = previewPage
     ? Object.fromEntries(availablePublicSitePaths(previewPage).map(path => [
