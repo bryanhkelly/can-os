@@ -21,7 +21,7 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
   const identity=current?current.lessonId+":"+current.assetVersionId:"";
   const resolved=loaded&&loaded.key===identity?resolveClassVideo(loaded.src):null;
   useEffect(()=>{
-    if(!enabled||!current||!identity||loaded?.key===identity)return;
+    if(!enabled||!current||command.data?.roomState!=="live"||!identity||loaded?.key===identity)return;
     let active=true;
     setError("");setManualPlay(false);
     void getFacilitatedRoomMediaAccess({data:{
@@ -30,15 +30,16 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
       if(active)setLoaded({key:identity,src:result.downloadUrl});
     }).catch(()=>{if(active)setError("The selected lesson is unavailable. Recheck approval or rights.");});
     return ()=>{active=false;};
-  },[enabled,identity,current?.lessonId,current?.assetVersionId,loaded?.key,facilitatedSessionId]);
+  },[enabled,current,identity,loaded?.key,facilitatedSessionId,command.data?.roomState]);
   useEffect(()=>{
     const node=player.current;
-    if(!enabled||!node||!current||!loaded||loaded.key!==identity||resolved?.kind!=="file")return;
+    if(!enabled||!node||!current||command.data?.roomState!=="live"||!loaded||loaded.key!==identity||resolved?.kind!=="file")return;
     const seek=()=>{
       if(!Number.isFinite(node.duration)||node.duration<=0)return;
       const drift=current.commandKind==="play"?
         Math.max(0,Math.min(10,(Date.now()-Date.parse(current.issuedAt))/1000)):0;
-      const position=current.positionSeconds+drift;
+      const position=current.commandKind==="stop"?0:current.positionSeconds+drift;
+      if(current.commandKind==="pause")return;
       if(Math.abs(node.currentTime-position)>2)
         node.currentTime=Math.max(0,Math.min(node.duration,position));
     };
@@ -51,7 +52,7 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
     if(node.readyState>=1)apply();
     else node.addEventListener("loadedmetadata",apply,{once:true});
     return ()=>node.removeEventListener("loadedmetadata",apply);
-  },[enabled,current?.id,loaded?.src,identity,resolved?.kind]);
+  },[enabled,current,loaded,identity,resolved?.kind,command.data?.roomState]);
   async function observed(kind:"opened"|"played"|"paused"|"ended"){
     if(!current || !player.current)return;
     try{
@@ -73,12 +74,13 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
       <Button type="button" onClick={()=>setEnabled(true)}>Activate projector playback</Button>
     </div>:<div className="mt-4">
       {command.isError&&<p role="alert">Unable to read projector commands. Verify your facilitator session.</p>}
+      {command.data?.roomState==="ended"&&<p role="status" className="mt-3 text-sm">The facilitator ended this classroom.</p>}
       {!current&&<p role="status" className="flex aspect-video items-center justify-center border border-border">
         Waiting for your facilitator to load a recording.</p>}
       {current&&!resolved&&<p role="status" className="flex aspect-video items-center justify-center border border-border">
         Checking approved playback access…</p>}
       {resolved?.kind==="file"&&<video key={loaded?.key} ref={player} src={resolved.src}
-        playsInline controls preload="none" className="aspect-video w-full bg-black"
+        playsInline controls preload="metadata" className="aspect-video w-full bg-black"
         onLoadedMetadata={()=>{void observed("opened");}}
         onPlay={()=>{void observed("played");}}
         onPause={e=>{if(!e.currentTarget.ended)void observed("paused");}}
