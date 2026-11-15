@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isPublicSiteSlug, publicSiteHost } from "@/domain/public-site-address";
-import { getSitePublicationDraftView, renameSitePublicIdentity, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability } from "@/modules/sites/site-publication.functions";
+import { getSitePublicationDraftView, renameSitePublicIdentity, reserveSitePublicationAddress, setSitePublicationStatus, verifySitePublicationReachability, verifySiteEnrollmentHandoff } from "@/modules/sites/site-publication.functions";
 import { AcademicProgramMarketingEditor } from "@/components/sites/AcademicProgramMarketingEditor";
 import { SitePublicPeopleReviewPanel } from "@/components/operations/SitePublicPeopleReviewPanel";
 import { FamilyServicesSetupPanel } from "@/components/operations/FamilyServicesSetupPanel";
@@ -44,6 +44,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   const [reachability, setReachability] = useState<"live" | "unreachable" | "hosting_disabled" | "not_published" | null>(null);
   const [previewPath, setPreviewPath] = useState("/");
   const [verifying, setVerifying] = useState(false);
+  const [sourceSha, setSourceSha] = useState("");
+  const [handoffBusy, setHandoffBusy] = useState(false);
+  const [handoff, setHandoff] = useState<Awaited<ReturnType<typeof verifySiteEnrollmentHandoff>> | null>(null);
   const [schoolName, setSchoolName] = useState(data.site.name);
   const [newSlug, setNewSlug] = useState(data.address?.slug ?? "");
   const [renameReason, setRenameReason] = useState("");
@@ -113,6 +116,20 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
     } finally { setVerifying(false); }
   }
 
+  async function verifyEnrollmentHandoff(){
+    if(handoffBusy)return;
+    setHandoffBusy(true);setError("");setHandoff(null);
+    try{
+      const result=await verifySiteEnrollmentHandoff({data:{
+        siteId:data.site.id,
+        ...(sourceSha.trim()?{expectedSourceRevision:sourceSha.trim().toLowerCase()}:{}),
+      }});
+      setHandoff(result);
+    }catch(cause){
+      setError(mutationErrorMessage(cause,"Unable to verify this Site's deployment and registration destination."));
+    }finally{setHandoffBusy(false);}
+  }
+
   const hasApprovedPublicContent = data.catalogPreview.length > 0 ||
     data.academicPrograms.some(program => program.marketing?.catalogEligible);
   const candidate = isPublicSiteSlug(slug)
@@ -158,6 +175,33 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         <span className="pb-2 text-sm text-muted-foreground">.{data.publicSiteDomain}</span>
         <Button type="submit" disabled={saving}>{saving ? "Reserving…" : "Reserve address"}</Button>
       </form>}
+    </section>
+    <section className="mt-6 border bg-card p-5" aria-label="Enrollment and deployment readiness">
+      <h2 className="text-xl font-semibold">Enrollment &amp; deployment verification</h2>
+      <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+        Check the actual HTTPS Site address, CAN registration application, and the source revision serving visitors.
+        A saved publication record or a GitHub commit does not prove the Site is live.
+      </p>
+      <label className="mt-5 block max-w-xl text-sm font-semibold">
+        Expected `main` commit SHA
+        <Input className="mt-2" value={sourceSha} maxLength={40}
+          onChange={event=>setSourceSha(event.target.value.trim())}
+          placeholder="40-character Git commit (required to verify exact deployment)"/>
+      </label>
+      <Button className="mt-3" type="button" disabled={handoffBusy||saving||
+        (sourceSha.length>0&&!/^[a-f0-9]{40}$/i.test(sourceSha))}
+        onClick={()=>void verifyEnrollmentHandoff()}>
+        {handoffBusy?"Checking live delivery…":"Verify enrollment destination"}
+      </Button>
+      {handoff&&<div className="mt-5 space-y-2 border-t pt-4 text-sm" role="status">
+        <p><strong>Site website:</strong> {handoff.website.status} · {handoff.website.diagnostic}</p>
+        <p><strong>CAN registration application:</strong> {handoff.application.status} · {handoff.application.diagnostic}</p>
+        <p><strong>Registration route:</strong> {handoff.application.routeStatus}</p>
+        <p><strong>Live source revision:</strong> <code>{handoff.application.deployedSourceRevision??"Not independently reported"}</code></p>
+        <p className="font-semibold">{handoff.ready
+          ?"Published host, enrollment destination and exact source revision verified."
+          :"Release not accepted. Review the failed or incomplete checks above."}</p>
+      </div>}
     </section>
     <section className="mt-6 rounded-xl border bg-card p-5" aria-label="Custom domain settings">
       <h2 className="text-xl font-semibold">Custom domain</h2>
