@@ -132,6 +132,81 @@ room close, seven-day expiry and cross-person attempts; and aggregation
 suppression with four vs five distinct people. Use synthetic test01 data
 and never run fixture-writing browser tests against production.
 
+## Release 1–2 application integration (2026-11-14)
+
+The following capabilities are now wired in `main`, pending executable
+acceptance. These are source changes, NOT evidence of a successful deploy:
+
+- `/canonical/lab/facilitated`: private V6.1 facilitator console with room
+  creation, ephemeral QR, Site/Offering-scoped rehearsal, remote projector
+  controls and question release/close
+- `/classroom/$sessionId/presentation`: chrome-free shared-screen projection;
+  only current question, options and playback commands; no learner PII/answers
+- `/join`: typed code or local QR hash handoff; fragment is consumed and
+  cleared; reuses signed-in own Course attempts and existing pairing API
+- `/classroom/companion`: private live prompts/answers and observed presence;
+  idempotent response retry keys, current enrollment/Site/room checks, distinct
+  post-session feedback already in main
+- Server media authority checks current learner Source, Site placement, current
+  approved adoption, published Course rights and current room status for **all**
+  paired learners; native R2 signed media plus allowlisted YouTube/Vimeo embeds
+- Private projector commands and observed playback remain separate evidence;
+  source polling stops on revoked rights/expired rooms or network/auth errors
+- Facilitator rehearsal requires current Site and explicit approved adoption,
+  and does not invent a Course attempt or learning outcome
+- Existing Neon `main` and `test01` have required evidence tables. Source SQL
+  patches, read models and guarded schema checker are checked into GitHub
+
+Focused commands to run with a real installed repository and disposable branch:
+
+```bash
+npm ci
+npm run test:classroom:unit
+npm run typecheck
+npm run lint
+npm run build
+# Must point DATABASE_URL/TEST_DATABASE_URL to the SAME explicitly isolated test branch.
+npm run test:classroom:browser
+# Read-only schema check, explicitly against a NONPRODUCTION database:
+CAN_CLASSROOM_SCHEMA_VALIDATION=1 npm run db:canonical:classroom-schema
+```
+
+These commands have NOT been observed passing in the connected environment.
+GitHub Actions is still not furnishing an executable status and the live Netlify
+site has not been updated to the matching GitHub SHA. Deployed native restricted
+reader credentials are also unconfigured due Netlify permission denial.
+
+### Mandatory signed-in journey matrix before marking pilot-ready
+
+1. Facilitator A creates a room at Site A. Facilitator B at Site B cannot read
+   that room's command, question or playback data.
+2. Five or more learners sign into their own Course attempts, scan QR/enter
+   code, pair, and submit a choice/text response. Cross-Site school learner,
+   withdrawn registration, revoked facilitator and expired code must be denied.
+3. Validate exact same-session response retry after a simulated network timeout,
+   including retry after the facilitator has closed the question. Repeated
+   answers must remain distinct formative evidence and never official grades.
+4. Test 45-second active-device observations, hiding tabs, dropped connections,
+   rejoining, and voluntary leaving, without fabricating verified attendance.
+5. Test Course A/Offering adoption A and mixed adoption B. A learner whose
+   adoption or Site placement is withdrawn must stop new signed media URLs and
+   projector playback; wrong-rights media and external arbitrary URLs denied.
+6. Open the projector from an ephemeral code and validate it has no learner
+   names, answers, member identifiers, or attendance. Restart or expire room
+   while projector is playing; playback stops, with denial on authorization
+   or network refresh error.
+7. Rehearse an approved Course before any participant enrollment, including
+   approved R2 video and allowlisted YouTube/Vimeo; no room participation,
+   presence, attendance or learner completion rows may be written.
+8. Verify private learner feedback and Site-scoped aggregate reporting remain
+   separate from activity response counts, attendance decisions and funding.
+9. Repeat sessions over four weeks without duplicating account, learner,
+   registration or Course attempt identity. Scheduling, manual attendance and
+   rollup/export remain separate upcoming workstreams.
+
+No broad production rollout or sponsor-facing claims should be based solely on
+the anonymous QR smoke tests or source-code checks.
+
 ## Flag-free product availability (2026-11-14)
 
 Learning and facilitated-delivery handlers no longer consult environment
