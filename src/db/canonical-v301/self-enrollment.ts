@@ -26,7 +26,7 @@ export const noncreditSelfEnrollmentReleases = educationV30.table("noncredit_sel
   closedAt: timestamp("closed_at",{withTimezone:true}),
   createdAt: timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
 }, t => [
-  index("noncredit_self_enroll_provider_idx").on(t.registeringOrganizationId,t.status,t.createdAt),
+  index("noncredit_self_enroll_registering_idx").on(t.registeringOrganizationId,t.status,t.createdAt),
 ]);
 
 export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_enrollment_claims", {
@@ -42,7 +42,7 @@ export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_
   referralCode: text("referral_code"),
   createdAt: timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
 }, t => [
-  uniqueIndex("noncredit_self_claim_registration_uq").on(t.registrationId),
+  uniqueIndex("noncredit_self_enrollment_claims_registration_id_key").on(t.registrationId),
   uniqueIndex("noncredit_self_claim_person_release_uq").on(t.releaseId,t.participantPersonId),
 ]);
 
