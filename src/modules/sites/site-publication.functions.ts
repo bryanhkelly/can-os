@@ -5,6 +5,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { changeSitePublication, changeSitePublicIdentity, getSitePublicationDraft, reserveSitePublicAddress } from "./site-publication.server";
 import { changeAcademicProgramPublication } from "./academic-program-publication.server";
 import { checkPublishedSiteReachability } from "./public-host-reachability";
+import { checkEnrollmentAppReachability } from "./app-enrollment-reachability.server";
 
 const uuid = z.string().uuid();
 
@@ -81,4 +82,33 @@ export const verifySitePublicationReachability = createServerFn({ method: "POST"
       published: draft.address?.status === "published",
       hostingConfigured: draft.hostingConfigured,
     });
+  });
+
+/** A published Site URL, registration destination and deployed source revision
+ * have distinct independent checks. This command grants no publishing rights
+ * or new enrollment and does not trust user-supplied origins.
+ */
+export const verifySiteEnrollmentHandoff = createServerFn({method:"POST"})
+  .validator((v:unknown)=>z.object({
+    siteId:uuid,
+    expectedSourceRevision:z.string().regex(/^[a-f0-9]{40}$/i).optional(),
+  }).strict().parse(v))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const draft=await getSitePublicationDraft(await getCommandContext(getRequest()),data.siteId);
+    const [website,application]=await Promise.all([
+      checkPublishedSiteReachability({
+        host:draft.address?.host??null,
+        published:draft.address?.status==="published",
+        hostingConfigured:draft.hostingConfigured,
+      }),
+      checkEnrollmentAppReachability({
+        configuredOrigin:process.env.CAN_ACCESS_PUBLIC_ORIGIN,
+        expectedSourceRevision:data.expectedSourceRevision??null,
+      }),
+    ]);
+    return {
+      website,application,
+      ready:website.status==="live"&&application.status==="verified",
+    };
   });
