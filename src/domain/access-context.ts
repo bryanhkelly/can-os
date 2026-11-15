@@ -66,6 +66,10 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
 export function resolveAccessContext(principal: SessionPrincipal, grants: readonly VerifiedAccessGrant[]): AccessContext {
  const grant = grants.find(g => g.id === principal.activeGrantId && g.accountId === principal.accountId && g.active);
  if (!grant || !Object.hasOwn(roleCapabilities,grant.role)) throw new AuthorizationError("active membership");
+ // A personal login must never be reinterpreted as site-wide access even if
+ // a malformed database row is later introduced.
+ if (grant.role === "account_holder" && (grant.organizationId !== null || grant.siteId !== null))
+  throw new AuthorizationError("account-only scope");
  return {
   accountId: principal.accountId,
   sessionId: principal.sessionId,
