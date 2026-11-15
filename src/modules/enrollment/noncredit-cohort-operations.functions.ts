@@ -8,7 +8,7 @@ import {
   facilitatedClassroomPlans,facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts,noncreditCompletionDecisions,
   noncreditRegistrations,noncreditSelfEnrollmentClaims,noncreditReleasedSeats,
-  noncreditEnrollmentWaitlist,
+  noncreditEnrollmentWaitlist,noncreditWaitlistEmailDeliveries,
   noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
@@ -326,6 +326,11 @@ export const inviteNextNoncreditWaitlist=createServerFn({method:"POST"})
       await tx.update(noncreditEnrollmentWaitlist).set({
         status:"invited",invitedAt:now,inviteExpiresAt:until,updatedAt:now,
       }).where(eq(noncreditEnrollmentWaitlist.id,next.id));
+      // Enqueue atomically with the 48h hold. Delivery occurs post-commit
+      // through a leased, retryable worker, never inside this transaction.
+      await tx.insert(noncreditWaitlistEmailDeliveries).values({
+        waitlistId:next.id,invitationExpiresAt:until,
+      }).onConflictDoNothing();
       const payload={releaseId:release.id,waitlistId:next.id,
         invitationExpiresAt:until.toISOString(),expiredPriorHolds:expired.length};
       await tx.insert(auditEvents).values({
@@ -339,6 +344,6 @@ export const inviteNextNoncreditWaitlist=createServerFn({method:"POST"})
         aggregateType:"noncredit_enrollment_waitlist",
         aggregateId:next.id,actorPersonId:provider.actor.actorPersonId!,payload,
       });
-      return {invited:true,waiting:true,inviteExpiresAt:until.toISOString()};
+      return {invited:true,waiting:true,notificationQueued:true,inviteExpiresAt:until.toISOString()};
     });
   });
