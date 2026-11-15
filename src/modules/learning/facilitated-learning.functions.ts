@@ -8,7 +8,8 @@ import { db } from "@/db/client";
 import {
   auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants,
   contentAssetVersions, courseLessons, courseVersions, courses,
-  enrollments, learnerProfiles, noncreditRegistrations,
+  enrollments, learnerProfiles, noncreditRegistrations, noncreditTrainingVersions,
+  deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses,
   domainEvents,
   educationOperationOrganizationRoles,
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
@@ -292,6 +293,8 @@ async function currentRoomMediaAudience(
   for (const { attempt, participantPersonId } of paired) {
     let sourceCurrent = false;
     let currentRoomSitePlacement = false;
+    if (Boolean(attempt.enrollmentId) === Boolean(attempt.noncreditRegistrationId))
+      throw new AuthorizationError("single current Course participation source");
     if (attempt.enrollmentId) {
       const [school] = await tx.select({ id: enrollments.id }).from(enrollments)
         .innerJoin(learnerProfiles, eq(enrollments.learnerId, learnerProfiles.id))
@@ -307,7 +310,13 @@ async function currentRoomMediaAudience(
       );
     } else if (attempt.noncreditRegistrationId) {
       const [registration] = await tx.select({ id: noncreditRegistrations.id })
-        .from(noncreditRegistrations).where(and(
+        .from(noncreditRegistrations)
+        .innerJoin(noncreditTrainingVersions, and(
+          eq(noncreditTrainingVersions.id, noncreditRegistrations.trainingVersionId),
+          eq(noncreditTrainingVersions.offeringVersionId, attempt.offeringVersionId),
+          eq(noncreditTrainingVersions.state, "published"),
+        ))
+        .where(and(
           eq(noncreditRegistrations.id, attempt.noncreditRegistrationId),
           eq(noncreditRegistrations.deploymentId, room.deploymentId),
           eq(noncreditRegistrations.adoptionId, attempt.adoptionId),
@@ -330,6 +339,28 @@ async function currentRoomMediaAudience(
 
     // A distinct adoption is sufficient to represent an identical delivery
     // policy; every paired Person is still checked for current eligibility.
+    if (!eligibleAdoptions.has(attempt.adoptionId)) {
+      const [approved] = await tx.select({ id: deploymentOfferingAdoptions.id })
+        .from(deploymentOfferingAdoptions)
+        .innerJoin(offeringVersions, and(
+          eq(offeringVersions.id, deploymentOfferingAdoptions.offeringVersionId),
+          eq(offeringVersions.lifecycle, "published"),
+        ))
+        .innerJoin(classroomOfferingCourses, and(
+          eq(classroomOfferingCourses.offeringVersionId, offeringVersions.id),
+          eq(classroomOfferingCourses.courseVersionId, attempt.courseVersionId),
+        ))
+        .where(and(
+          eq(deploymentOfferingAdoptions.id, attempt.adoptionId),
+          eq(deploymentOfferingAdoptions.deploymentId, room.deploymentId),
+          eq(deploymentOfferingAdoptions.offeringVersionId, attempt.offeringVersionId),
+          eq(deploymentOfferingAdoptions.approvalStatus, "approved"),
+          lte(deploymentOfferingAdoptions.validFrom, now),
+          or(isNull(deploymentOfferingAdoptions.validThrough),
+            gt(deploymentOfferingAdoptions.validThrough, now)),
+        )).limit(1);
+      if (!approved) throw new AuthorizationError("current approved Course adoption");
+    }
     eligibleAdoptions.set(attempt.adoptionId, attempt);
   }
   return [...eligibleAdoptions.values()];
