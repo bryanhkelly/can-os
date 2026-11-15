@@ -16,6 +16,7 @@ const tables=[
   "facilitated_room_presence_events","facilitated_room_attendance_assertions",
   "facilitated_room_feedback","facilitated_room_survey_campaigns",
   "facilitated_rehearsal_events","facilitated_room_control_commands",
+  "facilitated_classroom_plans","facilitated_room_assisted_activity_evidence",
 ];
 const views=[
   "facilitated_room_pilot_evidence","facilitated_room_pilot_weekly_evidence",
@@ -36,6 +37,12 @@ const expectedColumns=[
   "facilitated_rehearsal_events.request_id",
   "facilitated_room_control_commands.command_kind",
   "facilitated_room_control_commands.position_seconds",
+  "facilitated_classroom_plans.delivery_session_id",
+  "facilitated_classroom_plans.course_version_id",
+  "facilitated_classroom_plans.facilitated_session_id",
+  "facilitated_room_assisted_activity_evidence.learner_person_id",
+  "facilitated_room_assisted_activity_evidence.facilitator_person_id",
+  "facilitated_room_assisted_activity_evidence.evidence_note",
 ];
 try{
   const [objects,columns,policies,indexes]=await Promise.all([
@@ -59,7 +66,9 @@ try{
       AND indexname IN (
         'facilitated_room_controls_recent_idx','facilitated_room_release_session_time_idx',
         'facilitated_room_responses_room_idx','facilitated_room_presence_room_recent_idx',
-        'facilitated_room_attendance_latest_idx','facilitated_rehearsal_events_site_idx'
+        'facilitated_room_attendance_latest_idx','facilitated_rehearsal_events_site_idx',
+        'facilitated_plans_facilitator_idx','facilitated_plans_site_course_idx',
+        'facilitated_assisted_activity_room_idx','facilitated_assisted_activity_attempt_idx'
       )
     `),
   ]);
@@ -82,6 +91,6 @@ try{
   }
   const have=new Set(columns.rows.map(r=>r.table_name+"."+r.column_name));
   for(const name of expectedColumns)assert(have.has(name),`Missing evidence column ${name}`);
-  assert.equal(indexes.rows.length,6,"Expected room evidence lookup indexes");
-  console.log("Classroom pilot evidence tables, RLS, private views and indexes verified.");
+  assert.equal(indexes.rows.length,10,"Expected Release 1–3 classroom indexes");
+  console.log("Classroom Release 1–3 tables, forced RLS, private views and indexes verified.");
 }finally{await pool.end();}
