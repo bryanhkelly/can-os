@@ -100,6 +100,12 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       <section className="mt-5 border border-border bg-card p-5" aria-label="Current device pairing code">
       <p className="text-sm font-semibold">Share this code or QR with authorized learners</p>
       <ClassroomConnectQr code={code.code} expiresAt={code.expiresAt}/>
+      <Button asChild variant="outline" size="sm" className="mt-3">
+        <a href={`/classroom/${code.roomId}/presentation#pair=${code.code.replaceAll("-", "")}&expires=${encodeURIComponent(code.expiresAt)}`}
+          target="_blank" rel="noopener noreferrer">
+          Launch projector with joining QR
+        </a>
+      </Button>
       <p className="mt-3 text-sm text-muted-foreground">
         Codes are temporary and independently revalidated at pairing time.
         Device pairing is not a verified learner headcount or attendance record.
