@@ -44,7 +44,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           metadata:sites.metadata, organizationName:organizations.name,
         }).from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
           .where(eq(sites.id,ids[0]!)).limit(1);
-        assertSiteSetupScope(actor,site,"program.read");
+        assertSiteSetupScope(actor,site,"program.launch.start");
 
         const [publication]=await db.select({slug:sitePublications.slug})
           .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
