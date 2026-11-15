@@ -129,9 +129,35 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
             gt(siteOrganizationRoles.validThrough,now)),
         ))),
     )).limit(200):[];
+  // Digital/independent Site association does not require a classroom room
+  // or in-person facilitator. It still requires the current operation-to-Site
+  // relationship and this registering organization's operator/host authority.
+  const digitalSites=available.length?await executor.select({
+    deploymentId:programDeployments.id,
+    siteId:educationOperationSites.siteId,
+    siteName:canonicalEnrollmentSites.name,
+  }).from(educationOperationSites)
+    .innerJoin(programDeployments,eq(programDeployments.operationId,educationOperationSites.operationId))
+    .innerJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,educationOperationSites.siteId))
+    .where(and(
+      inArray(programDeployments.id,available.map(row=>row.deploymentId)),
+      inArray(educationOperationSites.siteId,siteIds),
+      eq(canonicalEnrollmentSites.status,"active"),
+      lte(educationOperationSites.validFrom,now),
+      or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+      exists(executor.select({id:siteOrganizationRoles.id}).from(siteOrganizationRoles).where(and(
+        eq(siteOrganizationRoles.siteId,educationOperationSites.siteId),
+        eq(siteOrganizationRoles.organizationId,org),
+        inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+        lte(siteOrganizationRoles.validFrom,now),
+        or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+      ))),
+    )).limit(200):[];
   return available.map(row=>({
     ...row,
     siteOptions:sites.filter(site=>site.deploymentId===row.deploymentId)
+      .map(site=>({id:site.siteId,name:site.siteName})),
+    digitalSiteOptions:digitalSites.filter(site=>site.deploymentId===row.deploymentId)
       .map(site=>({id:site.siteId,name:site.siteName})),
   }));
 }
@@ -180,13 +206,16 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
       if(data.deliveryMode==="facilitated" &&
          !selected.siteOptions.some(option=>option.id===data.siteId))
         throw new AuthorizationError("authorized active Site for facilitated cohort");
+      if(data.deliveryMode==="independent" && data.siteId!==null &&
+         !selected.digitalSiteOptions.some(option=>option.id===data.siteId))
+        throw new AuthorizationError("authorized Site association for online release");
       const [release]=await tx.insert(noncreditSelfEnrollmentReleases).values({
         deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
         trainingVersionId:selected.trainingVersionId,courseVersionId:selected.courseVersionId,
         offeringVersionId:selected.offeringVersionId,
         providerOrganizationId:selected.providerOrganizationId,
         registeringOrganizationId:provider.organizationId,
-        siteId:data.deliveryMode==="facilitated"?data.siteId:null,
+        siteId:data.siteId,
         deliveryMode:data.deliveryMode,status:"published",
         opensAt:new Date(data.opensAt),closesAt:new Date(data.closesAt),
         maxParticipants:data.maxParticipants,
