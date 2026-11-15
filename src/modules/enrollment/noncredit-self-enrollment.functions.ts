@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { z } from "zod";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
-  accountPersonGrants, people,
+  accountPersonGrants,
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons, canonicalSessions,
@@ -19,9 +19,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { canonicalSessionCookie } from "@/domain/canonical-access";
 import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
-import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
-import { getCommandContext } from "@/modules/identity/command-context.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 
@@ -32,36 +30,6 @@ type VerifiedSelfEnrollmentActor = {
   preferredName: string | null; emailVerifiedAt: Date;
 };
 
-export async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollmentActor> {
-  const actor = await getCommandContext(getRequest());
-  // Synthetic demo switching is not acceptable evidence of a unique adult.
-  if (actor.sessionAccountId || !actor.actorPersonId)
-    throw new AuthorizationError("verified individual CAN identity");
-  const [account] = await db.select({
-    email:accessAccounts.emailNormalized,
-    verified:accessAccounts.emailVerifiedAt,
-    disabled:accessAccounts.disabled,
-  }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
-  if (!account || account.disabled || !account.verified || isDemoAccountEmail(account.email))
-    throw new AuthorizationError("verified independent CAN account");
-  // Load session-grant authorization only on the server. A static import here
-  // would expose a .server module to the client route graph in Vite.
-  const { readSessionGrants } = await import("@/modules/identity/session-grants.server");
-  const { grants, demoAccountSwitching } =
-    await readSessionGrants(actor.accountId,account.email);
-  if(demoAccountSwitching || new Set(grants.map(g=>g.personId)).size!==1 ||
-     !grants.some(g=>g.id===actor.grantId&&g.personId===actor.actorPersonId) ||
-     grants.some(g=>g.role==="student"))
-    throw new AuthorizationError("unambiguous adult account");
-  const [person] = await db.select({
-    id:people.id,active:people.active,
-    preferredName:people.preferredName,firstName:people.legalFirstName,
-  }).from(people).where(eq(people.id,actor.actorPersonId)).limit(1);
-  if(!person?.active)throw new AuthorizationError("active account Person");
-  return {accountId:actor.accountId,personId:actor.actorPersonId,
-    email:account.email,preferredName:person.preferredName??person.firstName,
-    emailVerifiedAt:account.verified};
-}
 
 async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActor, now:Date) {
   // An email from an authenticated legacy CAN session is NOT evidence that
@@ -163,6 +131,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
   .validator((value:unknown)=>noncreditEnrollCommand.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     if(!await probeCanonicalAuthReader())
       throw new Error("Secure native learning access is temporarily unavailable");
