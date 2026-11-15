@@ -387,3 +387,24 @@ export type QualificationProgramFitAssessmentRow =
   typeof qualificationProgramFitAssessments.$inferSelect;
 export type QualificationProgramFitReviewRow =
   typeof qualificationProgramFitReviews.$inferSelect;
+
+/** Assessment-scoped resource needs. Codes and descriptions are driven by
+ * qualification definitions and Site observations, not a hard-coded form.
+ * These are reported needs, never independently verified grant claims.
+ */
+export const qualificationResourceNeeds=educationV30.table("qualification_resource_needs",{
+  id:id(),
+  assessmentId:uuid("assessment_id").notNull(),
+  policyRequirementId:uuid("policy_requirement_id"),
+  resourceCode:text("resource_code").notNull(),
+  description:text("description").notNull(),
+  unitCode:text("unit_code").notNull().default("units"),
+  requiredQuantity:numeric("required_quantity").notNull(),
+  availableQuantity:numeric("available_quantity").notNull().default("0"),
+  estimatedUnitCostCents:bigint("estimated_unit_cost_cents",{mode:"number"}),
+  currency:text("currency").notNull().default("USD"),
+  evidenceVersionId:uuid("evidence_version_id"),
+  recordedByPersonId:uuid("recorded_by_person_id").notNull(),
+  recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().defaultNow(),
+  status:text("status").$type<"reported"|"verified"|"fulfilled"|"cancelled">().notNull().default("reported"),
+});
