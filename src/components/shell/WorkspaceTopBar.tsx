@@ -54,7 +54,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
       {member
         ? <Button ref={switcherRef} variant="outline" disabled={changing} aria-haspopup="dialog"
           aria-expanded={switcherOpen} onClick={onOpenSwitcher}
-          className="mr-auto flex h-auto min-w-0 max-w-[22rem] shrink items-center justify-start gap-2 rounded-xl border-border/70 bg-background px-3 py-1.5 text-left">
+          className="mr-auto flex h-auto min-w-0 max-w-[22rem] shrink items-center justify-start gap-2 rounded-none border-border/70 bg-background px-3 py-1.5 text-left">
           <span className="sr-only">Switch workspace:</span>{" "}
           <span className="min-w-0">
             <span className="block text-xs font-semibold">{formatWorkspaceRole(member.role)}</span>{" "}
@@ -85,7 +85,7 @@ export function WorkspaceTopBar({ member, sites, authenticated, sessionAvailable
           title={member ? `${member.firstName} ${member.lastName}` : undefined}
           aria-description={member ? `Signed in as ${member.firstName} ${member.lastName}` : undefined}
           onClick={onOpenAccount} className="rounded-full border bg-muted"><UserRound aria-hidden="true" /></Button>
-        : sessionAvailable && <Link to="/access" search={{returnTo}} className="rounded-lg px-2 py-2 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Sign in</Link>}
+        : sessionAvailable && <Link to="/access" search={{returnTo}} className="inline-flex min-h-11 items-center border border-border px-3 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Sign in</Link>}
     </div>
   </header>
   <div className="space-y-2 px-[var(--page-gutter)] empty:hidden [&:not(:empty)]:pt-3">
