@@ -34,6 +34,15 @@ function ExplorePage() {
     actions={<Link to="/account/" className="text-sm font-semibold text-primary underline underline-offset-4">
       My CAN account
     </Link>}>
+    <section className="mt-6 border border-border bg-card p-5">
+      <h2 className="font-serif text-xl">Adult and community training</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Independent and facilitator-led noncredit training has its own published enrollment releases, separate from school admissions and youth enrichment.
+      </p>
+      <Link to="/learn/enroll" search={{}} className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-primary underline underline-offset-4">
+        Explore noncredit training
+      </Link>
+    </section>
     <section aria-label="Search available programs" className="mt-6 border border-border bg-card p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
         <label className="block text-sm font-semibold" htmlFor="explore-query">
