@@ -145,3 +145,38 @@ Do not render a clickable Register CTA to a nonexistent application or enrollmen
 - Publish failures, pending permissions, unavailable restricted database reader and contradictory eligibility lead to explicit 'Not yet open', never fake enrollment.
 
 North-star measurement: proportion of authorized first-time Site operators who reach a meaningful private website preview, then progress to their **first real enrollable offering**. Measure these as distinct funnel milestones; do not reward fake enrollment or fabricated publish states.
+
+## Progressive program discovery: lightweight before website reveal, detailed afterward
+
+Make the **first website reveal** the explicit dividing line between simple discovery and detailed setup.
+
+### Pre-reveal Step 3: "What would you like to offer?"
+
+Collect only broad, optional multi-select intent chips. Suggested short initial set: grades 6–8, grades 9–12, afterschool, summer/breaks, adult learning, senior programs. Keep this fast: no curriculum publisher/source, teaching philosophy, specific course selection, funding, room assignments, operating schedule, cohort dates or capacity questions. Let the user change choices later. These chips reflect **proposed interests**, not approved curricula or live programs. Selecting a grades 6–8 or grades 9–12 interest chip alone does NOT establish an active grades 6–12 academic curriculum or assert school readiness; school classification from a real selected curriculum is evaluated later.
+
+Step ordering remains:
+1. Your Site: minimal Site/Organization and physical/digital capabilities
+2. Network: existing approved association, optional code/request, or continue independently
+3. Your interests: lightweight program category chips
+4. Website reveal: immediately generate an attractive **private preview** with accurate Site identity and clearly identified proposed experiences, and no invented real offering, enrollment date, approval, or public availability.
+
+Do not create canonical Program/Offering/Blueprint records merely from interest chips. Store partial intent as a scoped resumable launch draft. Preview can combine authorized facts with explicit draft plans without publishing either. Avoid an early six-step website design wizard.
+
+### Post-reveal: invite depth rather than require it upfront
+
+Provide three prominent actions:
+- **Build your programs**: refine multi-select dimensions (program format, curriculum grade bands, audience, curriculum approach, content focus), recommend actual published Blueprint/Offering versions, select curriculum source/license later, configure Site adoption/deployment.
+- **Personalize your website**: open the existing seven-design Website & Brand Studio for brand, images, editorial content and approved marketing.
+- **Prepare to enroll**: configure applicable qualification, staff, dates/cohorts, sessions, capacity, agreements/consents, independent approvals and real enrollment releases.
+
+Each action enhances the *same* Site and preview. A user may return to explore without completing activation. The Site's public published catalog must draw from authorized release states and approved copy, not unreviewed intent data.
+
+The aha moment is the early, beautiful, accurate preview. The second aha moment is selecting an approved offering and seeing the same Site website become genuinely enrollable. Measure both milestones separately.
+
+### Product acceptance
+
+- First preview from a minimal Site and 1–3 intent choices without selecting curriculum provider, school setup module, content or schedule.
+- Return after browser reload; preserve a scoped draft and chosen Site.
+- Revisit chips after preview; preview updates without recreating Site or overwriting customized content.
+- No intent chip creates a Program or bestows school classification, legal authorization or a live Register CTA.
+- Exact selected/approved Offering and separately authorized enrollment release produce the appropriate real enroll/apply affordance with current constraints.
