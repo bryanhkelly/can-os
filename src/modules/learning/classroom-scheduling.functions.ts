@@ -141,51 +141,92 @@ export const getClassroomSchedule=createServerFn({method:"GET"})
         note:"A calendar booking is not learner enrollment or verified attendance."};
     });
   });
+type ScheduleCommand=z.infer<typeof scheduleInput>;
+async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,now:Date){
+  const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
+  validateClassroomTimes(startsAt,endsAt,now);
+  const deploymentSiteId=await approvedSiteCourse(
+    tx,host,data.deploymentId,data.courseVersionId,data.siteId,
+  );
+  const [prior]=await tx.select().from(facilitatedClassroomPlans).where(and(
+    eq(facilitatedClassroomPlans.hostOrganizationId,host.organizationId),
+    eq(facilitatedClassroomPlans.facilitatorPersonId,host.actor.actorPersonId!),
+    eq(facilitatedClassroomPlans.requestId,data.requestId),
+  )).limit(1);
+  if(prior){
+    const [delivery]=await tx.select().from(canonicalDeliverySessions)
+      .where(eq(canonicalDeliverySessions.id,prior.deliverySessionId)).limit(1);
+    if(!delivery || prior.deploymentId!==data.deploymentId ||
+      prior.courseVersionId!==data.courseVersionId || prior.siteId!==data.siteId ||
+      delivery.startsAt.getTime()!==startsAt.getTime() ||
+      delivery.endsAt.getTime()!==endsAt.getTime())
+      throw new Error("Conflicting classroom schedule retry");
+    return {planId:prior.id,duplicate:true};
+  }
+  const [delivery]=await tx.insert(canonicalDeliverySessions).values({
+    deploymentId:data.deploymentId,deploymentSiteId,siteId:data.siteId,
+    startsAt,endsAt,modality:"onsite",modalityVocabularyCode:"delivery_modality",
+  }).returning({id:canonicalDeliverySessions.id});
+  if(!delivery)throw new Error("Cannot save classroom delivery session");
+  const [plan]=await tx.insert(facilitatedClassroomPlans).values({
+    deliverySessionId:delivery.id,deploymentId:data.deploymentId,
+    courseVersionId:data.courseVersionId,siteId:data.siteId,
+    hostOrganizationId:host.organizationId,
+    facilitatorPersonId:host.actor.actorPersonId!,
+    requestId:data.requestId,
+  }).returning({id:facilitatedClassroomPlans.id});
+  if(!plan)throw new Error("Cannot save classroom plan");
+  await auditPlan(tx,host,plan.id,"scheduled",{
+    deploymentId:data.deploymentId,siteId:data.siteId,
+    courseVersionId:data.courseVersionId,
+    startsAt:startsAt.toISOString(),endsAt:endsAt.toISOString(),
+  });
+  return {planId:plan.id,duplicate:false};
+}
 export const scheduleClassroom=createServerFn({method:"POST"})
   .validator((raw:unknown)=>scheduleInput.parse(raw))
   .handler(async({data})=>{
     guard();
     const host=await requireCanonicalFacilitator();
-    return db.transaction(async tx=>{
-      const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
-      validateClassroomTimes(startsAt,endsAt,new Date());
-      const deploymentSiteId=await approvedSiteCourse(
-        tx,host,data.deploymentId,data.courseVersionId,data.siteId,
-      );
-      const [prior]=await tx.select().from(facilitatedClassroomPlans).where(and(
-        eq(facilitatedClassroomPlans.hostOrganizationId,host.organizationId),
-        eq(facilitatedClassroomPlans.facilitatorPersonId,host.actor.actorPersonId!),
-        eq(facilitatedClassroomPlans.requestId,data.requestId),
-      )).limit(1);
-      if(prior){
-        const [delivery]=await tx.select().from(canonicalDeliverySessions)
-          .where(eq(canonicalDeliverySessions.id,prior.deliverySessionId)).limit(1);
-        if(!delivery || prior.deploymentId!==data.deploymentId ||
-          prior.courseVersionId!==data.courseVersionId || prior.siteId!==data.siteId ||
-          delivery.startsAt.getTime()!==startsAt.getTime() ||
-          delivery.endsAt.getTime()!==endsAt.getTime())
-          throw new Error("Conflicting classroom schedule retry");
-        return {planId:prior.id,duplicate:true};
+    return db.transaction(tx=>scheduleOneClassroom(tx,host,data,new Date()));
+  });
+
+/** Book a four-week sequence atomically, without creating or switching
+ * enrollments. Every meeting passes the same current host/Course/Site gate.
+ * Stable request IDs make a retried batch idempotent.
+ */
+export const scheduleFourWeekClassrooms=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>z.object({
+    meetings:z.array(scheduleInput).length(4),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    guard();
+    const host=await requireCanonicalFacilitator();
+    const now=new Date();
+    const first=data.meetings[0]!;
+    const ids=new Set<string>();
+    for(const [index,meeting] of data.meetings.entries()){
+      if(meeting.deploymentId!==first.deploymentId||
+        meeting.courseVersionId!==first.courseVersionId||
+        meeting.siteId!==first.siteId||ids.has(meeting.requestId))
+        throw new AuthorizationError("one distinct weekly schedule per authorized Site and Course");
+      ids.add(meeting.requestId);
+      const startsAt=new Date(meeting.startsAt),endsAt=new Date(meeting.endsAt);
+      validateClassroomTimes(startsAt,endsAt,now);
+      if(index>0){
+        const previous=new Date(data.meetings[index-1]!.startsAt).getTime();
+        const week=startsAt.getTime()-previous;
+        if(week<7*86400000-3600000||week>7*86400000+3600000 ||
+          endsAt.getTime()-startsAt.getTime()!==
+            new Date(first.endsAt).getTime()-new Date(first.startsAt).getTime())
+          throw new AuthorizationError("four consecutive weekly meetings with the same duration");
       }
-      const [delivery]=await tx.insert(canonicalDeliverySessions).values({
-        deploymentId:data.deploymentId,deploymentSiteId,siteId:data.siteId,
-        startsAt,endsAt,modality:"onsite",modalityVocabularyCode:"delivery_modality",
-      }).returning({id:canonicalDeliverySessions.id});
-      if(!delivery)throw new Error("Cannot save classroom delivery session");
-      const [plan]=await tx.insert(facilitatedClassroomPlans).values({
-        deliverySessionId:delivery.id,deploymentId:data.deploymentId,
-        courseVersionId:data.courseVersionId,siteId:data.siteId,
-        hostOrganizationId:host.organizationId,
-        facilitatorPersonId:host.actor.actorPersonId!,
-        requestId:data.requestId,
-      }).returning({id:facilitatedClassroomPlans.id});
-      if(!plan)throw new Error("Cannot save classroom plan");
-      await auditPlan(tx,host,plan.id,"scheduled",{
-        deploymentId:data.deploymentId,siteId:data.siteId,
-        courseVersionId:data.courseVersionId,
-        startsAt:startsAt.toISOString(),endsAt:endsAt.toISOString(),
-      });
-      return {planId:plan.id,duplicate:false};
+    }
+    return db.transaction(async tx=>{
+      const plans=[];
+      for(const meeting of data.meetings)
+        plans.push(await scheduleOneClassroom(tx,host,meeting,now));
+      return {plans,created:plans.filter(p=>!p.duplicate).length};
     });
   });
 export const rescheduleClassroom=createServerFn({method:"POST"})

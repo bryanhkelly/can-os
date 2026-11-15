@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { fourWeeklyClassroomWindows } from "@/domain/classroom-scheduling";
 import {
   cancelClassroomPlan, getClassroomSchedule, openScheduledClassroom,
-  rescheduleClassroom, scheduleClassroom,
+  rescheduleClassroom, scheduleClassroom, scheduleFourWeekClassrooms,
 } from "@/modules/learning/classroom-scheduling.functions";
 
 type Choice={
@@ -106,6 +107,29 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
         }});
         delete requestIds.current[key];
       })}>{busy==="new"?"Saving…":"Schedule classroom meeting"}</Button>
+    <Button className="mt-4 ml-2" type="button" variant="outline"
+      disabled={!!busy||!choice||!iso(startsAt)||!iso(endsAt)}
+      onClick={()=>void run("four-week",async()=>{
+        if(!choice)return;
+        const windows=fourWeeklyClassroomWindows(startsAt,endsAt);
+        const key=["four-week",choice.deploymentId,choice.courseVersionId,
+          choice.siteId,startsAt,endsAt].join(":");
+        const meetings=windows.map((window,week)=>{
+          const idKey=key+":"+week;
+          const requestId=requestIds.current[idKey]??crypto.randomUUID();
+          requestIds.current[idKey]=requestId;
+          return {...window,requestId,
+            deploymentId:choice.deploymentId,courseVersionId:choice.courseVersionId,
+            siteId:choice.siteId};
+        });
+        await scheduleFourWeekClassrooms({data:{meetings}});
+        for(let week=0;week<4;week++)delete requestIds.current[key+":"+week];
+      })}>{busy==="four-week"?"Scheduling four weeks…":"Schedule four weekly meetings"}</Button>
+    <p className="mt-2 text-xs text-muted-foreground">
+      The four bookings share one Course and Site, at the selected local time.
+      Scheduling does not enroll learners. Attach them to the correct
+      enrollment release in Cohort & participant management.
+    </p>
     <div className="mt-6 border-t border-border pt-4">
       <h3 className="font-semibold">Upcoming and recent meetings</h3>
       {schedule.isPending&&<p role="status" className="mt-3 text-sm">Loading your authorized calendar…</p>}
