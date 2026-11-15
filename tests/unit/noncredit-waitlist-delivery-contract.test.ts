@@ -1,8 +1,27 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import {currentWaitlistEmailOpportunity} from "@/domain/noncredit-waitlist-email-policy";
 const read=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
 describe("noncredit 48-hour invitation delivery",()=>{
+  it("rejects cancelled, expired, mismatched, or withdrawn invitations",()=>{
+    const now=new Date("2026-11-15T16:00:00Z");
+    const until=new Date(now.getTime()+48*60*60_000);
+    const valid={
+      waitlistStatus:"invited",invitationExpiresAt:until,
+      deliveryInvitationExpiresAt:until,releaseStatus:"published",
+      releaseClosesAt:new Date(until.getTime()+60_000),now,
+    };
+    expect(currentWaitlistEmailOpportunity(valid)).toBe(true);
+    expect(currentWaitlistEmailOpportunity({...valid,waitlistStatus:"accepted"})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,waitlistStatus:"cancelled"})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,invitationExpiresAt:null})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,deliveryInvitationExpiresAt:new Date(until.getTime()-1)})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,now:until})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,releaseStatus:"closed"})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,releaseClosesAt:now})).toBe(false);
+  });
+
   it("creates one transactional outbox receipt with each invite, not a mail send inside a transaction",()=>{
     const api=read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
     expect(api).toContain("tx.insert(noncreditWaitlistEmailDeliveries)");
@@ -12,7 +31,7 @@ describe("noncredit 48-hour invitation delivery",()=>{
   });
   it("rechecks live eligibility and verified adult identity before provider delivery",()=>{
     const worker=read("src/modules/enrollment/noncredit-waitlist-delivery.server.ts");
-    expect(worker).toContain('record.waitlistStatus!=="invited"');
+    expect(worker).toContain("currentWaitlistEmailOpportunity({");
     expect(worker).toContain("record.delivery.invitationExpiresAt");
     expect(worker).toContain("readEligibleSelfEnrollmentReleases(db,record.releaseId)");
     expect(worker).toContain("record.releaseStatus");
