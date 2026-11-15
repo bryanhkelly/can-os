@@ -1,12 +1,57 @@
 # CAN OS canonical database v3.0.1
 
-**Integration decision: net-new only.** Organizations, Sites, Persons,
-identity/session principals, role grants and demo data must be created directly
-in the canonical model. No legacy identity mapping tables, cross-schema record
-bridges, historical-data migration or reliance on existing demo account/Site
-identifiers. Native canonical sign-in, session scope, PostgreSQL permissions and Site selection
-are enforced directly for Blueprint actions. Existing app session code does
-not establish canonical identity.
+**Canonical baseline decision: net-new only.** Organizations, Sites, Persons,
+identity/session principals, role grants and demo data are created directly
+in the canonical model. No legacy ID inference, wholesale historical-data
+migration or reliance on existing demo account/Site identifiers. Native
+canonical sign-in, session scope, PostgreSQL permissions and Site selection
+remain enforced independently for Blueprint actions.
+
+**Narrow additive exception for adult self-enrollment:** The separately reviewed
+`patch-noncredit-self-enrollment.sql` introduces a verified, one-to-one
+`public.access_account_noncredit_principals` link between an existing
+verified My CAN account/Person and a *newly created* canonical learner
+account/Person. It never auto-merges by email, provides no Blueprint/admin
+access, requires current server-side identity checks and adult consent, and
+does not migrate school/guardian/child records. This exception must not be
+generalized to other canonical entities.
+
+### Adult noncredit self-enrollment (additive migration)
+  
+The enrollment page, provider publisher and native learner-session flow depend
+on `patch-noncredit-self-enrollment.sql`. This migration was installed on
+`test01`; it is **not** part of `schema.sql` and must not be assumed present
+on production. It creates no course or registration data.
+
+The patch enables and **forces** row-level security on release, consent and
+bridge tables; the trusted schema owner gets the explicit access policy, while
+the restricted native auth reader is denied direct SELECT. The claim trigger
+binds the release's Course, provider, exact Site, current consent digest and
+participant to the canonical registration. Schema owner permissions cannot be
+silently reused as the public authentication reader.
+
+With an *isolated* acceptance database:
+
+```sh
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/patch-noncredit-self-enrollment.sql
+APP_ENV=test npm run db:canonical:noncredit-self-enrollment
+npm run test:enrollment:unit
+npm run typecheck
+npm run build
+```
+
+**Important:** The patch is additive for a branch that does not yet have
+these tables, but includes named triggers and a composite FK, so do not
+rerun it blindly. Review its current schema state before applying. A user
+cannot enroll until the program is **active**, the course and training are
+published, the Offering adoption is currently approved, a completion policy
+is published/effective, the operator and any facilitated Site are authorized,
+and a provider publishes an enrollment release. A draft or merely authorized
+deployment must not be shown as ready for enrollment.
+
+The live Netlify deploy and production DB remain separate release gates.
+See `docs/product/NONCREDIT-SELF-ENROLLMENT.md`.
 
 ### Repairing the disposable `test01` branch
 
