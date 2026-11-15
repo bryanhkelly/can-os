@@ -13,7 +13,6 @@ import {
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {noncreditEnrollCommand} from "@/domain/noncredit-self-enrollment";
-import {requireVerifiedAdultAccount} from "./noncredit-self-enrollment.functions";
 import {readEligibleSelfEnrollmentReleases} from "./noncredit-self-enrollment-catalog.server";
 
 const waitlistInput=noncreditEnrollCommand.pick({
@@ -32,6 +31,7 @@ export const joinNoncreditWaitlist=createServerFn({method:"POST"})
   .validator((v:unknown)=>waitlistInput.parse(v))
   .handler(async({data})=>{
     privateGuard();
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     return db.transaction(async tx=>{
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
@@ -101,6 +101,7 @@ export const joinNoncreditWaitlist=createServerFn({method:"POST"})
 export const getMyNoncreditWaitlist=createServerFn({method:"GET"})
   .handler(async()=>{
     privateGuard();
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     const rows=await db.select({
       releaseId:noncreditEnrollmentWaitlist.releaseId,
@@ -135,6 +136,7 @@ export const cancelMyNoncreditWaitlist=createServerFn({method:"POST"})
   .validator((v:unknown)=>cancelInput.parse(v))
   .handler(async({data})=>{
     privateGuard();
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     return db.transaction(async tx=>{
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+data.releaseId}))`);
