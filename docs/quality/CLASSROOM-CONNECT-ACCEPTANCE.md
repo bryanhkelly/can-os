@@ -86,6 +86,52 @@ runtime, enabled-feature, browser, or deployment verification. The original
 Phase 2 PR #291 was closed without merge; its activity-response, attestation,
 projector and rehearsal functionality must be ported and accepted separately.
 
+## P1 source fixes committed (2026-11-14)
+
+Four targeted problems were addressed on `main`, **without asserting deployment
+or runtime test success**:
+
+1. **Media authorization:** The facilitator's catalog, signed private video URL
+   and playback observation command now check the currently paired room
+   audience. School learners must have active Enrollment and current placement
+   at the room's exact Site. Noncredit learners require their own current
+   registration in the Deployment. Every distinct audience adoption must
+   independently pass the recorded-track rights, publication and withdrawal
+   checks. No random same-Deployment Course attempt grants media access.
+   For pilot safety, no media may be played until at least one learner pairs;
+   the facilitator UI explains this and offers a refresh. More than 500
+   paired learners currently require a separately designed bulk validation.
+2. **Expiry:** The server projects an explicit `expired` state at eight hours
+   after the room starts. The open browser reevaluates the deadline every
+   15 seconds and hides expired playback/pairing controls. Persisted
+   `state='live'` is not treated as indefinitely usable.
+3. **Availability:** Public capability availability now runs a short-lived,
+   read-only probe using the dedicated restricted Neon login and its
+   session-context function under `SET LOCAL ROLE`. A correctly shaped
+   but unreachable or unauthorized database URL no longer reports ready.
+   Each learner/host command still authorizes the actual session separately.
+4. **Feedback:** The existing `education_v30.facilitated_room_feedback` table
+   (present in both Neon main and test01, with `FORCE ROW LEVEL SECURITY`)
+   is now mapped and wired to authenticated learner companion ratings.
+   A learner may submit/revise only their own three optional 1–5 ratings
+   within seven days after a room finishes, even if they leave early.
+   Participation evidence shows only aggregate ratings where at least five
+   distinct people answered. Feedback never updates attendance, assessments,
+   credit, certificates or funding claims.
+
+Added unit/source tests cover eight-hour boundary behavior, the Site/audience
+guard, restricted reader probe, person-bound feedback, the response window,
+and aggregation privacy suppression. **They have not been executed in a
+validated current-main build or browser session.**
+
+The following enabled-feature browser checks remain important: mixed-adoption
+playback denial; wrong-Site pairing; all-participants-revoked fail-closed
+handling; first pair then media refresh; expiry while page is open;
+restricted reader unavailable vs available; feedback save, revise, leave,
+room close, seven-day expiry and cross-person attempts; and aggregation
+suppression with four vs five distinct people. Use synthetic test01 data
+and never run fixture-writing browser tests against production.
+
 ## Flag-free product availability (2026-11-14)
 
 Learning and facilitated-delivery handlers no longer consult environment
