@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { FacilitatedRoomPlayer } from "@/components/learning/FacilitatedRoomPlayer";
+import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -97,12 +98,11 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       data.rooms.some(room => room.id === code.roomId &&
         effectiveRoomState(room, clockMs) === "live") &&
       <section className="mt-5 border border-border bg-card p-5" aria-label="Current device pairing code">
-      <p className="text-sm font-semibold">Share this code with enrolled learners in your room</p>
-      <p className="mt-2 font-mono text-3xl tracking-widest" aria-live="polite">{code.code}</p>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Valid until {new Date(code.expiresAt).toLocaleTimeString()}.
-        Learners can sign in at <a href="/join" className="underline">/join</a> and
-        select their existing course. Do not treat device pairing as headcount.
+      <p className="text-sm font-semibold">Share this code or QR with authorized learners</p>
+      <ClassroomConnectQr code={code.code} expiresAt={code.expiresAt}/>
+      <p className="mt-3 text-sm text-muted-foreground">
+        Codes are temporary and independently revalidated at pairing time.
+        Device pairing is not a verified learner headcount or attendance record.
       </p>
     </section>}
     <section className="mt-7" aria-label="Facilitated rooms">
