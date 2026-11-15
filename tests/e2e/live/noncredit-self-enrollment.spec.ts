@@ -93,3 +93,27 @@ test("@write only two verified adults can enroll, see own course, and withdraw",
     await Promise.all([a.close(),b.close()]);
   }
 });
+
+test("@public national adult training discovery exposes a bounded search and paging surface",async({page})=>{
+  await open(page,"/learn/enroll");
+  const search=page.getByRole("searchbox",{name:/Search training, provider, or hosting Site/i});
+  await expect(search).toBeVisible();
+  await search.fill("digital skills");
+  await expect(search).toHaveValue("digital skills");
+  await expect(page.getByRole("button",{name:"Previous"})).toBeDisabled();
+  await expect(page.getByRole("button",{name:"More training"})).toBeVisible();
+});
+
+test("@privacy My Learning & Programs does not disclose institutional records anonymously",async({page})=>{
+  await open(page,"/learn/my-programs");
+  await expect(page).toHaveURL(/\/access/);
+  await expect(page.getByText("Participant roster")).toHaveCount(0);
+});
+
+test("@public program discovery has independently paginated approved Sites",async({page})=>{
+  await open(page,"/explore/");
+  await expect(page.getByRole("heading",{name:"Explore programs and places"})).toBeVisible();
+  await expect(page.getByRole("searchbox",{name:/Program or location/i})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Previous"})).toBeVisible();
+  await expect(page.getByRole("button",{name:"Next locations"})).toBeVisible();
+});
