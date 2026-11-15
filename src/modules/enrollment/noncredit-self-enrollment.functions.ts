@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
@@ -197,8 +197,8 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           lte(noncreditCompletionPolicies.publishedAt,new Date()),
         )).orderBy(desc(noncreditCompletionPolicies.effectiveAt),
           desc(noncreditCompletionPolicies.policyVersion)).limit(1);
-      if(!policy || release.seatsRemaining<=0)
-        throw new AuthorizationError("Completion policy or available seats");
+      if(!policy)
+        throw new AuthorizationError("Current published completion policy");
 
       const now=new Date();
       const native=await bindNativeLearnerIdentity(tx,owner,now);
@@ -229,6 +229,8 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         if(!attempt)throw new AuthorizationError("Existing course attempt requires review");
         registrationId=prior.id;attemptId=attempt.id;alreadyEnrolled=true;
       }else{
+        if(release.seatsRemaining<=0)
+          throw new AuthorizationError("This registration has reached capacity");
         // New participant records cannot be invented when capacity is exhausted.
         await tx.insert(learnerProfiles).values({personId:native.personId})
           .onConflictDoNothing();
