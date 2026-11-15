@@ -45,3 +45,26 @@ On `test01`, separately installed the two missing noncredit waitlist and release
 `/launch` (entry); `/launch/site` (Site-first wizard); `/launch/site-preview?siteId=<UUID>` (private iframe HTML); `/launch/website?siteId=<UUID>` (Website Studio); `/site-identity` (three-party correspondence workflow); `/canonical/blueprints` (advanced Blueprints); `/programs/noncredit/enrollment` (operator noncredit releases); `/learn/enroll?release=<UUID>` (adult registration); `/sites/<UUID>/publish` (Site publisher); `/release-fingerprint` (deployment SHA probe). Public tenant websites follow `https://<site-slug>.<CAN_PUBLIC_SITE_DOMAIN>/` only after their own publication, wildcard hosting and DNS/TLS acceptance.
 
 **Do not advertise a final absolute production URL** until the deployed Cloudflare origin is independently established and each exact path is tested with appropriate authorization.
+
+
+## November 15 follow-up: Drizzle ledger and source snapshot reconciliation
+
+**Completed on GitHub `main`:**
+- Fixed malformed `DO $` PL/pgSQL delimiters in `drizzle/0081_account_favorite_sites.sql`.
+- Reconstructed missing source-schema Drizzle snapshots `0077_snapshot.json` through `0083_snapshot.json`, carrying version 7, dialect `postgresql`, unique snapshot IDs and an unbroken `prevId` chain. Snapshot changes are modeled only where the current schema exports changed. Specifically, `0080` creates an SQL-only retention table not currently exported by the Drizzle ORM schema, so its modeled snapshot is intentionally unchanged.
+- Verified eight snapshot versions `0076`–`0083` chain correctly. The modeled public table count rises from 182 to 186: session security signals, account favorite Sites, personal account signups and contact-sharing revisions.
+- Added `scripts/check-drizzle-snapshot-chain.mjs` and the early CI guard; added `scripts/acceptance/check-production-drizzle-parity.mjs` (read-only, exact Neon branch assertion, local SQL SHA verification). Commands: `npm run db:check:journal` and `CAN_PRODUCTION_SCHEMA_VALIDATION=1 DATABASE_URL='<production connection>' npm run db:check:main`.
+- The full Drizzle CLI `db:generate` or `drizzle-kit check` was **not run** in a successful CI/build environment, so these reconstructed source snapshots have not yet passed the official generator's no-drift test.
+
+**Completed and verified on Neon production `main`:**
+- Production objects for Drizzle SQL `0079`–`0083` were already present. Verified **22/22** specific post-migration table, column, constraint, index and RLS existence checks before backfilling. These SQL files were **not replayed** over production data.
+- Applied transactionally and with explicit ledger-tip/object guards: `database/production/2026-11-15-reconcile-applied-drizzle-ledger.sql`. It records five already-applied migrations under the exact SHA-256 of the committed (and corrected) SQL files, from journal idx 79–83. Drizzle's ledger now contains **85 rows**, last id **85**, final journal timestamp **1794690004000** (migration `0083`), and its sequence is at 85. Original 80 history records were preserved.
+- Added the missing `education_v30.noncredit_self_enrollment_releases(provider_organization_id,status,created_at DESC)` index. Verified it exists exactly once in production.
+- Added `can_v30_public_site_reader` as **NOLOGIN, NOBYPASSRLS** with public schema usage and read access *only* to approved `public.site_canonical_identity_links`, not to claims or identities. Verified via `SET LOCAL ROLE`: RLS active, no INSERT authority, no native schema usage, zero visible approved links. No unrestricted `can_v30_public_site_app` login was cloned from `test01`, and no runtime Cloudflare login was granted access without independent verification.
+- The existing `can_v30_site_identity_writer` remains a separate non-login RLS-constrained write role. No Site identity was approved or learner enrollment created.
+
+**Unresolved environment gates, not claims of completion:**
+- Neon has reached its **one-snapshot** and **ten-branch** limits. A fresh full recovery snapshot or staging branch could not be established. Do not delete an existing backup or project branch without identifying its ownership/retention purpose. A snapshot slot or additional plan capacity is required for a new production recovery point.
+- GitHub Actions runs continue to report `startup_failure` with no executed CI jobs. No successful complete typecheck, Drizzle generator check, unit test, browser test or Cloudflare deployment has been observed for this change.
+- Cloudflare's actual `DATABASE_URL` role, DNS/TLS and registration application origin still require read-only production runtime verification. The non-login Site mapping reader is not a substitute for an audited, supported production noncredit eligibility reader.
+- Application tables/columns in `public` and `education_v30`: Neon `main` is a superset of `test01`. Do not re-copy `test01` or archived `education_v24` schemas.
