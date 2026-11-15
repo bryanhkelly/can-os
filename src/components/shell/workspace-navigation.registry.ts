@@ -82,6 +82,7 @@ export interface WorkspaceNavigationItem {
 }
 
 export const workspaceHome = {
+  account_holder: "/account/",
   academic_content_creator: "/canonical/content",
   academic_content_reviewer: "/canonical/content-reviews",
   site_website_editor: "/home",
@@ -129,6 +130,7 @@ const siteAdminProfileLink = {
  * Role-specific destinations. Home and Messages are generated once below.
  */
 const roleLinks = {
+  account_holder: [],
   academic_content_creator: [],
   academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
