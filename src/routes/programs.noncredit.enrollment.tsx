@@ -87,7 +87,7 @@ function NoncreditPublicationPage(){
     width="wide" subtitle="Publish authorized enrollment windows for an approved training and delivery. Each learner registers themselves with their own verified CAN identity.">
     {query.isPending&&<p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your provider-scoped training and deployment authority…</p>}
     {query.isError&&<p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
-      Provider enrollment access is unavailable. A current canonical Site administrator or registrar session is required.
+      Enrollment management is unavailable for this Site. Your existing CAN sign-in is sufficient once its Person and Site links are independently verified and the matching canonical staff grant is active.
       <button type="button" className="ml-2 font-semibold text-primary underline" onClick={()=>void query.refetch()}>Retry</button>
     </p>}
     {query.data&&<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(15rem,.8fr)]">
