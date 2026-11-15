@@ -4,7 +4,7 @@ import { z } from "zod";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { sites } from "@/db/schema";
+import { sites, sitePublications } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
@@ -30,9 +30,11 @@ export const saveSiteLaunchPreferences = createServerFn({method:"POST"})
       const [site]=await tx.select().from(sites)
         .where(eq(sites.id,data.siteId)).for("update").limit(1);
       assertSiteSetupScope(actor,site,"program.launch.start");
-      // Reuse an existing Site website address or reserve one in the same
-      // verified transaction. Never alter an already published address.
-      await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
+      // A newly created Site already has an address. Avoid requiring a second,
+      // differently scoped reservation grant merely to save private interests.
+      const [address]=await tx.select({siteId:sitePublications.siteId})
+        .from(sitePublications).where(eq(sitePublications.siteId,site.id)).limit(1);
+      if(!address)await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:site.id,organizationId:site.organizationId,slug:site.slug,
       });
       const previous=site.metadata.launchPreferences;
