@@ -1,4 +1,4 @@
-# Canonical learning activity and facilitated rooms: release gate
+# Canonical learning activity and facilitated rooms: live runtime readiness
 
 Release target: CAN OS GitHub `main` and Neon `sweet-hall-62441909` production
 branch `br-restless-sea-ar9ooo55`. Acceptance branch: `test01`,
@@ -20,9 +20,11 @@ branch `br-restless-sea-ar9ooo55`. Acceptance branch: `test01`,
      previously used pepper invalidates existing native session cookies.
    - `CAN_FACILITATED_PAIRING_PEPPER`: separate random secret at least
      32 characters.
-3. Leave `CAN_CANONICAL_ACTIVITY_ENABLED` and
-   `CAN_FACILITATED_LEARNING_ENABLED` **off** until the tests below pass.
-   Do not copy secrets into GitHub, commit them, or paste them into tickets.
+3. No feature flags are used for either learning sessions or facilitated delivery.
+   When the strong credentials above are configured, protected server operations
+   become available automatically to currently authorized learners and facilitators.
+   Missing or invalid credentials deny the operation; they never broaden database
+   access. Do not copy secrets into GitHub, commit them, or paste them into tickets.
 
 ## Database permission expectations
 
@@ -40,7 +42,7 @@ branch `br-restless-sea-ar9ooo55`. Acceptance branch: `test01`,
 - `can_auth_gateway` is the empty gateway schema used to provision the
   dedicated restricted login. It must not contain readable PII tables.
 
-## Required checks before turning on either flag
+## Required checks before production use
 
 From a secure build or test runner with the appropriate environment:
 
@@ -119,13 +121,33 @@ denial, closed-room denial and rollback cleanup. These are real PostgreSQL
 tests, but **not** browser or production-credential sign-in tests.
 
 From the restricted **production auth login**, verify both permitted role
-projections before enabling a flag. The committed
+projections before accepting live learner activity. The committed
 `verify-production-credential-reader.sql` checks one of the role boundaries.
 
 **Operational limitations:** Netlify returned HTTP 403 when attempting to set
 the production canonical reader URL/pepper, and its most recently published
 `can-os-demo-new` build is from 2026-11-05, not the current `main`.
 The live browser service was also unavailable for the requested run.
-Do not turn on either learning release flag or claim current-build
-end-to-end acceptance until secret configuration, a matching deploy SHA
-and authenticated learner/facilitator Playwright tests have passed.
+There are no learning release flags to turn on. Do not claim current-build
+end-to-end acceptance or live classroom availability until the required
+restricted secrets, a matching deployed SHA and authenticated learner/facilitator
+Playwright tests have been verified.
+
+## Flag-free rollout update (2026-11-14)
+
+The `main` source no longer reads `CAN_CANONICAL_ACTIVITY_ENABLED` or
+`CAN_FACILITATED_LEARNING_ENABLED`, and the capability-lab navigation always
+shows Facilitated delivery and Participation evidence. Backend authorization,
+Site placement and content-rights checks remain mandatory.
+
+The connected `can-os-demo-new` Netlify site did not list
+`CAN_CANONICAL_AUTH_DATABASE_URL`, `CAN_CANONICAL_ACCESS_TOKEN_PEPPER` or
+`CAN_FACILITATED_PAIRING_PEPPER`. An authorized restricted Neon connection
+was retrieved securely, but the attempted Netlify production-variable write
+returned **HTTP 403**. The URL and signing secrets must be installed by an
+operator with appropriate site privileges. Do not substitute `DATABASE_URL`.
+
+A fresh, successful deployment from the current GitHub `main` commit is still
+required. The last verified published Netlify deployment predates these changes.
+Until the credentials and deployment work are completed, the visible feature
+entry points cannot deliver functioning authenticated rooms or activity collection.
