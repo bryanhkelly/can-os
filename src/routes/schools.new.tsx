@@ -7,6 +7,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
 import { DEFAULT_SITE_TIMEZONE } from "@/domain/site-timezone";
 import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
+import { WorkspaceShell } from "@/components/workspace";
 
 export const Route = createFileRoute("/schools/new")({
   server: { handlers: {
@@ -111,12 +112,9 @@ function SchoolSetupPage() {
   }
 
   const field = "mt-1 block min-h-11 w-full border border-border bg-background p-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-  return <main className="mx-auto max-w-xl space-y-6 px-6 py-12">
-    <header>
-      <p className="text-sm font-semibold text-muted-foreground">CAN OS school setup</p>
-      <h1 className="mt-2 font-serif text-4xl">Create a school</h1>
-      <p className="mt-3">Create a school profile and continue in its Launch Hub. Real schools use verified email; demo schools use a shared access code.</p>
-    </header>
+  return <WorkspaceShell width="reading" eyebrow="CAN OS · School setup" title="Create a school"
+    subtitle="Create a school profile and continue in its Launch Hub. Real schools use verified email; demo schools use a shared access code.">
+    <div className="mt-6 max-w-xl space-y-6">
     {signupRequested ? <section role="status" className="space-y-4 border border-border bg-card p-6">
       <h2 className="font-serif text-2xl">Check your email</h2>
       <p>If this email can start school setup, a one-time link will arrive shortly. Open it to verify your address and continue to the Launch Hub.</p>
@@ -166,5 +164,6 @@ function SchoolSetupPage() {
       </button>
     </form>}
     <Link to="/access" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4">Already have a school? Sign in</Link>
-  </main>;
+    </div>
+  </WorkspaceShell>;
 }
