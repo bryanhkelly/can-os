@@ -28,6 +28,7 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
   return <>
     {authenticated && <ContextTray title="Account" open={accountOpen} onClose={onCloseAccount}>
       <div className="space-y-2 text-sm">
+        <Link to="/account/" onClick={onCloseAccount} className={`block p-3 font-semibold hover:bg-muted ${focusRingClass}`}>My CAN account</Link>
         <Link to="/profiles" onClick={onCloseAccount} className={`block rounded-lg p-3 hover:bg-muted ${focusRingClass}`}>My profile</Link>
         <Link to="/account/sessions" onClick={onCloseAccount} className={`block rounded-lg p-3 hover:bg-muted ${focusRingClass}`}>Account sessions</Link>
         {member?.role === "student" && <Link to="/student/settings" onClick={onCloseAccount} className={`block rounded-lg p-3 hover:bg-muted ${focusRingClass}`}>Account settings</Link>}
@@ -37,6 +38,7 @@ export function WorkspaceNavigationPanels({ member, authenticated, accountOpen, 
     {member && <>
       <ContextTray title="Workspace navigation" open={menuOpen} onClose={onCloseMenu}>
         <SidebarLinks links={links} activePath={activePath} institutionSelection={institutionSelection} />
+        <Link to="/account/" className={`mt-3 block border-t p-3 text-sm underline ${focusRingClass}`}>My CAN account</Link>
         <Link to="/profiles" className={`mt-3 block rounded-lg border-t p-3 text-sm underline ${focusRingClass}`}>My profile</Link>
         <Link to="/account/sessions" className={`block rounded-lg p-3 text-sm underline ${focusRingClass}`}>Account sessions</Link>
       </ContextTray>
