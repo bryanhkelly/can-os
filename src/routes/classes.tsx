@@ -33,6 +33,7 @@ import { Select } from "@/components/ui/select";
 import { classResources, type ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
+import { getClassesViewerRole, getSiteAdminClasses, getSiteAdminClassRoster } from "@/modules/learning/site-admin-classes.functions";
 import { getTeacherClassRequestOptions } from "@/modules/programs/section-creation-requests.functions";
 import { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
@@ -54,6 +55,14 @@ export const Route = createFileRoute("/classes")({
   validateSearch: (search: Record<string, unknown>) => searchSchema.parse(search),
   loaderDeps: ({ search }) => ({ section: search.section, student: search.student }),
   loader: ({ deps }) => safeLoader(async () => {
+    const viewer = await getClassesViewerRole();
+    if (viewer.role === "site_admin") {
+      const directory = await getSiteAdminClasses();
+      const roster = deps.section
+        ? await getSiteAdminClassRoster({ data: { sectionId: deps.section } })
+        : null;
+      return { mode: "site_admin" as const, directory, roster };
+    }
     const directory = await getClassDirectory();
     const workspace = deps.section ? await getClassWorkspace({ data: { sectionId: deps.section, studentPersonId: deps.student } }) : null;
     const meetings = workspace ? await safeLoader(() => getClassroomMeetings({ data: {
@@ -62,7 +71,7 @@ export const Route = createFileRoute("/classes")({
     const classRequestOptions = !workspace && directory.role === "teacher"
       ? await getTeacherClassRequestOptions()
       : null;
-    return { directory, workspace, classRequestOptions, meetings };
+    return { mode: "learning" as const, directory, workspace, classRequestOptions, meetings };
   }, { authMessage: "Sign in with an authorized student, parent or teacher account to open classes." })(),
   component: ClassesPage,
 });
@@ -71,6 +80,38 @@ function ClassesPage() {
   const outcome = Route.useLoaderData();
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure eyebrow="Classes" title="Classes" outcome={outcome}/>;
+  if (outcome.data.mode === "site_admin") {
+    const { directory, roster } = outcome.data;
+    return <WorkspaceShell width="wide" eyebrow="School operations" title="Classes"
+      subtitle="All active classes in your authorized school Site. Rosters show only active Section and Program enrollments.">
+      {roster && <WorkspacePanel title={roster.section.title}
+        description={`${roster.section.code} · ${roster.students.length} actively enrolled students`}>
+        <Link to="/classes" search={{}} className="text-sm underline">Back to all classes</Link>
+        <ul className="mt-4 divide-y" aria-label="Class roster">
+          {roster.students.map(student => <li key={student.personId} className="py-3 text-sm">
+            <Link to="/staff/students/$personId" params={{personId:student.personId}}
+              className="font-semibold underline">{student.name}</Link>
+          </li>)}
+        </ul>
+        {!roster.students.length && <p className="mt-4 text-sm text-muted-foreground">No active enrollments in this class.</p>}
+      </WorkspacePanel>}
+      {!roster && <div className="mt-7 grid gap-4 md:grid-cols-2">
+        {directory.classes.map(section => <WorkspacePanel key={section.id} title={section.title}
+          description={section.code}>
+          <Link to="/classes" search={{section:section.id}} className="text-sm font-semibold underline">
+            View class roster
+          </Link>
+        </WorkspacePanel>)}
+      </div>}
+      {!roster && !directory.classes.length && <p className="mt-7 border p-5 text-sm" role="status">
+        No active classes are available for your authorized Site and Programs.
+      </p>}
+      <div className="mt-7 flex flex-wrap gap-5 text-sm">
+        <Link to="/staff/students" className="underline">Student directory</Link>
+        <Link to="/launch" className="underline">School enrollment and class operations</Link>
+      </div>
+    </WorkspaceShell>;
+  }
   const { directory, workspace, classRequestOptions, meetings } = outcome.data;
   if (workspace) return <ClassWorkspace key={`${workspace.section.id}:${workspace.studentPersonId}`} data={workspace} tab={search.tab} lessonId={search.lesson} meetings={meetings}/>;
   return <WorkspaceShell width="wide" eyebrow="Learning" title={directory.role === "guardian" ? "Your family's classes" : "My classes"}
