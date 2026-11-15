@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants,
-  contentAssetVersions, courseLessons, courseVersions, courses,
+  contentAssets, contentAssetVersions, courseLessons, courseVersions, courses,
   enrollments, learnerProfiles, noncreditRegistrations, noncreditTrainingVersions,
   deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses,
   domainEvents,
@@ -21,6 +21,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
+import { resolveClassVideo } from "@/domain/class-video";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
 import { assertFacilitatedInstructionalDelivery } from "./student-instructional-tracks.server";
 import {
@@ -466,18 +467,27 @@ export const getFacilitatedRoomMediaAccess = createServerFn({method:"POST"})
       );
       const [asset]=await tx.select({
         storageReference:contentAssetVersions.storageReference,
-      }).from(contentAssetVersions).where(and(
-        eq(contentAssetVersions.id,data.assetVersionId),
-        eq(contentAssetVersions.lifecycle,"published"),
-      )).limit(1);
+        externalUrl:contentAssets.externalUrl,
+      }).from(contentAssetVersions)
+        .innerJoin(contentAssets,eq(
+          contentAssets.id,contentAssetVersions.assetId,
+        ))
+        .where(and(
+          eq(contentAssetVersions.id,data.assetVersionId),
+          eq(contentAssetVersions.lifecycle,"published"),
+        )).limit(1);
+      if(!asset) throw new AuthorizationError("approved video resource");
       const expectedKey=instructionalTrackAssetStorageKey(data.assetVersionId);
-      if(!asset||asset.storageReference!==expectedKey||
-        !protectedMediaKey.test(asset.storageReference))
-        throw new AuthorizationError("approved private video resource");
-      return {downloadUrl:signPrivateObjectUrl({
-        method:"GET",key:asset.storageReference,
-        keyPattern:protectedMediaKey,expiresSeconds:30,
-      }),expiresInSeconds:30};
+      if(asset.storageReference===expectedKey && protectedMediaKey.test(expectedKey))
+        return {downloadUrl:signPrivateObjectUrl({
+          method:"GET",key:expectedKey,
+          keyPattern:protectedMediaKey,expiresSeconds:30,
+        }),expiresInSeconds:30};
+      // Only canonical YouTube/Vimeo embeds are permitted, and only after the
+      // SAME Site/adoption rights check used for private R2 recordings.
+      if(asset.externalUrl && resolveClassVideo(asset.externalUrl)?.kind==="embed")
+        return {downloadUrl:asset.externalUrl,expiresInSeconds:0};
+      throw new AuthorizationError("approved private video or allowlisted provider embed");
     });
   });
 
