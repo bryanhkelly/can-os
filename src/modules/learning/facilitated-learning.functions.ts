@@ -12,6 +12,7 @@ import {
   educationOperationSites, facilitatedLearningParticipants, facilitatedLearningPlayback,
   facilitatedPairingRateLimits,
   facilitatedLearningSessions, learnerCourseAttempts, programDeployments,
+  classroomDeploymentSites, classroomEnrollmentSitePlacements,
   siteOrganizationRoles, trackLessonPresentations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -541,6 +542,31 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
         sessionDeploymentId:room.deploymentId,sessionCourseVersionId:room.courseVersionId,
         attemptDeploymentId:attempt.deploymentId,attemptCourseVersionId:attempt.courseVersionId,
       }))return null;
+      // A shared Course and Deployment do not establish physical Site access.
+      // Noncredit remote participation is intentionally independent of school
+      // placement; a school Enrollment must have a current placement at the
+      // exact hosting Site. A denial is returned so the attempt limiter commits.
+      if (attempt.source === "school") {
+        const [placement] = await tx.select({id:classroomEnrollmentSitePlacements.id})
+          .from(classroomEnrollmentSitePlacements)
+          .innerJoin(classroomDeploymentSites,and(
+            eq(classroomDeploymentSites.id,classroomEnrollmentSitePlacements.deploymentSiteId),
+            eq(classroomDeploymentSites.deploymentId,room.deploymentId),
+            eq(classroomDeploymentSites.siteId,room.siteId),
+          ))
+          .innerJoin(learnerCourseAttempts,and(
+            eq(learnerCourseAttempts.enrollmentId,classroomEnrollmentSitePlacements.enrollmentId),
+            eq(learnerCourseAttempts.deploymentId,classroomEnrollmentSitePlacements.deploymentId),
+          ))
+          .where(and(
+            eq(learnerCourseAttempts.id,attempt.courseAttemptId),
+            eq(classroomEnrollmentSitePlacements.deploymentId,room.deploymentId),
+            lte(classroomEnrollmentSitePlacements.startsAt,now),
+            or(isNull(classroomEnrollmentSitePlacements.endsAt),
+              gt(classroomEnrollmentSitePlacements.endsAt,now)),
+          )).limit(1);
+        if (!placement) return null;
+      }
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
