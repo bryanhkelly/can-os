@@ -120,9 +120,16 @@ export async function readEligibleSelfEnrollmentReleases(
         lte(operator.validFrom,now),
         or(isNull(operator.validThrough),gt(operator.validThrough,now)),
       ))),
+      // A Site can be physical, virtual, or mobile. It is a separately
+      // authorized presentation/operating identity, not necessarily a room.
+      // Independent online delivery may also remain Site-less for a national
+      // provider. When linked, the same active Site/organization/operation
+      // checks apply; only facilitated delivery requires a classroom Site.
       or(
         and(eq(r.deliveryMode,"independent"),isNull(r.siteId)),
-        and(eq(r.deliveryMode,"facilitated"),isNotNull(r.siteId),
+        and(
+          isNotNull(r.siteId),
+          inArray(r.deliveryMode,["independent","facilitated"]),
           eq(canonicalEnrollmentSites.status,"active"),
           exists(executor.select({id:educationOperationSites.id})
             .from(educationOperationSites).where(and(
@@ -141,11 +148,16 @@ export async function readEligibleSelfEnrollmentReleases(
               or(isNull(siteOrganizationRoles.validThrough),
                 gt(siteOrganizationRoles.validThrough,now)),
             ))),
-          exists(executor.select({id:classroomDeploymentSites.id})
-            .from(classroomDeploymentSites).where(and(
-              eq(classroomDeploymentSites.deploymentId,r.deploymentId),
-              eq(classroomDeploymentSites.siteId,r.siteId),
-            ))),
+          or(
+            eq(r.deliveryMode,"independent"),
+            and(eq(r.deliveryMode,"facilitated"),
+              exists(executor.select({id:classroomDeploymentSites.id})
+                .from(classroomDeploymentSites).where(and(
+                  eq(classroomDeploymentSites.deploymentId,r.deploymentId),
+                  eq(classroomDeploymentSites.siteId,r.siteId),
+                ))),
+            ),
+          ),
         ),
       ),
     )).orderBy(paging?r.id:r.closesAt,r.id).limit(releaseId?1:paging?.limit??100);
