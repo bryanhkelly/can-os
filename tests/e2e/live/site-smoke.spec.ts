@@ -36,7 +36,7 @@ test("@public create-school entry point renders without sending data", async ({ 
   await expect(page.getByRole("heading", { name: /Create a school/i })).toBeVisible();
 });
 
-for (const path of ["/guardian/students", "/student/courses", "/calendar",
+for (const path of ["/guardian/students", "/student/courses", "/calendar", "/canonical",
   "/canonical/lab/facilitated", "/canonical/lab/impact"]) {
   test(`@signed-out ${path} does not expose an authenticated workspace`, async ({ page }) => {
     await expectHealthyPage(page, path);
