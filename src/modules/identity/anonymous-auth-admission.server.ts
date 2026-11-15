@@ -11,9 +11,10 @@ import { db } from "@/db/client";
  * A malicious caller can exhaust a shared budget: trusted-edge per-source
  * protection and service-specific operational limits remain mandatory.
  */
-export type AuthAdmissionRoute = "request" | "verify" | "church_application" | "school_setup";
+export type AuthAdmissionRoute = "request" | "verify" | "church_application" | "school_setup" | "account_signup";
 export const AUTH_ADMISSION_POLICY: Record<AuthAdmissionRoute, number> = {
   request: 240,
+  account_signup: 20,
   verify: 600,
   church_application: 40,
   school_setup: 6,
