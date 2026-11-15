@@ -13,17 +13,11 @@ const bytea = customType<{data:Buffer;driverData:Buffer}>({
  * assessment schema. The SQL release/eligibility/scoring triggers own
  * the business invariants and PostgreSQL RLS remains mandatory.
  */
-export const assessmentDefinitions = educationV30.table("assessment_definitions", {
-  id:id(),ownerOrganizationId:uuid("owner_organization_id").notNull(),
-  assessmentKey:text("assessment_key").notNull(),title:text("title").notNull(),
-  purpose:text("purpose").$type<"official"|"diagnostic"|"placement"|"readiness"|"foundation"|
-    "formative"|"mastery"|"credential"|"practice">().notNull(),
-});
-export const assessmentVersions = educationV30.table("assessment_versions",{
-  id:id(),assessmentId:uuid("assessment_id").notNull(),
-  courseVersionId:uuid("course_version_id"),
-  lifecycle:text("lifecycle").$type<"draft"|"published">().notNull(),
-});
+// Reuse the canonical definitions already declared in learning.ts.
+// Redefining these tables here creates ambiguous exports in index.ts and
+// two distinct Drizzle table objects for the same PostgreSQL relations.
+export { assessmentDefinitions, assessmentVersions } from "./learning";
+
 export const assessmentFormVersions = educationV30.table("assessment_form_versions",{
   id:id(),assessmentVersionId:uuid("assessment_version_id").notNull(),
   lifecycle:text("lifecycle").$type<"draft"|"published">().notNull(),
