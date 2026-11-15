@@ -25,7 +25,7 @@ function AccessPage(){
  const[code,setCode]=useState("");
  const[status,setStatus]=useState<{text:string;isError:boolean}|null>(null);
  const feedback=status??(search.error?{text:accessFormErrors[search.error],isError:true}:null);
- function updateEmail(value:string){setEmailDraft({forEmail:search.email,value});setCode("");setStatus(null);}
+ function updateEmail(value:string){setEmailDraft({forEmail:search.email,value});setCode("");setStatus({text:"",isError:false});}
  const[busy,setBusy]=useState(false);
  const hydrated=useHydrated();
  const isDemoEmail=isDemoAccountEmail(email);
@@ -49,7 +49,7 @@ function AccessPage(){
    <input type="hidden" name="returnTo" value={search.returnTo??""}/>
    <fieldset disabled={!hydrated||(!isDemoEmail&&busy)} className="space-y-4">
     <Field label="Email" required><Input name="email" type="email" autoComplete="email" value={email} onChange={e=>updateEmail(e.target.value)}/></Field>
-    {isDemoEmail&&<Field label="Access code" required><Input name="code" type="password" autoComplete="one-time-code" value={code} onChange={e=>{setCode(e.target.value);setStatus(null);}}/></Field>}
+    {isDemoEmail&&<Field label="Access code" required><Input name="code" type="password" autoComplete="one-time-code" value={code} onChange={e=>{setCode(e.target.value);setStatus({text:"",isError:false});}}/></Field>}
     <Button disabled={!hydrated||busy} type="submit" className="w-full">{!hydrated?"Preparing sign-in…":busy?isDemoEmail?"Signing in…":"Sending access link…":isDemoEmail?"Sign in":"Email me an access link"}</Button>
    </fieldset>
   </form>
