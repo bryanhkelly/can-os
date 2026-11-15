@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assertCanSelfEnroll, noncreditEnrollCommand, noncreditPublishCommand,
-  publishedNoncreditConsentHash,
+  publishedNoncreditConsentHash, noncreditSelfWithdrawalDecision,
 } from "@/domain/noncredit-self-enrollment";
 
 const releaseId = "11111111-1111-4111-8111-111111111111";
@@ -90,5 +90,28 @@ describe("Noncredit adult self-enrollment authority", () => {
     ]) {
       expect(() => assertCanSelfEnroll({...eligible,...change})).toThrow();
     }
+  });
+  it("does not withdraw completed training or silently release the seat", () => {
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"registered",hasCompletedAttempt:false,hasCompletedDecision:false,
+    })).toBe("withdraw");
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"active",hasCompletedAttempt:false,hasCompletedDecision:false,
+    })).toBe("withdraw");
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"withdrawn",hasCompletedAttempt:false,hasCompletedDecision:false,
+    })).toBe("already_withdrawn");
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"completed",hasCompletedAttempt:false,hasCompletedDecision:false,
+    })).toBe("deny");
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"cancelled",hasCompletedAttempt:false,hasCompletedDecision:false,
+    })).toBe("deny");
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"active",hasCompletedAttempt:true,hasCompletedDecision:false,
+    })).toBe("deny");
+    expect(noncreditSelfWithdrawalDecision({
+      registrationStatus:"registered",hasCompletedAttempt:false,hasCompletedDecision:true,
+    })).toBe("deny");
   });
 });
