@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
@@ -320,6 +320,7 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
         eq(canonicalAccounts.id,link.canonicalAccountId),
         eq(canonicalAccounts.emailNormalized,owner.email),
         isNull(canonicalAccounts.disabledAt),
+        isNotNull(canonicalAccounts.emailVerifiedAt),
       )).limit(1);
     if(!native)return [];
     return db.select({
