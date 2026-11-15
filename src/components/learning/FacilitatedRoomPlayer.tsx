@@ -57,10 +57,20 @@ export function FacilitatedRoomPlayer({ facilitatedSessionId }: {
     </p>
     {loading&&<p role="status" className="mt-3 text-sm">Checking course content rights...</p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
-    {!loading&&catalog&&catalog.media.length===0&&<p role="status"
-      className="mt-3 text-sm text-muted-foreground">
-      No currently approved recordings are available for this room.
-    </p>}
+    {!loading&&catalog&&catalog.media.length===0&&<div className="mt-3 space-y-2">
+      <p role="status" className="text-sm text-muted-foreground">{catalog.note}</p>
+      <Button type="button" size="sm" variant="outline" onClick={()=>{
+        setLoading(true);setError("");
+        void getFacilitatedRoomMedia({data:{facilitatedSessionId}})
+          .then(result=>{
+            setCatalog(result);
+            setSelected(result.media[0]?
+              result.media[0].lessonId+":"+result.media[0].assetVersionId:"");
+          })
+          .catch(()=>setError("Unable to refresh current media rights."))
+          .finally(()=>setLoading(false));
+      }}>Recheck approved recordings</Button>
+    </div>}
     {catalog?.media.length ? <div className="mt-3 space-y-3">
       <label className="block text-sm font-medium">
         Select a recorded lesson
