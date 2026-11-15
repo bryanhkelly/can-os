@@ -12,7 +12,6 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { noncreditSelfWithdrawalDecision } from "@/domain/noncredit-self-enrollment";
-import { requireVerifiedAdultAccount } from "./noncredit-self-enrollment.functions";
 
 /**
  * Adult self-service withdrawal is intentionally NOT an erasure or refund.
@@ -27,6 +26,7 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
   }).strict().parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     return db.transaction(async tx=>{
       const [bridge]=await tx.select().from(accessAccountNoncreditPrincipals)
