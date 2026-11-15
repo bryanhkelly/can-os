@@ -27,6 +27,9 @@ import {
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
+import {
+  classroomDeploymentSites, classroomEnrollmentSitePlacements,
+} from "@/db/canonical-v301/classroom-site-placements";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Host = Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
@@ -491,6 +494,26 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
         sessionDeploymentId:room.deploymentId,sessionCourseVersionId:room.courseVersionId,
         attemptDeploymentId:attempt.deploymentId,attemptCourseVersionId:attempt.courseVersionId,
       }))return null;
+      // School learners must have an effective-dated placement at THIS Site,
+      // not merely an enrollment somewhere in the same Deployment. Noncredit
+      // remote participants do not claim physical presence by pairing.
+      if(attempt.source==="school") {
+        const [sitePlacement]=await tx.select({id:classroomEnrollmentSitePlacements.id})
+          .from(classroomEnrollmentSitePlacements)
+          .innerJoin(classroomDeploymentSites,and(
+            eq(classroomEnrollmentSitePlacements.deploymentSiteId,classroomDeploymentSites.id),
+            eq(classroomDeploymentSites.siteId,room.siteId),
+            eq(classroomDeploymentSites.deploymentId,room.deploymentId),
+          ))
+          .where(and(
+            eq(classroomEnrollmentSitePlacements.enrollmentId,attempt.enrollmentId!),
+            eq(classroomEnrollmentSitePlacements.deploymentId,room.deploymentId),
+            lte(classroomEnrollmentSitePlacements.startsAt,now),
+            or(isNull(classroomEnrollmentSitePlacements.endsAt),
+              gt(classroomEnrollmentSitePlacements.endsAt,now)),
+          )).limit(1);
+        if(!sitePlacement)return null;
+      }
       await tx.insert(facilitatedLearningParticipants).values({
         facilitatedSessionId:room.id,courseAttemptId:data.courseAttemptId,
         participantPersonId:personId,joinedAt:now,lastPairedAt:now,
