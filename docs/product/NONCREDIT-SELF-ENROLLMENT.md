@@ -137,3 +137,15 @@ For facilitated claims, **room pairing and room-status reads** check the exact r
 ## Future, intentionally not falsely implemented
 
 Native canonical users whose separately created Person/account collides with a CAN account need operator-reviewed identity linking, not a silent email merge. Youth/guardian managed registration, payment/fee waivers, waitlists, release/cohort transfer, formal Site seat allocation and authorized portfolio/network reporting are separate features. A provider should not assume its registration attribution provides rights to see unrelated school records.
+
+## Update: community class operations source expansion (November 14, 2026)
+
+The subsequent implementation in `main` adds course release-to-Classroom
+Connect meeting links, provider-scoped roster and reporting, audited seat
+reconciliation, a first-class waiting queue and bounded invitations, multi-Site
+batch publication for currently authorized Sites, and a unified My Learning
+page. These commits do **not** supersede the release blockers above. The new
+SQL migrations are committed but not applied or validated here; production
+deployment, current browser acceptance, settlement processing, cross-provider
+network delegation and transfer workflows remain unverified or incomplete.
+See [Community Program Participation](COMMUNITY-PROGRAM-PARTICIPATION.md).

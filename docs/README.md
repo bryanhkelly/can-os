@@ -6,7 +6,7 @@ This is the new authoritative documentation entry point. The FullFlow delivery i
 
 1. **Purpose and ownership:** [CAN Vision](vision/CAN-VISION.md), [Platform Capabilities](product/PLATFORM-CAPABILITIES.md), and [Operating Model](product/OPERATING-MODEL.md).
 2. **Launch and family:** [School Launch and Run](product/LAUNCH-AND-RUN.md), [Launch Studio Audiences](product/LAUNCH-STUDIO-AUDIENCES.md), [Website Studio](product/WEBSITE-STUDIO.md), [Website Media](product/WEBSITE-MEDIA.md), and [Public Sites and Admissions](product/PUBLIC-SITES-AND-ADMISSIONS.md).
-3. **Teaching and operating:** [Academic Delivery](product/ACADEMIC-DELIVERY.md), [Extended Learning](product/EXTENDED-LEARNING.md), and [School and Site Operations](product/SITE-OPERATIONS.md).
+3. **Teaching and operating:** [Academic Delivery](product/ACADEMIC-DELIVERY.md), [Extended Learning](product/EXTENDED-LEARNING.md), [Community Participation](product/COMMUNITY-PROGRAM-PARTICIPATION.md), and [School and Site Operations](product/SITE-OPERATIONS.md).
 4. **Architecture and design:** [System](architecture/SYSTEM.md), [Domain Model](architecture/DOMAIN-MODEL.md), and [Design Authority](design/README.md).
 5. **Required safety and acceptance:** [Acceptance Standards](quality/ACCEPTANCE-STANDARDS.md), [Church-Hosted Safety Gates](quality/CHURCH-HOSTED-SAFETY-GATES.md), [Safety Test Traceability](quality/SAFETY-TEST-TRACEABILITY.md), [Public Site Release Gates](quality/PUBLIC-SITE-RELEASE-GATES.md), and [Engineering Operations and Security](engineering/OPERATIONS-AND-SECURITY.md).
 6. **Engineering policy:** [Agent Contract](../AGENTS.md); current code, migrations, and **executed** tests are implementation evidence.
