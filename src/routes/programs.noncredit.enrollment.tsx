@@ -9,6 +9,7 @@ import {
 } from "@/modules/enrollment/noncredit-enrollment-publication.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditReleaseOperations";
+import { NoncreditNetworkReportPanel } from "@/components/enrollment/NoncreditNetworkReportPanel";
 
 export const Route=createFileRoute("/programs/noncredit/enrollment")({
   component:NoncreditPublicationPage,
@@ -190,6 +191,7 @@ function NoncreditPublicationPage(){
         </div>
       </section>
     </div>}
-    {managedRelease&&<NoncreditReleaseOperations key={managedRelease} releaseId={managedRelease}/>}
+    {managedRelease&&<NoncreditReleaseOperations key={managedRelease} releaseId={managedRelease}/>} 
+    {query.isSuccess&&<NoncreditNetworkReportPanel/>}
   </WorkspaceShell>;
 }
