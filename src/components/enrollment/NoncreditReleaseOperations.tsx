@@ -5,6 +5,7 @@ import {Button} from "@/components/ui/button";
 import {
   attachClassroomPlanToNoncreditRelease,getNoncreditReleaseOperations,
   releaseWithdrawnNoncreditSeat,inviteNextNoncreditWaitlist,
+  attachFourWeekCohortPlans,
 } from "@/modules/enrollment/noncredit-cohort-operations.functions";
 import {normalizeClientError} from "@/lib/client-error";
 
@@ -28,6 +29,17 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       setMessage("This scheduled meeting now belongs to the selected cohort.");
     }catch(cause){
       setMessage(normalizeClientError(cause,"Could not assign the meeting to this enrollment release.").message);
+    }finally{setBusy(null);}
+  }
+  async function attachFourWeeks(planIds:string[]){
+    if(busy||!planIds.length)return;setBusy("attach-four");setMessage("");
+    try{
+      const result=await attachFourWeekCohortPlans({data:{releaseId,planIds}});
+      await client.invalidateQueries({queryKey:["noncredit-cohort-ops",releaseId]});
+      await client.invalidateQueries({queryKey:["noncredit-open-releases"]});
+      setMessage(result.attached+" meetings assigned to this one cohort; no registrations or attendance were generated.");
+    }catch(cause){
+      setMessage(normalizeClientError(cause,"All four assignments were rolled back. Check that every meeting is still authorized, future-dated and unallocated.").message);
     }finally{setBusy(null);}
   }
   async function invite(){
@@ -95,6 +107,16 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
         Attach a scheduled meeting here to include it in this cohort's learner-facing calendar.
       </p>
       {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person cohort.</p>}
+      {query.data.deliveryMode==="facilitated"&&query.data.sessions.some(s=>!s.linked&&s.state==="scheduled")&&
+        <div className="mt-3 border border-border bg-muted/20 p-3">
+          <p className="text-sm">Assign up to four upcoming, unallocated meetings to this cohort in one operation. Each meeting must belong to this exact approved Site and Course.</p>
+          <Button type="button" className="mt-3" variant="outline" disabled={busy!==null}
+            onClick={()=>void attachFourWeeks(query.data.sessions
+              .filter(s=>!s.linked&&s.state==="scheduled"&&Date.parse(s.startsAt)>Date.now())
+              .slice(0,4).map(s=>s.planId))}>
+            {busy==="attach-four"?"Assigning meetings…":"Attach next four meetings"}
+          </Button>
+        </div>}
       <div className="mt-3 divide-y divide-border border border-border">
         {query.data.sessions.map(session=><div key={session.planId} className="flex flex-wrap items-center justify-between gap-3 p-3">
           <div><p className="text-sm font-medium">{new Date(session.startsAt).toLocaleString()}</p>

@@ -172,57 +172,83 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
     });
   });
 
-/** An independently authorized provider can associate a Site's existing
- * Release 3 classroom plan with precisely one approved enrollment release.
- * The classroom's native delivery session remains the date/time authority. */
+/** Assign dated classroom meetings to exactly one authorized enrollment
+ * release. The release lock serializes competing operators; each plan is
+ * checked independently and both assignment and audit commit atomically.
+ */
+type ScopedCohort=Awaited<ReturnType<typeof scopedRelease>>;
+async function assignCohortPlan(tx:Executor,scope:ScopedCohort,planId:string){
+  const {provider,release}=scope;
+  if(release.status!=="published"||release.deliveryMode!=="facilitated"||
+    !release.siteId)throw new AuthorizationError("open facilitated release");
+  const [plan]=await tx.select({
+    id:facilitatedClassroomPlans.id,
+    enrollmentReleaseId:facilitatedClassroomPlans.enrollmentReleaseId,
+    deploymentId:facilitatedClassroomPlans.deploymentId,
+    courseVersionId:facilitatedClassroomPlans.courseVersionId,
+    siteId:facilitatedClassroomPlans.siteId,
+    hostOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
+    state:facilitatedClassroomPlans.state,
+    startsAt:canonicalDeliverySessions.startsAt,
+  }).from(facilitatedClassroomPlans)
+    .innerJoin(canonicalDeliverySessions,eq(
+      canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
+    .where(eq(facilitatedClassroomPlans.id,planId))
+    .limit(1).for("update",{of:facilitatedClassroomPlans});
+  if(!plan||plan.deploymentId!==release.deploymentId||
+    plan.courseVersionId!==release.courseVersionId||
+    plan.siteId!==release.siteId||
+    plan.hostOrganizationId!==provider.organizationId)
+    throw new AuthorizationError("own scheduled Course at the exact approved Site");
+  if(plan.enrollmentReleaseId===release.id)return {planId,attached:true,duplicate:true};
+  if(plan.enrollmentReleaseId!==null||plan.state!=="scheduled"||
+    plan.startsAt<=new Date())
+    throw new AuthorizationError("unallocated future classroom meeting");
+  await tx.update(facilitatedClassroomPlans).set({
+    enrollmentReleaseId:release.id,updatedAt:new Date(),
+  }).where(eq(facilitatedClassroomPlans.id,plan.id));
+  const payload={releaseId:release.id,planId:plan.id,siteId:release.siteId};
+  await tx.insert(auditEvents).values({
+    actorPersonId:provider.actor.actorPersonId!,
+    owningOrganizationId:provider.organizationId,
+    eventCode:"noncredit.cohort.session_assigned",
+    entityKind:"facilitated_classroom_plan",entityId:plan.id,payload,
+  });
+  await tx.insert(domainEvents).values({
+    eventType:"NoncreditCohortSessionAssigned",
+    aggregateType:"noncredit_self_enrollment_release",
+    aggregateId:release.id,actorPersonId:provider.actor.actorPersonId!,
+    payload,
+  });
+  return {planId,attached:true,duplicate:false};
+}
 export const attachClassroomPlanToNoncreditRelease=createServerFn({method:"POST"})
   .validator((v:unknown)=>attachInput.parse(v))
   .handler(async({data})=>{
     guard();
     return db.transaction(async tx=>{
-      const {provider,release}=await scopedRelease(tx,data.releaseId,true);
-      if(release.status!=="published"||release.deliveryMode!=="facilitated"||
-        !release.siteId)throw new AuthorizationError("open facilitated release");
-      const [plan]=await tx.select({
-        id:facilitatedClassroomPlans.id,
-        enrollmentReleaseId:facilitatedClassroomPlans.enrollmentReleaseId,
-        deploymentId:facilitatedClassroomPlans.deploymentId,
-        courseVersionId:facilitatedClassroomPlans.courseVersionId,
-        siteId:facilitatedClassroomPlans.siteId,
-        hostOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
-        state:facilitatedClassroomPlans.state,
-        startsAt:canonicalDeliverySessions.startsAt,
-      }).from(facilitatedClassroomPlans)
-        .innerJoin(canonicalDeliverySessions,eq(
-          canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
-        .where(eq(facilitatedClassroomPlans.id,data.planId))
-        .limit(1).for("update",{of:facilitatedClassroomPlans});
-      if(!plan||plan.deploymentId!==release.deploymentId||
-        plan.courseVersionId!==release.courseVersionId||
-        plan.siteId!==release.siteId||
-        plan.hostOrganizationId!==provider.organizationId)
-        throw new AuthorizationError("own scheduled Course at the exact approved Site");
-      if(plan.enrollmentReleaseId===release.id)return {attached:true,duplicate:true};
-      if(plan.enrollmentReleaseId!==null||plan.state!=="scheduled"||
-        plan.startsAt<=new Date())
-        throw new AuthorizationError("unallocated future classroom meeting");
-      await tx.update(facilitatedClassroomPlans).set({
-        enrollmentReleaseId:release.id,updatedAt:new Date(),
-      }).where(eq(facilitatedClassroomPlans.id,plan.id));
-      const payload={releaseId:release.id,planId:plan.id,siteId:release.siteId};
-      await tx.insert(auditEvents).values({
-        actorPersonId:provider.actor.actorPersonId!,
-        owningOrganizationId:provider.organizationId,
-        eventCode:"noncredit.cohort.session_assigned",
-        entityKind:"facilitated_classroom_plan",entityId:plan.id,payload,
-      });
-      await tx.insert(domainEvents).values({
-        eventType:"NoncreditCohortSessionAssigned",
-        aggregateType:"noncredit_self_enrollment_release",
-        aggregateId:release.id,actorPersonId:provider.actor.actorPersonId!,
-        payload,
-      });
-      return {attached:true,duplicate:false};
+      const scope=await scopedRelease(tx,data.releaseId,true);
+      return assignCohortPlan(tx,scope,data.planId);
+    });
+  });
+
+/** Four-week cohort assignment is all-or-nothing, not four client requests.
+ * A plan already attached to this release is idempotent; another release
+ * or Site is always rejected. Never infer affiliation from a Site name.
+ */
+export const attachFourWeekCohortPlans=createServerFn({method:"POST"})
+  .validator((v:unknown)=>releaseInput.extend({
+    planIds:z.array(id).min(1).max(4).refine(xs=>new Set(xs).size===xs.length,
+      "Every meeting must be distinct"),
+  }).strict().parse(v))
+  .handler(async({data})=>{
+    guard();
+    return db.transaction(async tx=>{
+      const scope=await scopedRelease(tx,data.releaseId,true);
+      const assigned=[];
+      for(const planId of data.planIds)
+        assigned.push(await assignCohortPlan(tx,scope,planId));
+      return {plans:assigned,attached:assigned.filter(p=>!p.duplicate).length};
     });
   });
 
