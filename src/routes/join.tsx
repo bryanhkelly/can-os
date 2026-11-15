@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeFacilitatedPairingCode } from "@/domain/facilitated-learning";
+import { classroomCodeFromFragment, displayClassroomCode } from "@/domain/classroom-connect";
 import { getClassroomConnectCourseChoices } from "@/modules/learning/classroom-connect.functions";
 import { pairWithFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 
@@ -22,10 +23,28 @@ function ClassroomJoinPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   useEffect(() => {
+    // QR payloads arrive only in the fragment. Remove the fragment immediately
+    // and remember it tab-locally across a one-time sign-in redirect. The code
+    // remains an untrusted, short-lived pointer, NEVER an authentication token.
+    const fromQr = classroomCodeFromFragment(window.location.hash);
+    if (window.location.hash.startsWith("#pair=")) {
+      window.history.replaceState(window.history.state, "", window.location.pathname + window.location.search);
+    }
+    if (fromQr) {
+      setCode(displayClassroomCode(fromQr));
+      try { window.sessionStorage.setItem("can-classroom-pending-pair-code", fromQr); } catch { /* manual entry remains available */ }
+    } else {
+      try {
+        const pending = window.sessionStorage.getItem("can-classroom-pending-pair-code");
+        if (pending) setCode(displayClassroomCode(pending));
+      } catch { /* stale/invalid tab state is ignored */ }
+    }
+  }, []);
+  useEffect(() => {
     let active = true;
     void getClassroomConnectCourseChoices()
       .then(result => { if (active) setChoices(result); })
-      .catch(() => { if (active) setError("Sign in as an enrolled learner to join a facilitated course. This feature may not yet be enabled."); })
+      .catch(() => { if (active) setError("Sign in with your CAN account and an authorized Course registration to join this classroom."); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
@@ -44,6 +63,7 @@ function ClassroomJoinPage() {
     try {
       await pairWithFacilitatedRoom({ data: { courseAttemptId: selected, pairingCode: normalized } });
       setCode("");
+      try { window.sessionStorage.removeItem("can-classroom-pending-pair-code"); } catch { /* no persistent code required */ }
       void navigate({ to: "/classroom/companion", search: { courseAttemptId: selected }, replace: true });
     } catch {
       setError("Pairing refused. Check the code, expiry, enrollment, and current Site assignment.");
@@ -55,6 +75,9 @@ function ClassroomJoinPage() {
     <section className="mt-5 border border-border bg-card p-5">
       {loading && <p role="status">Checking your current courses…</p>}
       {error && <p role="alert" className="mb-3 text-sm text-destructive">{error}</p>}
+      {!loading && !choices && <Button asChild variant="outline">
+        <Link to="/access" search={{returnTo:"/join"}}>Sign in to join</Link>
+      </Button>}
       {!loading && choices && <form className="space-y-4" onSubmit={e => void join(e)}>
         <label htmlFor="classroom-pair-code" className="block text-sm font-medium">Facilitator code</label>
         <Input id="classroom-pair-code" autoComplete="off" autoCapitalize="characters"
@@ -76,7 +99,8 @@ function ClassroomJoinPage() {
         </Button>
       </form>}
       <p className="mt-4 text-xs text-muted-foreground">
-        Your code is not saved in the page URL. Pairing is not verified attendance,
+        After opening a QR link, the secret is removed from the address bar and
+        kept only in this tab until pairing. Pairing is not verified attendance,
         time watched, a grade, a certificate, or a funding entitlement.
       </p>
     </section>
