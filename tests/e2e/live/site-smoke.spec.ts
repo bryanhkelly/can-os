@@ -36,7 +36,7 @@ test("@public create-school entry point renders without sending data", async ({ 
   await expect(page.getByRole("heading", { name: /Create a school/i })).toBeVisible();
 });
 
-for (const path of ["/guardian/students", "/student/courses", "/calendar",
+for (const path of ["/guardian/students", "/student/courses", "/calendar", "/canonical",
   "/canonical/lab/facilitated", "/canonical/lab/impact"]) {
   test(`@signed-out ${path} does not expose an authenticated workspace`, async ({ page }) => {
     await expectHealthyPage(page, path);
@@ -46,3 +46,41 @@ for (const path of ["/guardian/students", "/student/courses", "/calendar",
     );
   });
 }
+
+test("@public sign-in entry links preserve the requested return destination", async ({ page }) => {
+  await expectHealthyPage(page, "/access?returnTo=%2Flearn%2Fenroll");
+  await page.getByRole("link", { name: "Create a personal CAN account" }).click();
+  await expect(page.getByRole("heading", { name: "Create your CAN account" })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("returnTo")).toBe("/learn/enroll");
+  await page.getByRole("link", { name: "Sign in", exact: true }).last().click();
+  await expect(page.getByRole("textbox", { name: "Email" })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get("returnTo")).toBe("/learn/enroll");
+});
+
+test("@public navigation from access to discovery to adult training is usable", async ({ page }) => {
+  await expectHealthyPage(page, "/access?returnTo=%2F");
+  await page.getByRole("link", { name: "Explore programs and locations" }).click();
+  await expect(page.getByRole("heading", { name: "Explore programs and places" })).toBeVisible();
+  await expect(page.getByRole("searchbox", { name: "Program or location" })).toBeVisible();
+  await page.getByRole("link", { name: /Register for independent and facilitator-led adult training/ }).click();
+  await expect(page.getByRole("heading", { name: "Register for learning" })).toBeVisible();
+});
+
+test("@public create-school navigation remains read-only until explicit submission", async ({ page }) => {
+  await expectHealthyPage(page, "/access");
+  await page.getByRole("link", { name: "Create a school" }).click();
+  await expect(page.getByRole("heading", { name: "Create a school" })).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "School name" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Real school" })).toBeChecked();
+});
+
+test("@public release fingerprint identifies the deployed artifact without account data", async ({ request }) => {
+  const response = await request.get("/release-fingerprint");
+  expect(response.status()).toBe(200);
+  const body = await response.json();
+  expect(body).toEqual({
+    application: "can-os",
+    sourceRevision: expect.any(String),
+  });
+  expect(body.sourceRevision.length).toBeGreaterThan(0);
+});

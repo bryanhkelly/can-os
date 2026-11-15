@@ -7,8 +7,9 @@ on:
         description: Deployed CAN OS site to inspect
         required: true
         type: choice
-        default: can-os-demo-new
+        default: can-os-cloudflare
         options:
+          - can-os-cloudflare
           - can-os-demo-new
           - can-os-demo
       scope:
@@ -39,7 +40,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      CAN_LIVE_BASE_URL: ${{ inputs.target == 'can-os-demo' && 'https://can-os-demo.netlify.app' || 'https://can-os-demo-new.netlify.app' }}
+      CAN_LIVE_BASE_URL: ${{ inputs.target == 'can-os-cloudflare' && 'https://can-os.bryanhkelly.workers.dev' || (inputs.target == 'can-os-demo' && 'https://can-os-demo.netlify.app' || 'https://can-os-demo-new.netlify.app') }}
       QA_SCOPE: ${{ inputs.scope }}
     steps:
       - name: Checkout exact revision

@@ -110,26 +110,26 @@ function SchoolSetupPage() {
     }
   }
 
-  const field = "mt-1 block w-full rounded-lg border bg-background p-3";
+  const field = "mt-1 block min-h-11 w-full border border-border bg-background p-3 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
   return <main className="mx-auto max-w-xl space-y-6 px-6 py-12">
     <header>
       <p className="text-sm font-semibold text-muted-foreground">CAN OS school setup</p>
       <h1 className="mt-2 font-serif text-4xl">Create a school</h1>
       <p className="mt-3">Create a school profile and continue in its Launch Hub. Real schools use verified email; demo schools use a shared access code.</p>
     </header>
-    {signupRequested ? <section role="status" className="space-y-4 rounded-xl border bg-card p-6">
+    {signupRequested ? <section role="status" className="space-y-4 border border-border bg-card p-6">
       <h2 className="font-serif text-2xl">Check your email</h2>
       <p>If this email can start school setup, a one-time link will arrive shortly. Open it to verify your address and continue to the Launch Hub.</p>
       <p className="text-sm text-muted-foreground">Already have a CAN OS account? Sign in with that account instead.</p>
-      <Link to="/access" search={{ email }} className="inline-block rounded-lg border px-5 py-3">Return to sign in</Link>
-    </section> : result ? <section role="status" className="space-y-4 rounded-xl border bg-card p-6">
+      <Link to="/access" search={{ email }} className="inline-flex min-h-11 items-center border border-border px-5 py-3 font-semibold">Return to sign in</Link>
+    </section> : result ? <section role="status" className="space-y-4 border border-border bg-card p-6">
       <h2 className="font-serif text-2xl">Your demo school is ready</h2>
       <p>Domain: <strong>{result.domain}</strong></p>
       <p>Site Admin: <strong>{result.adminEmail}</strong></p>
       <p>Shared sign-in code: <strong>000000</strong></p>
       <p>Your basic school profile is saved. Sign in to open its Launch Hub; academic Programs can be added later.</p>
-      <Link to="/access" search={{ email: result.adminEmail, returnTo: `/launch/hub/school?siteId=${result.siteId}` }} className="inline-block rounded-lg bg-foreground px-5 py-3 text-background">Sign in and continue setup</Link>
-    </section> : <form onSubmit={submit} className="space-y-4 rounded-xl border bg-card p-6">
+      <Link to="/access" search={{ email: result.adminEmail, returnTo: `/launch/hub/school?siteId=${result.siteId}` }} className="inline-flex min-h-11 items-center bg-foreground px-5 py-3 font-semibold text-background">Sign in and continue setup</Link>
+    </section> : <form onSubmit={submit} className="space-y-4 border border-border bg-card p-6">
       <label className="block">School name
         <input required minLength={2} maxLength={160} value={name} onChange={event => setName(event.target.value)} className={field} />
       </label>
@@ -161,10 +161,10 @@ function SchoolSetupPage() {
         <p className="text-sm text-muted-foreground">Each .demo domain creates an isolated tenant. External email and SMS are suppressed. Publishing and opening readiness remain separate.</p>
       </>}
       {mutation.error && <p role="alert" className="text-sm text-destructive">{mutation.error}</p>}
-      <button disabled={!hydrated || mutation.pending} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">
+      <button disabled={!hydrated || mutation.pending} className="min-h-11 border border-primary bg-primary px-5 py-3 font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50">
         {mutation.pending ? mode === "demo" ? "Creating school..." : "Sending setup link..." : mode === "demo" ? "Create demo school" : "Continue with email"}
       </button>
     </form>}
-    <Link to="/access" className="text-sm underline">Already have a school? Sign in</Link>
+    <Link to="/access" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4">Already have a school? Sign in</Link>
   </main>;
 }

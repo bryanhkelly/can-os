@@ -346,6 +346,15 @@
       "writeBoundary": "Existing audited review and publish commands require current exact manifest and independent reviews covering academic, rights, accessibility, coverage and safeguarding"
     },
     {
+      "file": "src/routes/canonical.index.tsx",
+      "route": "/canonical/",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/canonical.lab.credentials.tsx",
       "route": "/canonical/lab/credentials",
       "owner": "operations",

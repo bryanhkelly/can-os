@@ -1,12 +1,13 @@
 import { defineConfig } from "@playwright/test";
 
 const targets = new Set([
+  "https://can-os.bryanhkelly.workers.dev",
   "https://can-os-demo-new.netlify.app",
   "https://can-os-demo.netlify.app",
 ]);
-const baseURL = process.env.CAN_LIVE_BASE_URL ?? "https://can-os-demo-new.netlify.app";
+const baseURL = process.env.CAN_LIVE_BASE_URL ?? "https://can-os.bryanhkelly.workers.dev";
 if (!targets.has(baseURL)) {
-  throw new Error("Live browser checks accept only the explicitly approved CAN OS Netlify hosts.");
+  throw new Error("Live browser checks accept only explicitly approved CAN OS deployment hosts.");
 }
 
 export default defineConfig({

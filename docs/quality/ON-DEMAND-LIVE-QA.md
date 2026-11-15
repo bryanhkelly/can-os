@@ -6,7 +6,7 @@
 
 1. Open **GitHub > Actions > CAN OS live QA - On-demand test and repair**.
 2. Click **Run workflow** on `main`.
-3. Select the deployed Netlify target and scope (all, public, or signed-out).
+3. Choose the Cloudflare CAN OS deployment (default), or an approved legacy Netlify deployment, and select scope (all, public, or signed-out).
 4. Leave **propose_fix** enabled if automatic *proposal* of a repair is wanted.
 5. Read the run summary; download `live-qa-evidence-<run-id>` for screenshots, videos, traces, and HTML output.
 
@@ -14,7 +14,7 @@ This workflow executes Playwright against a **deployed site** on demand. It does
 
 ## What runs
 
-The dedicated `playwright.live.config.ts` suite uses desktop and mobile Chromium to check the root entry point, sign-in form, school creation entry point, and signed-out access protection for guardian, student, and calendar routes. It only navigates with GET requests. The spec must never submit forms, log into accounts, send messages, or modify production data.
+The dedicated `playwright.live.config.ts` suite uses desktop and mobile Chromium to check the root entry point, sign-in form, click-through navigation from sign-in to personal-account registration, school setup, public program discovery and adult training, the deployed release fingerprint, and signed-out access protection for guardian, student, and calendar routes. It performs only read-only page navigation and GET requests. The spec must never submit forms, log into accounts, send messages, or modify production data.
 
 Authenticated workflows and state-changing scenarios belong to the existing disposable-Neon E2E suites. They require explicitly guarded test fixtures and separate nonproduction application/database environments.
 
@@ -33,7 +33,7 @@ Prerequisites for PR creation:
 
 ## Current limitations
 
-- The initial live suite is signed-out only. It does not claim to cover Blueprint approval, Launch Studio operations, real sessions, course delivery, admissions, or role-sensitive data.
+- The live suite is signed-out only and does not submit forms. It does not claim to cover Blueprint approval, Launch Studio operations, real sessions, course delivery, admissions, or role-sensitive data.
 - Browser testing does not currently run autonomously on ChatGPT message receipt; the supported trigger is GitHub Actions **Run workflow**.
 - Codex proposes fixes only when its API secret is configured, failure evidence supports a code defect, and the resulting patch passes validation.
 - A Playwright failure may come from an outdated deployment, an unavailable backend, or the test itself. Report uncertainty instead of manufacturing a passing result or bypassing security guards.
