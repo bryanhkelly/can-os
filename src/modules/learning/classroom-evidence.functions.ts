@@ -9,6 +9,7 @@ import {
   facilitatedRoomPresenceEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
@@ -57,6 +58,9 @@ async function learnerRoom(tx: Tx, courseAttemptId: string, roomId: string) {
   if (access.source === "school" && !await schoolAttemptIsPlacedAtSite(
     tx, access.courseAttemptId, room.deploymentId, room.siteId, now,
   )) throw new AuthorizationError("current school Site placement");
+  if(!await attemptInAssignedClassroomRelease(
+    tx,room,access.courseAttemptId,actor.actorPersonId,
+  ))throw new AuthorizationError("registered learner in assigned classroom release");
   return { room, personId: actor.actorPersonId };
 }
 
