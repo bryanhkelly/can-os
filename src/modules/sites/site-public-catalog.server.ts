@@ -1,4 +1,6 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
+import { readLinkedSiteNoncreditReleases } from "./site-noncredit-releases.server";
+import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, programs, sitePublications, sites } from "@/db/schema";
@@ -78,6 +80,8 @@ export async function readPublishedSiteCatalog(slug: string) {
     // requires a current, positive-capacity academic-year seat pool. Keep the
     // renderer's Program-level button and the parent DTO on the SAME decision.
     const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
+    const noncreditReleases = await readLinkedSiteNoncreditReleases(site.id, tx);
+    const enrollmentAppOrigin = noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
     return {
       parentInformation: projectApprovedParentInformation({
         site: { name: site.name, organizationName: site.organizationName },
@@ -92,6 +96,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       localContent,
       media,
       offerings: publicOfferings,
+      ...(noncreditReleases.length ? { noncreditReleases, enrollmentAppOrigin } : {}),
     };
   });
 }
