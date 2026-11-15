@@ -104,7 +104,8 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
     {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
     {notice&&<p role="status" className="text-sm">{notice}</p>}
     <p className="text-xs text-muted-foreground">
-      Responses are formative practice and remain attached to your own Course attempt.\n      Device heartbeats are client observations. They do not establish verified attendance,
+      Responses are formative practice and remain attached to your own Course attempt.
+      Device heartbeats are client observations. They do not establish verified attendance,
       video viewing, assessment completion or course credit.
     </p>
   </section>;
