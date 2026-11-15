@@ -7,9 +7,11 @@ on Neon `test01` and Neon `main`. Both standalone SQL patches are retained
 and their definitions are included in fresh-build `schema.sql`.
 **Database security:** All five tables have FORCE ROW LEVEL SECURITY, one
 owner-only policy, and no PUBLIC table grants; the SQL structure was verified.
-**Release:** `CAN_CANONICAL_ACTIVITY_ENABLED` and
-`CAN_FACILITATED_LEARNING_ENABLED` are **off by default**. No feature activation
-or end-to-end browser acceptance is claimed.
+**Runtime availability:** Learning sessions and facilitated delivery are normal
+capabilities on `main` without environment feature flags. The server fails closed
+unless the dedicated restricted native-auth connection and signing secrets are
+configured. Current live-site configuration and end-to-end browser acceptance
+are **not verified**, and code in `main` does not imply a deployed release.
 **CI:** GitHub Actions is still reporting `startup_failure`, not test success.
 
 ## What is implemented
