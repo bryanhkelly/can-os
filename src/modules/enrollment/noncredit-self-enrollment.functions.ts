@@ -11,6 +11,7 @@ import {
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
+  noncreditEnrollmentWaitlist,
   noncreditCompletionPolicies, noncreditTrainingVersions,
   auditEvents as canonicalAuditEvents, domainEvents as canonicalDomainEvents,
 } from "@/db/canonical-v301";
@@ -202,6 +203,17 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         throw new AuthorizationError("Current published completion policy");
 
       const now=new Date();
+      const [reservation]=await tx.select({
+        id:noncreditEnrollmentWaitlist.id,
+        status:noncreditEnrollmentWaitlist.status,
+        inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt,
+      }).from(noncreditEnrollmentWaitlist).where(and(
+        eq(noncreditEnrollmentWaitlist.releaseId,release.id),
+        eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId),
+        eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId),
+      )).limit(1).for("update");
+      const invited=reservation?.status==="invited"&&
+        !!reservation.inviteExpiresAt&&reservation.inviteExpiresAt>now;
       const native=await bindNativeLearnerIdentity(tx,owner,now);
       const [prior]=await tx.select({
         id:noncreditRegistrations.id,status:noncreditRegistrations.status,
@@ -230,8 +242,8 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         if(!attempt)throw new AuthorizationError("Existing course attempt requires review");
         registrationId=prior.id;attemptId=attempt.id;alreadyEnrolled=true;
       }else{
-        if(release.seatsRemaining<=0)
-          throw new AuthorizationError("This registration has reached capacity");
+        if(!invited&&(release.seatsRemaining<=0||release.hasWaitingQueue))
+          throw new AuthorizationError("This cohort is full or serving its waitlist; join the waiting queue");
         // New participant records cannot be invented when capacity is exhausted.
         await tx.insert(learnerProfiles).values({personId:native.personId})
           .onConflictDoNothing();
@@ -261,6 +273,12 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           consentSha256:release.consentSha256,adultAttested:data.adultConfirmed,
           referralCode:data.referralCode||null,
         });
+        if(invited&&reservation){
+          await tx.update(noncreditEnrollmentWaitlist).set({
+            status:"accepted",acceptedRegistrationId:registrationId,
+            updatedAt:now,
+          }).where(eq(noncreditEnrollmentWaitlist.id,reservation.id));
+        }
         await tx.insert(canonicalAuditEvents).values({
           actorPersonId:native.personId,owningOrganizationId:release.registeringOrganizationId,
           eventCode:"noncredit.self_enrolled",entityKind:"noncredit_registration",
@@ -317,6 +335,7 @@ export const getOpenNoncreditSelfEnrollment = createServerFn({method:"GET"})
       closesAt:row.closesAt.toISOString(),
       consentVersion:row.consentVersion,consentText:row.consentText,
       consentSha256:row.consentSha256,
+      hasWaitingQueue:row.hasWaitingQueue,
       sessions:plans.filter(p=>p.releaseId===row.id)
         .slice(0,20).map(p=>({
           startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),

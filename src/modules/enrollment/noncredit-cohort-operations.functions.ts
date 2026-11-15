@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,sql} from "drizzle-orm";
+import {and,asc,desc,eq,inArray,lte,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
@@ -8,10 +8,12 @@ import {
   facilitatedClassroomPlans,facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts,noncreditCompletionDecisions,
   noncreditRegistrations,noncreditSelfEnrollmentClaims,noncreditReleasedSeats,
+  noncreditEnrollmentWaitlist,
   noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
+import {readEligibleSelfEnrollmentReleases} from "./noncredit-self-enrollment-catalog.server";
 
 const id=z.string().uuid();
 const releaseInput=z.object({releaseId:id}).strict();
@@ -45,6 +47,10 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
     guard();
     return db.transaction(async tx=>{
       const {provider,release}=await scopedRelease(tx,data.releaseId);
+      const waitingEntries=await tx.select({status:noncreditEnrollmentWaitlist.status,
+        inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt})
+        .from(noncreditEnrollmentWaitlist)
+        .where(eq(noncreditEnrollmentWaitlist.releaseId,release.id)).limit(1001);
       const [title]=await tx.select({title:noncreditTrainingVersions.title})
         .from(noncreditTrainingVersions)
         .where(eq(noncreditTrainingVersions.id,release.trainingVersionId)).limit(1);
@@ -153,8 +159,11 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           completed:roster.filter(x=>latestDecision.get(x.registrationId)==="completed").length,
           verifiedAttendees:roster.filter(x=>x.courseAttemptId && present.has(x.courseAttemptId)).length,
           linkedSessions:plans.filter(p=>p.linkedReleaseId===release.id && p.state!=="cancelled").length,
+          waiting:waitingEntries.filter(p=>p.status==="waiting"||
+            (p.status==="invited"&&!!p.inviteExpiresAt&&p.inviteExpiresAt<=new Date())).length,
+          invitations:waitingEntries.filter(p=>p.status==="invited"&&!!p.inviteExpiresAt&&p.inviteExpiresAt>new Date()).length,
         },
-        partial:claims.length>500||plans.length>300||
+        partial:claims.length>500||plans.length>300||waitingEntries.length>1000||
           decisions.length>2000||attestations.length>3000,
         evidenceNote:"Facilitator-attested presence covers linked rooms only; pairing, video playback and enrollment are not attendance. Completion uses the latest noncredit decision, not a certificate claim.",
       };
@@ -275,5 +284,59 @@ export const releaseWithdrawnNoncreditSeat=createServerFn({method:"POST"})
         actorPersonId:provider.actor.actorPersonId!,payload,
       });
       return {released:true,duplicate:false};
+    });
+  });
+
+const inviteInput=z.object({releaseId:id}).strict();
+
+/** FIFO, 48-hour capacity hold. A host does NOT enroll or impersonate the
+ * invited person; the invited adult must accept the current terms and claim
+ * the held place using their own current verified CAN session. */
+export const inviteNextNoncreditWaitlist=createServerFn({method:"POST"})
+  .validator((v:unknown)=>inviteInput.parse(v))
+  .handler(async({data})=>{
+    guard();
+    return db.transaction(async tx=>{
+      const {provider,release}=await scopedRelease(tx,data.releaseId,true);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"self-enroll:"+release.id}))`);
+      const [eligible]=await readEligibleSelfEnrollmentReleases(tx,release.id);
+      if(!eligible||eligible.seatsRemaining<=0)
+        throw new AuthorizationError("a current authorized cohort with an available place");
+      const now=new Date();
+      // Expired holds no longer reserve a seat. Preserve timestamps in audit
+      // before returning an applicant to the waiting state.
+      const expired=await tx.update(noncreditEnrollmentWaitlist).set({
+        status:"waiting",invitedAt:null,inviteExpiresAt:null,updatedAt:now,
+      }).where(and(
+        eq(noncreditEnrollmentWaitlist.releaseId,release.id),
+        eq(noncreditEnrollmentWaitlist.status,"invited"),
+        lte(noncreditEnrollmentWaitlist.inviteExpiresAt,now),
+      )).returning({id:noncreditEnrollmentWaitlist.id});
+      const [next]=await tx.select().from(noncreditEnrollmentWaitlist)
+        .where(and(
+          eq(noncreditEnrollmentWaitlist.releaseId,release.id),
+          eq(noncreditEnrollmentWaitlist.status,"waiting"),
+        )).orderBy(asc(noncreditEnrollmentWaitlist.joinedAt),
+          asc(noncreditEnrollmentWaitlist.id)).limit(1).for("update");
+      if(!next)return {invited:false,waiting:false};
+      const until=new Date(Math.min(now.getTime()+48*60*60_000,release.closesAt.getTime()));
+      if(until<=now)throw new AuthorizationError("registration window expires before invitation");
+      await tx.update(noncreditEnrollmentWaitlist).set({
+        status:"invited",invitedAt:now,inviteExpiresAt:until,updatedAt:now,
+      }).where(eq(noncreditEnrollmentWaitlist.id,next.id));
+      const payload={releaseId:release.id,waitlistId:next.id,
+        invitationExpiresAt:until.toISOString(),expiredPriorHolds:expired.length};
+      await tx.insert(auditEvents).values({
+        actorPersonId:provider.actor.actorPersonId!,
+        owningOrganizationId:provider.organizationId,
+        eventCode:"noncredit.waitlist.invited",
+        entityKind:"noncredit_enrollment_waitlist",entityId:next.id,payload,
+      });
+      await tx.insert(domainEvents).values({
+        eventType:"NoncreditWaitlistInvited",
+        aggregateType:"noncredit_enrollment_waitlist",
+        aggregateId:next.id,actorPersonId:provider.actor.actorPersonId!,payload,
+      });
+      return {invited:true,waiting:true,inviteExpiresAt:until.toISOString()};
     });
   });
