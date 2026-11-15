@@ -8,6 +8,7 @@ import { useWorkspaceSession, workspaceSessionQueryOptions } from "@/components/
 import { switchVerifiedMembership } from "@/lib/workspace-membership-switch";
 import { getMyCanAccount, setMyCanFavoriteSite } from "@/modules/identity/my-can-account.functions";
 import { saveMyCanContact } from "@/modules/identity/my-can-profile.functions";
+import { getMyCanContactShares, setMyCanSiteContactShare } from "@/modules/identity/my-can-sharing.functions";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 
 /**
@@ -36,6 +37,14 @@ function MyCanAccount() {
     queryKey: ["my-can-account"],
     queryFn: () => getMyCanAccount(),
     enabled: session?.authenticated === true,
+    retry: false,
+    staleTime: 30_000,
+  });
+  const sharingQuery = useQuery({
+    queryKey: ["my-can-site-contact-consent"],
+    queryFn: () => getMyCanContactShares(),
+    enabled: session?.authenticated === true && query.data?.verified === true &&
+      !query.data?.identityNeedsReview && query.data?.demoAccountSwitching !== true,
     retry: false,
     staleTime: 30_000,
   });
@@ -137,26 +146,35 @@ function MyCanAccount() {
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
           </header>
           <div className="divide-y divide-border">
-            {visiblePlaces.map(place => <article key={place.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
-              <MapPin className="size-5 shrink-0 text-muted-foreground" aria-hidden="true"/>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{place.name}</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {[place.organizationName, [place.city, place.region].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}
-                </p>
+            {visiblePlaces.map(place => <article key={place.id} className="px-5 py-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <MapPin className="size-5 shrink-0 text-muted-foreground" aria-hidden="true"/>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold">{place.name}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {[place.organizationName, [place.city, place.region].filter(Boolean).join(", ")].filter(Boolean).join(" · ")}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {place.url ? <a href={place.url} target="_blank" rel="noopener noreferrer" className={sectionLink}
+                    aria-label={"Visit " + place.name}>Visit <ExternalLink className="size-3" aria-hidden="true"/></a>
+                    : <span className="text-xs text-muted-foreground">Workspace-only</span>}
+                  <Button variant={place.favorite ? "secondary" : "outline"} size="sm"
+                    disabled={busy !== null || !account.favoritesReady} aria-pressed={place.favorite}
+                    aria-label={(place.favorite ? "Remove " : "Save ") + place.name + (place.favorite ? " from favorites" : " to favorites")}
+                    onClick={() => void toggleFavorite(place.id, !place.favorite)}>
+                    {place.favorite ? <Check className="size-4" aria-hidden="true"/> : <Star className="size-4" aria-hidden="true"/>}
+                    {place.favorite ? "Saved" : "Save"}
+                  </Button>
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {place.url ? <a href={place.url} target="_blank" rel="noopener noreferrer" className={sectionLink}
-                  aria-label={"Visit " + place.name}>Visit <ExternalLink className="size-3" aria-hidden="true"/></a>
-                  : <span className="text-xs text-muted-foreground">Workspace-only</span>}
-                <Button variant={place.favorite ? "secondary" : "outline"} size="sm"
-                  disabled={busy !== null || !account.favoritesReady} aria-pressed={place.favorite}
-                  aria-label={(place.favorite ? "Remove " : "Save ") + place.name + (place.favorite ? " from favorites" : " to favorites")}
-                  onClick={() => void toggleFavorite(place.id, !place.favorite)}>
-                  {place.favorite ? <Check className="size-4" aria-hidden="true"/> : <Star className="size-4" aria-hidden="true"/>}
-                  {place.favorite ? "Saved" : "Save"}
-                </Button>
-              </div>
+              <SiteContactSharing siteId={place.id} siteName={place.name}
+                current={sharingQuery.data?.find(item => item.siteId === place.id)}
+                available={sharingQuery.isSuccess && account.verified &&
+                  !account.identityNeedsReview && !account.demoAccountSwitching}
+                onChanged={async () => {
+                  await queryClient.invalidateQueries({ queryKey: ["my-can-site-contact-consent"] });
+                }}/>
             </article>)}
             {!visiblePlaces.length && <p className="p-5 text-sm text-muted-foreground">
               {search ? "No available locations match your search." : "No published sites or authorized school locations are available yet."}
@@ -243,4 +261,78 @@ function AccountContactEditor({ profile, editable }: {
     </p>}
     {feedback && <p role="status" aria-live="polite" className="text-sm">{feedback}</p>}
   </form>;
+}
+
+type SiteConsentView = Awaited<ReturnType<typeof getMyCanContactShares>>[number];
+const consentPurposes = [
+  { value: "program_inquiry" as const, label: "Program inquiry or registration" },
+  { value: "school_application" as const, label: "School application" },
+  { value: "staff_onboarding" as const, label: "Staff onboarding" },
+];
+/**
+ * Consent is explicit and independent from favoriting. Neither action creates
+ * any enrollment, membership, school application or staff invitation.
+ */
+function SiteContactSharing({ siteId, siteName, current, available, onChanged }: {
+  siteId: string;
+  siteName: string;
+  current: SiteConsentView | undefined;
+  available: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [purpose, setPurpose] = useState<SiteConsentView["purpose"]>("program_inquiry");
+  const [sharePhone, setSharePhone] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState("");
+  async function decide(decision: "grant" | "revoke") {
+    if (!available || saving) return;
+    setSaving(true); setMessage("");
+    try {
+      await setMyCanSiteContactShare({ data: {
+        siteId, decision, sharePhone: decision === "grant" && sharePhone,
+        purpose: decision === "grant" ? purpose : current?.purpose ?? "program_inquiry",
+      } });
+      await onChanged();
+      setExpanded(false);
+      setMessage(decision === "grant" ? "Contact sharing enabled." : "Future contact sharing stopped.");
+    } catch (cause) {
+      setMessage(mutationErrorMessage(cause, "Unable to update contact sharing."));
+    } finally { setSaving(false); }
+  }
+  return <div className="mt-3 border-t border-border pt-3">
+    {current?.active ? <div className="flex flex-wrap items-center gap-3">
+      <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+        Contact shared for {consentPurposes.find(p => p.value === current.purpose)?.label.toLowerCase() ?? current.purpose}
+        {current.sharePhone ? " · includes phone" : " · email and name only"}
+      </p>
+      <Button variant="outline" size="sm" type="button" disabled={!available || saving}
+        onClick={() => void decide("revoke")}>Stop sharing</Button>
+    </div> : <>
+      <button type="button" className="text-xs font-semibold text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary"
+        disabled={!available || saving} aria-expanded={expanded}
+        onClick={() => setExpanded(!expanded)}>
+        Share my contact with this location
+      </button>
+      {expanded && <div className="mt-3 max-w-lg space-y-3 border border-border bg-muted/20 p-4">
+        <p className="text-sm leading-6">Allow {siteName} to see your CAN name and verified email address
+          for the purpose you select. This does not enroll you in anything or grant a staff role.</p>
+        <label htmlFor={"share-purpose-"+siteId} className="block text-xs font-semibold">Purpose</label>
+        <select id={"share-purpose-"+siteId} value={purpose}
+          onChange={event => setPurpose(event.target.value as SiteConsentView["purpose"])}
+          className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+          {consentPurposes.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
+        </select>
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" checked={sharePhone} onChange={event => setSharePhone(event.target.checked)}/>
+          Include my contact phone
+        </label>
+        <p className="text-xs leading-5 text-muted-foreground">You can revoke future access at any time.
+          Revoking does not erase information already lawfully received or retained by an organization.</p>
+        <Button type="button" size="sm" disabled={saving || !available}
+          onClick={() => void decide("grant")}>{saving ? "Saving…" : "Allow contact sharing"}</Button>
+      </div>}
+    </>}
+    {message && <p role="status" aria-live="polite" className="mt-2 text-xs">{message}</p>}
+  </div>;
 }
