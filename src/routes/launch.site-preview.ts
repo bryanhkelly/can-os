@@ -15,6 +15,8 @@ import { renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { renderSiteFirstPrivatePlan, siteFirstPreviewHeaders } from "@/domain/site-first-preview";
+import { readLinkedSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
+import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 
 function failure(status:number,title:string,message:string){
   return new Response(privateWebsitePreviewErrorPage(title,message), {
@@ -73,11 +75,16 @@ export const Route=createFileRoute("/launch/site-preview")({
             logoImage:siteLocalImagePublicationGaps(copy.branding.logoImage??null).length?null:copy.branding.logoImage??null,
           },
         };
+        const noncreditReleases=await readLinkedSiteNoncreditReleases(site.id);
         const page:PublicSitePage={
           host:publicSiteHost(publication.slug),
           site:{name:site.name,organizationName:site.organizationName},
           academicPrograms:academics,
           offerings:enrichment.map(toPublicSiteEnrichment),
+          ...(noncreditReleases.length?{
+            noncreditReleases,
+            enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
+          }:{}),
           localContent,
         };
         const parsed=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
