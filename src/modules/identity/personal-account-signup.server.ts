@@ -37,13 +37,11 @@ export async function requestPersonalCanAccount(input: unknown,
       }).from(accessAccounts).where(eq(accessAccounts.emailNormalized, email)).limit(1))[0];
     }
     if (!account || account.disabled) return;
-    const [grant, schoolSignup] = await Promise.all([
-      tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
-        .where(eq(accountPersonGrants.accountId, account.id)).limit(1),
-      tx.select({ id: schoolSetupSignups.id }).from(schoolSetupSignups)
-        .where(and(eq(schoolSetupSignups.accountId, account.id),
-          isNull(schoolSetupSignups.consumedAt), gt(schoolSetupSignups.expiresAt, new Date()))).limit(1),
-    ]);
+    const [grant] = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
+      .where(eq(accountPersonGrants.accountId, account.id)).limit(1);
+    const [schoolSignup] = await tx.select({ id: schoolSetupSignups.id }).from(schoolSetupSignups)
+      .where(and(eq(schoolSetupSignups.accountId, account.id),
+        isNull(schoolSetupSignups.consumedAt), gt(schoolSetupSignups.expiresAt, new Date()))).limit(1);
     // Real existing school/staff/guardian identities are never overwritten by
     // an anonymous signup; the same email receives its ordinary sign-in link.
     if (grant || schoolSignup) return;
