@@ -315,6 +315,13 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
     const [link]=await db.select().from(accessAccountNoncreditPrincipals)
       .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId)).limit(1);
     if(!link || link.accessPersonId!==owner.personId)return [];
+    const [native]=await db.select({id:canonicalAccounts.id})
+      .from(canonicalAccounts).where(and(
+        eq(canonicalAccounts.id,link.canonicalAccountId),
+        eq(canonicalAccounts.emailNormalized,owner.email),
+        isNull(canonicalAccounts.disabledAt),
+      )).limit(1);
+    if(!native)return [];
     return db.select({
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
       registrationId:noncreditRegistrations.id,
