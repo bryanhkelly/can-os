@@ -93,7 +93,10 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       </p>}
     </section>
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
-    {code&&<section className="mt-5 border border-border bg-card p-5" aria-label="Current device pairing code">
+    {code && Date.parse(code.expiresAt) > clockMs &&
+      data.rooms.some(room => room.id === code.roomId &&
+        effectiveRoomState(room, clockMs) === "live") &&
+      <section className="mt-5 border border-border bg-card p-5" aria-label="Current device pairing code">
       <p className="text-sm font-semibold">Share this code with enrolled learners in your room</p>
       <p className="mt-2 font-mono text-3xl tracking-widest" aria-live="polite">{code.code}</p>
       <p className="mt-2 text-sm text-muted-foreground">
