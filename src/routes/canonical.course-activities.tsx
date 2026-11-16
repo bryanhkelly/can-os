@@ -6,16 +6,16 @@ import { WorkspaceShell } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { getPublisherCourseActivityOptions } from "@/modules/classes/publisher-course-activity-options.functions";
 import { createCanonicalSurveyDraft } from "@/modules/operations/canonical-survey-draft.functions";
+import { createCanonicalObjectiveDraft } from "@/modules/classes/canonical-objective-draft.functions";
 import type { CreateSurveyDraftInput } from "@/domain/canonical-survey-draft";
 
 /**
  * The one-screen publisher experience from the original Class activities
  * prototype, restored WITHOUT its parallel answer, scoring or survey tables.
- * Existing canonical assessment authoring is not yet an authorized write
- * service. Quiz questions can be prepared/exported, NOT published here.
- * Canonical survey drafts are persisted through the existing restricted
- * survey authoring command; independent review and campaign creation remain
- * explicit separate steps.
+ * Quiz and survey drafts persist only through separately provisioned,
+ * organization-bound canonical authoring commands. Neither write publishes
+ * a Course assessment, survey campaign, result, credential or award.
+ * Independent review and publication remain separate authority boundaries.
  */
 export const Route=createFileRoute("/canonical/course-activities")({
   component:CourseActivityPublisher,
@@ -46,7 +46,12 @@ function CourseActivityPublisher(){
   const [feedback,setFeedback]=useState<Feedback[]>(freshFeedback);
   const [passing,setPassing]=useState(0.8);
   const [maxAttempts,setMaxAttempts]=useState(3);
-  const [quizPackage,setQuizPackage]=useState("");
+  const [quizKey,setQuizKey]=useState("");
+  const [quizTitle,setQuizTitle]=useState("Course knowledge check");
+  const [quizBusy,setQuizBusy]=useState(false);
+  const [quizDraft,setQuizDraft]=useState<{
+    assessmentVersionId:string;formVersionId:string;questionCount:number;
+  }|null>(null);
   const [surveyTitle,setSurveyTitle]=useState("Course feedback");
   const [surveyCode,setSurveyCode]=useState("");
   const [surveyBusy,setSurveyBusy]=useState(false);
@@ -57,30 +62,34 @@ function CourseActivityPublisher(){
 
   function editQuiz(key:string,change:Partial<Quiz>){
     setQuiz(current=>current.map(row=>row.key===key?{...row,...change}:row));
-    setQuizPackage("");
+    if(quizDraft)return;
   }
   function editFeedback(key:string,change:Partial<Feedback>){
     setFeedback(current=>current.map(row=>row.key===key?{...row,...change}:row));
   }
-  function exportQuiz(){
+  async function saveQuiz(){
+    if(quizBusy||quizDraft||!chosen)return;
     setError("");setNotice("");
-    if(!chosen||!validQuiz(quiz)){
-      setError("Select an approved Course and complete each quiz question and answer choice.");
+    if(!validQuiz(quiz)){
+      setError("Complete every quiz question and answer choice. Correct answers must be valid.");
       return;
     }
-    const body=JSON.stringify({
-      schema:"can-course-assessment-authoring-request-v1",
-      status:"unpublished-authoring-handoff",
-      courseVersionId:chosen.courseVersionId,
-      courseTitle:chosen.title,
-      assessmentPurpose:"formative",
-      passingFraction:passing,
-      maxAttempts,
-      questions:quiz.map(q=>({key:q.key,prompt:q.prompt.trim(),
-        choices:q.choices.map(v=>v.trim()),correctIndex:q.correctIndex})),
-    },null,2);
-    setQuizPackage(body);
-    setNotice("Quiz authoring package prepared. It is not saved to the database, published, or available to learners. It contains answer keys; share only with an authorized assessment publisher.");
+    setQuizBusy(true);
+    try{
+      const result=await createCanonicalObjectiveDraft({data:{
+        courseVersionId:chosen.courseVersionId,
+        assessmentKey:quizKey.trim().toLowerCase(),title:quizTitle.trim(),
+        passingFraction:passing,maxAttempts,
+        questions:quiz.map(q=>({prompt:q.prompt.trim(),
+          choices:q.choices.map(v=>v.trim()),correctIndex:q.correctIndex})),
+      }});
+      setQuizDraft({assessmentVersionId:result.assessmentVersionId,
+        formVersionId:result.formVersionId,questionCount:result.questionCount});
+      setNotice("Canonical assessment draft saved with sealed answer keys. Independent review and publication are required before any Class can use it.");
+    }catch(cause){
+      setError(normalizeClientError(cause,
+        "Assessment draft could not be saved. Verify the optional restricted publisher role, encryption key, and feature activation.").message);
+    }finally{setQuizBusy(false);}
   }
   async function saveSurvey(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
@@ -131,7 +140,9 @@ function CourseActivityPublisher(){
         <select id="course-activity-course" value={courseVersionId}
           onChange={e=>{
             setCourseVersionId(e.target.value);
-            setQuizPackage("");setSurveyDraft(null);setNotice("");setError("");
+            setQuizDraft(null);setQuiz(freshQuiz());setQuizKey("");
+            setQuizTitle("Course knowledge check");setSurveyDraft(null);
+            setNotice("");setError("");
           }} className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
           <option value="">Select a publisher-owned Course</option>
           {courses.data.courses.map(row=><option key={row.courseVersionId}
@@ -163,13 +174,31 @@ function CourseActivityPublisher(){
       <h2 className="mt-2 font-serif text-2xl">Knowledge check</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Five questions are the default, not hardcoded content. Correct answers are
-        restricted publisher material. The questions remain an unpublished authoring
-        handoff until the canonical assessment writer and independent approval are available.
+        restricted publisher material. Save a real canonical draft using the
+        organization-bound writer. Only a separate authorized reviewer can
+        approve and publish it. No learner sees draft questions or answer keys.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-semibold">
+          Assessment title
+          <input value={quizTitle} minLength={5} maxLength={160} required
+            disabled={quizBusy||!!quizDraft}
+            onChange={e=>setQuizTitle(e.target.value)}
+            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+            placeholder="AI skills knowledge check"/>
+        </label>
+        <label className="text-sm font-semibold">
+          Unique assessment key
+          <input value={quizKey} required pattern="[a-z][a-z0-9_-]{2,63}"
+            maxLength={64} disabled={quizBusy||!!quizDraft}
+            onChange={e=>setQuizKey(e.target.value.toLowerCase())}
+            placeholder="ai_skills_check_01"
+            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+        </label>
+        <label className="text-sm font-semibold">
           Passing threshold
-          <select value={passing} onChange={e=>{setPassing(Number(e.target.value));setQuizPackage("");}}
+          <select value={passing} disabled={quizBusy||!!quizDraft}
+            onChange={e=>setPassing(Number(e.target.value))}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
             {[0.6,0.7,0.8,0.9,1].map(v=><option key={v} value={v}>
               {Math.round(v*100)}%
@@ -178,7 +207,8 @@ function CourseActivityPublisher(){
         </label>
         <label className="text-sm font-semibold">
           Maximum attempts
-          <select value={maxAttempts} onChange={e=>{setMaxAttempts(Number(e.target.value));setQuizPackage("");}}
+          <select value={maxAttempts} disabled={quizBusy||!!quizDraft}
+            onChange={e=>setMaxAttempts(Number(e.target.value))}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
             {[1,2,3,4,5].map(v=><option key={v} value={v}>{v} attempt{v>1?"s":""}</option>)}
           </select>
@@ -191,6 +221,7 @@ function CourseActivityPublisher(){
             Question text
           </label>
           <input id={"quiz-prompt-"+question.key} value={question.prompt} maxLength={500}
+            disabled={quizBusy||!!quizDraft}
             onChange={e=>editQuiz(question.key,{prompt:e.target.value})}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
             placeholder="Enter an original knowledge-check question"/>
@@ -198,6 +229,7 @@ function CourseActivityPublisher(){
             {question.choices.map((choice,i)=><label key={i} className="text-sm">
               Answer {i+1}
               <input value={choice} maxLength={200}
+                disabled={quizBusy||!!quizDraft}
                 onChange={e=>editQuiz(question.key,{choices:question.choices.map(
                   (value,j)=>j===i?e.target.value:value,
                 )})}
@@ -208,6 +240,7 @@ function CourseActivityPublisher(){
             Correct answer (publisher only)
           </label>
           <select id={"quiz-answer-"+question.key} value={question.correctIndex}
+            disabled={quizBusy||!!quizDraft}
             onChange={e=>editQuiz(question.key,{correctIndex:Number(e.target.value)})}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
             {question.choices.map((choice,i)=><option value={i} key={i}>
@@ -215,45 +248,45 @@ function CourseActivityPublisher(){
             </option>)}
           </select>
           <Button type="button" variant="outline" size="sm" className="mt-3"
-            disabled={quiz.length<=1} onClick={()=>{setQuiz(rows=>rows.filter(
-              row=>row.key!==question.key));setQuizPackage("");}}>
+            disabled={quizBusy||!!quizDraft||quiz.length<=1}
+            onClick={()=>setQuiz(rows=>rows.filter(row=>row.key!==question.key))}>
             Remove question
           </Button>
         </fieldset>)}
       </div>
       <div className="mt-4 flex flex-wrap gap-3">
-        <Button type="button" variant="outline" disabled={quiz.length>=10}
+        <Button type="button" variant="outline"
+          disabled={quizBusy||!!quizDraft||quiz.length>=10}
           onClick={()=>{setQuiz(rows=>[...rows,{
             key:"quiz_"+crypto.randomUUID().slice(0,8),prompt:"",
             choices:["","","",""],correctIndex:0,
-          }]);setQuizPackage("");}}>
+          }])}}>  
           Add question
         </Button>
-        <Button type="button" disabled={!chosen||!validQuiz(quiz)} onClick={exportQuiz}>
-          Prepare canonical authoring handoff
+        <Button type="button"
+          disabled={!chosen||quizBusy||!!quizDraft||!validQuiz(quiz)||
+            !/^[a-z][a-z0-9_-]{2,63}$/.test(quizKey)||
+            quizTitle.trim().length<5}
+          onClick={()=>void saveQuiz()}>
+          {quizBusy?"Saving encrypted canonical draft…":quizDraft?
+            "Canonical draft saved":"Save canonical quiz draft"}
         </Button>
       </div>
-      {quizPackage&&<div className="mt-4 space-y-2">
-        <label className="block text-sm font-semibold" htmlFor="quiz-authoring-package">
-          Unpublished authoring package · contains private answer keys
-        </label>
-        <textarea id="quiz-authoring-package" value={quizPackage} readOnly rows={7}
-          className="w-full border border-border bg-muted/20 p-3 font-mono text-xs"/>
-        <div className="flex flex-wrap gap-3">
-          <Button type="button" variant="outline" onClick={()=>void navigator.clipboard
-            .writeText(quizPackage)
-            .then(()=>setNotice("Publisher-only knowledge-check draft copied. It is not published."))
-            .catch(()=>setError("Clipboard access is unavailable. Select the authoring package above and copy manually."))}>
-            Copy unpublished authoring package
-          </Button>
-          <Link to="/canonical/lab/readiness" className="self-center text-sm font-semibold underline">
-            Existing canonical assessment inventory
-          </Link>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          This is an export, NOT a saved assessment. Never give this source to learners.
-          Canonical publication requires separate author/reviewer authorization.
+      {quizDraft&&<div role="status"
+        className="mt-4 space-y-2 border border-border bg-muted/20 p-4 text-sm">
+        <p className="font-semibold">Canonical knowledge-check draft saved</p>
+        <p className="break-all font-mono text-xs">
+          Assessment {quizDraft.assessmentVersionId}
         </p>
+        <p className="break-all font-mono text-xs">Form {quizDraft.formVersionId}</p>
+        <p className="text-muted-foreground">
+          {quizDraft.questionCount} sealed objective questions. This version
+          is not published or accessible to learners. Independent assessment
+          publication approval and local administration are still required.
+        </p>
+        <Link to="/canonical/lab/readiness" className="inline-block font-semibold underline">
+          Canonical assessment inventory
+        </Link>
       </div>}
     </section>
     <form className="mt-5 border border-border bg-card p-5" onSubmit={e=>void saveSurvey(e)}
@@ -346,7 +379,9 @@ function CourseActivityPublisher(){
       <ul className="mt-3 space-y-2 text-sm">
         <li>Course publication: {chosen?"Selected":"Select a published Course"}</li>
         <li>Canonical knowledge check: {chosen?.publishedKnowledgeChecks.length?
-          "Publisher version available":"Publisher assessment authoring and approval required"}</li>
+          "Publisher version already published":quizDraft?
+            "Draft persisted; independent approval and publication pending":
+            "Assessment draft and approval required"}</li>
         <li>Survey draft: {surveyDraft?"Saved; independent approval still required":
           "Not yet saved"}</li>
         <li>Local delivery: create an authorized Class and approved local survey campaign</li>
