@@ -137,6 +137,58 @@ CREATE TABLE IF NOT EXISTS education_v30.class_awards (
 CREATE INDEX IF NOT EXISTS canonical_class_awards_outcome_idx
  ON education_v30.class_awards(class_outcome_id,issued_at);
 
+-- Class instructional authority is explicit and independent of publisher
+-- content authoring, general Site role, learner enrollment and credit issuance.
+CREATE TABLE IF NOT EXISTS education_v30.class_staff_assignments (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ class_id uuid NOT NULL REFERENCES education_v30.classes(id),
+ person_id uuid NOT NULL REFERENCES education_v30.persons(id),
+ role_code text NOT NULL CHECK(role_code IN ('teacher','facilitator')),
+ state text NOT NULL DEFAULT 'approved' CHECK(state IN ('approved','suspended','ended')),
+ begins_at timestamptz NOT NULL DEFAULT now(),
+ ends_at timestamptz,
+ assigned_by_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT canonical_class_staff_window_ck CHECK(ends_at IS NULL OR ends_at>begins_at)
+);
+CREATE INDEX IF NOT EXISTS canonical_class_staff_class_idx
+ ON education_v30.class_staff_assignments(class_id,state);
+CREATE INDEX IF NOT EXISTS canonical_class_staff_person_idx
+ ON education_v30.class_staff_assignments(person_id,state);
+CREATE UNIQUE INDEX IF NOT EXISTS canonical_class_staff_one_live_role_uq
+ ON education_v30.class_staff_assignments(class_id,person_id,role_code)
+ WHERE state='approved';
+
+CREATE OR REPLACE FUNCTION education_v30.canonical_class_staff_guard()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+ IF TG_OP='DELETE' THEN
+   RAISE EXCEPTION 'Class staff assignment history must be preserved' USING ERRCODE='23514';
+ END IF;
+ IF ROW(OLD.class_id,OLD.person_id,OLD.role_code,OLD.begins_at,
+        OLD.assigned_by_person_id,OLD.created_at)
+    IS DISTINCT FROM
+    ROW(NEW.class_id,NEW.person_id,NEW.role_code,NEW.begins_at,
+        NEW.assigned_by_person_id,NEW.created_at) THEN
+   RAISE EXCEPTION 'Class staff authority is immutable; end and reassign' USING ERRCODE='23514';
+ END IF;
+ IF OLD.state<>'approved' AND NEW.state IS DISTINCT FROM OLD.state THEN
+   RAISE EXCEPTION 'Class staff authority cannot be resurrected' USING ERRCODE='23514';
+ END IF;
+ IF OLD.ends_at IS NOT NULL AND OLD.ends_at IS DISTINCT FROM NEW.ends_at THEN
+   RAISE EXCEPTION 'Class staff end date cannot be rewritten' USING ERRCODE='23514';
+ END IF;
+ IF OLD.state='approved' AND NEW.state<>'approved' AND NEW.ends_at IS NULL THEN
+   RAISE EXCEPTION 'Ending staff authority requires an end time' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS canonical_class_staff_guard_trg
+ ON education_v30.class_staff_assignments;
+CREATE TRIGGER canonical_class_staff_guard_trg BEFORE UPDATE OR DELETE
+ ON education_v30.class_staff_assignments FOR EACH ROW
+ EXECUTE FUNCTION education_v30.canonical_class_staff_guard();
+
 -- A Class cannot silently change to a different Course/adoption after creation.
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_identity_guard()
 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -197,7 +249,7 @@ DECLARE obj text;
 BEGIN
  FOREACH obj IN ARRAY ARRAY[
  'classes','class_offerings','class_offering_versions',
- 'class_enrollments','class_outcomes','class_awards'
+ 'class_enrollments','class_outcomes','class_awards','class_staff_assignments'
  ] LOOP
   EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',obj);
   EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',obj);
