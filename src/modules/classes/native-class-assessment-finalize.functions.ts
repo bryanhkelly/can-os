@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -7,7 +7,7 @@ import {
   assessmentAccess, assessmentAutoScores, assessmentDefinitions,
   assessmentExecutionAttempts, assessmentExecutionItems, assessmentExecutionResults,
   assessmentFormAdministrations, assessmentFormVersions, assessmentVersions,
-  learnerCourseAttempts, canonicalClassEnrollments, canonicalClasses, learnerProfiles,
+  learnerCourseAttempts, canonicalClassEnrollments, canonicalClasses, canonicalPersons, learnerProfiles,
   auditEvents, domainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
@@ -18,6 +18,77 @@ import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canon
 
 const input=z.object({classEnrollmentId:z.string().uuid(),
   assessmentAttemptId:z.string().uuid()}).strict();
+
+const pendingInput=z.object({classId:z.string().uuid()}).strict();
+
+/** Per-Class provider queue, no raw answers or quiz keys. This query does not
+ * infer permission from a teacher/facilitator or an audience display.
+ */
+export const getNativeClassPendingKnowledgeReviews=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>pendingInput.parse(raw))
+  .handler(async({data})=>{
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+      throw new AuthorizationError("native Class release not activated");
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCanonicalCommandContext(getRequest());
+    if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
+      throw new AuthorizationError("independent Class assessment reviewer");
+    assertCapability(actor,"class.manage");
+    assertCapability(actor,"noncredit.assessment.finalize");
+    const organizationId=actor.scope.organizationIds?.[0];
+    if(!organizationId||actor.scope.organizationIds?.length!==1)
+      throw new AuthorizationError("single authorized provider");
+    return db.transaction(async tx=>{
+      const [cls]=await tx.select().from(canonicalClasses)
+        .where(eq(canonicalClasses.id,data.classId)).limit(1);
+      if(!cls||cls.operatingOrganizationId!==organizationId||
+        (cls.siteId&&!actor.scope.siteIds?.includes(cls.siteId))||
+        (!cls.siteId&&cls.createdByPersonId!==actor.actorPersonId))
+        throw new AuthorizationError("current exact operated Class");
+      await validateClassAuthority(tx,{
+        actor,organizationId,siteIds:actor.scope.siteIds??[],
+      },{
+        deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
+        offeringVersionId:cls.offeringVersionId,
+        courseVersionId:cls.courseVersionId,
+        operatingOrganizationId:cls.operatingOrganizationId,
+        siteId:cls.siteId,title:cls.title,deliveryMode:cls.deliveryMode,
+      });
+      const rows=await tx.select({
+        classEnrollmentId:canonicalClassEnrollments.id,
+        assessmentAttemptId:assessmentExecutionAttempts.id,
+        firstName:canonicalPersons.legalFirstName,
+        lastName:canonicalPersons.legalLastName,
+        submittedAt:assessmentExecutionAttempts.submittedAt,
+      }).from(assessmentExecutionAttempts)
+        .innerJoin(assessmentAccess,eq(
+          assessmentAccess.id,assessmentExecutionAttempts.accessGrantId))
+        .innerJoin(learnerCourseAttempts,eq(
+          learnerCourseAttempts.id,assessmentAccess.courseAttemptId))
+        .innerJoin(canonicalClassEnrollments,and(
+          eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
+          eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id)))
+        .innerJoin(canonicalPersons,eq(
+          canonicalPersons.id,canonicalClassEnrollments.learnerPersonId))
+        .innerJoin(assessmentFormAdministrations,eq(
+          assessmentFormAdministrations.id,assessmentExecutionAttempts.administrationId))
+        .where(and(
+          eq(canonicalClassEnrollments.classId,cls.id),
+          eq(canonicalClassEnrollments.status,"active"),
+          eq(assessmentExecutionAttempts.state,"scored"),
+          eq(assessmentAccess.accessStatus,"approved"),
+          eq(assessmentFormAdministrations.deploymentId,cls.deploymentId),
+          eq(assessmentFormAdministrations.courseVersionId,cls.courseVersionId),
+          eq(assessmentFormAdministrations.administeringOrganizationId,organizationId),
+        )).orderBy(asc(assessmentExecutionAttempts.submittedAt)).limit(101);
+      return {pending:rows.slice(0,100).map(r=>({
+        classEnrollmentId:r.classEnrollmentId,
+        assessmentAttemptId:r.assessmentAttemptId,
+        learnerName:[r.firstName,r.lastName].filter(Boolean).join(" ")||"Learner",
+        submittedAt:r.submittedAt?.toISOString()??null,
+      })),partial:rows.length>100};
+    });
+  });
 
 /** Independent provider review of a Class's EXISTING canonical assessment
  * result. Uses assessment_attempt_results and its database-owned result
