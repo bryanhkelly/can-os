@@ -1,6 +1,6 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import type { SiteContentBlockProjection } from "./site-content-channels";
-import { renderSiteNoncreditOfferings, type SiteNoncreditListing } from "./site-noncredit-public";
+import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
 import { templateDefaultImage, templateSampleImage } from "./template-sample-images";
@@ -984,7 +984,7 @@ ${composePublicSiteChrome(templateId, {
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual students or facilities of this school.</p>` : ""}
-  ${pageContent[path]}\n  ${path === "/" ? !hasContentChannel("learning.noncredit") ? renderSiteNoncreditOfferings(page.noncreditReleases ?? [], page.enrollmentAppOrigin) : "" : ""}\n</main>`,
+  ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
 })}
 </body>

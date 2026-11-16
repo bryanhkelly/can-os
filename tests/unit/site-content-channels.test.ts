@@ -13,7 +13,7 @@ describe("Site-owned website content channels", () => {
     const privateBlocks = resolveSiteContentBlocks(config, {
       mode: "private", preferences: {delivery: proposed.delivery, interestIds: [...proposed.interestIds]},
     });
-    expect(privateBlocks).toHaveLength(1);
+    expect(privateBlocks).toHaveLength(1); // Noncredit feed is empty; only proposed programs render.
     expect(privateBlocks[0]!.items.map(item => item.title))
       .toEqual(["Afterschool", "Adult Learning"]);
     expect(privateBlocks[0]!.items.every(item => !item.link)).toBe(true);

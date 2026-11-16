@@ -59,6 +59,12 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     eyebrow: "Your learning community",
     title: "Programs you are exploring",
     description: "These are planning interests, not approved offerings or enrollment opportunities.",
+  }, {
+    id: "eligible-training", channel: "learning.noncredit",
+    placement: "learning", layout: "cards", enabled: true,
+    eyebrow: "Training & learning",
+    title: "Programs available for enrollment",
+    description: "Approved noncredit training opportunities for this Site.",
   }],
 };
 
@@ -152,7 +158,7 @@ export function resolveSiteContentBlocks(
           id: program.programId, title: program.title, description: program.summary,
           label: program.availability === "operating"
             ? "Reviewed academic program" : "Program planned · admissions not open",
-          link: {href: "/academics", label: "Explore academic programs"},
+          ...(feeds.mode === "public" ? {link: {href: "/academics", label: "Explore academic programs"}} : {}),
         }));
         break;
       case "learning.enrichment":
@@ -160,7 +166,7 @@ export function resolveSiteContentBlocks(
           id: item.seasonId, title: item.title,
           description: item.programName,
           label: item.registrationOpen ? "Published program" : "Registration not open",
-          link: {href: "/student-life", label: "View program details"},
+          ...(feeds.mode === "public" ? {link: {href: "/student-life", label: "View program details"}} : {}),
         }));
         break;
       case "learning.noncredit":
@@ -168,7 +174,7 @@ export function resolveSiteContentBlocks(
           id: item.releaseId, title: item.title, description: item.siteName,
           label: item.seatsRemaining > 0 ? "Enrollment available" :
             item.waitlistAvailable ? "Waitlist available" : "Registration unavailable",
-          ...(origin && (item.seatsRemaining > 0 || item.waitlistAvailable) &&
+          ...(feeds.mode === "public" && origin && (item.seatsRemaining > 0 || item.waitlistAvailable) &&
             /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.releaseId)
             ? {link: {href: origin + "/learn/enroll?release=" + encodeURIComponent(item.releaseId),
               label: item.seatsRemaining > 0 ? "Register for training" : "Join the waitlist"}}
