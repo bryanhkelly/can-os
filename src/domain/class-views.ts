@@ -35,5 +35,5 @@ export function selectClassTab(
   if (requested && !classTabs[view].some(tab => tab === requested)) {
     throw new AuthorizationError("requested Class tab for authorized view");
   }
-  return requested as (typeof classTabs)[typeof view][number] ?? classTabs[view][0];
+  return (requested ?? classTabs[view][0]) as (typeof classTabs)[typeof view][number];
 }
