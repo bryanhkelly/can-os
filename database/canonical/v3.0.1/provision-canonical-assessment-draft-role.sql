@@ -55,6 +55,9 @@ SELECT format('GRANT %I TO %I WITH INHERIT FALSE, SET TRUE',
 SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v301_create_objective_assessment_draft(uuid,uuid,uuid,text,text,numeric,integer,jsonb) TO %I',
  :'draft_role')
 \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v301_list_objective_assessment_drafts(uuid,uuid) TO %I',
+ :'draft_role')
+\gexec
 INSERT INTO education_v30.database_role_organization_bindings
 (db_role,organization_id,purpose_code,valid_from,status)
 SELECT :'draft_role'::name,:'organization_id'::uuid,
