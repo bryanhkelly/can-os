@@ -254,11 +254,12 @@ Enrollment, Course Attempt and linked campaign, never Course/Deployment
 coincidence alone. The noncredit path does not expose a Class-attributed
 campaign once native Class is activated.
 
-For knowledge checks, `getCanonicalClassPublisher` resolves content
-ownership through the published Offering. Local Class operators may
-administer an authorized publisher-owned canonical assessment under their
-own governed Deployment without becoming the content publisher or
-altering secure answers. Provisioning, submissions and independent result
+For knowledge checks, `getCanonicalClassPublisher` resolves **Course content
+ownership** from the canonical Course publisher, independently from an
+Offering distributor, while verifying current published Offering/Course
+membership. Local Class operators may administer an authorized
+publisher-owned canonical assessment under their own governed Deployment
+without becoming the content publisher or altering secure answers. Provisioning, submissions and independent result
 confirmation retain separate authorization and audit boundaries.
 
 The Class learner's Assignments view now includes a clearer, deliberately
