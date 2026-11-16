@@ -21,6 +21,7 @@ export const courseActivityPublicationSchema=z.object({
   quizQuestions:z.array(quizPromptSchema).min(1).max(10),
   feedbackQuestions:z.array(feedbackPromptSchema).max(10),
   passingFraction:z.number().min(0.1).max(1),
+  maxQuizAttempts:z.number().int().min(1).max(5).default(3),
   requireAllLessons:z.boolean(),
   feedbackRequired:z.boolean(),
   feedbackConsentVersion:z.string().trim().min(3).max(60),
