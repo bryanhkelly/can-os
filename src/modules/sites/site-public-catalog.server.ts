@@ -1,6 +1,7 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
+import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -31,6 +32,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       id: sites.id,
       name: sites.name,
       metadata: sites.metadata,
+      timezone:sites.timezone,
       organizationName: organizations.name,
       status: sitePublications.status,
       publishedAt: sitePublications.publishedAt,
@@ -82,12 +84,14 @@ export async function readPublishedSiteCatalog(slug: string) {
     // renderer's Program-level button and the parent DTO on the SAME decision.
     const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
     const noncreditReleases = await readOptionalSiteNoncreditReleases(site.id, tx);
+    const classes = await readOptionalSitePublishedClasses(site.id, tx);
     const enrollmentAppOrigin = noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
     const contentConfig = safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const contentBlocks = resolveSiteContentBlocks(
       contentConfig, {
         mode: "public", academicPrograms: authorizedPrograms,
         enrichment: publicOfferings, noncredit: noncreditReleases,
+        classes, classTimezone:site.timezone,
         enrollmentOrigin: enrollmentAppOrigin,
       });
     return {

@@ -11,7 +11,7 @@ import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch
 export const siteContentChannelIds = [
   "learning.interests", "learning.academics",
   "learning.enrichment", "learning.noncredit",
-  "site.setup", "site.network",
+  "site.setup", "site.network", "learning.classes",
 ] as const;
 export type SiteContentChannelId = typeof siteContentChannelIds[number];
 
@@ -73,6 +73,11 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     title: "Programs you are exploring",
     description: "These are planning interests, not approved offerings or enrollment opportunities.",
   }, {
+    id: "public-classes", channel: "learning.classes",
+    placement: "learning", layout: "cards", enabled: true,
+    eyebrow: "Classroom experiences", title: "Upcoming learning Classes",
+    description: "Publicly published Classes at this Site. Enrollment is managed separately.",
+  }, {
     id: "eligible-training", channel: "learning.noncredit",
     placement: "learning", layout: "cards", enabled: true,
     eyebrow: "Training & learning",
@@ -93,7 +98,7 @@ export function readSiteContentChannelConfig(raw: unknown): SiteContentChannelCo
   if (v2.success) return v2.data;
   const v1 = legacySiteContentChannelConfigSchema.parse(raw);
   const missing = defaultSiteContentChannelConfig.blocks.filter(block =>
-    (block.channel === "site.setup" || block.channel === "site.network") &&
+    (block.channel === "site.setup" || block.channel === "site.network" || block.channel === "learning.classes") &&
     !v1.blocks.some(existing => existing.channel === block.channel));
   return siteContentChannelConfigSchema.parse({
     ...v1, version: 2, blocks: [...v1.blocks, ...missing],
@@ -138,6 +143,12 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
     defaultTitle: "Learning beyond the classroom", defaultEyebrow: "Explore more",
     defaultDescription: "Discover published enrichment and community activities.",
   },
+  "learning.classes": {
+    label: "Published native Classes", privateOnly: false,
+    description: "Only published public Class Offerings at the exact approved canonical Site, with safe next-Session details.",
+    defaultTitle: "Upcoming learning Classes", defaultEyebrow: "Classroom experiences",
+    defaultDescription: "Publicly published Classes at this Site. Registration terms are governed separately.",
+  },
   "learning.noncredit": {
     label: "Eligible noncredit training", privateOnly: false,
     description: "Pulls separately approved, currently enrollable Site training releases.",
@@ -163,6 +174,12 @@ export type SiteContentItem = {
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
 
+export type SitePublishedClassListing = {
+  classId:string;title:string;
+  deliveryMode:"self_paced"|"scheduled"|"facilitated"|"hybrid";
+  nextStartsAt:string|null;
+};
+
 export type SiteContentChannelFeeds = {
   /** The Site, not the preview route, resolves its channel sources. */
   mode: "private" | "public";
@@ -180,6 +197,8 @@ export type SiteContentChannelFeeds = {
     registrationOpen: boolean;
   }[];
   noncredit?: readonly SiteNoncreditListing[];
+  classes?: readonly SitePublishedClassListing[];
+  classTimezone?: string | null;
   enrollmentOrigin?: string | null;
 };
 
@@ -253,6 +272,29 @@ export function resolveSiteContentBlocks(
           ...(feeds.mode === "public" ? {link: {href: "/student-life", label: "View program details"}} : {}),
         }));
         break;
+      case "learning.classes": {
+        const labels = {
+          self_paced:"Self-paced",scheduled:"Scheduled",facilitated:"Facilitated",
+          hybrid:"Hybrid",
+        } as const;
+        items=(feeds.classes ?? []).map(item=>{
+          let next="";
+          if(item.nextStartsAt){
+            try{
+              next=" · Next session "+new Intl.DateTimeFormat("en-US",{
+                year:"numeric",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",
+                timeZone:feeds.classTimezone??"UTC",timeZoneName:"short",
+              }).format(new Date(item.nextStartsAt));
+            }catch{next="";}
+          }
+          return {
+            id:item.classId,title:item.title,
+            description:labels[item.deliveryMode]+next,
+            label:"Published public Class · Enrollment terms separately governed",
+          };
+        });
+        break;
+      }
       case "learning.noncredit":
         items = (feeds.noncredit ?? []).map(item => ({
           id: item.releaseId, title: item.title, description: item.siteName,

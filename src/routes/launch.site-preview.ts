@@ -18,6 +18,7 @@ import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
+import { readOptionalSitePublishedClasses } from "@/modules/sites/site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 
 function failure(status:number,title:string,message:string){
@@ -78,6 +79,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           },
         };
         const noncreditReleases=await readOptionalSiteNoncreditReleases(site.id);
+        const classes=await readOptionalSitePublishedClasses(site.id);
         const page:PublicSitePage={
           host:publicSiteHost(publication.slug),
           site:{name:site.name,organizationName:site.organizationName},
@@ -113,7 +115,7 @@ export const Route=createFileRoute("/launch/site-preview")({
             state:location.success?location.data.state:null,timezone:site.timezone},
           networkAffiliations,networkStatusKnown:networkRows!==null,
           academicPrograms:academics, enrichment:page.offerings,
-          noncredit:noncreditReleases,
+          noncredit:noncreditReleases,classes,classTimezone:site.timezone,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
         const rendered=renderPublicSiteHtml(page,{path:"/",localPreview:true});

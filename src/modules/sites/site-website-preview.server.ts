@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
+import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
@@ -80,6 +81,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // information projection. Fetch only after independently approved data
   // is assembled; the optional read fails closed without breaking preview.
   const noncreditReleases = host ? await readOptionalSiteNoncreditReleases(site.id) : [];
+  const classes = host ? await readOptionalSitePublishedClasses(site.id) : [];
   const contentConfig = safeReadSiteContentChannelConfig(siteConfiguration?.metadata?.websiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
@@ -91,7 +93,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
         state:planningLocation.success?planningLocation.data.state:null,
         timezone:siteConfiguration?.timezone??null},
       academicPrograms: authorizedPrograms, enrichment: offerings,
-      noncredit: noncreditReleases,
+      noncredit: noncreditReleases, classes, classTimezone:siteConfiguration?.timezone??null,
       enrollmentOrigin: noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
     });
   const previewPage = host ? {

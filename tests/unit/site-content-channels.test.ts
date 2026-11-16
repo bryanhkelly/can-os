@@ -93,6 +93,21 @@ describe("Site-owned website content channels", () => {
     expect(present[0]!.items[0]!.label).toContain("admissions not open");
   });
 
+  it("public Class cards only contain explicit published read-model items",()=>{
+    const classBlock=defaultSiteContentChannelConfig.blocks.find(b=>b.channel==="learning.classes")!;
+    const config={version:2 as const,revision:0,blocks:[classBlock]};
+    const noPublished=resolveSiteContentBlocks(config,{mode:"public",classes:[]});
+    expect(noPublished).toEqual([]);
+    const published=resolveSiteContentBlocks(config,{mode:"public",classes:[{
+      classId:"11111111-1111-4111-8111-111111111111",
+      title:"AI Skills, four Sessions",deliveryMode:"facilitated",
+      nextStartsAt:"2026-12-01T18:00:00.000Z",
+    }],classTimezone:"America/Los_Angeles"});
+    expect(published[0]?.items[0]?.title).toBe("AI Skills, four Sessions");
+    expect(published[0]?.items[0]?.description).toContain("Facilitated");
+    expect(published[0]?.items[0]?.description).toContain("PST");
+    expect(published[0]?.items[0]?.link).toBeUndefined();
+  });
   it("private previews cannot enable registration links", () => {
     const config = {version: 1 as const, revision: 1, blocks: [{
       id: "training", channel: "learning.noncredit" as const,
