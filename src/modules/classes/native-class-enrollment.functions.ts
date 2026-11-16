@@ -113,7 +113,7 @@ async function currentClassAuthority(tx:Tx,classId:string,now:Date){
 /** The public catalog never discloses unlisted/private Class Offerings. */
 export const getNativePublicClassCatalog=createServerFn({method:"GET"})
   .handler(async()=>{
-    guard();await requireLearner();
+    guard();
     const now=new Date();
     const rows=await db.select({
       classId:canonicalClasses.id,classTitle:canonicalClasses.title,
