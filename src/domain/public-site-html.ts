@@ -1,6 +1,8 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import type { SiteContentBlockProjection } from "./site-content-channels";
 import type { SiteEnrollmentOpportunity } from "./site-enrollment-opportunities";
+import { projectSiteEnrollmentOpportunities, enrollmentOpportunityKinds } from "./site-enrollment-opportunities";
+import { resolveSiteExperienceProfile, siteExperienceCopy } from "./site-website-experience";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
@@ -99,7 +101,8 @@ function renderSiteContentChannelBlock(block: SiteContentBlockProjection): strin
     // No URLs can be entered in Site block settings. Navigation comes solely
     // from verified public catalog adapters; all values are escaped.
     const safeHref = item.link?.href && (/^\/[a-zA-Z0-9/?=&%-]+$/.test(item.link.href) ||
-      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/enroll\?release=[a-f0-9-]+$/i.test(item.link.href));
+      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/enroll\?release=[a-f0-9-]+$/i.test(item.link.href) ||
+      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/classes$/i.test(item.link.href));
     const action = safeHref ?
       '<a class="text-action site-channel-action" href="' +
       escapePublicHtml(item.link!.href) + '">' +
@@ -140,6 +143,13 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     local.statementOfFaith, local.spiritualFormation, local.branding?.heroImage].some(Boolean));
   const hasReviewedPeople = Boolean(page.parentInformation?.people.length);
   const academic = Boolean(page.academicPrograms?.length);
+  const opportunities=page.enrollmentOpportunities??projectSiteEnrollmentOpportunities({
+    academicPrograms:page.academicPrograms,enrichment:page.offerings,
+    noncredit:page.noncreditReleases,enrollmentOrigin:page.enrollmentAppOrigin,
+  });
+  const kinds=enrollmentOpportunityKinds(opportunities);
+  const contentOn=(path:string)=>Boolean(page.contentBlocks?.some(block=>
+    block.page===path && block.items.length>0));
   const parent = page.parentInformation;
   const tuition = Boolean(academic || (parent?.tuition.description.canDisplay && parent.tuition.description.value) ||
     (parent?.tuition.financialAid.canDisplay && parent.tuition.financialAid.value));
@@ -154,12 +164,22 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     return ["/", "/about", "/academics", "/student-life", "/school-day",
       "/admissions", "/tuition", "/families", "/faq", "/contact"];
   }
-  return ["/", ...(hasStory || hasReviewedPeople ? ["/about"] as const : []),
-    ...(academic ? ["/academics", "/school-day", "/admissions"] as const : []),
-    ...(page.offerings.length || (page.demonstration && hasStory) ? ["/student-life"] as const : []),
-    ...(tuition ? ["/tuition"] as const : []),
-    ...(services || (page.demonstration && hasStory) ? ["/families"] as const : []),
-    ...(faq ? ["/faq"] as const : []), ...(contact ? ["/contact"] as const : [])];
+  const educational=[
+    ...(academic?["/academics","/school-day","/admissions"] as const:[]),
+    ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
+    ...(kinds.course||contentOn("/courses")?["/courses"] as const:[]),
+    ...(kinds.class||contentOn("/classes")?["/classes"] as const:[]),
+    ...(page.offerings.length||contentOn("/student-life")?["/student-life"] as const:[]),
+  ];
+  const extra=[
+    ...(tuition?["/tuition"] as const:[]),
+    ...(services?["/families"] as const:[]),
+    ...(faq?["/faq"] as const:[]),...(contact?["/contact"] as const:[]),
+  ];
+  const profile=resolveSiteExperienceProfile(opportunities);
+  return profile==="school" || profile==="mixed"
+    ? ["/",...(hasStory||hasReviewedPeople?["/about"] as const:[]),...educational,...extra]
+    : ["/",...educational,...(hasStory||hasReviewedPeople?["/about"] as const:[]),...extra];
 }
 
 export function renderPublicSiteHtml(page: PublicSitePage, options?: {
@@ -178,6 +198,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
 }): string {
   const path = options?.path ?? "/";
   const availablePaths = availablePublicSitePaths(page);
+  const opportunities=page.enrollmentOpportunities??projectSiteEnrollmentOpportunities({
+    academicPrograms:page.academicPrograms,enrichment:page.offerings,
+    noncredit:page.noncreditReleases,enrollmentOrigin:page.enrollmentAppOrigin,
+  });
+  const profile=resolveSiteExperienceProfile(opportunities);
+  const experienceCopy=siteExperienceCopy[profile];
   if (!availablePaths.includes(path)) throw new Error("This public page is not available");
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
@@ -279,6 +305,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/student-life": "Student life", "/school-day": "Learning model",
     "/admissions": "Admissions", "/tuition": "Tuition & aid", "/families": "Families",
     "/faq": "FAQs", "/contact": "Contact",
+    "/programs": "Programs", "/courses": "Courses", "/classes": "Classes",
   };
   const navigationLink = (destination: PublicSitePath) =>
     `<a href="${destination}"${destination === path ? ' aria-current="page"' : ""}>${pageLabels[destination]}</a>`;
@@ -397,12 +424,19 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const foundingFamilies = !demo && !hasOpenApplications && (page.academicPrograms ?? []).some(program =>
     program.availability === "planned");
   const navigationCtaPath = availablePaths.includes("/admissions") && hasOpenApplications ? "/admissions" :
+    availablePaths.includes(experienceCopy.heroExplorePath) ? experienceCopy.heroExplorePath :
+    availablePaths.includes("/classes") ? "/classes" :
+    availablePaths.includes("/programs") ? "/programs" :
+    availablePaths.includes("/courses") ? "/courses" :
     availablePaths.includes("/academics") ? "/academics" :
     availablePaths.includes("/contact") ? "/contact" : "/";
   const navigationCtaLabel = demo ? "Explore learning" : hasOpenApplications ? "Applications" :
     foundingFamilies ? "Founding families" :
-    availablePaths.includes("/academics") ? "Explore programs" :
-    availablePaths.includes("/contact") ? "Contact" : "Home";
+    navigationCtaPath==="/classes"?"Explore Classes":
+    navigationCtaPath==="/courses"?"Explore Courses":
+    navigationCtaPath==="/programs"?"Explore Programs":
+    navigationCtaPath==="/academics"?"Explore Academics":
+    navigationCtaPath==="/contact"?"Contact":"Home";
   const firstAcademicProgram = page.academicPrograms?.[0];
   const firstInquiryHref = firstAcademicProgram
     ? previewSlug
@@ -413,7 +447,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // and current photo delivery path.
   const hero = composePublicSiteHero(templateId, {
     kicker: local?.heroHeadline ? school :
-      foundingFamilies ? "Welcoming founding families" : "Welcome to our school",
+      foundingFamilies ? "Welcoming founding families" : experienceCopy.heroWelcome,
     title: local?.heroHeadline ? escapePublicHtml(local.heroHeadline) : school,
     subtitle: local?.welcomeMessage
       ? '<p class="hero-subtitle">' + escapePublicHtml(local.welcomeMessage) + '</p>' : "",
@@ -421,7 +455,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? "Discover a school experience where strong academics, meaningful relationships, and opportunities to explore come together. See how a connected community can make learning feel personal."
       : (academicCards
       ? "Explore the learning pathways and community that could be part of your family's next chapter."
-      : "Get to know the vision for this school as program information becomes available.") + " " +
+      : experienceCopy.heroIntro) + " " +
       (hasOpenApplications
         ? "Applications are available for eligible approved programs, subject to verification."
         : foundingFamilies
@@ -430,7 +464,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
             ? "Inquire about published programs; applications are not currently open through this website."
             : "Check back for published educational opportunities."),
     actions:
-      (availablePaths.includes("/academics") ? '<a class="hero-button" href="/academics">Explore academics</a>' : "") +
+      (availablePaths.includes(experienceCopy.heroExplorePath)
+        ? '<a class="hero-button" href="'+experienceCopy.heroExplorePath+'">'+experienceCopy.heroExplore+'</a>'
+        : availablePaths.includes("/classes")?'<a class="hero-button" href="/classes">Explore Classes</a>':"") +
       (firstInquiryHref && submissionsEnabled
         ? '<a class="hero-text-link" href="' + firstInquiryHref + '">Request information</a>' : "") +
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
@@ -753,6 +789,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // The parent journey uses only pages backed by approved public projections.
   // This navigation is shared by all schools and never fabricates availability.
   const exploreLinks = [
+    { path: "/programs", label:"Programs",description:"Explore authorized community and enrichment Programs." },
+    { path: "/courses", label:"Courses",description:"Find approved public Courses and their enrollment status." },
+    { path: "/classes", label:"Classes",description:"Discover published scheduled Classes and Sessions." },
     { path: "/academics", label: "Academics", description: demo ? "Explore purposeful, connected learning." : "Discover our published learning programs." },
     { path: "/school-day", label: "The school day", description: demo ? "Discover a rhythm built for focus and connection." : "Understand reviewed learning days and delivery patterns." },
     { path: "/student-life", label: "Student life", description: demo ? "Find creativity, friendship, and shared purpose." : "Explore published enrichment and activities." },
@@ -761,8 +800,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const exploreSection = exploreLinks.length > 1
     ? `<section class="explore-section editorial-section" aria-labelledby="explore-title">
       <div class="section-heading"><p class="tag">Explore the experience</p>
-      <h2 id="explore-title">Find what matters to your family</h2>
-      <p>Explore academics, daily learning, student experiences, and admissions information at your own pace.</p></div>
+      <h2 id="explore-title">${profile==="school"?"Find what matters to your family":"Find your next learning experience"}</h2>
+      <p>Explore independently published opportunities and the next steps available to you.</p></div>
       <div class="explore-grid">${exploreLinks.map((link, index) =>
         `<a class="explore-link" href="${link.path}"><span class="explore-number">0${index + 1}</span>
         <span class="explore-copy"><strong>${link.label}</strong><span>${link.description}</span></span>
@@ -983,9 +1022,10 @@ ${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus
 ${composePublicSiteChrome(templateId, {
   brand: logo ? `<img class="school-logo" src="${escapePublicHtml(logo.dataUrl)}" alt="${escapePublicHtml(logo.altText)}" width="48" height="48" decoding="async"/>${school}` : school,
   monogram: escapePublicHtml(schoolBrandMonogram(page.site.name)),
+   profile,
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
-  mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
+  mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="${experienceCopy.navLabel}">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual students or facilities of this school.</p>` : ""}
   ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
