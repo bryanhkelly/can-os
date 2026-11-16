@@ -57,6 +57,22 @@ describe("published Course-level Class checks, feedback and completion evidence"
       ...normal,quizQuestions:[{...questions[0],correctIndex:3}],
     }).success).toBe(false);
   });
+  it("pins a versioned bounded attempt limit for the knowledge check",()=>{
+    const base={
+      courseVersionId:"00000000-0000-4000-8000-000000000001",
+      title:"Pilot AI skills",quizQuestions:questions,feedbackQuestions:feedback,
+      passingFraction:0.8,requireAllLessons:false,feedbackRequired:false,
+      feedbackConsentVersion:"feedback-v1",
+      feedbackConsentText:"Identified answers are used to improve this published training program.",
+    };
+    expect(courseActivityPublicationSchema.parse(base).maxQuizAttempts).toBe(3);
+    expect(courseActivityPublicationSchema.safeParse({
+      ...base,maxQuizAttempts:6,
+    }).success).toBe(false);
+    expect(courseActivityPublicationSchema.safeParse({
+      ...base,maxQuizAttempts:1,
+    }).success).toBe(true);
+  });
   it("keeps readiness separate from a verified final evidence record or academic award",()=>{
     const pending=nativeClassCompletionReadiness({
       quizPassed:true,feedbackSubmitted:false,feedbackRequired:true,
@@ -81,10 +97,14 @@ describe("published Course-level Class checks, feedback and completion evidence"
     expect(sql).toContain("education_v30_secure.class_activity_submission_answers");
     expect(sql).toContain("class_activity_pin_source_trg");
     expect(sql).toContain("FORCE ROW LEVEL SECURITY");
-    expect(sql).toContain("class_activity_submission_one_uq");
+    expect(sql).toContain("class_activity_submission_attempt_uq");
+    expect(sql).toContain("class_activity_one_feedback_uq");
+    expect(sql).toContain("max_quiz_attempts integer NOT NULL");
     expect(service).toContain("publisherOwnsCourse");
     expect(service).toContain("assertCurrentCanonicalStaffForMutation");
     expect(service).toContain("current pinned Course activity version");
+    expect(service).toContain("prior.quizAttempts>=set.maxQuizAttempts");
+    expect(service).toContain("sameRequest.kind!==data.kind");
     expect(service).toContain("data.feedbackConsentAccepted!==true");
     expect(service).toContain("createHash(\"sha256\")");
     expect(service).toContain("resultCode:\"noncredit_requirements_met\"");
