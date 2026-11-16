@@ -35,6 +35,15 @@ const interests = [
   { id: "senior", title: "Senior programs", detail: "Learning for older adults", icon: Users },
 ] as const;
 const steps = ["Your Site", "Network", "Program interests", "Website reveal", "Launch setup"] as const;
+const previewPageChoices=[
+  {path:"/",name:"Homepage"},
+  {path:"/programs",name:"Programs"},
+  {path:"/courses",name:"Courses"},
+  {path:"/classes",name:"Classes"},
+  {path:"/academics",name:"Academics"},
+  {path:"/student-life",name:"Community experiences"},
+] as const;
+type PreviewPage=(typeof previewPageChoices)[number]["path"];
 
 /** A lightweight, explicitly private preview. No made-up Program or enrollment
  * release is created by choosing interests; publication remains server-owned. */
@@ -57,11 +66,16 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const [error,setError] = useState("");
   const [savingPreferences,setSavingPreferences] = useState(false);
   const [previewKey,setPreviewKey] = useState(0);
+  const [previewPage,setPreviewPage]=useState<PreviewPage>("/");
   const siteMutation=useWorkspaceMutation({mutationFn:createLaunchSite});
   const known=options.sites.find(s=>s.id===siteId);
   const siteName=known?.name??name;
   const siteCity=known?.planningLocation?.city??city;
   const siteState=known?.planningLocation?.state??state;
+  const previewUrl=siteId
+    ? "/launch/site-preview?siteId="+encodeURIComponent(siteId)+
+      (previewPage!=="/"?"&page="+encodeURIComponent(previewPage):"")
+    : null;
 
   function goTo(next:SiteFirstLaunchStep,nextSiteId=siteId) {
     void router.navigate({to:"/launch/site",search:{siteId:nextSiteId||undefined,step:next},replace:!selectedSiteId && Boolean(nextSiteId)})
@@ -198,8 +212,15 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
           <h2 className="mt-1 font-serif text-3xl">Your Site is taking shape.</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">This uses your Site's actual website design engine and saved plans. Proposed interests are marked as such. Your Site is not published and enrollment is not open by default.</p>
         </div>
-        <div className="flex gap-2">
-          {siteId&&<a href={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
+        <div className="flex flex-wrap items-end gap-2">
+          <Field label="Preview page" className="min-w-[170px]">
+            <Select value={previewPage}
+              onChange={e=>setPreviewPage(e.target.value as PreviewPage)}>
+              {previewPageChoices.map(item=>
+                <option key={item.path} value={item.path}>{item.name}</option>)}
+            </Select>
+          </Field>
+          {previewUrl&&<a href={previewUrl}
             target="_blank" rel="noopener noreferrer"
             className="inline-flex min-h-11 items-center gap-2 border bg-card px-4 py-2 text-sm font-semibold text-primary">
             Open full-page preview <ExternalLink className="size-4" aria-hidden="true"/>
@@ -214,8 +235,8 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
             <span>Canonical website preview · {siteName}</span>
             <span className="font-semibold text-warning">Private · not published</span>
           </div>
-          {siteId ? <iframe key={previewKey} title={`Private rendered website preview for ${siteName}`}
-            src={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
+          {previewUrl ? <iframe key={previewKey} title={`Private rendered website preview for ${siteName}`}
+            src={previewUrl}
             className="block min-h-[820px] w-full border-0 bg-white"
             sandbox="allow-same-origin" referrerPolicy="no-referrer"
           /> : <p role="alert" className="p-6">Save a Site before opening its website preview.</p>}
@@ -261,7 +282,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
           </details>
         </aside>
       </div>
-      {siteId&&<SiteContentChannelEditor siteId={siteId} initialConfig={initialChannels}
+      {siteId&&<SiteContentChannelEditor key={siteId} siteId={siteId} initialConfig={initialChannels}
         canPublish={Boolean(options.schoolSetupAdministrator)} onSaved={()=>setPreviewKey(k=>k+1)}/>}
     </section>}
     {step===4&&<section className="mt-6">
