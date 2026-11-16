@@ -347,3 +347,64 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
       return {classOfferingVersionId:created.id,versionNo:current.versionNo+1};
     });
   });
+
+
+/** Populate the native Class composer from actual published, adopted Courses.
+ * The creation command independently repeats every authorization check. */
+export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
+  .handler(async()=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    const now=new Date();
+    const available=await db.select({
+      deploymentId:programDeployments.id,
+      deploymentName:programDeployments.name,
+      adoptionId:deploymentOfferingAdoptions.id,
+      offeringVersionId:offeringVersions.id,
+      courseVersionId:courseVersions.id,
+      courseTitle:courses.title,
+    }).from(programDeployments)
+      .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
+      .innerJoin(deploymentOfferingAdoptions,eq(deploymentOfferingAdoptions.deploymentId,programDeployments.id))
+      .innerJoin(offeringVersions,and(
+        eq(offeringVersions.id,deploymentOfferingAdoptions.offeringVersionId),
+        eq(offeringVersions.offeringId,programDeployments.offeringId),
+      ))
+      .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
+      .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
+      .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
+      .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+      .where(and(
+        eq(programDeployments.status,"active"),eq(educationOperations.status,"active"),
+        eq(offeringVersions.lifecycle,"published"),isNotNull(offeringVersions.publishedAt),
+        eq(offerings.status,"active"),
+        eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
+        eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
+        lte(deploymentOfferingAdoptions.validFrom,now),
+        or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
+      )).orderBy(asc(courses.title)).limit(100);
+    const options=[];
+    for(const row of available){
+      const instance={
+        deploymentId:row.deploymentId,adoptionId:row.adoptionId,
+        offeringVersionId:row.offeringVersionId,courseVersionId:row.courseVersionId,
+        operatingOrganizationId:operator.organizationId,
+        title:row.courseTitle,deliveryMode:"self_paced" as const,siteId:null,
+      };
+      try{
+        await db.transaction(tx=>validateClassAuthority(tx,operator,instance));
+      }catch(e){if(e instanceof AuthorizationError)continue;throw e;}
+      const authorizedSites=[];
+      for(const siteId of operator.siteIds){
+        try {
+          await db.transaction(tx=>validateClassAuthority(tx,operator,{
+            ...instance,siteId,deliveryMode:"facilitated",
+          }));
+          authorizedSites.push(siteId);
+        }catch(e){if(!(e instanceof AuthorizationError))throw e;}
+      }
+      options.push({...row,operatingOrganizationId:operator.organizationId,
+        siteIds:authorizedSites});
+    }
+    return options;
+  });
