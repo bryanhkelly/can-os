@@ -25,6 +25,20 @@ function requireClassFeature() {
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type ClassOperator = { actor: CommandContext; organizationId: string; siteIds: string[] };
 
+/** Site staff cannot manage another Site's Classes or a different creator's
+ * provider-wide Class merely by knowing its UUID. */
+function assertManagedClassScope(operator:ClassOperator, instance:{
+  siteId:string|null;createdByPersonId:string;
+}):void{
+  if(instance.siteId){
+    if(!operator.siteIds.includes(instance.siteId))
+      throw new AuthorizationError("current Class Site");
+  }else if(instance.createdByPersonId!==operator.actor.actorPersonId){
+    throw new AuthorizationError("owner of provider-wide Class");
+  }
+}
+
+
 async function requireClassOperator(): Promise<ClassOperator> {
   const actor = await getCanonicalCommandContext(getRequest());
   if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? "")) {
@@ -195,8 +209,10 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
       ))
       .where(and(
         eq(canonicalClasses.operatingOrganizationId,operator.organizationId),
-        or(isNull(canonicalClasses.siteId),
-          operator.siteIds.length ? inArray(canonicalClasses.siteId,operator.siteIds) : undefined),
+        or(
+          operator.siteIds.length?inArray(canonicalClasses.siteId,operator.siteIds):undefined,
+          and(isNull(canonicalClasses.siteId),eq(canonicalClasses.createdByPersonId,operator.actor.actorPersonId!)),
+        ),
       )).orderBy(asc(canonicalClasses.createdAt)).limit(100);
   });
 
@@ -221,6 +237,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
         .for("update").limit(1);
       if(!instance || !["draft","approved","active"].includes(instance.state))
         throw new AuthorizationError("Class available for publication");
+      assertManagedClassScope(operator,instance);
       await validateClassAuthority(tx,operator,{
         deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
         offeringVersionId:instance.offeringVersionId,
@@ -272,8 +289,8 @@ export const closeUnifiedClassOffering = createServerFn({method:"POST"})
         .where(and(eq(canonicalClasses.id,data.classId),
           eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
         .for("update").limit(1);
-      if(!instance || instance.siteId && !operator.siteIds.includes(instance.siteId))
-        throw new AuthorizationError("owned Class and Site");
+      if(!instance)throw new AuthorizationError("owned Class");
+      assertManagedClassScope(operator,instance);
       const [terms]=await tx.select({
         id:canonicalClassOfferingVersions.id,
         state:canonicalClassOfferingVersions.state,
@@ -316,6 +333,7 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         .for("update").limit(1);
       if(!instance || !["draft","approved","active"].includes(instance.state))
         throw new AuthorizationError("current Class");
+      assertManagedClassScope(operator,instance);
       await validateClassAuthority(tx,operator,{
         deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
         offeringVersionId:instance.offeringVersionId,courseVersionId:instance.courseVersionId,
