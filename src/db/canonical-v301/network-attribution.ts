@@ -23,7 +23,7 @@ export const networkUnits = educationV30.table("network_units",{
 
 /** An Organization's reviewed, effective-dated membership in a network.
  * This does not verify the claimed affiliation of any individual learner. */
-export const networkMemberships = educationV30.table("network_memberships",{
+export const networkMemberships = educationV30.table("network_reporting_memberships",{
   id:id(),
   networkOrganizationId:uuid("network_organization_id").notNull(),
   memberOrganizationId:uuid("member_organization_id").notNull(),
@@ -38,8 +38,8 @@ export const networkMemberships = educationV30.table("network_memberships",{
   reviewedAt:timestamp("reviewed_at",{withTimezone:true}),
   createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[
-  index("network_memberships_member_idx").on(t.memberOrganizationId,t.networkOrganizationId,t.status),
-  index("network_memberships_unit_idx").on(t.networkOrganizationId,t.reportingUnitId,t.status),
+  index("network_reporting_memberships_member_idx").on(t.memberOrganizationId,t.networkOrganizationId,t.status),
+  index("network_reporting_memberships_unit_idx").on(t.networkOrganizationId,t.reportingUnitId,t.status),
 ]);
 
 /** A network-assigned church, chapter or affiliate number is a mapping
