@@ -28,6 +28,75 @@ const scope = z.object({
   session: uuid.optional(),
 }).strict();
 
+const rosterPageInput=z.object({
+  classId:uuid,
+  offset:z.number().int().min(0).max(100000).default(0),
+}).strict();
+
+/** Bounded Site-operator roster pagination. The learner list is never
+ * returned from the public catalog, audience display, or a generic teaching
+ * assignment. Authorization is checked on EVERY page, not page one only.
+ */
+export const getNativeClassRosterPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>rosterPageInput.parse(raw))
+  .handler(async({data})=>{
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+      throw new AuthorizationError("native Class release not activated");
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCanonicalCommandContext(getRequest());
+    if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
+      throw new AuthorizationError("Class manager");
+    assertCapability(actor,"class.manage");
+    return db.transaction(async tx=>{
+      const [cls]=await tx.select().from(canonicalClasses)
+        .where(eq(canonicalClasses.id,data.classId)).limit(1);
+      const organizationId=actor.scope.organizationIds?.[0];
+      if(!cls||!organizationId||actor.scope.organizationIds?.length!==1||
+         cls.operatingOrganizationId!==organizationId||
+         (cls.siteId?!actor.scope.siteIds?.includes(cls.siteId):
+           cls.createdByPersonId!==actor.actorPersonId))
+        throw new AuthorizationError("your operating Class");
+      await validateClassAuthority(tx,{
+        actor,organizationId,siteIds:actor.scope.siteIds??[],
+      },{
+        deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
+        offeringVersionId:cls.offeringVersionId,
+        courseVersionId:cls.courseVersionId,
+        operatingOrganizationId:cls.operatingOrganizationId,
+        siteId:cls.siteId,title:cls.title,deliveryMode:cls.deliveryMode,
+      });
+      const [total]=await tx.select({value:count()}).from(canonicalClassEnrollments)
+        .where(and(eq(canonicalClassEnrollments.classId,cls.id),
+          inArray(canonicalClassEnrollments.status,["pending","active"])));
+      const rows=await tx.select({
+        enrollmentId:canonicalClassEnrollments.id,personId:canonicalPersons.id,
+        preferredName:canonicalPersons.preferredName,
+        firstName:canonicalPersons.legalFirstName,
+        lastName:canonicalPersons.legalLastName,
+        status:canonicalClassEnrollments.status,
+        creditMode:canonicalClassEnrollments.creditMode,
+      }).from(canonicalClassEnrollments)
+        .innerJoin(canonicalPersons,
+          eq(canonicalPersons.id,canonicalClassEnrollments.learnerPersonId))
+        .where(and(eq(canonicalClassEnrollments.classId,cls.id),
+          inArray(canonicalClassEnrollments.status,["pending","active"])))
+        .orderBy(asc(canonicalPersons.legalLastName),
+          asc(canonicalPersons.legalFirstName),
+          asc(canonicalClassEnrollments.id))
+        .limit(51).offset(data.offset);
+      const page=rows.slice(0,50);
+      return {
+        members:page.map(row=>({
+          enrollmentId:row.enrollmentId,personId:row.personId,
+          name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Learner"),
+          status:row.status,creditMode:row.creditMode,
+        })),
+        total:total?.value??0,
+        nextOffset:rows.length>50?data.offset+50:null,
+      };
+    });
+  });
+
 /**
  * One Class ID and one role-aware workspace. The URL never supplies a role,
  * enrollment ID or staff permission. All permissible perspectives are rebuilt
