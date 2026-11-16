@@ -98,8 +98,9 @@ function NativeLearnerClasses(){
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.status} · {item.creditMode.replace("_"," ")}</p>
           <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
           <p className="mt-2 text-sm text-muted-foreground">{item.deliveryMode.replace("_"," ")}</p>
-          {item.courseAttemptId&&<Link to="/learn/class/$classEnrollmentId"
-            params={{classEnrollmentId:item.classEnrollmentId}}
+          {item.courseAttemptId&&<Link to="/classes/$classId"
+            params={{classId:item.classId}}
+            search={{view:"learn",tab:"lessons"}}
             className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">Open Class</Link>}
         </article>)}
       </div>
