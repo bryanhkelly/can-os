@@ -13,8 +13,8 @@ import {
  * audience-facing projector.
  */
 export function ClassroomFacilitatorConsole({
-  facilitatedSessionId,
-}: { facilitatedSessionId: string }) {
+  facilitatedSessionId, preferredLessonIds = [],
+}: { facilitatedSessionId: string; preferredLessonIds?: readonly string[] }) {
   const [prompt, setPrompt] = useState("");
   const [kind, setKind] = useState<"single_choice" | "text">("single_choice");
   const [choicesText, setChoicesText] = useState("Yes\nNo");
@@ -82,7 +82,8 @@ export function ClassroomFacilitatorConsole({
       Paired devices and activity heartbeats are observational, never verified
       physical attendance, video consumption, academic grades or completion.
     </p>
-    {isLive && <ClassroomPlaybackControls facilitatedSessionId={facilitatedSessionId}/>}
+    {isLive && <ClassroomPlaybackControls facilitatedSessionId={facilitatedSessionId}
+      preferredLessonIds={preferredLessonIds}/>}
     {room.isSuccess && room.data && !isLive && <p role="status" className="border border-border p-4 text-sm">
       This classroom is {currentState}. New prompts and playback controls are closed.
     </p>}
