@@ -9,7 +9,7 @@ describe("publisher Course Activities recover the original UX without a parallel
     const scope=source("src/modules/learning/native-class-assessment-scope.server.ts");
     const grant=source("src/modules/classes/native-class-assessment-provision.functions.ts");
     const final=source("src/modules/classes/native-class-assessment-finalize.functions.ts");
-    expect(publisher).toContain("offerings.publisherOrganizationId");
+    expect(publisher).toContain("courses.publisherOrganizationId");
     expect(publisher).toContain("canonicalOfferingCourses.courseVersionId");
     expect(scope).toContain("eq(assessmentDefinitions.ownerOrganizationId,publisherOrganizationId)");
     expect(scope).toContain('eq(assessmentFormAdministrations.administeringOrganizationId,cls.operatingOrganizationId)');
@@ -58,6 +58,7 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(page).not.toContain("publishNativeCourseActivitySet");
     expect(page).not.toContain("tx.insert(assessmentExecutionResults)");
     expect(options).toContain('assertCapability(actor,"curriculum.publish")');
+    expect(options).toContain("eq(courses.publisherOrganizationId,organizationId)");
     expect(options).toContain("eq(assessmentDefinitions.ownerOrganizationId,organizationId)");
     expect(packageJson).not.toContain("native-course-activities.test.ts");
   });
