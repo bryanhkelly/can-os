@@ -29,7 +29,7 @@ const requiredSource = [
   "official_course_assignment_versions", "assessment_versions",
 ];
 try {
-  const [tables, schema, indexes, triggers, constraints, policies] = await Promise.all([
+  const [tables, schema, indexes, triggers, constraints, policies, rolePrivileges] = await Promise.all([
     pool.query(`SELECT c.relname, c.relrowsecurity, c.relforcerowsecurity,
        EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
          WHERE a.grantee=0) AS grants_public
@@ -48,6 +48,15 @@ try {
        FROM pg_constraint WHERE conrelid=to_regclass($1)`,["education_v30."+relation]),
     pool.query(`SELECT policyname, roles, cmd FROM pg_policies
        WHERE schemaname='education_v30' AND tablename=$1`,[relation]),
+    // Read-only ACL inspection: a broad app-role grant would undermine
+    // forced owner-only RLS even if this script never writes data.
+    pool.query(`SELECT EXISTS(SELECT 1 FROM pg_roles
+        WHERE rolname='can_os_canonical_auth_app') AS app_role_exists,
+      CASE WHEN EXISTS(SELECT 1 FROM pg_roles
+        WHERE rolname='can_os_canonical_auth_app')
+      THEN has_table_privilege('can_os_canonical_auth_app',
+        'education_v30.class_session_agenda_revisions','SELECT,INSERT,UPDATE,DELETE')
+      ELSE false END AS app_has_direct_dml`),
   ]);
   const byName=new Map(tables.rows.map(row=>[row.relname,row]));
   for(const name of requiredSource)
@@ -76,6 +85,8 @@ try {
   assert.equal(policies.rows.length,1,"Expected exactly one owner-only RLS policy");
   assert.deepEqual(policies.rows[0].roles,["neondb_owner"],
     "Unreviewed direct application or PUBLIC policy");
+  assert(!rolePrivileges.rows[0]?.app_has_direct_dml,
+    "WS4 agenda direct application-role DML must remain disabled pending approved privileged API model");
   console.log("WS4 agenda schema, FKs, immutable trigger, forced RLS and private access verified (read-only).");
   console.log("Still required: restricted-role negative authorization, actual Class+Site operator/learner E2E, cross-workstream acceptance.");
 } finally {
