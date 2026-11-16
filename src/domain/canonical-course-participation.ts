@@ -53,7 +53,7 @@ export type CanonicalParticipationAccess = {
   courseVersionId: string;
   deploymentId: string;
   sectionId: string | null;
-  source: "school" | "noncredit";
+  source: "school" | "noncredit" | "class";
   participantPersonId: string;
   noncreditRegistrationId: string | null;
 };
