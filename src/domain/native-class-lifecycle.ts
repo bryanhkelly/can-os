@@ -132,10 +132,12 @@ export function assertNativeClassAttemptForExit(input:{
     deploymentId:string;adoptionId:string;offeringVersionId:string;
     courseVersionId:string;
   };
+  /** False only when closing additional active retakes from this enrollment. */
+  requireSelectedPointer?:boolean;
 }):void{
-  const {attempt,enrollment,classInstance}=input;
+  const {attempt,enrollment,classInstance,requireSelectedPointer=true}=input;
   if(attempt.status!=="active" ||
-     attempt.id!==enrollment.courseAttemptId ||
+     (requireSelectedPointer && attempt.id!==enrollment.courseAttemptId) ||
      attempt.classEnrollmentId!==enrollment.id ||
      attempt.enrollmentId!==null ||
      attempt.noncreditRegistrationId!==null ||
