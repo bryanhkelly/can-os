@@ -12,6 +12,7 @@ import {
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
+  participationAttributions,
   noncreditEnrollmentWaitlist,
   noncreditCompletionPolicies, noncreditTrainingVersions,
   auditEvents as canonicalAuditEvents, domainEvents as canonicalDomainEvents,
@@ -227,6 +228,14 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           consentVersion:release.consentVersion,
           consentSha256:release.consentSha256,adultAttested:data.adultConfirmed,
           referralCode:data.referralCode||null,
+        });
+        await tx.insert(participationAttributions).values({
+          noncreditRegistrationId:registrationId,releaseId:release.id,
+          deliverySiteId:release.siteId,reportingSiteId:release.siteId,
+          creditedOrganizationId:release.registeringOrganizationId,
+          attributionBasis:"provider_default",
+          relationshipSnapshot:{kind:"provider_default",releaseId:release.id,
+            organizationId:release.registeringOrganizationId,siteId:release.siteId},
         });
         if(invited&&reservation){
           await tx.update(noncreditEnrollmentWaitlist).set({
