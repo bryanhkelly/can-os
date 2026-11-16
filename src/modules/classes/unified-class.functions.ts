@@ -182,7 +182,7 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
       deliveryMode:canonicalClasses.deliveryMode,state:canonicalClasses.state,
       classOfferingId:canonicalClassOfferings.id,
       visibility:canonicalClassOfferingVersions.visibility,
-      enrollmentMethod:canonicalClassOfferingVersions.enrollmentMethod,
+      enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
       offeringState:canonicalClassOfferingVersions.state,
     }).from(canonicalClasses)
       .innerJoin(canonicalClassOfferings,eq(canonicalClassOfferings.classId,canonicalClasses.id))
@@ -271,7 +271,10 @@ export const closeUnifiedClassOffering = createServerFn({method:"POST"})
         .for("update").limit(1);
       if(!instance || instance.siteId && !operator.siteIds.includes(instance.siteId))
         throw new AuthorizationError("owned Class and Site");
-      const [terms]=await tx.select().from(canonicalClassOfferingVersions)
+      const [terms]=await tx.select({
+        id:canonicalClassOfferingVersions.id,
+        state:canonicalClassOfferingVersions.state,
+      }).from(canonicalClassOfferingVersions)
         .innerJoin(canonicalClassOfferings,and(
           eq(canonicalClassOfferings.id,canonicalClassOfferingVersions.classOfferingId),
           eq(canonicalClassOfferings.classId,instance.id),
@@ -280,8 +283,8 @@ export const closeUnifiedClassOffering = createServerFn({method:"POST"})
           eq(canonicalClassOfferingVersions.classId,instance.id)))
         .for("update").limit(1);
       if(!terms)throw new AuthorizationError("owned Class Offering");
-      if(terms.class_offering_versions.state==="closed")return {closed:true};
-      if(terms.class_offering_versions.state!=="published")
+      if(terms.state==="closed")return {closed:true};
+      if(terms.state!=="published")
         throw new AuthorizationError("only published Class Offerings can be closed");
       const now=new Date();
       await tx.update(canonicalClassOfferingVersions).set({state:"closed",closedAt:now})
