@@ -10,7 +10,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
-  assertNativeClassLearnerSessionForExit,
+  assertNativeClassLearnerSessionForExit, assertNativeClassAttemptForExit,
 } from "@/domain/native-class-lifecycle";
 import {
   canonicalSessionDigestFromRequest, getCanonicalCommandContext,
@@ -105,28 +105,38 @@ async function exitNativeClass(command:ExitRequest){
       releasedSeat:false,alreadyClosed:true,
     };
 
+    let closedAttemptIds:string[]=[];
     if(enrollment.status==="active"){
       if(!enrollment.courseAttemptId)
         throw new AuthorizationError("active Course Attempt required");
-      const [attempt]=await tx.select().from(learnerCourseAttempts)
-        .where(and(eq(learnerCourseAttempts.id,enrollment.courseAttemptId),
-          eq(learnerCourseAttempts.classEnrollmentId,enrollment.id)))
-        .for("update").limit(1);
-      if(!attempt || attempt.status!=="active" ||
-         attempt.enrollmentId!==null || attempt.noncreditRegistrationId!==null ||
-         attempt.sectionId!==null ||
-         attempt.deploymentId!==cls.deploymentId ||
-         attempt.adoptionId!==cls.adoptionId ||
-         attempt.offeringVersionId!==cls.offeringVersionId ||
-         attempt.courseVersionId!==cls.courseVersionId)
-        throw new AuthorizationError("exact active native Class Course Attempt");
-      // The canonical Course Attempt source trigger requires its Class
-      // Enrollment to still be ACTIVE at this moment.
-      await tx.update(learnerCourseAttempts)
-        .set({status:"withdrawn"})
-        .where(eq(learnerCourseAttempts.id,attempt.id));
+      // Retakes may share the native Class Enrollment source. Updating only
+      // its selected attempt could strand other ACTIVE retakes after exit.
+      // Lock and validate every linked active Course Attempt before changing
+      // any row; keep completed/withdrawn attempts as historical evidence.
+      const attempts=await tx.select().from(learnerCourseAttempts)
+        .where(eq(learnerCourseAttempts.classEnrollmentId,enrollment.id))
+        .for("update");
+      const selected=attempts.find(attempt=>attempt.id===enrollment.courseAttemptId);
+      if(!selected)throw new AuthorizationError("selected Class Course Attempt");
+      assertNativeClassAttemptForExit({
+        attempt:selected,enrollment,classInstance:cls,
+      });
+      const live=attempts.filter(attempt=>attempt.status==="active");
+      for(const attempt of live){
+        assertNativeClassAttemptForExit({
+          attempt,enrollment,classInstance:cls,requireSelectedPointer:false,
+        });
+      }
+      // The canonical Course Attempt source trigger requires its parent
+      // Class Enrollment to remain ACTIVE until every live attempt closes.
+      for(const attempt of live){
+        await tx.update(learnerCourseAttempts)
+          .set({status:"withdrawn"})
+          .where(eq(learnerCourseAttempts.id,attempt.id));
+      }
+      closedAttemptIds=live.map(attempt=>attempt.id);
     }else if(enrollment.courseAttemptId){
-      throw new AuthorizationError("pending enrollment cannot own active Course Attempt");
+      throw new AuthorizationError("pending enrollment cannot own Course Attempt");
     }
     await tx.update(canonicalClassEnrollments)
       .set({status:decision.enrollmentStatus})
@@ -145,7 +155,9 @@ async function exitNativeClass(command:ExitRequest){
       offeringVersionId:cls.offeringVersionId,courseVersionId:cls.courseVersionId,
       classOfferingVersionId:enrollment.classOfferingVersionId,
       previousStatus:enrollment.status,status:decision.enrollmentStatus,
-      reason:command.reason,capacityReleased:true,occurredAt:now.toISOString(),
+      reason:command.reason,capacityReleased:true,
+      courseAttemptIdsWithdrawn:closedAttemptIds,
+      occurredAt:now.toISOString(),
     };
     await tx.insert(auditEvents).values({
       actorPersonId:actor.actorPersonId,
