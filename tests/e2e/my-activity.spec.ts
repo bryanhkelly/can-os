@@ -54,6 +54,16 @@ test.describe("WS1 My Activity authenticated acceptance", () => {
     });
   });
 
+  test("WS00 activity alias routes to the same authenticated read experience", async ({browser}) => {
+    if (!fixture) throw new Error("fixture unavailable");
+    await withAuthenticatedPage(browser, fixture.studentSecret, async ({page}) => {
+      await page.goto("/learn/activity");
+      await expect(page).toHaveURL(/\\/learn\\/my-activity(?:\\?|$)/);
+      await expect(page.getByRole("heading", {name: "My Activity"})).toBeVisible();
+      await expect(page.getByText("This is a partial view", {exact: false})).toBeVisible();
+    });
+  });
+
   test("legacy My Programs redirects to the verified dashboard", async ({browser}) => {
     if (!fixture) throw new Error("fixture unavailable");
     await withAuthenticatedPage(browser, fixture.studentSecret, async ({page}) => {
