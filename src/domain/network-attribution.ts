@@ -73,3 +73,18 @@ export function rollupAttributionEvidence(rows:readonly AttributionEvidence[]){
     uniqueRegistrations:rows.length,
   };
 }
+
+/** A historic snapshot is user-independent evidence read from canonical JSON.
+ * Malformed paths must fail reporting, never silently skip a jurisdiction. */
+export function decodeHistoricalNetworkPath(value:unknown):HistoricalNetworkUnit[]|null{
+  if(value===undefined||value===null)return null;
+  if(!Array.isArray(value))throw new Error("Historical reporting path is not an array");
+  return value.map((item:unknown)=>{
+    if(!item||typeof item!=="object"||Array.isArray(item))
+      throw new Error("Invalid historical reporting unit");
+    const node=item as Record<string,unknown>;
+    if(typeof node.id!=="string"||typeof node.name!=="string"||
+      typeof node.code!=="string")throw new Error("Invalid historical reporting unit");
+    return {id:node.id,name:node.name,code:node.code};
+  });
+}
