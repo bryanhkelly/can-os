@@ -9,6 +9,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-enrollment.functions";
+import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
@@ -65,26 +66,9 @@ export const scheduleNativeClassSessions=createServerFn({method:"POST"})
     setResponseHeader("Cache-Control","private, no-store");
     const host=await requireCanonicalFacilitator();
     const now=new Date();
-    const unique=new Set<string>();
+    assertNativeClassSessionSeries(data.meetings,data.cadence);
     for(const meeting of data.meetings){
-      if(unique.has(meeting.requestId))
-        throw new AuthorizationError("distinct idempotent booking request IDs");
-      unique.add(meeting.requestId);
       validateClassroomTimes(new Date(meeting.startsAt),new Date(meeting.endsAt),now);
-    }
-    if(data.cadence==="weekly"){
-      if(data.meetings.length!==4)
-        throw new AuthorizationError("four dated meetings for the four-week series");
-      const firstDuration=new Date(data.meetings[0]!.endsAt).getTime()-
-        new Date(data.meetings[0]!.startsAt).getTime();
-      for(let i=1;i<4;i++){
-        const previous=new Date(data.meetings[i-1]!.startsAt).getTime();
-        const current=new Date(data.meetings[i]!.startsAt).getTime();
-        // A one-hour allowance preserves the same local clock time at DST.
-        if(Math.abs(current-previous-7*86400000)>3600000 ||
-           new Date(data.meetings[i]!.endsAt).getTime()-current!==firstDuration)
-          throw new AuthorizationError("four consecutive weekly meetings with equal duration");
-      }
     }
     return db.transaction(async tx=>{
       // Serialize one Class's schedule mutations, including overlapping
