@@ -241,5 +241,5 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         visibility:"authorized_provider_private" as const,
         publicationApproved:false as const,
       };
-    });
+    },{isolationLevel:"repeatable read",accessMode:"read only"});
   });
