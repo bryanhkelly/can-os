@@ -28,8 +28,12 @@ export type CanonicalObjectiveDraftInput=z.infer<typeof canonicalObjectiveDraftI
 export function canonicalAssessmentDraftDatabaseRole(
   actor: Pick<CommandContext,"scope"|"capabilities">,
 ):string{
-  if(!actor.capabilities.has("curriculum.publish"))
-    throw new AuthorizationError("curriculum.publish");
+  // Native Class staff currently receive class.manage; this is only a
+  // preliminary application gate. The purpose-bound NOLOGIN DB role and
+  // Course copyright owner check are still mandatory before any write.
+  if(!actor.capabilities.has("curriculum.publish")&&
+     !actor.capabilities.has("class.manage"))
+    throw new AuthorizationError("canonical Course publisher capability");
   const ids=actor.scope.organizationIds;
   if(ids?.length!==1||!z.string().uuid().safeParse(ids[0]).success)
     throw new AuthorizationError("one verified Course publisher organization");
