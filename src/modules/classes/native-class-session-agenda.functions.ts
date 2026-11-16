@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -61,7 +61,8 @@ async function courseCatalog(tx:Tx, courseVersionId:string) {
       eq(assessmentDefinitions.status,"active"),
     ))
     .where(and(eq(assessmentVersions.courseVersionId,courseVersionId),
-      eq(assessmentVersions.lifecycle,"published")))
+      eq(assessmentVersions.lifecycle,"published"),
+      isNotNull(assessmentVersions.publishedAt)))
     .orderBy(asc(assessmentDefinitions.title)).limit(501);
   if(lessons.length>500||assignments.length>500||assessments.length>500)
     throw new AuthorizationError("Course inventory requires pagination");
