@@ -116,6 +116,40 @@ CREATE INDEX IF NOT EXISTS canonical_class_enroll_person_idx
 CREATE INDEX IF NOT EXISTS canonical_class_enroll_class_idx
  ON education_v30.class_enrollments(class_id,status);
 
+-- The learner, Class, enrollment provenance and accepted consent identify one
+-- immutable participation record. Changes of learner or registration terms
+-- require a new reviewed enrollment, never a silent UPDATE of old evidence.
+-- Only status transitions and governed Course Attempt pointers may change.
+CREATE OR REPLACE FUNCTION education_v30.canonical_class_enrollment_identity_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+BEGIN
+ IF TG_OP='DELETE' THEN
+   RAISE EXCEPTION 'Class Enrollment history must be preserved' USING ERRCODE='23514';
+ END IF;
+ IF ROW(OLD.class_id,OLD.class_offering_version_id,OLD.learner_person_id,
+        OLD.enrollment_method,OLD.credit_mode,OLD.enrolled_by_person_id,
+        OLD.consent_version,OLD.consent_sha256,OLD.consented_at,OLD.enrolled_at)
+    IS DISTINCT FROM
+    ROW(NEW.class_id,NEW.class_offering_version_id,NEW.learner_person_id,
+        NEW.enrollment_method,NEW.credit_mode,NEW.enrolled_by_person_id,
+        NEW.consent_version,NEW.consent_sha256,NEW.consented_at,NEW.enrolled_at) THEN
+   RAISE EXCEPTION 'Class Enrollment person, source and consent are immutable'
+     USING ERRCODE='23514';
+ END IF;
+ IF (OLD.status IN ('completed','withdrawn','cancelled')
+       AND NEW.status IS DISTINCT FROM OLD.status)
+    OR (OLD.status='active' AND NEW.status='pending') THEN
+   RAISE EXCEPTION 'Class Enrollment cannot be resurrected or rolled back'
+     USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS canonical_class_enrollment_identity_guard_trg
+ ON education_v30.class_enrollments;
+CREATE TRIGGER canonical_class_enrollment_identity_guard_trg
+ BEFORE UPDATE OR DELETE ON education_v30.class_enrollments
+ FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_class_enrollment_identity_guard();
+
 -- Observed outcomes are distinct from awards. Never rewrite official grades
 -- or issue a credential based on a content-completion flag.
 CREATE TABLE IF NOT EXISTS education_v30.class_outcomes (
