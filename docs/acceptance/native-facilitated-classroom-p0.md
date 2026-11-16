@@ -99,11 +99,12 @@ application origin, never a real school or church roster.
 - Existing academic and noncredit assessment and survey records remain
   authoritative. No parallel quiz, survey, consent or completion tables are
   introduced by the unified Class migrations.
-- **Blocking integration gap:** legacy noncredit knowledge-check and
-  identified survey endpoints currently require a noncredit registration.
-  Add native Class support to the canonical assessment/survey authorization
-  and provider-grant provisioning contracts before promising a five-question
-  pilot check and five-question survey on native Class.
+- **Source integration, not accepted:** native Class now uses the canonical
+  assessment result and identified-survey endpoints, with exact Class Course
+  Attempt verification, provider-issued assessment access, independent
+  provisional-result confirmation and individually invited, permissioned
+  surveys. Validate published five-question forms and five-question campaigns
+  under real restricted DB roles before promising the pilot journey.
 - Require publisher-approved versions, matching Course and deployment,
   independent verified staff access grants, consented survey invitations,
   per-learner response isolation, immutable results and completion policy
