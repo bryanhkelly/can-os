@@ -471,7 +471,7 @@ psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
   -f database/canonical/v3.0.1/provision-canonical-assessment-draft-role.sql
 ```
 
-The role is named `can_v30_assessment_draft_author_<organization-uuid-without-dashes>`
+The role is named `can_v30_assess_draft_author_<organization-uuid-without-dashes>`
 and receives only EXECUTE on the canonical write and metadata readback
 functions, plus the organization-purpose binding verifier. It does not
 receive direct canonical assessment table DML or plaintext answer-key access.
