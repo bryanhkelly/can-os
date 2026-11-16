@@ -247,6 +247,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
   const [learnerCreditMode,setLearnerCreditMode]=useState<"audit"|"not_applicable">("not_applicable");
   const [staffPersonId,setStaffPersonId]=useState("");
   const [staffRole,setStaffRole]=useState<"teacher"|"facilitator">("facilitator");
+  const [canVerifyAttendance,setCanVerifyAttendance]=useState(false);
   const [pending,setPending]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
@@ -270,7 +271,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
     if(!staffPersonId||pending)return;
     setPending(true);setError("");setNotice("");
     try{
-      await assignNativeClassStaff({data:{classId:workspace.classId,personId:staffPersonId,roleCode:staffRole}});
+      await assignNativeClassStaff({data:{classId:workspace.classId,personId:staffPersonId,roleCode:staffRole,canVerifyAttendance}});
       await refresh();setNotice("Verified Class staff assignment saved.");
     }catch(e){setError(normalizeClientError(e,"Could not assign staff.").message)}
     finally{setPending(false)}
@@ -373,12 +374,25 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             <option value="facilitator">Facilitator</option>
             <option value="teacher">Class teacher</option>
           </select>
+          <label className="flex items-start gap-3 border border-border p-3 text-sm">
+            <input type="checkbox" checked={canVerifyAttendance}
+              onChange={event=>setCanVerifyAttendance(event.target.checked)}
+              className="mt-1"/>
+            <span><strong>Authorize attendance verification</strong>
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Separately grant this facilitator access to the exact Class's
+                roster, roll call and recorded corrections. This is not academic grading authority.
+              </span>
+            </span>
+          </label>
           <Button disabled={pending||!staffPersonId} onClick={()=>void assign()}>Assign to Class</Button>
         </div>:<p className="mt-4 text-sm">Provider-wide self-paced Classes do not need local teaching staff.</p>}
         <ul className="mt-5 divide-y divide-border">
           {workspace.staffAssignments.map(assignment=><li key={assignment.id} className="py-3">
             <p className="text-sm font-semibold">{assignment.name}</p>
-            <p className="text-xs text-muted-foreground">{assignment.roleCode}</p>
+            <p className="text-xs text-muted-foreground">{assignment.roleCode}
+              {assignment.attendanceAuthorized?" · Attendance authorized":" · Attendance not authorized"}
+            </p>
             <Button variant="outline" size="sm" className="mt-2" disabled={pending}
               onClick={()=>void end(assignment.id)}>End assignment</Button>
           </li>)}
