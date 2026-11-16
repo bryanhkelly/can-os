@@ -48,6 +48,9 @@ describe("canonical Course objective draft authoring",()=>{
     expect(canonicalAssessmentDraftDatabaseRole({
       scope:{organizationIds:[org]},capabilities:new Set(["curriculum.publish"]),
     })).toBe("can_v30_assess_draft_author_11110000000040008000000000000001");
+    expect(canonicalAssessmentDraftDatabaseRole({
+      scope:{organizationIds:[org]},capabilities:new Set(["curriculum.publish"]),
+    }).length).toBeLessThanOrEqual(63);
     expect(()=>canonicalAssessmentDraftDatabaseRole({
       scope:{organizationIds:[org]},capabilities:new Set(),
     })).toThrow();
