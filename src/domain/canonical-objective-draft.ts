@@ -33,7 +33,7 @@ export function canonicalAssessmentDraftDatabaseRole(
   const ids=actor.scope.organizationIds;
   if(ids?.length!==1||!z.string().uuid().safeParse(ids[0]).success)
     throw new AuthorizationError("one verified Course publisher organization");
-  return "can_v30_assessment_draft_author_"+ids[0]!.replaceAll("-","").toLowerCase();
+  return "can_v30_assess_draft_author_"+ids[0]!.replaceAll("-","").toLowerCase();
 }
 
 /** A local Class may issue fewer attempts than the publisher's published
