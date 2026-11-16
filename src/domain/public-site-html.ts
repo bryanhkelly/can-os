@@ -100,9 +100,12 @@ function renderSiteContentChannelBlock(block: SiteContentBlockProjection): strin
     const detail = '<p>' + escapePublicHtml(item.description) + '</p>';
     // No URLs can be entered in Site block settings. Navigation comes solely
     // from verified public catalog adapters; all values are escaped.
-    const safeHref = item.link?.href && (/^\/[a-zA-Z0-9/?=&%-]+$/.test(item.link.href) ||
+    const safeHref = item.link?.href && (
+      ["/academics","/admissions","/student-life","/programs","/courses","/classes"]
+        .includes(item.link.href) ||
       /^https:\/\/[a-zA-Z0-9.-]+\/learn\/enroll\?release=[a-f0-9-]+$/i.test(item.link.href) ||
-      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/classes$/i.test(item.link.href));
+      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/classes\?search=[A-Za-z0-9%+._~-]+$/i.test(item.link.href)
+    );
     const action = safeHref ?
       '<a class="text-action site-channel-action" href="' +
       escapePublicHtml(item.link!.href) + '">' +

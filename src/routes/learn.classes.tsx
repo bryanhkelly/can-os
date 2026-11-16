@@ -8,7 +8,13 @@ import {
   getNativePublicClassCatalogPage, getMyNativeClassEnrollments, enrollInNativeClass,
 } from "@/modules/classes/native-class-enrollment.functions";
 
-export const Route=createFileRoute("/learn/classes")({component:NativeLearnerClasses});
+export const Route=createFileRoute("/learn/classes")({
+  validateSearch:(value:Record<string,unknown>):{search?:string}=>({
+    search:typeof value.search==="string"&&value.search.trim().length<=100
+      ?value.search.trim():undefined,
+  }),
+  component:NativeLearnerClasses,
+});
 type Item=Awaited<ReturnType<typeof getNativePublicClassCatalogPage>>["items"][number];
 type CreditMode="for_credit"|"audit"|"not_applicable";
 const creditName:Record<CreditMode,string>={
@@ -76,8 +82,9 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
 }
 function NativeLearnerClasses(){
   const client=useQueryClient();
-  const [searchText,setSearchText]=useState("");
-  const [search,setSearch]=useState("");
+  const requested=Route.useSearch();
+  const [searchText,setSearchText]=useState(requested.search??"");
+  const [search,setSearch]=useState(requested.search??"");
   const catalog=useInfiniteQuery({
     queryKey:["native-public-class-catalog",search],
     initialPageParam:null as {title:string;classId:string}|null,

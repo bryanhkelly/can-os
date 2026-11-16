@@ -71,7 +71,12 @@ export function projectSiteEnrollmentOpportunities(
     // Class directory rechecks the current Offering's enrollment methods,
     // capacity, consent and actor identity. Do not invent an "Enroll" CTA.
     status:"explore" as const,
-    ...(origin?{action:{href:origin+"/learn/classes",label:"Explore Class enrollment"}}:{}),
+    ...(origin?{action:{
+      href:origin+"/learn/classes?search="+new URLSearchParams({
+        search:item.title.slice(0,100),
+      }).toString().slice("search=".length),
+      label:"Find this Class",
+    }}:{}),
   }));
   return [...academic,...enrichment,...courses,...classes];
 }
