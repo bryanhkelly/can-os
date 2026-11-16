@@ -12,7 +12,7 @@ const now = new Date("2026-11-16T19:00:00.000Z");
 const uuid = (n: number) => "00000000-0000-4000-8000-" + n.toString().padStart(12, "0");
 describe("Participation Read Model v1", () => {
   it("exposes a stable version and never infers an outcome from dates", () => {
-    expect(PARTICIPATION_READ_MODEL_VERSION).toBe("1.0.0");
+    expect(PARTICIPATION_READ_MODEL_VERSION).toBe("1.1.0");
     expect(activityBucket("active", "2026-01-01T00:00:00Z", now)).toBe("current");
     expect(activityBucket("active", "2027-01-01T00:00:00Z", now)).toBe("upcoming");
     expect(activityBucket("withdrawn", "2027-01-01T00:00:00Z", now)).toBe("history");
