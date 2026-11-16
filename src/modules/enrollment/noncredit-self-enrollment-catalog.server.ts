@@ -70,7 +70,7 @@ export async function readEligibleSelfEnrollmentReleases(
       eq(canonicalOfferingCourses.courseVersionId,r.courseVersionId),
     ))
     .innerJoin(courses,eq(courses.id,courseVersions.courseId))
-    .leftJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,r.siteId))
+    .innerJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,r.siteId))
     .where(and(
       releaseId?eq(r.id,releaseId):undefined,
       paging?.siteId?eq(r.siteId,paging.siteId):undefined,
@@ -121,44 +121,34 @@ export async function readEligibleSelfEnrollmentReleases(
         lte(operator.validFrom,now),
         or(isNull(operator.validThrough),gt(operator.validThrough,now)),
       ))),
-      // A Site can be physical, virtual, or mobile. It is a separately
-      // authorized presentation/operating identity, not necessarily a room.
-      // Independent online delivery may also remain Site-less for a national
-      // provider. When linked, the same active Site/organization/operation
-      // checks apply; only facilitated delivery requires a classroom Site.
+      // Every release has a current, explicitly authorized Site. Online
+      // delivery does not require a physical classroom placement.
+      eq(canonicalEnrollmentSites.status,"active"),
+      exists(executor.select({id:educationOperationSites.id})
+        .from(educationOperationSites).where(and(
+          eq(educationOperationSites.operationId,programDeployments.operationId),
+          eq(educationOperationSites.siteId,r.siteId),
+          lte(educationOperationSites.validFrom,now),
+          or(isNull(educationOperationSites.validThrough),
+            gt(educationOperationSites.validThrough,now)),
+        ))),
+      exists(executor.select({id:siteOrganizationRoles.id})
+        .from(siteOrganizationRoles).where(and(
+          eq(siteOrganizationRoles.siteId,r.siteId),
+          eq(siteOrganizationRoles.organizationId,r.registeringOrganizationId),
+          inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+          lte(siteOrganizationRoles.validFrom,now),
+          or(isNull(siteOrganizationRoles.validThrough),
+            gt(siteOrganizationRoles.validThrough,now)),
+        ))),
       or(
-        and(eq(r.deliveryMode,"independent"),isNull(r.siteId)),
-        and(
-          isNotNull(r.siteId),
-          inArray(r.deliveryMode,["independent","facilitated"]),
-          eq(canonicalEnrollmentSites.status,"active"),
-          exists(executor.select({id:educationOperationSites.id})
-            .from(educationOperationSites).where(and(
-              eq(educationOperationSites.operationId,programDeployments.operationId),
-              eq(educationOperationSites.siteId,r.siteId),
-              lte(educationOperationSites.validFrom,now),
-              or(isNull(educationOperationSites.validThrough),
-                gt(educationOperationSites.validThrough,now)),
+        eq(r.deliveryMode,"independent"),
+        and(eq(r.deliveryMode,"facilitated"),
+          exists(executor.select({id:classroomDeploymentSites.id})
+            .from(classroomDeploymentSites).where(and(
+              eq(classroomDeploymentSites.deploymentId,r.deploymentId),
+              eq(classroomDeploymentSites.siteId,r.siteId),
             ))),
-          exists(executor.select({id:siteOrganizationRoles.id})
-            .from(siteOrganizationRoles).where(and(
-              eq(siteOrganizationRoles.siteId,r.siteId),
-              eq(siteOrganizationRoles.organizationId,r.registeringOrganizationId),
-              inArray(siteOrganizationRoles.roleCode,["operator","host"]),
-              lte(siteOrganizationRoles.validFrom,now),
-              or(isNull(siteOrganizationRoles.validThrough),
-                gt(siteOrganizationRoles.validThrough,now)),
-            ))),
-          or(
-            eq(r.deliveryMode,"independent"),
-            and(eq(r.deliveryMode,"facilitated"),
-              exists(executor.select({id:classroomDeploymentSites.id})
-                .from(classroomDeploymentSites).where(and(
-                  eq(classroomDeploymentSites.deploymentId,r.deploymentId),
-                  eq(classroomDeploymentSites.siteId,r.siteId),
-                ))),
-            ),
-          ),
         ),
       ),
     )).orderBy(paging?r.id:r.closesAt,r.id).limit(releaseId?1:paging?.limit??100);
