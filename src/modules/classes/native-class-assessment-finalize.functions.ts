@@ -13,6 +13,7 @@ import {
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { evaluateKnowledgeCheckResult } from "@/domain/noncredit-knowledge-check";
 import { validateClassAuthority } from "@/modules/classes/unified-class.functions";
+import { getCanonicalClassPublisher } from "./native-class-publisher.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
@@ -168,8 +169,13 @@ export const finalizeNativeClassKnowledgeCheck=createServerFn({method:"POST"})
         .where(eq(assessmentDefinitions.id,version.assessmentId)).limit(1):[];
       const [form]=await tx.select().from(assessmentFormVersions)
         .where(eq(assessmentFormVersions.id,assessment.formVersionId)).limit(1);
+      const publisherOrganizationId=await getCanonicalClassPublisher(tx,{
+        offeringVersionId:cls.offeringVersionId,
+        courseVersionId:cls.courseVersionId,
+      });
       if(!version||version.lifecycle!=="published"||
           version.courseVersionId!==cls.courseVersionId||!definition||
+          definition.ownerOrganizationId!==publisherOrganizationId||
           !["formative","practice","readiness","mastery"].includes(definition.purpose)||
           !form||form.lifecycle!=="published"||form.shuffleQuestions||
           form.id!==administration.formVersionId||
