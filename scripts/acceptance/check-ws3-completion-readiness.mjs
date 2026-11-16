@@ -66,6 +66,22 @@ try {
            'learning_award_issuance_events')
        GROUP BY c.relname`,
     );
+    const proposedTriggers=[
+      "ws3_completion_evidence_guard_trg",
+      "ws3_class_completion_policy_guard_trg",
+      "ws3_class_enrollment_completion_pin_trg",
+      "ws3_class_completion_pin_guard_trg",
+    ];
+    const {rows:proposedTriggerRows}=requireProposed
+      ?await client.query(
+        `SELECT tgname FROM pg_trigger
+         WHERE NOT tgisinternal AND tgname=ANY($1::text[])`,
+        [proposedTriggers],
+      )
+      :{rows:[]};
+    const missingProposedTriggers=requireProposed
+      ?proposedTriggers.filter(name=>!proposedTriggerRows.some(row=>row.tgname===name))
+      :[];
     const {rows:counts}=await client.query(
       `SELECT
        (SELECT count(*) FROM education_v30.class_enrollments) AS class_participants,
@@ -79,11 +95,12 @@ try {
     const noTriggers=["class_outcomes","noncredit_completion_decisions",
       "learning_award_issuance_events"].filter(name=>!(triggerMap.get(name)>0));
     const okay=missing.length===0&&unsafe.length===0&&noTriggers.length===0&&
+      missingProposedTriggers.length===0&&
       f.validates_noncredit&&f.checks_award_current&&f.checks_issuer_access;
     console.log(JSON.stringify({
       preflight:"WS3 read-only canonical completion authority",pass:!!okay,
       requireProposed,
-      missing,unsafe,noTriggers,functionPresence:f,
+      missing,unsafe,noTriggers,missingProposedTriggers,functionPresence:f,
       counts:counts[0],rowLevelSecurity:objects,
       warning:"Schema readiness only; does not test a real learner, operator, approved policy, award grant, or authenticated UI.",
     },null,2));
