@@ -64,6 +64,45 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
     expect(agenda).toContain('actor.capabilities.has("learning.room.facilitate")');
     expect(agenda).toContain("link.facilitatorPersonId===actor.actorPersonId");
   });
+  it("requires optimistic plan revision and gradual activation",()=>{
+    const api=read("src/modules/classes/native-class-session-agenda.functions.ts");
+    const agenda=read("src/components/learning/NativeClassSessionAgenda.tsx");
+    const schedule=read("src/modules/classes/native-class-sessions.functions.ts");
+    expect(api).toContain("data.expectedRevisionNo,previous?.revisionNo??0");
+    expect(api).toContain("assertClassSessionAgendaExpectedRevision(");
+    expect(agenda).toContain("expectedRevisionNo:data.revisionNo");
+    expect(agenda).toContain("Reload latest plan");
+    expect(schedule).toContain("requiresClassSessionAgenda({");
+    expect(schedule).toContain("CAN_WS4_AGENDA_REQUIRED_FROM");
+    expect(schedule).toContain("sessionCreatedAt:link.createdAt");
+  });
+  it("changes only unopened Sessions and links an audited replacement atomically",()=>{
+    const schedule=read("src/modules/classes/native-class-sessions.functions.ts");
+    const panel=read("src/components/learning/NativeClassSessionsPanel.tsx");
+    const source=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
+    expect(schedule).toContain("changeNativeClassSessionSchedule=createServerFn");
+    expect(schedule).toContain('plan.state!=="scheduled"||plan.facilitatedSessionId!==null');
+    expect(schedule).toContain("delivery.startsAt.getTime()<=now.getTime()");
+    expect(schedule).toContain("const booked=await scheduleOneClassroom");
+    expect(schedule).toContain("tx.insert(canonicalClassSessions)");
+    expect(schedule).toContain('state:"cancelled",updatedAt:now');
+    expect(schedule).toContain('eventType:"ClassSessionScheduleChanged"');
+    expect(schedule).toContain('eq(domainEvents.aggregateId,original.id)');
+    expect(schedule).toContain('eq(domainEvents.eventType,"ClassSessionScheduleChanged")');
+    expect(panel).toContain("Confirm reschedule");
+    expect(panel).toContain("Confirm cancellation");
+    expect(panel).toContain("buildSiteClassMeetings([");
+    expect(source).toContain("OLD.state='cancelled' AND NEW.state<>'cancelled'");
+  });
+  it("requires learner-accessible media readiness and permits live-room resume",()=>{
+    const panel=read("src/components/learning/NativeClassSessionsPanel.tsx");
+    expect(panel).toContain("Captions/transcript and readable slides checked");
+    expect(panel).toContain("Bandwidth and facilitator recovery plan checked");
+    expect(panel).toContain("Resume authorized live controls");
+    const schedule=read("src/modules/classes/native-class-sessions.functions.ts");
+    expect(schedule).toContain("if(plan.state===\"started\"&&plan.facilitatedSessionId)");
+    expect(schedule).toContain("alreadyStarted:true");
+  });
   it("orders existing authorized media without granting playback or activity evidence",()=>{
     const controls=read("src/components/learning/ClassroomPlaybackControls.tsx");
     const presenter=read("src/components/learning/NativeClassroomHostPanel.tsx");
