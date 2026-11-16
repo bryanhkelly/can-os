@@ -30,9 +30,10 @@ function ObjectiveAssessmentPublications(){
     queryFn:()=>readCanonicalObjectiveApproval({data:{
       mode:"publish",assessmentVersionId:selected,
     }}),
-    enabled:!!selected,retry:false,
+    enabled:!!selected,retry:false,gcTime:0,staleTime:0,
+    refetchOnMount:"always",refetchOnWindowFocus:"always",
   });
-  const data=details.data;
+  const data=details.isSuccess&&!details.isFetching?details.data:undefined;
   const gate=data?objectiveApprovalGate({
     items:data.items.map(item=>({id:item.id,authorPersonId:item.authorPersonId})),
     assessmentReviews:data.reviews.assessment,
