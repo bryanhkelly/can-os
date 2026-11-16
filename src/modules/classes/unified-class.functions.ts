@@ -212,6 +212,7 @@ export const activateUnifiedClass=createServerFn({method:"POST"})
       if(!instance||!["draft","approved","active"].includes(instance.state))
         throw new AuthorizationError("current owned Class");
       assertManagedClassScope(operator,instance);
+      if(!instance.siteId)throw new AuthorizationError("authorized Site required before Class activation");
       await validateClassAuthority(tx,operator,{
         deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
         offeringVersionId:instance.offeringVersionId,
@@ -293,6 +294,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       if(!instance || !["draft","approved","active"].includes(instance.state))
         throw new AuthorizationError("Class available for publication");
       assertManagedClassScope(operator,instance);
+      if(!instance.siteId)throw new AuthorizationError("authorized Site required before Class publication");
       await validateClassAuthority(tx,operator,{
         deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
         offeringVersionId:instance.offeringVersionId,
