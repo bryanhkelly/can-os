@@ -10,7 +10,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
-import { validateClassAuthority } from "./unified-class.functions";
+import { validateClassAuthority } from "./unified-class-authority.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 const uuid=z.string().uuid();
