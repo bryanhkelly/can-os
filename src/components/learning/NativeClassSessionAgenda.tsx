@@ -76,8 +76,9 @@ export function NativeClassSessionAgenda({
       const saved=await publishNativeClassSessionAgenda({data:{
         classId,classSessionId,requestId,expectedRevisionNo:data.revisionNo,items:draft,
       }});
-      await agenda.refetch();
-      await onPublished?.();
+      // A cache-refresh failure cannot turn a committed plan revision into
+      // a claimed mutation failure or provoke an unnecessary second publish.
+      await Promise.allSettled([agenda.refetch(),onPublished?.()??Promise.resolve()]);
       setRequestId(crypto.randomUUID());setEditing(false);
       setNotice("Session agenda revision "+saved.revisionNo+" saved. This does not issue assignments, attendance or completion.");
     }catch(e){
