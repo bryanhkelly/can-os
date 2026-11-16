@@ -70,7 +70,7 @@
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
     "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts",
     "db:canonical:classes": "node scripts/acceptance/check-native-class-schema.mjs",
-    "test:classes:unit": "vitest run tests/unit/unified-class.test.ts tests/unit/native-class-enrollment.test.ts tests/unit/unified-classroom-player.test.tsx"
+    "test:classes:unit": "vitest run tests/unit/unified-class.test.ts tests/unit/native-class-enrollment.test.ts tests/unit/unified-classroom-player.test.tsx tests/unit/class-views.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
