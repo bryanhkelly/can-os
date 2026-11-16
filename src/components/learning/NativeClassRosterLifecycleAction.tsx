@@ -8,13 +8,14 @@ type Props={
   classEnrollmentId:string;
   status:"pending"|"active";
   onChanged:()=>Promise<void>;
+  onCompleted:(notice:string)=>void;
 };
 
 /** Registrar action, not a Site-wide browser authorization shortcut.
  * The command independently revalidates the exact staff session, Class,
  * owning Organization and Site immediately before changing participation. */
 export function NativeClassRosterLifecycleAction({
-  classEnrollmentId,status,onChanged,
+  classEnrollmentId,status,onChanged,onCompleted,
 }:Props){
   const [confirm,setConfirm]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -29,7 +30,9 @@ export function NativeClassRosterLifecycleAction({
         reason:status==="pending"?"not_eligible":"operator_decision",
       }});
       setConfirm(false);
-      setMessage(status==="pending"?"Request rejected.":"Enrollment cancelled.");
+      const notice=status==="pending"?"Request rejected.":"Enrollment cancelled.";
+      setMessage(notice);
+      onCompleted(notice);
       await onChanged();
     }catch(e){setError(normalizeClientError(e,"Unable to change participation.").message);}
     finally{setBusy(false);}
