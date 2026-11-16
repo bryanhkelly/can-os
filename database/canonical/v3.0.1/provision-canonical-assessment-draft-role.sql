@@ -52,6 +52,9 @@ SELECT format('GRANT USAGE ON SCHEMA education_v30 TO %I',:'draft_role')
 SELECT format('GRANT %I TO %I WITH INHERIT FALSE, SET TRUE',
  :'draft_role',:'application_role')
 \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v28_role_can_access_org(uuid,text) TO %I',
+ :'draft_role')
+\gexec
 SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v301_create_objective_assessment_draft(uuid,uuid,uuid,text,text,numeric,integer,jsonb) TO %I',
  :'draft_role')
 \gexec
