@@ -160,3 +160,45 @@ export function assertVerifiedAdultNativeClassExit(
   if(!verifiedAdultOn(birthDate,now))
     throw new AuthorizationError("verified adult Class lifecycle");
 }
+
+
+/** A Class has one authoritative pool of seats, regardless of enrollment
+ * method. An optional public Offering cap is a *stricter* gate for that
+ * Offering's self-enrollment, never additional seats for assignments.
+ * Call under the Class's FOR UPDATE lock after the open-enrollment lookup.
+ */
+export function assertNativeClassSeatAvailable(args:{
+  method:"self"|"assignment";
+  activeOrPending:number;
+  classCapacity:number|null;
+  offeringCapacity?:number|null;
+}):void{
+  if(!Number.isSafeInteger(args.activeOrPending)||args.activeOrPending<0){
+    throw new AuthorizationError("valid Class occupancy count");
+  }
+  const capacities=[args.classCapacity,
+    ...(args.method==="self"?[args.offeringCapacity??null]:[])];
+  for(const cap of capacities){
+    if(cap!==null && (!Number.isSafeInteger(cap)||cap<=0)){
+      throw new AuthorizationError("valid positive Class capacity");
+    }
+    if(cap!==null && args.activeOrPending>=cap){
+      throw new AuthorizationError("Class is at capacity");
+    }
+  }
+}
+
+/** Stable reason semantics; a failed eligibility review is not an ordinary
+ * cancellation of active learning. Retain policy-coded reasons in the outbox.
+ */
+export function assertNativeClassExitReason(
+  status:ClassEnrollmentStatus,
+  action:ClassClosureAction,
+  reason:"requested"|"not_eligible"|"session_cancelled"|"operator_decision",
+):void{
+  if(action==="withdraw" && reason!=="requested" ||
+     action==="cancel" && reason==="requested" ||
+     reason==="not_eligible" && status!=="pending"){
+    throw new AuthorizationError("consistent Class lifecycle reason");
+  }
+}
