@@ -35,3 +35,19 @@ export function canonicalAssessmentDraftDatabaseRole(
     throw new AuthorizationError("one verified Course publisher organization");
   return "can_v30_assessment_draft_author_"+ids[0]!.replaceAll("-","").toLowerCase();
 }
+
+/** A local Class may issue fewer attempts than the publisher's published
+ * maximum, but may never silently exceed the immutable Course policy.
+ * Existing legacy assessment blueprints retain their previous behavior.
+ */
+export function assertPublisherObjectiveAttemptLimit(
+  blueprint:unknown,attemptLimit:number,
+):void{
+  if(!blueprint||typeof blueprint!=="object"||Array.isArray(blueprint))return;
+  const policy=blueprint as Record<string,unknown>;
+  if(policy.source!=="course-activities")return;
+  const limit=policy.maxAttempts;
+  if(typeof limit!=="number"||!Number.isInteger(limit)||limit<1||limit>5||
+      !Number.isInteger(attemptLimit)||attemptLimit<1||attemptLimit>limit)
+    throw new AuthorizationError("local Class assessment attempts exceed published Course policy");
+}
