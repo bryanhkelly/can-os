@@ -176,8 +176,8 @@ DECLARE source_row record;
 DECLARE membership_row record;
 BEGIN
   IF NEW.noncredit_registration_id IS NOT NULL THEN
-    SELECT r.id,r.site_id,r.registering_organization_id,r.status,
-           c.registration_id
+    SELECT r.id,r.site_id,r.registering_organization_id,
+           NULL::uuid AS operating_organization_id,r.status,c.registration_id
       INTO source_row
       FROM noncredit_self_enrollment_releases r
       JOIN noncredit_self_enrollment_claims c ON c.release_id=r.id
@@ -187,7 +187,8 @@ BEGIN
       RAISE EXCEPTION 'Attribution must reference the registered release and its authorized Site';
     END IF;
   ELSE
-    SELECT cl.id,cl.site_id,cl.operating_organization_id
+    SELECT cl.id,cl.site_id,cl.operating_organization_id,
+           NULL::uuid AS registering_organization_id
       INTO source_row
       FROM class_enrollments ce JOIN classes cl ON cl.id=ce.class_id
      WHERE ce.id=NEW.class_enrollment_id;
