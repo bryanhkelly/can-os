@@ -81,8 +81,12 @@ async function activitySubmissions(tx:Tx,enrollmentId:string,activitySetId:strin
   const rows=await tx.select().from(canonicalClassActivitySubmissions)
     .where(and(eq(canonicalClassActivitySubmissions.classEnrollmentId,enrollmentId),
       eq(canonicalClassActivitySubmissions.activitySetId,activitySetId)));
+  const quizzes=rows.filter(row=>row.kind==="quiz")
+    .sort((a,b)=>a.attemptNo-b.attemptNo);
   return {
-    quiz:rows.find(row=>row.kind==="quiz")??null,
+    quiz:quizzes.find(row=>row.quizPassed)??quizzes.at(-1)??null,
+    quizAttempts:quizzes.length,
+    quizPassed:quizzes.some(row=>row.quizPassed===true),
     feedback:rows.find(row=>row.kind==="feedback")??null,
   };
 }
@@ -101,7 +105,7 @@ async function completionReadiness(tx:Tx,enrollmentId:string,courseAttemptId:str
     .map(row=>row.lessonId));
   const completedLessons=lessons.filter(lesson=>completed.has(lesson.id)).length;
   const readiness=nativeClassCompletionReadiness({
-    quizPassed:submissions.quiz?.quizPassed===true,
+    quizPassed:submissions.quizPassed,
     feedbackSubmitted:!!submissions.feedback,
     feedbackRequired:set.feedbackRequired,
     requireAllLessons:set.requireAllLessons,
@@ -209,6 +213,7 @@ export const publishNativeCourseActivitySet=createServerFn({method:"POST"})
         quizQuestions:publicNativeQuizQuestions(data.quizQuestions),
         feedbackQuestions:data.feedbackQuestions,
         passingFraction:data.passingFraction.toFixed(5),
+        maxQuizAttempts:data.maxQuizAttempts,
         requireAllLessons:data.requireAllLessons,
         feedbackRequired:data.feedbackRequired,
         feedbackConsentVersion:data.feedbackConsentVersion,
@@ -253,7 +258,7 @@ export const getNativeCourseActivitySet=createServerFn({method:"GET"})
       if(!set)return {available:false as const,activitySetId:null,title:null,
         versionNo:null,quizQuestions:[],feedbackQuestions:[],
         feedbackConsentText:null,feedbackRequired:false,
-        quizSubmitted:false,quizPassed:false,feedbackSubmitted:false,
+        quizSubmitted:false,quizPassed:false,quizAttempts:0,maxQuizAttempts:0,feedbackSubmitted:false,
         completionRecorded:false,readiness:null};
       const {submissions,readiness}=await completionReadiness(
         tx,enrollment.id,enrollment.courseAttemptId!,cls.courseVersionId,set);
@@ -269,7 +274,8 @@ export const getNativeCourseActivitySet=createServerFn({method:"GET"})
         feedbackQuestions:set.feedbackQuestions,
         feedbackConsentText:set.feedbackConsentText,
         feedbackRequired:set.feedbackRequired,
-        quizSubmitted:!!submissions.quiz,quizPassed:submissions.quiz?.quizPassed===true,
+        quizSubmitted:submissions.quizAttempts>0,quizPassed:submissions.quizPassed,
+        quizAttempts:submissions.quizAttempts,maxQuizAttempts:set.maxQuizAttempts,
         feedbackSubmitted:!!submissions.feedback,
         completionRecorded:!!outcome,readiness};
     });
@@ -287,13 +293,23 @@ export const submitNativeClassActivity=createServerFn({method:"POST"})
       const {set,pin}=await pinnedActivitySet(tx,enrollment.id,cls.courseVersionId);
       if(!set||set.id!==data.activitySetId)
         throw new AuthorizationError("current pinned Course activity version; reload the Class");
-      const [existing]=await tx.select({id:canonicalClassActivitySubmissions.id})
-        .from(canonicalClassActivitySubmissions).where(and(
-          eq(canonicalClassActivitySubmissions.classEnrollmentId,enrollment.id),
-          eq(canonicalClassActivitySubmissions.activitySetId,set.id),
-          eq(canonicalClassActivitySubmissions.kind,data.kind),
-        )).limit(1);
-      if(existing)return {saved:true,alreadySubmitted:true,kind:data.kind};
+      const [sameRequest]=await tx.select({
+        id:canonicalClassActivitySubmissions.id,kind:canonicalClassActivitySubmissions.kind,
+      }).from(canonicalClassActivitySubmissions).where(and(
+        eq(canonicalClassActivitySubmissions.classEnrollmentId,enrollment.id),
+        eq(canonicalClassActivitySubmissions.requestId,data.requestId),
+      )).limit(1);
+      if(sameRequest){
+        if(sameRequest.kind!==data.kind)
+          throw new AuthorizationError("a submission retry may not change activity kind");
+        return {saved:true,alreadySubmitted:true,kind:data.kind};
+      }
+      const prior=await activitySubmissions(tx,enrollment.id,set.id);
+      if(data.kind==="feedback"&&prior.feedback)
+        return {saved:true,alreadySubmitted:true,kind:data.kind};
+      if(data.kind==="quiz"&&(prior.quizPassed||prior.quizAttempts>=set.maxQuizAttempts))
+        throw new AuthorizationError("no more knowledge-check attempts are available");
+      const attemptNo=data.kind==="quiz"?prior.quizAttempts+1:1;
       let quizFraction:string|null=null,quizPassed:boolean|null=null;
       let consentVersion:string|null=null,consentHash:string|null=null;
       let consentedAt:Date|null=null;
@@ -327,7 +343,7 @@ export const submitNativeClassActivity=createServerFn({method:"POST"})
       }
       const [saved]=await tx.insert(canonicalClassActivitySubmissions).values({
         classEnrollmentId:enrollment.id,activitySetId:set.id,kind:data.kind,
-        requestId:data.requestId,quizFraction,quizPassed,
+        attemptNo,requestId:data.requestId,quizFraction,quizPassed,
         feedbackConsentVersion:consentVersion,
         feedbackConsentSha256:consentHash,feedbackConsentedAt:consentedAt,
       }).returning({id:canonicalClassActivitySubmissions.id});
@@ -336,7 +352,7 @@ export const submitNativeClassActivity=createServerFn({method:"POST"})
         submissionId:saved.id,answers,
       });
       const payload={classEnrollmentId:enrollment.id,activitySetId:set.id,
-        kind:data.kind,quizPassed,quizFraction,feedbackConsentVersion:consentVersion};
+        kind:data.kind,attemptNo,quizPassed,quizFraction,feedbackConsentVersion:consentVersion};
       await tx.insert(auditEvents).values({
         actorPersonId:actor.actorPersonId,owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.activity.submitted",entityKind:"class_activity_submission",
