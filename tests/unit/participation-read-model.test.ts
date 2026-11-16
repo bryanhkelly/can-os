@@ -1,6 +1,6 @@
 import {describe, expect, it} from "vitest";
 import {
-  PARTICIPATION_READ_MODEL_VERSION, activityBucket, activityStatusLabel,
+  PARTICIPATION_READ_MODEL_VERSION, activityBucket, activityStatus, activityStatusLabel,
   resolveActivityFilters, assertUniqueParticipationKeys,
 } from "@/domain/participation-read-model";
 import {
@@ -30,6 +30,21 @@ describe("Participation Read Model v1", () => {
       bucket: "current", outcome: null,
     });
     expect(records[0]?.action?.href).toContain(uuid(2));
+  });
+  it("does not infer an official result or access from completed enrollment", () => {
+    const school = projectSchoolSections([{
+      id: uuid(2), title: "Completed History", code: "HIS",
+      enrollmentId: uuid(3), enrollmentStatus: "completed",
+    }], now)[0];
+    const native = projectNativeClasses([{
+      classEnrollmentId: uuid(4), classId: uuid(5), title: "Completed AI",
+      status: "completed", deliveryMode: "online",
+      courseAttemptId: uuid(9), enrolledAt: now, siteId: null,
+    }], now)[0];
+    expect(school).toMatchObject({status: "completed", bucket: "history", outcome: null, action: null});
+    expect(native).toMatchObject({status: "completed", bucket: "history", outcome: null, action: null});
+    expect(activityStatus("expired")).toBe("unknown");
+    expect(activityStatus("cancelled")).toBe("cancelled");
   });
   it("keeps withdrawn school Sections as history without assigning a grade", () => {
     const records = projectSchoolSections([{
