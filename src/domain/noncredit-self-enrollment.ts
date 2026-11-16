@@ -16,14 +16,13 @@ export const noncreditPublishCommand = z.object({
   trainingVersionId:z.string().uuid(),
   courseVersionId:z.string().uuid(),
   deliveryMode:z.enum(["independent","facilitated"]),
-  siteId:z.string().uuid().nullable(),
+  siteId:z.string().uuid(),
   opensAt:z.string().datetime({offset:true}),
   closesAt:z.string().datetime({offset:true}),
   maxParticipants:z.number().int().min(1).max(1000000),
   consentVersion:z.string().trim().min(3).max(80),
   consentText:z.string().trim().min(25).max(4000),
-}).strict().refine(x=>new Date(x.opensAt)<new Date(x.closesAt),{message:"Enrollment close must follow opening"})
-  .refine(x=>x.deliveryMode!=="facilitated"||x.siteId!==null,{message:"Facilitated registration requires a Site"});
+}).strict().refine(x=>new Date(x.opensAt)<new Date(x.closesAt),{message:"Enrollment close must follow opening"});
 
 /** Consent is bound to the exact server published text and revision, not a
  * mutable browser/localStorage copy. */
