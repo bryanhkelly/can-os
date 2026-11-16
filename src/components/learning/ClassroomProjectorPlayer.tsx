@@ -140,7 +140,7 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
             setError("Rechecking short-lived recording access…");
           }else setError("Playback failed. Refresh the approved recording or check the media source.");
         }}
-      />
+      />}
       {resolved?.kind==="embed"&&<p className="mt-2 text-xs text-muted-foreground">
         Third-party providers have their own play and pause controls. CAN OS cannot independently
         verify viewing or automatically synchronize these embeds.
