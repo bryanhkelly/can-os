@@ -8,7 +8,7 @@ import {
   canonicalClassOfferings, canonicalClassOfferingVersions, canonicalPersons,
   canonicalAccountGrants, canonicalAccounts, courseLessons, courseUnits,
   canonicalClassSessions, canonicalDeliverySessions, facilitatedClassroomPlans,
-  facilitatedLearningSessions,
+  facilitatedLearningSessions, canonicalEnrollmentSites,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { classViews, classTabs, selectClassTab, selectClassView } from "@/domain/class-views";
@@ -46,6 +46,13 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       const [instance]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId)).limit(1);
       if(!instance)throw new AuthorizationError("available Class");
+      const [hostingSite]=instance.siteId?await tx.select({
+        timeZone:canonicalEnrollmentSites.timeZone,
+      }).from(canonicalEnrollmentSites)
+        .where(eq(canonicalEnrollmentSites.id,instance.siteId)).limit(1):[];
+      if(instance.siteId&&!hostingSite)
+        throw new AuthorizationError("Class hosting Site time zone");
+      const siteTimeZone=hostingSite?.timeZone??"UTC";
       const now=new Date();
       let canLearn=false;
       let canTeach=false;
@@ -327,7 +334,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       }));
       return {
         classId:instance.id,title:instance.title,
-        courseVersionId:instance.courseVersionId,siteId:instance.siteId,
+        courseVersionId:instance.courseVersionId,siteId:instance.siteId,siteTimeZone,
         deliveryMode:instance.deliveryMode,state:instance.state,
         view,tab,availableViews:permittedViews,
         availableTabs:classTabs[view],
