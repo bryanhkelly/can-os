@@ -10,6 +10,7 @@ import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstr
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
+import { NativeCourseActivitiesPanel } from "@/components/learning/NativeCourseActivitiesPanel";
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
@@ -158,13 +159,8 @@ function LearnerClass({workspace}:{workspace:Workspace}){
         <p className="mt-2 text-sm">{data.awards.filter(a=>!a.revokedAt).length} active awards recorded.</p>
       </>}
     </section>}
-    {workspace.tab==="assignments"&&<section className="border border-border bg-card p-5">
-      <h2 className="font-serif text-2xl">Assignments</h2>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Canonical graded assessments are not yet connected to this native Class workspace.
-        Recorded teacher practice is accessible through Lessons and does not change official assessment requirements.
-      </p>
-    </section>}
+    {workspace.tab==="assignments"&&
+      <NativeCourseActivitiesPanel classEnrollmentId={learner.classEnrollmentId}/>}
     {workspace.tab==="sessions"&&<>
       <NativeClassSessionsPanel workspace={workspace}/>
       {learner.status==="active"&&<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>}
