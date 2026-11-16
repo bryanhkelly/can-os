@@ -23,9 +23,10 @@ Each metric includes its source, grain/denominator, time basis, counting rule, v
 | Sessions delivered | facilitated_learning_sessions | Linked room must have ended; scheduling alone is not delivery |
 | Verified attendance occurrences | facilitated_room_attendance_assertions | Latest host assertion per room + Course Attempt must be present |
 | Verified attendees | canonical enrolled Person IDs plus assertions | Distinct verified Person with at least one present assertion in linked rooms |
-| Assessments submitted | assessment_attempts via canonical access grant | Distinct submitted/scored/finalized attempts created in interval |
-| Assessments finalized | assessment_attempt_results | Latest revision must be finalized, later void excludes it |
-| Recorded Class completion outcomes | class_outcomes | Distinct enrollments with completion code completed, provisional pending WS3 ratification |
+| Assessments submitted | assessment_attempts via canonical access grant | Distinct submitted/scored/finalized attempts with submitted_at in interval, including participants registered earlier |
+| Assessments finalized | assessment_attempt_results | Latest revision AND parent attempt must be finalized, among attempts submitted in interval; later void excludes it |
+| Recorded Class completion outcomes | class_outcomes | Distinct enrollments with completion code completed; *not* a formal verified completion determination |
+| Verified Class completions | WS3 governed completion authority | NULL / unavailable until formal decision and correction contract are ratified |
 | Awards issued / revoked | class_awards | Distinct original awards by respective issue and revoke timestamps |
 
 Do not equate facilitator attestation with school roll-call, room pairing with verified attendance, watched video with assessment, or completed Course Attempt with issued credential. Bounded query limits fail with an explicit error, never publish truncated totals as complete.
@@ -41,15 +42,19 @@ Existing getNoncreditOperatorNetworkSummary supports one operating Organization 
 ## Concrete WS6 implementation
 
 - src/domain/participation-reporting.ts: pure metrics and reconciler with provenance.
-- src/modules/reporting/native-class-report.functions.ts: bounded Class report and revalidated operator/Site/Session authority; read-only.
+- src/modules/reporting/native-class-report.functions.ts: bounded Class report and revalidated operator/Site/Session authority; confirms Class Enrollment to Course Attempt identity, exact room/Session, assessment grant, learner identity, provider and Course/version; read-only.
 - src/components/reports/NativeClassReportPanel.tsx: design system 6.1 UI, date filters, prior-period comparison, definitions, evidence-only CSV.
 - src/routes/reports.classes_.$classId.tsx: isolated authorized report page.
+- src/domain/participation-reporting-authority.ts and tests/unit/participation-reporting-authority.test.ts: explicit principal, single Organization, Site, capability and revoked-scope negative tests.
+- src/domain/network-reporting-authorization.ts and tests/unit/network-reporting-authorization.test.ts: independently scoped current host-by-metric grant and disclosure review policy, **not** a live network endpoint.
+- src/components/reports/NoncreditProviderEvidencePanel.tsx: existing authorized one-Organization release evidence with Site filter, release drill-down and operator-private aggregate CSV.
+- src/domain/participation-rollups.ts and tests/unit/participation-rollups.test.ts: aggregate by authoritative source grain and Person across independently authorized Sites, Courses and Programs.
 - tests/unit/participation-reporting.test.ts: dedup, corrections, unlinked-room rejection, voided assessment, withdrawal and outcome history.
 - Existing Class Reports tab in src/routes/classes_.$classId.tsx remains a placeholder. WS00/WS4 own its shared workspace integration, to avoid competing edits.
 
 ## Illustrative calculations, NOT pilot results
 
-One-hour synthetic pilot: 10 Enrollment rows, 9 distinct Persons, 1 linked room actually ended, 7 latest present host assertions. The measures are 10 registrations, 9 unique in-period people, 1 delivered Session, 7 attendance occurrences. No claim about new skills, lesson watch time or accreditation follows.
+One-hour synthetic pilot: 10 Class Enrollment rows, 9 distinct Persons, 1 linked room actually ended, 7 latest present host assertions. The illustrative measures are 10 registrations, 9 unique in-period people, 1 delivered Session, 7 host-attested attendance occurrences. This is not a tested live pilot. No claim about new skills, lesson watch time or accreditation follows.
 
 Four-session, two-Site synthetic pilot: Site A has 8 registrations for 8 people; Site B has 6 registrations for 6 people, with one Person at both. If the same operator has both current Site grants, report 14 registrations and 13 distinct people for that operator, not 14 unique. Four scheduled sessions may be fewer than four delivered. Two unrelated independent Site operators must NEVER be joined under an affiliate just because they share a network membership.
 
@@ -59,4 +64,4 @@ History correction: present then absent in same room/attempt is absent. Finalize
 
 WS1 and WS00 must ratify source identity, participation status and event/projection fields. WS2 must confirm lifecycle event-time semantics and explicitly absent native Class waitlist support. WS3 must ratify the formal Class completion result code, corrected/revoked decisions, awards and completion definitions. WS4 must confirm delivered Session and attendance assertion authority. WS5 must approve Program mapping and independently operated Site aggregation. WS00 owns the existing Class tab integration, grant bridge, cross-branch conflicts and release sign-off.
 
-No runtime build or test passes are claimed. Required: clean typecheck, lint/design-system, unit/reconciliation, integration, Cloudflare build, QA schema and RLS, negative-grant, cross-Site, multi-Site aggregation, historical corrections, authenticated one-hour/four-session and school/guardian journeys. No production changes or migrations. Rollback is to revert WS6 source commits and preserve all canonical evidence.
+No runtime build or test passes are claimed. GitHub Actions PR checks were previously observed to fail at startup before creating any jobs; a startup failure is neither build failure evidence nor a test pass. Required: clean typecheck, lint/design-system, unit/reconciliation, integration, Cloudflare build, QA schema and RLS, negative-grant, cross-Site, multi-Site aggregation, historical corrections, authenticated one-hour/four-session and school/guardian journeys. No production changes or migrations. Rollback is to revert WS6 source commits and preserve all canonical evidence.
