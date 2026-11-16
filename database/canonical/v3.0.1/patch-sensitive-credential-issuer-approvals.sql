@@ -88,6 +88,9 @@ BEGIN
  END IF;
 END $policy$;
 
+-- An approval belongs to both the exact native staff grant AND the
+-- verified CAN account that requested it. Rebinding the canonical Person to
+-- a different CAN account never transfers issuer authority.
 -- No browser-selected identity, Site, org or role can authorize issuance.
 -- This function accepts only the hashed existing CAN session plus a
 -- hardcoded capability; it performs the full native staff session check.
@@ -100,8 +103,12 @@ AS $capability$
  SELECT p_capability_code='credential.issue' AND EXISTS (
    SELECT 1
    FROM education_v30.v301_can_staff_session_context(p_can_session_hash) staff
+   JOIN public.access_sessions source_session
+     ON source_session.id=staff.session_id
+       AND source_session.secret_hash=p_can_session_hash
    JOIN education_v30.canonical_sensitive_capability_approvals approval
      ON approval.canonical_grant_id=staff.grant_id
+       AND approval.requested_by_can_account_id=source_session.account_id
    WHERE approval.capability_code=p_capability_code
      AND approval.status='approved'
      AND approval.reviewed_at IS NOT NULL
