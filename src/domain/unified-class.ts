@@ -35,7 +35,12 @@ export const classOfferingTermsSchema = z.object({
   opensAt: dateTime.nullable(),
   closesAt: dateTime.nullable(),
   capacity: z.number().int().min(1).nullable(),
+  consentVersion: z.string().trim().min(3).max(80).nullable(),
+  consentText: z.string().trim().min(25).max(10000).nullable(),
 }).strict().superRefine((terms, ctx) => {
+  if (terms.enrollmentMethods.includes("self") && (!terms.consentVersion || !terms.consentText)) {
+    ctx.addIssue({code:"custom",path:["consentText"],message:"Self-enrollment requires published participation terms"});
+  }
   if (terms.opensAt && terms.closesAt &&
       Date.parse(terms.closesAt) <= Date.parse(terms.opensAt)) {
     ctx.addIssue({ code: "custom", path: ["closesAt"],
