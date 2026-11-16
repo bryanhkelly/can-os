@@ -54,6 +54,20 @@ describe("Site-owned website content channels", () => {
     expect(present[0]!.items[0]!.label).toContain("admissions not open");
   });
 
+  it("private previews cannot enable registration links", () => {
+    const config = {version: 1 as const, revision: 1, blocks: [{
+      id: "training", channel: "learning.noncredit" as const,
+      placement: "learning" as const, layout: "cards" as const,
+      enabled: true, eyebrow: "Training", title: "Learn", description: "",
+    }]};
+    const blocks = resolveSiteContentBlocks(config, {mode: "private", noncredit: [{
+      releaseId: "11111111-1111-4111-8111-111111111111",
+      title: "AI training", siteName: "Example", seatsRemaining: 10, waitlistAvailable: false,
+    }], enrollmentOrigin: "https://example.org"});
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]!.items[0]!.link).toBeUndefined();
+  });
+
   it("noncredit registration links require an eligible release and trusted HTTPS origin", () => {
     const config = {version: 1 as const, revision: 1, blocks: [{
       id: "training", channel: "learning.noncredit" as const,

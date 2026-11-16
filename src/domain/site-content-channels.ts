@@ -105,7 +105,7 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   },
 };
 
-const interestCopy: Record<typeof siteLaunchInterestIds[number], {title: string; description: string}> = {
+const interestCopy: Record<(typeof siteLaunchInterestIds)[number], {title: string; description: string}> = {
   "grades-6-8": {title: "Grades 6–8", description: "Exploring middle school curriculum"},
   "grades-9-12": {title: "Grades 9–12", description: "Exploring high school curriculum"},
   afterschool: {title: "Afterschool", description: "Exploring programs after the school day"},
