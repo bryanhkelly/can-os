@@ -233,10 +233,12 @@ INSERT INTO education_v30.participation_attributions (
 )
 SELECT c.registration_id,r.id,r.site_id,r.site_id,r.registering_organization_id,
        'provider_default',jsonb_build_object('kind','provider_default','backfilled',true,
-         'releaseId',r.id,'organizationId',r.registering_organization_id,'siteId',r.site_id),
+         'releaseId',r.id,'organizationId',r.registering_organization_id,'siteId',r.site_id,
+         'creditedOrganizationName',COALESCE(o.display_name,o.legal_name)),
        c.created_at
 FROM education_v30.noncredit_self_enrollment_claims c
 JOIN education_v30.noncredit_self_enrollment_releases r ON r.id=c.release_id
+JOIN education_v30.organizations o ON o.id=r.registering_organization_id
 ON CONFLICT (noncredit_registration_id) DO NOTHING;
 
 INSERT INTO education_v30.participation_attributions (
@@ -245,10 +247,12 @@ INSERT INTO education_v30.participation_attributions (
 )
 SELECT e.id,c.site_id,c.site_id,c.operating_organization_id,'provider_default',
   jsonb_build_object('kind','provider_default','backfilled',true,
-    'classId',c.id,'organizationId',c.operating_organization_id,'siteId',c.site_id),
+    'classId',c.id,'organizationId',c.operating_organization_id,'siteId',c.site_id,
+    'creditedOrganizationName',COALESCE(o.display_name,o.legal_name)),
   e.enrolled_at
 FROM education_v30.class_enrollments e
 JOIN education_v30.classes c ON c.id=e.class_id
+JOIN education_v30.organizations o ON o.id=c.operating_organization_id
 ON CONFLICT (class_enrollment_id) DO NOTHING;
 
 -- All historical and future self-enrollment claims / native Class enrollments
@@ -287,6 +291,7 @@ RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $at
 DECLARE source_row record;
 DECLARE membership_row record;
 DECLARE lineage_snapshot jsonb;
+DECLARE credited_org_name text;
 BEGIN
   IF NEW.noncredit_registration_id IS NOT NULL THEN
     SELECT r.id,r.site_id,r.registering_organization_id,
@@ -319,12 +324,22 @@ BEGIN
   IF NEW.reporting_site_id IS DISTINCT FROM NEW.delivery_site_id THEN
     RAISE EXCEPTION 'Reporting Site must be the verified enrollment delivery Site';
   END IF;
+  SELECT COALESCE(o.display_name,o.legal_name) INTO credited_org_name
+    FROM organizations o WHERE o.id=NEW.credited_organization_id;
+  IF credited_org_name IS NULL THEN
+    RAISE EXCEPTION 'Credited Organization requires a displayable verified identity';
+  END IF;
   IF NEW.attribution_basis='provider_default' THEN
     IF NEW.credited_organization_id IS DISTINCT FROM
        COALESCE(source_row.registering_organization_id,source_row.operating_organization_id)
        OR NEW.reporting_site_id IS DISTINCT FROM NEW.delivery_site_id THEN
       RAISE EXCEPTION 'Default attribution must credit its operating Organization and Site';
     END IF;
+    NEW.relationship_snapshot=NEW.relationship_snapshot || jsonb_build_object(
+      'creditedOrganizationId',NEW.credited_organization_id,
+      'creditedOrganizationName',credited_org_name,
+      'deliverySiteId',NEW.delivery_site_id,
+      'basis',NEW.attribution_basis);
   ELSE
     SELECT * INTO membership_row
       FROM network_memberships WHERE id=NEW.network_membership_id
@@ -360,6 +375,8 @@ BEGIN
     NEW.relationship_snapshot=jsonb_build_object(
       'networkOrganizationId',membership_row.network_organization_id,
       'memberOrganizationId',membership_row.member_organization_id,
+      'creditedOrganizationId',NEW.credited_organization_id,
+      'creditedOrganizationName',credited_org_name,
       'networkMembershipId',membership_row.id,
       'reportingUnitId',membership_row.reporting_unit_id,
       'reportingPath',COALESCE(lineage_snapshot,'[]'::jsonb),
