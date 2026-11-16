@@ -21,6 +21,23 @@ ALTER TABLE education_v30.noncredit_self_enrollment_releases
 ALTER TABLE education_v30.noncredit_self_enrollment_claims
   ALTER COLUMN site_id SET NOT NULL;
 
+-- Draft native Classes may be Site-less; active/completed Classes and their
+-- existing Enrollments cannot be attributed to an invented Site.
+DO $native_preflight$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM education_v30.class_enrollments e
+      JOIN education_v30.classes c ON c.id=e.class_id WHERE c.site_id IS NULL
+  ) THEN
+    RAISE EXCEPTION 'Network attribution migration blocked: existing native Class enrollment has no real Site';
+  END IF;
+END $native_preflight$;
+ALTER TABLE education_v30.classes
+  ADD CONSTRAINT native_class_active_site_ck CHECK (
+    state NOT IN ('active','completed') OR site_id IS NOT NULL
+  ) NOT VALID;
+ALTER TABLE education_v30.classes VALIDATE CONSTRAINT native_class_active_site_ck;
+
 -- A network unit represents an organizational reporting node, not an operating
 -- Site or a separate legal entity. Its reporting parent belongs to the same network.
 CREATE TABLE IF NOT EXISTS education_v30.network_units (
@@ -87,7 +104,9 @@ CREATE TABLE IF NOT EXISTS education_v30.network_memberships (
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT network_membership_window_ck CHECK(valid_through IS NULL OR valid_through > valid_from),
   CONSTRAINT network_membership_not_self_ck CHECK(network_organization_id <> member_organization_id),
-  CONSTRAINT network_membership_approval_ck CHECK(status <> 'approved' OR (reviewed_at IS NOT NULL AND reviewed_by_person_id IS NOT NULL)),
+  CONSTRAINT network_membership_approval_ck CHECK(status <> 'approved' OR
+    (reviewed_at IS NOT NULL AND reviewed_by_person_id IS NOT NULL
+      AND evidence_version_id IS NOT NULL)),
   CONSTRAINT network_membership_unit_fk FOREIGN KEY(reporting_unit_id,network_organization_id)
     REFERENCES education_v30.network_units(id,network_organization_id) ON DELETE RESTRICT
 );
@@ -170,6 +189,64 @@ CREATE INDEX IF NOT EXISTS participation_attribution_membership_idx
   ON education_v30.participation_attributions(network_membership_id,attributed_at);
 CREATE INDEX IF NOT EXISTS participation_attribution_site_idx
   ON education_v30.participation_attributions(reporting_site_id,attributed_at);
+
+-- Reconstruct only provable provider-default attribution from existing immutable
+-- source records. Never infer a learner's church from referrers or emails.
+-- These additive records are marked backfilled and retain source timestamps.
+INSERT INTO education_v30.participation_attributions (
+  noncredit_registration_id,release_id,delivery_site_id,reporting_site_id,
+  credited_organization_id,attribution_basis,relationship_snapshot,attributed_at
+)
+SELECT c.registration_id,r.id,r.site_id,r.site_id,r.registering_organization_id,
+       'provider_default',jsonb_build_object('kind','provider_default','backfilled',true,
+         'releaseId',r.id,'organizationId',r.registering_organization_id,'siteId',r.site_id),
+       c.created_at
+FROM education_v30.noncredit_self_enrollment_claims c
+JOIN education_v30.noncredit_self_enrollment_releases r ON r.id=c.release_id
+ON CONFLICT (noncredit_registration_id) DO NOTHING;
+
+INSERT INTO education_v30.participation_attributions (
+  class_enrollment_id,delivery_site_id,reporting_site_id,credited_organization_id,
+  attribution_basis,relationship_snapshot,attributed_at
+)
+SELECT e.id,c.site_id,c.site_id,c.operating_organization_id,'provider_default',
+  jsonb_build_object('kind','provider_default','backfilled',true,
+    'classId',c.id,'organizationId',c.operating_organization_id,'siteId',c.site_id),
+  e.enrolled_at
+FROM education_v30.class_enrollments e
+JOIN education_v30.classes c ON c.id=e.class_id
+ON CONFLICT (class_enrollment_id) DO NOTHING;
+
+-- All historical and future self-enrollment claims / native Class enrollments
+-- must have exactly one linked attribution; commit-time checks allow both
+-- rows to be written atomically in either command order.
+CREATE OR REPLACE FUNCTION education_v30.v301_require_noncredit_attribution()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $required_claim$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM participation_attributions
+      WHERE noncredit_registration_id=NEW.registration_id) THEN
+    RAISE EXCEPTION 'Noncredit claim lacks immutable participation attribution';
+  END IF;
+  RETURN NEW;
+END $required_claim$;
+CREATE CONSTRAINT TRIGGER v301_noncredit_attribution_required
+ AFTER INSERT ON education_v30.noncredit_self_enrollment_claims
+ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+ EXECUTE FUNCTION education_v30.v301_require_noncredit_attribution();
+
+CREATE OR REPLACE FUNCTION education_v30.v301_require_class_attribution()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $required_class$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM participation_attributions
+      WHERE class_enrollment_id=NEW.id) THEN
+    RAISE EXCEPTION 'Native Class Enrollment lacks immutable participation attribution';
+  END IF;
+  RETURN NEW;
+END $required_class$;
+CREATE CONSTRAINT TRIGGER v301_class_attribution_required
+ AFTER INSERT ON education_v30.class_enrollments
+ DEFERRABLE INITIALLY DEFERRED FOR EACH ROW
+ EXECUTE FUNCTION education_v30.v301_require_class_attribution();
 
 CREATE OR REPLACE FUNCTION education_v30.v301_validate_participation_attribution()
 RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $attribution_scope$
