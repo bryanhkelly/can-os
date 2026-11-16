@@ -11,7 +11,8 @@ import {
 } from "@/db/canonical-v301";
 import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
 import {
-  assertClassSessionAgendaReferences, canPublishClassSessionAgenda,
+  assertClassSessionAgendaReferences, assertClassSessionAgendaExpectedRevision,
+  canPublishClassSessionAgenda,
   classSessionAgendaItemsSchema, type ClassSessionAgendaItem,
 } from "@/domain/native-class-session-agenda";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -26,7 +27,8 @@ import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facil
 const uuid = z.string().uuid();
 const readInput = z.object({classId:uuid,classSessionId:uuid}).strict();
 const publishInput = readInput.extend({
-  requestId:uuid,items:classSessionAgendaItemsSchema,
+  requestId:uuid,expectedRevisionNo:z.number().int().min(0).max(1000),
+  items:classSessionAgendaItemsSchema,
 }).strict();
 
 function requireAgendaFeature() {
@@ -243,6 +245,9 @@ export const publishNativeClassSessionAgenda=createServerFn({method:"POST"})
         assessments:new Set(catalog.assessments.map(x=>x.id)),
       });
       const previous=await latestAgenda(tx,link.id);
+      assertClassSessionAgendaExpectedRevision(
+        data.expectedRevisionNo,previous?.revisionNo??0,
+      );
       const revisionNo=(previous?.revisionNo??0)+1;
       const [saved]=await tx.insert(classSessionAgendaRevisions).values({
         classSessionId:link.id,courseVersionId:cls.courseVersionId,
