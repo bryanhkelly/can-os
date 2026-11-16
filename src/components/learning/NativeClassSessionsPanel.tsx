@@ -111,6 +111,9 @@ export function NativeClassSessionsPanel({
         One-time pairing expires: {utcDisplay(opened.expiresAt)}
       </p>}
       <Link to="/classroom/$sessionId/presentation" params={{sessionId:opened.roomId}}
+        hash={opened.pairingCode&&opened.expiresAt
+          ?"pair="+encodeURIComponent(opened.pairingCode)+"&expires="+encodeURIComponent(opened.expiresAt)
+          :undefined}
         className="mt-3 inline-block text-sm font-semibold underline">Open shared-screen projector</Link>
       <p className="mt-3 text-xs text-muted-foreground">
         A paired device is not proof of learner attendance or lesson completion.
