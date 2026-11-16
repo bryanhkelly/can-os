@@ -93,7 +93,29 @@ BEGIN
  THEN RAISE EXCEPTION 'issuer approval broadened to arbitrary capabilities'; END IF;
 END $accept$;
 
+-- Reassigning a native Person to another CAN account may never transfer
+-- an approval from the original CAN account.
+INSERT INTO public.access_accounts(id,email_normalized,email_verified_at)
+VALUES ('faab0000-0000-4000-8000-000000000009',
+        'sso-qa-other-account@can.invalid',clock_timestamp());
 UPDATE education_v30.canonical_sensitive_capability_approvals SET
+ requested_by_can_account_id='faab0000-0000-4000-8000-000000000009'
+WHERE requested_by_can_account_id='faab0000-0000-4000-8000-000000000001'
+ AND status='approved';
+DO $deny$
+BEGIN
+ IF education_v30.v301_can_sensitive_capability(repeat('a',64),'credential.issue')
+ THEN RAISE EXCEPTION 'issuer approval transferred to another CAN account'; END IF;
+END $deny$;
+UPDATE education_v30.canonical_sensitive_capability_approvals SET
+ requested_by_can_account_id='faab0000-0000-4000-8000-000000000001'
+WHERE requested_by_can_account_id='faab0000-0000-4000-8000-000000000009'
+ AND status='approved';
+
+-- Expiry must be the reason for denial. Keep requested_at <= reviewed_at
+-- and approved_until > reviewed_at so no other check masks the outcome.
+UPDATE education_v30.canonical_sensitive_capability_approvals SET
+ requested_at=clock_timestamp()-interval '4 days',
  approved_until=clock_timestamp()-interval '1 day',
  reviewed_at=clock_timestamp()-interval '3 days'
 WHERE requested_by_can_account_id='faab0000-0000-4000-8000-000000000001'
@@ -104,6 +126,7 @@ BEGIN
  THEN RAISE EXCEPTION 'expired issuer approval remains usable'; END IF;
 END $deny$;
 UPDATE education_v30.canonical_sensitive_capability_approvals SET
+ requested_at=clock_timestamp()-interval '1 hour',
  approved_until=clock_timestamp()+interval '2 days',
  reviewed_at=clock_timestamp()
 WHERE requested_by_can_account_id='faab0000-0000-4000-8000-000000000001';
