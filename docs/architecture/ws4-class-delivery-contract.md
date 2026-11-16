@@ -140,3 +140,113 @@ execution**. GitHub Actions on `feature/class-delivery` returns
 `startup_failure` before jobs run. WS00 must supply an isolated migration,
 synthetic two-Site fixtures, real authorized operators and learners, and an
 operational CI/browsing environment before any release claim can be made.
+
+
+## November 16 WS4 hardening: safe rollout, immutable rebooking, evidence boundaries
+
+### Optimistic agenda editing
+
+`publishNativeClassSessionAgenda` now requires
+`expectedRevisionNo` (0 before the first publication).
+The Class-scoped transaction serializes the write, checks current revision
+against this value, then appends the next immutable revision. A true
+identical `requestId` retry is recognized **before** the conflict check.
+A stale browser cannot replace another facilitator's latest changes; the
+6.1 editor offers **Reload latest plan**, deliberately discarding the stale
+draft only when clicked. Publisher Course versions and learner track
+selection remain unmodified.
+
+### Safe, nonretroactive activation
+
+`CAN_WS4_SESSION_AGENDAS_ENABLED=true` exposes optional, authorized
+planning only when `CAN_UNIFIED_CLASS_COMMANDS_ENABLED=true`.
+Enforcing the agenda as an opening prerequisite requires an **independent**
+`CAN_WS4_AGENDA_REQUIRED_FROM=YYYY-MM-DDTHH:mm:ssZ` cutoff.
+Only native Class Sessions whose immutable `class_sessions.created_at`
+is on or after that UTC cutoff require an agenda before opening.
+Prior scheduled Sessions continue under their original opening behavior,
+avoiding a surprise denial during an existing training series.
+
+A missing cutoff means **no mandatory gate**, even if the planning UI is
+enabled. An invalid cutoff fails closed rather than silently enforcing an
+unintended date. WS00 must set a cutoff **after** successful migration and
+verified QA; never use today's date as an automatic default. Disabling
+`CAN_WS4_SESSION_AGENDAS_ENABLED` is the rollback for all new WS4 agenda
+requests and mandatory gating. The existing room emergency stop is never
+hidden behind this flag.
+
+### Cancel or replace a future Session without rewriting history
+
+`changeNativeClassSessionSchedule` uses the existing canonical Class lock,
+current facilitator grant and exact Site/Deployment/Adoption authority.
+It only handles future `scheduled` plans without a room. An authorized
+facilitator supplies a 15–500-character audited reason and immutable
+`requestId`, choosing cancellation alone or cancellation plus a new dated
+Session. Replacement uses the same `scheduleOneClassroom` writer and creates
+a fresh `class_sessions` row; **the original delivery timestamp, Session ID,
+publisher Course and agenda revisions are not modified**. The old plan is
+marked `cancelled` in the same transaction, and its existing database guard
+blocks resurrection. A matching retry returns the existing replacement;
+any other attempt to alter the already-cancelled original is rejected.
+
+The existing `ClassSessionScheduleChanged` event, scoped to the **original
+class_session ID**, carries `{classId,requestId,cancelledSessionId,
+replacementSessionId,reason,replacementStartsAt,replacementEndsAt,changedAt}`.
+A matching `class.session.schedule.changed` audit event is also written.
+Neither event touches enrollment, attendance, learner progress or completion.
+**WS2 owns notification delivery** when this event must notify participating
+learners and local hosts. **WS6 owns reporting reconciliation**, counting a
+cancelled Session separately from its valid replacement and not double
+counting scheduling as delivered instruction.
+
+This is not a general student transfer or a replacement of the canonical
+schedule authority; no new tables or migrations are required for cancellation.
+
+### Facilitator operational recovery and accessibility
+
+The Class workspace links back to an existing live room after browser reload
+or reconnect. It does **not** create a second live room or replay the old
+one-time pairing code; authorized staff can renew QR through the existing
+room service. Local preparation reminders now cover captions/transcripts,
+readable slides, TV/audio, joining instructions and bandwidth fallback.
+They are explicitly **human checklist items, not stored compliance proof**.
+The Session list reports an elapsed unopened Session as
+`elapsed_unverified`, not delivered, absent, completed or failed.
+
+### Verification added, not yet run
+
+`tests/unit/native-class-session-agenda.test.ts` now covers revision
+conflicts and the UTC rollout cutoff. Source-contract tests cover the
+authorization-sensitive atomic replacement path, source event, 6.1
+rescheduling UI, readiness copy and recovery affordance.
+
+`playwright.ws4-two-site.config.ts` and
+`tests/e2e/read-only/ws4-two-site.spec.ts` implement **actual signed-in
+read-only browser assertions** for two independently scoped synthetic Sites:
+each site's assigned facilitator and learner must see four Sessions only at
+their Site, and cross-Site/anonymous requests must be refused. These are
+**not fixtures or executed results**. WS00 must provide four canonical
+Session rows per Site, two real synthetic Class enrollments/Course Attempts
+and four native, independently authenticated principal secrets. The browser
+suite intentionally sits under `read-only/` and is excluded from general
+Playwright runs to avoid failing unrelated releases without seeded QA.
+Run only against an already-running isolated local QA server:
+
+```sh
+CAN_WS4_QA_RUN=1 CAN_WS4_QA_BASE_URL=http://localhost:5173 \
+CAN_WS4_QA_CLASS_A='<synthetic Class UUID A>' \
+CAN_WS4_QA_CLASS_B='<synthetic Class UUID B>' \
+CAN_WS4_QA_FACILITATOR_A_SECRET='<isolated synthetic native cookie>' \
+CAN_WS4_QA_FACILITATOR_B_SECRET='<isolated synthetic native cookie>' \
+CAN_WS4_QA_LEARNER_A_SECRET='<isolated synthetic native cookie>' \
+CAN_WS4_QA_LEARNER_B_SECRET='<isolated synthetic native cookie>' \
+npx playwright test --config playwright.ws4-two-site.config.ts
+```
+
+Do not put secrets in CI logs or commit them. This read-only suite **does
+not** demonstrate Session opening, playback, pairing, actual attendance,
+permission revocation, grading or room closure; WS00 still requires a
+separate rollback-isolated transaction/browser pilot that exercises those
+flows with fresh non-production data. CI Actions currently reports
+`startup_failure` before it starts any job. No new hardening
+changes are claimed typechecked, built, migrated, E2E-tested, or deployed.
