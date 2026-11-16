@@ -82,12 +82,6 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       });
   const site={name:school.siteName,organizationName:school.organizationName};
   const academicPrograms=[...approvedPrograms,...planning];
-  const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
-    site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
-    parentInformation:projectApprovedParentInformation({
-      site,academicPrograms,offerings,localContent,...parentExtras,
-    }),
-  };
   const config=siteContentChannelConfigSchema.safeParse(siteFlags?.metadata?.websiteContentChannels);
   const launchPrefs=siteLaunchPreferencesSchema.safeParse(siteFlags?.metadata?.launchPreferences);
   const contentBlocks=resolveSiteContentBlocks(
@@ -95,7 +89,12 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       mode:"private",preferences:launchPrefs.success?launchPrefs.data:null,
       academicPrograms,enrichment:offerings,
     });
-  page.contentBlocks=contentBlocks;
+  const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
+    site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
+    parentInformation:projectApprovedParentInformation({
+      site,academicPrograms,offerings,localContent,...parentExtras,
+    }),contentBlocks,
+  };
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.
   const previewPages = Object.fromEntries(availablePublicSitePaths(page).map(path => [
