@@ -219,7 +219,8 @@ export function NativeClassSessionsPanel({
     </div>}
     {showConsole&&canSchedule&&activeSession?.roomId&&
       <NativeClassroomHostPanel key={activeSession.roomId}
-        roomId={activeSession.roomId}
+        roomId={activeSession.roomId} classId={workspace.classId}
+        classSessionId={activeSession.id}
         canReviewAttendance={workspace.canVerifyAttendance}
         initialCode={opened?.roomId===activeSession.roomId?opened.pairingCode:null}
         initialExpiry={opened?.roomId===activeSession.roomId?opened.expiresAt:null}
