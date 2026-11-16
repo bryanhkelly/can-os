@@ -84,8 +84,8 @@ describe("Public Enrollment Opportunity read model",()=>{
     });
     expect(item?.kind).toBe("class");
     expect(item?.status).toBe("explore");
-    expect(item?.action?.label).toBe("Find this Class");
-    expect(item?.action?.href).toContain("/learn/classes?search=AI+Skills");
+    expect(item?.action?.label).toBe("View this Class");
+    expect(item?.action?.href).toContain("/learn/classes?classId=22222222-2222-4222-8222-222222222222");
     expect(item?.action?.href).not.toContain("offering=");
     expect(resolveSiteExperienceProfile([item!])).toBe("training");
   });

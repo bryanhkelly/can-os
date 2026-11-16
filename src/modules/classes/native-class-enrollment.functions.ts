@@ -169,6 +169,7 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
 
 const nativeCatalogPageInput=z.object({
   search:z.string().trim().max(100).default(""),
+  classId:uuid.optional(),
   cursor:z.object({title:z.string().min(1).max(200),classId:uuid}).strict().nullable().default(null),
 }).strict();
 
@@ -201,6 +202,7 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
           eq(canonicalClassOfferingVersions.state,"published"),
           eq(canonicalClassOfferingVersions.visibility,"public"),
           eq(canonicalClasses.state,"active"),
+          data.classId?eq(canonicalClasses.id,data.classId):undefined,
           or(isNull(canonicalClassOfferingVersions.opensAt),lte(canonicalClassOfferingVersions.opensAt,now)),
           or(isNull(canonicalClassOfferingVersions.closesAt),gt(canonicalClassOfferingVersions.closesAt,now)),
           data.search?ilike(canonicalClasses.title,"%"+escaped+"%"):undefined,

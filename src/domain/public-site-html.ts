@@ -104,7 +104,7 @@ function renderSiteContentChannelBlock(block: SiteContentBlockProjection): strin
       ["/academics","/admissions","/student-life","/programs","/courses","/classes"]
         .includes(item.link.href) ||
       /^https:\/\/[a-zA-Z0-9.-]+\/learn\/enroll\?release=[a-f0-9-]+$/i.test(item.link.href) ||
-      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/classes\?search=[A-Za-z0-9%+._~-]+$/i.test(item.link.href)
+      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/classes\?classId=[a-f0-9-]+$/i.test(item.link.href)
     );
     const action = safeHref ?
       '<a class="text-action site-channel-action" href="' +

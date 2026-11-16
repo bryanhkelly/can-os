@@ -9,9 +9,12 @@ import {
 } from "@/modules/classes/native-class-enrollment.functions";
 
 export const Route=createFileRoute("/learn/classes")({
-  validateSearch:(value:Record<string,unknown>):{search?:string}=>({
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string}=>({
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
+    classId:typeof value.classId==="string"&&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.classId)
+      ?value.classId:undefined,
   }),
   component:NativeLearnerClasses,
 });
@@ -85,11 +88,13 @@ function NativeLearnerClasses(){
   const requested=Route.useSearch();
   const [searchText,setSearchText]=useState(requested.search??"");
   const [search,setSearch]=useState(requested.search??"");
+  const [filteredClassId,setFilteredClassId]=useState(requested.classId??"");
   const catalog=useInfiniteQuery({
-    queryKey:["native-public-class-catalog",search],
+    queryKey:["native-public-class-catalog",search,filteredClassId],
     initialPageParam:null as {title:string;classId:string}|null,
     queryFn:({pageParam})=>getNativePublicClassCatalogPage({data:{
       search,cursor:pageParam,
+      ...(filteredClassId?{classId:filteredClassId}:{}),
     }}),
     getNextPageParam:last=>last.nextCursor,
     retry:false,
@@ -99,7 +104,7 @@ function NativeLearnerClasses(){
     queryFn:()=>getMyNativeClassEnrollments(),retry:false});
   async function refresh(){
     await Promise.all([
-      client.invalidateQueries({queryKey:["native-public-class-catalog",search]}),
+      client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId]}),
       client.invalidateQueries({queryKey:["native-my-class-enrollments"]}),
     ]);
   }
@@ -127,16 +132,22 @@ function NativeLearnerClasses(){
       <h2 className="font-serif text-2xl">Explore Classes</h2>
       <p className="mt-2 text-sm text-muted-foreground">Only currently published public Class Offerings are listed. Private and unlisted Classes are not shown.</p>
       <form className="mt-4 flex flex-wrap gap-2" role="search"
-        onSubmit={event=>{event.preventDefault();setSearch(searchText.trim());}}>
+        onSubmit={event=>{event.preventDefault();setFilteredClassId("");setSearch(searchText.trim());}}>
         <label className="sr-only" htmlFor="native-class-catalog-search">Search Classes</label>
         <input id="native-class-catalog-search" type="search" maxLength={100}
           value={searchText} onChange={event=>setSearchText(event.target.value)}
           placeholder="Search by Class name"
           className="min-h-11 min-w-[14rem] flex-1 border border-border bg-background px-3 text-sm"/>
         <Button type="submit">Search Classes</Button>
-        {search&&<Button type="button" variant="outline"
-          onClick={()=>{setSearch("");setSearchText("");}}>Clear</Button>}
+        {(search||filteredClassId)&&<Button type="button" variant="outline"
+          onClick={()=>{setFilteredClassId("");setSearch("");setSearchText("");}}>
+          {filteredClassId?"Browse all public Classes":"Clear"}
+        </Button>}
       </form>
+      {filteredClassId&&<p role="status" className="mt-3 text-sm">
+        Showing the specific publicly published Class selected from the Site website.
+        Its enrollment terms and current authority are checked again here.
+      </p>}
       {catalog.isPending&&<p role="status" className="mt-4 text-sm">Checking currently offered Classes…</p>}
       {catalog.isError&&<p role="alert" className="mt-4 border border-border p-4 text-sm">Public Class discovery is not enabled or is unavailable.</p>}
       {catalog.isSuccess&&catalogItems.length===0&&<p className="mt-4 text-sm text-muted-foreground">No public Class Offerings are currently accepting enrollment.</p>}

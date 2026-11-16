@@ -117,7 +117,7 @@ describe("Site-owned website content channels", () => {
       nextStartsAt:"2026-12-01T18:00:00.000Z",
     }],enrollmentOrigin:"https://app.example.org"});
     expect(withOrigin[0]?.items[0]?.link?.href)
-      .toContain("/learn/classes?search=AI+Skills");
+      .toContain("/learn/classes?classId=11111111-1111-4111-8111-111111111111");
     const privateWithOrigin=resolveSiteContentBlocks(config,{mode:"private",classes:[{
       classId:"11111111-1111-4111-8111-111111111111",
       title:"AI Skills, four Sessions",deliveryMode:"facilitated",

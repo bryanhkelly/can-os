@@ -44,6 +44,7 @@ describe("portable Course -> Site Class launch setup",()=>{
     const manager=readFileSync("src/modules/classes/native-class-workspace.functions.ts","utf8");
     expect(catalog).toContain("getNativePublicClassCatalogPage");
     expect(catalog).toContain('eq(canonicalClassOfferingVersions.visibility,"public")');
+    expect(catalog).toContain('data.classId?eq(canonicalClasses.id,data.classId):undefined');
     expect(catalog).toContain("currentClassAuthority(tx,row.classId,now)");
     expect(learner).toContain("useInfiniteQuery");
     expect(learner).toContain("Load more Classes");
