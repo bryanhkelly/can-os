@@ -278,9 +278,10 @@ const revokeInput=z.object({classId:uuid,classSessionId:uuid,
 export const revokeNativeClassSession=createServerFn({method:"POST"})
   .validator((raw:unknown)=>revokeInput.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
-    requireFacilitatedLearningEnabled();
+    // Emergency revocation must remain available after native scheduling
+    // or ordinary facilitated-learning commands have been disabled. A room
+    // already created is not made safe merely by hiding its feature flag.
+    // Authorization below still requires a current exact-Site operator.
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
