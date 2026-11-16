@@ -367,6 +367,56 @@ DROP TRIGGER IF EXISTS canonical_class_outcome_guard_trg ON education_v30.class_
 CREATE TRIGGER canonical_class_outcome_guard_trg BEFORE UPDATE OR DELETE
  ON education_v30.class_outcomes FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_class_evidence_guard();
 
+-- A single canonical survey Version may be published nationally, then
+-- used in separately authorized, local Class-specific campaigns. The link
+-- does NOT copy survey questions, answers, invitations or Course content.
+-- One campaign belongs to one Class only; a Class can have several campaigns.
+CREATE TABLE IF NOT EXISTS education_v30.class_survey_campaigns (
+  campaign_id uuid PRIMARY KEY REFERENCES education_v30.survey_campaigns(id),
+  class_id uuid NOT NULL REFERENCES education_v30.classes(id),
+  linked_by_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
+  linked_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS class_survey_campaign_class_idx
+ ON education_v30.class_survey_campaigns(class_id);
+
+CREATE OR REPLACE FUNCTION education_v30.canonical_class_survey_campaign_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+DECLARE c record; sc record;
+BEGIN
+  IF TG_OP<>'INSERT' THEN
+    RAISE EXCEPTION 'Class survey campaign attribution is immutable'
+      USING ERRCODE='23514';
+  END IF;
+  SELECT deployment_id,operating_organization_id,state
+    INTO c FROM education_v30.classes WHERE id=NEW.class_id;
+  SELECT deployment_id,operating_organization_id,response_mode,status
+    INTO sc FROM education_v30.survey_campaigns WHERE id=NEW.campaign_id;
+  IF c.deployment_id IS NULL OR sc.deployment_id IS NULL OR
+     c.deployment_id<>sc.deployment_id OR
+     c.operating_organization_id<>sc.operating_organization_id OR
+     c.state NOT IN ('approved','active') OR
+     sc.response_mode<>'identified' OR sc.status NOT IN ('scheduled','active') THEN
+    RAISE EXCEPTION 'Survey campaign requires exact current Class, Deployment and operator'
+      USING ERRCODE='23514';
+  END IF;
+  -- Never reinterpret historical invitations or submitted results
+  -- as belonging to a different local Class.
+  IF EXISTS(SELECT 1 FROM education_v30.survey_invitations
+            WHERE campaign_id=NEW.campaign_id)
+     OR EXISTS(SELECT 1 FROM education_v30.survey_responses
+            WHERE campaign_id=NEW.campaign_id) THEN
+    RAISE EXCEPTION 'Class attribution must precede survey invitations'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS canonical_class_survey_campaign_guard_trg
+ ON education_v30.class_survey_campaigns;
+CREATE TRIGGER canonical_class_survey_campaign_guard_trg
+ BEFORE INSERT OR UPDATE OR DELETE ON education_v30.class_survey_campaigns
+ FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_class_survey_campaign_guard();
+
 -- Explicitly DENY new application roles until reviewed per-organization RLS
 -- and verified authorization commands are supplied. No public discovery grant.
 DO $$
@@ -374,7 +424,8 @@ DECLARE obj text;
 BEGIN
  FOREACH obj IN ARRAY ARRAY[
  'classes','class_offerings','class_offering_versions',
- 'class_enrollments','class_outcomes','class_awards','class_staff_assignments','class_sessions'
+ 'class_enrollments','class_outcomes','class_awards','class_staff_assignments','class_sessions',
+  'class_survey_campaigns'
  ] LOOP
   EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',obj);
   EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',obj);
