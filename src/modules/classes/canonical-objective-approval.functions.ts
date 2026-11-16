@@ -73,6 +73,33 @@ async function withApprovalRole<T>(purpose:Purpose,
   });
 }
 
+/** Discover only Organization-owned draft identifiers and question counts.
+ * The reviewer can inspect each question only after the independent SQL role
+ * is verified, and the publisher cannot read correct-answer keys.
+ */
+export const listCanonicalObjectiveApprovalQueue=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    mode:z.enum(["review","publish"]),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    const purpose:Purpose=data.mode==="review"
+      ?"assessment_reviewer":"assessment_publisher";
+    return withApprovalRole(purpose,async(ctx,tx)=>{
+      const rows=await tx.execute(sql`
+        SELECT * FROM education_v30.v301_list_objective_review_queue(
+          ${ctx.organizationId}::uuid,${ctx.actorPersonId}::uuid,
+          ${purpose}::text
+        )
+      `);
+      return {organizationId:ctx.organizationId,versions:rows.rows.map(row=>({
+        assessmentVersionId:uuid.parse(row.assessment_version_id),
+        title:z.string().parse(row.title),
+        assessmentKey:z.string().parse(row.assessment_key),
+        questionCount:z.coerce.number().int().min(1).max(10).parse(row.question_count),
+      }))};
+    });
+  });
+
 /** Reviewer preview shows decoded correct answer to the independent
  * authorized reviewer only, without returning raw encrypted key material.
  * The publisher view hides all correct-answer identifiers and values.
