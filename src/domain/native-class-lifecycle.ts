@@ -115,3 +115,35 @@ export function assertNativeClassLearnerSessionForExit(
     throw new AuthorizationError("unchanged provider-scoped learner grant");
   }
 }
+
+/** A native Course Attempt may close only with its exact Class Enrollment and
+ * published Course/Offering source. The selected attempt stays linked even
+ * when previous completed or withdrawn retakes remain historical records.
+ */
+export function assertNativeClassAttemptForExit(input:{
+  attempt:{
+    id:string;classEnrollmentId:string|null;enrollmentId:string|null;
+    noncreditRegistrationId:string|null;sectionId:string|null;
+    deploymentId:string;adoptionId:string;offeringVersionId:string;
+    courseVersionId:string;status:"planned"|"active"|"completed"|"withdrawn";
+  };
+  enrollment:{id:string;courseAttemptId:string|null};
+  classInstance:{
+    deploymentId:string;adoptionId:string;offeringVersionId:string;
+    courseVersionId:string;
+  };
+}):void{
+  const {attempt,enrollment,classInstance}=input;
+  if(attempt.status!=="active" ||
+     attempt.id!==enrollment.courseAttemptId ||
+     attempt.classEnrollmentId!==enrollment.id ||
+     attempt.enrollmentId!==null ||
+     attempt.noncreditRegistrationId!==null ||
+     attempt.sectionId!==null ||
+     attempt.deploymentId!==classInstance.deploymentId ||
+     attempt.adoptionId!==classInstance.adoptionId ||
+     attempt.offeringVersionId!==classInstance.offeringVersionId ||
+     attempt.courseVersionId!==classInstance.courseVersionId){
+    throw new AuthorizationError("exact active native Class Course Attempt");
+  }
+}
