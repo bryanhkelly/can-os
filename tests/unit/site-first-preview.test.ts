@@ -52,6 +52,10 @@ describe("Site-first private website preview",()=>{
     expect(siteFirstPreviewHeaders["X-Robots-Tag"]).toBe("noindex, nofollow");
     expect(siteFirstPreviewHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
     expect(siteFirstPreviewHeaders["Content-Security-Policy"]).toContain("frame-ancestors 'self'");
+    expect(siteFirstPreviewHeaders["Content-Security-Policy"]).toContain("default-src 'none'");
+    // Parent permits the same-origin iframe, while the preview itself remains
+    // restricted to same-origin framing with no scripts or form submission.
+    expect(siteFirstPreviewHeaders["Content-Security-Policy"]).not.toContain("script-src");
     expect(siteFirstPreviewHeaders["Content-Security-Policy"]).toContain("form-action 'none'");
   });
 });

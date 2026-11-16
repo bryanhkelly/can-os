@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Building2, Check, Globe2, GraduationCap, Monitor, Sparkles, Users } from "lucide-react";
+import { ArrowLeft, ArrowRight, Building2, Check, ExternalLink, Globe2, GraduationCap, Monitor, Sparkles, Users } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
 import { SiteLaunchActivationPanel } from "./SiteLaunchActivationPanel";
@@ -189,6 +189,11 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">This uses your Site's actual website design engine and saved plans. Proposed interests are marked as such. Your Site is not published and enrollment is not open by default.</p>
         </div>
         <div className="flex gap-2">
+          {siteId&&<a href={`/launch/site-preview?siteId=${encodeURIComponent(siteId)}`}
+            target="_blank" rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-2 border bg-card px-4 py-2 text-sm font-semibold text-primary">
+            Open full-page preview <ExternalLink className="size-4" aria-hidden="true"/>
+          </a>}
           <Button type="button" variant="outline" onClick={()=>setPreviewKey(k=>k+1)}>Refresh website</Button>
           <Button type="button" variant="outline" onClick={backward}>Edit interests</Button>
         </div>
