@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -250,6 +250,33 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
       if(!grant||!grant.siteId||!grant.active||grant.revokedAt||
          !["site_admin","registrar"].includes(grant.roleCode))
         throw new AuthorizationError("current native Site staff grant");
+      // A pending request cannot be promoted after native staff/organization
+      // authority has been disabled or its hosting relationship has expired.
+      const nativeAuthority=await tx.execute(sql`
+        SELECT 1
+        FROM education_v30.canonical_accounts native_account
+        JOIN education_v30.organizations native_org
+          ON native_org.id=${grant.organizationId}::uuid
+        JOIN education_v30.sites native_site
+          ON native_site.id=${grant.siteId}::uuid
+        WHERE native_account.id=${grant.accountId}::uuid
+          AND native_account.disabled_at IS NULL
+          AND native_account.email_verified_at IS NOT NULL
+          AND native_org.status='active'
+          AND native_site.status IN ('planning','active')
+          AND EXISTS (
+            SELECT 1 FROM education_v30.site_organization_roles operator_role
+            WHERE operator_role.organization_id=${grant.organizationId}::uuid
+              AND operator_role.site_id=${grant.siteId}::uuid
+              AND operator_role.role_code IN ('operator','host')
+              AND operator_role.valid_from<=clock_timestamp()
+              AND (operator_role.valid_through IS NULL
+                OR operator_role.valid_through>clock_timestamp())
+          )
+        LIMIT 1
+      `);
+      if(nativeAuthority.rows.length!==1)
+        throw new AuthorizationError("current authorized issuer Site organization");
       const requesterMembership=await tx.select({
         personId:accountPersonGrants.personId,
       }).from(accountPersonGrants)
@@ -264,6 +291,7 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
           eq(accountPersonGrants.role,grant.roleCode),
           eq(accountPersonGrants.active,true),
           eq(accessAccounts.disabled,false),
+          isNotNull(accessAccounts.emailVerifiedAt),
           sql`EXISTS (
             SELECT 1 FROM public.site_canonical_identity_links link
             WHERE link.public_site_id=${accountPersonGrants.siteId}
