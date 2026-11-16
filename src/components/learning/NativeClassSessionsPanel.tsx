@@ -6,6 +6,7 @@ import { buildSiteClassMeetings, displaySiteClassTime, siteWallWeek, type LocalM
 import { scheduleNativeClassSessions, openNativeClassSession, revokeNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
 import { NativeClassroomHostPanel } from "@/components/learning/NativeClassroomHostPanel";
 import { NativeClassSessionAgenda } from "@/components/learning/NativeClassSessionAgenda";
+import { nativeClassSessionDisplayStatus } from "@/domain/native-class-sessions";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
 type ClassWorkspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
@@ -148,9 +149,17 @@ export function NativeClassSessionsPanel({
           <p className="mt-1 text-sm">{displaySiteClassTime(session.startsAt,siteTimeZone)}
             {" to "}{displaySiteClassTime(session.endsAt,siteTimeZone)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Status: {session.roomState==="ended"?"After Class · Ended":
-              session.state==="scheduled"?"Scheduled":
-              session.state==="started"?"Started":"Cancelled"}
+            Status: {({
+              scheduled:"Scheduled",
+              live:"Live classroom",
+              ended:"After Class · Ended",
+              started:"Started",
+              cancelled:"Cancelled",
+              elapsed_unverified:"Session window elapsed · Delivery not verified",
+            } as const)[nativeClassSessionDisplayStatus({
+              state:session.state,roomState:session.roomState,
+              endsAt:session.endsAt,now:new Date(),
+            })]}
           </p>
           {workspace.sessionAgendasEnabled&&<Button type="button" variant="outline"
             size="sm" className="mt-2"
