@@ -9,6 +9,7 @@ import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
+import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
@@ -164,7 +165,10 @@ function LearnerClass({workspace}:{workspace:Workspace}){
         Recorded teacher practice is accessible through Lessons and does not change official assessment requirements.
       </p>
     </section>}
-    {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}/>}
+    {workspace.tab==="sessions"&&<>
+      <NativeClassSessionsPanel workspace={workspace}/>
+      {learner.status==="active"&&<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>}
+    </>}
   </UnifiedCoursePlayer>;
 }
 function TeachingClass({workspace}:{workspace:Workspace}){
