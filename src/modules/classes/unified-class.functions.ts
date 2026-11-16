@@ -8,7 +8,7 @@ import {
   canonicalClassOfferingVersions, canonicalOfferingCourses, courseVersions, courses,
   deploymentOfferingAdoptions, offeringVersions, offerings, programDeployments,
   educationOperations, educationOperationOrganizationRoles, educationOperationSites,
-  siteOrganizationRoles, catalogSites, classroomDeploymentSites,
+  siteOrganizationRoles, catalogSites, canonicalEnrollmentSites, classroomDeploymentSites,
 } from "@/db/canonical-v301";
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
@@ -385,6 +385,9 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
         lte(deploymentOfferingAdoptions.validFrom,now),
         or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
       )).orderBy(asc(courses.title)).limit(100);
+    const names=operator.siteIds.length?await db.select({
+      id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
+    }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,operator.siteIds)):[];
     const options=[];
     for(const row of available){
       const instance={
@@ -406,7 +409,9 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
         }catch(e){if(!(e instanceof AuthorizationError))throw e;}
       }
       options.push({...row,operatingOrganizationId:operator.organizationId,
-        siteIds:authorizedSites});
+        siteOptions:authorizedSites.map(id=>({
+          id,name:names.find(site=>site.id===id)?.name??"Authorized Site",
+        }))});
     }
     return options;
   });
