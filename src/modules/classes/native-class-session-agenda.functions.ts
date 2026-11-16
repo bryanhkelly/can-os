@@ -20,6 +20,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { requireNativeClassSessionHost } from "./native-class-session-host.server";
+import { validateClassAuthority } from "./unified-class-authority.server";
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 
 const uuid = z.string().uuid();
@@ -125,7 +126,6 @@ export const getNativeClassSessionAgenda=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId)throw new AuthorizationError("verified Class Person");
-    const host=actor.role==="learner"?null:await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const link=await linkedSession(tx,data.classId,data.classSessionId);
       let canEdit=false;
@@ -150,7 +150,39 @@ export const getNativeClassSessionAgenda=createServerFn({method:"GET"})
         if(authorized.source!=="class"||authorized.sectionId!==null||
           authorized.courseVersionId!==link.courseVersionId)
           throw new AuthorizationError("native Class Course Attempt");
-      }else if(host){
+      }else if(["site_admin","registrar"].includes(actor.role??"") &&
+               actor.capabilities.has("class.manage")){
+        // A Site manager can inspect the instructional plan for an exact
+        // managed Class, but management does not confer Session edit,
+        // private playback or attendance authority.
+        const [cls]=await tx.select().from(canonicalClasses)
+          .where(eq(canonicalClasses.id,data.classId)).limit(1);
+        const organizationId=actor.scope.organizationIds?.[0];
+        if(!cls||!organizationId||actor.scope.organizationIds?.length!==1||
+           !cls.siteId||cls.operatingOrganizationId!==organizationId||
+           !actor.scope.siteIds?.includes(cls.siteId))
+          throw new AuthorizationError("current exact-Site Class manager");
+        await validateClassAuthority(tx,{
+          actor,organizationId,siteIds:actor.scope.siteIds??[],
+        },{
+          deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
+          offeringVersionId:cls.offeringVersionId,
+          courseVersionId:cls.courseVersionId,
+          operatingOrganizationId:cls.operatingOrganizationId,
+          siteId:cls.siteId,title:cls.title,deliveryMode:cls.deliveryMode,
+        });
+        // A manager who is ALSO the explicitly assigned facilitator may
+        // edit using the same independent teaching grant as any other host.
+        if(link.facilitatorPersonId===actor.actorPersonId &&
+           actor.capabilities.has("learning.room.facilitate")){
+          const host=await requireCanonicalFacilitator();
+          await requireNativeClassSessionHost(tx,host,data.classId,new Date());
+          canEdit=canPublishClassSessionAgenda({
+            planState:link.planState,startsAt:link.startsAt,now:new Date(),
+          });
+        }
+      }else{
+        const host=await requireCanonicalFacilitator();
         await requireNativeClassSessionHost(tx,host,data.classId,new Date());
         canEdit=link.facilitatorPersonId===actor.actorPersonId &&
           canPublishClassSessionAgenda({
