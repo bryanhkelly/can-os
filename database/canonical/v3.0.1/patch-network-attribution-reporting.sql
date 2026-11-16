@@ -291,6 +291,7 @@ RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $at
 DECLARE source_row record;
 DECLARE membership_row record;
 DECLARE lineage_snapshot jsonb;
+DECLARE lineage_valid boolean;
 DECLARE credited_org_name text;
 BEGIN
   IF NEW.noncredit_registration_id IS NOT NULL THEN
@@ -362,16 +363,23 @@ BEGIN
     IF NOT membership_row.directory_visible THEN
       RAISE EXCEPTION 'Self-reported selection is limited to approved directory-visible affiliates';
     END IF;
-    WITH RECURSIVE lineage(id,parent_id,code,name,depth,visited) AS (
-      SELECT u.id,u.parent_unit_id,u.code,u.name,0,ARRAY[u.id]
+    WITH RECURSIVE lineage(id,parent_id,code,name,depth,visited,unit_status,valid_from,valid_through) AS (
+      SELECT u.id,u.parent_unit_id,u.code,u.name,0,ARRAY[u.id],
+             u.status,u.valid_from,u.valid_through
         FROM network_units u WHERE u.id=membership_row.reporting_unit_id
       UNION ALL
-      SELECT p.id,p.parent_unit_id,p.code,p.name,l.depth+1,l.visited||p.id
+      SELECT p.id,p.parent_unit_id,p.code,p.name,l.depth+1,l.visited||p.id,
+             p.status,p.valid_from,p.valid_through
         FROM network_units p JOIN lineage l ON p.id=l.parent_id
        WHERE NOT p.id=ANY(l.visited)
     )
-    SELECT jsonb_agg(jsonb_build_object('id',id,'code',code,'name',name) ORDER BY depth DESC)
-      INTO lineage_snapshot FROM lineage;
+    SELECT jsonb_agg(jsonb_build_object('id',id,'code',code,'name',name) ORDER BY depth DESC),
+           bool_and(unit_status='active' AND valid_from<=NEW.attributed_at AND
+             (valid_through IS NULL OR valid_through>NEW.attributed_at))
+      INTO lineage_snapshot,lineage_valid FROM lineage;
+    IF lineage_valid IS DISTINCT FROM true THEN
+      RAISE EXCEPTION 'Network reporting path is not active and effective at attribution';
+    END IF;
     NEW.relationship_snapshot=jsonb_build_object(
       'networkOrganizationId',membership_row.network_organization_id,
       'memberOrganizationId',membership_row.member_organization_id,
