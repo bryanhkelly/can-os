@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { resolveLaunchResume } from "@/domain/launch-resume";
 import { LaunchWizardPage } from "@/components/operations/LaunchWizardPage";
 import { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
@@ -12,10 +12,14 @@ import { listLaunchJurisdictionResearch } from "@/modules/programs/jurisdiction-
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { supplementaryRead } from "@/lib/supplementary-read";
-import { schoolLaunchSearch } from "@/domain/launch-studio";
+import { schoolLaunchSearch, shouldOpenSiteFirstLaunch } from "@/domain/launch-studio";
 import { getLaunchStudioDraft } from "@/modules/programs/launch-drafts.functions";
 
 export const Route = createFileRoute("/launch/school")({
+  beforeLoad: ({ search }) => {
+    if (shouldOpenSiteFirstLaunch(search))
+      throw redirect({to:"/launch/site",search:{siteId:search.siteId,step:"site"},replace:true});
+  },
   staleTime: Infinity,
   validateSearch: (search: Record<string, unknown>) => schoolLaunchSearch.parse(search),
   loaderDeps: ({ search }) => ({ siteId: search.siteId, programId: search.programId }),

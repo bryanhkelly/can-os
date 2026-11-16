@@ -415,3 +415,24 @@ project, but the native schema has not been installed or tested there.
 
 **Do not run this migration on production or switch live routes to the new tables without
 a separately approved release and empirical test01 verification.**
+
+## Launch Studio to native Class handoff (2026-11-16)
+
+The Site-first post-preview workflow includes a Class preparation panel only
+after a current, independently approved public Site/native Site correspondence.
+The client queries native Classes under the separate authenticated canonical
+grant and filters results to that exact canonical Site. Missing, pending,
+revoked and invalid identities fail closed. Existing Class/Session services
+remain the source of truth; no parallel Class, content, registration or approval
+store is introduced.
+
+A Site-scoped link enters `/canonical/classes?siteId=<canonical UUID>`.
+The composer filters its already-authorized adoption and Course options for
+that exact Site and prefills facilitated delivery; the Class creation command
+still rechecks native Site and adoption authority transactionally. The Class
+detail Sessions tab then owns scheduling and running the four-session pilot.
+An internal assigned Class need not publish a Class Offering.
+
+This integration is on draft PR #298 only, with no production migration,
+deployment or classroom E2E acceptance. Apply the two ordered SQL patches only
+to an approved disposable QA branch before any database-first staging cutover.

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
+import { z } from "zod";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
@@ -12,7 +13,10 @@ import {
 import type { ClassOfferingTerms } from "@/domain/unified-class";
 import { parseNetworkClassLaunchRecipe, serializeNetworkClassLaunchRecipe } from "@/domain/network-class-launch";
 
-export const Route=createFileRoute("/canonical/classes")({component:NativeClasses});
+export const Route=createFileRoute("/canonical/classes")({
+ validateSearch:(raw:Record<string,unknown>)=>z.object({siteId:z.string().uuid().optional()}).strip().parse(raw),
+ component:NativeClasses,
+});
 
 type Method=ClassOfferingTerms["enrollmentMethods"][number];
 type CreditMode=ClassOfferingTerms["allowedCreditModes"][number];
@@ -34,6 +38,7 @@ function toggle<T extends string>(list:T[],name:T):T[]{
 function utc(value:string):string|null{return value?new Date(value).toISOString():null;}
 
 function NativeClasses(){
+  const {siteId:preferredSiteId}=Route.useSearch();
   const client=useQueryClient();
   const options=useQuery({queryKey:["native-class-course-options"],
     queryFn:()=>getUnifiedClassCourseOptions(),retry:false});
@@ -45,7 +50,7 @@ function NativeClasses(){
   const [title,setTitle]=useState("");
   const [classCapacity,setClassCapacity]=useState("");
   const [siteId,setSiteId]=useState("");
-  const [deliveryMode,setDeliveryMode]=useState<(typeof deliveryOptions)[number]>("self_paced");
+  const [deliveryMode,setDeliveryMode]=useState<(typeof deliveryOptions)[number]>(preferredSiteId?"facilitated":"self_paced");
   const [createWithOffering,setCreateWithOffering]=useState(false);
   const [visibility,setVisibility]=useState<ClassOfferingTerms["visibility"]>("private");
   const [methods,setMethods]=useState<Method[]>(["assignment"]);
@@ -59,8 +64,11 @@ function NativeClasses(){
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const selected=options.data?.find(row=>optionKey(row)===choice);
+  // A deep link is only a suggestion; the server independently validates
+  // current Course adoption and operating Site rights on Class creation.
   const visibleOptions=(options.data??[]).filter(row=>
-    !recipeCourseId||row.courseVersionId===recipeCourseId);
+    (!recipeCourseId||row.courseVersionId===recipeCourseId) &&
+    (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
   async function exportLaunchRecipe(){
     if(!selected)return;
     const value=serializeNetworkClassLaunchRecipe({
@@ -183,7 +191,9 @@ function NativeClasses(){
         <p className="mt-2 text-sm text-muted-foreground">Select an approved Course and authorized delivery context. The Class identity is independent of registration publication.</p>
         {options.isPending&&<p role="status" className="mt-4 text-sm">Checking available Courses and operating authorizations…</p>}
         {options.isError&&<p role="alert" className="mt-4 border border-border p-3 text-sm">The native Class service is not available for this operator or environment. No changes were made.</p>}
-        {options.data&&options.data.length===0&&<p role="status" className="mt-4 text-sm">No approved Course/Deployment combinations are currently available for your organization.</p>}
+        {options.data&&visibleOptions.length===0&&<p role="status" className="mt-4 text-sm">
+          {preferredSiteId?"No approved Course/Deployment is available for this Site and current canonical grant.":"No approved Course/Deployment combinations are currently available for your organization."}
+        </p>}
         <section className="mt-5 border border-border bg-muted/20 p-4"
           aria-label="Network Class launch recipe">
           <h3 className="font-semibold">Launch the same Course at another Site</h3>
@@ -216,7 +226,11 @@ function NativeClasses(){
         <form onSubmit={event=>void create(event)} className="mt-5 space-y-5">
           <div>
             <label className="block text-sm font-semibold" htmlFor="native-class-course">Approved Course Offering</label>
-            <select id="native-class-course" required value={choice} onChange={e=>{setChoice(e.target.value);setSiteId("");}}
+            <select id="native-class-course" required value={choice} onChange={e=>{
+              const selectedOption=visibleOptions.find(option=>optionKey(option)===e.target.value);
+              setChoice(e.target.value);
+              setSiteId(selectedOption?.siteOptions.some(site=>site.id===preferredSiteId)?preferredSiteId??"":"");
+            }}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Select an authorized Course</option>
               {visibleOptions.map(row=><option key={optionKey(row)} value={optionKey(row)}>
