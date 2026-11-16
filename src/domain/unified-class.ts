@@ -35,6 +35,8 @@ export const classOfferingTermsSchema = z.object({
   opensAt: dateTime.nullable(),
   closesAt: dateTime.nullable(),
   capacity: z.number().int().min(1).nullable(),
+  allowedCreditModes: z.array(classCreditModeSchema).min(1).max(3)
+    .refine(modes => new Set(modes).size === modes.length, "Credit modes must be unique"),
   consentVersion: z.string().trim().min(3).max(80).nullable(),
   consentText: z.string().trim().min(25).max(10000).nullable(),
 }).strict().superRefine((terms, ctx) => {
