@@ -5,6 +5,7 @@ import {
   assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertOperationalClassOfferingTerms,
   assertNativeClassAttemptForExit, assertVerifiedAdultNativeClassExit,
+  assertNativeClassSeatAvailable, assertNativeClassExitReason,
 } from "./native-class-lifecycle";
 import type { CommandContext } from "./command-context";
 
@@ -72,6 +73,55 @@ describe("WS2 native Class enrollment lifecycle", () => {
   it("allows new registration after withdrawal, not ungoverned completed repeat", () => {
     expect(() => assertNativeClassRepeatEligible(["withdrawn","cancelled"])).not.toThrow();
     expect(() => assertNativeClassRepeatEligible(["completed","withdrawn"])).toThrow();
+  });
+});
+
+describe("WS2 shared Class capacity and lifecycle reason policy",()=>{
+  it("uses one Class seat pool across self and assignment",()=>{
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"self",activeOrPending:9,classCapacity:10,offeringCapacity:12,
+    })).not.toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"assignment",activeOrPending:9,classCapacity:10,offeringCapacity:8,
+    })).not.toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"self",activeOrPending:8,classCapacity:10,offeringCapacity:8,
+    })).toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"assignment",activeOrPending:10,classCapacity:10,
+    })).toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"self",activeOrPending:10,classCapacity:10,offeringCapacity:null,
+    })).toThrow();
+  });
+  it("supports unlimited Class capacity without manufacturing seats",()=>{
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"assignment",activeOrPending:1000,classCapacity:null,
+    })).not.toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"self",activeOrPending:5,classCapacity:null,offeringCapacity:5,
+    })).toThrow();
+  });
+  it("rejects invalid capacity and occupancy, not merely full Classes",()=>{
+    for(const count of [-1,1.3,Number.NaN,Number.POSITIVE_INFINITY]){
+      expect(()=>assertNativeClassSeatAvailable({
+        method:"self",activeOrPending:count,classCapacity:20,
+      })).toThrow();
+    }
+    for(const cap of [0,-1,Number.NaN,2.7]){
+      expect(()=>assertNativeClassSeatAvailable({
+        method:"assignment",activeOrPending:1,classCapacity:cap,
+      })).toThrow();
+    }
+  });
+  it("uses truthful cancellation reasons and preserves idempotent retry",()=>{
+    expect(()=>assertNativeClassExitReason("pending","cancel","not_eligible")).not.toThrow();
+    expect(()=>assertNativeClassExitReason("active","cancel","operator_decision")).not.toThrow();
+    expect(()=>assertNativeClassExitReason("active","cancel","session_cancelled")).not.toThrow();
+    expect(()=>assertNativeClassExitReason("active","withdraw","requested")).not.toThrow();
+    expect(()=>assertNativeClassExitReason("active","cancel","not_eligible")).toThrow();
+    expect(()=>assertNativeClassExitReason("pending","cancel","requested")).toThrow();
+    expect(()=>assertNativeClassExitReason("active","withdraw","operator_decision")).toThrow();
   });
 });
 
