@@ -228,6 +228,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
   const [grantBusy,setGrantBusy]=useState<string|null>(null);
   const [grantMessage,setGrantMessage]=useState("");
   const [grantError,setGrantError]=useState("");
+  const [lifecycleNotice,setLifecycleNotice]=useState("");
   const isOperator=workspace.view==="manage"&&namesAllowed;
   async function grantKnowledgeCheck(classEnrollmentId:string){
     if(grantBusy)return;
@@ -277,6 +278,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
           {isOperator&&(row.status==="active"||row.status==="pending")&&
             <NativeClassRosterLifecycleAction
               classEnrollmentId={row.enrollmentId} status={row.status}
+              onCompleted={setLifecycleNotice}
               onChanged={async()=>{
                 await Promise.all([
                   client.invalidateQueries({queryKey:["native-class-roster",workspace.classId]}),
@@ -287,6 +289,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
         </div>
       </li>)}
     </ul>}
+    {lifecycleNotice&&<p role="status" className="mt-3 text-sm">{lifecycleNotice}</p>}
     {grantMessage&&<p role="status" className="mt-3 text-sm">{grantMessage}</p>}
     {grantError&&<p role="alert" className="mt-3 text-sm text-destructive">{grantError}</p>}
     {isOperator&&pages.hasNextPage&&<Button className="mt-4" variant="outline"
