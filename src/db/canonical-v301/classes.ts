@@ -50,7 +50,7 @@ export const canonicalClassOfferingVersions = educationV30.table("class_offering
 ]);
 
 /** Same enrollment contract for school assignment, invitations, adult training
- * and auditing. Source records stay authoritative during compatibility. */
+ * and auditing. The Class Enrollment is the native participation record. */
 export const canonicalClassEnrollments = educationV30.table("class_enrollments", {
   id:id(),classId:uuid("class_id").notNull(),
   classOfferingVersionId:uuid("class_offering_version_id").notNull(),
