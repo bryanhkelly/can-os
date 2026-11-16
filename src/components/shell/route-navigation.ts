@@ -43,6 +43,7 @@ export const routeNavigation = {
   "/canonical/content-reviews": hidden("Independent provider instructional track review workspace", []),
   "/canonical/capability-lab": hidden("Temporary canonical provider Capability Lab; never in role navigation", []),
   "/canonical/lab/enrollment": hidden("Internal enrollment experience preview, not a live signup"),
+  "/canonical/issuer-access": hidden("Independent credential issuer access requests, reviews and revocations", ["site_admin","registrar","can_network_steward"]),
   "/canonical/lab/noncredit": hidden("Temporary canonical provider assessment and completion testing", []),
   "/canonical/lab/credentials": hidden("Temporary canonical provider credential previews", []),
   "/canonical/lab/surveys": hidden("Temporary canonical provider survey inspection", []),
