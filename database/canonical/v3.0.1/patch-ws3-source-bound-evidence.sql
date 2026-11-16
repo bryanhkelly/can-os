@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_completion_evidence_bindings (
   purpose text NOT NULL CHECK (purpose IN ('completion_correction','award_revocation')),
   evidence_version_id uuid NOT NULL REFERENCES education_v30.evidence_document_versions(id),
   noncredit_registration_id uuid REFERENCES education_v30.noncredit_registrations(id),
+  expected_decision_id uuid REFERENCES education_v30.noncredit_completion_decisions(id),
+  approved_correction_outcome text CHECK(approved_correction_outcome IN ('not_yet_completed','voided')),
+  review_reason text NOT NULL CHECK (length(btrim(review_reason)) BETWEEN 10 AND 1000),
   award_issuance_id uuid REFERENCES education_v30.learning_award_issuances(id),
   participant_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
   provider_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id),
@@ -21,9 +24,13 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_completion_evidence_bindings (
   approved_at timestamptz NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT ws3_evidence_exact_subject CHECK (
-    (purpose='completion_correction' AND noncredit_registration_id IS NOT NULL AND award_issuance_id IS NULL)
+    (purpose='completion_correction' AND noncredit_registration_id IS NOT NULL AND
+     expected_decision_id IS NOT NULL AND approved_correction_outcome IS NOT NULL AND
+     award_issuance_id IS NULL)
     OR
-    (purpose='award_revocation' AND award_issuance_id IS NOT NULL AND noncredit_registration_id IS NULL)
+    (purpose='award_revocation' AND award_issuance_id IS NOT NULL AND
+     noncredit_registration_id IS NULL AND expected_decision_id IS NULL AND
+     approved_correction_outcome IS NULL)
   ),
   CONSTRAINT ws3_evidence_independent_review CHECK (
     submitted_by_person_id<>approved_by_person_id
@@ -33,7 +40,7 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_completion_evidence_bindings (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ws3_evidence_registration_version_uq
  ON education_v30.learning_completion_evidence_bindings
- (noncredit_registration_id,evidence_version_id,purpose)
+ (noncredit_registration_id,expected_decision_id,evidence_version_id,purpose)
  WHERE noncredit_registration_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS ws3_evidence_award_version_uq
  ON education_v30.learning_completion_evidence_bindings
@@ -59,6 +66,8 @@ BEGIN
     SELECT r.participant_person_id,t.provider_organization_id,a.delivery_site_id
       INTO target_person,target_org,target_site
     FROM education_v30.noncredit_registrations r
+    JOIN education_v30.noncredit_completion_decisions prior
+      ON prior.registration_id=r.id AND prior.id=NEW.expected_decision_id
     JOIN education_v30.noncredit_training_versions t ON t.id=r.training_version_id
     JOIN education_v30.participation_attributions a
       ON a.noncredit_registration_id=r.id
@@ -92,6 +101,7 @@ BEGIN
      ev.verified_at IS NULL OR ev.verified_at>clock_timestamp() OR
      ev.verified_by_person_id IS NULL OR
      ev.verified_by_person_id IN (NEW.participant_person_id,NEW.submitted_by_person_id) OR
+     ev.verified_at>NEW.approved_at OR
      (ev.valid_from IS NOT NULL AND ev.valid_from>today) OR
      (ev.valid_through IS NOT NULL AND ev.valid_through<today) THEN
     RAISE EXCEPTION 'WS3 evidence not independently verified for the source'
