@@ -59,7 +59,7 @@ BEGIN
   IF TG_OP<>'INSERT' THEN
     RAISE EXCEPTION 'WS3 reviewed evidence bindings are immutable' USING ERRCODE='23514';
   END IF;
-  IF NEW.approved_at>clock_timestamp() OR NEW.approved_at>NEW.created_at THEN
+  IF NEW.approved_at>clock_timestamp() THEN
     RAISE EXCEPTION 'Evidence binding approval time invalid' USING ERRCODE='23514';
   END IF;
   IF NEW.purpose='completion_correction' THEN
