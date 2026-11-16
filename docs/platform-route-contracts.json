@@ -904,6 +904,15 @@
       "writeBoundary": "Single verified legacy session maps to a new native Person only after explicit consent; participant IDs are server-derived"
     },
     {
+      "file": "src/routes/learn.my-activity.tsx",
+      "route": "/learn/my-activity",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/learn.my-courses.tsx",
       "route": "/learn/my-courses",
       "owner": "enrollment",
