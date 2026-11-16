@@ -93,6 +93,20 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(session).toContain('state:"ended",endedAt:now');
     expect(workspace).toContain("canRevoke onChanged={refresh}");
   });
+  it("disambiguates same-Course enrollments by exact native Class and Site",()=>{
+    const choices=source("src/modules/learning/classroom-connect.functions.ts");
+    const join=source("src/routes/join.tsx");
+    expect(choices).toContain("classId:canonicalClasses.id");
+    expect(choices).toContain("classTitle:canonicalClasses.title");
+    expect(choices).toContain("siteName:canonicalEnrollmentSites.name");
+    expect(choices).toContain("classId:candidate.classId");
+    expect(join).toContain("if(chosen?.classId)");
+    expect(join).toContain('to:"/classes/$classId"');
+    expect(join).toContain('search:{view:"learn",tab:"sessions"}');
+    // A QR code is never sufficient to choose the wrong Class or create one.
+    expect(join).toContain("pairWithFacilitatedRoom");
+    expect(join).not.toContain("createNativeClassEnrollment");
+  });
   it("shows a permitted enrollment path without silently enrolling QR visitors",()=>{
     const join=source("src/routes/join.tsx");
     expect(join).toContain('to="/learn/classes"');
