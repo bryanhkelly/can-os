@@ -4,6 +4,7 @@ import {
   planNativeClassExit,
   assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertOperationalClassOfferingTerms,
+  assertNativeClassAttemptForExit,
 } from "./native-class-lifecycle";
 import type { CommandContext } from "./command-context";
 
@@ -117,5 +118,54 @@ describe("WS2 negative enrollment authorization boundaries",()=>{
       {...grant,person_id:undefined},
     ];
     variants.forEach(value=>expect(()=>assertNativeClassLearnerSessionForExit(value,person,org)).toThrow());
+  });
+});
+
+describe("WS2 exact native Class Course Attempt exit authority",()=>{
+  const enrollmentId="11111111-1111-4111-8111-111111111111";
+  const attemptId="22222222-2222-4222-8222-222222222222";
+  const deploymentId="33333333-3333-4333-8333-333333333333";
+  const adoptionId="44444444-4444-4444-8444-444444444444";
+  const offeringVersionId="55555555-5555-4555-8555-555555555555";
+  const courseVersionId="66666666-6666-4666-8666-666666666666";
+  const classInstance={deploymentId,adoptionId,offeringVersionId,courseVersionId};
+  const enrollment={id:enrollmentId,courseAttemptId:attemptId};
+  const attempt={
+    id:attemptId,classEnrollmentId:enrollmentId,
+    enrollmentId:null,noncreditRegistrationId:null,sectionId:null,
+    deploymentId,adoptionId,offeringVersionId,courseVersionId,
+    status:"active" as const,
+  };
+  it("permits only an active, exactly linked Class attempt",()=>{
+    expect(()=>assertNativeClassAttemptForExit({
+      attempt,enrollment,classInstance,
+    })).not.toThrow();
+    for(const broken of [
+      {...attempt,classEnrollmentId:"other"},
+      {...attempt,enrollmentId:"other"},
+      {...attempt,noncreditRegistrationId:"other"},
+      {...attempt,sectionId:"other"},
+      {...attempt,deploymentId:"other"},
+      {...attempt,adoptionId:"other"},
+      {...attempt,offeringVersionId:"other"},
+      {...attempt,courseVersionId:"other"},
+      {...attempt,status:"completed" as const},
+      {...attempt,status:"withdrawn" as const},
+    ])expect(()=>assertNativeClassAttemptForExit({
+      attempt:broken,enrollment,classInstance,
+    })).toThrow();
+    expect(()=>assertNativeClassAttemptForExit({
+      attempt:{...attempt,id:"not-selected"},enrollment,classInstance,
+    })).toThrow();
+  });
+  it("can close additional linked live retakes without rewriting history",()=>{
+    expect(()=>assertNativeClassAttemptForExit({
+      attempt:{...attempt,id:"second-live"},enrollment,classInstance,
+      requireSelectedPointer:false,
+    })).not.toThrow();
+    expect(()=>assertNativeClassAttemptForExit({
+      attempt:{...attempt,id:"second-live",classEnrollmentId:"unrelated"},
+      enrollment,classInstance,requireSelectedPointer:false,
+    })).toThrow();
   });
 });
