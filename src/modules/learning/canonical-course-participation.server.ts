@@ -5,6 +5,7 @@ import {
   noncreditTrainingVersions, programDeployments, deploymentOfferingAdoptions,
   courseVersions, offeringVersions, canonicalClassEnrollments, canonicalClasses,
   catalogSites, educationOperationSites, siteOrganizationRoles, classroomDeploymentSites,
+  educationOperations, educationOperationOrganizationRoles, offerings, canonicalOfferingCourses,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { resolveCanonicalCourseParticipation, type CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
@@ -50,14 +51,41 @@ export async function authorizeCanonicalCourseAttempt(
     if (!classInstance || !classEnrollment) {
       throw new AuthorizationError("current native Class Enrollment");
     }
+    if(!deployment || !adoption || !course || !offering){
+      throw new AuthorizationError("current native Course publication and Deployment");
+    }
+    const now=new Date();
+    const [operator] = await tx.select({id:educationOperationOrganizationRoles.id})
+      .from(educationOperationOrganizationRoles)
+      .innerJoin(educationOperations,eq(educationOperations.id,educationOperationOrganizationRoles.operationId))
+      .where(and(
+        eq(educationOperationOrganizationRoles.operationId,deployment.operationId),
+        eq(educationOperationOrganizationRoles.organizationId,classInstance.operatingOrganizationId),
+        eq(educationOperationOrganizationRoles.roleCode,"operator"),
+        eq(educationOperationOrganizationRoles.status,"approved"),
+        lte(educationOperationOrganizationRoles.validFrom,now),
+        or(isNull(educationOperationOrganizationRoles.validThrough),
+          gt(educationOperationOrganizationRoles.validThrough,now)),
+        eq(educationOperations.status,"active"),
+      )).limit(1);
+    if(!operator)throw new AuthorizationError("current operating Organization authority");
+    const [publishedProduct]=await tx.select({courseVersionId:canonicalOfferingCourses.courseVersionId})
+      .from(canonicalOfferingCourses)
+      .innerJoin(offerings,eq(offerings.id,offering.offeringId))
+      .where(and(
+        eq(canonicalOfferingCourses.offeringVersionId,offering.id),
+        eq(canonicalOfferingCourses.courseVersionId,course.id),
+        eq(offerings.id,deployment.offeringId),
+        eq(offerings.status,"active"),
+      )).limit(1);
+    if(!publishedProduct)throw new AuthorizationError("currently authorized publisher Course contents");
     // Revoked Site authority must close native instructional access, even
     // when the learner has a previously issued Course Attempt.
     if (classInstance.siteId) {
-      const now = new Date();
       const [site] = await tx.select({id:catalogSites.id}).from(catalogSites)
         .innerJoin(educationOperationSites,and(
           eq(educationOperationSites.siteId,catalogSites.id),
-          eq(educationOperationSites.operationId,deployment?.operationId ?? ""),
+          eq(educationOperationSites.operationId,deployment.operationId),
           lte(educationOperationSites.validFrom,now),
           or(isNull(educationOperationSites.validThrough),
             gt(educationOperationSites.validThrough,now)),
