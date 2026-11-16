@@ -44,8 +44,9 @@ export function assertPublisherClassVariationAllowed(
     throw new AuthorizationError("publisher-locked Course/Class title; new publisher approval required");
   if(!policy.allowedDeliveryModes.includes(input.deliveryMode))
     throw new AuthorizationError("publisher did not authorize this Class delivery mode");
-  if(policy.maxClassCapacity!==null&&input.capacity!==null&&input.capacity!==undefined&&
-      input.capacity>policy.maxClassCapacity)
+  // Null is unlimited and therefore exceeds any publisher-imposed ceiling.
+  if(policy.maxClassCapacity!==null&&
+      (input.capacity===null||input.capacity===undefined||input.capacity>policy.maxClassCapacity))
     throw new AuthorizationError("Class capacity exceeds the publisher-approved maximum");
 }
 
