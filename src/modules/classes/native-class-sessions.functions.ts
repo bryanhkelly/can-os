@@ -11,7 +11,7 @@ import {
   facilitatedClassroomPlans, facilitatedLearningSessions, auditEvents, domainEvents,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
+import { assertNativeClassSessionSeries, canChangeUnopenedClassSession } from "@/domain/native-class-sessions";
 import { requireNativeClassSessionHost } from "./native-class-session-host.server";
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
@@ -199,9 +199,12 @@ export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
             ?payload.replacementSessionId:null,
         };
       }
-      if(plan.state!=="scheduled"||plan.facilitatedSessionId!==null||
-         delivery.startsAt.getTime()<=now.getTime())
-        throw new AuthorizationError("only future unopened Class Sessions may be cancelled or replaced");
+      if(!canChangeUnopenedClassSession({
+        planState:plan.state,facilitatedSessionId:plan.facilitatedSessionId,
+        scheduledStartsAt:delivery.startsAt,now,
+      }))throw new AuthorizationError(
+        "only future unopened Class Sessions may be cancelled or replaced",
+      );
 
       let replacementSessionId:string|null=null;
       if(data.replacement){
