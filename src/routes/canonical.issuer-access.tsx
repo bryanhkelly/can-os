@@ -123,7 +123,7 @@ function CredentialIssuerAccess(){
     </section>}
     {tab==="review"&&<section className="mt-6 max-w-4xl border border-border bg-card p-6">
       <h2 className="font-serif text-2xl">Independent institutional review</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Only authorized CAN network stewards can approve issuer authority. The requester and reviewer must be different verified persons. Approval automatically expires.</p>
+      <p className="mt-2 text-sm text-muted-foreground">Only explicitly assigned CAN credential reviewers can approve issuer authority. The requester and reviewer must be different verified persons. Approval automatically expires.</p>
       {pending.isPending&&<p role="status" className="mt-4 text-sm">Loading pending requests…</p>}
       {pending.isError&&<p role="alert" className="mt-4 text-sm text-destructive">No authorized institutional reviewer session is available.</p>}
       {pending.data?.length===0&&<p className="mt-4 text-sm">No pending issuer requests.</p>}
