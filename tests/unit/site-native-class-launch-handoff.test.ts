@@ -18,11 +18,15 @@ describe("Site-first native-Class handoff",()=>{
   expect(panel).toContain("item.siteId===canonicalSiteId");
   expect(panel).toContain("getMyUnifiedClassDrafts");
   expect(panel).toContain('tab:"sessions"');
+  expect(panel).toContain("Assign a Class facilitator");
+  expect(panel).toContain("Review Sessions");
+  expect(panel).not.toContain("Schedule and run Sessions");
  });
  it("preselects only native Site-authorized Course options",()=>{
   const route=source("src/routes/canonical.classes.tsx");
   expect(route).toContain('siteId:z.string().uuid().optional()');
   expect(route).toContain('row.siteOptions.some(site=>site.id===preferredSiteId)');
   expect(route).toContain("createUnifiedClassDraft({data:");
+  expect(route).toContain('<NativeClasses key={siteId??"all"}/>');
  });
 });

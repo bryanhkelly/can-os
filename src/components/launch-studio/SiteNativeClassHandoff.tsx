@@ -63,18 +63,28 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
       {item.state.replaceAll("_"," ")} · {item.deliveryMode.replaceAll("_"," ")}
       {item.offeringState?" · Offering: "+item.offeringState:" · No Class Offering required"}
      </p>
-     <Link to="/classes/$classId" params={{classId:item.classId}}
-      search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}
-      className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
-      <CalendarDays className="size-4"/> Schedule and run Sessions <ArrowRight className="size-4"/>
+     {item.state==="active"?<div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+      <Link to="/classes/$classId" params={{classId:item.classId}}
+       search={{view:"manage",tab:"overview",lesson:undefined,session:undefined}}
+       className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+       Assign a Class facilitator <ArrowRight className="size-4"/>
+      </Link>
+      <Link to="/classes/$classId" params={{classId:item.classId}}
+       search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}
+       className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+       <CalendarDays className="size-4"/> Review Sessions <ArrowRight className="size-4"/>
+      </Link>
+     </div>:<Link to="/canonical/classes" search={{siteId:canonicalSiteId}}
+       className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
+       Activate draft Class <ArrowRight className="size-4"/>
      </Link>
     </li>)}</ul>}
    </>}
   </>}
   <p className="mt-4 text-xs leading-5 text-muted-foreground">
-   Native Class creation and enrollment remain independently authorized. A portable network Class
-   recipe transfers no Course content, Site grants, staff roles or learner records.
-   A Class Offering is optional for private assignment.
+   Class managers assign an authorized facilitator; that facilitator schedules and runs
+   Sessions from the Class teaching view. A Class Offering is optional for private
+   assignment. Portable network Class recipes contain no learner, grant or Course-content rights.
   </p>
  </section>;
 }

@@ -15,7 +15,7 @@ import { parseNetworkClassLaunchRecipe, serializeNetworkClassLaunchRecipe } from
 
 export const Route=createFileRoute("/canonical/classes")({
  validateSearch:(raw:Record<string,unknown>)=>z.object({siteId:z.string().uuid().optional()}).strip().parse(raw),
- component:NativeClasses,
+ component:NativeClassesScope,
 });
 
 type Method=ClassOfferingTerms["enrollmentMethods"][number];
@@ -37,6 +37,12 @@ function toggle<T extends string>(list:T[],name:T):T[]{
 }
 function utc(value:string):string|null{return value?new Date(value).toISOString():null;}
 
+function NativeClassesScope(){
+  const {siteId}=Route.useSearch();
+  // Changing Site drops the previous Site's unsaved Class composer state.
+  // Each command additionally checks current native Site authority.
+  return <NativeClasses key={siteId??"all"}/>;
+}
 function NativeClasses(){
   const {siteId:preferredSiteId}=Route.useSearch();
   const client=useQueryClient();
