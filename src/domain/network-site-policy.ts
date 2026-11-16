@@ -24,3 +24,15 @@ export function assertIanaTimezone(timezone: string): void {
   try { new Intl.DateTimeFormat("en-US", { timeZone: timezone }); }
   catch { throw new Error("Choose a valid IANA timezone"); }
 }
+
+/** An organization-wide local registrar may manage any Site belonging to
+ * that organization. A Site-bound registrar remains restricted to their exact
+ * active Site. Network HQ memberships are never local Site grants. */
+export function assertLocalSiteAffiliationScope(actor: AccessContext,
+  site: { id: string; organizationId: string; organizationType: string }): void {
+  const ownOrganization=actor.scope.organizationIds?.includes(site.organizationId)===true;
+  const exactSite=actor.grantSiteId===null ||
+    (actor.grantSiteId===site.id && actor.scope.siteIds?.includes(site.id)===true);
+  if (!ownOrganization || !exactSite || site.organizationType==="denomination")
+    throw new AuthorizationError("verified independent Site membership");
+}

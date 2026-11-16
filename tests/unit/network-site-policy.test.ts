@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveAccessContext } from "@/domain/access-context";
-import { assertNetworkSiteAccess, assertIanaTimezone } from "@/domain/network-site-policy";
+import { assertNetworkSiteAccess, assertIanaTimezone, assertLocalSiteAffiliationScope } from "@/domain/network-site-policy";
 
 const grant = { id: "grant", accountId: "account", personId: "person", role: "network_admin",
   organizationId: "denom", siteId: null, active: true };
@@ -43,5 +43,26 @@ describe("denomination HQ site authority", () => {
   it("requires a real timezone", () => {
     expect(() => assertIanaTimezone("America/Los_Angeles")).not.toThrow();
     expect(() => assertIanaTimezone("Mars/Colony")).toThrow("IANA timezone");
+  });
+});
+
+// Local Site launch must also work from a verified organization-wide registrar
+// account, without granting a cross-organization or sibling-Site shortcut.
+describe("Site launch affiliation boundaries",()=>{
+  const local=(siteId:string|null, organizationId="local") =>
+    resolveAccessContext({accountId:"account",sessionId:"session",activeGrantId:"grant"},[
+      {id:"grant",accountId:"account",personId:"person",role:"registrar",organizationId,siteId,active:true},
+    ]);
+  const site={id:"campus",organizationId:"local",organizationType:"church"};
+  it("allows verified organization-wide operators to request for their own Site",()=>{
+    expect(()=>assertLocalSiteAffiliationScope(local(null),site)).not.toThrow();
+  });
+  it("allows exact Site registrars but no sibling Site",()=>{
+    expect(()=>assertLocalSiteAffiliationScope(local("campus"),site)).not.toThrow();
+    expect(()=>assertLocalSiteAffiliationScope(local("other-campus"),site)).toThrow();
+  });
+  it("refuses another organization and a denomination HQ Site",()=>{
+    expect(()=>assertLocalSiteAffiliationScope(local(null,"another"),site)).toThrow();
+    expect(()=>assertLocalSiteAffiliationScope(local(null),{...site,organizationType:"denomination"})).toThrow();
   });
 });

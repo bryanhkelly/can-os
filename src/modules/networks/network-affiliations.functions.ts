@@ -9,7 +9,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
-import { assertNetworkSiteAccess } from "@/domain/network-site-policy";
+import { assertLocalSiteAffiliationScope, assertNetworkSiteAccess } from "@/domain/network-site-policy";
 
 const uuid = z.string().uuid();
 const siteQuery = z.object({ siteId: uuid }).strict();
@@ -44,9 +44,8 @@ async function requireLocalSite(siteId: string, capability: "network.affiliation
     organizationType: organizations.type,
   }).from(sites).innerJoin(organizations, eq(organizations.id, sites.organizationId))
     .where(eq(sites.id, siteId)).limit(1);
-  if (!site || !actor.scope.organizationIds?.includes(site.organizationId) ||
-      !actor.scope.siteIds?.includes(site.id) || site.organizationType === "denomination")
-    throw new AuthorizationError("verified independent site membership");
+  if (!site) throw new AuthorizationError("verified independent site membership");
+  assertLocalSiteAffiliationScope(actor,site);
   return { actor, site };
 }
 
