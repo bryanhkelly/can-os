@@ -1,6 +1,7 @@
 import { AuthorizationError, type CommandContext } from "./command-context";
 import type { z } from "zod";
 import { classEnrollmentStatusSchema } from "./unified-class";
+import { verifiedAdultOn } from "./native-class-enrollment";
 type ClassEnrollmentStatus = z.infer<typeof classEnrollmentStatusSchema>;
 
 /**
@@ -148,4 +149,14 @@ export function assertNativeClassAttemptForExit(input:{
      attempt.courseVersionId!==classInstance.courseVersionId){
     throw new AuthorizationError("exact active native Class Course Attempt");
   }
+}
+
+/** Native Class self/assignment are verified-adult pathways. Do not infer
+ * guardian authority from the learner login or an operator's Site grant. */
+export function assertVerifiedAdultNativeClassExit(
+  birthDate: string | null | undefined,
+  now:Date,
+):void{
+  if(!verifiedAdultOn(birthDate,now))
+    throw new AuthorizationError("verified adult Class lifecycle");
 }
