@@ -8,7 +8,8 @@ const id = "5d9bd7cb-b6b8-443b-8732-087e7ea6a236";
 const aClass = {deploymentId:id,adoptionId:id,offeringVersionId:id,courseVersionId:id,
   operatingOrganizationId:id,siteId:null,title:"AI Literacy Evergreen",deliveryMode:"self_paced" as const};
 const terms = {visibility:"private" as const,enrollmentMethods:["assignment"] as const,
-  opensAt:null,closesAt:null,capacity:null,consentVersion:null,consentText:null};
+  opensAt:null,closesAt:null,capacity:null,consentVersion:null,consentText:null,
+  allowedCreditModes:["not_applicable"] as const};
 const fulfilled = {outcomeRecorded:true,requirementsSatisfied:true,
   learnerEligible:true,issuerAuthorized:true,policyApproved:true,awarded:true};
 
