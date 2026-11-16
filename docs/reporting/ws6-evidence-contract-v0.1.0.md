@@ -8,7 +8,7 @@
 
 WS6 derives reporting from the original canonical enrollment, Course Attempt, Sessions, attendance, assessments, completion and award authorities. It does not create a ledger or new participant status. Follow WS1's proposed Participation Read Model v1.0.0: one source registration or Class Enrollment is one participation; a Course Attempt is a child reference, not another registration.
 
-The Class reporting service accepts only a Class ID and bounded UTC dates. It resolves the authenticated canonical Person with current Site Admin or Registrar role, class.manage capability, a single operating Organization, matching exact Site, and approved current Operation, Site, Course, Offering and Deployment authority. A network membership or partner identifier never grants access. Current Class Report requests return no learner names or responses. Browser cache is private, no-store. CSV contains the same aggregate metrics and metric definitions, never a person-level roster.
+The Class reporting service executes its source reads inside a repeatable-read, read-only PostgreSQL transaction so independently queried totals use one consistent snapshot. It accepts only a Class ID and bounded UTC dates. It resolves the authenticated canonical Person with current Site Admin or Registrar role, class.manage capability, a single operating Organization, matching exact Site, and approved current Operation, Site, Course, Offering and Deployment authority. A network membership or partner identifier never grants access. Current Class Report requests return no learner names or responses. Browser cache is private, no-store. CSV contains the same aggregate metrics and metric definitions, never a person-level roster.
 
 Each metric includes its source, grain/denominator, time basis, counting rule, version and report as-of timestamp. Range is [start-of-day UTC, day-after-through-date UTC), at most 366 days. Current statuses describe current source state of in-period registrants, not reconstructed historical status. Evidence activity can belong to someone who registered in an earlier period.
 
@@ -50,6 +50,7 @@ Existing getNoncreditOperatorNetworkSummary supports one operating Organization 
 - src/components/reports/NoncreditProviderEvidencePanel.tsx: existing authorized one-Organization release evidence with Site filter, release drill-down and operator-private aggregate CSV.
 - src/domain/participation-rollups.ts and tests/unit/participation-rollups.test.ts: aggregate by authoritative source grain and Person across independently authorized Sites, Courses and Programs.
 - tests/unit/participation-reporting.test.ts: dedup, corrections, unlinked-room rejection, voided assessment, withdrawal and outcome history.
+- tests/unit/participation-reporting-two-site-pilot.test.ts: synthetic four-Session, two-Site reconciliation, source Person-level deduplication and evidence expiry/corrections.
 - Existing Class Reports tab in src/routes/classes_.$classId.tsx remains a placeholder. WS00/WS4 own its shared workspace integration, to avoid competing edits.
 
 ## Illustrative calculations, NOT pilot results
