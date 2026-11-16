@@ -83,9 +83,13 @@ function NativeClasses(){
   // Offering versions remain canonical publisher products. Each authorized
   // adoption may support many Course components and local Classes; no extra
   // Program records are synthesized for standalone Courses.
-  const offeringGroups=Array.from(new Set((options.data??[]).map(row=>row.offeringVersionId)))
+  const localOfferingOptions=(options.data??[]).filter(row=>
+    !preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId));
+  const groupKey=(row:{deploymentId:string;adoptionId:string;offeringVersionId:string})=>
+    [row.deploymentId,row.adoptionId,row.offeringVersionId].join(":");
+  const offeringGroups=Array.from(new Set(localOfferingOptions.map(groupKey)))
     .map(id=>{
-      const rows=(options.data??[]).filter(row=>row.offeringVersionId===id);
+      const rows=localOfferingOptions.filter(row=>groupKey(row)===id);
       const components=rows
         .filter((row,index)=>rows.findIndex(other=>other.courseVersionId===row.courseVersionId)===index)
         .sort((a,b)=>(a.sequenceNo??Number.MAX_SAFE_INTEGER)-(b.sequenceNo??Number.MAX_SAFE_INTEGER)||
@@ -278,7 +282,7 @@ function NativeClasses(){
           </p>
           <h3 className="mt-1 text-base font-semibold">{group.first.offeringTitle}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
-            {group.components.length} available Course component(s) · Publisher content is read-only
+            {group.components.length} available Course component(s) · {group.first.deploymentName} · Publisher content is read-only
           </p>
           <ul className="mt-3 space-y-2">
             {group.components.map(row=><li key={row.courseVersionId} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-2 text-sm">
@@ -321,8 +325,10 @@ function NativeClasses(){
             Portable publisher rollout (JSON, legacy Class recipes also accepted)
           </label>
           <textarea id="native-network-recipe" value={recipeText} rows={4}
-            maxLength={4000} onChange={e=>setRecipeText(e.target.value)}
-            placeholder="Paste a Class launch recipe from an approved partner"
+            maxLength={24000} onChange={e=>{setRecipeText(e.target.value);
+              setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
+              setChoice("");setSiteId("");}}
+            placeholder="Paste versioned publisher rollout instructions from an approved partner"
             className="mt-1 w-full border border-border bg-background p-3 font-mono text-xs"/>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={!selected}
