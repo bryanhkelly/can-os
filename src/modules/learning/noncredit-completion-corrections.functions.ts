@@ -11,6 +11,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
+import { assertNoncreditCompletionSiteScope } from "@/modules/learning/verified-completion-site.server";
 
 const schema = z.object({
   registrationId: z.string().uuid(),
@@ -55,6 +56,7 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
           actor.scope.organizationIds?.length !== 1 ||
           training.offeringVersionId !== registration.offeringVersionId)
         throw new AuthorizationError("exact noncredit provider organization");
+      await assertNoncreditCompletionSiteScope(tx,actor,registration);
 
       const [evidence] = await tx.select({
         id: evidenceDocumentVersions.id,
