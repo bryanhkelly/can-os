@@ -146,7 +146,7 @@ export const createUnifiedClassDraft = createServerFn({method:"POST"})
       if (!offering) throw new Error("Class Offering creation did not return an identity");
       const [version] = await tx.insert(canonicalClassOfferingVersions).values({
         classOfferingId:offering.id,classId:created.id,versionNo:1,
-        visibility:data.terms.visibility,enrollmentMethod:data.terms.enrollmentMethod,
+        visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
         capacity:data.terms.capacity,state:"draft",
