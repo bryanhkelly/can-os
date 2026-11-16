@@ -546,6 +546,7 @@ export const learnerCourseAttempts = educationV30.table(
     id: id(),
     enrollmentId: uuid("enrollment_id"),
     noncreditRegistrationId: uuid("noncredit_registration_id"),
+    classEnrollmentId: uuid("class_enrollment_id"),
     deploymentId: uuid("deployment_id").notNull(),
     adoptionId: uuid("adoption_id").notNull(),
     offeringVersionId: uuid("offering_version_id").notNull(),
