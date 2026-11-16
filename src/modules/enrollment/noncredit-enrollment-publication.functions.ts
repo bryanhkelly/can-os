@@ -17,6 +17,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { noncreditPublishCommand, publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 type Executor = Pick<typeof db,"select">;
 type Provider = Awaited<ReturnType<typeof requireCanonicalLabProvider>>;
@@ -209,6 +210,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
       if(data.deliveryMode==="independent" && data.siteId!==null &&
          !selected.digitalSiteOptions.some(option=>option.id===data.siteId))
         throw new AuthorizationError("authorized Site association for online release");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       const [release]=await tx.insert(noncreditSelfEnrollmentReleases).values({
         deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
         trainingVersionId:selected.trainingVersionId,courseVersionId:selected.courseVersionId,
@@ -262,6 +264,7 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
       // original grant + same Site restricts who can close the release.
       if(!candidate && !release.siteId)
         throw new AuthorizationError("current operator deployment");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       await tx.update(noncreditSelfEnrollmentReleases)
         .set({status:"closed",closedAt:new Date()})
         .where(eq(noncreditSelfEnrollmentReleases.id,release.id));
@@ -317,6 +320,7 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
       if(!selected || !ids.every(siteId=>
         selected.siteOptions.some(option=>option.id===siteId)))
         throw new AuthorizationError("approved training at each authorized host Site");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       const released:{siteId:string;releaseId:string;alreadyPublished:boolean}[]=[];
       for(const siteId of ids){
         const existing=await tx.select().from(noncreditSelfEnrollmentReleases)
