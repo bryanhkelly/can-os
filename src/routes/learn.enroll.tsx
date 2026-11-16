@@ -105,13 +105,13 @@ function PublicSelfEnrollment() {
   }
   return <WorkspaceShell eyebrow="Learning" width="wide" title="Register for learning"
     subtitle="Choose an approved training, confirm your participation, and use your own CAN account. A school application is a separate experience."
-    actions={<Link to="/learn/my-courses" className="text-sm font-semibold text-primary underline underline-offset-4">My courses</Link>}>
+    actions={<Link to="/learn/my-courses" className="text-sm font-semibold text-primary underline underline-offset-4">My classes</Link>}>
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,.55fr)]">
       <div className="space-y-5">
         <section className="border border-border bg-card p-5">
-          <h2 className="font-serif text-2xl">Choose a training</h2>
+          <h2 className="font-serif text-2xl">Choose a Class Offering</h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Only current, provider-approved noncredit releases appear. Courses can be independent or hosted at an authorized community learning location.
+            This catalog currently lists approved adult-training Class Offerings. Public discovery is separate from authorization to enroll. Classes can be self-paced or hosted at an authorized community learning location.
           </p>
           <label htmlFor="noncredit-search" className="mt-4 block text-sm font-semibold">
             Search training, provider, or hosting Site
@@ -130,7 +130,7 @@ function PublicSelfEnrollment() {
                 : "No noncredit programs are accepting self-registration right now. Providers must publish their courses and enrollment releases before registration can open."}
           </p>}
           {catalog.data && catalog.data.items.length>0 && <div className="mt-4">
-            <label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</label>
+            <label className="block text-sm font-semibold" htmlFor="noncredit-release">Available Classes</label>
             <select id="noncredit-release" value={search.release??""}
               onChange={event=>void router.navigate({to:"/learn/enroll",search:{release:event.target.value||undefined,ref:search.ref}})}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
