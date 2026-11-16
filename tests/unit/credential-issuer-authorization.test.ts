@@ -73,7 +73,7 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain("requestCanonicalCredentialIssuerApproval");
     expect(service).toContain("reviewCanonicalCredentialIssuerApproval");
     expect(service).toContain("revokeCanonicalCredentialIssuerApproval");
-    expect(service).toContain("assertCANIdentityReviewer(reviewer,organization)");
+    expect(service).toContain("assertCANCredentialIssuerReviewer(reviewer,organization)");
     expect(service).toContain("approval.requestedByCanAccountId===reviewer.accountId");
     expect(service).toContain("requesterMembership[0]?.personId===reviewer.actorPersonId");
     expect(service).toContain("assertCurrentReviewerInTransaction(tx,reviewer)");
@@ -82,7 +82,7 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain('withSensitiveApprovalWriter(\n        tx,"request",can.accountId');
     expect(service).toContain('withSensitiveApprovalWriter(tx,"review",reviewer.accountId');
     expect(service).toContain('withSensitiveApprovalWriter(tx,"revoke",reviewer.accountId');
-    expect(service).toContain('grant_row.role=\'can_network_steward\'');
+    expect(service).toContain('grant_row.role=\'can_credential_reviewer\'');
     expect(service).toContain("FOR SHARE OF s,account,grant_row,organization,person");
     expect(service).toContain("reviewEvidenceReference:data.evidenceReference");
     expect(service).toContain("expiresAt.getTime()>now.getTime()+366");
