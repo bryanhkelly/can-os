@@ -86,7 +86,7 @@ export async function assertNativeClassRoomStaff(tx:Tx,room:Room){
 export async function nativeClassRoomParticipant(
   tx:Tx,room:Room,courseAttemptId:string,participantPersonId:string,
 ):Promise<{classId:string;personId:string}|null>{
-  const linked=await nativeClassForRoom(tx,room);
+  const linked=await assertNativeClassRoomStaff(tx,room);
   const [attempt]=await tx.select({
     classEnrollmentId:learnerCourseAttempts.classEnrollmentId,
     id:learnerCourseAttempts.id,
