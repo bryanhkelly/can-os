@@ -1,5 +1,7 @@
 import { AuthorizationError } from "./command-context";
-import type { ClassEnrollmentStatus } from "./unified-class";
+import type { z } from "zod";
+import { classEnrollmentStatusSchema } from "./unified-class";
+type ClassEnrollmentStatus = z.infer<typeof classEnrollmentStatusSchema>;
 
 /**
  * WS2 native Class lifecycle v1. A terminal enrollment is historical evidence,
