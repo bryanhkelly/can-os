@@ -318,8 +318,9 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             <h3 className="text-base font-semibold">Assign an existing adult learner</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               Assignment is independent of Class Offering publication. Candidates
-              must already have a verified learner grant for this Organization
-              and Site. Minors require the separate school/guardian placement flow.
+              must already have a verified organization-scoped learner grant.
+              The Class's Site authority is checked independently. Minors
+              require the separate school/guardian placement flow.
             </p>
             <label htmlFor="class-assign-learner" className="mt-4 block text-sm font-semibold">
               Verified learner
