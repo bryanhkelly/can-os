@@ -8,9 +8,7 @@ import {
   listCanonicalObjectiveApprovalQueue,readCanonicalObjectiveApproval,
   recordCanonicalObjectiveReview,
 } from "@/modules/classes/canonical-objective-approval.functions";
-import {
-  objectiveReviewRequirements,type AssessmentReviewDecision,
-} from "@/domain/canonical-objective-review";
+import { objectiveReviewRequirements } from "@/domain/canonical-objective-review";
 
 export const Route=createFileRoute("/canonical/assessment-reviews")({
   component:CanonicalAssessmentReviewerPage,
@@ -51,7 +49,6 @@ function CanonicalAssessmentReviewerPage(){
   const currentReviews=data?(target==="assessment"?data.reviews.assessment:
     target==="form"?data.reviews.form:
       data.reviews.items.filter(x=>x.itemVersionId===itemVersionId)):[];
-  const authorSet=new Set(data?.items.map(x=>x.authorPersonId)??[]);
   async function submit(){
     if(!data||busy||!ack||rationale.trim().length<20||
        (target==="item"&&!question))return;
