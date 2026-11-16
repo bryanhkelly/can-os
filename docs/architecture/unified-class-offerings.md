@@ -210,15 +210,24 @@ The earlier, unshipped `course_activity_sets` /
 before activation because CAN already has authoritative assessment,
 survey and completion capabilities.
 
-**Remaining compatibility work:** Existing noncredit knowledge-check and
-course-survey services currently require `source="noncredit"` and an actual
-noncredit registration; native Class attempts have `source="class"` and a
-`class_enrollment_id` instead. Provider-governed assessment administration,
-provisioning, questionnaire submissions, consented survey invitations, and
-independent completion decisions must be extended to Class attempts using
-the canonical engines. The read-only adapter is not a finished Class quiz or
-survey journey. No one may create a fictitious noncredit registration just
-to satisfy legacy requirements.
+**Source-level Class integration added:** The existing canonical objective
+assessment service now accepts an independently authorized native Class
+Course Attempt with a real `class_enrollment_id`, publisher-approved exact
+Course/Deployment administration and Person-bound provider assessment grant.
+The Class registrar's roster can provision that existing canonical grant,
+the learner can use `CourseAssessmentPanel`, and the independent provider
+reviewer can finalize the provisional result through the existing
+`assessment_attempt_results` ledger and database result gate. Existing
+identified `course-surveys.functions.ts` now also accepts native Class
+Course Attempts when an authorized campaign, published survey, verified
+consent evidence and personal invitation exist.
+
+**Unproven and not yet a release claim:** These are source-level changes, not
+a successful Class assessment/survey/grading acceptance test. In particular,
+restricted DB roles, canonical assessment fixtures, survey invitation
+delivery, full completion-policy outcome governance, and two-Site revocation
+still require isolated QA. No synthetic noncredit registration was created,
+and a learner cannot self-finalize scores or completion.
 
 The Class Session planner now accepts a one-off Session, four weekly Sessions
 or up to twelve custom dated Sessions. Wall-clock input is interpreted in
