@@ -128,7 +128,7 @@ export interface FamilyEnrichmentActivity {
   offeringName: string; seasonName: string; startsOn: DateValue; endsOn: DateValue;
 }
 export interface FamilyChildActivity {
-  studentProfileId: string; name: string; lastName: string;
+  studentProfileId: string; name: string | null; lastName: string | null;
 }
 export function projectFamilyEnrichment(
   registrations: readonly FamilyEnrichmentActivity[],
@@ -137,7 +137,7 @@ export function projectFamilyEnrichment(
 ): ParticipationRecord[] {
   const childNames = new Map(children.map(child =>
     [child.studentProfileId, [child.name, child.lastName].filter(Boolean).join(" ")]));
-  return registrations.map(item => {
+  return registrations.filter(item => childNames.has(item.studentProfileId)).map(item => {
     const status = state(item.status);
     return base({
       key: "family_enrichment:" + item.id, source: "family_enrichment", sourceId: item.id,
