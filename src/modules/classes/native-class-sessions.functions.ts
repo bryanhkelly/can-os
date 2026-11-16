@@ -1,14 +1,14 @@
 import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions, canonicalClassStaffAssignments,
   canonicalClassEnrollments, learnerCourseAttempts, canonicalDeliverySessions,
-  facilitatedClassroomPlans, auditEvents, domainEvents,
+  facilitatedClassroomPlans, facilitatedLearningSessions, auditEvents, domainEvents,
 } from "@/db/canonical-v301";
-import { AuthorizationError } from "@/domain/command-context";
+import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-enrollment.functions";
 import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
@@ -18,6 +18,8 @@ import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
 import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning.functions";
 import { canOpenScheduledClassroom } from "@/domain/classroom-scheduling";
+import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Host=Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
@@ -238,5 +240,86 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         payload:{classSessionId:link.id,facilitatedSessionId:room.facilitatedSessionId},
       });
       return {classSessionId:link.id,...room,alreadyStarted:false};
+    });
+  });
+
+
+/** Emergency stop is an operator power, NOT a classroom-facilitator power.
+ * It intentionally works after facilitator or Course rights are withdrawn,
+ * while still requiring a current verified exact Site staff session.
+ *
+ * Do not delete/retarget a native Class plan or change its state to cancelled:
+ * the Class→plan tombstone must survive, preventing a previously native room
+ * from falling back to generic Course/Site authorization.
+ */
+const revokeInput=z.object({classId:uuid,classSessionId:uuid,
+  reason:z.string().trim().min(15).max(500)}).strict();
+
+export const revokeNativeClassSession=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>revokeInput.parse(raw))
+  .handler(async({data})=>{
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+      throw new AuthorizationError("native Class release not activated");
+    requireFacilitatedLearningEnabled();
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCanonicalCommandContext(getRequest());
+    if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
+      throw new AuthorizationError("Class Site operator");
+    assertCapability(actor,"class.manage");
+    return db.transaction(async tx=>{
+      const [cls]=await tx.select().from(canonicalClasses)
+        .where(eq(canonicalClasses.id,data.classId)).for("update").limit(1);
+      if(!cls?.siteId ||
+         !actor.scope.organizationIds?.includes(cls.operatingOrganizationId) ||
+         !actor.scope.siteIds?.includes(cls.siteId))
+        throw new AuthorizationError("exact Class operating Site");
+      const [link]=await tx.select().from(canonicalClassSessions)
+        .where(and(eq(canonicalClassSessions.id,data.classSessionId),
+          eq(canonicalClassSessions.classId,cls.id))).limit(1);
+      if(!link)throw new AuthorizationError("exact Class Session");
+      const [plan]=await tx.select().from(facilitatedClassroomPlans)
+        .where(and(eq(facilitatedClassroomPlans.id,link.classroomPlanId),
+          eq(facilitatedClassroomPlans.deliverySessionId,link.deliverySessionId),
+          eq(facilitatedClassroomPlans.deploymentId,cls.deploymentId),
+          eq(facilitatedClassroomPlans.courseVersionId,cls.courseVersionId),
+          eq(facilitatedClassroomPlans.siteId,cls.siteId),
+          eq(facilitatedClassroomPlans.hostOrganizationId,cls.operatingOrganizationId)))
+        .for("update").limit(1);
+      if(!plan)throw new AuthorizationError("unaltered Class delivery plan");
+      // Session cancellation before opening is performed by ending its
+      // delivery plan only with a separate approved scheduling workflow.
+      if(!plan.facilitatedSessionId)
+        throw new AuthorizationError("room is not yet started");
+      const [room]=await tx.select().from(facilitatedLearningSessions)
+        .where(and(eq(facilitatedLearningSessions.id,plan.facilitatedSessionId),
+          eq(facilitatedLearningSessions.siteId,cls.siteId),
+          eq(facilitatedLearningSessions.deploymentId,cls.deploymentId),
+          eq(facilitatedLearningSessions.courseVersionId,cls.courseVersionId),
+          eq(facilitatedLearningSessions.hostOrganizationId,cls.operatingOrganizationId)))
+        .for("update").limit(1);
+      if(!room)throw new AuthorizationError("exact Class room instance");
+      if(room.state==="ended")return {revoked:true,alreadyEnded:true};
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
+      const now=new Date();
+      await tx.update(facilitatedLearningSessions)
+        .set({state:"ended",endedAt:now,
+          pairingExpiresAt:now})
+        .where(eq(facilitatedLearningSessions.id,room.id));
+      await tx.insert(auditEvents).values({
+        actorPersonId:actor.actorPersonId,
+        owningOrganizationId:cls.operatingOrganizationId,
+        eventCode:"class.session.revoked",
+        entityKind:"class_session",entityId:link.id,
+        payload:{classId:cls.id,facilitatedSessionId:room.id,
+          reason:data.reason,endedAt:now.toISOString()},
+      });
+      await tx.insert(domainEvents).values({
+        actorPersonId:actor.actorPersonId,
+        eventType:"ClassSessionRevoked",
+        aggregateType:"class",aggregateId:cls.id,
+        payload:{classSessionId:link.id,facilitatedSessionId:room.id,
+          reason:data.reason,endedAt:now.toISOString()},
+      });
+      return {revoked:true,alreadyEnded:false};
     });
   });
