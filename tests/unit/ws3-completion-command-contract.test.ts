@@ -5,6 +5,7 @@ const file = (path: string) => readFileSync(path, "utf8");
 const corrections = file("src/modules/learning/noncredit-completion-corrections.functions.ts");
 const revocation = file("src/modules/learning/credential-revocation.functions.ts");
 const decisions = file("src/modules/learning/noncredit-completion-decisions.functions.ts");
+const siteGuard = file("src/modules/learning/verified-completion-site.server.ts");
 const credentialSql = file("database/canonical/v3.0.1/patch-achievement-credentials.sql");
 const classSql = file("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
 
@@ -13,6 +14,14 @@ describe("WS3 guarded completion mutation integration contracts", () => {
     expect(decisions).toContain("registration.participantPersonId===actor.actorPersonId");
     expect(decisions).toContain("registration.completionPolicyId!==policy.id");
     expect(decisions).toContain("assertCurrentCanonicalStaffForMutation");
+  });
+  it("denies missing or cross-Site attribution in both decision and correction paths", () => {
+    expect(siteGuard).toContain("participationAttributions.noncreditRegistrationId");
+    expect(siteGuard).toContain("attributions.length !== 1");
+    expect(siteGuard).toContain("attributions[0]!.deliverySiteId !== exactSite");
+    expect(siteGuard).toContain("claims[0]!.participantPersonId !== registration.participantPersonId");
+    expect(decisions).toContain("assertNoncreditCompletionSiteScope(tx,actor,registration)");
+    expect(corrections).toContain("assertNoncreditCompletionSiteScope(tx,actor,registration)");
   });
   it("gates correction, locks source, validates independent verified evidence and appends history", () => {
     expect(corrections).toContain("CAN_NONCREDIT_COMPLETION_CORRECTIONS_ENABLED");
