@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS education_v30.class_offering_versions (
  class_id uuid NOT NULL,
  version_no integer NOT NULL CHECK(version_no>=1),
  visibility text NOT NULL CHECK(visibility IN ('public','unlisted','private')),
- enrollment_method text NOT NULL CHECK(enrollment_method IN ('self','invitation','assignment','approval')),
+ enrollment_methods text[] NOT NULL CHECK(cardinality(enrollment_methods) BETWEEN 1 AND 4 AND enrollment_methods <@ ARRAY['self','invitation','assignment','approval']::text[]),
  state text NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','published','closed')),
  opens_at timestamptz,
  closes_at timestamptz,
@@ -71,8 +71,8 @@ CREATE TABLE IF NOT EXISTS education_v30.class_enrollments (
  class_offering_version_id uuid NOT NULL,
  learner_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
  enrollment_method text NOT NULL CHECK(enrollment_method IN ('self','invitation','assignment','approval')),
- award_intent text NOT NULL DEFAULT 'unspecified'
-  CHECK(award_intent IN ('credit','certificate','participation','audit','unspecified')),
+ credit_mode text NOT NULL DEFAULT 'not_applicable'
+  CHECK(credit_mode IN ('for_credit','audit','not_applicable')),
  status text NOT NULL DEFAULT 'pending'
   CHECK(status IN ('pending','active','completed','withdrawn','cancelled')),
  course_attempt_id uuid REFERENCES education_v30.learner_course_attempts(id),
@@ -143,11 +143,11 @@ BEGIN
  IF TG_OP='DELETE' THEN RAISE EXCEPTION 'Class Offering history cannot be deleted' USING ERRCODE='23514'; END IF;
  IF OLD.state IN ('published','closed') THEN
    IF ROW(OLD.class_offering_id,OLD.class_id,OLD.version_no,
-          OLD.visibility,OLD.enrollment_method,OLD.opens_at,OLD.closes_at,
+          OLD.visibility,OLD.enrollment_methods,OLD.opens_at,OLD.closes_at,
           OLD.capacity,OLD.created_by_person_id,OLD.published_at,OLD.created_at)
       IS DISTINCT FROM
       ROW(NEW.class_offering_id,NEW.class_id,NEW.version_no,
-          NEW.visibility,NEW.enrollment_method,NEW.opens_at,NEW.closes_at,
+          NEW.visibility,NEW.enrollment_methods,NEW.opens_at,NEW.closes_at,
           NEW.capacity,NEW.created_by_person_id,NEW.published_at,NEW.created_at)
       OR NOT (
         (OLD.state=NEW.state AND OLD.closed_at IS NOT DISTINCT FROM NEW.closed_at)
