@@ -2,7 +2,7 @@
 -- Requires existing canonical v3.0.1 tables, independent schema review and test01 QA.
 -- No legacy Section mapping, imported registrations, compatibility adapters or backfills.
 -- Enrollment and credential issuance writes remain disabled until scoped RLS,
--- auditing, source-record bridge and award-authority commands are implemented.
+-- auditing, native learner-participation integration and award-authority commands are implemented.
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS education_v30.classes (
