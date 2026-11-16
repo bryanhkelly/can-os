@@ -34,7 +34,7 @@ export const nativeClassSessionScheduleSchema=z.object({
   }).strict()).min(1).max(12),
 }).strict();
 
-export async function requireNativeClassSessionHost(
+async function requireNativeClassSessionHost(
   tx:Tx,host:Host,classId:string,now:Date,lock=false,
 ){
   const query=tx.select().from(canonicalClasses)
