@@ -52,7 +52,7 @@ async function requireClassOperator(): Promise<ClassOperator> {
   return { actor, organizationId: ids[0]!, siteIds: actor.scope.siteIds ?? [] };
 }
 
-async function validateClassAuthority(tx: Tx, operator: ClassOperator, input: ReturnType<typeof classDefinitionSchema.parse>) {
+export async function validateClassAuthority(tx: Tx, operator: ClassOperator, input: ReturnType<typeof classDefinitionSchema.parse>) {
   if (input.operatingOrganizationId !== operator.organizationId) {
     throw new AuthorizationError("current operating Organization");
   }
