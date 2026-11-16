@@ -146,3 +146,41 @@ enabling `CAN_CREDENTIAL_ISSUANCE_ENABLED` is insufficient.
 
 A single login does not mean every staff member automatically has every
 canonical role. Authorization remains an exact resource/role relationship.
+
+## Independently approved sensitive capabilities (P0 slice)
+
+**Source is committed on `main`, not activated in production.**
+`database/canonical/v3.0.1/patch-sensitive-credential-issuer-approvals.sql`
+has been installed on `test01`. The migration adds an expiring,
+independently reviewed `credential.issue` approval for one native staff grant,
+plus a restricted `v301_can_sensitive_capability(text,text)` projection.
+There are no real approved issuer grants.
+
+The governed workflow is at `/canonical/issuer-access`, using the existing
+CAN login. Verified Site Admins or Registrars can submit their own issuer
+request with evidence. A separately authenticated CAN institutional reviewer
+must approve it with a defined expiry; the requester cannot self-approve.
+Reviewers can reject or revoke requests and all decisions are audited.
+
+The issuance command now uses `assertCurrentCredentialIssuer` inside its
+write transaction and locks the approved grant row before creating an award.
+A Site Admin/Registrar role by itself is never `credential.issue` authority,
+and a native-only second-login cookie cannot satisfy the new issuer guard.
+
+**Activation blockers:** `CAN_CREDENTIAL_ISSUANCE_ENABLED` must remain
+disabled until a reviewed runtime DB permission plan, DB-backed issuer
+lifecycle acceptance, executable TypeScript/build/Playwright checks, credential
+artifact issuance, revocation and cross-organization negative acceptance pass.
+The rollback-only issuer acceptance SQL is committed as
+`database/canonical/v3.0.1/accept-sensitive-credential-issuer-test01.sql`,
+but its execution was blocked and no positive issuer-grant test is claimed.
+A read-only negative test using a nonmatching session digest was verified on
+`test01` and returned false for both issuance and unrelated capabilities.
+The restricted reader can EXECUTE the capability projection but cannot directly
+SELECT the approval table; public EXECUTE is revoked.
+
+**Important:** Existing credential-award domain RLS and runtime application
+role grants are separate prerequisites. The issuer workflow may not have
+runtime DB write privileges under a non-owner deployment login until the
+credential-specific, audited role is provisioned. Do not widen general
+application database privileges to make it work.
