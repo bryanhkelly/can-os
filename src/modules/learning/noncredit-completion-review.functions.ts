@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -46,12 +46,36 @@ export const getNoncreditCompletionReview = createServerFn({ method: "GET" })
       if (rows.length > 500)
         throw new AuthorizationError("completion history pagination required");
       const current=projectCurrentNoncreditCompletion(registration.id,rows);
+      // Canonical function combines source supersession, issuer revocation,
+      // expiration and legacy-certificate state. Never infer validity from
+      // noncredit_completion_certificates.status='issued' alone.
+      const awardResult=await tx.execute(sql`
+        SELECT issuance.id AS "issuanceId",
+               issuance.issued_at AS "issuedAt",
+               education_v30.v301_credential_is_current(issuance.id)
+                 AS "currentlyValid"
+        FROM education_v30.noncredit_completion_decisions source
+        JOIN education_v30.learner_achievement_decisions achievement
+          ON achievement.noncredit_completion_decision_id=source.id
+        JOIN education_v30.learning_award_issuances issuance
+          ON issuance.achievement_decision_id=achievement.id
+        WHERE source.registration_id=${registration.id}::uuid
+          AND issuance.issuer_organization_id=${training.providerOrganizationId}::uuid
+        ORDER BY issuance.issued_at DESC,issuance.id DESC LIMIT 101
+      `);
+      if(awardResult.rows.length>100)
+        throw new AuthorizationError("credential history pagination required");
+      const awards=awardResult.rows.map(raw=>({
+        issuanceId:String(raw.issuanceId),
+        issuedAt:new Date(String(raw.issuedAt)).toISOString(),
+        currentlyValid:raw.currentlyValid===true,
+      }));
       return {
         registrationId:registration.id,
         registrationStatus:registration.status,
         trainingTitle:training.title,
         pinnedPolicyId:registration.completionPolicyId,
-        current,
+        current,awards,
         history:rows.map(row=>({
           id:row.id,outcome:row.outcome,
           supersedesId:row.supersedesId,
