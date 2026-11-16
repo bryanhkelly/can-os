@@ -421,22 +421,33 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
       try{
         await db.transaction(tx=>validateClassAuthority(tx,operator,instance));
       }catch(e){if(e instanceof AuthorizationError)continue;throw e;}
-      const authorizedSites=[];
+      const authorizedSites:Array<{
+        id:string;
+        allowedDeliveryModes:Array<"self_paced"|"scheduled"|"facilitated"|"hybrid">;
+      }>=[];
       for(const siteId of operator.siteIds){
-        try {
-          await db.transaction(tx=>validateClassAuthority(tx,operator,{
-            ...instance,siteId,deliveryMode:"facilitated",
-          }));
-          authorizedSites.push(siteId);
-        }catch(e){if(!(e instanceof AuthorizationError))throw e;}
+        const allowedDeliveryModes:Array<"self_paced"|"scheduled"|"facilitated"|"hybrid">=[];
+        // An authorized virtual/self-paced Site need not have a classroom
+        // placement. Scheduled/facilitated/hybrid delivery DOES require one.
+        for(const mode of ["self_paced","facilitated"] as const){
+          try {
+            await db.transaction(tx=>validateClassAuthority(tx,operator,{
+              ...instance,siteId,deliveryMode:mode,
+            }));
+            if(mode==="self_paced")allowedDeliveryModes.push("self_paced");
+            else allowedDeliveryModes.push("scheduled","facilitated","hybrid");
+          }catch(e){if(!(e instanceof AuthorizationError))throw e;}
+        }
+        if(allowedDeliveryModes.length)authorizedSites.push({id:siteId,allowedDeliveryModes});
       }
       // productDefinition is publisher-owned; return classification only.
       // A recipe cannot import or edit academic content or assessment rules.
       const {productDefinition,...publicRow}=row;
       options.push({...publicRow,offeringKind:publishedOfferingKind(productDefinition),
         operatingOrganizationId:operator.organizationId,
-        siteOptions:authorizedSites.map(id=>({
-          id,name:names.find(site=>site.id===id)?.name??"Authorized Site",
+        siteOptions:authorizedSites.map(site=>({
+          id:site.id,allowedDeliveryModes:site.allowedDeliveryModes,
+          name:names.find(item=>item.id===site.id)?.name??"Authorized Site",
         }))});
     }
     return options;
