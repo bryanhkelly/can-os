@@ -15,14 +15,12 @@ export const canonicalClasses = educationV30.table("classes", {
   title: text("title").notNull(),
   deliveryMode: text("delivery_mode").$type<"self_paced"|"scheduled"|"facilitated"|"hybrid">().notNull(),
   state: text("state").$type<"draft"|"approved"|"active"|"completed"|"cancelled">().notNull().default("draft"),
-  legacyAcademicSectionId: uuid("legacy_academic_section_id"),
   createdByPersonId: uuid("created_by_person_id").notNull(),
   createdAt: timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
   updatedAt: timestamp("updated_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[
   index("canonical_classes_operator_idx").on(t.operatingOrganizationId,t.state),
   index("canonical_classes_course_idx").on(t.courseVersionId,t.deploymentId),
-  uniqueIndex("canonical_classes_legacy_section_uq").on(t.legacyAcademicSectionId),
 ]);
 
 export const canonicalClassOfferings = educationV30.table("class_offerings", {
@@ -57,17 +55,14 @@ export const canonicalClassEnrollments = educationV30.table("class_enrollments",
   id:id(),classId:uuid("class_id").notNull(),
   classOfferingVersionId:uuid("class_offering_version_id").notNull(),
   learnerPersonId:uuid("learner_person_id").notNull(),
-  enrollmentMethod:text("enrollment_method").$type<"self"|"invitation"|"assignment"|"approval"|"imported">().notNull(),
+  enrollmentMethod:text("enrollment_method").$type<"self"|"invitation"|"assignment"|"approval">().notNull(),
   awardIntent:text("award_intent").$type<"credit"|"certificate"|"participation"|"audit"|"unspecified">().notNull().default("unspecified"),
   status:text("status").$type<"pending"|"active"|"completed"|"withdrawn"|"cancelled">().notNull().default("pending"),
   courseAttemptId:uuid("course_attempt_id"),
-  sourceRecordKind:text("source_record_kind").$type<"academic"|"noncredit"|"native">().notNull().default("native"),
-  sourceRecordId:uuid("source_record_id"),
   enrolledAt:timestamp("enrolled_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[
   index("canonical_class_enroll_person_idx").on(t.learnerPersonId,t.status),
   index("canonical_class_enroll_class_idx").on(t.classId,t.status),
-  uniqueIndex("canonical_class_enroll_source_uq").on(t.sourceRecordKind,t.sourceRecordId),
 ]);
 
 export const canonicalClassOutcomes = educationV30.table("class_outcomes", {
