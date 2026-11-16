@@ -88,14 +88,19 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
         if (choices.has(candidate.courseAttemptId)) continue;
         try {
           await authorizeCanonicalCourseAttempt(tx, actor, candidate.courseAttemptId);
-          const isNative="classId" in candidate && typeof candidate.classId==="string";
-          choices.set(candidate.courseAttemptId, {
-            courseAttemptId:candidate.courseAttemptId,
-            courseTitle:isNative
-              ?`${candidate.classTitle} · ${candidate.siteName??"Online"} · ${candidate.courseTitle}`
-              :candidate.courseTitle,
-            classId:isNative?candidate.classId:null,
-          });
+          if("classId" in candidate){
+            choices.set(candidate.courseAttemptId,{
+              courseAttemptId:candidate.courseAttemptId,
+              courseTitle:`${candidate.classTitle} · ${candidate.siteName??"Online"} · ${candidate.courseTitle}`,
+              classId:candidate.classId,
+            });
+          }else{
+            choices.set(candidate.courseAttemptId,{
+              courseAttemptId:candidate.courseAttemptId,
+              courseTitle:candidate.courseTitle,
+              classId:null,
+            });
+          }
         } catch (error) {
           if (!(error instanceof AuthorizationError) && !(error instanceof DomainError)) throw error;
         }
