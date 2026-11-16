@@ -99,3 +99,39 @@ export function assessLocalRollout(
     };
   });
 }
+
+/**
+ * A portable Class rollout covers the *entire* published Offering-to-Course
+ * composition. Blueprint activities, clubs and other independent products are
+ * not Class components, and must never be silently represented as Courses.
+ *
+ * If publisher metadata declares additional activity/component types, fail
+ * closed and direct the operator to the independently approved Blueprint path.
+ */
+export function assertCompletePortableCourseComposition(
+  definition: unknown,
+  components: ReadonlyArray<{
+    courseVersionId: string;
+    lifecycle: string;
+    publishedAt: Date | null;
+  }>,
+): void {
+  if (!components.length) throw new Error("Offering has no Course components to roll out.");
+  if (components.length > 50) throw new Error("Offering exceeds the 50-Course portable rollout limit.");
+  if (new Set(components.map(c => c.courseVersionId)).size !== components.length)
+    throw new Error("Offering contains duplicate Course versions.");
+  if (components.some(c => c.lifecycle !== "published" || !c.publishedAt))
+    throw new Error("Offering contains unavailable Course components; exporting a partial Program is prohibited.");
+  if (definition && typeof definition === "object" && !Array.isArray(definition)) {
+    const record = definition as Record<string, unknown>;
+    for (const field of ["activities", "nonCourseComponents", "requiredActivities", "activityComponents"]) {
+      if (Array.isArray(record[field]) && record[field].length)
+        throw new Error("This Offering declares non-Course activities. Publish or adopt these through their governed Blueprint workflow; a Class-only rollout would be incomplete.");
+    }
+    if (Array.isArray(record.components) && record.components.some(c => {
+      if (!c || typeof c !== "object") return true;
+      const kind = (c as Record<string, unknown>).kind;
+      return kind !== "course";
+    })) throw new Error("This Offering declares non-Course components. A Course-only rollout cannot represent the whole Program.");
+  }
+}
