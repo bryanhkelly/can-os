@@ -72,7 +72,7 @@ describe("canonical Course objective draft authoring",()=>{
     expect(patch).toContain("v28_role_can_access_org");
     expect(patch).toContain("REVOKE ALL ON FUNCTION");
     expect(patch).toContain("assessment_item_secure_keys");
-    expect(patch).toContain("sealed");
+    expect(patch).toContain("Sealed answer key is missing");
     expect(provision).toContain("NOLOGIN NOINHERIT NOBYPASSRLS");
     expect(provision).toContain("WITH INHERIT FALSE, SET TRUE");
     expect(provision).not.toContain("GRANT SELECT,INSERT ON education_v30.assessment_");
@@ -84,7 +84,7 @@ describe("canonical Course objective draft authoring",()=>{
   it("preserves canonical governed publication and returns no secure item answers",()=>{
     const patch=read("database/canonical/v3.0.1/patch-canonical-assessment-draft-authoring.sql");
     const service=read("src/modules/classes/canonical-objective-draft.functions.ts");
-    expect(patch).toContain("VALUES(version_id");
+    expect(patch).toContain("RETURN QUERY SELECT version_id,form_version,question_index");
     expect(patch).toContain("'draft'");
     expect(patch).not.toContain("UPDATE assessment_versions SET lifecycle='published'");
     expect(patch).not.toContain("UPDATE assessment_item_versions SET lifecycle='published'");
