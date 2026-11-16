@@ -2,11 +2,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { z } from "zod";
 import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
-  canonicalClassEnrollments, learnerCourseAttempts, enrollments, learnerProfiles,
-  noncreditRegistrations, noncreditSelfEnrollmentClaims,
   canonicalClassOfferingVersions, canonicalOfferingCourses, courseVersions, courses,
   deploymentOfferingAdoptions, offeringVersions, offerings, programDeployments,
   educationOperations, educationOperationOrganizationRoles, educationOperationSites,
@@ -16,7 +13,7 @@ import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unifie
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 
-// These commands are deliberately dormant until migration, restricted RLS,
+// These native commands are dormant until restricted RLS,
 // dedicated role provision and test01 acceptance are approved.
 function requireClassFeature() {
   if (process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED !== "true") {
@@ -32,8 +29,8 @@ async function requireClassOperator(): Promise<ClassOperator> {
   if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? "")) {
     throw new AuthorizationError("authorized Class operator");
   }
-  // Purpose-specific grant: noncredit provisioning or Site membership alone
-  // must not authorize academic Class creation.
+  // Purpose-specific grant: unrelated program or Site membership alone
+  // must not authorize Class creation.
   assertCapability(actor, "class.manage");
   const ids = actor.scope.organizationIds ?? [];
   if (ids.length !== 1) throw new AuthorizationError("one verified operating organization");
@@ -197,133 +194,4 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
         or(isNull(canonicalClasses.siteId),
           operator.siteIds.length ? inArray(canonicalClasses.siteId,operator.siteIds) : undefined),
       )).orderBy(asc(canonicalClasses.createdAt)).limit(100);
-  });
-
-
-/**
- * Migration-only, exact-source bridge. It does not enroll someone into the
- * original academic/noncredit systems, alter grades or determine credit.
- * The approved Class Offering version is kept even when private or closed.
- * Unknown historical enrollment method and award intent are never guessed.
- */
-export const linkVerifiedLegacyClassEnrollment = createServerFn({method:"POST"})
-  .validator((raw:unknown)=>z.object({
-    classId:z.string().uuid(),classOfferingVersionId:z.string().uuid(),
-    courseAttemptId:z.string().uuid(),
-  }).strict().parse(raw))
-  .handler(async({data})=>{
-    requireClassFeature();
-    const operator=await requireClassOperator();
-    return db.transaction(async tx=>{
-      const [instance]=await tx.select().from(canonicalClasses)
-        .where(and(eq(canonicalClasses.id,data.classId),
-          eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
-        .for("update").limit(1);
-      if(!instance || instance.siteId && !operator.siteIds.includes(instance.siteId))
-        throw new AuthorizationError("owned Class and current operator Site");
-      await validateClassAuthority(tx,operator,{
-        deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
-        offeringVersionId:instance.offeringVersionId,courseVersionId:instance.courseVersionId,
-        operatingOrganizationId:instance.operatingOrganizationId,
-        siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
-      });
-      const [terms]=await tx.select({id:canonicalClassOfferingVersions.id})
-        .from(canonicalClassOfferingVersions)
-        .innerJoin(canonicalClassOfferings,and(
-          eq(canonicalClassOfferings.id,canonicalClassOfferingVersions.classOfferingId),
-          eq(canonicalClassOfferings.classId,instance.id),
-        ))
-        .where(and(
-          eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId),
-          eq(canonicalClassOfferingVersions.classId,instance.id),
-        )).limit(1);
-      if(!terms)throw new AuthorizationError("exact Class Offering version");
-
-      const [attempt]=await tx.select().from(learnerCourseAttempts)
-        .where(eq(learnerCourseAttempts.id,data.courseAttemptId)).for("update").limit(1);
-      if(!attempt ||
-        attempt.deploymentId!==instance.deploymentId ||
-        attempt.adoptionId!==instance.adoptionId ||
-        attempt.offeringVersionId!==instance.offeringVersionId ||
-        attempt.courseVersionId!==instance.courseVersionId ||
-        Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId)) {
-        throw new AuthorizationError("Course attempt and Class provenance");
-      }
-
-      let learnerPersonId:string;
-      let sourceRecordKind:"academic"|"noncredit";
-      let sourceRecordId:string;
-      let status:"pending"|"active"|"completed"|"withdrawn"|"cancelled";
-      if(attempt.enrollmentId){
-        // A legacy academic Section is not a Course. Require its exact,
-        // separately reviewed Section mapping, never title/code matching.
-        if(!attempt.sectionId || attempt.sectionId!==instance.legacyAcademicSectionId)
-          throw new AuthorizationError("verified academic Section-to-Class mapping");
-        const [source]=await tx.select().from(enrollments)
-          .where(and(eq(enrollments.id,attempt.enrollmentId),
-            eq(enrollments.deploymentId,instance.deploymentId))).limit(1);
-        if(!source)throw new AuthorizationError("original academic enrollment");
-        const [profile]=await tx.select().from(learnerProfiles)
-          .where(eq(learnerProfiles.id,source.learnerId)).limit(1);
-        if(!profile)throw new AuthorizationError("verified academic learner Person");
-        learnerPersonId=profile.personId;
-        sourceRecordKind="academic";sourceRecordId=source.id;
-        status=source.status;
-      }else{
-        const [source]=await tx.select().from(noncreditRegistrations)
-          .where(and(eq(noncreditRegistrations.id,attempt.noncreditRegistrationId!),
-            eq(noncreditRegistrations.deploymentId,instance.deploymentId),
-            eq(noncreditRegistrations.adoptionId,instance.adoptionId),
-            eq(noncreditRegistrations.offeringVersionId,instance.offeringVersionId),
-            eq(noncreditRegistrations.registeringOrganizationId,operator.organizationId),
-          )).limit(1);
-        if(!source)throw new AuthorizationError("original training registration");
-        if(instance.siteId){
-          const [claim]=await tx.select({id:noncreditSelfEnrollmentClaims.id})
-            .from(noncreditSelfEnrollmentClaims).where(and(
-              eq(noncreditSelfEnrollmentClaims.registrationId,source.id),
-              eq(noncreditSelfEnrollmentClaims.siteId,instance.siteId),
-            )).limit(1);
-          if(!claim)throw new AuthorizationError("verified registration at this exact Site");
-        }
-        learnerPersonId=source.participantPersonId;
-        sourceRecordKind="noncredit";sourceRecordId=source.id;
-        status=source.status==="registered"?"active":source.status;
-      }
-
-      const [prior]=await tx.select().from(canonicalClassEnrollments)
-        .where(and(
-          eq(canonicalClassEnrollments.sourceRecordKind,sourceRecordKind),
-          eq(canonicalClassEnrollments.sourceRecordId,sourceRecordId),
-        )).limit(1);
-      if(prior){
-        if(prior.classId!==instance.id ||
-           prior.learnerPersonId!==learnerPersonId ||
-           prior.courseAttemptId!==attempt.id ||
-           prior.classOfferingVersionId!==terms.id)
-          throw new AuthorizationError("conflicting historical Class Enrollment mapping");
-        return {classEnrollmentId:prior.id,alreadyLinked:true};
-      }
-      const [created]=await tx.insert(canonicalClassEnrollments).values({
-        classId:instance.id,classOfferingVersionId:terms.id,
-        learnerPersonId,enrollmentMethod:"imported",awardIntent:"unspecified",
-        status,courseAttemptId:attempt.id,
-        sourceRecordKind,sourceRecordId,
-      }).returning({id:canonicalClassEnrollments.id});
-      if(!created)throw new Error("Class Enrollment link was not created");
-      await tx.insert(auditEvents).values({
-        actorPersonId:operator.actor.actorPersonId!,
-        owningOrganizationId:operator.organizationId,
-        eventCode:"class.legacy_enrollment_linked",
-        entityKind:"class_enrollment",entityId:created.id,
-        payload:{classId:instance.id,sourceRecordKind,sourceRecordId,
-          courseAttemptId:attempt.id,origin:"audited_migration"},
-      });
-      await tx.insert(domainEvents).values({
-        eventType:"ClassLegacyEnrollmentLinked",aggregateType:"class_enrollment",
-        aggregateId:created.id,actorPersonId:operator.actor.actorPersonId!,
-        payload:{classId:instance.id,sourceRecordKind},
-      });
-      return {classEnrollmentId:created.id,alreadyLinked:false};
-    });
   });
