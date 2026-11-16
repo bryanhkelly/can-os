@@ -77,6 +77,19 @@ roll-back options. A Git merge alone is not a safe deployment.
     unauthorized role, plaintext key retrieval and all publication writes.
     Inspect existing assessment item/form/version publication triggers
     separately: a saved draft is NOT sufficient to launch a knowledge check.
+4b. On the same disposable QA database, after the canonical objective
+    draft patch and its own restricted author role, review the optional
+    `patch-canonical-assessment-review-publication.sql` and
+    `provision-canonical-assessment-approval-roles.sql` capabilities.
+    Every reviewer and publisher needs a **different NOLOGIN SQL role**
+    and a current **Person-specific evidence-backed
+    `professional_role_assignments` appointment**. Run the read-only
+    `db:canonical:objective-approval:preflight`, then exercise original
+    item/version/form release triggers, author self-approval denial,
+    each question's latest approvals, reviewer-only sealed answer preview
+    and atomic rollback on an incomplete form. These are not extra Unified
+    Class migrations and the flags remain OFF outside isolated QA.
+
 5. Design and verify exact application-role permissions and row-level
    policies for the new tables and the existing shared classroom tables.
    Do not replace owner-only RLS with a `PUBLIC` grant or unconditional
