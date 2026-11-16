@@ -117,9 +117,16 @@ application origin, never a real school or church roster.
 - Publisher-authorized Course Activities page shows the same published
   canonical assessment versions available for a Course; it never exposes
   secure answers or grants national publisher rights to local Site managers.
-- The five-question objective quiz editor prepares a **local, unpublished
-  authoring handoff** while canonical assessment write/review permission is
-  not yet available. Do not claim that quiz forms were persisted or published.
+- The five-question objective quiz editor now uses the scoped canonical
+  **assessment draft writer**, storing the real definition, item bank,
+  versioned questions, form and encrypted keys without a parallel quiz
+  database. Confirm the saved version is visible after refreshing and that
+  no correct answers, raw keys or other publisher's drafts are returned.
+- **Draft is not publication**: `assessment_draft_author` has only two
+  restricted stored-function EXECUTE grants and no arbitrary SELECT/INSERT,
+  answer-key reads, review, publishing, administration or award access.
+  Publication requires separately governed canonical item, assessment and
+  form review decisions under the existing release triggers.
 - The five-question survey editor saves a real **canonical survey draft** only
   through the existing restricted survey-draft command. Independent approval,
   campaign creation and per-person invitations are still required.
