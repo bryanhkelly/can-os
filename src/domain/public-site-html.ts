@@ -173,7 +173,7 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     ...(kinds.program||contentOn("/programs")?["/programs"] as const:[]),
     ...(kinds.course||contentOn("/courses")?["/courses"] as const:[]),
     ...(kinds.class||contentOn("/classes")?["/classes"] as const:[]),
-    ...(page.offerings.length||contentOn("/student-life")?["/student-life"] as const:[]),
+    ...(page.offerings.length||kinds.program||contentOn("/student-life")?["/student-life"] as const:[]),
   ];
   const extra=[
     ...(tuition?["/tuition"] as const:[]),

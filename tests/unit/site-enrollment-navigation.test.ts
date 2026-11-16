@@ -76,6 +76,7 @@ describe("Enrollment-driven public website navigation and templates",()=>{
         seasonId:"summer-a",title:"Summer Arts",programName:"Youth Program",registrationOpen:true,
       }]})};
     expect(availablePublicSitePaths(site)).toContain("/programs");
+    expect(availablePublicSitePaths(site)).toContain("/student-life");
     expect(availablePublicSitePaths(site)).not.toContain("/courses");
     const html=renderPublicSiteHtml(site,{path:"/programs"});
     expect(html).toContain("Summer Arts");
