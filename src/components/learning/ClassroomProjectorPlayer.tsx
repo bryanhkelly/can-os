@@ -6,11 +6,12 @@ import { ClassroomMediaSurface } from "@/components/learning/ClassroomMediaSurfa
 import { getFacilitatedRoomMediaAccess, recordFacilitatedPlayback } from "@/modules/learning/facilitated-learning.functions";
 import { getClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 
-type Loaded={key:string;src:string;expiresAt:number|null;accessCommandId:string};
+type Loaded={key:string;src:string;expiresAt:number|null;accessCommandId:string;refreshTick:number};
 export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSessionId:string}){
   const player=useRef<HTMLVideoElement>(null);
   const [enabled,setEnabled]=useState(false);
   const [loaded,setLoaded]=useState<Loaded|null>(null);
+  const [refreshTick,setRefreshTick]=useState(0);
   const [error,setError]=useState("");
   const [manualPlay,setManualPlay]=useState(false);
   const recovery=useRef<{key:string;attempts:number}>({key:"",attempts:0});
@@ -25,24 +26,36 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
   const resolved=loaded&&loaded.key===identity?resolveClassVideo(loaded.src,true):null;
   const roomState=command.data?.roomState;
   useEffect(()=>{
+    if(!enabled||!loaded?.expiresAt||roomState!=="live")return;
+    // Refresh the SHORT-LIVED signed R2 URL even when no new play command
+    // arrived. Keep the current video visible until the new URL succeeds.
+    const wait=Math.max(1000,loaded.expiresAt-Date.now());
+    const timer=window.setTimeout(()=>{
+      resumeAt.current=player.current?.currentTime??null;
+      setRefreshTick(tick=>tick+1);
+    },wait);
+    return ()=>window.clearTimeout(timer);
+  },[enabled,loaded?.expiresAt,loaded?.key,roomState]);
+  useEffect(()=>{
     if(!enabled||!current||command.data?.roomState!=="live"||!identity)return;
     const expiredForNewCommand=!!loaded && loaded.expiresAt!==null &&
       Date.now()>=loaded.expiresAt && loaded.accessCommandId!==current.id;
-    if(loaded?.key===identity && !expiredForNewCommand)return;
+    if(loaded?.key===identity && !expiredForNewCommand &&
+       loaded.refreshTick===refreshTick)return;
     let active=true;
     setError("");setManualPlay(false);
     void getFacilitatedRoomMediaAccess({data:{
       facilitatedSessionId,lessonId:current.lessonId,assetVersionId:current.assetVersionId,
     }}).then(result=>{
       if(active)setLoaded({
-        key:identity,src:result.downloadUrl,accessCommandId:current.id,
+        key:identity,src:result.downloadUrl,accessCommandId:current.id,refreshTick,
         expiresAt:result.expiresInSeconds>0?
           Date.now()+Math.max(1,result.expiresInSeconds-5)*1000:null,
       });
     }).catch(()=>{if(active)setError("The selected lesson is unavailable. Recheck approval or rights.");});
     return ()=>{active=false;};
   },[enabled,current,identity,loaded?.key,loaded?.expiresAt,loaded?.accessCommandId,
-    facilitatedSessionId,command.data?.roomState]);
+    facilitatedSessionId,command.data?.roomState,refreshTick]);
   useEffect(()=>{
     const node=player.current;
     if(!enabled||!node||!current||command.data?.roomState!=="live"||!loaded||loaded.key!==identity||resolved?.kind!=="file")return;
