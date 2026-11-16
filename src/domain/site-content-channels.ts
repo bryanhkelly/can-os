@@ -4,7 +4,7 @@ import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { noncreditEnrollmentOrigin } from "./site-noncredit-public";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
 import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch-preferences";
-import { projectSiteEnrollmentOpportunities, type EnrollmentTargetKind } from "./site-enrollment-opportunities";
+import { projectSiteEnrollmentOpportunities } from "./site-enrollment-opportunities";
 
 /** A Site owns placement and presentation. A channel only references a
  * separately authorized data source; the editor cannot write Program facts,

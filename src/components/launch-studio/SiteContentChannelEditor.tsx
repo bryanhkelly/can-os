@@ -199,7 +199,8 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
                 onClick={()=>duplicateBlock(block)}><Copy/> Duplicate</Button>
               <Button variant="outline" onClick={()=>{setBlocks(old=>old.filter(b=>b.id!==block.id));setSaved(false);setPublished(false);}}>
               <Trash2/> Remove block
-            </Button>
+              </Button>
+            </div>
           </div>
         </fieldset>
       })}
