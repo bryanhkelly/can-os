@@ -5,6 +5,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import { buildSiteClassMeetings, displaySiteClassTime, siteWallWeek, type LocalMeeting } from "@/domain/class-session-local-time";
 import { scheduleNativeClassSessions, openNativeClassSession, revokeNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
 import { NativeClassroomHostPanel } from "@/components/learning/NativeClassroomHostPanel";
+import { NativeClassSessionAgenda } from "@/components/learning/NativeClassSessionAgenda";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
 type ClassWorkspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
@@ -33,6 +34,7 @@ export function NativeClassSessionsPanel({
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const [revoking,setRevoking]=useState<string|null>(null);
+  const [agendaSession,setAgendaSession]=useState<string|null>(null);
   const [revocationReason,setRevocationReason]=useState("");
   const activeSession=workspace.sessions.find(session=>
     session.id===workspace.selectedSessionId &&
@@ -150,6 +152,14 @@ export function NativeClassSessionsPanel({
               session.state==="scheduled"?"Scheduled":
               session.state==="started"?"Started":"Cancelled"}
           </p>
+          <Button type="button" variant="outline" size="sm" className="mt-2"
+            onClick={()=>setAgendaSession(current=>current===session.id?null:session.id)}>
+            {agendaSession===session.id?"Hide study plan":"View study plan"}
+          </Button>
+          {agendaSession===session.id&&
+            <NativeClassSessionAgenda key={session.id}
+              classId={workspace.classId} classSessionId={session.id}
+              canEdit={canSchedule&&session.isMySession&&session.state==="scheduled"}/>}
         </div>
         {canRevoke&&session.roomId&&session.roomState==="live"&&
           <div className="space-y-2">
@@ -186,7 +196,9 @@ export function NativeClassSessionsPanel({
         </div>}
       </li>)}
     </ol>:<p className="mt-4 text-sm text-muted-foreground">
-      No dated Sessions are scheduled for this Class.
+      {workspace.deliveryMode==="self_paced"
+        ?"This Class is self-paced. Open Lessons to study and practice in your own Course Attempt."
+        :"No dated Sessions are scheduled for this Class."}
     </p>}
     {opened&&<div className="mt-4 border border-border bg-muted/30 p-4">
       <p className="text-sm font-semibold">Classroom started</p>
