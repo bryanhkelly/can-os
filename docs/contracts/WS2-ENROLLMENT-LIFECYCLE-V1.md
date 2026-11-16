@@ -49,6 +49,11 @@ rechecks the same policy. The composer exposes only operational choices.
 | Completed | repeat | **Denied** without separately published/approved repeat policy | Never restart old attempt | N/A |
 | Completed/Withdrawn/Cancelled | conflicting transition | **Denied** | Preserved | None |
 
+Both learner withdrawal and exact-Site registrar cancellation require a
+verified-adult Class participant. Youth or unknown-age Class exits are
+deliberately denied rather than bypassing the independent guardian/school
+authorization model.
+
 The original `class_enrollments` row is never resurrected. Repeated same
 terminal command returns `alreadyClosed=true`, makes no second event and
 does not release capacity again. Repeating a pending learner withdrawal,
@@ -113,6 +118,12 @@ with `aggregateType=class_enrollment`,
   `reason` (fixed policy code), `capacityReleased=true`,
   `courseAttemptIdsWithdrawn` (all linked active Course Attempt IDs,
   empty for pending cancellation), and ISO-8601 `occurredAt`.
+  The same timestamp is written to the transactional canonical
+  `domain_events.occurred_at` and `audit_events.occurred_at`; WS6
+  should use the domain event ID for deduplication and the event-row
+  timestamp for in-period transition metrics. Historical in-period
+  status snapshots are **not** yet fully reconstructable without all
+  initial/enrollment/WS3 completion events.
 
 WS6 must count only *distinct authoritative participation identities*
 with domain-specific transitions, never count the audit and domain event as
