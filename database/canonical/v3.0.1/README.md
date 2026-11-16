@@ -450,6 +450,55 @@ runtime database are aligned for these tables, but credential feature flags
 remain disabled until restricted DB grants and role-based acceptance tests pass.
 See `verify-achievement-credentials.sql` for the reusable, read-only checks.
 
+### Optional canonical Course knowledge-check draft writer (not installed by default)
+
+The publisher Course Activities page uses the existing canonical assessment
+definition, version, form, item and encrypted answer-key schema. It does not
+create a new quiz or survey response ledger.
+
+On an approved **disposable QA database only**, a trusted administrator may
+apply the optional security-function patch. This does not install native
+Class tables, grant a publisher any learner records, publish assessments or
+authorize assessments for a local Site:
+
+```sh
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/patch-canonical-assessment-draft-authoring.sql
+
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v organization_id=YOUR_ACTIVE_PUBLISHER_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_NOINHERIT_LOGIN \
+  -f database/canonical/v3.0.1/provision-canonical-assessment-draft-role.sql
+```
+
+The role is named `can_v30_assessment_draft_author_<organization-uuid-without-dashes>`
+and receives only EXECUTE on the canonical write and metadata readback
+functions, plus the organization-purpose binding verifier. It does not
+receive direct canonical assessment table DML or plaintext answer-key access.
+The stored function rechecks the bound DB role, active verified Person grant,
+current publisher Course identity, complete quiz configuration and
+in-transaction audit events.
+
+Enable `CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED=true` and a **server-only**
+`CAN_NONCREDIT_ASSESSMENT_KEY_HEX` (64 hex chars) on that isolated QA
+process, never in browsers, source, or build output. Default remains OFF.
+
+Use `CAN_CANONICAL_ASSESSMENT_DRAFT_PREFLIGHT=1` with
+`CAN_CANONICAL_ASSESSMENT_QA_ORGANIZATION_ID` and the QA `DATABASE_URL`
+before attempting writes:
+
+```sh
+npm run db:canonical:objective-draft:preflight
+npm run test:classes:unit
+npm run typecheck
+```
+
+This patch is **not** the retired third Unified Class activity migration.
+The original Class change remains two ordered SQL patches. Assessment
+item/form/version **publication still requires independent canonical
+reviews** and separate authorized release actions. See
+`docs/acceptance/canonical-objective-draft-authoring.md`.
+
 ### Optional survey draft writer (not installed by default)
 
 The temporary Capability Lab survey draft page is guarded by
