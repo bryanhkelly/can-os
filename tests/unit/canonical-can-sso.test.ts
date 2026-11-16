@@ -27,7 +27,7 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(canResolveCanSiteStaff(staff)).toBe(true);
     expect(canResolveCanSiteStaff({ ...staff, role: "registrar" })).toBe(true);
     expect(canResolveCanSiteStaff({
-      ...staff, sessionAccountId: staff.accountId,
+      ...staff, capabilities: new Set<string>(),
     })).toBe(true);
   });
 
@@ -43,7 +43,7 @@ describe("one CAN login for authorized canonical Site staff", () => {
       { ...staff, scope: { organizationIds: [], siteIds: ["school-site"] } },
       { ...staff, scope: { organizationIds: ["school-org"], siteIds: ["other-site"] } },
       { ...staff, scope: { organizationIds: ["school-org","other-org"], siteIds: ["school-site"] } },
-      { ...staff, capabilities: new Set<string>() },
+      { ...staff, sessionAccountId: staff.accountId },
     ]) {
       expect(canResolveCanSiteStaff(denied)).toBe(false);
     }
@@ -92,6 +92,10 @@ describe("one CAN login for authorized canonical Site staff", () => {
     });
     expect(projected.actorPersonId).toBe("native-person");
     expect(projected.capabilities.has("noncredit.assessment.provision")).toBe(true);
+    expect(projected.capabilities.has("noncredit.enrollment.read")).toBe(true);
+    expect(projected.capabilities.has("noncredit.enrollment.manage")).toBe(true);
+    expect(projected.capabilities.has("credential.preview")).toBe(true);
+    expect(projected.capabilities.has("credential.issue")).toBe(false);
     expect(projected.capabilities.has("learning.participate")).toBe(false);
     expect(projected.capabilities.has("blueprint.review")).toBe(false);
   });
@@ -101,17 +105,26 @@ describe("one CAN login for authorized canonical Site staff", () => {
     const bridge = source("src/modules/identity/canonical-can-staff-bridge.server.ts");
     expect(auth).toContain("accessSessionCookie");
     expect(auth).toContain("getCommandContext(request)");
-    expect(auth).toContain("resolveCanonicalSiteStaffFromCan(actor)");
+    expect(auth).toContain("resolveCanonicalSiteStaffFromCan(actor, request)");
     expect(auth.indexOf("getCommandContext(request)"))
       .toBeLessThan(auth.lastIndexOf("getCanonicalSessionRow(request)"));
-    expect(bridge).toContain("accessAccountCanonicalPrincipals");
-    expect(bridge).toContain("site_canonical_identity_links");
-    expect(bridge).toContain("status = 'approved'");
-    expect(bridge).toContain('confirmed_at IS NOT NULL AND reviewed_at IS NOT NULL');
-    expect(bridge).toContain("canonicalAccountGrants.revokedAt");
-    expect(bridge).toContain("canonicalAccounts.disabledAt");
-    expect(bridge).toContain("siteOrganizationRoles.validThrough");
-    expect(bridge).toContain("unique canonical Person ownership");
+    const restricted = source(
+      "database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql",
+    );
+    expect(bridge).toContain("CAN_CANONICAL_AUTH_DATABASE_URL");
+    expect(bridge).toContain("SET LOCAL ROLE");
+    expect(bridge).toContain("v301_can_staff_session_context($1::text)");
+    expect(bridge).not.toContain('from(accessAccountCanonicalPrincipals)');
+    expect(bridge).not.toContain('from(canonicalAccountGrants)');
+    expect(restricted).toContain("public.access_account_canonical_principals");
+    expect(restricted).toContain("public.site_canonical_identity_links");
+    expect(restricted).toContain("site_link.status = 'approved'");
+    expect(restricted).toContain("site_link.confirmed_at IS NOT NULL");
+    expect(restricted).toContain("native_grant.revoked_at IS NULL");
+    expect(restricted).toContain("native_account.disabled_at IS NULL");
+    expect(restricted).toContain("operator_role.valid_through");
+    expect(restricted).toContain("SECURITY DEFINER");
+    expect(restricted).toContain("REVOKE ALL ON FUNCTION");
     expect(bridge).not.toContain("email === canonical");
     expect(bridge).not.toContain("issueNativeLearnerSession");
     expect(bridge).not.toContain("insert(canonicalAccountGrants)");
