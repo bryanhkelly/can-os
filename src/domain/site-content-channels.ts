@@ -4,6 +4,7 @@ import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { noncreditEnrollmentOrigin } from "./site-noncredit-public";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
 import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch-preferences";
+import { projectSiteEnrollmentOpportunities, type EnrollmentTargetKind } from "./site-enrollment-opportunities";
 
 /** A Site owns placement and presentation. A channel only references a
  * separately authorized data source; the editor cannot write Program facts,
@@ -11,7 +12,7 @@ import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch
 export const siteContentChannelIds = [
   "learning.interests", "learning.academics",
   "learning.enrichment", "learning.noncredit",
-  "site.setup", "site.network", "learning.classes",
+  "site.setup", "site.network", "learning.classes", "learning.opportunities",
 ] as const;
 export type SiteContentChannelId = typeof siteContentChannelIds[number];
 
@@ -25,6 +26,11 @@ export const siteContentBlockSchema = z.object({
   channel: z.enum(siteContentChannelIds),
   placement: z.enum(["learning", "community", "closing"]),
   layout: z.enum(["cards", "list", "featured"]),
+  /** Optional means legacy V1/V2 blocks remain valid and default to home. */
+  page: z.enum(["/", "/programs", "/courses", "/classes", "/academics", "/student-life"]).optional(),
+  targetKinds: z.array(z.enum(["school", "program", "course", "class"])).max(4).optional(),
+  sort: z.enum(["source", "title", "upcoming"]).optional(),
+  limit: z.number().int().min(1).max(40).optional(),
   enabled: z.boolean(),
   eyebrow: editorial(64),
   title: editorial(120),
@@ -37,13 +43,11 @@ export const siteContentChannelConfigSchema = z.object({
   blocks: z.array(siteContentBlockSchema).max(12)
     .superRefine((blocks, ctx) => {
       const seenIds = new Set<string>();
-      const seenChannels = new Set<string>();
       blocks.forEach((block, index) => {
-        if (seenIds.has(block.id) || seenChannels.has(block.channel))
+        if (seenIds.has(block.id))
           ctx.addIssue({code: "custom", path: [index],
-            message: "A website block ID and data channel may only be used once"});
+            message: "Each website block needs a unique ID"});
         seenIds.add(block.id);
-        seenChannels.add(block.channel);
       });
     }),
 }).strict();
@@ -77,6 +81,11 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
     placement: "learning", layout: "cards", enabled: true,
     eyebrow: "Classroom experiences", title: "Upcoming learning Classes",
     description: "Publicly published Classes at this Site. Enrollment is managed separately.",
+  }, {
+    id: "enrollment-opportunities", channel: "learning.opportunities",
+    placement: "learning", layout: "cards", enabled: false,
+    eyebrow: "Enrollment & discovery", title: "Find your next learning opportunity",
+    description: "Approved schools, Programs, Courses and Classes with their authorized next step.",
   }, {
     id: "eligible-training", channel: "learning.noncredit",
     placement: "learning", layout: "cards", enabled: true,
@@ -149,6 +158,12 @@ export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
     defaultTitle: "Upcoming learning Classes", defaultEyebrow: "Classroom experiences",
     defaultDescription: "Publicly published Classes at this Site. Registration terms are governed separately.",
   },
+  "learning.opportunities": {
+    label: "Enrollment opportunities", privateOnly: false,
+    description: "Unified approved School, Program, Course and Class discovery. Enrollment permissions come from each owning service.",
+    defaultTitle: "Find your next learning opportunity", defaultEyebrow: "Enrollment & discovery",
+    defaultDescription: "Explore authorized Schools, Programs, Courses and Classes.",
+  },
   "learning.noncredit": {
     label: "Eligible noncredit training", privateOnly: false,
     description: "Pulls separately approved, currently enrollable Site training releases.",
@@ -170,6 +185,7 @@ const interestCopy: Record<(typeof siteLaunchInterestIds)[number], {title: strin
 
 export type SiteContentItem = {
   id: string; title: string; description: string; label: string;
+  startsAt?: string | null;
   link?: {href: string; label: string};
 };
 export type SiteContentBlockProjection = SiteContentBlock & {items: SiteContentItem[]};
@@ -295,6 +311,20 @@ export function resolveSiteContentBlocks(
         });
         break;
       }
+      case "learning.opportunities":
+        items = projectSiteEnrollmentOpportunities(feeds)
+          .filter(item=>!block.targetKinds?.length || block.targetKinds.includes(item.kind))
+          .map(item=>({
+            id:item.id,title:item.title,description:item.description,
+            startsAt:item.startsAt,
+            label:item.kind.charAt(0).toUpperCase()+item.kind.slice(1)+" · "+
+              (item.status==="apply"?"Applications open":
+                item.status==="register"?"Enrollment available":
+                item.status==="waitlist"?"Waitlist available":
+                item.status==="closed"?"Registration unavailable":"Explore"),
+            ...(feeds.mode==="public" && item.action ? {link:item.action}:{}),
+          }));
+        break;
       case "learning.noncredit":
         items = (feeds.noncredit ?? []).map(item => ({
           id: item.releaseId, title: item.title, description: item.siteName,
@@ -308,6 +338,13 @@ export function resolveSiteContentBlocks(
         }));
         break;
     }
+    if (block.sort==="title") items.sort((a,b)=>a.title.localeCompare(b.title));
+    if (block.sort==="upcoming") items.sort((a,b)=>{
+      const first=a.startsAt ? Date.parse(a.startsAt) : Number.POSITIVE_INFINITY;
+      const second=b.startsAt ? Date.parse(b.startsAt) : Number.POSITIVE_INFINITY;
+      return first-second || a.title.localeCompare(b.title);
+    });
+    if (block.limit) items=items.slice(0,block.limit);
     return items.length ? [{...block, items}] : [];
   });
 }
