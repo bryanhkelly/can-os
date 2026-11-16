@@ -23,11 +23,12 @@ type Method=ClassOfferingTerms["enrollmentMethods"][number];
 type CreditMode=ClassOfferingTerms["allowedCreditModes"][number];
 const methodOptions: {value:Method;label:string}[]=[
   {value:"self",label:"Self-enrollment"},{value:"assignment",label:"Assignment"},
-  {value:"invitation",label:"Invitation"},{value:"approval",label:"Approval"},
+  // Invitation and approval become selectable only after WS2 verified commands.
 ];
 const creditOptions: {value:CreditMode;label:string}[]=[
   {value:"not_applicable",label:"No academic credit"},
-  {value:"audit",label:"Audit"},{value:"for_credit",label:"For credit (eligibility required)"},
+  {value:"audit",label:"Audit"},
+  // For-credit participation needs institutional eligibility and issuer approval.
 ];
 const deliveryOptions=["self_paced","scheduled","facilitated","hybrid"] as const;
 function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:string;courseVersionId:string}){
@@ -89,7 +90,7 @@ function NativeClasses(){
     (!recipeOfferingVersionId||row.offeringVersionId===recipeOfferingVersionId) &&
     (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
   const rolloutReadiness=recipePlan
-    ?assessLocalRollout(recipePlan,options.data??[],rolloutSiteId||null):[];
+    ?assessLocalRollout(recipePlan,optionsData,rolloutSiteId||null):[];
   const rolloutSiteOptions=Array.from(new Map(
     optionsData.flatMap(row=>row.siteOptions.map(site=>[site.id,site] as const))
   ).values()).sort((a,b)=>a.name.localeCompare(b.name));
