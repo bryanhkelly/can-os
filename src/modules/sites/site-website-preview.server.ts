@@ -8,6 +8,8 @@ import { sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
+import { siteContentChannelConfigSchema, defaultSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
 import { siteInformationSchema } from "@/domain/site-setup-configuration";
@@ -78,11 +80,20 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // information projection. Fetch only after independently approved data
   // is assembled; the optional read fails closed without breaking preview.
   const noncreditReleases = host ? await readOptionalSiteNoncreditReleases(site.id) : [];
+  const parsedContentChannels = siteContentChannelConfigSchema.safeParse(siteConfiguration?.metadata?.websiteContentChannels);
+  const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
+  const contentBlocks = resolveSiteContentBlocks(
+    parsedContentChannels.success ? parsedContentChannels.data : defaultSiteContentChannelConfig, {
+      mode: "private", preferences: preferences.success ? preferences.data : null,
+      academicPrograms: authorizedPrograms, enrichment: offerings,
+      noncredit: noncreditReleases,
+      enrollmentOrigin: noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
+    });
   const previewPage = host ? {
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
-    parentInformation, media,
+    parentInformation, media, contentBlocks,
     ...(noncreditReleases.length ? {
       noncreditReleases,
       enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
