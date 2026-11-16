@@ -148,6 +148,7 @@ CREATE TABLE IF NOT EXISTS education_v30.class_staff_assignments (
  class_id uuid NOT NULL REFERENCES education_v30.classes(id),
  person_id uuid NOT NULL REFERENCES education_v30.persons(id),
  role_code text NOT NULL CHECK(role_code IN ('teacher','facilitator')),
+ attendance_authorized boolean NOT NULL DEFAULT false,
  state text NOT NULL DEFAULT 'approved' CHECK(state IN ('approved','suspended','ended')),
  begins_at timestamptz NOT NULL DEFAULT now(),
  ends_at timestamptz,
@@ -169,10 +170,10 @@ BEGIN
  IF TG_OP='DELETE' THEN
    RAISE EXCEPTION 'Class staff assignment history must be preserved' USING ERRCODE='23514';
  END IF;
- IF ROW(OLD.class_id,OLD.person_id,OLD.role_code,OLD.begins_at,
+ IF ROW(OLD.class_id,OLD.person_id,OLD.role_code,OLD.attendance_authorized,OLD.begins_at,
         OLD.assigned_by_person_id,OLD.created_at)
     IS DISTINCT FROM
-    ROW(NEW.class_id,NEW.person_id,NEW.role_code,NEW.begins_at,
+    ROW(NEW.class_id,NEW.person_id,NEW.role_code,NEW.attendance_authorized,NEW.begins_at,
         NEW.assigned_by_person_id,NEW.created_at) THEN
    RAISE EXCEPTION 'Class staff authority is immutable; end and reassign' USING ERRCODE='23514';
  END IF;
