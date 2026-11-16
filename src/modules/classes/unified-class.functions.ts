@@ -244,7 +244,7 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
   .handler(async()=>{
     requireClassFeature();
     const operator=await requireClassOperator();
-    return db.select({
+    return db.selectDistinctOn([canonicalClasses.id],{
       classId:canonicalClasses.id,title:canonicalClasses.title,
       capacity:canonicalClasses.capacity,
       courseVersionId:canonicalClasses.courseVersionId,
@@ -268,7 +268,7 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
           operator.siteIds.length?inArray(canonicalClasses.siteId,operator.siteIds):undefined,
           and(isNull(canonicalClasses.siteId),eq(canonicalClasses.createdByPersonId,operator.actor.actorPersonId!)),
         ),
-      )).orderBy(asc(canonicalClasses.createdAt)).limit(100);
+      )).orderBy(asc(canonicalClasses.id),desc(canonicalClassOfferingVersions.versionNo)).limit(100);
   });
 
 
