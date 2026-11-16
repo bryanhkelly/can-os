@@ -81,6 +81,34 @@ CREATE TABLE IF NOT EXISTS education_v30_secure.class_activity_submission_answer
  recorded_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- A Class Enrollment may pin only a currently active Class and exactly the
+-- same immutable Course version. Preserve this provenance even for owner-
+-- backed SQL clients or a future narrowly granted application role.
+CREATE OR REPLACE FUNCTION education_v30.class_activity_pin_source_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+DECLARE class_course uuid; published_course uuid; class_state text; enrollment_state text;
+BEGIN
+ SELECT c.course_version_id,c.state,e.status
+   INTO class_course,class_state,enrollment_state
+   FROM education_v30.class_enrollments e
+   JOIN education_v30.classes c ON c.id=e.class_id
+   WHERE e.id=NEW.class_enrollment_id;
+ SELECT course_version_id INTO published_course
+   FROM education_v30.course_activity_sets WHERE id=NEW.activity_set_id;
+ IF class_course IS NULL OR published_course IS NULL OR
+    class_course<>published_course OR class_state<>'active' OR
+    enrollment_state<>'active' THEN
+   RAISE EXCEPTION 'Course activity pin must match an active Class Enrollment'
+     USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS class_activity_pin_source_trg
+ ON education_v30.class_activity_enrollment_pins;
+CREATE TRIGGER class_activity_pin_source_trg
+ BEFORE INSERT ON education_v30.class_activity_enrollment_pins
+ FOR EACH ROW EXECUTE FUNCTION education_v30.class_activity_pin_source_guard();
+
 CREATE OR REPLACE FUNCTION education_v30.course_activity_set_immutable_guard()
 RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
