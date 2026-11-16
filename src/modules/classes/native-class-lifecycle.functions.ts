@@ -88,8 +88,10 @@ async function exitNativeClass(command:ExitRequest){
         throw new AuthorizationError("current canonical learner session");
       }
       const grant=session.rows[0] as Record<string,unknown>;
+      if(actor.scope.organizationIds?.length!==1)
+        throw new AuthorizationError("one verified learner home Organization");
       assertNativeClassLearnerSessionForExit(
-        grant,actor.actorPersonId,cls.operatingOrganizationId,
+        grant,actor.actorPersonId,actor.scope.organizationIds[0],
       );
     }
     const [enrollment]=await tx.select().from(canonicalClassEnrollments)
