@@ -8,6 +8,7 @@ import {
 } from "@/modules/classes/unified-class.functions";
 import { getNativeOfferingVersionImpact } from "@/modules/programs/publisher-version-impact.functions";
 import { localClassFields, publisherOwnedFields } from "@/domain/publisher-class-variation";
+import { projectedRolloutStages } from "@/domain/program-rollout-lifecycle";
 
 /**
  * One operator-facing administrative entry point. Published product authority
@@ -60,6 +61,17 @@ function ProgramOperations(){
   const classesAtVersion=classVersions.reduce((total,row)=>total+row.classCount,0);
   const activeAtVersion=classVersions.filter(row=>row.state==="active")
     .reduce((total,row)=>total+row.classCount,0);
+  const publishedAtVersion=(impact.data?.publishedClassOfferings??[])
+    .filter(row=>row.offeringVersionId===selected?.first.offeringVersionId)
+    .reduce((total,row)=>total+row.classCount,0);
+  const rolloutStages=projectedRolloutStages({
+    publisherPublished:!!selected,
+    adoptionApproved:!!selected,
+    siteAuthorized:!!selected?.first.siteOptions.length,
+    localClassCount:classesAtVersion,
+    activeClassCount:activeAtVersion,
+    publishedClassOfferingCount:publishedAtVersion,
+  });
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Publisher and Program Operations"
     title="Program operations"
     subtitle="Follow the approved publisher product from immutable Course versions to each authorized local Class. Independent operators do not need a network affiliation."
@@ -132,17 +144,14 @@ function ProgramOperations(){
         Local Deployment: {selected.first.deploymentName}. Adopted publisher Offering v{selected.first.offeringVersionNo}.
         A new publisher release does not upgrade active Classes automatically.
       </p>
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        {[
-          ["Publisher","Published version"],
-          ["Operator","Adoption approved"],
-          ["Site","Delivery authorized"],
-          ["Local Class",activeAtVersion?"Active delivery":classesAtVersion?"Draft or inactive":"Not yet launched"],
-        ].map(([label,detail])=><div key={label} className="border border-border bg-muted/20 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-          <p className="mt-1 text-sm font-semibold">{detail}</p>
+      {impact.data&&<div className="mt-4 grid gap-3 md:grid-cols-3">
+        {rolloutStages.map(stage=><div key={stage.key} className="border border-border bg-muted/20 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {stage.complete?"Verified stage":"Not yet verified"}
+          </p>
+          <p className="mt-1 text-sm font-semibold">{stage.label}</p>
         </div>)}
-      </div>
+      </div>}
       <p className="mt-2 text-xs text-muted-foreground">
         These milestones are derived from current canonical records. They are not a replacement
         for durable publisher approvals or an authoritative rollout event ledger.
@@ -163,7 +172,8 @@ function ProgramOperations(){
         <p className="mt-2 text-sm text-muted-foreground">
           Across the Sites currently authorized to this operator, {classesAtVersion} Class(es)
           reference this pinned version; {activeAtVersion} are active.
-          The full Class count comes from the server, not this page's limited Class list.
+          {publishedAtVersion} Class(es) have a published optional registration Offering.
+          The full Class counts come from the server, not this page's limited Class list.
         </p>
         {impact.data.publisherVersionsTruncated&&<p className="mt-2 text-xs text-muted-foreground">
           More than 100 publisher versions exist. The version history shown here is limited.
