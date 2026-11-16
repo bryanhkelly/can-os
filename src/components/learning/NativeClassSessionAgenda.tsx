@@ -21,10 +21,10 @@ const selectClass="min-h-10 w-full border border-border bg-background px-3 text-
  * Course Attempt or exact facilitator authority for every read and write.
  */
 export function NativeClassSessionAgenda({
-  classId,classSessionId,view,canEdit=false,
+  classId,classSessionId,view,canEdit=false,onPublished,
 }:{
   classId:string;classSessionId:string;view:"learn"|"teach"|"manage";
-  canEdit?:boolean;
+  canEdit?:boolean;onPublished?:()=>Promise<unknown>;
 }){
   const agenda=useQuery({
     queryKey:["native-class-session-agenda",classId,classSessionId],
@@ -77,6 +77,7 @@ export function NativeClassSessionAgenda({
         classId,classSessionId,requestId,expectedRevisionNo:data.revisionNo,items:draft,
       }});
       await agenda.refetch();
+      await onPublished?.();
       setRequestId(crypto.randomUUID());setEditing(false);
       setNotice("Session agenda revision "+saved.revisionNo+" saved. This does not issue assignments, attendance or completion.");
     }catch(e){
