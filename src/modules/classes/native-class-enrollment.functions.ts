@@ -82,12 +82,22 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
         // Previously published, unsupported methods remain invisible until
         // fully authorized invitation/approval commands are delivered.
         assertOperationalClassOfferingTerms(row);
-        const authority=await db.transaction(tx=>currentClassAuthority(tx,row.classId,now));
-        // Do not advertise a larger publication limit than the underlying
-        // Class can actually seat across assignment and self-registration.
+        const {authority,openSeats}=await db.transaction(async tx=>{
+          const authority=await currentClassAuthority(tx,row.classId,now);
+          const [occupancy]=await tx.select({total:count()})
+            .from(canonicalClassEnrollments).where(and(
+              eq(canonicalClassEnrollments.classId,row.classId),
+              inArray(canonicalClassEnrollments.status,["pending","active"]),
+            ));
+          return {authority,openSeats:occupancy?.total??0};
+        });
+        // All enrollment methods share one occupied-seat count. The optional
+        // publication limit narrows only self-registration, not assignment.
         const limits=[row.capacity,authority.classCapacity]
           .filter((n):n is number=>n!==null);
-        allowed.push({...row,capacity:limits.length?Math.min(...limits):null});
+        const capacity=limits.length?Math.min(...limits):null;
+        allowed.push({...row,capacity,
+          remainingSeats:capacity===null?null:Math.max(0,capacity-openSeats)});
       }catch(e){if(!(e instanceof AuthorizationError))throw e;}
     }
     return allowed;
@@ -144,9 +154,17 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
         try{
           assertOperationalClassOfferingTerms(row);
           const authority=await currentClassAuthority(tx,row.classId,now);
+          const [occupancy]=await tx.select({total:count()})
+            .from(canonicalClassEnrollments).where(and(
+              eq(canonicalClassEnrollments.classId,row.classId),
+              inArray(canonicalClassEnrollments.status,["pending","active"]),
+            ));
           const limits=[row.capacity,authority.classCapacity]
             .filter((n):n is number=>n!==null);
-          items.push({...row,capacity:limits.length?Math.min(...limits):null});
+          const capacity=limits.length?Math.min(...limits):null;
+          items.push({...row,capacity,
+            remainingSeats:capacity===null?null:
+              Math.max(0,capacity-(occupancy?.total??0))});
         }catch(error){
           if(!(error instanceof AuthorizationError))throw error;
         }
