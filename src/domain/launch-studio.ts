@@ -2,6 +2,16 @@ import { z } from "zod";
 import { siteProgramSelectionSchema, optionalSearchString } from "@/lib/route-search";
 
 export const schoolLaunchSteps = ["welcome", "school", "academics", "website", "families", "readiness", "next"] as const;
+export const siteFirstLaunchSteps = ["site", "network", "interests", "preview"] as const;
+export type SiteFirstLaunchStep = typeof siteFirstLaunchSteps[number];
+export const siteFirstLaunchSearch = z.object({
+  siteId: z.string().optional(),
+  step: z.enum(siteFirstLaunchSteps).catch("site").optional(),
+});
+/** Preserve existing Program editing; new, unsaved setup has one Site-first entry. */
+export function shouldOpenSiteFirstLaunch(search: { programId?: string; step?: typeof schoolLaunchSteps[number] }) {
+  return !search.programId && (!search.step || search.step === "welcome" || search.step === "school");
+}
 export const schoolLaunchSearch = siteProgramSelectionSchema.extend({
   step: z.enum(schoolLaunchSteps).catch("welcome").optional(),
 });

@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import type { ReactNode } from "react";
 import { readFileSync, existsSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { isLaunchStudioPath, launchRequirementProgress, schoolLaunchSearch, familyLaunchSearch } from "@/domain/launch-studio";
+import { isLaunchStudioPath, launchRequirementProgress, schoolLaunchSearch, familyLaunchSearch, siteFirstLaunchSearch, shouldOpenSiteFirstLaunch } from "@/domain/launch-studio";
 import { LaunchStudioChrome, LaunchStudioShell } from "@/components/launch-studio/LaunchStudioShell";
 import { launchDraftValueSchema, saveLaunchDraftSchema, assertLaunchDraftAudience } from "@/domain/launch-draft";
 import { resolveAccessContext } from "@/domain/access-context";
@@ -25,7 +25,7 @@ describe("canonical standalone Launch Studio", () => {
   it("removes old route modules rather than redirecting to them", () => {
     for (const file of ["operations.launch.tsx", "operations.launch.index.tsx", "operations.launch.$programId.tsx", "guardian.apply.tsx"])
       expect(existsSync(new URL(`../../src/routes/${file}`, import.meta.url))).toBe(false);
-    expect(source("src/routes/launch.school.tsx")).not.toContain("redirect(");
+    expect(source("src/routes/launch.school.tsx")).toContain('throw redirect({to:"/launch/site"');
     expect(source("src/routes/__root.tsx")).toContain("? <LaunchStudioChrome>");
   });
   it("preserves exact school and application scope while bounding steps", () => {
@@ -37,6 +37,25 @@ describe("canonical standalone Launch Studio", () => {
     const school = source("src/routes/launch.school.tsx");
     expect(school).toContain("staleTime: Infinity");
     expect(school).toContain("loaderDeps: ({ search }) => ({ siteId: search.siteId, programId: search.programId })");
+  });
+  it("routes new school setup to one Site journey without losing active academic work", () => {
+    expect(shouldOpenSiteFirstLaunch({})).toBe(true);
+    expect(shouldOpenSiteFirstLaunch({step:"school"})).toBe(true);
+    expect(shouldOpenSiteFirstLaunch({step:"welcome"})).toBe(true);
+    expect(shouldOpenSiteFirstLaunch({programId:"active"})).toBe(false);
+    expect(shouldOpenSiteFirstLaunch({step:"academics"})).toBe(false);
+    expect(shouldOpenSiteFirstLaunch({step:"readiness"})).toBe(false);
+    expect(siteFirstLaunchSearch.parse({siteId:"exact-site",step:"preview"}))
+      .toEqual({siteId:"exact-site",step:"preview"});
+    expect(siteFirstLaunchSearch.parse({step:"invalid"}).step).toBe("site");
+    const route = source("src/routes/launch.site.tsx");
+    expect(route).toContain("readSiteLaunchPreferences");
+    expect(route).toContain("selectionError");
+    const wizard = source("src/components/launch-studio/SiteFirstLaunch.tsx");
+    expect(wizard).toContain("SiteAffiliationPanel");
+    expect(wizard).toContain('to:"/launch/site"');
+    expect(wizard).not.toContain("networkCode");
+    expect(source("src/routes/launch.hub.school_.new.tsx")).toContain('to:"/launch/site"');
   });
   it("never treats unconfigured requirements or a visited step as completion", () => {
     expect(launchRequirementProgress([])).toBeUndefined();

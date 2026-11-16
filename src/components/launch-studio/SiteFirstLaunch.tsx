@@ -1,7 +1,10 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Check, Globe2, GraduationCap, Monitor, Sparkles, Users } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
+import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
+import { siteFirstLaunchSteps, type SiteFirstLaunchStep } from "@/domain/launch-studio";
+import type { SiteLaunchPreferences } from "@/domain/site-launch-preferences";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -31,18 +34,20 @@ const steps = ["Your Site", "Network", "Program interests", "Website reveal"] as
 
 /** A lightweight, explicitly private preview. No made-up Program or enrollment
  * release is created by choosing interests; publication remains server-owned. */
-export function SiteFirstLaunch({options}:{options:Options}) {
-  const [step,setStep] = useState<Step>(0);
-  const [siteId,setSiteId] = useState("");
+export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",initialPreferences=null,selectionError=null}:{
+  options:Options;selectedSiteId?:string;initialStep?:SiteFirstLaunchStep;
+  initialPreferences?:SiteLaunchPreferences|null;selectionError?:string|null;
+}) {
+  const router=useRouter();
+  const [siteId,setSiteId] = useState(selectedSiteId);
+  const step=(siteId?siteFirstLaunchSteps.indexOf(initialStep):0) as Step;
   const [name,setName] = useState("");
   const [organizationId,setOrganizationId] = useState("");
   const [city,setCity] = useState("");
   const [state,setState] = useState("");
   const [timezone,setTimezone] = useState("");
-  const [delivery,setDelivery] = useState<Delivery>("both");
-  const [networkCode,setNetworkCode] = useState("");
-  const [networkChoice,setNetworkChoice] = useState<"independent"|"code">("independent");
-  const [chosen,setChosen] = useState<string[]>([]);
+  const [delivery,setDelivery] = useState<Delivery>(initialPreferences?.delivery??"both");
+  const [chosen,setChosen] = useState<string[]>(initialPreferences?.interestIds??[]);
   const [error,setError] = useState("");
   const [savingPreferences,setSavingPreferences] = useState(false);
   const [previewKey,setPreviewKey] = useState(0);
@@ -52,6 +57,10 @@ export function SiteFirstLaunch({options}:{options:Options}) {
   const siteCity=known?.planningLocation?.city??city;
   const siteState=known?.planningLocation?.state??state;
 
+  function goTo(next:SiteFirstLaunchStep,nextSiteId=siteId) {
+    void router.navigate({to:"/launch/site",search:{siteId:nextSiteId||undefined,step:next},replace:true})
+      .catch(()=>setError("Your Site remains saved, but navigation failed. Reload this page to resume."));
+  }
   async function saveSite(e:FormEvent) {
     e.preventDefault();
     if(siteMutation.isSubmitting)return;
@@ -60,7 +69,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
       try {
         const preferences=await readSiteLaunchPreferences({data:{siteId}});
         if(preferences){setDelivery(preferences.delivery);setChosen(preferences.interestIds);}
-        setStep(1);
+        goTo("network");
       } catch(cause) {setError(mutationErrorMessage(cause,"Unable to read this Site’s saved launch preferences."));}
       return;
     }
@@ -71,21 +80,29 @@ export function SiteFirstLaunch({options}:{options:Options}) {
       }});
       if(saved.status==="ignored")return;
       setSiteId(saved.value.siteId);
-      setStep(1);
+      goTo("network",saved.value.siteId);
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to establish your Site. Nothing has been published."));}
   }
 
-  const forward=()=>setStep(current=>Math.min(3,current+1) as Step);
+  const forward=()=>goTo(siteFirstLaunchSteps[Math.min(3,step+1)]!);
   async function revealSite(){
     if(!siteId||savingPreferences)return;
     setSavingPreferences(true);setError("");
     try {
       await saveSiteLaunchPreferences({data:{siteId,preferences:{delivery,interestIds:chosen}}});
-      setStep(3);
+      goTo("preview");
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to save program interests. The Site remains private."));}
     finally{setSavingPreferences(false);}
   }
-  const backward=()=>setStep(current=>Math.max(0,current-1) as Step);
+  const backward=()=>goTo(siteFirstLaunchSteps[Math.max(0,step-1)]!);
+  if(selectionError) return <PageFrame width="wide" className="launch-studio-page">
+    <PageHeader eyebrow="Launch Studio" title="Choose an authorized Site"
+      subtitle="Site access is verified against your active account and role."/>
+    <p role="alert" className="mt-6 border border-destructive bg-card p-5 text-sm">{selectionError}</p>
+    <Link to="/launch/site" search={{step:"site"}} className="mt-5 inline-flex min-h-11 items-center gap-2 font-semibold text-primary">
+      Choose another Site <ArrowRight className="size-4"/>
+    </Link>
+  </PageFrame>;
   return <PageFrame width="wide" className="launch-studio-page">
     <PageHeader eyebrow="Launch Studio / Site setup" title="Bring your Site to life."
       subtitle="Establish your Site, choose what you'd like to offer, and see a private website preview before configuring the details." />
@@ -101,7 +118,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
     {step===0&&<form onSubmit={e=>void saveSite(e)} className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
       <section className="space-y-5 border bg-card p-6 sm:p-8">
         <h2 className="font-serif text-3xl">Your Site</h2>
-        <p className="text-sm text-muted-foreground">A Site is the home for your programs. Start with the essentials and add details later.</p>
+        <p className="text-sm text-muted-foreground">A Site is the home for all your programs. Start with the essentials and add details later. Return here without recreating a Site.</p>
         {options.sites.length>0&&<Field label="Continue with an existing Site">
           <Select value={siteId} onChange={e=>{setSiteId(e.target.value);setError("");}}>
             <option value="">Create a new Site</option>{options.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
@@ -136,16 +153,14 @@ export function SiteFirstLaunch({options}:{options:Options}) {
       </aside>
     </form>}
     {step===1&&<section className="mt-6 max-w-4xl border bg-card p-6 sm:p-8">
-      <h2 className="font-serif text-3xl">Are you associated with a network?</h2>
-      <p className="mt-3 text-sm text-muted-foreground">Affiliation is optional. A network invitation is reviewed separately and does not itself grant access to network programs.</p>
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
-        {([{id:"independent",title:"Continue independently",detail:"Explore programs available to your organization."},{id:"code",title:"I have a network code",detail:"Keep your invitation details for later verification."}] as const).map(item=><label key={item.id} className={`cursor-pointer border p-5 ${networkChoice===item.id?"border-primary bg-accent":""}`}>
-          <input type="radio" name="network" className="sr-only" checked={networkChoice===item.id} onChange={()=>setNetworkChoice(item.id)}/><strong className="block text-sm">{item.title}</strong><span className="mt-2 block text-xs text-muted-foreground">{item.detail}</span>
-        </label>)}
+      <h2 className="font-serif text-3xl">Your network, if you have one.</h2>
+      <p className="mt-3 text-sm text-muted-foreground">You can operate independently. To join a network, submit a real Site affiliation request below. Network HQ must review it before any network-specific access becomes available.</p>
+      <SiteAffiliationPanel siteId={siteId}/>
+      <div className="mt-7 flex flex-wrap gap-3">
+        <Button variant="outline" onClick={backward}><ArrowLeft/> Back</Button>
+        <Button onClick={forward}>Continue to programs <ArrowRight/></Button>
       </div>
-      {networkChoice==="code"&&<div className="mt-5"><Field label="Network code (not yet submitted)"><Input maxLength={80} value={networkCode} onChange={e=>setNetworkCode(e.target.value)} placeholder="Enter invitation code"/></Field>
-        <p className="mt-2 text-xs text-muted-foreground">Code verification and association are not enabled in this quick-start. Continue independently of network entitlements until verified.</p></div>}
-      <div className="mt-7 flex gap-3"><Button variant="outline" onClick={backward}><ArrowLeft/> Back</Button><Button onClick={forward}>Continue <ArrowRight/></Button></div>
+      <p className="mt-3 text-xs text-muted-foreground">No network relationship is required. Pending requests never grant membership, content, branding or student data access.</p>
     </section>}
     {step===2&&<section className="mt-6 border bg-card p-6 sm:p-8">
       <h2 className="font-serif text-3xl">What would you like to offer?</h2>
@@ -192,7 +207,7 @@ export function SiteFirstLaunch({options}:{options:Options}) {
           <p className="text-sm text-muted-foreground">{siteCity}{siteCity&&siteState?", ":""}{siteState} · {delivery==="both"?"Physical and digital":delivery==="physical"?"Physical":"Digital"}</p>
           <p className="text-sm text-muted-foreground">{chosen.length} proposed interests selected. Adding real approved Offerings is a separate step.</p>
           <p className="border-l-2 border-warning bg-muted p-4 text-xs">
-            {networkChoice==="independent"?"Independent operation.":networkCode?"Network code entered but not submitted or approved.":"Network affiliation is not verified."} A code does not unlock network-owned programs.
+            Network-specific access requires independently approved Site affiliation. These private plans do not confer membership or program rights.
           </p>
           <hr/>
           <h4 className="font-semibold">What would you like to do next?</h4>

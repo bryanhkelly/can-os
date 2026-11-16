@@ -14,12 +14,13 @@ export function SchoolLaunchHub({ options, siteId, module, statuses, workflow, s
   if (!site) return <PageFrame width="wide"><PageHeader eyebrow="School preparation" title="Choose your school" subtitle="Open the Launch Hub for an authorized school." />
     {siteId ? <p role="alert" className="mt-6 border bg-card p-5">{selectionError ?? "This school is unavailable in your current workspace. Select an authorized school explicitly."}</p> : null}
     <div className="mt-6 grid gap-4 sm:grid-cols-2">{options.sites.map(item => <Link key={item.id} to="/launch/hub/school" search={{siteId:item.id}} className="flex min-h-20 items-center justify-between border bg-card p-5 font-semibold">{item.name}<ArrowRight className="size-4 text-primary" /></Link>)}</div>
-    {options.canCreateSite && <Link to="/launch/hub/school/new" className="mt-6 inline-flex min-h-11 items-center gap-2 text-primary">Create your school profile <ArrowRight className="size-4" /></Link>}
+    {options.canCreateSite && <Link to="/launch/site" search={{step:"site"}} className="mt-6 inline-flex min-h-11 items-center gap-2 text-primary">Establish a new Site <ArrowRight className="size-4" /></Link>}
   </PageFrame>;
   const search = {siteId:site.id};
   const selected = module ? schoolHubModules[module] : null;
   return <PageFrame width="wide" className="launch-studio-page">
     {module && <Link to="/launch/hub/school" search={search} className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4" /> Launch Hub</Link>}
+    {!module && <Link to="/launch/site" search={{siteId:site.id,step:"site"}} className="mb-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary"><ArrowLeft className="size-4"/> Site Launch Studio</Link>}
     <div className="flex flex-wrap items-start justify-between gap-5"><PageHeader eyebrow={module ? "School preparation / Launch module" : "School preparation / Launch Hub"} title={selected?.title ?? "Build your school."} subtitle={selected?.description ?? "Work on these modules in any order. Your saved work stays with your school."} />
       <Link to="/sites/$siteId/profile" params={{siteId:site.id}} className="border bg-card px-5 py-4 text-sm"><strong className="block">{site.name}</strong><span className="mt-1 block text-xs text-muted-foreground">View school profile →</span></Link></div>
     {!module ? <>
