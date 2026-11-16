@@ -165,7 +165,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
 export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
     const candidates=await listReleaseCandidates(provider);
     const published=await db.select({
       id:noncreditSelfEnrollmentReleases.id,
@@ -191,7 +191,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
   .validator((value:unknown)=>noncreditPublishCommand.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     const now=new Date();
     if(new Date(data.closesAt)<=now)
       throw new AuthorizationError("Enrollment closing must be in the future");
@@ -246,7 +246,7 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({releaseId:z.string().uuid()}).strict().parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     return db.transaction(async tx=>{
       const [release]=await tx.select().from(noncreditSelfEnrollmentReleases)
         .where(and(eq(noncreditSelfEnrollmentReleases.id,data.releaseId),
@@ -299,7 +299,7 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
   .validator((v:unknown)=>multiSitePublishInput.parse(v))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     if(new Date(data.closesAt)<=new Date())
       throw new AuthorizationError("future registration closing");
     const ids=[...new Set(data.siteIds)];
