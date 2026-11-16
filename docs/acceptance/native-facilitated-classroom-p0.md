@@ -88,6 +88,48 @@ application origin, never a real school or church roster.
 | End room, renew QR, retry stale question submission | No access to closed room or new evidence |
 | Manager emergency revokes live room after facilitator grant is removed | Exact Site manager may terminate with reason; learner and presenter access stay denied |
 
+## Reusable Course learning activities and resilience
+
+- Publisher authorizes and publishes ONE versioned Course activity set with
+  five quiz questions and five feedback prompts. Both Sites deliver that
+  same Course version without copying content or answer keys.
+- Learner sees ONLY prompt/choice projections. Correct choices are never
+  present in HTML, JSON, public room APIs or network requests.
+- Signed-in learner from Class A may submit quiz and feedback only for their
+  own active Class Enrollment. Class B and withdrawn learners fail closed.
+- Identified feedback requires a separate explicit consent acknowledgement.
+  Consent version and SHA are stored; response bodies stay in the restricted
+  secure schema and are not shared with a facilitator or audience display.
+- Duplicate knowledge check/feedback retries do not create multiple submissions.
+  If publication changes after a learner starts answering, an unpinned request
+  to the old version fails and must be reloaded; submitted learners remain pinned.
+- Completion readiness requires the pinned policy's knowledge threshold,
+  optional feedback and lesson milestones. One explicit learner command
+  records only noncredit outcome evidence, never a Class Award, certificate,
+  grade or government-funding eligibility determination.
+- The hosting Site's IANA timezone governs one-off, weekly and custom
+  dates. Verify spring-forward, fall-back, ambiguous/missing local time,
+  ordering and overlapping-session rejection, including a laptop in
+  a DIFFERENT timezone.
+- Bring a phone offline with a drafted answer. The answer remains editable
+  on the open page; no offline submission or attendance is silently claimed.
+  Reconnection allows retry with the original idempotency key.
+- On an expiring signed R2 URL, the projector refreshes rights even without
+  a new play command. Verify resume position, no uncontrolled replay,
+  explicit failure state, revoked rights and remote command closure.
+- Public Class search pages beyond 100 items, including revoked entries
+  that must be filtered out. Verify no private/unlisted Class leaks and
+  stable results across cursor paging.
+- Manager roster over 100 enrolled people: pages require exact Site
+  operator authorization on EVERY request, never from public endpoints.
+- Import a shared network launch recipe at a second Site. The Site must
+  select its own authorized adoption and hosting location. A tampered
+  template containing operating-organization, Site, participant or
+  credential fields must be rejected.
+- Accessibility: keyboard-only scheduling, speaker display, questions
+  and learner navigation; semantic labels, caption-ready player controls,
+  200% zoom, projector text readability and screen reader status messages.
+
 ## QA and deployment gates
 
 - Run `npm run typecheck`, `npm run test:classes:unit`,
