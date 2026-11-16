@@ -40,6 +40,7 @@ export const canonicalClassOfferingVersions = educationV30.table("class_offering
   opensAt:timestamp("opens_at",{withTimezone:true}),
   closesAt:timestamp("closes_at",{withTimezone:true}),
   capacity:integer("capacity"),
+  allowedCreditModes:text("allowed_credit_modes").array().$type<Array<"for_credit"|"audit"|"not_applicable">>().notNull(),
   consentVersion:text("consent_version"),
   consentText:text("consent_text"),
   createdByPersonId:uuid("created_by_person_id").notNull(),
