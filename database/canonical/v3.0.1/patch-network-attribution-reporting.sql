@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS education_v30.network_memberships (
   member_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
   reporting_unit_id uuid NOT NULL,
   membership_kind text NOT NULL DEFAULT 'affiliate',
+  directory_visible boolean NOT NULL DEFAULT false,
   status text NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','approved','suspended','revoked')),
   valid_from timestamptz NOT NULL,
@@ -174,6 +175,7 @@ CREATE OR REPLACE FUNCTION education_v30.v301_validate_participation_attribution
 RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $attribution_scope$
 DECLARE source_row record;
 DECLARE membership_row record;
+DECLARE lineage_snapshot jsonb;
 BEGIN
   IF NEW.noncredit_registration_id IS NOT NULL THEN
     SELECT r.id,r.site_id,r.registering_organization_id,
@@ -213,9 +215,32 @@ BEGIN
        membership_row.member_organization_id IS DISTINCT FROM NEW.credited_organization_id THEN
       RAISE EXCEPTION 'Network attribution requires an approved effective membership';
     END IF;
-    -- An organization's verified affiliation does not verify a PERSON's membership.
-    -- The verified_member basis additionally requires an independent person-proof
-    -- workflow and is not writable through the present self-registration service.
+    IF NEW.attribution_basis='verified_member' THEN
+      RAISE EXCEPTION 'Verified individual affiliation requires separate person evidence and review';
+    END IF;
+    IF NOT membership_row.directory_visible THEN
+      RAISE EXCEPTION 'Self-reported selection is limited to approved directory-visible affiliates';
+    END IF;
+    WITH RECURSIVE lineage(id,parent_id,depth,visited) AS (
+      SELECT u.id,u.parent_unit_id,0,ARRAY[u.id]
+        FROM network_units u WHERE u.id=membership_row.reporting_unit_id
+      UNION ALL
+      SELECT p.id,p.parent_unit_id,l.depth+1,l.visited||p.id
+        FROM network_units p JOIN lineage l ON p.id=l.parent_id
+       WHERE NOT p.id=ANY(l.visited)
+    )
+    SELECT jsonb_agg(jsonb_build_object('id',id) ORDER BY depth DESC)
+      INTO lineage_snapshot FROM lineage;
+    NEW.relationship_snapshot=jsonb_build_object(
+      'networkOrganizationId',membership_row.network_organization_id,
+      'memberOrganizationId',membership_row.member_organization_id,
+      'networkMembershipId',membership_row.id,
+      'reportingUnitId',membership_row.reporting_unit_id,
+      'reportingPath',COALESCE(lineage_snapshot,'[]'::jsonb),
+      'membershipValidFrom',membership_row.valid_from,
+      'membershipValidThrough',membership_row.valid_through,
+      'basis',NEW.attribution_basis
+    );
   END IF;
   RETURN NEW;
 END $attribution_scope$;
