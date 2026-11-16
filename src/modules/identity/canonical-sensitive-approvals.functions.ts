@@ -11,7 +11,7 @@ import {
   canonicalAccountGrants, canonicalAccounts,
   canonicalSensitiveCapabilityApprovals as approvals,
 } from "@/db/canonical-v301";
-import { assertCANIdentityReviewer } from "@/domain/site-identity-review";
+import { assertCANCredentialIssuerReviewer } from "@/domain/credential-issuer-review";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
@@ -49,7 +49,7 @@ async function requireIndependentInstitutionalReviewer() {
   const [organization]=organizationId?await db.select({
     id:organizations.id,type:organizations.type,
   }).from(organizations).where(eq(organizations.id,organizationId)).limit(1):[];
-  assertCANIdentityReviewer(reviewer,organization);
+  assertCANCredentialIssuerReviewer(reviewer,organization);
   const [account]=await db.select({
     email:accessAccounts.emailNormalized,
     verified:accessAccounts.emailVerifiedAt,
@@ -91,7 +91,7 @@ async function assertCurrentReviewerInTransaction(
       AND account.id=${reviewer.accountId}::uuid
       AND grant_row.id=${reviewer.grantId}::uuid
       AND grant_row.person_id=${reviewer.actorPersonId}::uuid
-      AND grant_row.role='can_network_steward'
+      AND grant_row.role='can_credential_reviewer'
       AND grant_row.active=true
       AND grant_row.site_id IS NULL
       AND organization.type='can_network'
