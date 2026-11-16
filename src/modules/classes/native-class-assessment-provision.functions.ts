@@ -13,6 +13,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { validateClassAuthority } from "@/modules/classes/unified-class.functions";
+import { getCanonicalClassPublisher } from "./native-class-publisher.server";
 
 /** Provider-administered canonical assessment ACCESS for a native Class.
  * This never creates an alternative quiz, assessment result, score or
@@ -64,10 +65,15 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
           isNull(learnerCourseAttempts.enrollmentId),
           eq(learnerCourseAttempts.status,"active"))).limit(1);
       if(!attempt)throw new AuthorizationError("exact native Course Attempt provenance");
+      const publisherOrganizationId=await getCanonicalClassPublisher(tx,{
+        offeringVersionId:cls.offeringVersionId,
+        courseVersionId:cls.courseVersionId,
+      });
       const now=new Date();
       const candidates=await tx.select({
         administration:assessmentFormAdministrations,
         purpose:assessmentDefinitions.purpose,
+        ownerOrganizationId:assessmentDefinitions.ownerOrganizationId,
         versionLifecycle:assessmentVersions.lifecycle,
         versionCourseId:assessmentVersions.courseVersionId,
         formLifecycle:assessmentFormVersions.lifecycle,
@@ -90,6 +96,7 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
         )).limit(51);
       if(candidates.length>50)throw new AuthorizationError("assessment configuration requires review");
       const available=candidates.filter(c=>
+        c.ownerOrganizationId===publisherOrganizationId&&
         c.versionLifecycle==="published"&&c.formLifecycle==="published"&&
         c.versionCourseId===cls.courseVersionId&&!c.formShuffle&&
         ["formative","practice","readiness","mastery"].includes(c.purpose));
