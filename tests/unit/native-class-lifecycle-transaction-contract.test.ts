@@ -33,6 +33,17 @@ describe("WS2 native Class transaction and integration invariants",()=>{
       "await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
   });
 
+  it("revalidates current learner session inside both enrollment transactions",()=>{
+    const verifier=read("src/modules/classes/native-class-learner-session.server.ts");
+    expect(verifier).toContain("v301_canonical_session_context");
+    expect(verifier).toContain("canonicalSessionDigestFromRequest(request)");
+    expect(verifier).toContain("assertNativeClassLearnerSessionForExit(");
+    expect(verifier).toContain("actor.scope.organizationIds[0]");
+    expect(verifier).not.toContain("operatingOrganizationId");
+    expect(self).toContain("await assertCurrentNativeClassLearnerForMutation(tx,request,actor)");
+    expect(exit).toContain("await assertCurrentNativeClassLearnerForMutation(tx,request,actor)");
+  });
+
   it("keeps public seat estimates behind the same current authority",()=>{
     expect(self).toContain("await currentClassAuthority(tx,row.classId,now)");
     expect(self).toContain("remainingSeats:");
