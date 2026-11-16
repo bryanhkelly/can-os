@@ -51,9 +51,14 @@ RLS before enabling any Class server functions.
    can attest present/absent/unknown with the existing append-only evidence
    and no-device correction workflow. Device pairing, responding, verified
    physical presence, course completion and mastery are separate facts.
-10. Facilitator confirms End Session. No further pairing, new activity
-    submissions or playback commands are accepted. Historical evidence is
-    retained under existing policy.
+10. Facilitator confirms End Session. An authorized Site manager can
+    independently use **Emergency revoke room** with an audited reason even
+    if the facilitator's teaching role was revoked. The Class-to-plan link
+    remains immutable, so the room cannot accidentally fall back to generic
+    Course/Site authorization.
+11. No further pairing, new activity submissions or playback commands are
+    accepted after closure. Historical evidence and correction policy remain
+    distinct from the device connection history.
 
 ## Isolation fixture
 
@@ -81,6 +86,7 @@ application origin, never a real school or church roster.
 | Video on R2 signed URL after expiry | Rights rechecked; graceful refresh or explicit error |
 | YouTube/Vimeo embed | Playback/seek limitations explained; no invented synchronization |
 | End room, renew QR, retry stale question submission | No access to closed room or new evidence |
+| Manager emergency revokes live room after facilitator grant is removed | Exact Site manager may terminate with reason; learner and presenter access stay denied |
 
 ## QA and deployment gates
 
