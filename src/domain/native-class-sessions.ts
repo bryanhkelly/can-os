@@ -19,6 +19,7 @@ export function assertNativeClassSessionSeries(
   const seen=new Set<string>();
   const starts:number[]=[];
   const lengths:number[]=[];
+  const ends:number[]=[];
   for(const meeting of meetings){
     if(seen.has(meeting.requestId))
       throw new AuthorizationError("distinct Class Session request identities");
@@ -28,7 +29,10 @@ export function assertNativeClassSessionSeries(
     if(!Number.isFinite(start)||!Number.isFinite(end)||
        end-start<15*60000||end-start>8*3600000)
       throw new AuthorizationError("a Class Session lasts 15 minutes to eight hours");
+    if(starts.length&&start<ends[ends.length-1]!)
+      throw new AuthorizationError("Class Sessions must be ordered and cannot overlap");
     starts.push(start);
+    ends.push(end);
     lengths.push(end-start);
   }
   if(cadence==="weekly"){
