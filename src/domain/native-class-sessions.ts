@@ -45,3 +45,21 @@ export function assertNativeClassSessionSeries(
     }
   }
 }
+
+/** Read-only display classification. Elapsed Sessions are NOT attendance
+ * absences, academic failures or completed learning, and never write status. */
+export function nativeClassSessionDisplayStatus(input: {
+  state:"scheduled"|"started"|"cancelled";
+  roomState:"live"|"ended"|null;
+  endsAt:string;
+  now:Date;
+}):"scheduled"|"live"|"ended"|"cancelled"|"elapsed_unverified"|"started" {
+  if(input.state==="cancelled")return "cancelled";
+  if(input.roomState==="ended")return "ended";
+  if(input.roomState==="live")return "live";
+  if(input.state==="started")return "started";
+  const endsAt=new Date(input.endsAt).getTime();
+  if(Number.isFinite(endsAt)&&Number.isFinite(input.now.getTime())&&
+     endsAt<=input.now.getTime())return "elapsed_unverified";
+  return "scheduled";
+}
