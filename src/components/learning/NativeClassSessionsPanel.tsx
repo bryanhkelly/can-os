@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
-import { scheduleNativeClassSessions } from "@/modules/classes/native-class-sessions.functions";
+import { scheduleNativeClassSessions, openNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
 type ClassWorkspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
@@ -34,6 +35,7 @@ export function NativeClassSessionsPanel({
   const [minutes,setMinutes]=useState(60);
   const [requestIds,setRequestIds]=useState<string[]>([]);
   const [busy,setBusy]=useState(false);
+  const [opened,setOpened]=useState<{roomId:string;pairingCode:string|null;expiresAt:string|null}|null>(null);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   async function createFour(event:FormEvent<HTMLFormElement>){
@@ -54,6 +56,22 @@ export function NativeClassSessionsPanel({
       setError(normalizeClientError(e,"Unable to schedule this Class.").message);
     }finally{setBusy(false)}
   }
+  async function start(classSessionId:string){
+    if(!canSchedule||busy)return;
+    setError("");setNotice("");setOpened(null);setBusy(true);
+    try{
+      const room=await openNativeClassSession({data:{
+        classId:workspace.classId,classSessionId,
+      }});
+      setOpened({roomId:room.facilitatedSessionId,
+        pairingCode:room.pairingCode,expiresAt:room.pairingExpiresAt});
+      await onChanged?.();
+      setNotice(room.alreadyStarted?
+        "Room is already started. Its previous one-time pairing code is not reproduced.":
+        "Classroom started. The join code is shown only to the authorized facilitator.");
+    }catch(e){setError(normalizeClientError(e,"Cannot open this Class Session.").message)}
+    finally{setBusy(false)}
+  }
   return <section className="border border-border bg-card p-5">
     <h2 className="font-serif text-2xl">Class Sessions</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -72,13 +90,32 @@ export function NativeClassSessionsPanel({
               session.state==="started"?"Started":"Cancelled"}
           </p>
         </div>
-        {session.isMySession&&<span className="text-xs text-muted-foreground">
-          You are the assigned session facilitator
-        </span>}
+        {canSchedule&&session.isMySession&&<div className="flex flex-wrap items-center gap-2">
+          {session.state==="scheduled"&&<Button size="sm" variant="outline" disabled={busy}
+            onClick={()=>void start(session.id)}>Open room</Button>}
+          {session.roomId&&<Link to="/classroom/$sessionId/presentation"
+            params={{sessionId:session.roomId}}
+            className="text-sm font-semibold underline">Projector view</Link>}
+          <span className="text-xs text-muted-foreground">Your Class Session</span>
+        </div>}
       </li>)}
     </ol>:<p className="mt-4 text-sm text-muted-foreground">
       No dated Sessions are scheduled for this Class.
     </p>}
+    {opened&&<div className="mt-4 border border-border bg-muted/30 p-4">
+      <p className="text-sm font-semibold">Classroom started</p>
+      {opened.pairingCode&&<p className="mt-2 text-lg font-bold tracking-wide">
+        Join code: {opened.pairingCode}
+      </p>}
+      {opened.expiresAt&&<p className="mt-1 text-xs text-muted-foreground">
+        One-time pairing expires: {utcDisplay(opened.expiresAt)}
+      </p>}
+      <Link to="/classroom/$sessionId/presentation" params={{sessionId:opened.roomId}}
+        className="mt-3 inline-block text-sm font-semibold underline">Open shared-screen projector</Link>
+      <p className="mt-3 text-xs text-muted-foreground">
+        A paired device is not proof of learner attendance or lesson completion.
+      </p>
+    </div>}
     {workspace.sessionsTruncated&&<p className="mt-4 text-sm text-muted-foreground">
       Showing the first 100 Sessions. Additional results require pagination.
     </p>}
