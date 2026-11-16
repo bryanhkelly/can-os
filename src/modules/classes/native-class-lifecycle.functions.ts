@@ -5,9 +5,10 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassEnrollments,
-  learnerCourseAttempts,
+  canonicalPersons, learnerCourseAttempts,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertNativeClassAttemptForExit,
@@ -96,8 +97,18 @@ async function exitNativeClass(command:ExitRequest){
         eq(canonicalClassEnrollments.classId,cls.id)))
       .for("update").limit(1);
     if(!enrollment)throw new AuthorizationError("current exact Class enrollment");
-    if(command.action==="withdraw" && enrollment.learnerPersonId!==actor.actorPersonId)
-      throw new AuthorizationError("own Class participation");
+    if(command.action==="withdraw"){
+      if(enrollment.learnerPersonId!==actor.actorPersonId)
+        throw new AuthorizationError("own Class participation");
+      // Existing native Class self-enrollment/assignment pathways are
+      // adult-only. Any future minor exit must use the approved guardian
+      // and school authority flow, never adult learner self-service.
+      const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
+        .from(canonicalPersons).where(eq(canonicalPersons.id,actor.actorPersonId))
+        .limit(1);
+      if(!verifiedAdultOn(person?.birthDate,new Date()))
+        throw new AuthorizationError("verified adult Class withdrawal");
+    }
 
     const decision=planNativeClassExit(enrollment.status,command.action);
     if(decision.alreadyClosed)return {
