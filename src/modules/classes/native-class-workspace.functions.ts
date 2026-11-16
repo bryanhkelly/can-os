@@ -15,7 +15,7 @@ import { classViews, classTabs, selectClassTab, selectClassView } from "@/domain
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { currentClassAuthority } from "./native-class-authority.server";
-import { validateClassAuthority } from "./unified-class.functions";
+import { validateClassAuthority } from "./unified-class-authority.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
 
