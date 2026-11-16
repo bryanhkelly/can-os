@@ -51,6 +51,9 @@ describe("WS5 authority and publisher/operator boundary",()=>{
     expect(options).toContain('eq(educationOperationOrganizationRoles.roleCode,"operator")');
     expect(options).toContain('publishedOfferingKind(productDefinition)');
     expect(options).not.toContain('networkMembershipId');
-    expect(options).toContain('await validateClassAuthority(tx,operator,instance)');
+    expect(options).toContain('exists(tx.select({id:educationOperationOrganizationRoles.id})');
+    expect(options).toContain('exists(tx.select({id:educationOperationSites.id})');
+    expect(options).toContain('placementKeys.has(row.deploymentId+":"+id)');
+    expect(options).not.toContain('for(const siteId of operator.siteIds)');
   });
 });
