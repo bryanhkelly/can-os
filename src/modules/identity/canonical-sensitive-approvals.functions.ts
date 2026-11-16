@@ -12,6 +12,7 @@ import {
   canonicalSensitiveCapabilityApprovals as approvals,
 } from "@/db/canonical-v301";
 import { assertCANIdentityReviewer } from "@/domain/site-identity-review";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
 import { getCommandContext } from "./command-context.server";
@@ -49,6 +50,14 @@ async function requireIndependentInstitutionalReviewer() {
     id:organizations.id,type:organizations.type,
   }).from(organizations).where(eq(organizations.id,organizationId)).limit(1):[];
   assertCANIdentityReviewer(reviewer,organization);
+  const [account]=await db.select({
+    email:accessAccounts.emailNormalized,
+    verified:accessAccounts.emailVerifiedAt,
+    disabled:accessAccounts.disabled,
+  }).from(accessAccounts).where(eq(accessAccounts.id,reviewer.accountId)).limit(1);
+  if(!account||!account.verified||account.disabled||
+     isDemoAccountEmail(account.email))
+    throw new AuthorizationError("verified non-demo institutional reviewer");
   return reviewer;
 }
 
@@ -89,6 +98,7 @@ async function assertCurrentReviewerInTransaction(
       AND person.active=true
       AND account.disabled=false
       AND account.email_verified_at IS NOT NULL
+      AND lower(account.email_normalized) NOT LIKE '%.demo'
       AND s.revoked_at IS NULL
       AND s.expires_at>clock_timestamp()
       AND s.updated_at>clock_timestamp()-interval '30 minutes'
