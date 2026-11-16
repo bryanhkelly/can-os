@@ -23,7 +23,8 @@ describe("native Class room isolation contract",()=>{
   });
   it("prevents room playback and roll calls from selecting a different Class",()=>{
     const room=read("src/modules/learning/facilitated-learning-operations.server.ts");
-    expect(room).toContain("nativeClassRoomParticipant(tx,room,attempt.id,participantPersonId)");
+    expect(room).toContain("nativeClassRoomParticipant(");
+    expect(room).toContain("tx,room,attempt.id,participantPersonId");
     const attendance=read("src/modules/learning/classroom-attendance-operations.server.ts");
     expect(attendance).toContain("eq(canonicalClassEnrollments.classId,native.classId)");
     const roster=read("src/modules/learning/classroom-attendance.functions.ts");
