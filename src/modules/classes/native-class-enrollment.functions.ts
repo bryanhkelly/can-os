@@ -17,6 +17,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   assertNativeClassRepeatEligible, assertOperationalClassOfferingTerms,
+  assertNativeClassSeatAvailable,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
@@ -196,8 +197,11 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       }).from(canonicalClassEnrollments).where(and(
         eq(canonicalClassEnrollments.classId,instance.id),
         eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
-      )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(5);
-      const existing=previous.find(row=>["pending","active"].includes(row.status));
+        inArray(canonicalClassEnrollments.status,["pending","active"]),
+      )).limit(2);
+      if(previous.length>1)
+        throw new AuthorizationError("duplicate open Class enrollments require reconciliation");
+      const existing=previous[0];
       if(existing){
         if(existing.creditMode!==data.creditMode || !existing.courseAttemptId)
           throw new AuthorizationError("existing enrollment requires governed modification");
@@ -219,9 +223,9 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
-      if((current.classCapacity!==null && (occupancy?.total??0)>=current.classCapacity)||
-         (version.capacity!==null && (occupancy?.total??0)>=version.capacity))
-        throw new AuthorizationError("Class is at capacity");
+      assertNativeClassSeatAvailable({method:"self",
+        activeOrPending:occupancy?.total??0,
+        classCapacity:current.classCapacity,offeringCapacity:version.capacity});
       const consentSha256=createHash("sha256")
         .update(version.consentVersion!).update("\u0000").update(version.consentText!)
         .digest("hex");
