@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -40,6 +40,7 @@ export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
     const now=new Date();
     return db.transaction(async tx=>{
       const [approved]=await tx.select({
+        offeringId:offerings.id,
         offeringVersionId:offeringVersions.id,
         offeringTitle:offerings.title,
         productDefinition:offeringVersions.productDefinition,
@@ -78,6 +79,14 @@ export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
           isNotNull(offeringVersions.publishedAt),
         )).limit(1);
       if(!approved)throw new AuthorizationError("currently approved published Offering adoption");
+      // Later publisher versions are never adopted implicitly. A local Class
+      // keeps its originally approved immutable Offering/Course version.
+      const [latest]=await tx.select({versionNo:offeringVersions.versionNo})
+        .from(offeringVersions).where(and(
+          eq(offeringVersions.offeringId,approved.offeringId),
+          eq(offeringVersions.lifecycle,"published"),
+          isNotNull(offeringVersions.publishedAt),
+        )).orderBy(desc(offeringVersions.versionNo)).limit(1);
       const rows=await tx.select({
         courseVersionId:courseVersions.id,courseTitle:courses.title,
         isRequired:canonicalOfferingCourses.isRequired,
@@ -96,6 +105,7 @@ export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
       return {
         offeringVersionId:approved.offeringVersionId,
         offeringVersionNo:approved.offeringVersionNo,
+        latestPublishedVersionNo:latest?.versionNo??approved.offeringVersionNo,
         offeringTitle:approved.offeringTitle,
         offeringKind:publishedOfferingKind(approved.productDefinition),
         courses:rows,
