@@ -3,7 +3,7 @@ import {getRequest, setResponseHeader} from "@tanstack/react-start/server";
 import {AuthorizationError} from "@/domain/command-context";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {
-  PARTICIPATION_READ_MODEL_VERSION,
+  PARTICIPATION_READ_MODEL_VERSION, assertParticipationReadModel,
   type ParticipationReadModel, type ParticipationRecord,
   type ParticipationSource, type ActivitySource, type ParticipationOpportunity,
 } from "@/domain/participation-read-model";
@@ -107,7 +107,7 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
       });
     }
     sources.sort((a, b) => allSources.indexOf(a.source) - allSources.indexOf(b.source));
-    return {
+    const projection: ParticipationReadModel = {
       version: PARTICIPATION_READ_MODEL_VERSION,
       generatedAt: now.toISOString(),
       viewerRole: session.role,
@@ -116,5 +116,7 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
       opportunities,
       sources,
     };
+    assertParticipationReadModel(projection);
+    return projection;
   },
 );
