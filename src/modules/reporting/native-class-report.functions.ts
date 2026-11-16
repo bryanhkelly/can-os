@@ -45,8 +45,8 @@ export const getNativeClassReport=createServerFn({method:"GET"})
     const to=new Date(data.to+"T00:00:00.000Z");
     const asOf=new Date();
     if(!Number.isFinite(from.getTime())||!Number.isFinite(to.getTime())||
-      !(from<to) || to.getTime()-from.getTime()>366*86400000 ||
-      from>asOf)throw new Error("Choose a valid UTC report window of up to 366 days");
+      from.getTime()>=to.getTime() || to.getTime()-from.getTime()>366*86400000 ||
+      from.getTime()>asOf.getTime())throw new Error("Choose a valid UTC report window of up to 366 days");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
       throw new AuthorizationError("current Class reporting operator");
