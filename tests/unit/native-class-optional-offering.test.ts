@@ -20,6 +20,8 @@ describe("Class identity and optional enrollment publication",()=>{
     expect(assigned.classOfferingVersionId).toBeNull();
     expect(enrollmentNeedsOffering(assigned.enrollmentMethod)).toBe(false);
     expect(enrollmentNeedsOffering("self")).toBe(true);
+    expect(enrollmentNeedsOffering("invitation")).toBe(false);
+    expect(enrollmentNeedsOffering("approval")).toBe(false);
   });
   it("creates Class first; Class Offering is optional and can be added afterward",()=>{
     const server=read("src/modules/classes/unified-class.functions.ts");
@@ -43,7 +45,7 @@ describe("Class identity and optional enrollment publication",()=>{
   it("schema protects self-registration while permitting direct assignment",()=>{
     const sql=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
     expect(sql).toContain("class_offering_version_id uuid,");
-    expect(sql).toContain("enrollment_method='assignment' OR class_offering_version_id IS NOT NULL");
+    expect(sql).toContain("enrollment_method<>'self' OR class_offering_version_id IS NOT NULL");
     expect(sql).toContain("capacity integer CHECK(capacity IS NULL OR capacity>0)");
     expect(sql).not.toMatch(/RETURNS trigger LANGUAGE plpgsql[^\n]* AS \$\n/);
     expect(sql).not.toMatch(/END \$;\n/);
