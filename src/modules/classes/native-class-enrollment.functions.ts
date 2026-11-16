@@ -22,6 +22,7 @@ import {
 import { currentClassAuthority } from "./native-class-authority.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentNativeClassLearnerForMutation } from "./native-class-learner-session.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
@@ -40,11 +41,12 @@ function guard(){
   setResponseHeader("Referrer-Policy","no-referrer");
 }
 async function requireLearner(){
-  const actor=await getCanonicalCommandContext(getRequest());
+  const request=getRequest();
+  const actor=await getCanonicalCommandContext(request);
   if(!actor.actorPersonId || actor.role!=="learner")
     throw new AuthorizationError("verified canonical learner Person");
   assertCapability(actor,"learning.participate");
-  return actor.actorPersonId;
+  return {learnerPersonId:actor.actorPersonId,actor,request};
 }
 
 /** A live Class is permitted only while publisher/adoption/deployment and
@@ -181,7 +183,7 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
 export const enrollInNativeClass=createServerFn({method:"POST"})
   .validator((raw:unknown)=>selfInput.parse(raw))
   .handler(async({data})=>{
-    guard();const learnerPersonId=await requireLearner();
+    guard();const {learnerPersonId,actor,request}=await requireLearner();
     return db.transaction(async tx=>{
       const now=new Date();
       const [version]=await tx.select().from(canonicalClassOfferingVersions)
@@ -244,6 +246,9 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       assertNativeClassSeatAvailable({method:"self",
         activeOrPending:occupancy?.total??0,
         classCapacity:current.classCapacity,offeringCapacity:version.capacity});
+      // Revocation between preflight and insertion must fail inside the same
+      // transaction as the seat change, including cross-provider public Classes.
+      await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
       const consentSha256=createHash("sha256")
         .update(version.consentVersion!).update("\u0000").update(version.consentText!)
         .digest("hex");
@@ -307,7 +312,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
 
 export const getMyNativeClassEnrollments=createServerFn({method:"GET"})
   .handler(async()=>{
-    guard();const learnerPersonId=await requireLearner();
+    guard();const {learnerPersonId}=await requireLearner();
     return db.select({
       classEnrollmentId:canonicalClassEnrollments.id,classId:canonicalClasses.id,
       title:canonicalClasses.title,deliveryMode:canonicalClasses.deliveryMode,
