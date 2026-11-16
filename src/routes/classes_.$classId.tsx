@@ -228,7 +228,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
     <h2 className="font-serif text-2xl">Class roster</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       {workspace.rosterCount} active or pending enrollments.
-      {!namesAllowed&&" Your current facilitator assignment permits counts, not learner identities."}
+      {!namesAllowed&&" Your instructional assignment permits roster counts. Learner identities require a separately approved roster-read permission."}
     </p>
     {namesAllowed&&<ul className="mt-4 divide-y divide-border">
       {workspace.roster.map(row=><li key={row.enrollmentId} className="grid grid-cols-[1fr_auto] gap-4 py-3 text-sm">
