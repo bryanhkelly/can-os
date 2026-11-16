@@ -18,6 +18,7 @@
     "db:canonical:activity-schema": "node scripts/acceptance/check-canonical-learning-activity-schema.mjs",
     "db:canonical:auth-reader": "node scripts/acceptance/check-canonical-auth-reader.mjs",
     "db:canonical:issuer-reader": "node scripts/acceptance/check-can-issuer-reader.mjs",
+    "db:canonical:issuer-acceptance": "node scripts/acceptance/run-sensitive-issuer-fixture.mjs",
     "db:canonical:noncredit-schema": "node scripts/acceptance/check-canonical-noncredit-migration.mjs",
     "db:canonical:v301:instructional-isolation": "node scripts/acceptance/check-instructional-learner-isolation.mjs",
     "db:seed:canonical:v301:demo": "node scripts/seed-canonical-v301-demo.mjs",
