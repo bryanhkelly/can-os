@@ -1,0 +1,66 @@
+name: Cloudflare production build and regression gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: can-os-cloudflare-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  production-build:
+    name: Exact Cloudflare bundle, typecheck and regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - name: Show the exact source revision and toolchain
+        run: |
+          git rev-parse HEAD
+          node --version
+          npm --version
+      - name: Reproducible clean dependency install
+        run: npm ci
+      - name: Cloudflare production bundle (client AND server)
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build:cloudflare 2>&1 | tee cloudflare-build.log
+      - name: TypeScript diagnostics after route generation
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run typecheck 2>&1 | tee typecheck.log
+      - name: Site enrollment and website regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:site:channels 2>&1 | tee site-regressions.log
+      - name: Native Class regression suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:classes:unit 2>&1 | tee class-regressions.log
+      - name: Retain diagnostics for first failure at this exact SHA
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-release-gate-${{ github.sha }}
+          path: |
+            cloudflare-build.log
+            typecheck.log
+            site-regressions.log
+            class-regressions.log
+          if-no-files-found: warn
+          retention-days: 14
