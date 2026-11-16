@@ -130,12 +130,15 @@ export function NativeClassSessionsPanel({
         requestId:changeRequestId,reason:changeReason.trim(),
         replacement:meeting?{startsAt:meeting.startsAt,endsAt:meeting.endsAt}:null,
       }});
-      await onChanged?.();
+      // The transaction may have committed even if cache invalidation fails.
+      // Never misreport a successful cancellation as a failed write.
+      const [refresh]=await Promise.allSettled([onChanged?.()??Promise.resolve()]);
       setChangeSessionId(null);setChangeReason("");
       setChangeLocalStart("");setChangeRequestId(crypto.randomUUID());
       setNotice(result.replacementSessionId?
         "The original Session is cancelled and its new dated Session is linked in the audit history. Review the replacement study plan.":
         "The unopened Session was cancelled. Existing Class enrollment and learning history were not changed.");
+      if(refresh?.status==="rejected")setNotice("Session changed successfully. Refresh the Class page to see the latest schedule.");
     }catch(e){
       setError(normalizeClientError(e,"Unable to change this Class Session.").message);
     }finally{setBusy(false);}
