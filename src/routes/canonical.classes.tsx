@@ -134,12 +134,13 @@ function NativeClasses(){
     const available=combinedOptions.find(row=>
       row.offeringVersionId===recipePlan.offeringVersionId &&
       row.courseVersionId===course.courseVersionId &&
+      row.localClassPolicy.allowedDeliveryModes.includes(course.deliveryMode) &&
       row.siteOptions.some(site=>site.id===rolloutSiteId &&
         site.allowedDeliveryModes.includes(course.deliveryMode)));
     if(!available){setError("This Site cannot launch the selected Course and delivery mode.");return;}
     setRecipeCourseId(course.courseVersionId);
     setChoice(optionKey(available));setSiteId(rolloutSiteId);
-    setTitle(course.suggestedClassTitle);
+    setTitle(available.localClassPolicy.classTitle==="locked"?available.courseTitle:course.suggestedClassTitle);
     setDeliveryMode(course.deliveryMode);
     setClassCapacity(course.capacity===null?"":String(course.capacity));
     setCreateWithOffering(false);setError("");
@@ -365,8 +366,11 @@ function NativeClasses(){
                 onClick={()=>{
                   setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
                   setChoice(optionKey(row));setTitle(row.courseTitle);
+                  const mode=row.localClassPolicy.allowedDeliveryModes.includes(deliveryMode)
+                    ?deliveryMode:row.localClassPolicy.allowedDeliveryModes[0]!;
+                  setDeliveryMode(mode);
                   setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId&&
-                    site.allowedDeliveryModes.includes(deliveryMode))?preferredSiteId:"");
+                    site.allowedDeliveryModes.includes(mode))?preferredSiteId:"");
                   setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
                 }}>Configure Class</Button>
             </li>)}
@@ -469,7 +473,17 @@ function NativeClasses(){
             <select id="native-class-course" required value={choice} onChange={e=>{
               const selectedOption=visibleOptions.find(option=>optionKey(option)===e.target.value);
               setChoice(e.target.value);
-              setSiteId(selectedOption?.siteOptions.some(site=>site.id===preferredSiteId)?preferredSiteId??"":"");
+              if(selectedOption){
+                setTitle(selectedOption.localClassPolicy.classTitle==="locked"
+                  ?selectedOption.courseTitle:title||selectedOption.courseTitle);
+                if(!selectedOption.localClassPolicy.allowedDeliveryModes.includes(deliveryMode)){
+                  setDeliveryMode(selectedOption.localClassPolicy.allowedDeliveryModes[0]!);
+                  setSiteId("");
+                }else{
+                  setSiteId(selectedOption.siteOptions.some(site=>site.id===preferredSiteId&&
+                    site.allowedDeliveryModes.includes(deliveryMode))?preferredSiteId??"":"");
+                }
+              }else setSiteId("");
             }}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Select an authorized Course</option>
@@ -485,6 +499,13 @@ function NativeClasses(){
               {selected.isRequired?" · required component":" · optional component"}.
               Local Classes retain this published Course version.
             </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Publisher-approved local variation: title {selected.localClassPolicy.classTitle==="locked"?"locked":"editable"};
+              delivery {selected.localClassPolicy.allowedDeliveryModes.join(", ").replaceAll("_"," ")};
+              {selected.localClassPolicy.maxClassCapacity!==null
+                ?" maximum capacity "+selected.localClassPolicy.maxClassCapacity:" unlimited Class capacity"}.
+              Publisher curriculum, grading and assessments remain locked.
+            </p>
             <p className="mt-2 flex flex-wrap gap-4 text-xs font-semibold">
               <Link to="/canonical/lab/deployments" className="underline">Deployment and adoption</Link>
               <Link to="/operations/curriculum" className="underline">Curriculum</Link>
@@ -493,6 +514,7 @@ function NativeClasses(){
           </aside>}
           <div><label className="block text-sm font-semibold" htmlFor="native-class-title">Class name</label>
             <input id="native-class-title" required minLength={3} maxLength={200} value={title}
+              disabled={selected?.localClassPolicy.classTitle==="locked"}
               onChange={e=>setTitle(e.target.value)} placeholder="AI Literacy · January 2027"
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
           </div>
@@ -501,6 +523,7 @@ function NativeClasses(){
               Class capacity
             </label>
             <input id="native-class-overall-capacity" type="number" min={1}
+              max={selected?.localClassPolicy.maxClassCapacity??undefined}
               value={classCapacity} placeholder="Unlimited"
               onChange={event=>setClassCapacity(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
@@ -518,7 +541,8 @@ function NativeClasses(){
                     site.allowedDeliveryModes.includes(mode)))setSiteId("");
               }}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-                {deliveryOptions.map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
+                {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.includes(mode))
+                  .map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
               </select>
             </div>
             <div><label className="block text-sm font-semibold" htmlFor="native-class-site">Site</label>
