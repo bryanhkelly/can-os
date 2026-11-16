@@ -248,6 +248,28 @@ new learner, quiz, survey, or assessment result tables. It is not a third
 Unified Class schema migration. Saving a draft is not independent review,
 publication or a local Class administration.
 
+The optional canonical approval extension now adds the independent review
+and publication **commands and workspaces**, with no duplicate review tables.
+Reviewers use `/canonical/assessment-reviews` to inspect each question and
+its server-decrypted designated correct choice under a bound reviewer role,
+and record append-only item (academic/rights/accessibility), version (those
+three plus independent), and form (academic/rights/accessibility) decisions.
+Authors cannot independently review their own items. The publisher at
+`/canonical/assessment-publications` sees current approval metadata, never
+correct answer keys, and publishes items, version and form atomically only
+after all required independent approvals. Original canonical publication
+triggers remain authoritative.
+
+SQL roles are insufficient on their own: each reviewer/publisher Person must
+also have a current, separately appointed, evidence-backed role in the
+EXISTING `professional_role_assignments` table for the exact owning
+Organization. A general Class staff grant does not confer that appointment.
+These are optional gated authoring/approval capability policies, **not** the
+retired third Class activities migration. One-account role switching,
+network reporting and invitations remain explicitly deferred until after
+merging with main. The approval commands and per-Person authorization
+have been committed but not migrated, typechecked or runtime-accepted.
+
 For feedback, the page calls the existing
 `createCanonicalSurveyDraft` command, which writes to the canonical Survey
 model only when the independent survey-draft author role, database
@@ -283,12 +305,13 @@ and an independently recorded Class Outcome. The UI never equates video
 playback, draft lesson progress, quiz pass or identified survey feedback
 with automatically earned credit, completion or a credential.
 
-**Still required before release:** a reviewed and accepted isolated-QA
-installation of the optional restricted canonical assessment draft writer
-and role, the **existing assessment's independent review and publication**
-workflow, campaign creation and individual survey invitation delivery,
-approved completion-policy mapping, real application-role permissions
-and two-Site end-to-end acceptance. One new native attribution relation is included
+**Still required before release:** reviewed and accepted isolated-QA
+installation of the optional restricted canonical assessment draft, independent
+review and publication functions, approved per-Person appointments,
+person-scoped negative permission tests, campaign creation and individual
+survey invitations, completion-policy mapping, real application-role
+permissions and two-Site end-to-end acceptance. Source-level review and
+publication exist; no successful runtime release claim is made. One new native attribution relation is included
 in the **existing first Class migration**; the removed parallel activity
 migration must not be reintroduced.
 
