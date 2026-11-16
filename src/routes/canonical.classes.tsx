@@ -162,7 +162,7 @@ function NativeClasses(){
         setRecipeOfferingVersionId(recipe.offeringVersionId);
         setRecipeCourseId(null);
         setTitle("");setClassCapacity("");
-        setNotice("Published Offering version "+recipe.revision+" rollout instructions loaded. Select each approved Course below. Missing adoptions must be approved separately before creating Classes.");
+        setNotice("Rollout instructions revision "+recipe.revision+" loaded for the pinned Offering version. Select each locally approved Course below. Missing adoptions require separate publisher/operator approval before any Class is created.");
       }
       setError("");
     }catch(error){
