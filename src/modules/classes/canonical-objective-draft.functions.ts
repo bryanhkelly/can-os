@@ -13,6 +13,7 @@ import { sealNoncreditAnswerKey, NONCREDIT_KEY_REF } from
   "@/domain/noncredit-knowledge-check";
 import { getCanonicalCommandContext } from
   "@/modules/identity/canonical-command-context.server";
+import { bindCanonicalAssessmentSession } from "@/modules/identity/canonical-assessment-session.server";
 
 /**
  * Real canonical *draft* persistence. The database writer has only EXECUTE
@@ -54,6 +55,7 @@ export const createCanonicalObjectiveDraft=createServerFn({method:"POST"})
     const result=await db.transaction(async tx=>{
       // Explicit, scoped SET ROLE; the role is derived only from verified
       // UUID scope. No client-supplied role or tenant name is interpolated.
+      await bindCanonicalAssessmentSession(tx,getRequest());
       await tx.execute(sql.raw(`SET LOCAL ROLE ${role}`));
       const binding=await tx.execute(sql`
         SELECT education_v30.v28_role_can_access_org(
@@ -101,10 +103,12 @@ export const listCanonicalObjectiveDrafts=createServerFn({method:"GET"})
     const role=canonicalAssessmentDraftDatabaseRole(actor);
     const organizationId=actor.scope.organizationIds![0]!;
     const rows=await db.transaction(async tx=>{
+      await bindCanonicalAssessmentSession(tx,getRequest());
       await tx.execute(sql.raw(`SET LOCAL ROLE ${role}`));
       return tx.execute(sql`
         SELECT * FROM education_v30.v301_list_objective_assessment_drafts(
-          ${organizationId}::uuid,${data.courseVersionId}::uuid
+          ${organizationId}::uuid,${data.courseVersionId}::uuid,
+          ${actor.actorPersonId}::uuid
         )
       `);
     });

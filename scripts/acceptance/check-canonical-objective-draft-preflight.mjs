@@ -29,7 +29,7 @@ try{
 
   const signatures=[
     "education_v30.v301_create_objective_assessment_draft(uuid,uuid,uuid,text,text,numeric,integer,jsonb)",
-    "education_v30.v301_list_objective_assessment_drafts(uuid,uuid)",
+    "education_v30.v301_list_objective_assessment_drafts(uuid,uuid,uuid)",
   ];
   const {rows:funcs}=await pool.query(
     `SELECT p.oid::regprocedure::text AS signature,

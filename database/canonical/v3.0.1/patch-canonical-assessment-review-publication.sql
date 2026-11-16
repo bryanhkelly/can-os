@@ -36,6 +36,7 @@ CREATE OR REPLACE FUNCTION education_v30.v301_assess_approval_authority(
 SET search_path=education_v30,pg_catalog AS $authority$
 DECLARE r text;
 BEGIN
+ PERFORM education_v30.v301_assert_assessment_actor_session(p_org,p_actor);
  IF p_purpose NOT IN ('assessment_reviewer','assessment_publisher') THEN
    RAISE EXCEPTION 'Unsupported assessment approval purpose' USING ERRCODE='42501';
  END IF;
