@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS education_v30.class_offering_versions (
  opens_at timestamptz,
  closes_at timestamptz,
  capacity integer CHECK(capacity IS NULL OR capacity>0),
+ allowed_credit_modes text[] NOT NULL CHECK(
+   cardinality(allowed_credit_modes) BETWEEN 1 AND 3
+   AND allowed_credit_modes <@ ARRAY['for_credit','audit','not_applicable']::text[]
+ ),
  consent_version text,
  consent_text text,
  created_by_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
@@ -157,11 +161,11 @@ BEGIN
  IF OLD.state IN ('published','closed') THEN
    IF ROW(OLD.class_offering_id,OLD.class_id,OLD.version_no,
           OLD.visibility,OLD.enrollment_methods,OLD.opens_at,OLD.closes_at,
-          OLD.capacity,OLD.consent_version,OLD.consent_text,OLD.created_by_person_id,OLD.published_at,OLD.created_at)
+          OLD.capacity,OLD.allowed_credit_modes,OLD.consent_version,OLD.consent_text,OLD.created_by_person_id,OLD.published_at,OLD.created_at)
       IS DISTINCT FROM
       ROW(NEW.class_offering_id,NEW.class_id,NEW.version_no,
           NEW.visibility,NEW.enrollment_methods,NEW.opens_at,NEW.closes_at,
-          NEW.capacity,NEW.consent_version,NEW.consent_text,NEW.created_by_person_id,NEW.published_at,NEW.created_at)
+          NEW.capacity,NEW.allowed_credit_modes,NEW.consent_version,NEW.consent_text,NEW.created_by_person_id,NEW.published_at,NEW.created_at)
       OR NOT (
         (OLD.state=NEW.state AND OLD.closed_at IS NOT DISTINCT FROM NEW.closed_at)
         OR (OLD.state='published' AND NEW.state='closed' AND NEW.closed_at IS NOT NULL)
