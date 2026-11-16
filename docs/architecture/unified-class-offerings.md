@@ -255,8 +255,10 @@ project, but the native schema has not been installed or tested there.
 
 ### P0: Native enrollment commands
 - One Class Enrollment identity with verified Person and an authorized enrollment
-  mechanism. The Class Offering version is optional for direct assignment and
-  required for self-registration. Credit or certificate intent does not select
+  mechanism. The Class Offering version is optional for assignment, invitation
+  and approval; published terms are required only for self-registration.
+  Private invitation and approval still need dedicated consent and eligibility
+  controls before those commands can be enabled. Credit intent does not select
   a different enrollment system.
 - Verify the implemented native Course Attempt source constraint, trigger and atomic
   enrollment command. It must work without creating a school/noncredit source row.
