@@ -169,6 +169,7 @@ export function NativeClassSessionsPanel({
           {workspace.sessionAgendasEnabled&&agendaSession===session.id&&
             <NativeClassSessionAgenda key={session.id}
               classId={workspace.classId} classSessionId={session.id}
+              view={workspace.view}
               canEdit={canSchedule&&session.isMySession&&session.state==="scheduled"}/>}
         </div>
         {canRevoke&&session.roomId&&session.roomState==="live"&&
