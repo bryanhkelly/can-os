@@ -53,7 +53,12 @@ describe("WS5 governed publisher rollout", () => {
     expect(assessLocalRollout(plan,options,north).map(x=>x.status)).toEqual(["ready","ready"]);
     expect(assessLocalRollout(plan,options,south).map(x=>x.status))
       .toEqual(["ready","site_authorization_required"]);
-    expect(assessLocalRollout(plan,options,null).map(x=>x.status)).toEqual(["ready","ready"]);
+    expect(assessLocalRollout(plan,options,null).map(x=>x.status)).toEqual(["site_selection_required","site_selection_required"]);
+    expect(assessLocalRollout(plan,[{
+      offeringVersionId:offering,courseVersionId:first,
+      siteOptions:[{id:north,allowedDeliveryModes:["self_paced" as const]}],
+    }],north).map(x=>x.status))
+      .toEqual(["site_authorization_required","adoption_required"]);
     expect(assessLocalRollout(plan,options.map(x=>({...x,offeringVersionId:second})),north)
       .map(x=>x.status)).toEqual(["adoption_required","adoption_required"]);
   });
