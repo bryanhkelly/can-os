@@ -74,13 +74,13 @@ export function NativeClassSessionAgenda({
     setBusy(true);setError("");setNotice("");
     try{
       const saved=await publishNativeClassSessionAgenda({data:{
-        classId,classSessionId,requestId,items:draft,
+        classId,classSessionId,requestId,expectedRevisionNo:data.revisionNo,items:draft,
       }});
       await agenda.refetch();
       setRequestId(crypto.randomUUID());setEditing(false);
       setNotice("Session agenda revision "+saved.revisionNo+" saved. This does not issue assignments, attendance or completion.");
     }catch(e){
-      setError(normalizeClientError(e,"Session agenda could not be published.").message);
+      setError(normalizeClientError(e,"Session agenda could not be published. If the plan changed elsewhere, reload the latest plan before retrying.").message);
     }finally{setBusy(false)}
   }
   return <section className="mt-3 border border-border bg-card p-3"
@@ -168,6 +168,10 @@ export function NativeClassSessionAgenda({
               <Button type="button" size="sm" variant="outline" disabled={busy}
                 onClick={()=>{setEditing(false);setDraft(data.items.map(x=>({kind:x.kind,referenceId:x.referenceId})));}}>
                 Discard changes
+              </Button>
+              <Button type="button" size="sm" variant="outline" disabled={busy}
+                onClick={async()=>{await agenda.refetch();setError("");setNotice("Loaded the latest published plan. Review before editing again.");}}>
+                Reload latest plan
               </Button>
             </div>
           </div>
