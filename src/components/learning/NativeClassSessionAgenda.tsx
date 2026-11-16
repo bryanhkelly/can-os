@@ -102,7 +102,7 @@ export function NativeClassSessionAgenda({
           <span className="ml-2">{item.title}</span>
           {["study","watch","practice"].includes(item.kind)&&
             <Link to="/classes/$classId" params={{classId}}
-              search={{view:"learn",tab:"lessons",lesson:item.referenceId,session:undefined}}
+              search={{view:undefined,tab:"lessons",lesson:item.referenceId,session:undefined}}
               className="ml-2 underline underline-offset-2">
               Open lesson
             </Link>}
