@@ -15,6 +15,7 @@ import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalConten
 import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
+import { linkPrivateSitePreviewPages } from "@/domain/site-private-preview-navigation";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
 import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
@@ -136,7 +137,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           path,localPreview:true,privateDraftPages:true,
         });
         const html=renderPrivateWebsitePreviewHtml(
-          rendered,site.id,availablePages,Boolean(history.length),"site",
+          linkPrivateSitePreviewPages(rendered,site.id),site.id,availablePages,Boolean(history.length),"site",
         );
         return new Response(html,{status:200,headers:siteFirstPreviewHeaders});
       }catch(error){
