@@ -91,6 +91,10 @@ describe("canonical independent objective assessment review and atomic publicati
       expect(patch).toContain("INSERT INTO "+table);
     }
     expect(patch).toContain("pg_advisory_xact_lock");
+    expect(patch).toContain("professional_role_assignments");
+    expect(patch).toContain("assignment.role_code=p_purpose");
+    expect(patch).toContain("assignment.authority_evidence_id");
+    expect(patch).toContain("document.owning_organization_id=p_org");
     expect(patch).toContain("Missing independent latest item approval");
     expect(patch).toContain("UPDATE assessment_item_versions SET lifecycle='published'");
     expect(patch).toContain("UPDATE assessment_versions SET lifecycle='published'");
@@ -101,6 +105,12 @@ describe("canonical independent objective assessment review and atomic publicati
     expect(roles).not.toContain("GRANT UPDATE ON education_v30.assessment_versions");
     expect(service).toContain("openNoncreditAnswerKey");
     expect(service).toContain("SET LOCAL ROLE");
+    expect(service).toContain("listCanonicalObjectiveApprovalQueue");
+    expect(service).toContain("recordCanonicalObjectiveReview");
+    expect(service).toContain("publishCanonicalObjectiveAssessment");
+    expect(service).not.toContain("return {sealedKey:");
+    expect(read("scripts/acceptance/check-canonical-objective-approval-preflight.mjs"))
+      .toContain("BEGIN READ ONLY");
     expect(service).toContain("CAN_CANONICAL_ASSESSMENT_REVIEW_ENABLED");
     expect(service).toContain("CAN_CANONICAL_ASSESSMENT_PUBLICATION_ENABLED");
     expect(publisher).toContain("objectiveApprovalGate");
