@@ -46,6 +46,7 @@ async function requireLearner(){
 export async function currentClassAuthority(tx:Tx,classId:string,now:Date){
   const [r]=await tx.select({
     classId:canonicalClasses.id,classTitle:canonicalClasses.title,
+    classCapacity:canonicalClasses.capacity,
     classState:canonicalClasses.state,
     deploymentId:canonicalClasses.deploymentId,adoptionId:canonicalClasses.adoptionId,
     offeringVersionId:canonicalClasses.offeringVersionId,
@@ -213,7 +214,8 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           inArray(canonicalClassEnrollments.status,["pending","active"])));
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
-      if(version.capacity!==null && (occupancy?.total??0)>=version.capacity)
+      if((current.classCapacity!==null && (occupancy?.total??0)>=current.classCapacity)||
+         (version.capacity!==null && (occupancy?.total??0)>=version.capacity))
         throw new AuthorizationError("Class is at capacity");
       const consentSha256=createHash("sha256")
         .update(version.consentVersion!).update("\u0000").update(version.consentText!)
