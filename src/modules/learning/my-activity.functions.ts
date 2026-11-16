@@ -5,11 +5,11 @@ import {readWorkspaceSession} from "@/modules/identity/workspace-session.server"
 import {
   PARTICIPATION_READ_MODEL_VERSION,
   type ParticipationReadModel, type ParticipationRecord,
-  type ParticipationSource,
+  type ParticipationSource, type ActivitySource, type ParticipationOpportunity,
 } from "@/domain/participation-read-model";
 import {
   assembleParticipation, projectSchoolSections, projectNativeClasses,
-  projectNoncreditCourses, projectFamilyEnrichment, projectNoncreditWaitlists,
+  projectNoncreditCourses, projectFamilyEnrichment, projectNoncreditOpportunities,
 } from "@/domain/participation-projections";
 import {getCourseRegistration} from "@/modules/learning/course-registration.functions";
 import {getMyNativeClassEnrollments} from "@/modules/classes/native-class-enrollment.functions";
@@ -30,9 +30,10 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
     if (!session.authenticated) throw new AuthorizationError("authenticated CAN account");
     const now = new Date();
     const records: ParticipationRecord[] = [];
+    const opportunities: ParticipationOpportunity[] = [];
     const sources: ParticipationReadModel["sources"] = [];
     const work: Array<Promise<void>> = [];
-    const enabled = new Set<ParticipationSource>();
+    const enabled = new Set<ActivitySource>();
     function register(
       source: ParticipationSource,
       reader: () => Promise<ParticipationRecord[]>,
@@ -42,13 +43,28 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
         try {
           const permitted = await reader();
           records.push(...permitted);
-          sources.push({source, state: "ready", message: null});
+          sources.push({source, state: "ready", coverage: "partial", message: null});
         } catch {
           // Never leak which records exist, or an internal auth/database error.
           sources.push({
-            source, state: "unavailable",
+            source, state: "unavailable", coverage: "unknown",
             message: "This source could not be verified with the current access.",
           });
+        }
+      })());
+    }
+    function registerOpportunities(
+      source: "noncredit_waitlist",
+      reader: () => Promise<ParticipationOpportunity[]>,
+    ): void {
+      enabled.add(source);
+      work.push((async () => {
+        try {
+          opportunities.push(...await reader());
+          sources.push({source, state: "ready", coverage: "partial", message: null});
+        } catch {
+          sources.push({source, state: "unavailable", coverage: "unknown",
+            message: "This source could not be verified with the current access."});
         }
       })());
     }
@@ -71,8 +87,8 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
     if (session.role === "guardian" || session.role === "account_holder") {
       register("noncredit_course", async () =>
         projectNoncreditCourses(await getMyNoncreditSelfEnrollments(), now));
-      register("noncredit_waitlist", async () =>
-        projectNoncreditWaitlists(await getMyNoncreditWaitlist(), now));
+      registerOpportunities("noncredit_waitlist", async () =>
+        projectNoncreditOpportunities(await getMyNoncreditWaitlist()));
     }
     // Native Class service requires its own canonical learner grant and active
     // Class feature gate. Do not use a CAN student/guardian role as a substitute.
@@ -81,13 +97,13 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
         projectNativeClasses(await getMyNativeClassEnrollments(), now, session.sites));
     }
     await Promise.all(work);
-    const allSources: ParticipationSource[] = [
+    const allSources: ActivitySource[] = [
       "school_section", "native_class", "noncredit_course",
       "family_enrichment", "noncredit_waitlist",
     ];
     for (const source of allSources) {
       if (!enabled.has(source)) sources.push({
-        source, state: "not_applicable", message: null,
+        source, state: "not_applicable", coverage: "not_applicable", message: null,
       });
     }
     sources.sort((a, b) => allSources.indexOf(a.source) - allSources.indexOf(b.source));
@@ -97,6 +113,7 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
       viewerRole: session.role,
       activeGrantId: session.activeGrantId,
       records: assembleParticipation(records),
+      opportunities,
       sources,
     };
   },
