@@ -22,7 +22,8 @@ type Method=ClassOfferingTerms["enrollmentMethods"][number];
 type CreditMode=ClassOfferingTerms["allowedCreditModes"][number];
 const methodOptions: {value:Method;label:string}[]=[
   {value:"self",label:"Self-enrollment"},{value:"assignment",label:"Assignment"},
-  {value:"invitation",label:"Invitation"},{value:"approval",label:"Approval"},
+  // Invitation and approval are not publishable until the verified offer,
+  // expiration, guardian and approval-queue commands exist.
 ];
 const creditOptions: {value:CreditMode;label:string}[]=[
   {value:"not_applicable",label:"No academic credit"},
