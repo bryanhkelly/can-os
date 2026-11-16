@@ -88,25 +88,31 @@ application origin, never a real school or church roster.
 | End room, renew QR, retry stale question submission | No access to closed room or new evidence |
 | Manager emergency revokes live room after facilitator grant is removed | Exact Site manager may terminate with reason; learner and presenter access stay denied |
 
-## Reusable Course learning activities and resilience
+## Canonical assessment, survey and completion reuse
 
-- Publisher authorizes and publishes ONE versioned Course activity set with
-  five quiz questions and five feedback prompts. Both Sites deliver that
-  same Course version without copying content or answer keys.
-- Learner sees ONLY prompt/choice projections. Correct choices are never
-  present in HTML, JSON, public room APIs or network requests.
-- Signed-in learner from Class A may submit quiz and feedback only for their
-  own active Class Enrollment. Class B and withdrawn learners fail closed.
-- Identified feedback requires a separate explicit consent acknowledgement.
-  Consent version and SHA are stored; response bodies stay in the restricted
-  secure schema and are not shared with a facilitator or audience display.
-- Duplicate knowledge check/feedback retries do not create multiple submissions.
-  If publication changes after a learner starts answering, an unpinned request
-  to the old version fails and must be reloaded; submitted learners remain pinned.
-- Completion readiness requires the pinned policy's knowledge threshold,
-  optional feedback and lesson milestones. One explicit learner command
-  records only noncredit outcome evidence, never a Class Award, certificate,
-  grade or government-funding eligibility determination.
+- The learner's native Class Course Attempt is the ONLY participation
+  authority. It is tied to an actual `class_enrollment_id`, never to a
+  fabricated noncredit registration or school Section.
+- The native Assignments tab queries canonical lesson-progress, assessment
+  access/result and Class outcome records. It cannot read another Person's
+  Course Attempt, leak answer keys or issue completion decisions.
+- Existing academic and noncredit assessment and survey records remain
+  authoritative. No parallel quiz, survey, consent or completion tables are
+  introduced by the unified Class migrations.
+- **Blocking integration gap:** legacy noncredit knowledge-check and
+  identified survey endpoints currently require a noncredit registration.
+  Add native Class support to the canonical assessment/survey authorization
+  and provider-grant provisioning contracts before promising a five-question
+  pilot check and five-question survey on native Class.
+- Require publisher-approved versions, matching Course and deployment,
+  independent verified staff access grants, consented survey invitations,
+  per-learner response isolation, immutable results and completion policy
+  provenance. No learner may independently finalize an assessment or award.
+- Regression: the existing school and noncredit paths must be unchanged,
+  and a revoked or cross-Site actor must fail closed for Class records.
+
+## Classroom resilience and operational acceptance
+
 - The hosting Site's IANA timezone governs one-off, weekly and custom
   dates. Verify spring-forward, fall-back, ambiguous/missing local time,
   ordering and overlapping-session rejection, including a laptop in
