@@ -9,7 +9,7 @@ import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
 import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
 import {safeReadSiteContentChannelConfig,resolveSiteContentBlocks} from "@/domain/site-content-channels";
-import {schoolPlanningLocationSchema} from "@/domain/site-setup-configuration";
+import {schoolPlanningLocationSchema} from "@/domain/school-stub";
 import {readOptionalSitePublishedClasses} from "@/modules/sites/site-published-classes.server";
 import {siteLaunchPreferencesSchema} from "@/domain/site-launch-preferences";
 import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-program-publication";
