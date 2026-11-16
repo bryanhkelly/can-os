@@ -28,8 +28,7 @@ export const canonicalClassOfferings = educationV30.table("class_offerings", {
   createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[uniqueIndex("canonical_class_offerings_class_uq").on(t.classId)]);
 
-/** A private or assigned Class still has a Class Offering. Publication is
- * versioned, independently from its marketing visibility. */
+/** A Class Offering is optional. It publishes access to a Class, not its identity. */
 export const canonicalClassOfferingVersions = educationV30.table("class_offering_versions", {
   id:id(),classOfferingId:uuid("class_offering_id").notNull(),
   classId:uuid("class_id").notNull(),
@@ -56,7 +55,7 @@ export const canonicalClassOfferingVersions = educationV30.table("class_offering
  * and auditing. The Class Enrollment is the native participation record. */
 export const canonicalClassEnrollments = educationV30.table("class_enrollments", {
   id:id(),classId:uuid("class_id").notNull(),
-  classOfferingVersionId:uuid("class_offering_version_id").notNull(),
+  classOfferingVersionId:uuid("class_offering_version_id"),
   learnerPersonId:uuid("learner_person_id").notNull(),
   enrollmentMethod:text("enrollment_method").$type<"self"|"invitation"|"assignment"|"approval">().notNull(),
   creditMode:text("credit_mode").$type<"for_credit"|"audit"|"not_applicable">().notNull().default("not_applicable"),
