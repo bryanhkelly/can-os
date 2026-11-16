@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, desc, eq, ne, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   learnerCourseAttempts, canonicalClassEnrollments, canonicalClasses,
@@ -103,15 +103,11 @@ export async function loadNativeClassAssessmentScope(
       .from(assessmentExecutionAttempts)
       .innerJoin(assessmentAccess,eq(
         assessmentAccess.id,assessmentExecutionAttempts.accessGrantId))
-      .where(and(eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
-        // A diagnostic must precede ANY existing other assessment attempt.
-        // The diagnostic's own in-progress attempt remains valid.
-        // The normal attempt-number gate handles re-entry separately.
-        // Explicitly exclude the diagnostic's own grant.
-        // Drizzle ne() omitted here to avoid implicit nullable grant matches.
-      )).limit(25);
-    baselineLocked=!!progress||prior.some(row=>row.id!==null&&
-      !readHistory); // A provider must explicitly clear readiness before start.
+      .where(and(
+        eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
+        ne(assessmentExecutionAttempts.administrationId,administration.id),
+      )).limit(1);
+    baselineLocked=!!progress||!!prior;
   }
   const canStart=!baselineLocked&&enrollment.status==="active"&&
     attempt.status==="active"&&!!activeGrant;
