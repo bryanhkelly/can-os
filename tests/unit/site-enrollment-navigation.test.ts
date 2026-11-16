@@ -43,10 +43,44 @@ describe("Enrollment-driven public website navigation and templates",()=>{
       expect(course).toContain('template-'+templateId);
       const classes=renderPublicSiteHtml(site,{path:"/classes"});
       expect(classes).toContain("AI Skills");
-      expect(classes).toContain("Find this Class");
-      expect(classes).toContain("learn/classes?search=AI+Skills");
+      expect(classes).toContain("View this Class");
+      expect(classes).toContain("learn/classes?classId=22222222-2222-4222-8222-222222222222");
       expect(classes).not.toContain("Enroll in Class");
     }
+  });
+  it("keeps the approved Course directory even when unrelated blocks share its page",()=>{
+    const site={...page("modern"),contentBlocks:[{
+      id:"community-hero",channel:"learning.enrichment" as const,
+      page:"/courses" as const,placement:"learning" as const,layout:"cards" as const,
+      enabled:true,eyebrow:"Community",title:"Community programs",
+      description:"Approved community content",items:[{
+        id:"community-item",title:"Community outreach",
+        description:"An independently published community Program",label:"Program",
+      }],
+    }]};
+    const html=renderPublicSiteHtml(site,{path:"/courses"});
+    expect(html).toContain("Community outreach");
+    expect(html).toContain("Digital Skills");
+    expect(html).toContain("/learn/enroll?release="+release);
+    expect(html.split('data-content-channel="learning.opportunities"').length-1).toBe(1);
+  });
+  it("uses a Course-specific custom block instead of duplicating its automatic directory",()=>{
+    const site={...page("heritage"),contentBlocks:[{
+      id:"featured-course",channel:"learning.opportunities" as const,
+      page:"/courses" as const,targetKinds:["course" as const],
+      placement:"learning" as const,layout:"featured" as const,
+      enabled:true,eyebrow:"Featured",title:"Our Courses",
+      description:"Site-selected Course presentation",items:[{
+        id:"course:"+release,title:"Digital Skills",description:"Featured public Course",
+        label:"Registration available",
+        link:{href:"https://app.example.org/learn/enroll?release="+release,
+          label:"Register for Course"},
+      }],
+    }]};
+    const html=renderPublicSiteHtml(site,{path:"/courses"});
+    expect(html).toContain("Our Courses");
+    expect(html.split('data-content-channel="learning.opportunities"').length-1).toBe(1);
+    expect(html).toContain("Digital Skills");
   });
   it("hides direct enrollment actions in read-only preview, but retains content",()=>{
     const site=page("modern");

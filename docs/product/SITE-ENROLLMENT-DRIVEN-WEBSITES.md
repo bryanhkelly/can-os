@@ -26,13 +26,13 @@ For digital/provider-wide enrollments not attached to physical premises, preserv
 - `src/domain/site-enrollment-opportunities.ts`: typed, pure public opportunity projection. Sources are separately governed.
 - `src/domain/site-website-experience.ts`: adaptive School, Community, Training, and Mixed content profiles derived only from approved public opportunities. Launch Studio private planning interests do not confer public authority.
 - `src/domain/site-content-channels.ts`: reusable Site-owned channels, typed page placement, multiple blocks from one feed, source sorting, item limits, audience-enrollment target filters.
-- `src/components/launch-studio/SiteContentChannelEditor.tsx`: Site editor supports add, duplicate, reorder, page destination, filters, and separate private save / public publication. Site publication still requires existing Site publisher authorization.
+- `src/components/launch-studio/SiteContentChannelEditor.tsx`: Site editor supports add, duplicate, reorder, page destination, filters, and separate private save / public publication. The Site-first preview also lets operators select an interior page without leaving Launch Studio. Site publication still requires existing Site publisher authorization.
 - `src/domain/public-site-html.ts`: native homepage and interior Programs, Courses and Classes pages; navigation, hero and copy follow the Site's verified content.
 - `src/domain/public-site-paths.ts`: fixed, safe 13-page Site route allowlist. No arbitrary paths, file serving or private CAN OS endpoint proxy.
 - `src/domain/public-site-templates.ts`: seven native layout systems; each receives a public-content-derived profile to avoid forcing a training Site to masquerade as a school.
 - `src/modules/sites/site-public-catalog.server.ts` and private preview adapters: use approved academic, published enrichment, approved noncredit and public Class readers. No unreviewed Site content reaches a public page.
 
-An operator may reuse one authoritative source on the homepage and on the relevant interior page. The renderer consumes the Site's block configuration and approved feed projection; individual pages do not store duplicate Course, Class, session, pricing or enrollment records.
+An operator may reuse one authoritative source on the homepage and on the relevant interior page. An unrelated custom block must not suppress an approved Course, Program or Class directory. The renderer consumes the Site's block configuration and approved feed projection; individual pages do not store duplicate Course, Class, session, pricing or enrollment records.
 
 ## Safe public links
 
@@ -42,14 +42,14 @@ Program: `/student-life` is an informational destination. There is **no** newly 
 
 Course: only an approved noncredit release UUID and a validated HTTPS CAN application origin can produce `/learn/enroll?release=<UUID>`. The POST checks are still authoritative.
 
-Class: a published Class card can link to `/learn/classes?search=<encoded-title>`, which filters the native public Class catalog. **This is not an exact Class Offering version deep link nor a promise of immediate self-enrollment.** Native Class enrollment keeps its own adult verification, consent, window, allowed method, approved Site, learner and capacity checks.
+Class: a published Class card links to `/learn/classes?classId=<UUID>`, which filters the native public Class catalog by **exact Class ID**. This is not an exact Class Offering-version deep link and is never a promise of immediate self-enrollment. Native Class enrollment keeps its own adult verification, consent, window, allowed method, approved Site, learner and capacity checks.
 
 Private previews and fictional template galleries suppress external enrollment actions and submit no learner records.
 
 ## Release gaps that must not be misrepresented
 
 1. Program registration from the public Site still needs a verified, exact Program/Season registration route and domain-specific eligibility checks.
-2. Class discovery currently filters by public Class name. A reviewed exact Class Offering-version link would be more reliable for similarly named Classes, but it requires a secure URL and public-catalog contract, not guessing the version ID.
+2. Class discovery now filters by the stable Class ID and revalidates public Class Offering publication. A future exact Class Offering-version URL could improve direct-registration UX, but must continue validating the current version, learner eligibility, capacity and consent.
 3. Site-independent provider-wide online Course discovery needs its own legitimate public provider profile if it is to appear outside a single Site.
 4. Payment and guardian/youth consent must remain owned by appropriate registered Program, Course or Class workflows. Do not infer them from public listing.
 5. The unified public directory is bounded and server rendered; large national catalogs need paginated provider-aware discovery.
