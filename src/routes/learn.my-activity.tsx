@@ -185,11 +185,11 @@ function MyActivityPage() {
       <section className="mt-6" aria-label={bucket + " activity"}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-serif text-2xl">{views.find(view => view.id === bucket)?.title} activity</h2>
-          <p className="text-sm text-muted-foreground">{shown.length} {shown.length === 1 ? "item" : "items"}</p>
+          <p className="text-sm text-muted-foreground">{shown.length} {shown.length === 1 ? "participation" : "participations"}{opportunities.length > 0 ? ` · ${opportunities.length} enrollment opportunities` : ""}</p>
         </div>
         {shown.length ? <div className="mt-3 grid gap-3">
           {shown.map(item => <ActivityCard key={item.key} item={item}/>)}
-        </div> : <div className="mt-3 border border-border bg-card p-6">
+        </div> : opportunities.length === 0 ? <div className="mt-3 border border-border bg-card p-6">
           <h3 className="font-serif text-xl">Nothing to display in this view</h3>
           <p className="mt-2 text-sm text-muted-foreground">
             {unavailable.length ? "Some sources are unavailable, so this view may be incomplete." :
