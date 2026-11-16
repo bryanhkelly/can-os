@@ -1,7 +1,8 @@
 import {describe, expect, it} from "vitest";
 import {
   PARTICIPATION_READ_MODEL_VERSION, activityBucket, activityStatus, activityStatusLabel,
-  resolveActivityFilters, assertUniqueParticipationKeys,
+  resolveActivityFilters, assertUniqueParticipationKeys, assertParticipationReadModel,
+  type ParticipationReadModel,
 } from "@/domain/participation-read-model";
 import {
   assembleParticipation, projectFamilyEnrichment, projectNativeClasses,
@@ -168,6 +169,36 @@ describe("Participation Read Model v1", () => {
     expect(resolveActivityFilters(records, "upcoming", "event")).toHaveLength(0);
     expect(() => assertUniqueParticipationKeys(records)).not.toThrow();
     expect(() => assertUniqueParticipationKeys([...school, ...school])).toThrow();
+  });
+  it("enforces shared source identity and collection separation for WS2–WS6 consumers", () => {
+    const record = projectSchoolSections([{
+      id: uuid(1), title: "Logic", code: "LOG",
+      enrollmentId: uuid(2), enrollmentStatus: "active",
+    }], now)[0]!;
+    const opportunity = projectNoncreditOpportunities([{
+      releaseId: uuid(3), title: "AI", status: "waiting",
+      joinedAt: now, inviteExpiresAt: null, invitationActive: false,
+    }])[0]!;
+    const projection: ParticipationReadModel = {
+      version: PARTICIPATION_READ_MODEL_VERSION,
+      generatedAt: now.toISOString(), viewerRole: "student", activeGrantId: uuid(4),
+      records: [record], opportunities: [opportunity],
+      sources: [
+        {source: "school_section", state: "ready", coverage: "partial", message: null},
+        {source: "noncredit_waitlist", state: "ready", coverage: "partial", message: null},
+      ],
+    };
+    expect(() => assertParticipationReadModel(projection)).not.toThrow();
+    expect(() => assertParticipationReadModel({
+      ...projection, records: [{...record, key: "school_section:" + uuid(99)}],
+    })).toThrow(/identity/);
+    expect(() => assertParticipationReadModel({
+      ...projection, opportunities: [opportunity, opportunity],
+    })).toThrow(/Duplicate enrollment opportunity/);
+    expect(() => assertParticipationReadModel({
+      ...projection, sources: [{source: "school_section", state: "unavailable",
+        coverage: "complete", message: null}],
+    })).toThrow(/complete coverage/);
   });
   it("deduplicates repeated source rows without combining unrelated enrollments", () => {
     const one = projectSchoolSections([{
