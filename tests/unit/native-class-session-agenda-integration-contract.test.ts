@@ -82,8 +82,8 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
     const panel=read("src/components/learning/NativeClassSessionsPanel.tsx");
     const source=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
     expect(schedule).toContain("changeNativeClassSessionSchedule=createServerFn");
-    expect(schedule).toContain('plan.state!=="scheduled"||plan.facilitatedSessionId!==null');
-    expect(schedule).toContain("delivery.startsAt.getTime()<=now.getTime()");
+    expect(schedule).toContain("canChangeUnopenedClassSession({");
+    expect(schedule).toContain("scheduledStartsAt:delivery.startsAt,now,");
     expect(schedule).toContain("const booked=await scheduleOneClassroom");
     expect(schedule).toContain("tx.insert(canonicalClassSessions)");
     expect(schedule).toContain('state:"cancelled",updatedAt:now');
