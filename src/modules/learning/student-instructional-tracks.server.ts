@@ -26,6 +26,7 @@ import {
   instructionalTrackVersions,
   courseVersions,
   learnerCourseAttempts,
+  canonicalClassEnrollments,
   learnerLessonProgress,
   learnerProfiles,
   learnerTrackSelections,
@@ -148,6 +149,30 @@ async function loadAuthorizedParticipant(
   ) {
     throw new DomainError("UNAVAILABLE", "Active course participation is unavailable.");
   }
+  // Native Classes use the same recorded teacher/lesson/practice services.
+  // The Course Attempt's verified Class Enrollment is the sole learner source.
+  if (attempt.classEnrollmentId) {
+    assertLearningParticipantRole(context, "learner");
+    const [native] = await tx.select().from(canonicalClassEnrollments)
+      .where(eq(canonicalClassEnrollments.id,attempt.classEnrollmentId))
+      .limit(1);
+    if (!native || native.learnerPersonId !== context.actorPersonId ||
+        native.courseAttemptId !== attempt.id ||
+        (native.status !== "active" && !(allowCompletedHistory && native.status === "completed"))) {
+      throw new AuthorizationError("current own Class Enrollment");
+    }
+    // A recorded presenter never changes the Class Enrollment, credit
+    // selection, official results, or canonical Course Attempt.
+    const [profile] = await tx.select().from(learnerProfiles)
+      .where(eq(learnerProfiles.personId,native.learnerPersonId))
+      .limit(1);
+    return {attempt,participant:{
+      selectionSource:"learner",
+      participantPersonId:native.learnerPersonId,
+      learnerId:profile?.id??null,
+    }};
+  }
+
   if (attempt.sectionId) assertSectionScope(context, attempt.sectionId);
 
   if (attempt.enrollmentId) {
