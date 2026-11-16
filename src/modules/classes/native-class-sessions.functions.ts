@@ -1,17 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalClasses, canonicalClassSessions, canonicalClassStaffAssignments,
+  canonicalClasses, canonicalClassSessions,
   canonicalClassEnrollments, learnerCourseAttempts, canonicalDeliverySessions,
   facilitatedClassroomPlans, facilitatedLearningSessions, auditEvents, domainEvents,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { currentClassAuthority } from "./native-class-enrollment.functions";
 import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
-import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
+import { requireNativeClassSessionHost } from "./native-class-session-host.server";
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
@@ -22,8 +21,6 @@ import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
-type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
-type Host=Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
 const uuid=z.string().uuid();
 const datetime=z.string().datetime({offset:true});
 export const nativeClassSessionScheduleSchema=z.object({
@@ -34,33 +31,6 @@ export const nativeClassSessionScheduleSchema=z.object({
   }).strict()).min(1).max(12),
 }).strict();
 
-async function requireNativeClassSessionHost(
-  tx:Tx,host:Host,classId:string,now:Date,lock=false,
-){
-  const query=tx.select().from(canonicalClasses)
-    .where(eq(canonicalClasses.id,classId)).limit(1);
-  const [instance]=lock?await query.for("update"):await query;
-  if(!instance || instance.state!=="active" || !instance.siteId ||
-     instance.operatingOrganizationId!==host.organizationId ||
-     !host.siteIds.includes(instance.siteId) ||
-     !["scheduled","hybrid","facilitated"].includes(instance.deliveryMode))
-    throw new AuthorizationError("active, authorized hosted Class");
-  await currentClassAuthority(tx,instance.id,now);
-  const [assignment]=await tx.select({
-    id:canonicalClassStaffAssignments.id,
-  }).from(canonicalClassStaffAssignments)
-    .where(and(
-      eq(canonicalClassStaffAssignments.classId,instance.id),
-      eq(canonicalClassStaffAssignments.personId,host.actor.actorPersonId!),
-      eq(canonicalClassStaffAssignments.state,"approved"),
-      lte(canonicalClassStaffAssignments.beginsAt,now),
-      or(isNull(canonicalClassStaffAssignments.endsAt),
-        gt(canonicalClassStaffAssignments.endsAt,now)),
-    )).limit(1);
-  if(!assignment)throw new AuthorizationError("explicit active Class teaching assignment");
-  await assertCurrentNativeTeachingGrant(tx,host.actor.actorPersonId!,host.organizationId,instance.siteId);
-  return instance;
-}
 
 /** A native Class Session references the authoritative delivery timetable
  * and existing classroom plan. It does not create another enrollment, copy
