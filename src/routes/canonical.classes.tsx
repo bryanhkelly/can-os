@@ -55,6 +55,7 @@ function NativeClasses(){
   const [recipeCourseId,setRecipeCourseId]=useState<string|null>(null);
   const [recipeOfferingVersionId,setRecipeOfferingVersionId]=useState<string|null>(null);
   const [recipePlan,setRecipePlan]=useState<ProgramRolloutRecipe|null>(null);
+  const [rolloutSiteId,setRolloutSiteId]=useState(preferredSiteId??"");
   const [title,setTitle]=useState("");
   const [classCapacity,setClassCapacity]=useState("");
   const [siteId,setSiteId]=useState("");
@@ -79,7 +80,10 @@ function NativeClasses(){
     (!recipeOfferingVersionId||row.offeringVersionId===recipeOfferingVersionId) &&
     (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
   const rolloutReadiness=recipePlan
-    ?assessLocalRollout(recipePlan,options.data??[],siteId||preferredSiteId||null):[];
+    ?assessLocalRollout(recipePlan,options.data??[],rolloutSiteId||null):[];
+  const rolloutSiteOptions=Array.from(new Map(
+    (options.data??[]).flatMap(row=>row.siteOptions.map(site=>[site.id,site] as const))
+  ).values()).sort((a,b)=>a.name.localeCompare(b.name));
   // Offering versions remain canonical publisher products. Each authorized
   // adoption may support many Course components and local Classes; no extra
   // Program records are synthesized for standalone Courses.
@@ -97,13 +101,22 @@ function NativeClasses(){
       return {id,first:rows[0]!,components};
     });
   function chooseRolloutCourse(course:ProgramRolloutRecipe["courses"][number]){
+    if(!recipePlan||!rolloutSiteId)return;
+    // Select an eligible local Deployment/adoption, never a publisher supplied
+    // Organization, Site or permission reference.
+    const available=(options.data??[]).find(row=>
+      row.offeringVersionId===recipePlan.offeringVersionId &&
+      row.courseVersionId===course.courseVersionId &&
+      row.siteOptions.some(site=>site.id===rolloutSiteId &&
+        site.allowedDeliveryModes.includes(course.deliveryMode)));
+    if(!available){setError("This Site cannot launch the selected Course and delivery mode.");return;}
     setRecipeCourseId(course.courseVersionId);
-    setChoice("");setSiteId("");
+    setChoice(optionKey(available));setSiteId(rolloutSiteId);
     setTitle(course.suggestedClassTitle);
     setDeliveryMode(course.deliveryMode);
     setClassCapacity(course.capacity===null?"":String(course.capacity));
-    setCreateWithOffering(false);
-    setNotice("Review the local Course adoption, Site and Class terms. Loading a recipe never publishes or enrolls anyone.");
+    setCreateWithOffering(false);setError("");
+    setNotice("Local adoption selected. Review Class title and terms. No Class exists until you submit the authorized create command.");
   }
   async function exportLaunchRecipe(){
     if(!selected)return;
@@ -159,6 +172,7 @@ function NativeClasses(){
         setNotice("Legacy Class setup loaded. Select your organization's approved Course Offering and Site. Suggested Session duration: "+recipe.recommendedSessionMinutes+" minutes.");
       }else{
         setRecipePlan(recipe);
+        setRolloutSiteId(preferredSiteId??"");
         setRecipeOfferingVersionId(recipe.offeringVersionId);
         setRecipeCourseId(null);
         setTitle("");setClassCapacity("");
@@ -291,12 +305,21 @@ function NativeClasses(){
                 <p className="mt-1 text-xs text-muted-foreground">
                   {row.isRequired?"Required":"Optional"} · {row.siteOptions.length} authorized delivery Site(s)
                 </p>
+                {(classes.data??[]).filter(item=>item.deploymentId===row.deploymentId&&
+                  item.courseVersionId===row.courseVersionId&&
+                  item.offeringVersionId===row.offeringVersionId).map(cls=>
+                    <Link key={cls.classId} to="/classes/$classId"
+                      params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
+                      className="mt-2 block text-xs font-semibold underline">
+                      {cls.title} · {cls.state} · Sessions
+                    </Link>)}
               </div>
               <Button type="button" size="sm" variant="outline"
                 onClick={()=>{
                   setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
                   setChoice(optionKey(row));setTitle(row.courseTitle);
-                  setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId)?preferredSiteId:"");
+                  setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId&&
+                    site.allowedDeliveryModes.includes(deliveryMode))?preferredSiteId:"");
                   setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
                 }}>Configure Class</Button>
             </li>)}
@@ -343,6 +366,13 @@ function NativeClasses(){
           </div>
           {recipePlan&&<div className="mt-4 space-y-2" aria-label="Local rollout checklist">
             <p className="text-sm font-semibold">{recipePlan.offeringTitle} · rollout v{recipePlan.revision}</p>
+            <label className="block text-sm font-semibold" htmlFor="publisher-rollout-site">Receiving Site</label>
+            <select id="publisher-rollout-site" value={rolloutSiteId}
+              onChange={event=>{setRolloutSiteId(event.target.value);setChoice("");setSiteId("");}}
+              className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+              <option value="">Select an authorized physical or virtual Site</option>
+              {rolloutSiteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+            </select>
             <p className="text-xs text-muted-foreground">
               Readiness reflects current visible local Course options only. It is not a grant or publication approval.
               Every Class and optional Class Offering is created independently under a server-side authorization check.
@@ -353,8 +383,9 @@ function NativeClasses(){
                 <div>
                   <p className="font-semibold">{course.courseTitle} {course.isRequired?"· Required":"· Optional"}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    {status==="ready"?"Approved local adoption found. Review Site and staffing before launch."
-                      :status==="site_authorization_required"?"Current Site is not authorized for this Course."
+                    {status==="ready"?"Approved local adoption and Site mode found. Review staffing and terms before launch."
+                      :status==="site_selection_required"?"Choose a receiving Site to check delivery permissions."
+                      :status==="site_authorization_required"?"Selected Site lacks permission for this Course delivery mode."
                       :"No approved adoption of this Offering version for your organization."}
                   </p>
                 </div>
@@ -415,20 +446,30 @@ function NativeClasses(){
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div><label className="block text-sm font-semibold" htmlFor="native-class-mode">Delivery</label>
-              <select id="native-class-mode" value={deliveryMode} onChange={e=>setDeliveryMode(e.target.value as typeof deliveryMode)}
+              <select id="native-class-mode" value={deliveryMode} onChange={e=>{
+                const mode=e.target.value as typeof deliveryMode;
+                setDeliveryMode(mode);
+                if(!selected?.siteOptions.some(site=>site.id===siteId&&
+                    site.allowedDeliveryModes.includes(mode)))setSiteId("");
+              }}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 {deliveryOptions.map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
               </select>
             </div>
             <div><label className="block text-sm font-semibold" htmlFor="native-class-site">Site</label>
-              <select id="native-class-site" value={siteId} required={deliveryMode!=="self_paced"}
+              <select id="native-class-site" value={siteId} required
                 onChange={e=>setSiteId(e.target.value)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-                <option value="">No physical Site (self-paced only)</option>
-                {(selected?.siteOptions??[]).map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+                <option value="">Select an approved physical or virtual Site</option>
+                {(selected?.siteOptions??[]).filter(site=>site.allowedDeliveryModes.includes(deliveryMode))
+                  .map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
               </select>
             </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            All launched Classes require an approved canonical physical or virtual Site,
+            including self-paced delivery. An unassigned draft cannot be activated.
+          </p>
           <div className="border-t border-border pt-4">
             <label className="flex items-center gap-3 text-sm font-semibold">
               <input type="checkbox" checked={createWithOffering}
@@ -488,7 +529,7 @@ function NativeClasses(){
             </div>}
             </div>}
           </div>
-          <Button disabled={busy||!selected||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
+          <Button disabled={busy||!selected||!siteId||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
             {busy?"Working…":"Create draft Class"}
           </Button>
         </form>
@@ -511,7 +552,8 @@ function NativeClasses(){
             <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {(item.enrollmentMethods??[]).join(", ")||"No registration publication"}</p>
             <Link to="/classes/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
               className="mt-2 inline-block text-sm font-semibold underline">Open Class workspace</Link>
-            {item.state!=="active"&&<Button disabled={busy} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
+            {item.state!=="active"&&<Button disabled={busy||!item.siteId} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
+            {!item.siteId&&<p className="mt-2 text-xs text-muted-foreground">No assigned canonical Site. This draft cannot be activated or published.</p>}
             {!item.classOfferingVersionId&&<Button disabled={busy||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Create draft Offering from form terms</Button>}
             {item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3"
