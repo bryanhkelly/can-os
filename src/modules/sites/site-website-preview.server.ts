@@ -5,7 +5,7 @@ import { readOptionalSitePublishedClasses } from "./site-published-classes.serve
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
-import { sitePublications, sites } from "@/db/schema";
+import { organizations, siteAffiliations, sitePublications, sites } from "@/db/schema";
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
@@ -85,6 +85,18 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const contentConfig = safeReadSiteContentChannelConfig(siteConfiguration?.metadata?.websiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
+  // Show actual reviewed affiliation statuses only to Site-scoped users
+  // holding network read authority; never generate public network claims.
+  const networkRows=actor.capabilities.has("network.affiliations.read")
+    ? await db.select({name:organizations.name,status:siteAffiliations.status})
+        .from(siteAffiliations)
+        .innerJoin(organizations,eq(organizations.id,siteAffiliations.denominationOrganizationId))
+        .where(eq(siteAffiliations.siteId,site.id)).limit(20)
+    : null;
+  const networkAffiliations=networkRows?.flatMap(row=>
+    (["pending","approved","rejected","revoked"] as const).includes(
+      row.status as "pending"|"approved"|"rejected"|"revoked")
+      ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}] : []) ?? null;
   const contentBlocks = resolveSiteContentBlocks(
     contentConfig, {
       mode: "private", preferences: preferences.success ? preferences.data : null,
@@ -92,6 +104,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
         city:planningLocation.success?planningLocation.data.city:null,
         state:planningLocation.success?planningLocation.data.state:null,
         timezone:siteConfiguration?.timezone??null},
+      networkAffiliations,networkStatusKnown:networkRows!==null,
       academicPrograms: authorizedPrograms, enrichment: offerings,
       noncredit: noncreditReleases, classes, classTimezone:siteConfiguration?.timezone??null,
       enrollmentOrigin: noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),

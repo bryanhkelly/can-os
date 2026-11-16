@@ -9,6 +9,8 @@ import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
 import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
 import {safeReadSiteContentChannelConfig,resolveSiteContentBlocks} from "@/domain/site-content-channels";
+import {schoolPlanningLocationSchema} from "@/domain/site-setup-configuration";
+import {readOptionalSitePublishedClasses} from "@/modules/sites/site-published-classes.server";
 import {siteLaunchPreferencesSchema} from "@/domain/site-launch-preferences";
 import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-program-publication";
 import {createIllustrativeSchoolContent,emptySiteLocalContent} from "@/domain/site-local-content";
@@ -64,7 +66,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
     asynchronous:school.deliveryModel.asynchronous===true,liveOnline:school.deliveryModel.liveOnline===true,
     onsiteDaysPerWeek:school.deliveryModel.onsiteDaysPerWeek??null},
   })]:[];
-  const [siteFlags] = await db.select({metadata:sites.metadata}).from(sites)
+  const [siteFlags] = await db.select({metadata:sites.metadata,timezone:sites.timezone}).from(sites)
     .where(eq(sites.id,school.siteId)).limit(1);
   // Use the same independently approved parent-data adapter as the public
   // school website. A private planning preview must not invent tuition,
@@ -84,10 +86,16 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const academicPrograms=[...approvedPrograms,...planning];
   const config=safeReadSiteContentChannelConfig(siteFlags?.metadata?.websiteContentChannels);
   const launchPrefs=siteLaunchPreferencesSchema.safeParse(siteFlags?.metadata?.launchPreferences);
+  const plannedLocation=schoolPlanningLocationSchema.safeParse(siteFlags?.metadata?.schoolPlanningLocation);
+  const classes=await readOptionalSitePublishedClasses(school.siteId);
   const contentBlocks=resolveSiteContentBlocks(
     config,{
       mode:"private",preferences:launchPrefs.success?launchPrefs.data:null,
-      academicPrograms,enrichment:offerings,
+      siteSetup:{name:school.siteName,organizationName:school.organizationName,
+        city:plannedLocation.success?plannedLocation.data.city:null,
+        state:plannedLocation.success?plannedLocation.data.state:null,
+        timezone:siteFlags?.timezone??null},
+      academicPrograms,enrichment:offerings,classes,classTimezone:siteFlags?.timezone??null,
     });
   const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
     site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
