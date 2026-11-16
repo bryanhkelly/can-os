@@ -147,6 +147,7 @@ export const canonicalCourseActivitySets=educationV30.table("course_activity_set
   }>>().notNull(),
   feedbackQuestions:jsonb("feedback_questions").$type<FeedbackPrompt[]>().notNull(),
   passingFraction:numeric("passing_fraction",{precision:6,scale:5}).notNull(),
+  maxQuizAttempts:integer("max_quiz_attempts").notNull(),
   requireAllLessons:boolean("require_all_lessons").notNull().default(false),
   feedbackRequired:boolean("feedback_required").notNull().default(false),
   feedbackConsentVersion:text("feedback_consent_version").notNull(),
@@ -170,6 +171,7 @@ export const canonicalClassActivitySubmissions=educationV30.table("class_activit
   classEnrollmentId:uuid("class_enrollment_id").notNull(),
   activitySetId:uuid("activity_set_id").notNull(),
   kind:text("kind").$type<"quiz"|"feedback">().notNull(),
+  attemptNo:integer("attempt_no").notNull().default(1),
   requestId:uuid("request_id").notNull(),
   quizFraction:numeric("quiz_fraction",{precision:6,scale:5}),
   quizPassed:boolean("quiz_passed"),
@@ -178,7 +180,7 @@ export const canonicalClassActivitySubmissions=educationV30.table("class_activit
   feedbackConsentedAt:timestamp("feedback_consented_at",{withTimezone:true}),
   submittedAt:timestamp("submitted_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[
-  uniqueIndex("class_activity_submission_one_uq").on(t.classEnrollmentId,t.activitySetId,t.kind),
+  uniqueIndex("class_activity_submission_attempt_uq").on(t.classEnrollmentId,t.activitySetId,t.kind,t.attemptNo),
   uniqueIndex("class_activity_submission_request_uq").on(t.classEnrollmentId,t.requestId),
 ]);
 export const canonicalClassActivityAnswers=educationV30Secure.table("class_activity_submission_answers",{
