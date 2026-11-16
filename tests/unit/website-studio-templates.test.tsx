@@ -115,7 +115,7 @@ describe("Website Studio seven-template contract", () => {
     }
   });
 
-  it("renders all 70 public design/pages from canonical approved data without scripts", () => {
+  it("renders all 91 public design/pages from canonical approved data without scripts", () => {
     const example = {
       host: "fictional.can-os.com",
       site: {name:"Sample School",organizationName:"Sample Community"},
