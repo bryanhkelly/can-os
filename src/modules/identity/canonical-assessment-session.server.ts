@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import type { db } from "@/db/client";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { canonicalSessionDigestFromRequest } from "./canonical-command-context.server";
@@ -13,7 +14,7 @@ import { canonicalSessionDigestFromRequest } from "./canonical-command-context.s
  * AND comparing the resolved Person, Organization and staff role.
  */
 export async function bindCanonicalAssessmentSession(
-  tx: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+  tx: Pick<typeof db, "execute">,
   request: Request,
 ): Promise<void> {
   const rawCanSession = (request.headers.get("cookie") ?? "")
