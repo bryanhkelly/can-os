@@ -33,7 +33,8 @@ const privateResult=()=>setResponseHeader("Cache-Control","private, no-store");
  */
 async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:string},data:z.infer<typeof scope>) {
   const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId,true);
-  if(access.source!=="noncredit")throw new AuthorizationError("active noncredit course registration");
+  if(access.source!=="noncredit"&&access.source!=="class")
+    throw new AuthorizationError("active registered Course or Class participant");
   const [campaign]=await tx.select().from(surveyCampaigns)
     .where(and(eq(surveyCampaigns.id,data.campaignId),
       eq(surveyCampaigns.deploymentId,access.deploymentId))).limit(1);
@@ -99,7 +100,8 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
     requireLearner(context);
     return db.transaction(async tx=>{
       const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId,true);
-      if(access.source!=="noncredit")throw new AuthorizationError("noncredit course survey participation");
+      if(access.source!=="noncredit"&&access.source!=="class")
+        throw new AuthorizationError("authorized learner Course survey participation");
       const now=new Date();
       const rows=await tx.select({
         campaignId:surveyCampaigns.id,title:surveyDefinitions.title,
