@@ -54,3 +54,9 @@ Source-level unit and contract tests cover source isolation, theme composition
 and public versus private channel behavior. A Cloudflare build, authenticated
 two-Site acceptance and a matching deployed SHA remain mandatory before the
 live implementation can be considered verified.
+
+## Enrollment-aware multi-page channels (November 2026)
+
+The same approved content source can now appear in more than one presentation block. Site block IDs remain unique, while channel IDs can repeat. Blocks can target Home, Programs, Courses, Classes, Academics or Student life, and may specify permitted enrollment target types, source order/title/upcoming sort and bounded item limits. Launch Studio allows reordering, duplication and independent private save/public publication.
+
+A new `learning.opportunities` channel combines approved School, Program, Course and Class public discovery and source-verified next actions, without creating new enrollment records. It defaults disabled to avoid duplicate existing Course/Class homepage sections. The shared Site renderer composes three new interior pages with the existing seven templates. For scope, safety and remaining issues, see [Site enrollment-driven websites](SITE-ENROLLMENT-DRIVEN-WEBSITES.md).

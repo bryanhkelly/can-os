@@ -111,6 +111,19 @@ describe("Site-owned website content channels", () => {
     expect(published[0]?.items[0]?.description).toContain("Facilitated");
     expect(published[0]?.items[0]?.description).toContain("PST");
     expect(published[0]?.items[0]?.link).toBeUndefined();
+    const withOrigin=resolveSiteContentBlocks(config,{mode:"public",classes:[{
+      classId:"11111111-1111-4111-8111-111111111111",
+      title:"AI Skills, four Sessions",deliveryMode:"facilitated",
+      nextStartsAt:"2026-12-01T18:00:00.000Z",
+    }],enrollmentOrigin:"https://app.example.org"});
+    expect(withOrigin[0]?.items[0]?.link?.href)
+      .toContain("/learn/classes?search=AI+Skills");
+    const privateWithOrigin=resolveSiteContentBlocks(config,{mode:"private",classes:[{
+      classId:"11111111-1111-4111-8111-111111111111",
+      title:"AI Skills, four Sessions",deliveryMode:"facilitated",
+      nextStartsAt:"2026-12-01T18:00:00.000Z",
+    }],enrollmentOrigin:"https://app.example.org"});
+    expect(privateWithOrigin[0]?.items[0]?.link).toBeUndefined();
   });
   it("private previews cannot enable registration links", () => {
     const config = {version: 2 as const, revision: 1, blocks: [{
