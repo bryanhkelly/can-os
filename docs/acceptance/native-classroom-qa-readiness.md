@@ -62,6 +62,21 @@ roll-back options. A Git merge alone is not a safe deployment.
    Course Attempt source constraint and trigger, so it MUST NOT run
    against real users without approved impact/recovery review. The parallel
    Course quiz/survey migration was removed; do not apply it.
+4a. Independently evaluate the **optional existing canonical assessment
+    authoring capability patch**, `patch-canonical-assessment-draft-authoring.sql`.
+    It is NOT the removed third unified Class activities migration and creates
+    NO parallel quiz tables. On the same disposable QA database only, a
+    trusted DBA may apply it and then provision one Organization's NOLOGIN
+    `assessment_draft_author` role with
+    `provision-canonical-assessment-draft-role.sql` for the restricted test
+    application login. Set `CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED=true`
+    ONLY on that test process with a server-only, valid 32-byte hex
+    `CAN_NONCREDIT_ASSESSMENT_KEY_HEX`. Prove publisher-only creation,
+    recovered draft inventory and real AES-GCM key decryption server-side;
+    deny wrong Organization, revoked Person, arbitrary direct table DML,
+    unauthorized role, plaintext key retrieval and all publication writes.
+    Inspect existing assessment item/form/version publication triggers
+    separately: a saved draft is NOT sufficient to launch a knowledge check.
 5. Design and verify exact application-role permissions and row-level
    policies for the new tables and the existing shared classroom tables.
    Do not replace owner-only RLS with a `PUBLIC` grant or unconditional
