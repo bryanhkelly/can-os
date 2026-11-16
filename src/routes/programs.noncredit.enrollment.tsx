@@ -102,8 +102,8 @@ function NoncreditPublicationPage(){
     }catch(error){setMessage(normalizeClientError(error,"Unable to close this enrollment release.").message);}
     finally{setBusy(false);}
   }
-  return <WorkspaceShell eyebrow="Program operations" title="Class Offerings · Training"
-    width="wide" subtitle="Manage the existing noncredit Class Offering publication workflow. A Class Offering can ultimately be public, unlisted or private; this current screen publishes adult self-registration only.">
+  return <WorkspaceShell eyebrow="Program operations" title="Noncredit enrollment"
+    width="wide" subtitle="Publish authorized enrollment windows for an approved training and delivery. Each learner registers themselves with their own verified CAN identity.">
     {publicSiteId&&<section className="mt-5 border border-border bg-card p-4" aria-label="Site enrollment handoff">
       <h2 className="font-serif text-xl">Your Site enrollment handoff</h2>
       {linkedSite.isPending&&<p className="mt-2 text-sm">Checking the independently approved canonical Site connection…</p>}
@@ -125,9 +125,9 @@ function NoncreditPublicationPage(){
     </p>}
     {query.data&&<div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(15rem,.8fr)]">
       <section className="border border-border bg-card p-5">
-        <h2 className="font-serif text-2xl">Publish Class Offering</h2>
+        <h2 className="font-serif text-2xl">Publish enrollment</h2>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          A Class Offering publishes approved enrollment terms for a delivered Course. A published training, active operating organization, approved current adoption,
+          A published training, active operating organization, approved current adoption,
           published Course, approved completion policy and your verified operator role are all required.
           Enrollment terms are versioned and immutable after publication.
         </p>
