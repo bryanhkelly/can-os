@@ -52,8 +52,11 @@ describe("publisher Course Activities recover the original UX without a parallel
     const packageJson=source("package.json");
     expect(page).toContain("createCanonicalSurveyDraft({data:value})");
     expect(page).toContain("getPublisherCourseActivityOptions()");
-    expect(page).toContain("quizPackage");
-    expect(page).toContain("unpublished-authoring-handoff");
+    expect(page).toContain("createCanonicalObjectiveDraft({data:{");
+    expect(page).toContain("listCanonicalObjectiveDrafts({data:{courseVersionId}})");
+    expect(page).toContain("Save canonical quiz draft");
+    expect(page).not.toContain("quizPackage");
+    expect(page).not.toContain("navigator.clipboard");
     expect(page).toContain("independent approval");
     expect(page).not.toContain("publishNativeCourseActivitySet");
     expect(page).not.toContain("tx.insert(assessmentExecutionResults)");
