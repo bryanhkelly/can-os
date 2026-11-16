@@ -26,9 +26,8 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
   const roomState=command.data?.roomState;
   useEffect(()=>{
     if(!enabled||!current||command.data?.roomState!=="live"||!identity)return;
-    const expiredForNewCommand=loaded?.expiresAt!==null &&
-      loaded?.expiresAt!==undefined && Date.now()>=loaded.expiresAt &&
-      loaded.accessCommandId!==current.id;
+    const expiredForNewCommand=!!loaded && loaded.expiresAt!==null &&
+      Date.now()>=loaded.expiresAt && loaded.accessCommandId!==current.id;
     if(loaded?.key===identity && !expiredForNewCommand)return;
     let active=true;
     setError("");setManualPlay(false);
@@ -140,6 +139,13 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
         Latest control: {current.commandKind}. Commands are not proof that playback occurred.
       </p>}
     </div>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {error&&<div className="mt-3 space-y-2">
+      <p role="alert" className="text-sm text-destructive">{error}</p>
+      {enabled&&current&&roomState==="live"&&
+        <Button variant="outline" size="sm" onClick={()=>{
+          recovery.current={key:identity,attempts:0};
+          setLoaded(null);setError("");
+        }}>Recheck approved recording access</Button>}
+    </div>}
   </section>;
 }
