@@ -1,15 +1,17 @@
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,or,isNull} from "drizzle-orm";
+import {and,desc,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {
   canonicalEnrollmentSites,facilitatedClassroomPlans,
   facilitatedRoomAttendanceAssertions,learnerCourseAttempts,
   noncreditCompletionDecisions,noncreditRegistrations,
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
-  noncreditTrainingVersions,
+  noncreditTrainingVersions,participationAttributions,
+  canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
+import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
  * grant from a label, favorite Site, or marketing affiliation.
@@ -19,7 +21,7 @@ import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capabi
 export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
     const releases=await db.select({
       id:noncreditSelfEnrollmentReleases.id,
       siteId:noncreditSelfEnrollmentReleases.siteId,
@@ -29,18 +31,18 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
-      .leftJoin(canonicalEnrollmentSites,eq(
+      .innerJoin(canonicalEnrollmentSites,eq(
         canonicalEnrollmentSites.id,noncreditSelfEnrollmentReleases.siteId))
       .where(and(
         eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
-        or(isNull(noncreditSelfEnrollmentReleases.siteId),
-          inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)),
+        inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds),
       )).limit(1001);
     if(releases.length>1000)throw new Error("Organization has more than 1000 releases; use an interval report");
     if(!releases.length)return {asOf:new Date().toISOString(),totals:{
       registrations:0,active:0,withdrawn:0,completed:0,
       verifiedAttendees:0,linkedRooms:0,
-    },sites:[],cohorts:[],publicationSafe:{minimumCell:10,groups:[]}};
+    },sites:[],cohorts:[],affiliations:[],networkUnits:[],
+      publicationSafe:{minimumCell:10,groups:[],affiliations:[]}};
     const ids=releases.map(x=>x.id);
     const claims=await db.select({
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
@@ -55,6 +57,23 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       )).limit(5001);
     if(claims.length>5000)throw new Error("More than 5000 registrations; partition the organization report");
     const registrationIds=claims.map(x=>x.registrationId);
+    const attributions=registrationIds.length?await db.select({
+      registrationId:participationAttributions.noncreditRegistrationId,
+      creditedOrganizationId:participationAttributions.creditedOrganizationId,
+      organizationName:canonicalEnrollmentOrganizations.displayName,
+      networkMembershipId:participationAttributions.networkMembershipId,
+      attributionBasis:participationAttributions.attributionBasis,
+      relationshipSnapshot:participationAttributions.relationshipSnapshot,
+    }).from(participationAttributions)
+      .innerJoin(canonicalEnrollmentOrganizations,eq(
+        canonicalEnrollmentOrganizations.id,participationAttributions.creditedOrganizationId))
+      .where(inArray(participationAttributions.noncreditRegistrationId,registrationIds))
+      .limit(5001):[];
+    // Reconcile exactly one immutable attribution against every source claim.
+    if(attributions.length!==registrationIds.length)
+      throw new Error("Reporting requires reconciled, uniquely attributed registrations");
+    const attributionByRegistration=new Map(
+      attributions.map(a=>[a.registrationId,a] as const));
     const decisions=registrationIds.length?await db.select({
       registrationId:noncreditCompletionDecisions.registrationId,
       outcome:noncreditCompletionDecisions.outcome,
@@ -117,7 +136,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         (attemptsByRegistration.get(c.registrationId)??[]).some(a=>
           roomIds.some(room=>present.has(room+":"+a)))).length;
       return {
-        releaseId:r.id,siteId:r.siteId,siteName:r.siteName??"Independent online",
+        releaseId:r.id,siteId:r.siteId,siteName:r.siteName,
         trainingTitle:r.title,deliveryMode:r.deliveryMode,
         registrations:local.length,
         active:local.filter(x=>["registered","active"].includes(x.status)).length,
@@ -126,12 +145,12 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         verifiedAttendees,linkedRooms:roomIds.length,
       };
     });
-    const siteKeys=[...new Set(cohorts.map(c=>c.siteId??"independent"))];
+    const siteKeys=[...new Set(cohorts.map(c=>c.siteId))];
     const sites=siteKeys.map(key=>{
-      const local=cohorts.filter(c=>(c.siteId??"independent")===key);
+      const local=cohorts.filter(c=>c.siteId===key);
       return {
-        siteId:key==="independent"?null:key,
-        siteName:local[0]?.siteName??"Independent online",
+        siteId:key,
+        siteName:local[0]?.siteName??"Unknown authorized Site",
         registrations:local.reduce((n,x)=>n+x.registrations,0),
         active:local.reduce((n,x)=>n+x.active,0),
         withdrawn:local.reduce((n,x)=>n+x.withdrawn,0),
@@ -148,6 +167,40 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       verifiedAttendees:sites.reduce((n,x)=>n+x.verifiedAttendees,0),
       linkedRooms:sites.reduce((n,x)=>n+x.linkedRooms,0),
     };
+    // Delivery Site and credited Organization are distinct dimensions.
+    // Each attributed registration is one unique source fact; the same
+    // fact may appear at multiple ancestor network units without duplication.
+    const attendanceFor=(claim:{releaseId:string;registrationId:string})=>
+      (attemptsByRegistration.get(claim.registrationId)??[]).some(attempt=>
+        (roomsByRelease.get(claim.releaseId)??[]).some(room=>present.has(room+":"+attempt)));
+    const {affiliations,networkUnits:unitRollups,uniqueRegistrations}=rollupAttributionEvidence(
+      claims.map(claim=>{
+        const attribution=attributionByRegistration.get(claim.registrationId);
+        if(!attribution)throw new Error("Missing immutable registration attribution");
+        // A church may move districts after registration. Never substitute the
+        // current membership's district for the immutable event-time path.
+        const historicalPath=decodeHistoricalNetworkPath(
+          attribution.relationshipSnapshot.reportingPath);
+        const historicalLeaf=historicalPath?.length
+          ?historicalPath[historicalPath.length-1]:null;
+        return {
+          registrationId:claim.registrationId,
+          creditedOrganizationId:attribution.creditedOrganizationId,
+          organizationName:typeof attribution.relationshipSnapshot.creditedOrganizationName==="string"
+            ?attribution.relationshipSnapshot.creditedOrganizationName
+            :attribution.organizationName,
+          networkMembershipId:attribution.networkMembershipId,
+          reportingUnitId:historicalLeaf?.id??null,
+          reportingUnitName:historicalLeaf?.name??null,
+          basis:attribution.attributionBasis,
+          path:historicalPath,
+          completed:lastDecision.get(claim.registrationId)==="completed",
+          verifiedAttendee:attendanceFor(claim),
+        };
+      }),
+    );
+    if(uniqueRegistrations!==totals.registrations)
+      throw new Error("Affiliate attribution did not reconcile to source totals");
     const minimumCell=10;
     const safe=sites.filter(s=>s.registrations>=minimumCell).map(s=>({
       siteName:s.siteName,registrations:s.registrations,
@@ -155,6 +208,12 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       verifiedAttendees:s.verifiedAttendees>=minimumCell?s.verifiedAttendees:null,
     }));
     return {asOf:new Date().toISOString(),totals,sites,cohorts,
-      publicationSafe:{minimumCell,groups:safe},
-      notice:"Provider-private totals. Each completion is a latest formal noncredit decision; attendance is facilitator-attested in explicitly linked rooms. No inferred watch-time, funding or accreditation claims. Published partner reports must use the suppressed publicationSafe projection."};
+      affiliations,networkUnits:unitRollups,
+      publicationSafe:{minimumCell,groups:safe,
+        affiliations:affiliations.filter(a=>a.registrations>=minimumCell).map(a=>({
+          organizationName:a.organizationName,registrations:a.registrations,
+          completed:a.completed>=minimumCell?a.completed:null,
+          verifiedAttendees:a.verifiedAttendees>=minimumCell?a.verifiedAttendees:null,
+        }))},
+      notice:"Provider-private totals. Each completion is a latest formal noncredit decision; attendance is facilitator-attested in explicitly linked rooms. Affiliate selection is self-reported; no inferred individual church membership, watch-time, funding or accreditation claims. Network-wide reporting across other providers requires independently approved grants. Published partner reports must use the suppressed publicationSafe projection."};
   });

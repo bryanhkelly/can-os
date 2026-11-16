@@ -42,7 +42,7 @@ export function NoncreditNetworkReportPanel(){
             <th scope="col" className="p-3">Site</th><th scope="col" className="p-3">Registered</th>
             <th scope="col" className="p-3">Attended</th><th scope="col" className="p-3">Completed</th>
           </tr></thead>
-          <tbody>{report.data.sites.map(site=><tr key={site.siteId??"independent"} className="border-b border-border">
+          <tbody>{report.data.sites.map(site=><tr key={site.siteId} className="border-b border-border">
             <th scope="row" className="p-3 font-medium">{site.siteName}</th>
             <td className="p-3 tabular-nums">{site.registrations}</td>
             <td className="p-3 tabular-nums">{site.verifiedAttendees}</td>
@@ -50,6 +50,48 @@ export function NoncreditNetworkReportPanel(){
           </tr>)}</tbody>
         </table>
       </div>
+      {report.data.affiliations.length>0&&<section className="mt-6">
+        <h3 className="text-sm font-semibold">Organizations credited for participation</h3>
+        <p className="mt-2 text-xs text-muted-foreground">Local affiliation is self-reported unless separately verified. Site and affiliation totals represent the same registrations, not additional people served.</p>
+        <div className="mt-3 overflow-x-auto border border-border">
+          <table className="w-full text-left text-sm">
+            <thead><tr className="border-b border-border bg-muted/30">
+              <th scope="col" className="p-3">Organization</th>
+              <th scope="col" className="p-3">Reporting unit at registration</th>
+              <th scope="col" className="p-3">Basis</th>
+              <th scope="col" className="p-3">Registrations</th>
+              <th scope="col" className="p-3">Completed</th>
+            </tr></thead>
+            <tbody>{report.data.affiliations.map(row=>
+              <tr key={[row.organizationId,row.networkMembershipId??"provider",row.reportingUnitId??"none",row.basis].join(":")} className="border-b border-border">
+                <th scope="row" className="p-3 font-medium">{row.organizationName}</th>
+                <td className="p-3">{row.reportingUnitName??"Provider Site"}</td>
+                <td className="p-3">{row.basis==="self_reported"?"Self-reported local":"Provider default"}</td>
+                <td className="p-3 tabular-nums">{row.registrations}</td>
+                <td className="p-3 tabular-nums">{row.completed}</td>
+              </tr>)}</tbody>
+          </table>
+        </div>
+      </section>}
+      {report.data.networkUnits.length>0&&<section className="mt-6">
+        <h3 className="text-sm font-semibold">Network reporting units</h3>
+        <p className="mt-2 text-xs text-muted-foreground">Each participant is counted once per level in the snapshotted network path. Do not sum totals from different levels.</p>
+        <div className="mt-3 overflow-x-auto border border-border">
+          <table className="w-full text-left text-sm">
+            <thead><tr className="border-b border-border bg-muted/30">
+              <th scope="col" className="p-3">Unit</th>
+              <th scope="col" className="p-3">Registered</th>
+              <th scope="col" className="p-3">Completed</th>
+            </tr></thead>
+            <tbody>{report.data.networkUnits.map(row=>
+              <tr key={row.unitId} className="border-b border-border">
+                <th scope="row" className="p-3 font-medium">{row.unitName}</th>
+                <td className="p-3 tabular-nums">{row.registrations}</td>
+                <td className="p-3 tabular-nums">{row.completed}</td>
+              </tr>)}</tbody>
+          </table>
+        </div>
+      </section>}
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{report.data?.notice}</p>
       <p className="mt-2 text-xs text-muted-foreground">Public-safe site totals suppress counts below {report.data?.publicationSafe.minimumCell}. The exact figures above are private to the authorized operator.</p>
     </>}

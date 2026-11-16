@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, desc, eq, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { z } from "zod";
 import {
@@ -12,6 +12,7 @@ import {
   canonicalEnrollmentSites,canonicalDeliverySessions,facilitatedClassroomPlans,
   learnerProfiles, noncreditRegistrations, learnerCourseAttempts,
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
+  participationAttributions,networkMemberships,
   noncreditEnrollmentWaitlist,
   noncreditCompletionPolicies, noncreditTrainingVersions,
   auditEvents as canonicalAuditEvents, domainEvents as canonicalDomainEvents,
@@ -227,6 +228,35 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
           consentVersion:release.consentVersion,
           consentSha256:release.consentSha256,adultAttested:data.adultConfirmed,
           referralCode:data.referralCode||null,
+        });
+        // Directory visibility validates the institution, not the learner's
+        // personal affiliation. Self-selection is explicitly self-reported.
+        const [selectedMembership]=data.networkMembershipId
+          ?await tx.select({
+            id:networkMemberships.id,
+            memberOrganizationId:networkMemberships.memberOrganizationId,
+          }).from(networkMemberships).where(and(
+            eq(networkMemberships.id,data.networkMembershipId),
+            eq(networkMemberships.status,"approved"),
+            eq(networkMemberships.directoryVisible,true),
+            or(eq(networkMemberships.networkOrganizationId,release.providerOrganizationId),
+              eq(networkMemberships.networkOrganizationId,release.registeringOrganizationId)),
+            lte(networkMemberships.validFrom,now),
+            or(isNull(networkMemberships.validThrough),
+              gt(networkMemberships.validThrough,now)),
+          )).limit(1):[];
+        if(data.networkMembershipId&&!selectedMembership)
+          throw new AuthorizationError("current approved, directory-visible affiliate for this release");
+        await tx.insert(participationAttributions).values({
+          noncreditRegistrationId:registrationId,releaseId:release.id,
+          deliverySiteId:release.siteId,reportingSiteId:release.siteId,
+          creditedOrganizationId:selectedMembership?.memberOrganizationId??
+            release.registeringOrganizationId,
+          networkMembershipId:selectedMembership?.id??null,
+          attributionBasis:selectedMembership?"self_reported":"provider_default",
+          relationshipSnapshot:selectedMembership?{}:{
+            kind:"provider_default",releaseId:release.id,
+            organizationId:release.registeringOrganizationId,siteId:release.siteId},
         });
         if(invited&&reservation){
           await tx.update(noncreditEnrollmentWaitlist).set({

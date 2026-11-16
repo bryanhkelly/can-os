@@ -11,7 +11,7 @@ import {
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
   educationOperationOrganizationRoles,
-  canonicalOfferingCourses,
+  canonicalOfferingCourses, participationAttributions, networkMemberships,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
@@ -25,6 +25,7 @@ const selfInput=z.object({
   creditMode:classCreditModeSchema,
   adultAttested:z.literal(true),
   consentAccepted:z.literal(true),
+  networkMembershipId:z.string().uuid().optional(),
 }).strict();
 function guard(){
   if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true"){
@@ -82,6 +83,7 @@ export async function currentClassAuthority(tx:Tx,classId:string,now:Date){
       or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
     )).limit(1);
   if(!r || r.classState!=="active")throw new AuthorizationError("currently authorized Class");
+  if(!r.siteId)throw new AuthorizationError("active Class must have an authorized Site");
   const [operator]=await tx.select({id:educationOperationOrganizationRoles.id})
     .from(educationOperationOrganizationRoles)
     .innerJoin(programDeployments,eq(programDeployments.operationId,educationOperationOrganizationRoles.operationId))
@@ -242,6 +244,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
         .where(eq(canonicalClasses.id,version.classId)).for("update").limit(1);
       if(!instance)throw new AuthorizationError("current Class");
       const current=await currentClassAuthority(tx,instance.id,now);
+      if(!current.siteId)throw new AuthorizationError("Class enrollment requires a Site");
       const [offering]=await tx.select({id:canonicalClassOfferings.id})
         .from(canonicalClassOfferings).where(and(
           eq(canonicalClassOfferings.id,version.classOfferingId),
@@ -292,6 +295,31 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
         consentVersion:version.consentVersion,consentSha256,consentedAt:now,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Class Enrollment insert failed");
+      const [selectedMembership]=data.networkMembershipId
+        ?await tx.select({
+          id:networkMemberships.id,
+          memberOrganizationId:networkMemberships.memberOrganizationId,
+        }).from(networkMemberships).where(and(
+          eq(networkMemberships.id,data.networkMembershipId),
+          eq(networkMemberships.status,"approved"),
+          eq(networkMemberships.directoryVisible,true),
+          eq(networkMemberships.networkOrganizationId,current.operatingOrganizationId),
+          lte(networkMemberships.validFrom,now),
+          or(isNull(networkMemberships.validThrough),gt(networkMemberships.validThrough,now)),
+        )).limit(1):[];
+      if(data.networkMembershipId&&!selectedMembership)
+        throw new AuthorizationError("approved directory-visible network affiliate");
+      await tx.insert(participationAttributions).values({
+        classEnrollmentId:enrollment.id,
+        deliverySiteId:current.siteId,reportingSiteId:current.siteId,
+        creditedOrganizationId:selectedMembership?.memberOrganizationId??
+          current.operatingOrganizationId,
+        networkMembershipId:selectedMembership?.id??null,
+        attributionBasis:selectedMembership?"self_reported":"provider_default",
+        relationshipSnapshot:selectedMembership?{}:{
+          kind:"provider_default",classId:instance.id,
+          organizationId:current.operatingOrganizationId,siteId:current.siteId},
+      });
       const [attempt]=await tx.insert(learnerCourseAttempts).values({
         classEnrollmentId:enrollment.id,enrollmentId:null,noncreditRegistrationId:null,
         deploymentId:current.deploymentId,adoptionId:current.adoptionId,
