@@ -15,6 +15,13 @@ not a release certificate. This document does not override WS1's read-model sche
 | School | existing academic `enrollments.id` and Section | verified school/guardian placement | No adult self-registration bypass; placement and school transfers stay with institutional commands |
 | Extended learning | existing enrichment/season registration | verified household/guardian and Site | Never auto-creates native Class Enrollment |
 
+A verified learner's home Organization can differ from the publishing
+Class provider's Organization. Public cross-provider enrollment and exit
+authenticate the **learner's own** current Person, role and home-Organization
+session; only registrar/operator mutations require exact provider Organization
+and Site authority. Report attribution remains linked to the actual
+authorized Class delivery Site and credited Organization, not the home login.
+
 The Class's `deployment_id`, `adoption_id`, `offering_version_id`,
 `course_version_id`, `operating_organization_id`, `site_id`, and
 `class_offering_version_id` must stay attached to their authoritative
@@ -73,6 +80,12 @@ then query *only* open enrollments for the exact Class and Person, denying
 duplicate open identities rather than silently selecting a recent record.
 This is not a five-record history search; completed-history repeat policy
 is independently checked across all prior completions.
+
+The public Class catalog may display approximate `remainingSeats`, derived
+from the same open-participation count. This is a read-only estimate, not a
+reservation or guaranteed seat. Only the Class-row-locked write command can
+confirm a seat. The client disables enrollment when the last observed
+remaining-seat count is zero, but the server always recomputes occupancy.
 
 The Class's `capacity` is the universal maximum for both direct assignment
 and self-enrollment. An optional published Class Offering `capacity` is a
@@ -183,6 +196,9 @@ cross-stream interfaces, not an authorization to overwrite other agents. The exi
 still a prerequisite; disabled means denial, not a partial workflow.
 
 Required integration acceptance **not yet claimed**:
+- Run `tests/unit/native-class-lifecycle-transaction-contract.test.ts`
+  alongside the pure state-machine tests. Source-contract checks are guardrails,
+  **not substitutes** for real transaction, authorization or browser checks.
 - Run `tests/unit/native-class-optional-offering.test.ts`,
   `tests/unit/native-class-mutation-authority.test.ts`,
   `tests/unit/native-class-enrollment.test.ts`, and
