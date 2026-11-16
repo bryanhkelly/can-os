@@ -7,8 +7,8 @@ import {
   facilitatedRoomAttendanceAssertions,learnerCourseAttempts,
   noncreditCompletionDecisions,noncreditRegistrations,
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
-  noncreditTrainingVersions,participationAttributions,networkMemberships,
-  networkUnits,canonicalEnrollmentOrganizations,
+  noncreditTrainingVersions,participationAttributions,
+  canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
 import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
@@ -62,16 +62,11 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       creditedOrganizationId:participationAttributions.creditedOrganizationId,
       organizationName:canonicalEnrollmentOrganizations.displayName,
       networkMembershipId:participationAttributions.networkMembershipId,
-      reportingUnitId:networkMemberships.reportingUnitId,
-      reportingUnitName:networkUnits.name,
       attributionBasis:participationAttributions.attributionBasis,
       relationshipSnapshot:participationAttributions.relationshipSnapshot,
     }).from(participationAttributions)
       .innerJoin(canonicalEnrollmentOrganizations,eq(
         canonicalEnrollmentOrganizations.id,participationAttributions.creditedOrganizationId))
-      .leftJoin(networkMemberships,eq(
-        networkMemberships.id,participationAttributions.networkMembershipId))
-      .leftJoin(networkUnits,eq(networkUnits.id,networkMemberships.reportingUnitId))
       .where(inArray(participationAttributions.noncreditRegistrationId,registrationIds))
       .limit(5001):[];
     // Reconcile exactly one immutable attribution against every source claim.
@@ -182,16 +177,21 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       claims.map(claim=>{
         const attribution=attributionByRegistration.get(claim.registrationId);
         if(!attribution)throw new Error("Missing immutable registration attribution");
+        // A church may move districts after registration. Never substitute the
+        // current membership's district for the immutable event-time path.
+        const historicalPath=decodeHistoricalNetworkPath(
+          attribution.relationshipSnapshot.reportingPath);
+        const historicalLeaf=historicalPath?.length
+          ?historicalPath[historicalPath.length-1]:null;
         return {
           registrationId:claim.registrationId,
           creditedOrganizationId:attribution.creditedOrganizationId,
           organizationName:attribution.organizationName,
           networkMembershipId:attribution.networkMembershipId,
-          reportingUnitId:attribution.reportingUnitId,
-          reportingUnitName:attribution.reportingUnitName,
+          reportingUnitId:historicalLeaf?.id??null,
+          reportingUnitName:historicalLeaf?.name??null,
           basis:attribution.attributionBasis,
-          path:decodeHistoricalNetworkPath(
-            attribution.relationshipSnapshot.reportingPath),
+          path:historicalPath,
           completed:lastDecision.get(claim.registrationId)==="completed",
           verifiedAttendee:attendanceFor(claim),
         };
