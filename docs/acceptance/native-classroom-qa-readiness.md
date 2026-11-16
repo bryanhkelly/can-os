@@ -26,6 +26,26 @@ end-to-end test report.
 - GitHub Actions reports `startup_failure` without running the CI jobs.
   This is not a passing or failing application typecheck or browser test.
 
+## Atomic cutover dependency
+
+The unified Class branch changes the shared Drizzle
+`learner_course_attempts` definition to include
+`class_enrollment_id`, and uses new `class_sessions` relationships
+inside existing classroom, attendance and QR-join services.
+**Do not merge this branch and deploy the application before its migrations
+are present.** Existing school/noncredit SQL queries that select the whole
+Course Attempt row would otherwise refer to an absent database column.
+
+The native Class feature flag is an **authorization/rollout control, not a
+substitute for installing the migration**. Even with the flag disabled,
+shared legacy code may query tables/columns defined by this branch.
+
+Release order must establish a verified schema on a disposable QA clone,
+exercise the existing legacy school/noncredit regressions and native Class
+paths, then perform an approved database-first staging cutover before
+deploying the new application. Maintain emergency room revocation and
+roll-back options. A Git merge alone is not a safe deployment.
+
 ## Safe next operation (no production write)
 
 1. Review existing Neon QA/recovery branches and preserve anything still
