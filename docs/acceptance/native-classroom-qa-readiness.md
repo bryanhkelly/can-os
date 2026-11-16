@@ -72,8 +72,12 @@ roll-back options. A Git merge alone is not a safe deployment.
    their prior school/noncredit behavior and restricted app-role permissions.
    Confirm the new native Class evidence adapter reads only the signed-in
    learner's authorized Course Attempt and NEVER writes assessments or outcomes.
-   Extend and test the existing canonical assessment/survey engines for native
-   Class attempts before enabling native questionnaire submission.
+   Review the Class-specific authorization adapters to the existing canonical
+   assessment and identified-survey engines. Source paths now include provider
+   grant provisioning, learner submissions and independent provider
+   finalization; these are unverified until exercised with actual Class grants,
+   published forms/campaigns, restricted database roles, consent and revocation.
+   No native survey invitations or completion-policy publication may be assumed.
    Run both `npm run typecheck` and `npm run test:classes:unit` in a
    working test environment. Neither has yet been observed passing.
 7. Exercise a real authenticated two-Site/25-learner acceptance journey,
