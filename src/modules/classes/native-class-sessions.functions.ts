@@ -18,6 +18,7 @@ import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
 import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning.functions";
 import { canOpenScheduledClassroom } from "@/domain/classroom-scheduling";
+import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
@@ -190,10 +191,29 @@ export const openNativeClassSession=createServerFn({method:"POST"})
          delivery.siteId!==instance.siteId ||
          delivery.deploymentId!==instance.deploymentId)
         throw new AuthorizationError("unmodified, currently authorized Class Session");
-      if(plan.state==="started"&&plan.facilitatedSessionId)
-        return {classSessionId:link.id,facilitatedSessionId:plan.facilitatedSessionId,
+      if(plan.state==="started"&&plan.facilitatedSessionId){
+        // Never return an ended, emergency-revoked or timed-out room as
+        // successfully reopened. The Class Session is immutable: a new
+        // session must be scheduled rather than reviving the old room.
+        const [room]=await tx.select({
+          id:facilitatedLearningSessions.id,
+          state:facilitatedLearningSessions.state,
+          startedAt:facilitatedLearningSessions.startedAt,
+          endedAt:facilitatedLearningSessions.endedAt,
+        }).from(facilitatedLearningSessions).where(and(
+          eq(facilitatedLearningSessions.id,plan.facilitatedSessionId),
+          eq(facilitatedLearningSessions.deploymentId,instance.deploymentId),
+          eq(facilitatedLearningSessions.courseVersionId,instance.courseVersionId),
+          eq(facilitatedLearningSessions.siteId,instance.siteId!),
+          eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
+          eq(facilitatedLearningSessions.facilitatorPersonId,host.actor.actorPersonId!),
+        )).limit(1);
+        if(!room || facilitatedRoomOperationalState(room,now)!=="live")
+          throw new AuthorizationError("Class Session room is ended or expired; schedule a new Session");
+        return {classSessionId:link.id,facilitatedSessionId:room.id,
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,
           alreadyStarted:true};
+      }
       if(plan.state!=="scheduled"||plan.facilitatedSessionId!==null||
          !canOpenScheduledClassroom(delivery.startsAt,delivery.endsAt,now))
         throw new AuthorizationError("open this Class Session near its scheduled time");
@@ -298,8 +318,10 @@ export const revokeNativeClassSession=createServerFn({method:"POST"})
           eq(facilitatedLearningSessions.hostOrganizationId,cls.operatingOrganizationId)))
         .for("update").limit(1);
       if(!room)throw new AuthorizationError("exact Class room instance");
-      if(room.state==="ended")return {revoked:true,alreadyEnded:true};
+      // Even an idempotent emergency stop requires a current operator
+      // session. Do not disclose room state to a revoked administrator.
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
+      if(room.state==="ended")return {revoked:true,alreadyEnded:true};
       const now=new Date();
       await tx.update(facilitatedLearningSessions)
         .set({state:"ended",endedAt:now,
