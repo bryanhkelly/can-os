@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   classDefinitionSchema, classOfferingTermsSchema, classEnrollmentRequestSchema,
   mayIssueClassAward, validOfferingProductKind, publisherOfferingLabel, visibleInPublicCatalog,
+  enrollmentNeedsOffering,
 } from "@/domain/unified-class";
 
 const id = "5d9bd7cb-b6b8-443b-8732-087e7ea6a236";
@@ -38,7 +39,14 @@ describe("unified Class and Class Offering contract", () => {
     const e={classId:id,classOfferingVersionId:id,learnerPersonId:id,enrollmentMethod:"assignment"};
     for(const creditMode of ["for_credit","audit","not_applicable"]) {
       expect(classEnrollmentRequestSchema.safeParse({...e,creditMode}).success).toBe(true);
+      expect(classEnrollmentRequestSchema.safeParse({...e,classOfferingVersionId:null,creditMode}).success).toBe(true);
     }
+  });
+  it("separates Class assignment from optional publication",()=>{
+    expect(enrollmentNeedsOffering("assignment")).toBe(false);
+    expect(enrollmentNeedsOffering("self")).toBe(true);
+    expect(enrollmentNeedsOffering("invitation")).toBe(true);
+    expect(enrollmentNeedsOffering("approval")).toBe(true);
   });
   it("requires explicit publisher classification", () => {
     expect(validOfferingProductKind("course",1,false)).toBe(true);
