@@ -21,9 +21,10 @@ const selectClass="min-h-10 w-full border border-border bg-background px-3 text-
  * Course Attempt or exact facilitator authority for every read and write.
  */
 export function NativeClassSessionAgenda({
-  classId,classSessionId,canEdit=false,
+  classId,classSessionId,view,canEdit=false,
 }:{
-  classId:string;classSessionId:string;canEdit?:boolean;
+  classId:string;classSessionId:string;view:"learn"|"teach"|"manage";
+  canEdit?:boolean;
 }){
   const agenda=useQuery({
     queryKey:["native-class-session-agenda",classId,classSessionId],
@@ -100,11 +101,17 @@ export function NativeClassSessionAgenda({
         {data.items.map((item,index)=><li key={index} className="py-2 text-sm">
           <span className="font-semibold">{index+1}. {labels[item.kind]}</span>
           <span className="ml-2">{item.title}</span>
-          {["study","watch","practice"].includes(item.kind)&&
+          {view!=="manage"&&["study","watch","practice"].includes(item.kind)&&
             <Link to="/classes/$classId" params={{classId}}
-              search={{view:undefined,tab:"lessons",lesson:item.referenceId,session:undefined}}
+              search={{view,tab:"lessons",lesson:item.referenceId,session:undefined}}
               className="ml-2 underline underline-offset-2">
               Open lesson
+            </Link>}
+          {view==="learn"&&(item.kind==="assignment"||item.kind==="assessment")&&
+            <Link to="/classes/$classId" params={{classId}}
+              search={{view:"learn",tab:"assignments",lesson:undefined,session:undefined}}
+              className="ml-2 underline underline-offset-2">
+              View authorized assignments
             </Link>}
         </li>)}
       </ol>}
