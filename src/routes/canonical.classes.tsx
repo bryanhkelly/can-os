@@ -377,7 +377,7 @@ function NativeClasses(){
             {item.offeringState==="closed"&&item.classOfferingVersionId&&<Button
               disabled={busy||methods.length===0||creditModes.length===0}
               className="mt-3 ml-2" variant="outline"
-              onClick={()=>void addOffering(item.classId)}>Draft new Offering terms</Button>
+              onClick={()=>void addOffering(item.classId)}>Draft new Offering terms</Button>}
           </article>)}
           {classes.data?.length===0&&<p className="text-sm text-muted-foreground">No Classes created yet.</p>}
         </div>
