@@ -76,7 +76,7 @@ describe("canonical workspace navigation",()=>{
    expect(links.filter(item=>item.icon==="home"),role).toHaveLength(1);
   }
   expect(workspaceLinks.site_admin[0]?.path).toBe("/home");
-    expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/launch/school")).toBe("/launch/school");
+    expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/launch/site")).toBe("/launch/site");
  });
  it("marks only the exact route current when nested destinations share a prefix",async()=>{
   const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.teacher,

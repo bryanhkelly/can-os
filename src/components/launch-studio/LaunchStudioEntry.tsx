@@ -1,11 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, Building2, GraduationCap, Landmark, Save, ShieldCheck, Users } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, GraduationCap, Save, ShieldCheck, Users } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
 import wallpaper from "@/assets/student-dashboard-wallpaper.jpg";
 
 const paths = [
   { title: "Bring your Site to life", description: "Establish a learning Site, explore programs and see your website preview", to: "/launch/site", icon: Building2 },
-  { title: "Continue an existing launch", description: "Return to the detailed Launch Hub for an authorized Site", to: "/launch/hub/school", icon: Landmark },
   { title: "Apply for your child", description: "For parents and guardians", to: "/launch/family", icon: Users },
   { title: "Get started as a student", description: "For enrolled or invited students", to: "/launch/student", icon: GraduationCap },
   { title: "Join your school team", description: "For teachers and school staff", to: "/launch/staff", icon: BookOpen },

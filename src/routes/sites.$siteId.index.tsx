@@ -78,10 +78,10 @@ function SiteTodayPage() {
     priority={<>
     <nav aria-label="School operating areas" className="mt-6 flex flex-wrap gap-2 text-sm">
       {([
-        ["Operations", "/home"], ["Launch", "/launch/school"],
+        ["Operations", "/home"], ["Launch", "/launch/site"],
         ["Readiness", "/readiness"], ["Admissions", "/admissions"],
         ["People", "/profiles"], ["Ask CAN", "/ask"],
-      ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/launch/school","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
+      ] as const).map(([name, href]) => <Link key={href} to={href} search={{siteId:["/home","/launch/site","/admissions"].includes(href)?data.site.id:undefined,programId:undefined}}
         className="rounded-full border px-3 py-1.5 hover:bg-muted">{name}</Link>)}
         {data.canOpenOnsiteDay && <Link to="/home" search={{ siteId: data.site.id, date: data.localDate, view: "onsite" }}
         className="border px-3 py-1.5 hover:bg-muted">Onsite day</Link>}

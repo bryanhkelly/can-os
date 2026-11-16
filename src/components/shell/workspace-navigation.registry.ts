@@ -4,7 +4,7 @@ import { optionalSearchUuid } from "@/lib/route-search";
 
 const destinationContextKeys: Record<string, readonly string[]> = {
   "/home": ["siteId", "programId"],
-  "/launch/school": ["siteId", "programId"],
+  "/launch/site": ["siteId"],
   "/launch/hub/school": ["siteId", "programId"],
   "/admissions": ["siteId", "programId"],
   "/staff/students": ["siteId", "programId"],
@@ -114,7 +114,7 @@ const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readon
 };
 
 const schoolAdministrationLinks = [
-  { title: "Launch", path: "/launch/school", icon: "building" },
+  { title: "Launch", path: "/launch/site", icon: "building" },
   { title: "Admissions", path: "/admissions", icon: "clipboard" },
   { title: "Students", path: "/staff/students", icon: "users" },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },
