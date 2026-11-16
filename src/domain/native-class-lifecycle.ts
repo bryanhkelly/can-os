@@ -21,7 +21,9 @@ export function planNativeClassExit(
   current: ClassEnrollmentStatus,
   action: ClassClosureAction,
 ): ClassExitDecision {
-  const target = action === "withdraw" && current === "active" ? "withdrawn" : "cancelled";
+  const target = action === "withdraw"
+    ? current === "pending" ? "cancelled" : "withdrawn"
+    : "cancelled";
   if (current === target) return {
     enrollmentStatus: target, attemptStatus: null,
     releasedSeat: false, alreadyClosed: true,
