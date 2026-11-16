@@ -51,6 +51,21 @@ describe("P0 independent credential issuer authorization",()=>{
     const hotfix=file("database/canonical/v3.0.1/patch-sensitive-credential-issuer-account-binding.sql");
     expect(hotfix).toContain("approval.requested_by_can_account_id=source_session.account_id");
     expect(hotfix).toContain("REVOKE ALL ON FUNCTION");
+    const writer=file("database/canonical/v3.0.1/provision-sensitive-issuer-approval-writer.sql");
+    for(const item of [
+      "NOLOGIN NOINHERIT NOBYPASSRLS",
+      "can_v30_sensitive_approval_writer",
+      "FOR INSERT TO can_v30_sensitive_approval_writer",
+      "FOR UPDATE TO can_v30_sensitive_approval_writer",
+      "REVOKE DELETE,TRUNCATE,REFERENCES,TRIGGER",
+      "status='pending'",
+      "status IN ('approved','rejected')",
+      "status='revoked'",
+      "current_setting('can.issuer_approval_actor',true)",
+    ]) expect(writer).toContain(item);
+    const reader=file("scripts/acceptance/check-can-issuer-reader.mjs");
+    expect(reader).toContain("BEGIN READ ONLY");
+    expect(reader).toContain("approval.requested_by_can_account_id=source_session.account_id");
     expect(sql).not.toContain("GRANT SELECT ON education_v30.canonical_sensitive_capability_approvals");
   });
   it("separates staff requests from reviewer decisions and revocation",()=>{
@@ -62,6 +77,11 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain("approval.requestedByCanAccountId===reviewer.accountId");
     expect(service).toContain("requesterMembership[0]?.personId===reviewer.actorPersonId");
     expect(service).toContain("assertCurrentReviewerInTransaction(tx,reviewer)");
+    expect(service).toContain("withSensitiveApprovalWriter");
+    expect(service).toContain("SET LOCAL ROLE can_v30_sensitive_approval_writer");
+    expect(service).toContain('withSensitiveApprovalWriter(\n        tx,"request",can.accountId');
+    expect(service).toContain('withSensitiveApprovalWriter(tx,"review",reviewer.accountId');
+    expect(service).toContain('withSensitiveApprovalWriter(tx,"revoke",reviewer.accountId');
     expect(service).toContain('grant_row.role=\'can_network_steward\'');
     expect(service).toContain("FOR SHARE OF s,account,grant_row,organization,person");
     expect(service).toContain("reviewEvidenceReference:data.evidenceReference");
