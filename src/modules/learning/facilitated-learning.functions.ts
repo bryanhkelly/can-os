@@ -12,6 +12,7 @@ import {
   auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants,
   contentAssets, contentAssetVersions, courseLessons, courseVersions, courses,
   enrollments, learnerProfiles, noncreditRegistrations, noncreditTrainingVersions,
+  canonicalClassEnrollments,
   deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses,
   domainEvents,
   educationOperationOrganizationRoles,
@@ -286,6 +287,39 @@ async function currentRoomMediaAudience(
   tx: Tx,
   room: typeof facilitatedLearningSessions.$inferSelect,
 ): Promise<Array<typeof learnerCourseAttempts.$inferSelect>> {
+  const nativeClass=await assertNativeClassRoomStaff(tx,room);
+  if(nativeClass){
+    // Approved native Class lessons can start before a learner scans the QR.
+    // Recording rights come from enrolled people in this exact Class,
+    // never a different Class sharing the same Course, Site or Deployment.
+    const candidates=await tx.select({
+      attempt:learnerCourseAttempts,
+      personId:canonicalClassEnrollments.learnerPersonId,
+    }).from(canonicalClassEnrollments)
+      .innerJoin(learnerCourseAttempts,and(
+        eq(learnerCourseAttempts.id,canonicalClassEnrollments.courseAttemptId),
+        eq(learnerCourseAttempts.classEnrollmentId,canonicalClassEnrollments.id),
+        eq(learnerCourseAttempts.courseVersionId,nativeClass.courseVersionId),
+        eq(learnerCourseAttempts.deploymentId,nativeClass.deploymentId),
+        eq(learnerCourseAttempts.adoptionId,nativeClass.adoptionId),
+        eq(learnerCourseAttempts.offeringVersionId,nativeClass.offeringVersionId),
+        eq(learnerCourseAttempts.status,"active"),
+        isNull(learnerCourseAttempts.enrollmentId),
+        isNull(learnerCourseAttempts.noncreditRegistrationId),
+      )).where(and(
+        eq(canonicalClassEnrollments.classId,nativeClass.classId),
+        eq(canonicalClassEnrollments.status,"active"),
+      )).limit(501);
+    if(candidates.length>500)
+      throw new AuthorizationError("bounded native Class audience for recording rights");
+    const adoptions=new Map<string,typeof learnerCourseAttempts.$inferSelect>();
+    for(const candidate of candidates){
+      await nativeClassRoomParticipant(tx,room,candidate.attempt.id,candidate.personId);
+      if(!adoptions.has(candidate.attempt.adoptionId))
+        adoptions.set(candidate.attempt.adoptionId,candidate.attempt);
+    }
+    return [...adoptions.values()];
+  }
   const paired = await tx.select({
     attempt: learnerCourseAttempts,
     participantPersonId: facilitatedLearningParticipants.participantPersonId,
