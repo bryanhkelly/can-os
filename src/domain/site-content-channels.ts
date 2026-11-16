@@ -293,6 +293,9 @@ export function resolveSiteContentBlocks(
           self_paced:"Self-paced",scheduled:"Scheduled",facilitated:"Facilitated",
           hybrid:"Hybrid",
         } as const;
+        const links=new Map(projectSiteEnrollmentOpportunities(feeds)
+          .filter(opportunity=>opportunity.kind==="class")
+          .map(opportunity=>[opportunity.targetId,opportunity.action]));
         items=(feeds.classes ?? []).map(item=>{
           let next="";
           if(item.nextStartsAt){
@@ -303,10 +306,12 @@ export function resolveSiteContentBlocks(
               }).format(new Date(item.nextStartsAt));
             }catch{next="";}
           }
+          const action=feeds.mode==="public"?links.get(item.classId):undefined;
           return {
             id:item.classId,title:item.title,
             description:labels[item.deliveryMode]+next,
             label:"Published public Class · Enrollment terms separately governed",
+            ...(action?{link:action}:{}),
           };
         });
         break;
