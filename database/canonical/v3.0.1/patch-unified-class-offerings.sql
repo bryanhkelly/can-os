@@ -123,7 +123,7 @@ CREATE INDEX IF NOT EXISTS canonical_class_enroll_class_idx
 -- require a new reviewed enrollment, never a silent UPDATE of old evidence.
 -- Only status transitions and governed Course Attempt pointers may change.
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_enrollment_identity_guard()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
  IF TG_OP='DELETE' THEN
    RAISE EXCEPTION 'Class Enrollment history must be preserved' USING ERRCODE='23514';
@@ -145,7 +145,7 @@ BEGIN
      USING ERRCODE='23514';
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS canonical_class_enrollment_identity_guard_trg
  ON education_v30.class_enrollments;
 CREATE TRIGGER canonical_class_enrollment_identity_guard_trg
@@ -381,7 +381,7 @@ CREATE INDEX IF NOT EXISTS class_survey_campaign_class_idx
  ON education_v30.class_survey_campaigns(class_id);
 
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_survey_campaign_guard()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 DECLARE c record; sc record;
 BEGIN
   IF TG_OP<>'INSERT' THEN
@@ -410,7 +410,7 @@ BEGIN
       USING ERRCODE='23514';
   END IF;
   RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS canonical_class_survey_campaign_guard_trg
  ON education_v30.class_survey_campaigns;
 CREATE TRIGGER canonical_class_survey_campaign_guard_trg
@@ -421,7 +421,7 @@ CREATE TRIGGER canonical_class_survey_campaign_guard_trg
 -- campaign owner, Deployment, Survey version and response mode cannot be
 -- silently moved after the link. Closing/pausing is still permitted.
 CREATE OR REPLACE FUNCTION education_v30.canonical_linked_survey_scope_guard()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
   IF EXISTS(SELECT 1 FROM education_v30.class_survey_campaigns
             WHERE campaign_id=OLD.id) THEN
@@ -440,7 +440,7 @@ BEGIN
   END IF;
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS canonical_linked_survey_scope_guard_trg
  ON education_v30.survey_campaigns;
 CREATE TRIGGER canonical_linked_survey_scope_guard_trg
