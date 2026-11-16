@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS education_v30.class_offering_versions (
  opens_at timestamptz,
  closes_at timestamptz,
  capacity integer CHECK(capacity IS NULL OR capacity>0),
+ consent_version text,
+ consent_text text,
  created_by_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
  published_at timestamptz,
  closed_at timestamptz,
@@ -56,6 +58,9 @@ CREATE TABLE IF NOT EXISTS education_v30.class_offering_versions (
  CONSTRAINT canonical_class_offering_version_uq UNIQUE(class_offering_id,version_no),
  CONSTRAINT canonical_class_offering_version_class_uq UNIQUE(id,class_id),
  CONSTRAINT canonical_class_offering_window_ck CHECK(opens_at IS NULL OR closes_at IS NULL OR closes_at>opens_at),
+ CONSTRAINT canonical_class_offering_consent_ck CHECK(
+   NOT('self'=ANY(enrollment_methods)) OR (length(btrim(consent_version)) BETWEEN 3 AND 80 AND length(btrim(consent_text)) BETWEEN 25 AND 10000)
+ ),
  CONSTRAINT canonical_class_offering_publication_ck CHECK (
   (state='draft' AND published_at IS NULL AND closed_at IS NULL)
   OR (state='published' AND published_at IS NOT NULL AND closed_at IS NULL)
@@ -76,6 +81,14 @@ CREATE TABLE IF NOT EXISTS education_v30.class_enrollments (
  status text NOT NULL DEFAULT 'pending'
   CHECK(status IN ('pending','active','completed','withdrawn','cancelled')),
  course_attempt_id uuid REFERENCES education_v30.learner_course_attempts(id),
+ enrolled_by_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
+ consent_version text,
+ consent_sha256 text,
+ consented_at timestamptz,
+ CONSTRAINT canonical_class_enrollment_consent_ck CHECK(
+  (enrollment_method='self' AND consent_version IS NOT NULL AND consent_sha256 IS NOT NULL AND consented_at IS NOT NULL)
+  OR (enrollment_method<>'self' AND consent_version IS NULL AND consent_sha256 IS NULL AND consented_at IS NULL)
+ ),
  enrolled_at timestamptz NOT NULL DEFAULT now(),
  CONSTRAINT canonical_class_enroll_offering_fk FOREIGN KEY(class_offering_version_id,class_id)
    REFERENCES education_v30.class_offering_versions(id,class_id)
@@ -144,11 +157,11 @@ BEGIN
  IF OLD.state IN ('published','closed') THEN
    IF ROW(OLD.class_offering_id,OLD.class_id,OLD.version_no,
           OLD.visibility,OLD.enrollment_methods,OLD.opens_at,OLD.closes_at,
-          OLD.capacity,OLD.created_by_person_id,OLD.published_at,OLD.created_at)
+          OLD.capacity,OLD.consent_version,OLD.consent_text,OLD.created_by_person_id,OLD.published_at,OLD.created_at)
       IS DISTINCT FROM
       ROW(NEW.class_offering_id,NEW.class_id,NEW.version_no,
           NEW.visibility,NEW.enrollment_methods,NEW.opens_at,NEW.closes_at,
-          NEW.capacity,NEW.created_by_person_id,NEW.published_at,NEW.created_at)
+          NEW.capacity,NEW.consent_version,NEW.consent_text,NEW.created_by_person_id,NEW.published_at,NEW.created_at)
       OR NOT (
         (OLD.state=NEW.state AND OLD.closed_at IS NOT DISTINCT FROM NEW.closed_at)
         OR (OLD.state='published' AND NEW.state='closed' AND NEW.closed_at IS NOT NULL)
