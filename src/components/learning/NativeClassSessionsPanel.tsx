@@ -193,6 +193,14 @@ export function NativeClassSessionsPanel({
               endsAt:session.endsAt,now:new Date(),
             })]}
           </p>
+          {workspace.sessionAgendasEnabled&&session.state==="scheduled"&&
+            <p className="mt-2 text-xs text-muted-foreground">
+              {session.agendaReady
+                ?"Study plan published for this Session."
+                :session.agendaRequired
+                  ?"Study plan required before opening this newly scheduled Session."
+                  :"Study plan optional for this pre-activation Session."}
+            </p>}
           {workspace.sessionAgendasEnabled&&<Button type="button" variant="outline"
             size="sm" className="mt-2"
             onClick={()=>setAgendaSession(current=>current===session.id?null:session.id)}>
