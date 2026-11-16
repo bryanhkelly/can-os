@@ -149,7 +149,8 @@ export const createUnifiedClassDraft = createServerFn({method:"POST"})
         visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
-        capacity:data.terms.capacity,state:"draft",
+        capacity:data.terms.capacity,
+        consentVersion:data.terms.consentVersion,consentText:data.terms.consentText,state:"draft",
         createdByPersonId:operator.actor.actorPersonId!,
       }).returning({id:canonicalClassOfferingVersions.id});
       if (!version) throw new Error("Class Offering terms could not be stored");
@@ -332,7 +333,8 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         visibility:data.terms.visibility,enrollmentMethod:data.terms.enrollmentMethod,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
-        capacity:data.terms.capacity,createdByPersonId:operator.actor.actorPersonId!,
+        capacity:data.terms.capacity,consentVersion:data.terms.consentVersion,
+        consentText:data.terms.consentText,createdByPersonId:operator.actor.actorPersonId!,
         state:"draft",
       }).returning({id:canonicalClassOfferingVersions.id});
       if(!created)throw new Error("Cannot create Class Offering version");
