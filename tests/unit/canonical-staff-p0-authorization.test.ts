@@ -46,12 +46,11 @@ describe("canonical single-login P0 authorization boundaries", () => {
 
   it("retains strict learner and independent reviewer separation", () => {
     for (const role of ["learner", "blueprint_reviewer", "survey_reviewer"] as const) {
-      const scope = role === "learner" ? null : null;
       const context = projectCanonicalPrincipalContext({
         person_id: "test-person",
         role_code: role,
         organization_id: "test-organization",
-        site_id: scope,
+        site_id: null,
       });
       for (const denied of [
         "noncredit.enrollment.manage", "credential.issue",
@@ -68,7 +67,7 @@ describe("canonical single-login P0 authorization boundaries", () => {
     expect(guard).toContain("v301_can_staff_session_context");
     expect(guard).toContain("v301_canonical_session_context");
     expect(guard).toContain("canonicalSessionDigestFromRequest");
-    expect(guard).toContain("current active");
+    expect(guard).toContain("current canonical staff grant");
     expect(guard).toContain("unchanged exact canonical staff assignment");
     expect(guard).not.toContain("insert(canonicalAccountGrants)");
   });
