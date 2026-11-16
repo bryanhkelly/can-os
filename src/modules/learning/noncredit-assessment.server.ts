@@ -181,7 +181,7 @@ async function loadFormQuestions(tx:Tx,formVersionId:string) {
     if(choices.length<2)throw new Error("Objective questions require at least two options");
     const maxPoints=Number(f.pointsOverride??version.maximumPoints);
     if(!Number.isFinite(maxPoints)||maxPoints<=0)throw new Error("Invalid question points");
-    return {formItemId:f.id,itemVersionId:version.id,responseKind:kind,
+    return {formItemId:f.id,itemVersionId:version.id,responseKind:version.responseKind,
       prompt:publicText(version.itemPrompt,"prompt"),maxPoints,
       options:choices.map(o=>({id:o.id,label:publicText(o.displayContent,"option")}))};
   });
