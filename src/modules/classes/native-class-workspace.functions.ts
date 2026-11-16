@@ -6,7 +6,7 @@ import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassStaffAssignments, canonicalClassEnrollments,
   canonicalClassOfferings, canonicalClassOfferingVersions, canonicalPersons,
-  courseLessons, courseUnits,
+  canonicalAccountGrants, canonicalAccounts, courseLessons, courseUnits,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { classViews, classTabs, selectClassTab, selectClassView } from "@/domain/class-views";
@@ -167,7 +167,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
             .limit(100);
           roster=rows.map(row=>({
             enrollmentId:row.enrollmentId,personId:row.personId,
-            name:row.preferredName??[row.firstName,row.lastName].filter(Boolean).join(" ")||"Learner",
+            name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Learner"),
             status:row.status,creditMode:row.creditMode,
           }));
         }
@@ -196,6 +196,50 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         offering=latest??null;
       }
 
+
+      let staffCandidates:Array<{personId:string;name:string}>=[];
+      let staffAssignments:Array<{id:string;personId:string;roleCode:string;name:string}>=[];
+      if(view==="manage" && instance.siteId){
+        const candidateRows=await tx.select({
+          personId:canonicalPersons.id,
+          firstName:canonicalPersons.legalFirstName,
+          lastName:canonicalPersons.legalLastName,
+          preferredName:canonicalPersons.preferredName,
+        }).from(canonicalAccountGrants)
+          .innerJoin(canonicalPersons,eq(canonicalPersons.id,canonicalAccountGrants.personId))
+          .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+          .where(and(
+            eq(canonicalAccountGrants.organizationId,instance.operatingOrganizationId),
+            eq(canonicalAccountGrants.siteId,instance.siteId),
+            eq(canonicalAccountGrants.roleCode,"room_facilitator"),
+            eq(canonicalAccountGrants.active,true),
+            isNull(canonicalAccountGrants.revokedAt),
+            isNull(canonicalAccounts.disabledAt),
+          )).limit(100);
+        staffCandidates=[...new Map(candidateRows.map(row=>[
+          row.personId,{personId:row.personId,
+            name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Facilitator")},
+        ])).values()];
+        const assigned=await tx.select({
+          id:canonicalClassStaffAssignments.id,
+          personId:canonicalClassStaffAssignments.personId,
+          roleCode:canonicalClassStaffAssignments.roleCode,
+          firstName:canonicalPersons.legalFirstName,
+          lastName:canonicalPersons.legalLastName,
+          preferredName:canonicalPersons.preferredName,
+        }).from(canonicalClassStaffAssignments)
+          .innerJoin(canonicalPersons,eq(canonicalPersons.id,canonicalClassStaffAssignments.personId))
+          .where(and(eq(canonicalClassStaffAssignments.classId,instance.id),
+            eq(canonicalClassStaffAssignments.state,"approved"),
+            lte(canonicalClassStaffAssignments.beginsAt,now),
+            or(isNull(canonicalClassStaffAssignments.endsAt),
+              gt(canonicalClassStaffAssignments.endsAt,now))))
+          .limit(100);
+        staffAssignments=assigned.map(row=>({
+          id:row.id,personId:row.personId,roleCode:row.roleCode,
+          name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Staff"),
+        }));
+      }
       return {
         classId:instance.id,title:instance.title,
         courseVersionId:instance.courseVersionId,siteId:instance.siteId,
@@ -205,7 +249,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         learner,staffRole,
         canViewRoster:rosterAllowed,
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
-        offering,lessons,
+        offering,lessons,staffCandidates,staffAssignments,
         selectedLessonId:data.lesson??null,
         selectedSessionId:data.session??null,
       };
