@@ -63,9 +63,11 @@ export const classEnrollmentRequestSchema = z.object({
 }).strict();
 export type ClassEnrollmentRequest = z.infer<typeof classEnrollmentRequestSchema>;
 
-/** Direct school/organization assignment can be authorized without a Class Offering. */
+/** A Class Offering is required for self-registration only. Private invitation,
+ * approval and assignment require their own authorized consent/eligibility
+ * workflows, not a mandatory marketing publication. */
 export function enrollmentNeedsOffering(method:z.infer<typeof classEnrollmentMethodSchema>):boolean{
-  return method==="self" || method==="invitation" || method==="approval";
+  return method==="self";
 }
 
 export function validOfferingProductKind(
