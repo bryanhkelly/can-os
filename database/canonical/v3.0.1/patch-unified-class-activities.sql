@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS education_v30.course_activity_sets (
  feedback_questions jsonb NOT NULL CHECK(jsonb_typeof(feedback_questions)='array'
    AND jsonb_array_length(feedback_questions)<=10),
  passing_fraction numeric(6,5) NOT NULL CHECK(passing_fraction>=0.1 AND passing_fraction<=1),
+ max_quiz_attempts integer NOT NULL CHECK(max_quiz_attempts BETWEEN 1 AND 5),
  require_all_lessons boolean NOT NULL DEFAULT false,
  feedback_required boolean NOT NULL DEFAULT false,
  feedback_consent_version text NOT NULL CHECK(length(btrim(feedback_consent_version)) BETWEEN 3 AND 60),
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS education_v30.class_activity_submissions (
  class_enrollment_id uuid NOT NULL REFERENCES education_v30.class_enrollments(id),
  activity_set_id uuid NOT NULL REFERENCES education_v30.course_activity_sets(id),
  kind text NOT NULL CHECK(kind IN ('quiz','feedback')),
+ attempt_no integer NOT NULL DEFAULT 1 CHECK(attempt_no BETWEEN 1 AND 5),
  request_id uuid NOT NULL,
  quiz_fraction numeric(6,5) CHECK(quiz_fraction IS NULL OR (quiz_fraction>=0 AND quiz_fraction<=1)),
  quiz_passed boolean,
@@ -66,15 +68,19 @@ CREATE TABLE IF NOT EXISTS education_v30.class_activity_submissions (
      AND feedback_consent_version IS NULL AND feedback_consent_sha256 IS NULL
      AND feedback_consented_at IS NULL)
    OR
-   (kind='feedback' AND quiz_fraction IS NULL AND quiz_passed IS NULL
+   (kind='feedback' AND attempt_no=1 AND quiz_fraction IS NULL AND quiz_passed IS NULL
      AND feedback_consent_version IS NOT NULL AND feedback_consent_sha256 IS NOT NULL
      AND feedback_consented_at IS NOT NULL)
  ),
- CONSTRAINT class_activity_submission_one_uq UNIQUE(class_enrollment_id,activity_set_id,kind),
+ CONSTRAINT class_activity_submission_attempt_uq UNIQUE(class_enrollment_id,activity_set_id,kind,attempt_no),
  CONSTRAINT class_activity_submission_request_uq UNIQUE(class_enrollment_id,request_id),
  CONSTRAINT class_activity_pin_fk FOREIGN KEY (class_enrollment_id,activity_set_id)
    REFERENCES education_v30.class_activity_enrollment_pins(class_enrollment_id,activity_set_id)
 );
+CREATE UNIQUE INDEX IF NOT EXISTS class_activity_one_feedback_uq
+ ON education_v30.class_activity_submissions(class_enrollment_id,activity_set_id)
+ WHERE kind='feedback';
+
 CREATE TABLE IF NOT EXISTS education_v30_secure.class_activity_submission_answers (
  submission_id uuid PRIMARY KEY REFERENCES education_v30.class_activity_submissions(id),
  answers jsonb NOT NULL CHECK(jsonb_typeof(answers)='array'),
@@ -116,12 +122,12 @@ BEGIN
    RAISE EXCEPTION 'Published Course activity versions must be preserved' USING ERRCODE='23514';
  END IF;
  IF ROW(OLD.course_version_id,OLD.publisher_organization_id,OLD.version_no,
-        OLD.title,OLD.quiz_questions,OLD.feedback_questions,OLD.passing_fraction,
+        OLD.title,OLD.quiz_questions,OLD.feedback_questions,OLD.passing_fraction,OLD.max_quiz_attempts,
         OLD.require_all_lessons,OLD.feedback_required,OLD.feedback_consent_version,
         OLD.feedback_consent_text,OLD.created_by_person_id,OLD.published_at)
     IS DISTINCT FROM
     ROW(NEW.course_version_id,NEW.publisher_organization_id,NEW.version_no,
-        NEW.title,NEW.quiz_questions,NEW.feedback_questions,NEW.passing_fraction,
+        NEW.title,NEW.quiz_questions,NEW.feedback_questions,NEW.passing_fraction,NEW.max_quiz_attempts,
         NEW.require_all_lessons,NEW.feedback_required,NEW.feedback_consent_version,
         NEW.feedback_consent_text,NEW.created_by_person_id,NEW.published_at)
     OR NOT(
