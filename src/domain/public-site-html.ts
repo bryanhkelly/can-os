@@ -827,12 +827,23 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     .filter(block=>block.page===route).map(renderSiteContentChannelBlock).join("");
   const renderOpportunityDirectory=(kind:"program"|"course"|"class",
     title:string,description:string):string=>{
-    const authored=pageBlocks(kind==="program"?"/programs":
-      kind==="course"?"/courses":"/classes");
-    if(authored)return authored;
+    const route=kind==="program"?"/programs":kind==="course"?"/courses":"/classes";
+    const authoredBlocks=contentBlocks.filter(block=>block.page===route);
+    const authored=authoredBlocks.map(renderSiteContentChannelBlock).join("");
+    // A Site editor can place *other* content on a Course/Class/Program page
+    // without accidentally hiding its independently approved directory.
+    // Only a block that actually represents this target kind replaces the
+    // automatic directory, preserving the operator's chosen ordering/layout.
+    const coversTarget=authoredBlocks.some(block=>
+      (block.channel==="learning.opportunities" &&
+        (!block.targetKinds?.length || block.targetKinds.includes(kind))) ||
+      (kind==="program" && block.channel==="learning.enrichment") ||
+      (kind==="course" && block.channel==="learning.noncredit") ||
+      (kind==="class" && block.channel==="learning.classes"));
+    if(coversTarget)return authored;
     const records=opportunities.filter(item=>item.kind===kind);
-    if(!records.length)return "";
-    return renderSiteContentChannelBlock({
+    if(!records.length)return authored;
+    return authored+renderSiteContentChannelBlock({
       id:"auto-"+kind,channel:"learning.opportunities",
       placement:"learning",layout:"cards",enabled:true,
       eyebrow:"Published learning opportunities",title,description,
