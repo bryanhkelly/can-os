@@ -115,6 +115,16 @@ appointment, and verified Organization-owned, unexpired
 SQL membership alone is **not** sufficient. These are independently
 appointed roles without adding a second login or a new role table.
 
+Before trying authorized review or publication, run the read-only role,
+function, key-privilege and **current Person appointment** preflight:
+
+```sh
+CAN_CANONICAL_ASSESSMENT_APPROVAL_PREFLIGHT=1 \
+CAN_CANONICAL_ASSESSMENT_QA_ORGANIZATION_ID=YOUR_PUBLISHER_ORGANIZATION_UUID \
+DATABASE_URL="$TEST_DATABASE_URL" \
+npm run db:canonical:objective-approval:preflight
+```
+
 Enable the optional flags only in that isolated QA runtime:
 
 ```sh
