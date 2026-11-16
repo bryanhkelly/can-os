@@ -7,6 +7,7 @@ import {
   canonicalClasses,canonicalClassEnrollments,canonicalClassOfferingVersions,
   canonicalClassSessions,canonicalClassOutcomes,canonicalClassAwards,
   canonicalDeliverySessions,facilitatedClassroomPlans,facilitatedLearningSessions,
+  learnerCourseAttempts,assessmentFormAdministrations,
   facilitatedRoomAttendanceAssertions,assessmentAccess,
   assessmentExecutionAttempts,assessmentExecutionResults,
 } from "@/db/canonical-v301";
@@ -85,6 +86,8 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         5000,"Class Enrollments");
       const sessions=bounded(await tx.select({
         id:canonicalClassSessions.id,
+        deliverySessionId:canonicalClassSessions.deliverySessionId,
+        planDeliverySessionId:facilitatedClassroomPlans.deliverySessionId,
         scheduledAt:canonicalDeliverySessions.startsAt,
         planState:facilitatedClassroomPlans.state,
         roomId:facilitatedClassroomPlans.facilitatedSessionId,
@@ -95,6 +98,7 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         deliverySiteId:canonicalDeliverySessions.siteId,
         roomSiteId:facilitatedLearningSessions.siteId,
         roomCourseVersionId:facilitatedLearningSessions.courseVersionId,
+        roomDeploymentId:facilitatedLearningSessions.deploymentId,
         roomOrganizationId:facilitatedLearningSessions.hostOrganizationId,
         roomState:facilitatedLearningSessions.state,
         roomEndedAt:facilitatedLearningSessions.endedAt,
@@ -111,7 +115,8 @@ export const getNativeClassReport=createServerFn({method:"GET"})
       // metric can be returned. A joined room must not be borrowed from a
       // different Course, Site, Deployment or operator.
       for(const session of sessions){
-        if(session.planDeploymentId!==cls.deploymentId ||
+        if(session.planDeliverySessionId!==session.deliverySessionId ||
+          session.planDeploymentId!==cls.deploymentId ||
           session.planCourseVersionId!==cls.courseVersionId ||
           session.planSiteId!==cls.siteId ||
           session.planOrganizationId!==cls.operatingOrganizationId ||
@@ -119,12 +124,39 @@ export const getNativeClassReport=createServerFn({method:"GET"})
           (session.roomId && (
             session.roomSiteId!==cls.siteId ||
             session.roomCourseVersionId!==cls.courseVersionId ||
+            session.roomDeploymentId!==cls.deploymentId ||
             session.roomOrganizationId!==cls.operatingOrganizationId
           )))
           throw new Error("Class reporting Session authority does not reconcile");
       }
       const attemptIds=[...new Set(enrollments.map(e=>e.courseAttemptId)
         .filter((id):id is string=>id!==null))];
+      const courseAttempts=attemptIds.length?bounded(await tx.select({
+        id:learnerCourseAttempts.id,
+        classEnrollmentId:learnerCourseAttempts.classEnrollmentId,
+        enrollmentId:learnerCourseAttempts.enrollmentId,
+        noncreditRegistrationId:learnerCourseAttempts.noncreditRegistrationId,
+        sectionId:learnerCourseAttempts.sectionId,
+        deploymentId:learnerCourseAttempts.deploymentId,
+        courseVersionId:learnerCourseAttempts.courseVersionId,
+      }).from(learnerCourseAttempts)
+        .where(inArray(learnerCourseAttempts.id,attemptIds)).limit(5001),
+        5000,"Canonical Course Attempts"):[];
+      if(courseAttempts.length!==attemptIds.length)
+        throw new Error("Class Enrollment Course Attempt references are incomplete");
+      const authoritativeAttemptById=new Map(courseAttempts.map(a=>[a.id,a] as const));
+      const uniqueAttemptEnrollment=new Set<string>();
+      for(const entry of enrollments){
+        if(!entry.courseAttemptId)continue;
+        const attempt=authoritativeAttemptById.get(entry.courseAttemptId);
+        if(!attempt||attempt.classEnrollmentId!==entry.id||
+          attempt.enrollmentId||attempt.noncreditRegistrationId||attempt.sectionId||
+          attempt.deploymentId!==cls.deploymentId||
+          attempt.courseVersionId!==cls.courseVersionId||
+          uniqueAttemptEnrollment.has(attempt.id))
+          throw new Error("Course Attempt does not belong to this exact Class Enrollment");
+        uniqueAttemptEnrollment.add(attempt.id);
+      }
       const roomIds=[...new Set(sessions.map(s=>s.roomId)
         .filter((id):id is string=>id!==null))];
       const attendance=attemptIds.length&&roomIds.length?bounded(await tx.select({
@@ -142,11 +174,29 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         courseAttemptId:assessmentAccess.courseAttemptId,
         state:assessmentExecutionAttempts.state,
         createdAt:assessmentExecutionAttempts.createdAt,
+        submittedAt:assessmentExecutionAttempts.submittedAt,
+        attemptAdministrationId:assessmentExecutionAttempts.administrationId,
+        grantAdministrationId:assessmentAccess.administrationId,
+        attemptLearnerId:assessmentExecutionAttempts.learnerId,
+        grantLearnerId:assessmentAccess.learnerId,
+        assessmentDeploymentId:assessmentFormAdministrations.deploymentId,
+        assessmentCourseVersionId:assessmentFormAdministrations.courseVersionId,
+        assessmentOrganizationId:assessmentFormAdministrations.administeringOrganizationId,
       }).from(assessmentExecutionAttempts)
         .innerJoin(assessmentAccess,eq(
           assessmentAccess.id,assessmentExecutionAttempts.accessGrantId))
+        .innerJoin(assessmentFormAdministrations,eq(
+          assessmentFormAdministrations.id,assessmentExecutionAttempts.administrationId))
         .where(inArray(assessmentAccess.courseAttemptId,attemptIds))
         .limit(10001),10000,"Assessment attempts"):[];
+      for(const assessment of assessments){
+        if(assessment.attemptAdministrationId!==assessment.grantAdministrationId||
+          assessment.attemptLearnerId!==assessment.grantLearnerId||
+          assessment.assessmentDeploymentId!==cls.deploymentId||
+          assessment.assessmentCourseVersionId!==cls.courseVersionId||
+          assessment.assessmentOrganizationId!==cls.operatingOrganizationId)
+          throw new Error("Class reporting assessment grant/administration scope mismatch");
+      }
       const assessmentIds=assessments.map(a=>a.id);
       const results=assessmentIds.length?bounded(await tx.select({
         id:assessmentExecutionResults.id,
@@ -183,7 +233,7 @@ export const getNativeClassReport=createServerFn({method:"GET"})
           roomEndedAt:s.roomEndedAt?iso(s.roomEndedAt):null})),
         attendance:attendance.map(a=>({...a,assertedAt:iso(a.assertedAt)})),
         assessments:assessments.map(a=>({...a,courseAttemptId:a.courseAttemptId??"",
-          createdAt:iso(a.createdAt)})),
+          createdAt:iso(a.createdAt),submittedAt:a.submittedAt?iso(a.submittedAt):null})),
         results, outcomes:outcomes.map(o=>({...o,recordedAt:iso(o.recordedAt)})),
         awards:awards.map(a=>({...a,issuedAt:iso(a.issuedAt),
           revokedAt:a.revokedAt?iso(a.revokedAt):null})),
