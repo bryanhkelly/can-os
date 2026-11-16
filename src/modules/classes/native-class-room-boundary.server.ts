@@ -6,7 +6,7 @@ import {
   learnerCourseAttempts, canonicalAccountGrants, canonicalAccounts,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { currentClassAuthority } from "./native-class-enrollment.functions";
+import { currentClassAuthority } from "./native-class-authority.server";
 import type { facilitatedLearningSessions } from "@/db/canonical-v301";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
