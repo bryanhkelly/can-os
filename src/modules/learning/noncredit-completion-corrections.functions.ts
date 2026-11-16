@@ -12,6 +12,8 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { assertNoncreditCompletionSiteScope } from "@/modules/learning/verified-completion-site.server";
+import { assertSourceBoundCompletionEvidence } from "@/modules/learning/verified-completion-evidence.server";
+import { projectCurrentNoncreditCompletion } from "@/domain/verified-completion-projection";
 
 const schema = z.object({
   registrationId: z.string().uuid(),
@@ -85,9 +87,27 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
         .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(501);
       if (decisions.length > 500)
         throw new AuthorizationError("completion history needs pagination");
-      const replaced = new Set(decisions.flatMap(d => d.supersedesId ? [d.supersedesId] : []));
-      const current = decisions.find(d => !replaced.has(d.id));
-      if (!current) throw new AuthorizationError("existing completion decision");
+      const projected=projectCurrentNoncreditCompletion(registration.id,decisions);
+      if (projected.state==="unavailable" || projected.state==="not_decided")
+        throw new AuthorizationError("unambiguous current completion history");
+      const current=decisions.find(d=>d.id===projected.decisionId);
+      if (!current) throw new AuthorizationError("current completion decision");
+      // A generic verified document is never permission to correct arbitrary
+      // learners. The approved binding must reference this exact historical
+      // decision, Person, outcome, reason, provider and immutable delivery Site.
+      await assertSourceBoundCompletionEvidence(tx,{
+        purpose:"completion_correction",
+        registrationId:registration.id,
+        expectedDecisionId:data.expectedCurrentDecisionId,
+        approvedCorrectionOutcome:data.outcome,
+      },{
+        evidenceVersionId:data.evidenceVersionId,
+        participantPersonId:registration.participantPersonId,
+        organizationId:training.providerOrganizationId,
+        deliverySiteId:actor.scope.siteIds?.[0]??"",
+        actorPersonId:actor.actorPersonId,
+        reason:data.reason,
+      });
       if (current.id !== data.expectedCurrentDecisionId) {
         // Safe retry only for this exact same corrective decision.
         if (current.supersedesId === data.expectedCurrentDecisionId &&
