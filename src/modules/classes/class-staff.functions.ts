@@ -18,6 +18,7 @@ const assignInput=z.object({
   classId:uuid,
   personId:uuid,
   roleCode:z.enum(["teacher","facilitator"]),
+  canVerifyAttendance:z.boolean().default(false),
 }).strict();
 const endInput=z.object({classId:uuid,assignmentId:uuid}).strict();
 
@@ -81,7 +82,10 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
           lte(canonicalAccountGrants.grantedAt,new Date()),
         )).limit(1);
       if(!grant)throw new AuthorizationError("current verified room-facilitator grant at this Site");
-      const [prior]=await tx.select({id:canonicalClassStaffAssignments.id})
+      const [prior]=await tx.select({
+        id:canonicalClassStaffAssignments.id,
+        attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
+      })
         .from(canonicalClassStaffAssignments).where(and(
           eq(canonicalClassStaffAssignments.classId,instance.id),
           eq(canonicalClassStaffAssignments.personId,data.personId),
@@ -89,10 +93,15 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
           eq(canonicalClassStaffAssignments.state,"approved"),
           isNull(canonicalClassStaffAssignments.endsAt),
         )).limit(1);
-      if(prior)return {assignmentId:prior.id,alreadyAssigned:true};
+      if(prior){
+        if(prior.attendanceAuthorized!==data.canVerifyAttendance)
+          throw new AuthorizationError("end and reassign to change attendance permissions");
+        return {assignmentId:prior.id,alreadyAssigned:true};
+      }
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),manager.actor);
       const [assignment]=await tx.insert(canonicalClassStaffAssignments).values({
         classId:instance.id,personId:data.personId,roleCode:data.roleCode,
+        attendanceAuthorized:data.canVerifyAttendance,
         state:"approved",beginsAt:new Date(),assignedByPersonId:manager.actor.actorPersonId!,
       }).returning({id:canonicalClassStaffAssignments.id});
       if(!assignment)throw new Error("Staff assignment was not saved");
@@ -101,12 +110,14 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
         owningOrganizationId:manager.organizationId,
         eventCode:"class.staff_assigned",
         entityKind:"class_staff_assignment",entityId:assignment.id,
-        payload:{classId:instance.id,personId:data.personId,roleCode:data.roleCode},
+        payload:{classId:instance.id,personId:data.personId,roleCode:data.roleCode,
+          attendanceAuthorized:data.canVerifyAttendance},
       });
       await tx.insert(domainEvents).values({
         eventType:"ClassStaffAssigned",aggregateType:"class",aggregateId:instance.id,
         actorPersonId:manager.actor.actorPersonId!,
-        payload:{assignmentId:assignment.id,personId:data.personId,roleCode:data.roleCode},
+        payload:{assignmentId:assignment.id,personId:data.personId,roleCode:data.roleCode,
+          attendanceAuthorized:data.canVerifyAttendance},
       });
       return {assignmentId:assignment.id,alreadyAssigned:false};
     });
