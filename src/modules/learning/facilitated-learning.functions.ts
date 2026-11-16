@@ -567,22 +567,22 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
       const choices=versions.flatMap(version=>visible.filter(row=>
         row.deploymentId===version.deploymentId,
       ).map(site=>({...version,siteId:site.siteId,deploymentName:site.deploymentName})));
-      const rooms=await tx.select({
-        id:facilitatedLearningSessions.id,
-        deploymentId:facilitatedLearningSessions.deploymentId,
-        courseVersionId:facilitatedLearningSessions.courseVersionId,
-        siteId:facilitatedLearningSessions.siteId,
-        state:facilitatedLearningSessions.state,
-        startedAt:facilitatedLearningSessions.startedAt,
-        pairingExpiresAt:facilitatedLearningSessions.pairingExpiresAt,
-        endedAt:facilitatedLearningSessions.endedAt,
-      }).from(facilitatedLearningSessions).where(and(
+      const rooms=await tx.select().from(facilitatedLearningSessions).where(and(
         eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
         eq(facilitatedLearningSessions.facilitatorPersonId,host.actor.actorPersonId!),
         inArray(facilitatedLearningSessions.siteId,host.siteIds),
       )).orderBy(desc(facilitatedLearningSessions.startedAt)).limit(30);
-      const authorizedRooms=rooms.filter(room=>visible.some(
-        choice=>choice.deploymentId===room.deploymentId&&choice.siteId===room.siteId));
+      const authorizedRooms:typeof rooms=[];
+      for(const room of rooms){
+        if(!visible.some(choice=>
+          choice.deploymentId===room.deploymentId&&choice.siteId===room.siteId))continue;
+        try {
+          await assertNativeClassRoomStaff(tx,room);
+          authorizedRooms.push(room);
+        }catch(e){
+          if(!(e instanceof AuthorizationError))throw e;
+        }
+      }
       const ids=authorizedRooms.map(room=>room.id);
       const counts=ids.length ? await tx.select({
         id:facilitatedLearningParticipants.facilitatedSessionId,
