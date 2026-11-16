@@ -20,7 +20,7 @@ describe("native Class evidence consolidates on existing canonical engines",()=>
       expect(source).toContain(name);
     }
     expect(source).toContain('eq(assessmentAccess.courseAttemptId,access.courseAttemptId)');
-    expect(source).toContain('eq(assessmentAccess.accessStatus,"approved")');
+    expect(source).toContain('g.accessStatus==="approved"');
     expect(source).toContain('eq(assessmentFormAdministrations.deploymentId,access.deploymentId)');
     expect(source).toContain('row.resultStatus==="finalized"');
     expect(source).not.toMatch(/tx\.(?:insert|update|delete)\(/);
