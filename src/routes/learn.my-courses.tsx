@@ -62,6 +62,11 @@ function MyNoncreditCourses(){
   return <WorkspaceShell eyebrow="My CAN" width="wide" title="My courses"
     subtitle="Your noncredit course registrations and learning history are tied to your own verified CAN identity."
     actions={<Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link>}>
+    <p className="mt-5 border-l-2 border-primary bg-muted/30 p-4 text-sm">
+      <Link to="/learn/my-activity" className="font-semibold text-primary underline">My Activity</Link>
+      {" "}is your unified participation dashboard. This legacy workspace remains for
+      current training withdrawals, waitlist controls and Course resume commands.
+    </p>
     {query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
     {query.isError && <p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
       Your course records are temporarily unavailable. <button type="button" onClick={()=>void query.refetch()} className="font-semibold text-primary underline">Try again</button>
