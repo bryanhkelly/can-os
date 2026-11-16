@@ -28,7 +28,8 @@ describe("exact noncredit release membership in linked classroom",()=>{
   });
   it("denies cross-release access for QR, live media, activities, survey and assisted practice",()=>{
     const room=read("src/modules/learning/facilitated-learning.functions.ts");
-    expect(room.match(/attemptInAssignedClassroomRelease\(/g)?.length).toBeGreaterThanOrEqual(3);
+    const helpers=read("src/modules/learning/facilitated-learning-operations.server.ts");
+    expect((room+helpers).match(/attemptInAssignedClassroomRelease\(/g)?.length).toBeGreaterThanOrEqual(3);
     expect(read("src/modules/learning/classroom-evidence.functions.ts"))
       .toContain("attemptInAssignedClassroomRelease(");
     expect(read("src/modules/learning/classroom-surveys.functions.ts"))
