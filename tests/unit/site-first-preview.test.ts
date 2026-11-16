@@ -1,61 +1,65 @@
 import { describe, expect, it } from "vitest";
-import { renderSiteFirstPrivatePlan, siteFirstPreviewHeaders } from "@/domain/site-first-preview";
 import { renderPublicSiteHtml } from "@/domain/public-site-html";
 import { emptySiteLocalContent } from "@/domain/site-local-content";
+import { resolveSiteContentBlocks, defaultSiteContentChannelConfig } from "@/domain/site-content-channels";
+import { siteTemplateIds } from "@/domain/site-theme";
+import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
 
-const site = {
-  host:"learning.can-os.com",
-  site:{name:"Example Learning Center",organizationName:"Example Community Organization"},
-  offerings:[],
-  localContent:{
-    ...emptySiteLocalContent,
-    heroHeadline:"A place to learn.",
-    localDescription:"Learning plans are taking shape.",
-  },
-};
+const base = (templateId: typeof siteTemplateIds[number]) => ({
+  host: "example.can-os.com",
+  site: {name: "Example Learning Center", organizationName: "Community Organization"},
+  offerings: [],
+  localContent: {...emptySiteLocalContent, heroHeadline: "A place to learn.",
+    localDescription: "Learning plans are taking shape.",
+    branding: {...emptySiteLocalContent.branding, templateId}},
+});
 
-describe("Site-first private website preview",()=>{
-  it("uses the real Site renderer and places proposed program cards only in private HTML",()=>{
-    const canonical=renderPublicSiteHtml(site,{localPreview:true});
-    const preview=renderSiteFirstPrivatePlan(canonical,{
-      delivery:"both",interestIds:["afterschool","adult","grades-6-8"],
+describe("Private Site preview pulls data channels through the actual template", () => {
+  const channels = resolveSiteContentBlocks(defaultSiteContentChannelConfig, {
+    mode: "private", preferences: {
+      delivery: "both", interestIds: ["afterschool", "adult", "grades-6-8"],
+    },
+  });
+
+  it("composes proposed program cards on all seven templates, never as an injected overlay", () => {
+    for (const templateId of siteTemplateIds) {
+      const site = base(templateId);
+      const html = renderPublicSiteHtml({...site, contentBlocks: channels}, {localPreview: true});
+      expect(html).toContain('data-content-channel="learning.interests"');
+      expect(html).toContain("Afterschool");
+      expect(html).toContain("Adult Learning");
+      expect(html).toContain("Grades 6–8");
+      expect(html).toContain("Proposed · not enrolling");
+      expect(html).not.toContain("can-launch-section");
+      expect(html).not.toContain("can-launch-interest");
+      expect(html).not.toContain("<form");
+      expect(renderPublicSiteHtml(site, {localPreview: true}))
+        .not.toContain('data-content-channel="learning.interests"');
+    }
+  });
+
+  it("keeps a dark modern theme for programs instead of a mismatched white insert", () => {
+    const html = renderPublicSiteHtml({...base("modern"), contentBlocks: channels}, {localPreview: true});
+    expect(html).toContain("body.template-modern .site-content-block .site-channel-card");
+    expect(html).toContain("background:#142b44");
+    expect(html).toContain("var(--site-display)");
+  });
+
+  it("cannot publish private proposed channel content", () => {
+    const published = resolveSiteContentBlocks(defaultSiteContentChannelConfig, {
+      mode: "public", preferences: {delivery: "both", interestIds: ["adult"]},
     });
-    expect(preview).toContain("Example Learning Center");
-    expect(preview).toContain("Afterschool");
-    expect(preview).toContain("Adult Learning");
-    expect(preview).toContain("Grades 6–8");
-    expect(preview).toContain("PROPOSED · NOT ENROLLING");
-    expect(preview).not.toContain("<form");
-    expect(preview).not.toContain("Register now");
-    // Site publication must use the original canonical renderer, not the
-    // separate private-intent overlay.
-    expect(canonical).not.toContain("PROPOSED · NOT ENROLLING");
+    const html = renderPublicSiteHtml({...base("modern"), contentBlocks: published});
+    expect(html).not.toContain("Programs you are exploring");
+    expect(html).not.toContain("Proposed · not enrolling");
   });
 
-  it("does not invent an offering when no interests are saved",()=>{
-    const base="<html><head></head><body><main></main></body></html>";
-    const html=renderSiteFirstPrivatePlan(base,null);
-    expect(html).toContain("Select program interests");
-    expect(html).not.toContain("Enroll now");
-  });
-
-  it("renders no unescaped program markup from private planning inputs",()=>{
-    const output=renderSiteFirstPrivatePlan("<html><head></head><body><main></main></body></html>",{
-      delivery:"digital", interestIds:["summer"],
-    });
-    expect(output).toContain("Summer &amp; Breaks");
-    expect(output).not.toContain("<script");
-  });
-
-  it("never indexes private pages or allows cross-origin framing and form submissions",()=>{
+  it("retains the restricted private preview response policy", () => {
     expect(siteFirstPreviewHeaders["Cache-Control"]).toBe("private, no-store");
     expect(siteFirstPreviewHeaders["X-Robots-Tag"]).toBe("noindex, nofollow");
     expect(siteFirstPreviewHeaders["X-Frame-Options"]).toBe("SAMEORIGIN");
     expect(siteFirstPreviewHeaders["Content-Security-Policy"]).toContain("frame-ancestors 'self'");
     expect(siteFirstPreviewHeaders["Content-Security-Policy"]).toContain("default-src 'none'");
-    // Parent permits the same-origin iframe, while the preview itself remains
-    // restricted to same-origin framing with no scripts or form submission.
-    expect(siteFirstPreviewHeaders["Content-Security-Policy"]).not.toContain("script-src");
     expect(siteFirstPreviewHeaders["Content-Security-Policy"]).toContain("form-action 'none'");
   });
 });

@@ -14,7 +14,8 @@ import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalConten
 import { renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
-import { renderSiteFirstPrivatePlan, siteFirstPreviewHeaders } from "@/domain/site-first-preview";
+import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
+import { siteContentChannelConfigSchema, defaultSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 
@@ -88,10 +89,18 @@ export const Route=createFileRoute("/launch/site-preview")({
           localContent,
         };
         const parsed=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+        const settings=siteContentChannelConfigSchema.safeParse(site.metadata.websiteContentChannels);
+        const config=settings.success?settings.data:defaultSiteContentChannelConfig;
+        page.contentBlocks=resolveSiteContentBlocks(config,{
+          mode:"private",
+          preferences:parsed.success?parsed.data:null,
+          academicPrograms:academics, enrichment:page.offerings,
+          noncredit:noncreditReleases,
+          enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
+        });
         const rendered=renderPublicSiteHtml(page,{path:"/",localPreview:true});
-        const planned=renderSiteFirstPrivatePlan(rendered,parsed.success?parsed.data:null);
         const html=renderPrivateWebsitePreviewHtml(
-          planned,site.id,[],Boolean(history.length),"site",
+          rendered,site.id,[],Boolean(history.length),"site",
         );
         return new Response(html,{status:200,headers:siteFirstPreviewHeaders});
       }catch(error){
