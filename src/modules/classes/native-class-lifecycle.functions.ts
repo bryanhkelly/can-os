@@ -23,7 +23,7 @@ const uuid = z.string().uuid();
 const withdrawInput = z.object({classEnrollmentId:uuid}).strict();
 const cancelInput = z.object({
   classEnrollmentId:uuid,
-  reason:z.enum(["not_eligible","session_cancelled","operator_decision"]),
+  reason:z.enum(["not_eligible","operator_decision"]),
 }).strict();
 
 function requireEnabled():void {
@@ -36,7 +36,7 @@ function requireEnabled():void {
 type ExitRequest = {
   classEnrollmentId:string;
   action:"withdraw"|"cancel";
-  reason:"requested"|"not_eligible"|"session_cancelled"|"operator_decision";
+  reason:"requested"|"not_eligible"|"operator_decision";
 };
 
 /**
