@@ -4,7 +4,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   courses, courseVersions, enrollments, learnerCourseAttempts,
-  learnerProfiles, noncreditRegistrations,
+  learnerProfiles, noncreditRegistrations, canonicalClassEnrollments, canonicalClasses,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -54,8 +54,29 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
           eq(learnerCourseAttempts.status, "active"),
         ))
         .orderBy(desc(learnerCourseAttempts.startedAt)).limit(30);
+      // The personal Class Enrollment is the Course Attempt source. The
+      // presentation room will separately validate exact Class Session links
+      // before accepting the learner's pairing code.
+      const native = await tx.select({
+        ...common,
+      }).from(learnerCourseAttempts)
+        .innerJoin(canonicalClassEnrollments,and(
+          eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
+          eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id),
+          eq(canonicalClassEnrollments.learnerPersonId,personId),
+          eq(canonicalClassEnrollments.status,"active"),
+        ))
+        .innerJoin(canonicalClasses,and(
+          eq(canonicalClasses.id,canonicalClassEnrollments.classId),
+          eq(canonicalClasses.state,"active"),
+          eq(canonicalClasses.courseVersionId,learnerCourseAttempts.courseVersionId),
+        ))
+        .innerJoin(courseVersions,eq(courseVersions.id,learnerCourseAttempts.courseVersionId))
+        .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+        .where(eq(learnerCourseAttempts.status,"active"))
+        .orderBy(desc(learnerCourseAttempts.startedAt)).limit(30);
       const choices = new Map<string, { courseAttemptId: string; courseTitle: string }>();
-      for (const candidate of [...school, ...noncredit]) {
+      for (const candidate of [...school, ...noncredit, ...native]) {
         if (choices.has(candidate.courseAttemptId)) continue;
         try {
           await authorizeCanonicalCourseAttempt(tx, actor, candidate.courseAttemptId);
