@@ -414,6 +414,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
         offering,lessons,staffCandidates,staffAssignments,learnerCandidates,
         sessions,sessionsTruncated:scheduleRows.length>100,
+        sessionAgendasEnabled:process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true",
         selectedLessonId:data.lesson??null,
         selectedSessionId:data.session??null,
       };
