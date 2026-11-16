@@ -142,7 +142,10 @@ function NativeClasses(){
     setChoice(optionKey(available));setSiteId(rolloutSiteId);
     setTitle(available.localClassPolicy.classTitle==="locked"?available.courseTitle:course.suggestedClassTitle);
     setDeliveryMode(course.deliveryMode);
-    setClassCapacity(course.capacity===null?"":String(course.capacity));
+    const limit=available.localClassPolicy.maxClassCapacity;
+    setClassCapacity(course.capacity===null
+      ?limit===null?"":String(limit)
+      :String(limit===null?course.capacity:Math.min(course.capacity,limit)));
     setCreateWithOffering(false);setError("");
     setNotice("Local adoption selected. Review Class title and terms. No Class exists until you submit the authorized create command.");
   }
@@ -369,6 +372,8 @@ function NativeClasses(){
                 onClick={()=>{
                   setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
                   setChoice(optionKey(row));setTitle(row.courseTitle);
+                  setClassCapacity(row.localClassPolicy.maxClassCapacity===null
+                    ?"":String(row.localClassPolicy.maxClassCapacity));
                   const mode=row.localClassPolicy.allowedDeliveryModes.includes(deliveryMode)
                     ?deliveryMode:row.localClassPolicy.allowedDeliveryModes[0]!;
                   setDeliveryMode(mode);
@@ -479,6 +484,8 @@ function NativeClasses(){
               if(selectedOption){
                 setTitle(selectedOption.localClassPolicy.classTitle==="locked"
                   ?selectedOption.courseTitle:title||selectedOption.courseTitle);
+                setClassCapacity(selectedOption.localClassPolicy.maxClassCapacity===null
+                  ?classCapacity:String(selectedOption.localClassPolicy.maxClassCapacity));
                 if(!selectedOption.localClassPolicy.allowedDeliveryModes.includes(deliveryMode)){
                   setDeliveryMode(selectedOption.localClassPolicy.allowedDeliveryModes[0]!);
                   setSiteId("");
@@ -531,6 +538,8 @@ function NativeClasses(){
               onChange={event=>setClassCapacity(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
             <p className="mt-2 text-xs text-muted-foreground">
+              {selected?.localClassPolicy.maxClassCapacity!==null&&selected&&
+                "Publisher maximum: "+selected.localClassPolicy.maxClassCapacity+". An unlimited Class is not permitted. "}
               This is the total number of seats in the Class across every enrollment method.
               A Class Offering may impose an additional, lower registration limit.
             </p>
