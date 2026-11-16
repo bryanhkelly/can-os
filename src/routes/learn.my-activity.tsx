@@ -9,7 +9,7 @@ import {getMyActivity} from "@/modules/learning/my-activity.functions";
 import {
   activityStatusLabel, resolveActivityFilters,
   type ParticipationBucket, type ParticipationKind,
-  type ParticipationRecord,
+  type ParticipationRecord, type ParticipationOpportunity,
 } from "@/domain/participation-read-model";
 
 export const Route = createFileRoute("/learn/my-activity")({
@@ -87,18 +87,43 @@ function ActivityCard({item}: {item: ParticipationRecord}) {
     </div>
   </article>;
 }
+function OpportunityCard({item}: {item: ParticipationOpportunity}) {
+  const expires = displayDate(item.expiresAt);
+  return <article className="border border-border bg-card p-4 sm:p-5" data-opportunity-key={item.key}>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {item.state === "invited" ? "Invitation to enroll" :
+            item.state === "waiting" ? "Waiting list" :
+            item.state === "expired" ? "Invitation expired" : "Enrollment opportunity"}
+        </p>
+        <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          You are not enrolled in this activity. Claiming an invitation requires the current enrollment checks.
+        </p>
+        {item.state === "invited" && expires && <p className="mt-2 text-sm text-muted-foreground">Offer expires: {expires}</p>}
+      </div>
+      {item.action && <a href={item.action.href}
+        className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
+      </a>}
+    </div>
+  </article>;
+}
 function MyActivityPage() {
   const {session} = useWorkspaceSession();
   const [bucket, setBucket] = useState<ParticipationBucket>("current");
   const [kind, setKind] = useState<ParticipationKind | "all">("all");
   const activity = useQuery({
-    queryKey: ["my-activity", session?.authenticated ? session.activeGrantId : null],
+    queryKey: ["my-activity", session?.authenticated ? session.activeGrantId : null,
+      session?.authenticated ? session.role : null],
     queryFn: () => getMyActivity(),
     retry: false,
     staleTime: 15_000,
   });
   const records = activity.data?.records ?? [];
   const shown = resolveActivityFilters(records, bucket, kind);
+  const opportunities = bucket === "upcoming" && kind === "all" ? activity.data?.opportunities ?? [] : [];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Activity"
     subtitle="Your learning, programs, and participation in one place. Each provider keeps authority over its own records."
@@ -172,11 +197,22 @@ function MyActivityPage() {
           </div>
         </div>}
       </section>
+      {opportunities.length > 0 && <section className="mt-8" aria-label="Enrollment opportunities">
+        <h2 className="font-serif text-2xl">Enrollment opportunities</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          {opportunities.length} waiting-list or invitation {opportunities.length === 1 ? "item" : "items"}.
+          These are not enrollments, attendance, or completed learning.
+        </p>
+        <div className="mt-3 grid gap-3">
+          {opportunities.map(item => <OpportunityCard key={item.key} item={item}/>)}
+        </div>
+      </section>}
       <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
         <h2 className="font-semibold text-foreground">One CAN account, independently authorized access</h2>
         <p className="mt-2">This view uses your current verified workspace and each provider's own permissions.
           Another Site, guardian relationship, or staff role does not grant access to private learner activity.
           History is retained by its original records, not recreated here.</p>
+        <p className="mt-2">This is a partial view from current authorized readers, not a certified lifetime transcript. Some sources return at most 100 items and closed school Sections may be absent.</p>
         <p className="mt-3">
           <Link to="/account" className="font-semibold text-primary underline">Manage authorized workspaces</Link>
           {" · "}
