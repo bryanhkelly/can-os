@@ -34,8 +34,9 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
       <section aria-label="Learning and completion checklist" className="space-y-3">
         <h3 className="font-serif text-xl">Your learning checklist</h3>
         <p className="text-sm text-muted-foreground">
-          These are verified records, not a substitute for your Course's published
-          completion policy. The provider determines which requirements apply.
+          These are your recorded learning facts, not all independently verified outcomes
+          and not a substitute for the published completion policy. The provider
+          determines which requirements apply.
         </p>
         <ol className="divide-y divide-border border border-border">
           <li className="flex flex-wrap items-start justify-between gap-3 p-4">
