@@ -12,6 +12,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-enrollment.functions";
 import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
+import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
@@ -79,6 +80,7 @@ export const scheduleNativeClassSessions=createServerFn({method:"POST"})
       // Serialize one Class's schedule mutations, including overlapping
       // concurrent requests. Each individual plan is idempotently keyed.
       const instance=await requireNativeClassSessionHost(tx,host,data.classId,now,true);
+      await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
       const results=[];
       for(const meeting of data.meetings){
         const booked=await scheduleOneClassroom(tx,host,{
@@ -164,6 +166,7 @@ export const openNativeClassSession=createServerFn({method:"POST"})
     return db.transaction(async tx=>{
       const now=new Date();
       const instance=await requireNativeClassSessionHost(tx,host,data.classId,now,true);
+      await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
       const [link]=await tx.select().from(canonicalClassSessions)
         .where(and(eq(canonicalClassSessions.id,data.classSessionId),
           eq(canonicalClassSessions.classId,instance.id))).limit(1);
