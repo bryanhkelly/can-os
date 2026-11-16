@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   assertNativeClassRepeatEligible, assertOperationalClassEnrollmentMethods,
   planNativeClassExit,
+  assertNativeClassOperatorExitScope,
+  assertNativeClassLearnerSessionForExit,
 } from "./native-class-lifecycle";
+import type { CommandContext } from "./command-context";
 
 describe("WS2 native Class enrollment lifecycle", () => {
   it("withdraws active participation and releases capacity", () => {
@@ -47,5 +50,51 @@ describe("WS2 native Class enrollment lifecycle", () => {
   it("allows new registration after withdrawal, not ungoverned completed repeat", () => {
     expect(() => assertNativeClassRepeatEligible(["withdrawn","cancelled"])).not.toThrow();
     expect(() => assertNativeClassRepeatEligible(["completed","withdrawn"])).toThrow();
+  });
+});
+
+describe("WS2 negative enrollment authorization boundaries",()=>{
+  const org="11111111-1111-4111-8111-111111111111";
+  const site="22222222-2222-4222-8222-222222222222";
+  const person="33333333-3333-4333-8333-333333333333";
+  const operator:CommandContext={
+    actorPersonId:person,role:"registrar",
+    capabilities:new Set(["class.manage"]),
+    scope:{organizationIds:[org],siteIds:[site]},
+  };
+  const cls={operatingOrganizationId:org,siteId:site};
+  it("denies another Site and another Organization",()=>{
+    expect(()=>assertNativeClassOperatorExitScope(operator,cls)).not.toThrow();
+    expect(()=>assertNativeClassOperatorExitScope(operator,{...cls,siteId:"other-site"})).toThrow();
+    expect(()=>assertNativeClassOperatorExitScope(operator,{
+      ...cls,operatingOrganizationId:"other-org",
+    })).toThrow();
+  });
+  it("denies broad scope, no Site, wrong role or missing capability",()=>{
+    const fixtures:CommandContext[]=[
+      {...operator,scope:{...operator.scope,siteIds:[site,"other"]}},
+      {...operator,scope:{...operator.scope,organizationIds:[org,"other"]}},
+      {...operator,role:"learner"},
+      {...operator,capabilities:new Set()},
+      {...operator,actorPersonId:null},
+    ];
+    fixtures.forEach(actor=>expect(()=>assertNativeClassOperatorExitScope(actor,cls)).toThrow());
+    expect(()=>assertNativeClassOperatorExitScope(operator,{...cls,siteId:null})).toThrow();
+  });
+  it("denies switched Person, role, Organization, Site and missing restricted session values",()=>{
+    const grant={
+      person_id:person,role_code:"learner",
+      organization_id:org,site_id:null,
+    };
+    expect(()=>assertNativeClassLearnerSessionForExit(grant,person,org)).not.toThrow();
+    const variants=[
+      {...grant,person_id:"unrelated"},
+      {...grant,role_code:"guardian"},
+      {...grant,role_code:"site_admin"},
+      {...grant,organization_id:"unrelated"},
+      {...grant,site_id:site},
+      {...grant,person_id:undefined},
+    ];
+    variants.forEach(value=>expect(()=>assertNativeClassLearnerSessionForExit(value,person,org)).toThrow());
   });
 });
