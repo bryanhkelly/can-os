@@ -126,7 +126,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
         finalizedAssessments:valid.length,
         finalizedPassed:valid.filter(row=>row.outcome==="pass").length,
         classCompletionOutcomeRecorded:!!completion,
-        note:"Canonical assessment results and Class outcomes are separate from lesson ticks, room playback, attendance and award issuance. Native Class assessment submission requires a separately approved provider integration.",
+        note:"Canonical assessment results and Class outcomes are separate from lesson ticks, room playback, attendance and award issuance. Native Class assessment submission requires a published exact-Course administration and provider-issued grant; scores still require independent confirmation.",
       };
     });
   });
