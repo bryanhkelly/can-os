@@ -71,8 +71,8 @@ async function exitNativeClass(command:ExitRequest){
       if(!cls.siteId ||
          actor.scope.organizationIds?.length!==1 ||
          actor.scope.siteIds?.length!==1 ||
-         actor.scope.organizationIds[0]!==cls.operatingOrganizationId ||
-         actor.scope.siteIds[0]!==cls.siteId)
+         actor.scope.organizationIds?.[0]!==cls.operatingOrganizationId ||
+         actor.scope.siteIds?.[0]!==cls.siteId)
         throw new AuthorizationError("exact active Class Site operator");
       // Session and current exact Site grant are revalidated inside the same
       // transaction, including when the underlying Class was closed.
