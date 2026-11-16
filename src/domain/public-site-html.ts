@@ -1,5 +1,6 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
 import type { SiteContentBlockProjection } from "./site-content-channels";
+import type { SiteEnrollmentOpportunity } from "./site-enrollment-opportunities";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
@@ -35,6 +36,8 @@ export type PublicSitePage = {
   enrollmentAppOrigin?: string | null;
   /** Site-owned, source-resolved website content channels. */
   contentBlocks?: readonly SiteContentBlockProjection[];
+  /** Already approved, read-only discovery; never a second enrollment ledger. */
+  enrollmentOpportunities?: readonly SiteEnrollmentOpportunity[];
 };
 
 /** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */

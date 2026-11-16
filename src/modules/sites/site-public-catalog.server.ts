@@ -3,6 +3,7 @@ import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/do
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
+import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
 import { and, eq, isNotNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, programs, sitePublications, sites } from "@/db/schema";
@@ -86,6 +87,10 @@ export async function readPublishedSiteCatalog(slug: string) {
     const noncreditReleases = await readOptionalSiteNoncreditReleases(site.id, tx);
     const classes = await readOptionalSitePublishedClasses(site.id, tx);
     const enrollmentAppOrigin = noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
+    const enrollmentOpportunities=projectSiteEnrollmentOpportunities({
+      academicPrograms:authorizedPrograms,enrichment:publicOfferings,
+      noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
+    });
     const contentConfig = safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const contentBlocks = resolveSiteContentBlocks(
       contentConfig, {
@@ -108,6 +113,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       localContent,
       media,
       offerings: publicOfferings,
+      enrollmentOpportunities,
       contentBlocks,
       ...(noncreditReleases.length ? { noncreditReleases, enrollmentAppOrigin } : {}),
     };

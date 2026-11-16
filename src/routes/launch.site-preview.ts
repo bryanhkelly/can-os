@@ -20,6 +20,7 @@ import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/do
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "@/modules/sites/site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
+import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
 
 function failure(status:number,title:string,message:string){
   return new Response(privateWebsitePreviewErrorPage(title,message), {
@@ -107,6 +108,11 @@ export const Route=createFileRoute("/launch/site-preview")({
             ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}]
             : []) ?? null;
         const config=safeReadSiteContentChannelConfig(site.metadata.websiteContentChannels);
+        page.enrollmentOpportunities=projectSiteEnrollmentOpportunities({
+          academicPrograms:academics,enrichment:page.offerings,
+          noncredit:noncreditReleases,classes,
+          enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
+        });
         page.contentBlocks=resolveSiteContentBlocks(config,{
           mode:"private",
           preferences:parsed.success?parsed.data:null,

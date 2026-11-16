@@ -23,6 +23,7 @@ import {readApprovedSchoolSitePhotos} from "@/modules/sites/site-media-folder.se
 import {projectApprovedSchoolSiteMedia} from "@/domain/school-site-media-public";
 import {readEnrichmentCatalog} from "@/modules/activities/enrichment-catalog.server";
 import {toPublicSiteEnrichment} from "@/domain/public-site-catalog";
+import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
 import {checkPublishedSiteReachability} from "@/modules/sites/public-host-reachability";
 
 /** Launch owners can inspect their own safe planning preview. This grants no
@@ -109,11 +110,14 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       networkAffiliations,networkStatusKnown:networkRows!==null,
       academicPrograms,enrichment:offerings,classes,classTimezone:siteFlags?.timezone??null,
     });
-  const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
+  const enrollmentOpportunities=projectSiteEnrollmentOpportunities({
+     academicPrograms,enrichment:offerings,classes,
+   });
+   const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
     site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
     parentInformation:projectApprovedParentInformation({
       site,academicPrograms,offerings,localContent,...parentExtras,
-    }),contentBlocks,
+    }),contentBlocks,enrollmentOpportunities,
   };
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.

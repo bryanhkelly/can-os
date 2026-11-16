@@ -3,6 +3,7 @@ import { projectApprovedParentInformation, withVerifiedPublicApplications } from
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
+import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
 import { projectPublicInformationReadiness } from "@/domain/public-information-readiness";
 import { db } from "@/db/client";
 import { organizations, siteAffiliations, sitePublications, sites } from "@/db/schema";
@@ -82,6 +83,11 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // is assembled; the optional read fails closed without breaking preview.
   const noncreditReleases = host ? await readOptionalSiteNoncreditReleases(site.id) : [];
   const classes = host ? await readOptionalSitePublishedClasses(site.id) : [];
+  const enrollmentAppOrigin=noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
+  const enrollmentOpportunities=projectSiteEnrollmentOpportunities({
+    academicPrograms:authorizedPrograms,enrichment:offerings,
+    noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
+  });
   const contentConfig = safeReadSiteContentChannelConfig(siteConfiguration?.metadata?.websiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
@@ -113,7 +119,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     host, site: { name: site.name, organizationName: site.organizationName },
     academicPrograms:authorizedPrograms, offerings, localContent: previewContent,
-    parentInformation, media, contentBlocks,
+    parentInformation, media, contentBlocks, enrollmentOpportunities,
     ...(noncreditReleases.length ? {
       noncreditReleases,
       enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
