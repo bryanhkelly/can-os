@@ -40,6 +40,8 @@ describe("network attribution is not a parallel enrollment system",()=>{
     const native=read("src/modules/classes/native-class-enrollment.functions.ts");
     expect(native).toContain("insert(participationAttributions)");
     expect(native).toContain("Class enrollment requires a Site");
+    const assignment=read("src/modules/classes/native-class-assignment.functions.ts");
+    expect(assignment).toContain("insert(participationAttributions)");
   });
   it("permits an optional verifiable affiliate selector but not freeform attribution",()=>{
     const request={releaseId:id,acceptedConsent:true,adultConfirmed:true,
@@ -88,5 +90,8 @@ describe("network attribution is not a parallel enrollment system",()=>{
     expect(migration).toContain("Overlapping approved network membership reporting paths");
     expect(migration).toContain("Network hierarchy cannot contain cycles");
     expect(migration).toContain("Self-reported selection is limited");
+    expect(migration).toContain("v301_noncredit_attribution_required");
+    expect(migration).toContain("v301_class_attribution_required");
+    expect(migration).toContain("network_member_identifiers");
   });
 });
