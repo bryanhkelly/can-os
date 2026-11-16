@@ -11,7 +11,7 @@ import {
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
-import { currentClassAuthority } from "./native-class-enrollment.functions";
+import { currentClassAuthority } from "./native-class-authority.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 
 /** The first Class-without-Offering enrollment pathway is deliberately
