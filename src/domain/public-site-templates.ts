@@ -73,13 +73,18 @@ export type PublicSiteChrome = {
   mobile: string;
   main: string;
   footer: string;
+  /** Content profile is derived from approved Offerings, never Site intent. */
+  profile?: "school"|"community"|"training"|"mixed";
 };
 export function composePublicSiteChrome(template: SiteTemplateId, p: PublicSiteChrome): string {
-  const nav = '<nav class="desktop-nav" aria-label="School website navigation">' + p.navigation + '</nav>';
+  const profile=p.profile??"school";
+  const navLabel=profile==="school"?"School website navigation":"Learning website navigation";
+  const nav = '<nav class="desktop-nav" aria-label="' + navLabel + '">' + p.navigation + '</nav>';
   const brand = '<p class="brand">' + p.brand + '</p>';
   switch (template) {
     case "heritage": return '<div class="school-shell shell-heritage">' +
-      '<header class="school-masthead header-heritage"><span class="edition">A SCHOOL WITH A STORY TO TELL</span>' +
+      '<header class="school-masthead header-heritage"><span class="edition">' +
+      (profile==="school"?"A SCHOOL WITH A STORY TO TELL":"A LEARNING COMMUNITY WITH A STORY TO TELL")+'</span>' +
       '<div class="school-lockup"><span class="school-crest" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       '<div class="masthead-navigation">' + nav + p.cta + p.mobile + '</div></header>' +
       p.main + p.footer + '</div>';
@@ -91,7 +96,8 @@ export function composePublicSiteChrome(template: SiteTemplateId, p: PublicSiteC
     case "modern": return '<div class="school-shell shell-modern">' +
       '<header class="school-masthead header-modern"><div class="modern-logo">' +
       '<span class="modern-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
-      '<p class="rail-label">EXPLORE YOUR SCHOOL</p>' + nav +
+      '<p class="rail-label">' + (profile==="school"?"EXPLORE YOUR SCHOOL":
+        profile==="training"?"EXPLORE COURSES &amp; CLASSES":"EXPLORE LEARNING")+'</p>' + nav +
       '<div class="modern-rail-action">' + p.cta + '</div>' + p.mobile + '</header>' +
       p.main + p.footer + '</div>';
     case "bright-futures": return '<div class="school-shell shell-bright">' +
@@ -104,13 +110,16 @@ export function composePublicSiteChrome(template: SiteTemplateId, p: PublicSiteC
       '<span class="summit-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' + nav + p.cta + p.mobile + '</header>' +
       p.main + p.footer + '</div>';
     case "classic": return '<div class="school-shell shell-classic">' +
-      '<div class="classic-utility">FAITH&nbsp;&nbsp;·&nbsp;&nbsp;SCHOLARSHIP&nbsp;&nbsp;·&nbsp;&nbsp;CHARACTER</div>' +
+      '<div class="classic-utility">' +
+      (profile==="school"?"FAITH&nbsp;&nbsp;·&nbsp;&nbsp;SCHOLARSHIP&nbsp;&nbsp;·&nbsp;&nbsp;CHARACTER":
+        "LEARNING&nbsp;&nbsp;·&nbsp;&nbsp;CONNECTION&nbsp;&nbsp;·&nbsp;&nbsp;GROWTH")+'</div>' +
       '<header class="school-masthead header-classic"><div class="classic-lockup">' +
       '<span class="classic-crest" aria-hidden="true">' + p.monogram + '</span>' + brand + '</div>' +
       nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
     case "campus": return '<div class="school-shell shell-campus">' +
       '<header class="school-masthead header-campus"><div class="campus-lockup">' +
-      '<span class="campus-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand + '<small>THE SCHOOL JOURNAL</small></div>' +
+      '<span class="campus-logo-mark" aria-hidden="true">' + p.monogram + '</span>' + brand +
+      '<small>'+(profile==="school"?"THE SCHOOL JOURNAL":"THE LEARNING JOURNAL")+'</small></div>' +
       nav + p.cta + p.mobile + '</header>' + p.main + p.footer + '</div>';
   }
 }
