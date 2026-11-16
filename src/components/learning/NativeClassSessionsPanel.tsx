@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
-import { scheduleNativeClassSessions, openNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
+import { scheduleNativeClassSessions, openNativeClassSession, revokeNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
 import { NativeClassroomHostPanel } from "@/components/learning/NativeClassroomHostPanel";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
@@ -28,9 +28,9 @@ function buildFourWeekMeetings(firstLocal:string,durationMinutes:number,ids:stri
 }
 
 export function NativeClassSessionsPanel({
-  workspace,canSchedule=false,showConsole=false,onChanged,
+  workspace,canSchedule=false,showConsole=false,canRevoke=false,onChanged,
 }:{
-  workspace:ClassWorkspace;canSchedule?:boolean;showConsole?:boolean;
+  workspace:ClassWorkspace;canSchedule?:boolean;showConsole?:boolean;canRevoke?:boolean;
   onChanged?:()=>Promise<unknown>;
 }){
   const [first,setFirst]=useState("");
@@ -40,6 +40,8 @@ export function NativeClassSessionsPanel({
   const [opened,setOpened]=useState<{roomId:string;pairingCode:string|null;expiresAt:string|null}|null>(null);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
+  const [revoking,setRevoking]=useState<string|null>(null);
+  const [revocationReason,setRevocationReason]=useState("");
   const activeSession=workspace.sessions.find(session=>
     session.id===workspace.selectedSessionId &&
     session.isMySession && session.roomState==="live") ??
@@ -78,6 +80,18 @@ export function NativeClassSessionsPanel({
     }catch(e){setError(normalizeClientError(e,"Cannot open this Class Session.").message)}
     finally{setBusy(false)}
   }
+  async function revoke(classSessionId:string){
+    if(busy||revoking!==classSessionId||revocationReason.trim().length<15)return;
+    setError("");setNotice("");setBusy(true);
+    try{
+      await revokeNativeClassSession({data:{classId:workspace.classId,
+        classSessionId,reason:revocationReason.trim()}});
+      await onChanged?.();
+      setRevoking(null);setRevocationReason("");
+      setNotice("Room revoked. Existing learning and attendance evidence was preserved.");
+    }catch(e){setError(normalizeClientError(e,"Room revocation denied.").message)}
+    finally{setBusy(false)}
+  }
   return <section className="border border-border bg-card p-5">
     <h2 className="font-serif text-2xl">Class Sessions</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -97,6 +111,27 @@ export function NativeClassSessionsPanel({
               session.state==="started"?"Started":"Cancelled"}
           </p>
         </div>
+        {canRevoke&&session.roomId&&session.roomState==="live"&&
+          <div className="space-y-2">
+            {revoking!==session.id?<Button variant="outline" size="sm"
+              onClick={()=>{setRevoking(session.id);setRevocationReason("");}}>
+              Emergency revoke room
+            </Button>:<>
+              <label htmlFor={"revoke-"+session.id} className="block text-xs font-semibold">
+                Revocation reason (audited)
+              </label>
+              <textarea id={"revoke-"+session.id} rows={2} minLength={15} maxLength={500}
+                className="w-full border border-border bg-background p-2 text-sm"
+                value={revocationReason}
+                onChange={event=>setRevocationReason(event.target.value)}/>
+              <div className="flex gap-2">
+                <Button size="sm" disabled={busy||revocationReason.trim().length<15}
+                  onClick={()=>void revoke(session.id)}>Confirm emergency stop</Button>
+                <Button size="sm" variant="outline" disabled={busy}
+                  onClick={()=>setRevoking(null)}>Cancel</Button>
+              </div>
+            </>}
+          </div>}
         {canSchedule&&session.isMySession&&<div className="flex flex-wrap items-center gap-2">
           {session.state==="scheduled"&&<Button size="sm" variant="outline" disabled={busy}
             onClick={()=>void start(session.id)}>Open room</Button>}
