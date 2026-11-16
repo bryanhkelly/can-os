@@ -104,6 +104,7 @@ export const canonicalOfferingCourses = educationV30.table("offering_courses", {
 export const canonicalEnrollmentSites = educationV30.table("sites", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
+  timeZone: text("time_zone").notNull(),
   status: text("status").notNull(),
 });
 export const canonicalEnrollmentOrganizations = educationV30.table("organizations", {
