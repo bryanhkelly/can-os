@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { nativeClassSessionDisplayStatus } from "../../src/domain/native-class-sessions";
 import {
   assertClassSessionAgendaReferences, canPublishClassSessionAgenda,
   classSessionAgendaItemsSchema, nextClassSessionAgendaRevision,
@@ -42,6 +43,23 @@ describe("WS4 immutable Course-linked Session agenda", () => {
     for (const state of ["started","cancelled"] as const)
       expect(canPublishClassSessionAgenda({planState:state,startsAt,now:before})).toBe(false);
     expect(canPublishClassSessionAgenda({planState:"scheduled",startsAt,now:startsAt})).toBe(false);
+  });
+  it("does not treat a missed Session as verified absence or completion", () => {
+    const window={state:"scheduled" as const,roomState:null,endsAt:"2026-11-02T20:00:00Z"};
+    expect(nativeClassSessionDisplayStatus({
+      ...window,now:new Date("2026-11-02T20:00:01Z"),
+    })).toBe("elapsed_unverified");
+    expect(nativeClassSessionDisplayStatus({
+      ...window,now:new Date("2026-11-02T19:59:59Z"),
+    })).toBe("scheduled");
+    expect(nativeClassSessionDisplayStatus({
+      ...window,state:"started",roomState:"live",
+      now:new Date("2026-11-02T20:00:01Z"),
+    })).toBe("live");
+    expect(nativeClassSessionDisplayStatus({
+      ...window,state:"started",roomState:"ended",
+      now:new Date("2026-11-02T20:00:01Z"),
+    })).toBe("ended");
   });
   it("allows append-only revision but denies a conflicting idempotency replay", () => {
     const first = nextClassSessionAgendaRevision(null,"req-1",items);
