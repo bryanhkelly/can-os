@@ -91,6 +91,14 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(session).toContain("await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
     expect(session).toContain('eq(facilitatedLearningSessions.siteId,cls.siteId)');
     expect(session).toContain('state:"ended",endedAt:now');
+    const emergency = session.split("export const revokeNativeClassSession=")[1];
+    expect(emergency).toBeDefined();
+    // An emergency stop remains callable even when normal Class commands
+    // are shut off, and it verifies the administrator before idempotence.
+    expect(emergency).not.toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
+    expect(emergency).not.toContain("requireFacilitatedLearningEnabled()");
+    expect(emergency.indexOf("await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)"))
+      .toBeLessThan(emergency.indexOf('if(room.state==="ended")'));
     expect(workspace).toContain("canRevoke onChanged={refresh}");
   });
   it("disambiguates same-Course enrollments by exact native Class and Site",()=>{
