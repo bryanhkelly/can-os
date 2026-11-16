@@ -1,4 +1,4 @@
-import { index, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30, type JsonObject } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
@@ -29,6 +29,7 @@ export const networkMemberships = educationV30.table("network_memberships",{
   memberOrganizationId:uuid("member_organization_id").notNull(),
   reportingUnitId:uuid("reporting_unit_id").notNull(),
   membershipKind:text("membership_kind").notNull().default("affiliate"),
+  directoryVisible:boolean("directory_visible").notNull().default(false),
   status:text("status").$type<"pending"|"approved"|"suspended"|"revoked">().notNull().default("pending"),
   validFrom:timestamp("valid_from",{withTimezone:true}).notNull(),
   validThrough:timestamp("valid_through",{withTimezone:true}),
