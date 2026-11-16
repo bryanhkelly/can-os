@@ -17,7 +17,7 @@ const template = classDefinitionSchema.parse({
 // All assertions here must deny BEFORE touching the DB; the SQL/RLS and
 // cross-Site browser acceptance remain separate, required release gates.
 const forbiddenDb = new Proxy({}, {get(){throw new Error("Unauthorized guard reached database");}})
-  as Parameters<typeof validateClassAuthority>[0];
+  as unknown as Parameters<typeof validateClassAuthority>[0];
 const operator={organizationId:organization,siteIds:[siteA],actor:{}}
   as unknown as Parameters<typeof validateClassAuthority>[1];
 
