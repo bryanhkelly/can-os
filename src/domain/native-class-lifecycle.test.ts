@@ -3,7 +3,7 @@ import {
   assertNativeClassRepeatEligible, assertOperationalClassEnrollmentMethods,
   planNativeClassExit,
   assertNativeClassOperatorExitScope,
-  assertNativeClassLearnerSessionForExit,
+  assertNativeClassLearnerSessionForExit, assertOperationalClassOfferingTerms,
 } from "./native-class-lifecycle";
 import type { CommandContext } from "./command-context";
 
@@ -30,12 +30,17 @@ describe("WS2 native Class enrollment lifecycle", () => {
   it("idempotent same-command retries produce no second seat release", () => {
     expect(planNativeClassExit("withdrawn", "withdraw").alreadyClosed).toBe(true);
     expect(planNativeClassExit("cancelled", "cancel").alreadyClosed).toBe(true);
+    // Pending learner withdrawal ends in cancelled, not withdrawn.
+    expect(planNativeClassExit("cancelled", "withdraw")).toEqual({
+      enrollmentStatus:"cancelled",attemptStatus:null,
+      releasedSeat:false,alreadyClosed:true,
+    });
   });
   it("never changes terminal results or resurrects historical enrollments", () => {
     for (const status of ["completed", "withdrawn", "cancelled"] as const) {
       for (const action of ["withdraw", "cancel"] as const) {
         if ((status==="withdrawn"&&action==="withdraw") ||
-            (status==="cancelled"&&action==="cancel")) continue;
+            (status==="cancelled"&&(action==="cancel"||action==="withdraw"))) continue;
         expect(() => planNativeClassExit(status, action)).toThrow();
       }
     }
@@ -46,6 +51,22 @@ describe("WS2 native Class enrollment lifecycle", () => {
       [],["invitation"],["approval"],["self","approval"],
       ["assignment","invitation"],["self","self"],
     ]) expect(() => assertOperationalClassEnrollmentMethods(methods)).toThrow();
+  });
+  it("rejects unverified for-credit claims and invalid credit methods",()=>{
+    for(const terms of [
+      {enrollmentMethods:["self"],allowedCreditModes:["for_credit"]},
+      {enrollmentMethods:["assignment"],allowedCreditModes:["for_credit"]},
+      {enrollmentMethods:["self","invitation"],allowedCreditModes:["audit"]},
+      {enrollmentMethods:["self"],allowedCreditModes:[]},
+      {enrollmentMethods:["self"],allowedCreditModes:["audit","audit"]},
+      {enrollmentMethods:["self"],allowedCreditModes:["something_else"]},
+    ]){
+      expect(()=>assertOperationalClassOfferingTerms(terms)).toThrow();
+    }
+    expect(()=>assertOperationalClassOfferingTerms({
+      enrollmentMethods:["self","assignment"],
+      allowedCreditModes:["audit","not_applicable"],
+    })).not.toThrow();
   });
   it("allows new registration after withdrawal, not ungoverned completed repeat", () => {
     expect(() => assertNativeClassRepeatEligible(["withdrawn","cancelled"])).not.toThrow();
