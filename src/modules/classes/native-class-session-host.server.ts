@@ -2,7 +2,7 @@ import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import { canonicalClasses, canonicalClassStaffAssignments } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { currentClassAuthority } from "./native-class-enrollment.functions";
+import { currentClassAuthority } from "./native-class-authority.server";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 
