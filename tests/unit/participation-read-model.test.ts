@@ -5,7 +5,7 @@ import {
 } from "@/domain/participation-read-model";
 import {
   assembleParticipation, projectFamilyEnrichment, projectNativeClasses,
-  projectNoncreditCourses, projectNoncreditWaitlists, projectSchoolSections,
+  projectNoncreditCourses, projectNoncreditOpportunities, projectSchoolSections,
 } from "@/domain/participation-projections";
 
 const now = new Date("2026-11-16T19:00:00.000Z");
@@ -88,18 +88,36 @@ describe("Participation Read Model v1", () => {
     expect(record?.progress).toBeNull();
     expect(record?.outcome).toBeNull();
   });
-  it("never represents an invited waitlist as a completed course", () => {
-    const record = projectNoncreditWaitlists([{
+  it("keeps invitations outside participation records and completion counts", () => {
+    const opportunities = projectNoncreditOpportunities([{
       releaseId: uuid(1), title: "Summer Learning", status: "invited",
       joinedAt: now, inviteExpiresAt: "2026-11-18T00:00:00Z",
       invitationActive: true,
-    }], now)[0];
-    expect(record).toMatchObject({
-      source: "noncredit_waitlist", status: "invited", bucket: "upcoming",
-      outcome: null, progress: null,
+    }]);
+    expect(opportunities).toHaveLength(1);
+    expect(opportunities[0]).toMatchObject({
+      source: "noncredit_waitlist", state: "invited",
+      releaseId: uuid(1), expiresAt: "2026-11-18T00:00:00.000Z",
     });
-    expect(record?.refs.courseAttemptId).toBeUndefined();
-    expect(record?.action?.label).toBe("Claim invitation");
+    expect(opportunities[0]?.action?.label).toBe("Claim invitation");
+    const records = assembleParticipation([]);
+    expect(records).toHaveLength(0);
+    expect(resolveActivityFilters(records, "upcoming", "program")).toHaveLength(0);
+  });
+  it("does not equate an expired invitation with cancelled enrollment", () => {
+    const opportunities = projectNoncreditOpportunities([{
+      releaseId: uuid(1), title: "AI Skills", status: "expired",
+      joinedAt: now, inviteExpiresAt: "2026-11-14T00:00:00Z",
+      invitationActive: false,
+    }]);
+    expect(opportunities[0]?.state).toBe("expired");
+    expect(opportunities[0]?.action?.label).toBe("Manage waiting list");
+  });
+  it("deduplicates repeated release-scoped opportunities without inventing waitlist IDs", () => {
+    const item = {releaseId: uuid(1), title: "AI Skills", status: "waiting",
+      joinedAt: now, inviteExpiresAt: null, invitationActive: false};
+    expect(projectNoncreditOpportunities([item, item])).toHaveLength(1);
+    expect(projectNoncreditOpportunities([item])[0]?.key).toBe("noncredit_waitlist_release:" + uuid(1));
   });
   it("projects a guardian's independently permitted dependent program", () => {
     const records = projectFamilyEnrichment([{
