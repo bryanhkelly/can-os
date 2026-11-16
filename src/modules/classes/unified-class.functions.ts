@@ -12,6 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
 import { publishedOfferingKind } from "@/domain/network-program-rollout";
+import { publisherClassVariationPolicy } from "@/domain/publisher-class-variation";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -510,6 +511,7 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
             :(["self_paced"] as const),
         }));
         return {...publicRow,offeringKind:publishedOfferingKind(productDefinition),
+          localClassPolicy:publisherClassVariationPolicy(productDefinition),
           operatingOrganizationId:operator.organizationId,siteOptions};
       });
       return {items,nextCursor:more?data.cursor+pageSize:null as number|null};
