@@ -4,6 +4,7 @@ import type { AccessContext } from "./access-context";
  * A CAN login is the only staff sign-in. A verified session alone is NOT a
  * canonical grant. A staff bridge must also pass independently reviewed
  * Person and Site mappings plus a current canonical staff grant.
+ * Authentication must never depend on an enrollment-specific permission.
  */
 export function canResolveCanSiteStaff(
   actor: Pick<AccessContext, "role" | "accountId" | "actorPersonId" |
@@ -11,10 +12,10 @@ export function canResolveCanSiteStaff(
 ): boolean {
   return (actor.role === "site_admin" || actor.role === "registrar") &&
     Boolean(actor.accountId && actor.actorPersonId && actor.grantSiteId) &&
-    (!actor.sessionAccountId || actor.sessionAccountId === actor.accountId) &&
+    // Synthetic demo delegation never proves the human owns the selected Person.
+    !actor.sessionAccountId &&
     actor.scope.organizationIds?.length === 1 &&
-    Boolean(actor.grantSiteId && actor.scope.siteIds?.includes(actor.grantSiteId)) &&
-    actor.capabilities.has("enrollment:manage");
+    Boolean(actor.grantSiteId && actor.scope.siteIds?.includes(actor.grantSiteId));
 }
 
 /** Every effective school Person must be the explicitly mapped CAN Person. */
