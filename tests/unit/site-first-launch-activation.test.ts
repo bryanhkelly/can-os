@@ -15,6 +15,8 @@ describe("Site-first activation handoff",()=>{
   it("keeps saved Site and native offering authorization separate",()=>{
     const panel=read("src/components/launch-studio/SiteLaunchActivationPanel.tsx");
     expect(panel).toContain('search={{siteId,programId:program.id}}');
+    expect(panel).toContain('to="/settings/school/$module"');
+    expect(panel).not.toContain('to="/launch/hub/school"');
     expect(panel).toContain('search={{publicSiteId:siteId}}');
     expect(panel).toContain('to="/canonical/blueprints"');
     expect(panel).not.toContain("launchReady");

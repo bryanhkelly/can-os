@@ -21,7 +21,7 @@ import { readSiteLaunchPreferences, saveSiteLaunchPreferences } from "@/modules/
 
 type Options = Awaited<ReturnType<typeof listLaunchOptions>>;
 type Delivery = "physical" | "digital" | "both";
-type Step = 0 | 1 | 2 | 3;
+type Step = 0 | 1 | 2 | 3 | 4;
 const interests = [
   { id: "grades-6-8", title: "Grades 6–8", detail: "Middle school curriculum", icon: GraduationCap },
   { id: "grades-9-12", title: "Grades 9–12", detail: "High school curriculum", icon: GraduationCap },
@@ -32,7 +32,7 @@ const interests = [
   { id: "adult", title: "Adult learning", detail: "Skills and community education", icon: Users },
   { id: "senior", title: "Senior programs", detail: "Learning for older adults", icon: Users },
 ] as const;
-const steps = ["Your Site", "Network", "Program interests", "Website reveal"] as const;
+const steps = ["Your Site", "Network", "Program interests", "Website reveal", "Launch setup"] as const;
 
 /** A lightweight, explicitly private preview. No made-up Program or enrollment
  * release is created by choosing interests; publication remains server-owned. */
@@ -88,7 +88,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to establish your Site. Nothing has been published."));}
   }
 
-  const forward=()=>goTo(siteFirstLaunchSteps[Math.min(3,step+1)]!);
+  const forward=()=>goTo(siteFirstLaunchSteps[Math.min(4,step+1)]!);
   async function revealSite(){
     if(!siteId||savingPreferences)return;
     setSavingPreferences(true);setError("");
@@ -110,7 +110,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   return <PageFrame width="wide" className="launch-studio-page">
     <PageHeader eyebrow="Launch Studio / Site setup" title="Bring your Site to life."
       subtitle="Establish your Site, choose what you'd like to offer, and see a private website preview before configuring the details." />
-    <nav aria-label="Setup progress" className="mt-6 grid border bg-card sm:grid-cols-4">
+    <nav aria-label="Setup progress" className="mt-6 grid border bg-card sm:grid-cols-2 lg:grid-cols-5">
       {steps.map((label,index)=><div key={label} aria-current={index===step?"step":undefined}
         className={`flex items-center gap-3 border-b p-4 text-sm sm:border-b-0 sm:border-r last:border-r-0 ${index===step?"border-t-2 border-t-primary bg-accent":""}`}>
         <span className={`flex size-8 shrink-0 items-center justify-center border font-semibold ${index<step?"bg-success/10 text-success":index===step?"border-primary text-primary":"text-muted-foreground"}`}>
@@ -220,9 +220,9 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
               Customize website <ArrowRight className="size-4"/>
             </Link>}
             {!options.schoolSetupAdministrator&&<p className="border p-4 text-sm text-muted-foreground">To customize your Site website, ask an authorized Site Administrator to assign website editing access. You can still explore your private preview.</p>}
-            <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
-              Make programs enrollable <ArrowRight className="size-4"/>
-            </Link>
+            <Button onClick={()=>goTo("setup")} className="w-full justify-between">
+              Continue to launch setup <ArrowRight className="size-4"/>
+            </Button>
             {siteId&&options.schoolSetupAdministrator&&<Link to="/sites/$siteId/publish" params={{siteId}} className="flex min-h-11 items-center justify-between border px-4 text-sm font-semibold text-primary">
               Share or publish your Site <ArrowRight className="size-4"/>
             </Link>}
@@ -240,12 +240,15 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
                 className="block font-semibold text-primary underline">Verify existing Site identity connection</Link>}
               <Link to="/canonical/blueprints" search={{}}
                 className="block font-semibold text-primary underline">Manage approved educational blueprints</Link>
-              {siteId&&<Link to="/launch/hub/school" search={{siteId}}
-                className="block font-semibold text-primary underline">School-specific readiness</Link>}
+              {siteId&&<Link to="/settings/school/$module" params={{module:"compliance"}} search={{siteId}}
+                className="block font-semibold text-primary underline">School opening and compliance</Link>}
             </div>
           </details>
         </aside>
       </div>
+    </section>}
+    {step===4&&<section className="mt-6">
+      <Button variant="outline" onClick={backward} className="mb-4"><ArrowLeft className="size-4"/> Return to website preview</Button>
       <SiteLaunchActivationPanel siteId={siteId} site={known??null} programs={sitePrograms} readState={programsState}/>
     </section>}
   </PageFrame>;

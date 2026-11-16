@@ -269,3 +269,9 @@ Source-only change: New visits to `/launch/school` (including `?step=school`) re
 The Network step reuses the existing audited Site affiliation request and network HQ review workflow rather than a fake invitation-code field. Independent operators may continue without affiliation. The School Launch Hub retains its school-specific preparation work and links back to the unified Site-first setup. Interest chips still never create a Program, Offering, license, network grant or enrollment release.
 
 **Release gate still open:** Typecheck, CI/build, role-scoped browser workflows and matching deployed Cloudflare SHA must pass before describing the live application as fully updated. Blueprint/Offering adoption, Site-qualified deployment, and real enrollment activation remain separately governed existing workspaces and are not yet one embedded journey.
+
+## Main Site-first setup stage (2026-11-16)
+
+The Site-first flow adds an explicit fifth stage, Launch setup, following a private website preview. This stage presents the current Site website state, Site-scoped saved Program launch records, and direct links to the actual authorized website editor, Site profile, school team, academic configuration, interest events, opening compliance, native Blueprint planning and noncredit enrollment preparation. It does not route through the legacy School Launch Hub or wizard. Each destination retains its own authorization, readiness and publication gates; a preview is not an operating permission.
+
+The sidebar Launch link and new-school sign-in entry are wired directly to `/launch/site`. The former `/launch/school` and `/launch/hub/school` routes have **not yet been removed from the repository**, and full production deployment/acceptance is not proven. Do not describe the old implementation as retired until all deep links, old tests and its remaining academic wizard dependency have been migrated and removed.

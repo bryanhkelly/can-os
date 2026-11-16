@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, BookOpen, Globe2 } from "lucide-react";
+import { ArrowRight, BookOpen, Globe2, ShieldCheck, Users, CalendarDays, GraduationCap } from "lucide-react";
 import type { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
 
@@ -39,13 +39,37 @@ export function SiteLaunchActivationPanel({siteId,site,programs,readState}:{
           programs?.length?<ul className="mt-4 space-y-3">{programs.map(program=><li key={program.id} className="border p-3">
             <p className="font-semibold">{program.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">{programTypeLabels[program.type]} · {program.status}</p>
-            <Link to="/launch/hub/school/$module" params={{module:"academics"}} search={{siteId,programId:program.id}}
+            <Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId,programId:program.id}}
               className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Continue setup <ArrowRight className="size-4"/></Link>
           </li>)}</ul>:
           <p className="mt-4 text-sm text-muted-foreground">No saved school launch records are visible for this Site. Canonical offerings and enrollment releases are tracked separately.</p>}
-        <Link to="/launch/hub/school" search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">School-specific preparation <ArrowRight className="size-4"/></Link>
+        <Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Prepare academics <ArrowRight className="size-4"/></Link>
       </article>
     </div>
+    <section aria-label="Launch workspaces" className="mt-7">
+      <h3 className="font-serif text-2xl">Finish setting up your Site</h3>
+      <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+        These actions use your existing authorized operational records, not another Launch Studio.
+        Complete the work relevant to your program before requesting approval or publishing.
+      </p>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {([
+          {title:"Website and brand",icon:Globe2,href:"website"},
+          {title:"School details",icon:GraduationCap,href:"profile"},
+          {title:"Team and permissions",icon:Users,href:"team"},
+          {title:"Academic configuration",icon:BookOpen,href:"academics"},
+          {title:"Interest events",icon:CalendarDays,href:"events"},
+          {title:"Opening compliance",icon:ShieldCheck,href:"compliance"},
+        ] as const).map(item=><div key={item.title} className="border bg-card p-4">
+          <item.icon className="size-5 text-primary"/>
+          <h4 className="mt-3 text-sm font-semibold">{item.title}</h4>
+          {item.href==="website"?<Link to="/launch/website" search={{siteId,returnToHub:false}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
+           item.href==="events"?<Link to="/operations/interest-events" search={{siteId}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
+           item.href==="profile"?<Link to="/sites/$siteId/profile" params={{siteId}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
+           <Link to="/settings/school/$module" params={{module:item.href}} search={{siteId}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>}
+        </div>)}
+      </div>
+    </section>
     <div className="mt-5 flex flex-wrap gap-3">
       <Link to="/canonical/blueprints" search={{}} className="inline-flex min-h-11 items-center gap-2 border px-4 py-3 text-sm font-semibold text-primary">Plan approved offerings <ArrowRight className="size-4"/></Link>
       <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}} className="inline-flex min-h-11 items-center gap-2 border px-4 py-3 text-sm font-semibold text-primary">Configure noncredit enrollment <ArrowRight className="size-4"/></Link>
