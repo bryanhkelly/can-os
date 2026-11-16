@@ -44,7 +44,7 @@ Course: only an approved noncredit release UUID and a validated HTTPS CAN applic
 
 Class: a published Class card links to `/learn/classes?classId=<UUID>`, which filters the native public Class catalog by **exact Class ID**. This is not an exact Class Offering-version deep link and is never a promise of immediate self-enrollment. Native Class enrollment keeps its own adult verification, consent, window, allowed method, approved Site, learner and capacity checks.
 
-Private previews and fictional template galleries suppress external enrollment actions and submit no learner records.
+Private previews and fictional template galleries suppress external enrollment actions and submit no learner records. In Site-first Launch Studio, operators can select Home, Programs, Courses, Classes, Academics or Community Experiences. The authenticated Site preview renders a clearly marked empty page layout before approved content exists, while anonymous public routing continues to return 404 until an eligible source is published. Changing presentation does not change any enrollment terms.
 
 ## Release gaps that must not be misrepresented
 
