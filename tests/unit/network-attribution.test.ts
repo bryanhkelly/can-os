@@ -102,6 +102,10 @@ describe("network attribution is not a parallel enrollment system",()=>{
     const service=read("src/modules/enrollment/noncredit-network-report.functions.ts");
     expect(service).toContain("const historicalLeaf=historicalPath?.length");
     expect(service).not.toContain("networkMemberships.reportingUnitId");
+    expect(service).toContain("attribution.relationshipSnapshot.creditedOrganizationName");
+    const migration=read("database/canonical/v3.0.1/patch-network-attribution-reporting.sql");
+    expect(migration).toContain("'creditedOrganizationName',credited_org_name");
+    expect(migration).toContain("'creditedOrganizationName',COALESCE(o.display_name,o.legal_name)");
   });
   it("keeps private learner records behind policy and immutable event evidence",()=>{
     const migration=read("database/canonical/v3.0.1/patch-network-attribution-reporting.sql");
