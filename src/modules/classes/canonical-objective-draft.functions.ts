@@ -82,3 +82,39 @@ export const createCanonicalObjectiveDraft=createServerFn({method:"POST"})
       needsIndependentReview:true as const,
     };
   });
+
+/** Real canonical draft inventory for the same one publisher organization.
+ * No answer keys, item prompts, correct options, response data, other tenants
+ * or unapproved administrations are exposed by this readback.
+ */
+export const listCanonicalObjectiveDrafts=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    courseVersionId:z.string().uuid(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    if(process.env.CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED!=="true")
+      throw new AuthorizationError("canonical objective assessment draft writer disabled");
+    setResponseHeader("Cache-Control","private, no-store");
+    const actor=await getCanonicalCommandContext(getRequest());
+    if(!actor.actorPersonId||!["registrar","site_admin"].includes(actor.role??""))
+      throw new AuthorizationError("current Course publisher");
+    const role=canonicalAssessmentDraftDatabaseRole(actor);
+    const organizationId=actor.scope.organizationIds![0]!;
+    const rows=await db.transaction(async tx=>{
+      await tx.execute(sql.raw(`SET LOCAL ROLE ${role}`));
+      return tx.execute(sql`
+        SELECT * FROM education_v30.v301_list_objective_assessment_drafts(
+          ${organizationId}::uuid,${data.courseVersionId}::uuid
+        )
+      `);
+    });
+    return {drafts:rows.rows.map(row=>({
+      assessmentVersionId:z.string().uuid().parse(row.assessment_version_id),
+      assessmentKey:z.string().parse(row.assessment_key),
+      title:z.string().parse(row.title),
+      questionCount:z.coerce.number().int().min(1).max(10).parse(row.question_count),
+      passingFraction:z.coerce.number().min(0).max(1).parse(row.passing_fraction),
+      maxAttempts:z.coerce.number().int().min(1).max(5).parse(row.max_attempts),
+      lifecycle:"draft" as const,
+    }))};
+  });
