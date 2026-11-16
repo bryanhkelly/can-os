@@ -119,6 +119,7 @@ const schoolAdministrationLinks = [
   { title: "Students", path: "/staff/students", icon: "users" },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },
   { title: "Curriculum", path: "/operations/curriculum", icon: "book" },
+  { title: "Program operations", path: "/canonical/program-operations", icon: "book" },
   { title: "Teachers", path: "/operations/teacher-marketplace", icon: "users" },
   { title: "Administration", path: "/admin", icon: "users" },
 ] satisfies readonly WorkspaceNavigationItem[];
