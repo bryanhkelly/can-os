@@ -108,6 +108,54 @@ export const requestCanonicalCredentialIssuerApproval=createServerFn({method:"PO
     });
   });
 
+/** Current staff can see approval status without learning any other staff's IDs. */
+export const getMyCredentialIssuerApproval=createServerFn({method:"GET"})
+  .handler(async()=>{
+    protect();
+    const request=getRequest();
+    const can=await getCommandContext(request);
+    if(can.sessionAccountId||!["site_admin","registrar"].includes(can.role))
+      throw new AuthorizationError("current CAN school staff");
+    const canonical=await getCanonicalCommandContext(request);
+    const grant=await db.select({id:canonicalAccountGrants.id})
+      .from(canonicalAccountGrants)
+      .where(and(
+        eq(canonicalAccountGrants.personId,canonical.actorPersonId!),
+        eq(canonicalAccountGrants.organizationId,canonical.scope.organizationIds![0]!),
+        eq(canonicalAccountGrants.siteId,canonical.scope.siteIds![0]!),
+        eq(canonicalAccountGrants.roleCode,can.role as "site_admin"|"registrar"),
+        eq(canonicalAccountGrants.active,true),
+        isNull(canonicalAccountGrants.revokedAt),
+      )).limit(2);
+    if(grant.length!==1)throw new AuthorizationError("current exact staff grant");
+    const [row]=await db.select({
+      id:approvals.id,status:approvals.status,
+      requestedAt:approvals.requestedAt,reviewedAt:approvals.reviewedAt,
+      approvedUntil:approvals.approvedUntil,
+    }).from(approvals)
+      .where(eq(approvals.canonicalGrantId,grant[0]!.id))
+      .orderBy(sql`${approvals.requestedAt} DESC`).limit(1);
+    return row??null;
+  });
+
+/** A reviewer can revoke active approvals without unrestricted account search. */
+export const listActiveCredentialIssuerApprovals=createServerFn({method:"GET"})
+  .handler(async()=>{
+    protect();
+    await requireIndependentInstitutionalReviewer();
+    return db.select({
+      id:approvals.id,
+      requestedByAccountId:approvals.requestedByCanAccountId,
+      requestedAt:approvals.requestedAt,
+      reviewedAt:approvals.reviewedAt,
+      approvedUntil:approvals.approvedUntil,
+      nativeOrganizationId:canonicalAccountGrants.organizationId,
+      nativeSiteId:canonicalAccountGrants.siteId,
+    }).from(approvals).innerJoin(canonicalAccountGrants,
+      eq(canonicalAccountGrants.id,approvals.canonicalGrantId))
+      .where(eq(approvals.status,"approved")).limit(101);
+  });
+
 /** CAN network stewards review pending requests; pending is never authority. */
 export const listPendingCredentialIssuerApprovals=createServerFn({method:"GET"})
   .handler(async()=>{
