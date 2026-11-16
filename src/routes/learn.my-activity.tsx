@@ -125,6 +125,7 @@ function MyActivityPage() {
   const shown = resolveActivityFilters(records, bucket, kind);
   const opportunities = bucket === "upcoming" && kind === "all" ? activity.data?.opportunities ?? [] : [];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
+  const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial") ?? [];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Activity"
     subtitle="Your learning, programs, and participation in one place. Each provider keeps authority over its own records."
     actions={<Link to="/explore" className="text-sm font-semibold text-primary underline underline-offset-4">
@@ -170,6 +171,10 @@ function MyActivityPage() {
     </div>}
 
     {activity.data && <>
+      {partialSources.length > 0 && <div role="note" className="mt-5 border border-border bg-card p-4 text-sm">
+        <p className="font-semibold">Available records, not a complete lifetime history</p>
+        <p className="mt-1 text-muted-foreground">The following sources have limited or current-workspace-only coverage: {partialSources.map(item => item.source.replaceAll("_", " ")).join(", ")}. This view does not certify missing records as nonexistent.</p>
+      </div>}
       {unavailable.length > 0 && <div role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
         <p className="font-semibold">Some sources could not be verified.</p>
         <p className="mt-1 text-muted-foreground">Items from unavailable sources may be missing. Existing access and private records have not changed.</p>
