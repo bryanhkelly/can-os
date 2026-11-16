@@ -8,16 +8,11 @@ import {
   listCanonicalObjectiveApprovalQueue,readCanonicalObjectiveApproval,
   publishCanonicalObjectiveAssessment,
 } from "@/modules/classes/canonical-objective-approval.functions";
-import { objectiveReviewRequirements } from "@/domain/canonical-objective-review";
+import { objectiveApprovalGate } from "@/domain/canonical-objective-review";
 
 export const Route=createFileRoute("/canonical/assessment-publications")({
   component:ObjectiveAssessmentPublications,
 });
-type Review={kind:string;decision:string;order:number;reviewerPersonId:string};
-function latestApproval(rows:Review[],kind:string,authors:ReadonlySet<string>){
-  const last=rows.filter(x=>x.kind===kind).sort((a,b)=>b.order-a.order)[0];
-  return last?.decision==="approved"&&!authors.has(last.reviewerPersonId);
-}
 function ObjectiveAssessmentPublications(){
   const qc=useQueryClient();
   const [selected,setSelected]=useState("");
@@ -38,18 +33,17 @@ function ObjectiveAssessmentPublications(){
     enabled:!!selected,retry:false,
   });
   const data=details.data;
-  const authors=new Set(data?.items.map(x=>x.authorPersonId)??[]);
-  const itemGates=data?.items.map(item=>({
-    id:item.id,prompt:item.prompt,
-    passed:objectiveReviewRequirements.item.every(k=>latestApproval(
-      data.reviews.items.filter(r=>r.itemVersionId===item.id),k,authors)),
-  }))??[];
-  const assessmentReady=data?objectiveReviewRequirements.assessment.every(k=>
-    latestApproval(data.reviews.assessment,k,authors)):false;
-  const formReady=data?objectiveReviewRequirements.form.every(k=>
-    latestApproval(data.reviews.form,k,authors)):false;
-  const ready=Boolean(data&&itemGates.length>0&&itemGates.every(x=>x.passed)&&
-    assessmentReady&&formReady&&data.lifecycle==="draft"&&data.formLifecycle==="draft");
+  const gate=data?objectiveApprovalGate({
+    items:data.items.map(item=>({id:item.id,authorPersonId:item.authorPersonId})),
+    assessmentReviews:data.reviews.assessment,
+    formReviews:data.reviews.form,
+    itemReviews:data.reviews.items,
+  }):null;
+  const itemGates=gate?.items??[];
+  const assessmentReady=gate?.assessmentReady??false;
+  const formReady=gate?.formReady??false;
+  const ready=Boolean(data&&gate?.ready&&data.lifecycle==="draft"&&
+    data.formLifecycle==="draft");
   async function publish(){
     if(!ready||!confirmed||busy||!data)return;
     setBusy(true);setNotice("");setError("");
@@ -125,7 +119,7 @@ function ObjectiveAssessmentPublications(){
             </p>
           </div>
           <span className="shrink-0 font-semibold">
-            {itemGates.filter(x=>x.passed).length}/{itemGates.length} approved
+            {itemGates.filter(x=>x.ready).length}/{itemGates.length} approved
           </span>
         </div>
         <div className="flex items-start justify-between gap-4 p-4 text-sm">
