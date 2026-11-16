@@ -56,6 +56,11 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
     const host=read("src/components/learning/NativeClassroomHostPanel.tsx");
     expect(host).toContain("enabled:agendasEnabled");
     expect(panel).toContain("agendasEnabled={workspace.sessionAgendasEnabled}");
+    expect(workspace).toContain("agendaReady:plansReady.has(row.id)");
+    expect(workspace).toContain("agendaRequired:requiresClassSessionAgenda({");
+    expect(workspace).toContain("const planRows=sessionAgendasEnabled&&scheduleRows.length?");
+    expect(panel).toContain("Study plan required before opening");
+    expect(panel).toContain("onPublished={onChanged}");
     const planner=read("src/components/learning/NativeClassSessionAgenda.tsx");
     expect(planner).toContain('view!=="manage"');
     expect(planner).toContain('view==="learn"');
