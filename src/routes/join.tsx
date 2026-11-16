@@ -91,9 +91,22 @@ function ClassroomJoinPage() {
           {choices.choices.map(choice => <option key={choice.courseAttemptId}
             value={choice.courseAttemptId}>{choice.courseTitle}</option>)}
         </select>
-        {!choices.choices.length && <p role="status" className="text-sm text-muted-foreground">
-          No eligible courses were found for this account. Check your registration.
-        </p>}
+        {!choices.choices.length && <div role="status"
+          className="space-y-2 border border-border bg-muted/20 p-4 text-sm">
+          <p>No currently enrolled Class or Course Attempt is eligible to pair.</p>
+          <p className="text-muted-foreground">
+            Check the authorized Class catalog for public self-registration.
+            Private Classes require an invitation, approval, or an assignment
+            from your organization. Scanning a QR code never enrolls you.
+          </p>
+          <Link to="/learn/classes" className="inline-block font-semibold underline">
+            Explore available Classes
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            This tab retains the short-lived pairing code while you sign in or
+            enroll. Return to Join after enrollment; expired codes must be renewed.
+          </p>
+        </div>}
         <Button disabled={busy || !choices.choices.length} type="submit">
           {busy ? "Pairing…" : "Pair my device"}
         </Button>
