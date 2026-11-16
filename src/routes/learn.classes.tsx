@@ -110,7 +110,7 @@ function NativeLearnerClasses(){
   }
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Classes"
     subtitle="One Class enrollment and one learning record, regardless of whether your Class is academic, independent or facilitated."
-    actions={<Link to="/learn/my-programs" className="text-sm font-semibold text-primary underline underline-offset-4">My Learning &amp; Programs</Link>}>
+    actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}>
     <section className="mt-6">
       <h2 className="font-serif text-2xl">Enrolled Classes</h2>
       {enrolled.isPending&&<p role="status" className="mt-3 text-sm">Loading your Classes…</p>}
