@@ -59,7 +59,7 @@ function NoncreditPublicationPage(){
     ].some(site=>site.id===approvedCanonicalSite)));
   const selected=candidates.find(item=>candidateKey(item)===choice);
   const valid=selected&&opensAt&&closesAt&&maxParticipants&&additionalSites.length<=49&&consentVersion.trim().length>=3&&
-    consentText.trim().length>=25&&(deliveryMode==="independent"||siteId)&&
+    consentText.trim().length>=25&&siteId&&
     (!publicSiteId||(approvedCanonicalSite!==null&&siteId===approvedCanonicalSite));
   async function submit(event:FormEvent<HTMLFormElement>){
     event.preventDefault();if(!selected||!valid||busy)return;
@@ -80,7 +80,7 @@ function NoncreditPublicationPage(){
         setMessage(result.releases.length+" independently authorized Site releases published. Each Site has its own capacity and cohort sessions.");
       }else{
         const result=await publishNoncreditSelfEnrollment({data:{
-          ...base,deliveryMode,siteId:siteId||null,
+          ...base,deliveryMode,siteId,
         }});
         setCreated(result.releaseId);
         setMessage("Enrollment release published. It will appear to learners only inside its published registration window.");
@@ -176,14 +176,14 @@ function NoncreditPublicationPage(){
             </div>
           </fieldset>
           {deliveryMode==="independent"&&<div>
-            <label htmlFor="nc-online-site" className="block text-sm font-semibold">Present this online course on a Site website (optional)</label>
-            <select id="nc-online-site" value={siteId} onChange={event=>setSiteId(event.target.value)}
+            <label htmlFor="nc-online-site" className="block text-sm font-semibold">Authorized Site for online delivery (required)</label>
+            <select id="nc-online-site" required value={siteId} onChange={event=>setSiteId(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-              {!publicSiteId&&<option value="">No specific Site · provider-wide online offering</option>}
+              <option value="">Choose an authorized Site</option>
               {selected?.digitalSiteOptions.filter(site=>!publicSiteId||site.id===approvedCanonicalSite).map(site=>
                 <option key={site.id} value={site.id}>{site.name}</option>)}
             </select>
-            <p className="mt-2 text-xs text-muted-foreground">A virtual or physical Site may present an online offering. This does not turn it into facilitated classroom instruction. Only current authorized Site relationships are available.</p>
+            <p className="mt-2 text-xs text-muted-foreground">An authorized virtual, mobile or physical Site anchors the release and its reporting. Online delivery does not require an in-person facilitator.</p>
           </div>}
           {deliveryMode==="facilitated"&&<div>
             <label htmlFor="nc-site" className="block text-sm font-semibold">Authorized hosting Site</label>
