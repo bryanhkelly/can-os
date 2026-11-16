@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { getPublisherCourseActivityOptions } from "@/modules/classes/publisher-course-activity-options.functions";
 import { createCanonicalSurveyDraft } from "@/modules/operations/canonical-survey-draft.functions";
-import { createCanonicalObjectiveDraft } from "@/modules/classes/canonical-objective-draft.functions";
+import { createCanonicalObjectiveDraft, listCanonicalObjectiveDrafts } from
+  "@/modules/classes/canonical-objective-draft.functions";
 import type { CreateSurveyDraftInput } from "@/domain/canonical-survey-draft";
 
 /**
@@ -36,6 +37,7 @@ function validQuiz(questions:Quiz[]){
     item.correctIndex>=0&&item.correctIndex<item.choices.length);
 }
 function CourseActivityPublisher(){
+  const queryClient=useQueryClient();
   const courses=useQuery({
     queryKey:["publisher-course-activity-options"],
     queryFn:()=>getPublisherCourseActivityOptions(),
@@ -59,6 +61,11 @@ function CourseActivityPublisher(){
   const [notice,setNotice]=useState("");
   const [surveyDraft,setSurveyDraft]=useState<{surveyId:string;surveyVersionId:string}|null>(null);
   const chosen=courses.data?.courses.find(row=>row.courseVersionId===courseVersionId);
+  const priorDrafts=useQuery({
+    queryKey:["publisher-canonical-quiz-drafts",courseVersionId],
+    queryFn:()=>listCanonicalObjectiveDrafts({data:{courseVersionId}}),
+    enabled:!!courseVersionId,retry:false,
+  });
 
   function editQuiz(key:string,change:Partial<Quiz>){
     if(quizDraft||quizBusy)return;
@@ -85,6 +92,9 @@ function CourseActivityPublisher(){
       }});
       setQuizDraft({assessmentVersionId:result.assessmentVersionId,
         formVersionId:result.formVersionId,questionCount:result.questionCount});
+      void queryClient.invalidateQueries({
+        queryKey:["publisher-canonical-quiz-drafts",chosen.courseVersionId],
+      });
       setNotice("Canonical assessment draft saved with sealed answer keys. Independent review and publication are required before any Class can use it.");
     }catch(cause){
       setError(normalizeClientError(cause,
@@ -152,6 +162,34 @@ function CourseActivityPublisher(){
           More than 200 publisher Courses exist. Catalog pagination is required.
         </p>}
       </>}
+      {chosen&&<div className="mt-4 border border-border bg-muted/20 p-4 text-sm">
+        <p className="font-semibold">My organization's saved canonical drafts</p>
+        {priorDrafts.isPending&&<p className="mt-2 text-muted-foreground">
+          Checking draft inventory under your publisher role…
+        </p>}
+        {priorDrafts.isError&&<p className="mt-2 text-muted-foreground">
+          Draft readback is not available until the separately scoped
+          canonical assessment author role and release flag are enabled.
+        </p>}
+        {priorDrafts.data?.drafts.length===0&&<p className="mt-2 text-muted-foreground">
+          No saved quiz drafts for this Course version.
+        </p>}
+        {!!priorDrafts.data?.drafts.length&&<ul className="mt-3 divide-y divide-border">
+          {priorDrafts.data.drafts.map(row=><li key={row.assessmentVersionId}
+            className="flex flex-wrap items-center justify-between gap-3 py-2">
+            <div>
+              <p className="font-semibold">{row.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {row.questionCount} questions · {Math.round(row.passingFraction*100)}% passing ·
+                {row.maxAttempts} attempts
+              </p>
+            </div>
+            <span className="text-xs font-semibold text-muted-foreground">
+              Unpublished draft
+            </span>
+          </li>)}
+        </ul>}
+      </div>}
       {chosen&&<div className="mt-4 border border-border bg-muted/20 p-4 text-sm">
         <p className="font-semibold">Approved objective knowledge checks</p>
         {chosen.publishedKnowledgeChecks.length?
