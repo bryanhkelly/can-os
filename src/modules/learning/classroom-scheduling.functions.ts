@@ -142,7 +142,7 @@ export const getClassroomSchedule=createServerFn({method:"GET"})
     });
   });
 type ScheduleCommand=z.infer<typeof scheduleInput>;
-async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,now:Date){
+export async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,now:Date){
   const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
   validateClassroomTimes(startsAt,endsAt,now);
   const deploymentSiteId=await approvedSiteCourse(
