@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { classDeliveryModeSchema, publisherOfferingKindSchema } from "./unified-class";
+import { classDeliveryModeSchema, publisherOfferingKindSchema, type ClassDefinition } from "./unified-class";
 import { networkClassLaunchRecipeSchema } from "./network-class-launch";
 
 /**
@@ -68,10 +68,10 @@ export function publishedOfferingKind(definition: unknown): z.infer<typeof publi
 export type LocalPublishedCourseOption = {
   offeringVersionId: string;
   courseVersionId: string;
-  siteOptions: ReadonlyArray<{ id: string }>;
+  siteOptions: ReadonlyArray<{ id: string; allowedDeliveryModes?: ReadonlyArray<ClassDefinition["deliveryMode"]> }>;
 };
 
-export type RolloutCourseStatus = "ready" | "adoption_required" | "site_authorization_required";
+export type RolloutCourseStatus = "ready" | "adoption_required" | "site_selection_required" | "site_authorization_required";
 
 /** Advisory display only. Every server-side Class create/publish command MUST
  * recheck time-scoped operation, adoption, Course, publisher and Site grants.
@@ -89,7 +89,12 @@ export function assessLocalRollout(
     return {
       courseVersionId: course.courseVersionId,
       status: matches.length === 0 ? "adoption_required" :
-        siteId && !matches.some(option => option.siteOptions.some(site => site.id === siteId))
+        !siteId ? "site_selection_required" :
+        !matches.some(option => option.siteOptions.some(site =>
+          site.id === siteId &&
+          // Older options may not specify modes; the authorizing server still
+          // validates at write time, while new options provide exact modes.
+          (!site.allowedDeliveryModes || site.allowedDeliveryModes.includes(course.deliveryMode))))
           ? "site_authorization_required" : "ready",
     };
   });
