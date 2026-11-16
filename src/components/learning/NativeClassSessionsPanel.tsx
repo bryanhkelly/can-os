@@ -46,7 +46,7 @@ export function NativeClassSessionsPanel({
       if(requestIds.length!==4)setRequestIds(ids);
       const meetings=buildFourWeekMeetings(first,minutes,ids);
       const result=await scheduleNativeClassSessions({data:{
-        classId:workspace.classId,meetings,
+        classId:workspace.classId,cadence:"weekly",meetings,
       }});
       await onChanged?.();
       setNotice(result.created+" dated Class Sessions scheduled. No room playback or attendance has been activated.");
