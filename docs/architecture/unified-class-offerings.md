@@ -51,44 +51,79 @@ legacy Section or noncredit-registration services, and there are no importers, b
 dual writes, source adapters or fallback endpoints. Existing live data and workflows remain
 unmodified on main until a separately approved replacement deployment.
 
-## Branch implementation
+## Branch implementation (source committed, runtime inactive)
 
-- Shared domain contracts, product-kind/visibility semantics and award prerequisites:
-  src/domain/unified-class.ts
-- Additive canonical schema mapping: src/db/canonical-v301/classes.ts
-- Proposed migration script (not executed):
-  database/canonical/v3.0.1/patch-unified-class-offerings.sql
-- Unit tests: tests/unit/unified-class.test.ts
+- Contracts: src/domain/unified-class.ts and src/domain/native-class-enrollment.ts.
+- Tables/Drizzle mapping: src/db/canonical-v301/classes.ts; direct Course Attempt
+  mapping in src/db/canonical-v301/learning.ts.
+- SQL, in order, on an isolated reviewed database only:
+  1. database/canonical/v3.0.1/patch-unified-class-offerings.sql
+  2. database/canonical/v3.0.1/patch-unified-class-course-attempts.sql
+- Native operator creation/publishing/closing/revision commands:
+  src/modules/classes/unified-class.functions.ts.
+- Native **adult self-enrollment** with current adult DOB verification, consent
+  hashing, class-level capacity lock, idempotent duplicate handling and atomic
+  Class Enrollment/Course Attempt: src/modules/classes/native-class-enrollment.functions.ts.
+- Native Course Attempt authorization, Course lesson/progress and outcomes/awards
+  **read model**: src/modules/classes/native-class-learning.functions.ts.
+  Recorded media, assessments and independent instructor delivery are NOT yet
+  wired into the new native learner context.
+- Operator 6.1 workspace: /canonical/classes.
+- Learner listing/enrollment: /learn/classes.
+- Learner Course progress: /learn/class/$classEnrollmentId.
+- Unit contracts: tests/unit/unified-class.test.ts and
+  tests/unit/native-class-enrollment.test.ts.
+- Read-only isolated schema verification:
+  scripts/acceptance/check-native-class-schema.mjs.
 
-The SQL defines six new tables: classes, class_offerings, class_offering_versions,
-class_enrollments, class_outcomes and class_awards. All have FORCE RLS and no application
-access until a separate scoped authorization and release decision. This is deliberate:
-it is safer to build the model first than to mint unverified grades or awards.
+**Not activated:** no database migration was applied and no app role was granted
+access to the new tables. All six new tables have forced RLS, initially owner-only
+policies, and are not safely available to application roles until reviewed scoped
+authorization. Native server functions require CAN_UNIFIED_CLASS_COMMANDS_ENABLED=true,
+but setting this alone is NOT a release approval.
+
+The publisher Course/Program Offering kind currently has a domain contract;
+it is NOT yet a persisted, governed publisher publication classifier.
+
+`learner_course_attempts` still physically retains old source columns because
+the canonical v3.0.1 database has dependent constraints/triggers. The new code
+does not use those source paths, adapt them, import their rows or dual-write.
+Replacing the underlying fresh-install schema will be an explicit cutover task.
+
+**Verification:** no successful branch typecheck, unit run, database acceptance
+or browser E2E has been observed. GitHub Actions push runs are reporting
+`startup_failure` rather than executing tests. The original test01 database
+credentials were unavailable during the earlier integration work; this migration
+has not been executed or tested there.
 
 ## Next phases to graduate the model
 
 ### P0: Authorized Class and publication lifecycle
-- On test01, validate and apply the additive migration; provision purpose-specific RLS,
+- On an isolated canonical QA database, validate and apply both SQL patches; provision purpose-specific RLS,
   never an unrestricted network role or broad public SELECT.
-- Create Class and its Class Offering atomically from a published Course version and
-  current approved Deployment/adoption. Require verified operator and Site authority.
-- Publish/close/supersede Offering terms with audit events. Support all visibility and
-  enrollment methods, including private assignment.
-- Enforce one active Class Offering version at a time and aggregate seats across versions,
-  releases and enrollment methods with transactional capacity locks.
+- Exercise the newly implemented atomic Class/Offering draft command using approved
+  Course, Deployment, Site and operator authority on an isolated QA database.
+- Exercise publication, close and revision with database integrity and RLS checks.
+- Complete verified private assignment, invitations and approval workflows.
+- Exercise the native Class-level seat lock across concurrent requests and
+  multiple offering versions; no silent oversubscription.
 - Versioned policies must record eligibility, consent, any guardian approval and any credit/audit selection. Certificates and credentials remain independently governed awards.
 
 ### P0: Native enrollment commands
 - One Class Enrollment identity with verified Person, Class Offering version and
   authorized enrollment mechanism, regardless of credit or certification intent.
-- Class Enrollment becomes the source for canonical Course Attempts; remove existing
-  school/noncredit source assumptions in the new authorization and learning paths.
-- No source adapters or legacy Section/noncredit linkage. New learning activity and
-  grading must be driven by Class Enrollment, published Course versions and policy.
-- Enforce capacity, duplicate-active-enrollment and idempotency under transaction locks.
+- Verify the implemented native Course Attempt source constraint, trigger and atomic
+  enrollment command. It must work without creating a school/noncredit source row.
+- Add purpose-specific learner RLS and restricted media rights binding for native
+  Class Course Attempts, without exposing raw lesson media to unenrolled people.
+- Complete native Class guardian/child enrollment, assignment, invitation, approval,
+  withdrawals, repeats and seat release with verified policy and consent.
+- Integrate independent instructor choice, practice progress and official
+  assessments without resetting learners or duplicating Course attempts.
 
 ### P0: Outcomes and credit/credentials
-- Read existing gradebook/assessment/completion evidence as source of results.
+- Produce native outcomes from canonical assessment, grading and completion evidence,
+  without a legacy gradebook source adapter.
 - Evaluate learner-specific eligibility independently from what the Class could award.
 - Require issuer authorization, award policy version and verified evidence before
   any credit or certificate issuance; retain revocation and corrections as events.
@@ -97,7 +132,8 @@ it is safer to build the model first than to mint unverified grades or awards.
 ### P1: Native screens and reporting
 - Publisher: Course/Program Offerings, approved adoptions.
 - Operator: Classes → Class Offering → Enrollment → Sessions → Outcomes.
-- Learner: Explore Classes; My Classes; Course player; Progress and earned awards.
+- Learner: native Class catalog and lesson/progress read view are committed;
+  add authorized playback, practice, assessment, schedule and awarded outcomes.
 - Replace prior pages and services at cutover rather than maintaining dual routes.
   Old screens continue unchanged on main until the native workflows are proven.
 
