@@ -149,7 +149,11 @@ function NativeClasses(){
       setRecipeOfferingVersionId(plan.offeringVersionId);
       try{
         await navigator.clipboard.writeText(value);
-        setNotice("Published Offering v"+source.offeringVersionNo+" rollout copied with all Course components. Receiving operators must independently adopt and authorize delivery.");
+        setNotice("Published Offering v"+source.offeringVersionNo+" rollout copied with all Course components. "+
+          (source.latestPublishedVersionNo>source.offeringVersionNo
+            ?"Publisher v"+source.latestPublishedVersionNo+" is available. Existing Classes stay pinned until a separately approved adoption. "
+            :"")+
+          "Receiving operators must independently adopt and authorize delivery.");
       }catch{
         setNotice("Versioned publisher rollout prepared below. Copy it to share with another authorized operator.");
       }
