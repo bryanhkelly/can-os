@@ -12,7 +12,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
-import { validateClassAuthority } from "@/modules/classes/unified-class.functions";
+import { validateClassAuthority } from "@/modules/classes/unified-class-authority.server";
 import { assertPublisherObjectiveAttemptLimit } from "@/domain/canonical-objective-draft";
 import { getCanonicalClassPublisher } from "./native-class-publisher.server";
 
