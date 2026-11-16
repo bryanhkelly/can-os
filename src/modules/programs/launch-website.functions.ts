@@ -3,7 +3,7 @@ import {setResponseHeader} from "@tanstack/react-start/server";
 import {eq} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
-import {organizations,programs,sitePublications,sites} from "@/db/schema";
+import {organizations,programs,siteAffiliations,sitePublications,sites} from "@/db/schema";
 import {AuthorizationError} from "@/domain/command-context";
 import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
@@ -87,6 +87,17 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
   const config=safeReadSiteContentChannelConfig(siteFlags?.metadata?.websiteContentChannels);
   const launchPrefs=siteLaunchPreferencesSchema.safeParse(siteFlags?.metadata?.launchPreferences);
   const plannedLocation=schoolPlanningLocationSchema.safeParse(siteFlags?.metadata?.schoolPlanningLocation);
+  // Exact-Site network decisions are private and require a separate grant.
+  const networkRows=actor.capabilities.has("network.affiliations.read")
+    ? await db.select({name:organizations.name,status:siteAffiliations.status})
+        .from(siteAffiliations)
+        .innerJoin(organizations,eq(organizations.id,siteAffiliations.denominationOrganizationId))
+        .where(eq(siteAffiliations.siteId,school.siteId)).limit(20)
+    : null;
+  const networkAffiliations=networkRows?.flatMap(row=>
+    (["pending","approved","rejected","revoked"] as const).includes(
+      row.status as "pending"|"approved"|"rejected"|"revoked")
+      ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}] : []) ?? null;
   const classes=await readOptionalSitePublishedClasses(school.siteId);
   const contentBlocks=resolveSiteContentBlocks(
     config,{
@@ -95,6 +106,7 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
         city:plannedLocation.success?plannedLocation.data.city:null,
         state:plannedLocation.success?plannedLocation.data.state:null,
         timezone:siteFlags?.timezone??null},
+      networkAffiliations,networkStatusKnown:networkRows!==null,
       academicPrograms,enrichment:offerings,classes,classTimezone:siteFlags?.timezone??null,
     });
   const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
