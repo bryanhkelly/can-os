@@ -33,6 +33,9 @@ const baseRoleCapabilities = {
  academic_content_reviewer: ["instructional_track.review", "instructional_track.publish", "instructional_track.withdraw"],
  // Network partners govern affiliation and their own sites; never student or school operations.
  can_network_steward: ["network.agreements.verify", "network.admins.provision", "jurisdiction.profile.manage", "site.identity.review"],
+ // Issuer approval is independent of Site identity review and network stewardship.
+ // It must be explicitly assigned to a real CAN Person through an organization-wide grant.
+ can_credential_reviewer: ["credential.issuer.review"],
  can_jurisdiction_reviewer: ["jurisdiction.profile.verify"],
  network_admin: ["network.sites.read", "network.sites.manage", "network.affiliations.read", "network.affiliations.review"],
  // Partner website review is deliberately NOT registration, academic approval,

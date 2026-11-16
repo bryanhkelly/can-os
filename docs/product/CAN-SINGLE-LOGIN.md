@@ -146,3 +146,95 @@ enabling `CAN_CREDENTIAL_ISSUANCE_ENABLED` is insufficient.
 
 A single login does not mean every staff member automatically has every
 canonical role. Authorization remains an exact resource/role relationship.
+
+## Independently approved sensitive capabilities (P0 slice)
+
+**Source is committed on `main`, not activated in production.**
+`database/canonical/v3.0.1/patch-sensitive-credential-issuer-approvals.sql`
+has been installed on `test01`. The migration adds an expiring,
+independently reviewed `credential.issue` approval for one native staff grant,
+plus a restricted `v301_can_sensitive_capability(text,text)` projection.
+There are no real approved issuer grants.
+
+The governed workflow is at `/canonical/issuer-access`, using the existing
+CAN login. Verified Site Admins or Registrars can submit their own issuer
+request with evidence. A separately authenticated CAN institutional reviewer
+must approve it with a defined expiry; the requester cannot self-approve.
+Reviewers can reject or revoke requests and all decisions are audited.
+
+The issuance command now uses `assertCurrentCredentialIssuer` inside its
+write transaction and locks the approved grant row before creating an award.
+A Site Admin/Registrar role by itself is never `credential.issue` authority,
+and a native-only second-login cookie cannot satisfy the new issuer guard.
+
+**Activation blockers:** `CAN_CREDENTIAL_ISSUANCE_ENABLED` must remain
+disabled until a reviewed runtime DB permission plan, DB-backed issuer
+lifecycle acceptance, executable TypeScript/build/Playwright checks, credential
+artifact issuance, revocation and cross-organization negative acceptance pass.
+The rollback-only issuer acceptance SQL is committed as
+`database/canonical/v3.0.1/accept-sensitive-credential-issuer-test01.sql`,
+but its execution was blocked and no positive issuer-grant test is claimed.
+A read-only negative test using a nonmatching session digest was verified on
+`test01` and returned false for both issuance and unrelated capabilities.
+The restricted reader can EXECUTE the capability projection but cannot directly
+SELECT the approval table; public EXECUTE is revoked.
+
+**Important:** Existing credential-award domain RLS and runtime application
+role grants are separate prerequisites. The issuer workflow may not have
+runtime DB write privileges under a non-owner deployment login until the
+credential-specific, audited role is provisioned. Do not widen general
+application database privileges to make it work.
+
+## Issuer governance hardening, follow-up (pending database rollout)
+
+The sensitive issuance authorization is now bound to **both** the requested
+canonical staff grant and the original verified CAN account. If a canonical
+Person is subsequently linked to another CAN account, that account does not
+inherit an earlier account's credential-issuer approval.
+
+The original `patch-sensitive-credential-issuer-approvals.sql` has the
+account-binding check for fresh installations. Databases with the earlier
+version must apply the additive
+`patch-sensitive-credential-issuer-account-binding.sql` patch.
+
+The approval request/review/revoke handlers also switch temporarily to
+`can_v30_sensitive_approval_writer` within their authorized transaction,
+instead of executing the actual INSERT/UPDATE as the broad application role.
+The role has no login, no BYPASSRLS, no DELETE, and separate RLS policies
+covering pending requests, independent review and revocation. This requires
+`provision-sensitive-issuer-approval-writer.sql` and a separately reviewed
+runtime DB role membership grant, if the runtime app is not the table owner.
+Missing membership **denies approval writes**; there is no owner fallback.
+
+Credential issuer reviews now require a *dedicated*
+`can_credential_reviewer` CAN membership, authorized at the CAN institutional
+network scope. The usual `can_network_steward` Site identity reviewer cannot
+approve or revoke issuer access merely by holding that broader network role.
+This new role is a separate grant, not a new login. The institution must
+explicitly provision it to a verified Person before issuer requests can be
+approved; no reviewer is automatically seeded.
+
+**Rollout / verification order (test01 first, no production changes):**
+
+1. Apply `patch-sensitive-credential-issuer-account-binding.sql` to a
+   reviewed nonproduction environment with the base approval schema.
+2. Apply `provision-sensitive-issuer-approval-writer.sql`; verify the actual
+   writer RLS policies, absence of DELETE and who may SET the role.
+3. Configure the separate restricted auth login, then run
+   `npm run db:canonical:issuer-reader`. This is read-only and fails if the
+   installed SQL function lacks the CAN-account binding.
+4. With an approved test01-only owner connection and explicit test opt-in,
+   run `npm run db:canonical:issuer-acceptance`. The SQL asserts positive
+   approval, pending/expired/revoked denial, source CAN-account transfer denial,
+   and synthetic data rollback. This test was **not run in this follow-up**.
+5. Run `npm run typecheck`, `npm test`, `npm run build` and authenticated
+   browser tests for staff, dedicated reviewer, wrong organization, Site
+   switching and revocation. No successful workflow run is yet recorded.
+6. Do not enable `CAN_CREDENTIAL_ISSUANCE_ENABLED` until restricted runtime
+   credential-award writers, trusted artifact issuance, and cross-organization
+   and credential revocation acceptance have also passed.
+
+The application security check independently compares the issuer request's
+CAN account to the CAN session even before the SQL hotfix is deployed, but
+both code and the stored SQL function are mandatory for release. The test01
+database currently retains the earlier projection until migration approval.

@@ -55,6 +55,7 @@
     "/staff/students",
     "/profiles",
     "/account/sessions",
+    "/canonical/issuer-access",
     "/launch/website",
     "/settings"
   ],

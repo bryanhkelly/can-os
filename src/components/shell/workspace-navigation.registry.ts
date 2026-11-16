@@ -101,6 +101,7 @@ export const workspaceHome = {
   counselor: "/home",
   network_admin: "/home",
   can_network_steward: "/home",
+  can_credential_reviewer: "/canonical/issuer-access",
   can_jurisdiction_reviewer: "/home",
 } as const;
 
@@ -162,6 +163,7 @@ const roleLinks = {
   can_network_steward: [
     { title: "Jurisdiction profiles", path: "/operations/jurisdiction-profiles", icon: "clipboard" },
   ],
+  can_credential_reviewer: [],
   can_jurisdiction_reviewer: [],
   student: [
     { title: "Learn", path: "/student/courses", icon: "book" },

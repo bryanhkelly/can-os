@@ -123,6 +123,15 @@ describe("generated workspace navigation", () => {
     expect(workspaceLinks.registrar.some(item => item.path === "/sites")).toBe(false);
   });
 
+  it("routes credential reviewers to the issuer workspace without broader steward powers", () => {
+    expect(workspaceLinks.can_credential_reviewer[0])
+      .toMatchObject({title:"Home",path:"/canonical/issuer-access"});
+    expect(workspaceLinks.can_credential_reviewer.some(
+      item=>item.path==="/operations/jurisdiction-profiles")).toBe(false);
+    expect(workspaceLinks.can_network_steward.some(
+      item=>item.path==="/canonical/issuer-access")).toBe(false);
+  });
+
   it("routes jurisdiction reviewers to their own home without steward navigation", () => {
     expect(workspaceLinks.can_jurisdiction_reviewer[0]).toMatchObject({ title: "Home", path: "/home" });
     expect(workspaceLinks.can_jurisdiction_reviewer.some(item => item.path === "/operations/jurisdiction-profiles")).toBe(false);

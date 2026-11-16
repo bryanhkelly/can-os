@@ -1,5 +1,5 @@
 import { boolean, index, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { and, isNull } from "drizzle-orm";
+import { and, isNull, sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
@@ -28,6 +28,31 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
   index("canonical_account_grants_account_idx").on(t.accountId)
     .where(and(t.active, isNull(t.revokedAt))),
 ]);
+
+/** Independently approved time-bounded staff capability, not a role grant. */
+export const canonicalSensitiveCapabilityApprovals = educationV30.table(
+  "canonical_sensitive_capability_approvals", {
+    id: id(),
+    canonicalGrantId: uuid("canonical_grant_id").notNull(),
+    capabilityCode: text("capability_code").$type<"credential.issue">().notNull(),
+    requestedByCanAccountId: uuid("requested_by_can_account_id").notNull(),
+    requestEvidenceReference: text("request_evidence_reference").notNull(),
+    requestedAt: timestamp("requested_at", { withTimezone: true }).notNull().defaultNow(),
+    status: text("status").$type<"pending"|"approved"|"rejected"|"revoked">().notNull().default("pending"),
+    reviewedByCanAccountId: uuid("reviewed_by_can_account_id"),
+    reviewEvidenceReference: text("review_evidence_reference"),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    approvedUntil: timestamp("approved_until", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokedByCanAccountId: uuid("revoked_by_can_account_id"),
+    revokedReason: text("revoked_reason"),
+  }, t => [
+    uniqueIndex("sensitive_approvals_open_grant_uq")
+      .on(t.canonicalGrantId,t.capabilityCode)
+      .where(sql`${t.status} IN ('pending','approved')`),
+    index("sensitive_approvals_status_idx").on(t.status,t.requestedAt),
+  ],
+);
 
 /** Hashed bearer session, anchored to the same account as the selected grant. */
 export const canonicalSessions = educationV30.table("canonical_sessions", {
