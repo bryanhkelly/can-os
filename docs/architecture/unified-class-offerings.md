@@ -10,8 +10,8 @@ learning identity, progress, school records, registration and completion evidenc
 - **Course Offering**: one publisher-owned, explicitly classified single-Course product made available for approved organizational adoption.
 - **Program Offering**: a publisher-owned, versioned bundle of learning experiences (one or many Courses, possibly other components).
 - **Class**: a governed instantiation of *exactly one Course version* within one current Deployment/adoption and operating organization, optionally at a Site. No schedule is required for self-paced learning.
-- **Class Offering**: the required enrollment contract of that Class, even when entirely private or assigned. One identity, versioned terms. Visibility is separate from enrollment method.
-- **Class Enrollment**: one person's enrollment regardless of how participation began. Credit, audit, certificate and participation are choices/intents, not different types of student.
+- **Class Offering**: the required enrollment contract of that Class, even when entirely private or assigned. One identity, versioned terms. Visibility is separate from one or more permitted enrollment methods.
+- **Class Enrollment**: one person's enrollment regardless of how participation began. Learners may participate for credit, audit or without academic-credit applicability. Certificates and other awards are independent outcomes, not separate enrollment types.
 - **Individual Course Attempt**: authoritative individual Course activity/progress, not duplicated for classrooms or recorded teacher selection.
 - **Class Outcome**: independently supported evidence of achievement or assessment. A result may exist without an award.
 - **Class Award**: credit/certificate/credential issued by an independently authorized authority under a valid policy to an eligible participant. Not automatically derived from enrollment, completion or the Course's content.
@@ -29,7 +29,7 @@ learning identity, progress, school records, registration and completion evidenc
 ## Marketing and enrollment are independent
 
 Class Offering visibility: public, unlisted, private.
-Class Offering enrollment method: self, invitation, assignment, approval.
+Class Offering enrollment methods: any explicitly permitted combination of self, invitation, assignment and approval.
 These are orthogonal. A private Class can assign learners; a public Class can still require approval.
 Publication does not imply public advertising or open self-service.
 
@@ -76,7 +76,7 @@ it is safer to build the model first than to mint unverified grades or awards.
   enrollment methods, including private assignment.
 - Enforce one active Class Offering version at a time and aggregate seats across versions,
   releases and enrollment methods with transactional capacity locks.
-- Versioned policies must record eligibility, consent, any guardian approval and award intent.
+- Versioned policies must record eligibility, consent, any guardian approval and any credit/audit selection. Certificates and credentials remain independently governed awards.
 
 ### P0: Native enrollment commands
 - One Class Enrollment identity with verified Person, Class Offering version and
@@ -92,7 +92,7 @@ it is safer to build the model first than to mint unverified grades or awards.
 - Evaluate learner-specific eligibility independently from what the Class could award.
 - Require issuer authorization, award policy version and verified evidence before
   any credit or certificate issuance; retain revocation and corrections as events.
-- A learner may take a credit-eligible Class for audit and receive no academic credit.
+- A learner may take a credit-eligible Class for audit and receive no academic credit, while still qualifying for a separately authorized certificate.
 
 ### P1: Native screens and reporting
 - Publisher: Course/Program Offerings, approved adoptions.
@@ -106,7 +106,7 @@ it is safer to build the model first than to mint unverified grades or awards.
 - One Course instantiated by 25 independent authorized Sites, with no network privacy leak.
 - Class with a private assigned Offering succeeds without public catalog visibility.
 - Class with public Offering rejects unauthorized, ineligible and unconsented enrollment.
-- One Class supports credit, audit and certificate seekers; only legally authorized awards issue.
+- One Class supports credit and auditing learners; certificates may be separately awarded when authorized and earned.
 - A Program with three Courses records three Course-level attempts and appropriate Classes.
 - Same Class, different recorded instructors; grades and progress remain stable.
 - One Class, multiple publication versions; no duplicate active enrollment, no oversold seats.
