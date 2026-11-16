@@ -90,3 +90,22 @@ export const canonicalClassAwards = educationV30.table("class_awards", {
   issuedAt:timestamp("issued_at",{withTimezone:true}).notNull().defaultNow(),
   revokedAt:timestamp("revoked_at",{withTimezone:true}),
 },t=>[index("canonical_class_awards_outcome_idx").on(t.classOutcomeId,t.issuedAt)]);
+
+
+/** Class-specific instructional authority; a Site-wide role or publisher
+ * presenter identity never grants access to an individual Class roster.
+ * An independently verified canonical role/grant remains required. */
+export const canonicalClassStaffAssignments = educationV30.table("class_staff_assignments", {
+  id:id(),
+  classId:uuid("class_id").notNull(),
+  personId:uuid("person_id").notNull(),
+  roleCode:text("role_code").$type<"teacher"|"facilitator">().notNull(),
+  state:text("state").$type<"approved"|"suspended"|"ended">().notNull().default("approved"),
+  beginsAt:timestamp("begins_at",{withTimezone:true}).notNull(),
+  endsAt:timestamp("ends_at",{withTimezone:true}),
+  assignedByPersonId:uuid("assigned_by_person_id").notNull(),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  index("canonical_class_staff_class_idx").on(t.classId,t.state),
+  index("canonical_class_staff_person_idx").on(t.personId,t.state),
+]);
