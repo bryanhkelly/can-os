@@ -245,7 +245,9 @@ CREATE TRIGGER canonical_class_session_guard_trg
  FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_class_session_guard();
 
 -- A native Class plan cannot be repurposed as a legacy release, redirected
--- to another Site/Course or resurrected after cancellation. Keep scheduling
+-- to another Site/Course, or resurrected after cancellation. Once started,
+-- its facilitated room ID is immutable: unlinking it could make a formerly
+-- native Class room appear to be a generic Course/Site room. Keep scheduling
 -- times in delivery_sessions; controlled updates to plan state remain audited.
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_plan_boundary()
 RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
@@ -260,6 +262,9 @@ BEGIN
          OLD.site_id,OLD.host_organization_id,OLD.facilitator_person_id,
          OLD.request_id)
      OR NEW.enrollment_release_id IS NOT NULL
+     OR (OLD.facilitated_session_id IS NOT NULL
+          AND NEW.facilitated_session_id IS DISTINCT FROM OLD.facilitated_session_id)
+     OR (OLD.state='started' AND NEW.state<>'started')
      OR (OLD.state='cancelled' AND NEW.state<>'cancelled') THEN
     RAISE EXCEPTION 'Class Session cannot be repurposed or linked to another release'
      USING ERRCODE='23514';
