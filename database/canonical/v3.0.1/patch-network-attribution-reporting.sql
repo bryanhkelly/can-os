@@ -221,15 +221,15 @@ BEGIN
     IF NOT membership_row.directory_visible THEN
       RAISE EXCEPTION 'Self-reported selection is limited to approved directory-visible affiliates';
     END IF;
-    WITH RECURSIVE lineage(id,parent_id,depth,visited) AS (
-      SELECT u.id,u.parent_unit_id,0,ARRAY[u.id]
+    WITH RECURSIVE lineage(id,parent_id,code,name,depth,visited) AS (
+      SELECT u.id,u.parent_unit_id,u.code,u.name,0,ARRAY[u.id]
         FROM network_units u WHERE u.id=membership_row.reporting_unit_id
       UNION ALL
-      SELECT p.id,p.parent_unit_id,l.depth+1,l.visited||p.id
+      SELECT p.id,p.parent_unit_id,p.code,p.name,l.depth+1,l.visited||p.id
         FROM network_units p JOIN lineage l ON p.id=l.parent_id
        WHERE NOT p.id=ANY(l.visited)
     )
-    SELECT jsonb_agg(jsonb_build_object('id',id) ORDER BY depth DESC)
+    SELECT jsonb_agg(jsonb_build_object('id',id,'code',code,'name',name) ORDER BY depth DESC)
       INTO lineage_snapshot FROM lineage;
     NEW.relationship_snapshot=jsonb_build_object(
       'networkOrganizationId',membership_row.network_organization_id,
