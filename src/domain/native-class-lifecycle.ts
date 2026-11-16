@@ -103,17 +103,21 @@ export function assertNativeClassOperatorExitScope(
 }
 
 /** Typed against the restricted canonical session-function result, not a
- * caller-supplied Person or a role picked in the browser. */
+ * caller-supplied Person or browser-selected role. The native learner grant
+ * belongs to their home Organization, which need NOT be the operator's
+ * Organization for public national Class participation. Compare it against
+ * the independently resolved authenticated actor, never the Class provider.
+ */
 export function assertNativeClassLearnerSessionForExit(
   row:Record<string,unknown>,
   actorPersonId:string,
-  operatingOrganizationId:string,
+  authenticatedOrganizationId:string,
 ):void{
   if(row.person_id!==actorPersonId ||
      row.role_code!=="learner" ||
-     row.organization_id!==operatingOrganizationId ||
+     row.organization_id!==authenticatedOrganizationId ||
      row.site_id!==null){
-    throw new AuthorizationError("unchanged provider-scoped learner grant");
+    throw new AuthorizationError("unchanged native learner session and home Organization");
   }
 }
 
