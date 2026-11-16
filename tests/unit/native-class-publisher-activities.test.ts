@@ -67,7 +67,7 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(view).toContain("Your learning checklist");
     expect(view).toContain("Participation and attendance");
     expect(view).toContain("Provider review");
-    expect(view).toContain("Class completion outcome");
+    expect(view).toContain("Course completion decision");
     expect(view).toContain('context="class"');
     expect(assessment).toContain('context?:"noncredit"|"class"');
     expect(assessment).toContain('context==="class"?"Class":"noncredit"');
