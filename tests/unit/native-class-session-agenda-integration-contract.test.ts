@@ -46,6 +46,17 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
     expect(schedule).toContain("publish a Course-linked Class Session study plan before opening");
     expect(schedule).toContain("revokeNativeClassSession");
   });
+  it("hides disabled agenda UI and gives Site managers read-only access",()=>{
+    const workspace=read("src/modules/classes/native-class-workspace.functions.ts");
+    const panel=read("src/components/learning/NativeClassSessionsPanel.tsx");
+    const agenda=read("src/modules/classes/native-class-session-agenda.functions.ts");
+    expect(workspace).toContain('sessionAgendasEnabled:process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true"');
+    expect(panel).toContain("workspace.sessionAgendasEnabled&&");
+    expect(agenda).toContain('actor.capabilities.has("class.manage")');
+    expect(agenda).toContain("await validateClassAuthority(tx");
+    expect(agenda).toContain('actor.capabilities.has("learning.room.facilitate")');
+    expect(agenda).toContain("link.facilitatorPersonId===actor.actorPersonId");
+  });
   it("orders existing authorized media without granting playback or activity evidence",()=>{
     const controls=read("src/components/learning/ClassroomPlaybackControls.tsx");
     const presenter=read("src/components/learning/NativeClassroomHostPanel.tsx");
