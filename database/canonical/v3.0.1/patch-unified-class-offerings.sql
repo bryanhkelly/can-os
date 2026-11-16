@@ -29,6 +29,8 @@ CREATE INDEX IF NOT EXISTS canonical_classes_operator_idx
  ON education_v30.classes(operating_organization_id,state);
 CREATE INDEX IF NOT EXISTS canonical_classes_course_idx
  ON education_v30.classes(course_version_id,deployment_id);
+CREATE INDEX IF NOT EXISTS canonical_classes_discovery_title_idx
+ ON education_v30.classes(title,id) WHERE state='active';
 
 CREATE TABLE IF NOT EXISTS education_v30.class_offerings (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
