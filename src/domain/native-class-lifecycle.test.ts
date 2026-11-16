@@ -159,6 +159,13 @@ describe("WS2 negative enrollment authorization boundaries",()=>{
       organization_id:org,site_id:null,
     };
     expect(()=>assertNativeClassLearnerSessionForExit(grant,person,org)).not.toThrow();
+    // A public Class can be hosted by another Organization. The session
+    // must match the learner's own verified home Organization instead.
+    const providerOrganization="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    expect(providerOrganization).not.toBe(org);
+    expect(()=>assertNativeClassLearnerSessionForExit(
+      grant,person,org,
+    )).not.toThrow();
     const variants=[
       {...grant,person_id:"unrelated"},
       {...grant,role_code:"guardian"},
