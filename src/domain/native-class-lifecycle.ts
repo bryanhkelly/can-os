@@ -54,6 +54,24 @@ export function assertOperationalClassEnrollmentMethods(
   }
 }
 
+/** Published modes must map to working enrollment commands. Academic
+ * credit eligibility is not established by adult consent, a Class title or a
+ * publisher checkbox. Until the institutional credit placement command is
+ * integrated, no native Class Offering may advertise for-credit registration.
+ */
+export function assertOperationalClassOfferingTerms(input:{
+  enrollmentMethods: readonly string[];
+  allowedCreditModes: readonly string[];
+}):void{
+  assertOperationalClassEnrollmentMethods(input.enrollmentMethods);
+  if(input.allowedCreditModes.length===0 ||
+     new Set(input.allowedCreditModes).size!==input.allowedCreditModes.length ||
+     input.allowedCreditModes.some(mode=>
+       mode!=="audit" && mode!=="not_applicable")){
+    throw new AuthorizationError("operational noncredit Class participation modes");
+  }
+}
+
 /** Repeat follows a fresh Class Enrollment, never a reopened historic one.
  * Finished participants require separately approved repeat eligibility.
  * Withdrawn/cancelled records may re-enter through normal current checks. */
