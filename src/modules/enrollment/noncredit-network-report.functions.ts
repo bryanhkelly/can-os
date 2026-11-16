@@ -223,7 +223,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     }
     const affiliations=[...affiliateMap.values()].sort((a,b)=>
       a.organizationName.localeCompare(b.organizationName));
-    const networkUnits=[...unitMap.values()].sort((a,b)=>
+    const unitRollups=[...unitMap.values()].sort((a,b)=>
       a.unitName.localeCompare(b.unitName));
     if(affiliations.reduce((n,a)=>n+a.registrations,0)!==totals.registrations)
       throw new Error("Affiliate attribution did not reconcile to source totals");
@@ -234,7 +234,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       verifiedAttendees:s.verifiedAttendees>=minimumCell?s.verifiedAttendees:null,
     }));
     return {asOf:new Date().toISOString(),totals,sites,cohorts,
-      affiliations,networkUnits,
+      affiliations,networkUnits:unitRollups,
       publicationSafe:{minimumCell,groups:safe,
         affiliations:affiliations.filter(a=>a.registrations>=minimumCell).map(a=>({
           organizationName:a.organizationName,registrations:a.registrations,
