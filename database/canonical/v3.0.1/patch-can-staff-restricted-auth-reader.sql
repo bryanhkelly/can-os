@@ -45,7 +45,7 @@ AS $can_staff_auth$
         s.last_activity_at > clock_timestamp() - interval '5 minutes')
       AND a.disabled = false
       AND a.email_verified_at IS NOT NULL
-      AND a.email_normalized !~* '^[^@[:space:]]+@[a-z0-9]([a-z0-9-]*[a-z0-9])?\\.demo$'
+      AND lower(a.email_normalized) NOT LIKE '%.demo'
       AND person.active = true
       AND g.active = true
       AND g.role IN ('site_admin', 'registrar')
