@@ -27,17 +27,12 @@
 
 ## 3. Shared completion contract proposal: needs WS00 approval
 
-Version candidate: `ParticipationCompletionEvidence.v1`. WS1 owns the final read-model envelope; WS3 proposes the completion-only payload:
+Version candidate: `CompletionEvidenceExtension.v0.1` to be reviewed against WS1's **provisional** `docs/integration/participation-read-model-v0.1.0.md` on the integration branch. This is a **nested completion-specific extension**, never a competing participation envelope:
 
 ```ts
-type CompletionEvidenceV1 = {
-  participationKind: "class" | "noncredit" | "school" | "program";
-  participantPersonId: string; // server resolved, never trusted from browser
-  sourceEnrollmentId: string;
-  courseAttemptId: string | null;
-  courseVersionId: string | null;
-  owningOrganizationId: string;
-  siteId: string | null; // null only if delivery has no Site
+type CompletionEvidenceExtension = {
+  // Attach to WS1 ParticipationRecordV1, keyed by
+  // (sourceKind, sourceId) and the server-resolved personId.
   pinnedPolicyVersionId: string | null;
   lessonsRecorded: number;
   totalLessons: number;
@@ -53,6 +48,8 @@ type CompletionEvidenceV1 = {
   }[];
 };
 ```
+
+Use WS1's `personId`, `sourceKind`, `sourceId`, `courseAttemptId`, `operatorOrganizationId`, and `actualDeliverySiteId` unchanged. For an activated native Class or published enrollment release, a missing actual delivery Site is a reconciliation blocker under WS00's current provisional contract, **not** permission to fabricate a Site. Never manufacture a Program enrollment to attach completion data.
 
 Invariants:
 
