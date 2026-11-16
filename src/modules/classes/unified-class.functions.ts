@@ -138,50 +138,101 @@ export async function validateClassAuthority(tx: Tx, operator: ClassOperator, in
   return catalog;
 }
 
-/** Atomic creation: a Class always receives its Class Offering identity and
- * private/draft enrollment terms. No self-enrollment or credit is issued here. */
+/** Create the Class identity independently. Draft registration/publication terms
+ * are explicitly optional; school and organization assignments do not need
+ * a marketing or self-registration listing. */
 export const createUnifiedClassDraft = createServerFn({method:"POST"})
   .validator((value:unknown) => {
-    const {definition, terms} = value && typeof value === "object" ? value as Record<string,unknown> : {};
-    return {definition:classDefinitionSchema.parse(definition),terms:classOfferingTermsSchema.parse(terms)};
+    const {definition, terms} = value && typeof value === "object" ?
+      value as Record<string,unknown> : {};
+    return {definition:classDefinitionSchema.parse(definition),
+      terms:terms==null?null:classOfferingTermsSchema.parse(terms)};
   })
-  .handler(async({data}) => {
+  .handler(async({data})=>{
     requireClassFeature();
-    const operator = await requireClassOperator();
-    return db.transaction(async tx => {
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
       await validateClassAuthority(tx,operator,data.definition);
-      const [created] = await tx.insert(canonicalClasses).values({
-        ...data.definition, state:"draft",
+      const [created]=await tx.insert(canonicalClasses).values({
+        ...data.definition,state:"draft",
         createdByPersonId:operator.actor.actorPersonId!,
       }).returning({id:canonicalClasses.id});
-      if (!created) throw new Error("Class creation did not return an identity");
-      const [offering] = await tx.insert(canonicalClassOfferings)
-        .values({classId:created.id}).returning({id:canonicalClassOfferings.id});
-      if (!offering) throw new Error("Class Offering creation did not return an identity");
-      const [version] = await tx.insert(canonicalClassOfferingVersions).values({
-        classOfferingId:offering.id,classId:created.id,versionNo:1,
-        visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
-        opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
-        closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
-        capacity:data.terms.capacity,allowedCreditModes:data.terms.allowedCreditModes,
-        consentVersion:data.terms.consentVersion,consentText:data.terms.consentText,state:"draft",
-        createdByPersonId:operator.actor.actorPersonId!,
-      }).returning({id:canonicalClassOfferingVersions.id});
-      if (!version) throw new Error("Class Offering terms could not be stored");
+      if(!created)throw new Error("Class creation did not return an identity");
+      let classOfferingId:string|null=null;
+      let classOfferingVersionId:string|null=null;
+      if(data.terms){
+        const [offering]=await tx.insert(canonicalClassOfferings)
+          .values({classId:created.id}).returning({id:canonicalClassOfferings.id});
+        if(!offering)throw new Error("Class Offering creation did not return an identity");
+        const [version]=await tx.insert(canonicalClassOfferingVersions).values({
+          classOfferingId:offering.id,classId:created.id,versionNo:1,
+          visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
+          opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
+          closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
+          capacity:data.terms.capacity,allowedCreditModes:data.terms.allowedCreditModes,
+          consentVersion:data.terms.consentVersion,consentText:data.terms.consentText,
+          state:"draft",createdByPersonId:operator.actor.actorPersonId!,
+        }).returning({id:canonicalClassOfferingVersions.id});
+        if(!version)throw new Error("Class Offering terms could not be stored");
+        classOfferingId=offering.id;
+        classOfferingVersionId=version.id;
+      }
       await tx.insert(auditEvents).values({
         actorPersonId:operator.actor.actorPersonId!,
         owningOrganizationId:operator.organizationId,
         eventCode:"class.draft_created",entityKind:"class",entityId:created.id,
         payload:{courseVersionId:data.definition.courseVersionId,
           deploymentId:data.definition.deploymentId,siteId:data.definition.siteId,
-          classOfferingVersionId:version.id},
+          classOfferingVersionId},
       });
       await tx.insert(domainEvents).values({
         eventType:"ClassDraftCreated",aggregateType:"class",aggregateId:created.id,
         actorPersonId:operator.actor.actorPersonId!,
-        payload:{operatingOrganizationId:operator.organizationId,offeringVersionId:version.id},
+        payload:{operatingOrganizationId:operator.organizationId,classOfferingVersionId},
       });
-      return {classId:created.id,classOfferingId:offering.id,classOfferingVersionId:version.id,status:"draft" as const};
+      return {classId:created.id,classOfferingId,
+        classOfferingVersionId,status:"draft" as const};
+    });
+  });
+
+/** Class activation is independent from registration publication. The
+ * publisher/Course/adoption/Site authorization is independently rechecked. */
+export const activateUnifiedClass=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>z.object({classId:z.string().uuid()}).strict().parse(raw))
+  .handler(async({data})=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
+      const [instance]=await tx.select().from(canonicalClasses)
+        .where(and(eq(canonicalClasses.id,data.classId),
+          eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
+        .for("update").limit(1);
+      if(!instance||!["draft","approved","active"].includes(instance.state))
+        throw new AuthorizationError("current owned Class");
+      assertManagedClassScope(operator,instance);
+      await validateClassAuthority(tx,operator,{
+        deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
+        offeringVersionId:instance.offeringVersionId,
+        courseVersionId:instance.courseVersionId,
+        operatingOrganizationId:instance.operatingOrganizationId,
+        siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
+      });
+      if(instance.state==="active")return {classId:instance.id,alreadyActive:true};
+      await tx.update(canonicalClasses).set({
+        state:"active",updatedAt:new Date(),
+      }).where(eq(canonicalClasses.id,instance.id));
+      await tx.insert(auditEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,
+        owningOrganizationId:operator.organizationId,
+        eventCode:"class.activated",entityKind:"class",entityId:instance.id,
+        payload:{classOfferingRequired:false},
+      });
+      await tx.insert(domainEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,
+        eventType:"ClassActivated",aggregateType:"class",aggregateId:instance.id,
+        payload:{classOfferingRequired:false},
+      });
+      return {classId:instance.id,alreadyActive:false};
     });
   });
 
@@ -202,8 +253,8 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
       enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
       offeringState:canonicalClassOfferingVersions.state,
     }).from(canonicalClasses)
-      .innerJoin(canonicalClassOfferings,eq(canonicalClassOfferings.classId,canonicalClasses.id))
-      .innerJoin(canonicalClassOfferingVersions,and(
+      .leftJoin(canonicalClassOfferings,eq(canonicalClassOfferings.classId,canonicalClasses.id))
+      .leftJoin(canonicalClassOfferingVersions,and(
         eq(canonicalClassOfferingVersions.classId,canonicalClasses.id),
         eq(canonicalClassOfferingVersions.classOfferingId,canonicalClassOfferings.id),
       ))
