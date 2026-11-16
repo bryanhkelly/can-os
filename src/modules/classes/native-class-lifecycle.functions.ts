@@ -8,10 +8,10 @@ import {
   canonicalPersons, learnerCourseAttempts,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
-import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertNativeClassAttemptForExit,
+  assertVerifiedAdultNativeClassExit,
 } from "@/domain/native-class-lifecycle";
 import {
   canonicalSessionDigestFromRequest, getCanonicalCommandContext,
@@ -107,8 +107,7 @@ async function exitNativeClass(command:ExitRequest){
       .from(canonicalPersons)
       .where(eq(canonicalPersons.id,enrollment.learnerPersonId))
       .limit(1);
-    if(!verifiedAdultOn(person?.birthDate,new Date()))
-      throw new AuthorizationError("verified adult Class lifecycle");
+    assertVerifiedAdultNativeClassExit(person?.birthDate,new Date());
 
     const decision=planNativeClassExit(enrollment.status,command.action);
     if(decision.alreadyClosed)return {
