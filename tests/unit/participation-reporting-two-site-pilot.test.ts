@@ -7,7 +7,7 @@ const dayEnd=(day:number)=>"2026-11-"+String(day).padStart(2,"0")+"T12:00:00Z";
 const period={from:"2026-11-01T00:00:00Z",to:"2026-11-17T00:00:00Z",
   asOf:"2026-11-16T22:00:00Z"};
 
-function classFixture(classId:"classA"|"classB",size:number,siteId:string,delivered:number):EvidenceInput{
+function classFixture(classId:"classA"|"classB",size:number,delivered:number):EvidenceInput{
   const people=classId==="classA"
     ?Array.from({length:size},(_,i)=>"person"+i)
     :Array.from({length:size},(_,i)=>i===size-1?"person0":"person"+(8+i));
@@ -38,18 +38,18 @@ function classFixture(classId:"classA"|"classB",size:number,siteId:string,delive
 }
 describe("WS6 one-hour and four-Session/two-Site synthetic pilot acceptance",()=>{
  it("aggregates four scheduled Sessions but only three actually delivered",()=>{
-   const siteA=classFixture("classA",8,"siteA",2);
-   const siteB=classFixture("classB",6,"siteB",1);
+   const siteA=classFixture("classA",8,2);
+   const siteB=classFixture("classB",6,1);
    const a=aggregateClassEvidence(siteA).metrics;
    const b=aggregateClassEvidence(siteB).metrics;
-   expect(a.sessionsScheduled+b.sessionsScheduled).toBe(4);
+   expect(a.sessionsScheduled!+b.sessionsScheduled!).toBe(4);
    expect(a.sessionsDelivered!+b.sessionsDelivered!).toBe(3);
    expect(a.verifiedAttendance!+b.verifiedAttendance!).toBe(3);
    expect(a.registrations!+b.registrations!).toBe(14);
  });
  it("does not sum distinct Site people as network-wide unique participants",()=>{
-   const fixtures=[classFixture("classA",8,"siteA",2),
-      classFixture("classB",6,"siteB",1)];
+   const fixtures=[classFixture("classA",8,2),
+      classFixture("classB",6,1)];
    const facts:ParticipationReportingFact[]=fixtures.flatMap((f,i)=>
      f.enrollments.map(e=>({
        source:"native_class_enrollment",sourceId:e.id,personId:e.personId,
@@ -66,14 +66,14 @@ describe("WS6 one-hour and four-Session/two-Site synthetic pilot acceptance",()=
    expect(totals.sites.reduce((n,s)=>n+s.uniquePeople,0)).toBe(14);
  });
  it("does not convert one prior registration into a new registration when attending later",()=>{
-   const f=classFixture("classA",8,"siteA",1);
+   const f=classFixture("classA",8,1);
    const later=aggregateClassEvidence({...f,from:date(6)}).metrics;
    expect(later.registrations).toBe(0);
    expect(later.verifiedAttendance).toBe(1);
    expect(later.sessionsDelivered).toBe(1);
  });
  it("latest correction after the report snapshot is excluded",()=>{
-   const f=classFixture("classA",8,"siteA",1);
+   const f=classFixture("classA",8,1);
    const after=[
      ...f.attendance,
      {id:"correction-next-month",roomId:"classA-room-0",
@@ -83,7 +83,7 @@ describe("WS6 one-hour and four-Session/two-Site synthetic pilot acceptance",()=
    expect(aggregateClassEvidence({...f,attendance:after}).metrics.verifiedAttendance).toBe(1);
  });
  it("does not substitute device or playback evidence for verified attendance",()=>{
-   const f=classFixture("classA",8,"siteA",1);
+   const f=classFixture("classA",8,1);
    expect(aggregateClassEvidence({...f,attendance:[]}).metrics.verifiedAttendance).toBe(0);
    expect(aggregateClassEvidence({...f,attendance:[]}).metrics.sessionsDelivered).toBe(1);
  });
