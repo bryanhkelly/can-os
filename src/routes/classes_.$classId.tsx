@@ -11,6 +11,7 @@ import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
 import { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
+import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
 import {
   assignNativeClassStaff, endNativeClassStaffAssignment,
 } from "@/modules/classes/class-staff.functions";
@@ -242,12 +243,29 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
 }
 function ManagingClass({workspace}:{workspace:Workspace}){
   const client=useQueryClient();
+  const [learnerPersonId,setLearnerPersonId]=useState("");
+  const [learnerCreditMode,setLearnerCreditMode]=useState<"audit"|"not_applicable">("not_applicable");
   const [staffPersonId,setStaffPersonId]=useState("");
   const [staffRole,setStaffRole]=useState<"teacher"|"facilitator">("facilitator");
   const [pending,setPending]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   async function refresh(){await client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]});}
+  async function assignLearner(){
+    if(!learnerPersonId||pending)return;
+    setPending(true);setError("");setNotice("");
+    try{
+      const result=await assignAdultToNativeClass({data:{
+        classId:workspace.classId,learnerPersonId,creditMode:learnerCreditMode,
+      }});
+      await refresh();
+      setLearnerPersonId("");
+      setNotice(result.alreadyEnrolled?
+        "Learner already belongs to this Class.":
+        "Verified adult learner assigned to the Class without a Class Offering.");
+    }catch(e){setError(normalizeClientError(e,"Could not assign Class learner.").message)}
+    finally{setPending(false)}
+  }
   async function assign(){
     if(!staffPersonId||pending)return;
     setPending(true);setError("");setNotice("");
@@ -294,7 +312,38 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             Class Offering controls
           </Link>
         </>}
-        {workspace.tab==="roster"&&<Roster workspace={workspace} namesAllowed={true}/>}
+        {workspace.tab==="roster"&&<>
+          <Roster workspace={workspace} namesAllowed={true}/>
+          <div className="mt-6 border-t border-border pt-5">
+            <h3 className="text-base font-semibold">Assign an existing adult learner</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Assignment is independent of Class Offering publication. Candidates
+              must already have a verified learner grant for this Organization
+              and Site. Minors require the separate school/guardian placement flow.
+            </p>
+            <label htmlFor="class-assign-learner" className="mt-4 block text-sm font-semibold">
+              Verified learner
+            </label>
+            <select id="class-assign-learner" value={learnerPersonId}
+              onChange={event=>setLearnerPersonId(event.target.value)}
+              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              <option value="">Choose an authorized learner</option>
+              {workspace.learnerCandidates.map(person=><option
+                key={person.personId} value={person.personId}>{person.name}</option>)}
+            </select>
+            <label htmlFor="class-assign-credit" className="mt-4 block text-sm font-semibold">
+              Individual participation
+            </label>
+            <select id="class-assign-credit" value={learnerCreditMode}
+              onChange={event=>setLearnerCreditMode(event.target.value as typeof learnerCreditMode)}
+              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              <option value="not_applicable">No academic credit</option>
+              <option value="audit">Audit</option>
+            </select>
+            <Button className="mt-4" disabled={!learnerPersonId||pending}
+              onClick={()=>void assignLearner()}>Assign to Class</Button>
+          </div>
+        </>}
         {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}/>}
         {workspace.tab==="reports"&&<>
           <h2 className="font-serif text-2xl">Reporting</h2>
