@@ -13,6 +13,7 @@ export const canonicalClasses = educationV30.table("classes", {
   operatingOrganizationId: uuid("operating_organization_id").notNull(),
   siteId: uuid("site_id"),
   title: text("title").notNull(),
+  capacity:integer("capacity"),
   deliveryMode: text("delivery_mode").$type<"self_paced"|"scheduled"|"facilitated"|"hybrid">().notNull(),
   state: text("state").$type<"draft"|"approved"|"active"|"completed"|"cancelled">().notNull().default("draft"),
   createdByPersonId: uuid("created_by_person_id").notNull(),
