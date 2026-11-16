@@ -244,6 +244,33 @@ or E2E classroom acceptance have been observed. Particularly, a live room
 must be exercised with two independent Classes using the same Course and Site,
 including revoked staff/learner/adoption, before release.
 
+## P0 native facilitated classroom update
+
+The unified Class view now connects native Course Attempts to the existing
+facilitated companion, question release, private facilitator console,
+projector and attendance evidence components. For Class sessions, the
+presenter can select rights-approved recorded content before phones pair,
+using only active Course Attempts in that exact Class as the rights basis.
+Pairing and response submissions still independently verify the Person's
+Class Enrollment, Course Attempt and exact linked Session.
+
+Classroom device layouts: layout=single exposes only public-safe playback
+and question-release controls on the presentation page; dual-screen keeps
+private controls on the facilitator laptop; distributed screens require a
+separately authenticated presenter session, never shared public credentials.
+
+Physical attendance is independent of device pairing and formative answers.
+An authorized Site manager must explicitly set the immutable
+class_staff_assignments.attendance_authorized flag on the exact Class staff
+assignment before that facilitator can view or correct attendance. A teaching
+assignment alone does not grant personal roster access. Historical response
+evidence remains individual to the Course Attempt.
+
+See docs/acceptance/native-facilitated-classroom-p0.md for the 25-person,
+two-Site, shared-Course negative acceptance matrix and release blockers.
+These are committed source paths, not validated release evidence. Native
+tables and restricted RLS remain uninstalled on test01.
+
 ### Verified environment baseline
 
 On 2026-11-15, READ-ONLY Neon queries against `test01` confirmed
