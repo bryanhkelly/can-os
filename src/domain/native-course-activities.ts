@@ -59,7 +59,7 @@ export function scoreNativeClassQuiz(questions:readonly QuizPrompt[],answers:Qui
     throw new Error("Answer every published knowledge-check question exactly once.");
   const chosen=new Map(answers.map(a=>[a.key,a.choiceIndex]));
   for(const item of questions){
-    if((chosen.get(item.key)??-1)<0 || chosen.get(item.key)!>=item.choices.length)
+    if((chosen.get(item.key)??-1)<0 || (chosen.get(item.key)??-1)>=item.choices.length)
       throw new Error("One or more selected answers are not valid for this version.");
   }
   const earned=questions.filter(q=>chosen.get(q.key)===q.correctIndex).length;
