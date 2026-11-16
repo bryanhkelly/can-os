@@ -26,7 +26,7 @@ export const previewNoncreditCredential = createServerFn({ method: "POST" })
     const actor = await getCanonicalCommandContext(getRequest());
     if (!actor.actorPersonId || !["registrar", "site_admin"].includes(actor.role ?? ""))
       throw new AuthorizationError("credential preview staff");
-    assertCapability(actor, "credential.issue");
+    assertCapability(actor, "credential.preview");
     const orgIds = actor.scope.organizationIds ?? [];
     if (orgIds.length !== 1) throw new AuthorizationError("single provider scope");
     const [training] = await db.select({
