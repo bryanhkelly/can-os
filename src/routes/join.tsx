@@ -57,14 +57,25 @@ function ClassroomJoinPage() {
     const form = event.currentTarget;
     const selected = new FormData(form).get("courseAttemptId");
     if (typeof selected !== "string" || !choices?.choices.some(c => c.courseAttemptId === selected)) {
-      setError("Select an eligible course."); return;
+      setError("Select your enrolled Class or Course Attempt."); return;
     }
     setBusy(true); setError("");
     try {
       await pairWithFacilitatedRoom({ data: { courseAttemptId: selected, pairingCode: normalized } });
       setCode("");
       try { window.sessionStorage.removeItem("can-classroom-pending-pair-code"); } catch { /* no persistent code required */ }
-      void navigate({ to: "/classroom/companion", search: { courseAttemptId: selected }, replace: true });
+      const chosen=choices.choices.find(choice=>choice.courseAttemptId===selected);
+      if(chosen?.classId){
+        // A native Class stays in the one shared Class workspace. The QR
+        // code is only a pairing pointer, never an alternate learner route.
+        void navigate({to:"/classes/$classId",params:{classId:chosen.classId},
+          search:{view:"learn",tab:"sessions"},replace:true});
+      }else{
+        // Older school/noncredit courses retain their existing companion
+        // until the coordinated non-native enrollment cutover.
+        void navigate({to:"/classroom/companion",
+          search:{courseAttemptId:selected},replace:true});
+      }
     } catch {
       setError("Pairing refused. Check the code, expiry, enrollment, and current Site assignment.");
     } finally { setBusy(false); }
@@ -84,7 +95,7 @@ function ClassroomJoinPage() {
           spellCheck={false} maxLength={11} placeholder="XXXXX-XXXXX" value={code}
           className="font-mono text-xl tracking-wider"
           onChange={e => setCode(e.target.value.toUpperCase())}/>
-        <label htmlFor="classroom-course" className="block text-sm font-medium">Your course</label>
+        <label htmlFor="classroom-course" className="block text-sm font-medium">Your enrolled Class or course</label>
         <select id="classroom-course" name="courseAttemptId" required
           className="w-full min-h-10 border border-border bg-background p-2 text-sm">
           <option value="">Choose an active course</option>
