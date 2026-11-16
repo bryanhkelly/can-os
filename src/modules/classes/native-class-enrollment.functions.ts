@@ -15,6 +15,9 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
+import {
+  assertNativeClassRepeatEligible, assertOperationalClassEnrollmentMethods,
+} from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -75,6 +78,9 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
     const allowed=[];
     for(const row of rows){
       try{
+        // Previously published, unsupported methods remain invisible until
+        // fully authorized invitation/approval commands are delivered.
+        assertOperationalClassEnrollmentMethods(row.enrollmentMethods);
         const authority=await db.transaction(tx=>currentClassAuthority(tx,row.classId,now));
         // Do not advertise a larger publication limit than the underlying
         // Class can actually seat across assignment and self-registration.
@@ -135,6 +141,7 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
       const items=[];
       for(const row of page){
         try{
+          assertOperationalClassEnrollmentMethods(row.enrollmentMethods);
           const authority=await currentClassAuthority(tx,row.classId,now);
           const limits=[row.capacity,authority.classCapacity]
             .filter((n):n is number=>n!==null);
@@ -196,8 +203,16 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           throw new AuthorizationError("existing enrollment requires governed modification");
         return {classEnrollmentId:existing.id,courseAttemptId:existing.courseAttemptId,alreadyEnrolled:true};
       }
-      if(previous.some(row=>row.status==="completed"))
-        throw new AuthorizationError("repeat participation requires approved Class repeat policy");
+      // A bounded recent-history query is not sufficient for completed
+      // participants who later withdrew multiple times. Check the complete
+      // completion history via its indexed status predicate.
+      const [completed]=await tx.select({id:canonicalClassEnrollments.id})
+        .from(canonicalClassEnrollments).where(and(
+          eq(canonicalClassEnrollments.classId,instance.id),
+          eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
+          eq(canonicalClassEnrollments.status,"completed"),
+        )).limit(1);
+      assertNativeClassRepeatEligible(completed?["completed"]:[]);
       const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.classId,instance.id),
           inArray(canonicalClassEnrollments.status,["pending","active"])));
