@@ -24,7 +24,7 @@ export type EvidenceInput={
     status:"present"|"absent"|"unknown";assertedAt:string;
   }>;
   assessments:ReadonlyArray<{
-    id:string;courseAttemptId:string;state:string;createdAt:string;
+    id:string;courseAttemptId:string;state:string;createdAt:string;submittedAt:string|null;
   }>;
   results:ReadonlyArray<{
     id:string;attemptId:string;revision:number;status:string;
@@ -40,7 +40,7 @@ export type ClassReportMetricKey=
   |"publishedOpportunities"|"registrations"|"uniquePeople"|"active"
   |"withdrawn"|"waitlisted"|"sessionsScheduled"|"sessionsDelivered"
   |"verifiedAttendance"|"verifiedAttendees"|"assessmentsSubmitted"
-  |"assessmentsFinalized"|"formalCompletions"|"awardsIssued"|"awardsRevoked";
+  |"assessmentsFinalized"|"recordedCompletionOutcomes"|"formalCompletions"|"awardsIssued"|"awardsRevoked";
 export type ClassReportMetrics=Record<ClassReportMetricKey,number|null>;
 export type MetricDefinition={
   key:ClassReportMetricKey;label:string;source:string;
@@ -57,9 +57,10 @@ export const CLASS_METRIC_DEFINITIONS:readonly MetricDefinition[]=[
   {key:"sessionsDelivered",label:"Sessions delivered",source:"class_sessions + facilitated_learning_sessions",denominator:"delivery Session IDs",rule:"Linked live room must have ended; a scheduled or merely started plan is not delivered",timeBasis:"delivery_sessions.starts_at"},
   {key:"verifiedAttendance",label:"Verified attendance occurrences",source:"facilitated_room_attendance_assertions",denominator:"room ID and canonical Course Attempt ID pairs",rule:"Latest explicit host assertion is present; excludes device pairing and playback",timeBasis:"linked Session scheduled time, assertions as of query"},
   {key:"verifiedAttendees",label:"Verified attendees",source:"facilitated_room_attendance_assertions + class_enrollments",denominator:"canonical Person IDs",rule:"Unique Class-enrolled people with one or more latest present assertions in scoped rooms",timeBasis:"linked Session scheduled time, assertions as of query"},
-  {key:"assessmentsSubmitted",label:"Assessment attempts submitted",source:"assessment_attempts + assessment_access_grants",denominator:"assessment attempt IDs",rule:"Submitted/scored/finalized assessment attempts for in-period Class registrations",timeBasis:"assessment_attempts.created_at"},
-  {key:"assessmentsFinalized",label:"Finalized assessment attempts",source:"assessment_attempt_results",denominator:"assessment attempt IDs",rule:"Only latest result revision with status finalized; later void reverses count",timeBasis:"assessment_attempts.created_at, latest revision as of query"},
-  {key:"formalCompletions",label:"Recorded completion outcomes",source:"class_outcomes",denominator:"Class Enrollment IDs",rule:"Unique enrolled records with completion result_code completed, never inferred from Course Attempt or playback. Pending WS3 mapping ratification",timeBasis:"class_outcomes.recorded_at"},
+  {key:"assessmentsSubmitted",label:"Assessment attempts submitted",source:"assessment_attempts + assessment_access_grants",denominator:"assessment attempt IDs",rule:"Submitted/scored/finalized attempts by actual submitted timestamp, including earlier registrants",timeBasis:"assessment_attempts.submitted_at"},
+  {key:"assessmentsFinalized",label:"Finalized results for submitted attempts",source:"assessment_attempt_results",denominator:"assessment attempt IDs submitted in period",rule:"Latest result revision must be finalized, and parent attempt finalized; later void reverses count",timeBasis:"assessment_attempts.submitted_at and latest result as of query"},
+  {key:"recordedCompletionOutcomes",label:"Recorded completion outcomes (unverified)",source:"class_outcomes",denominator:"Class Enrollment IDs",rule:"Unique enrollment records with completion result_code completed; source-record count only, not an independently authorized completion decision",timeBasis:"class_outcomes.recorded_at"},
+  {key:"formalCompletions",label:"Verified Class completions",source:"WS3 governed completion authority",denominator:"authorized Class completion decision IDs",rule:"Unavailable until a governed Class completion decision/correction contract is ratified; never infer from recorded outcome or attempt status",timeBasis:"unavailable"},
   {key:"awardsIssued",label:"Awards issued",source:"class_awards + class_outcomes",denominator:"award IDs",rule:"Issued in period, including later-revoked awards; distinct from valid awards",timeBasis:"class_awards.issued_at"},
   {key:"awardsRevoked",label:"Awards revoked",source:"class_awards",denominator:"award IDs",rule:"Revocations in period, independent of original issuance period",timeBasis:"class_awards.revoked_at"},
 ] as const;
@@ -114,7 +115,7 @@ export function aggregateClassEvidence(input:EvidenceInput){
   }
   const present=[...latestAttendance.values()].filter(a=>a.status==="present");
   const periodAssessments=input.assessments.filter(a=>
-    eligibleAttempts.has(a.courseAttemptId)&&inPeriod(a.createdAt));
+    eligibleAttempts.has(a.courseAttemptId)&&!!a.submittedAt&&inPeriod(a.submittedAt));
   const lastResult=new Map<string,EvidenceInput["results"][number]>();
   const assessmentIds=new Set(periodAssessments.map(a=>a.id));
   for(const result of input.results){
@@ -146,8 +147,9 @@ export function aggregateClassEvidence(input:EvidenceInput){
     verifiedAttendance:present.length,
     verifiedAttendees:new Set(present.map(a=>attemptToPerson.get(a.courseAttemptId))).size,
     assessmentsSubmitted:periodAssessments.filter(a=>["submitted","scored","finalized"].includes(a.state)).length,
-    assessmentsFinalized:periodAssessments.filter(a=>lastResult.get(a.id)?.status==="finalized").length,
-    formalCompletions:completed.size,
+    assessmentsFinalized:periodAssessments.filter(a=>a.state==="finalized"&&lastResult.get(a.id)?.status==="finalized").length,
+    recordedCompletionOutcomes:completed.size,
+    formalCompletions:null,
     awardsIssued:input.awards.filter(a=>scopedOutcomes.has(a.outcomeId)&&inPeriod(a.issuedAt)).length,
     awardsRevoked:input.awards.filter(a=>scopedOutcomes.has(a.outcomeId)&&a.revokedAt&&
       inPeriod(a.revokedAt)).length,
