@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { resolveClassVideo } from "@/domain/class-video";
+import { ClassroomMediaSurface } from "@/components/learning/ClassroomMediaSurface";
 import { getFacilitatedRoomMediaAccess, recordFacilitatedPlayback } from "@/modules/learning/facilitated-learning.functions";
 import { getClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 
@@ -98,23 +99,19 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
         Waiting for your facilitator to load a recording.</p>}
       {current&&!resolved&&<p role="status" className="flex aspect-video items-center justify-center border border-border">
         Checking approved playback access…</p>}
-      {resolved?.kind==="file"&&<video key={loaded?.key} ref={player} src={resolved.src}
-        playsInline controls preload="metadata" className="aspect-video w-full bg-black"
+      {resolved && <ClassroomMediaSurface video={resolved}
+        title="Approved classroom recording" videoRef={player}
+        videoClassName="aspect-video w-full bg-black"
+        iframeClassName="aspect-video w-full border border-border"
         onLoadedMetadata={()=>{void observed("opened");}}
         onPlay={()=>{void observed("played");}}
         onPause={e=>{if(!e.currentTarget.ended)void observed("paused");}}
-        onEnded={()=>{void observed("ended");}}>
-        Your browser does not support this recording.
-      </video>}
-      {resolved?.kind==="embed"&&<div>
-        <iframe title="Approved external classroom video" src={resolved.src}
-          allow="fullscreen; picture-in-picture; encrypted-media"
-          referrerPolicy="no-referrer" allowFullScreen className="aspect-video w-full border border-border"/>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Third-party providers have their own play and pause controls. CAN OS cannot independently
-          verify viewing or automatically synchronize these embeds.
-        </p>
-      </div>}
+        onEnded={()=>{void observed("ended");}}
+      />}
+      {resolved?.kind==="embed"&&<p className="mt-2 text-xs text-muted-foreground">
+        Third-party providers have their own play and pause controls. CAN OS cannot independently
+        verify viewing or automatically synchronize these embeds.
+      </p>}
       {manualPlay&&<Button type="button" className="mt-3" onClick={()=>{
         void player.current?.play().catch(()=>setError("Playback requires a local gesture."));
       }}>Start projector playback</Button>}
