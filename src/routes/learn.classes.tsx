@@ -35,8 +35,9 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
   const self=item.enrollmentMethods.includes("self");
+  const full=item.remainingSeats===0;
   async function enroll(){
-    if(!self||!adult||!consent||busy)return;
+    if(!self||full||!adult||!consent||busy)return;
     setBusy(true);setMessage("");setError("");
     try{
       const result=await enrollInNativeClass({data:{
@@ -53,7 +54,14 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       {item.deliveryMode.replace("_"," ")} · {item.siteId?"Site hosted":"Online"}
     </p>
     <h3 className="mt-2 font-serif text-xl">{item.classTitle}</h3>
-    {item.capacity!==null&&<p className="mt-2 text-sm text-muted-foreground">Capacity: {item.capacity} seats</p>}
+    {full?<p role="status" className="mt-2 text-sm font-semibold">
+      Class full. Enrollment is unavailable until a seat is released.
+    </p>:item.remainingSeats!==null?
+      <p className="mt-2 text-sm text-muted-foreground">
+        {item.remainingSeats} of {item.capacity} seats currently available
+      </p>:<p className="mt-2 text-sm text-muted-foreground">
+        Seats available; no published numerical limit
+      </p>}
     {self?<>
       <div className="mt-4">
         <label className="block text-sm font-semibold" htmlFor={"class-credit-"+item.classOfferingVersionId}>Participation</label>
@@ -75,8 +83,8 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
         checked={consent} onChange={e=>setConsent(e.target.checked)}/>
         I have read and accept these participation and data-use terms.
       </label>
-      <Button className="mt-4" disabled={!adult||!consent||busy} onClick={()=>void enroll()}>
-        {busy?"Enrolling…":"Enroll in Class"}
+      <Button className="mt-4" disabled={!adult||!consent||busy||full} onClick={()=>void enroll()}>
+        {busy?"Enrolling…":full?"Class full":"Enroll in Class"}
       </Button>
     </>:<p className="mt-4 text-sm text-muted-foreground">
       This Class is available by {item.enrollmentMethods.join(", ")}. Self-enrollment is not enabled.
