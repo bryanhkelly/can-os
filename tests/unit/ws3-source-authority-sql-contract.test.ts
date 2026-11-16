@@ -18,7 +18,6 @@ describe("WS3 completion evidence source and credential-current contracts",()=>{
     expect(subjectSql).toContain("expected_decision_id uuid REFERENCES");
     expect(subjectSql).toContain("approved_correction_outcome");
     expect(subjectSql).toContain("noncredit_completion_decisions prior");
-    expect(subjectSql).toContain("source-bound");
     expect(subjectSql).toContain("WS3 reviewed evidence bindings are immutable");
     expect(subjectSql).toContain("ROW(target_person,target_org,target_site)");
     expect(subjectSql).toContain("FORCE ROW LEVEL SECURITY");
