@@ -9,6 +9,7 @@ describe("Authenticated Site-first multipage navigation",()=>{
       '<a href="/admissions">Admissions</a></nav>';
     const output=linkPrivateSitePreviewPages(html,id);
     expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fcourses');
+    expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2F"');
     expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fclasses');
     expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fprograms');
     expect(output).toContain('/launch/site-preview?siteId='+id+'&amp;page=%2Fadmissions');

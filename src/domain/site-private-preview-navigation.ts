@@ -10,7 +10,7 @@ export function linkPrivateSitePreviewPages(
 ): string {
   if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8a-f0-9]{4}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(siteId))
     throw new Error("A valid Site ID is required for private navigation");
-  return renderedHtml.replace(/href="(\/[a-z-]+)"/g,(full, path: string)=>{
+  return renderedHtml.replace(/href="(\/[a-z-]*)"/g,(full, path: string)=>{
     if (!isPublicSitePagePath(path)) return full;
     const query=new URLSearchParams({siteId,page:path});
     return 'href="/launch/site-preview?'+query.toString().replaceAll("&","&amp;")+'"';
