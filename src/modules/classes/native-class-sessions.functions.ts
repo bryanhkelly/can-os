@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions, canonicalClassStaffAssignments,
+  canonicalClassEnrollments, learnerCourseAttempts, canonicalDeliverySessions,
   facilitatedClassroomPlans, auditEvents, domainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -13,6 +14,8 @@ import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
+import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning.functions";
+import { canOpenScheduledClassroom } from "@/domain/classroom-scheduling";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Host=Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
@@ -138,5 +141,97 @@ export const scheduleNativeClassSessions=createServerFn({method:"POST"})
         created:results.filter(r=>!r.duplicate).length,
         note:"Scheduling does not pair participants, issue attendance or authorize classroom playback.",
       };
+    });
+  });
+
+
+const openInput=z.object({classId:uuid,classSessionId:uuid}).strict();
+
+/** Opens only a precisely bound Class Session near its scheduled start.
+ * Unlike generic Course/Site rooms, the native Class's enrolled audience
+ * must already exist and every pairing/media command checks it again.
+ */
+export const openNativeClassSession=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>openInput.parse(raw))
+  .handler(async({data})=>{
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+      throw new AuthorizationError("native Class release not activated");
+    requireFacilitatedLearningEnabled();
+    setResponseHeader("Cache-Control","private, no-store");
+    const host=await requireCanonicalFacilitator();
+    return db.transaction(async tx=>{
+      const now=new Date();
+      const instance=await requireNativeClassSessionHost(tx,host,data.classId,now,true);
+      const [link]=await tx.select().from(canonicalClassSessions)
+        .where(and(eq(canonicalClassSessions.id,data.classSessionId),
+          eq(canonicalClassSessions.classId,instance.id))).limit(1);
+      if(!link||link.facilitatorPersonId!==host.actor.actorPersonId)
+        throw new AuthorizationError("your own assigned Class Session");
+      const [plan]=await tx.select().from(facilitatedClassroomPlans)
+        .where(eq(facilitatedClassroomPlans.id,link.classroomPlanId))
+        .for("update").limit(1);
+      const [delivery]=await tx.select().from(canonicalDeliverySessions)
+        .where(eq(canonicalDeliverySessions.id,link.deliverySessionId)).limit(1);
+      if(!plan||!delivery ||
+         plan.deliverySessionId!==delivery.id ||
+         plan.deploymentId!==instance.deploymentId ||
+         plan.courseVersionId!==instance.courseVersionId ||
+         plan.siteId!==instance.siteId ||
+         plan.hostOrganizationId!==host.organizationId ||
+         plan.facilitatorPersonId!==host.actor.actorPersonId ||
+         plan.enrollmentReleaseId!==null ||
+         delivery.siteId!==instance.siteId ||
+         delivery.deploymentId!==instance.deploymentId)
+        throw new AuthorizationError("unmodified, currently authorized Class Session");
+      if(plan.state==="started"&&plan.facilitatedSessionId)
+        return {classSessionId:link.id,facilitatedSessionId:plan.facilitatedSessionId,
+          pairingCode:null as string|null,pairingExpiresAt:null as string|null,
+          alreadyStarted:true};
+      if(plan.state!=="scheduled"||plan.facilitatedSessionId!==null||
+         !canOpenScheduledClassroom(delivery.startsAt,delivery.endsAt,now))
+        throw new AuthorizationError("open this Class Session near its scheduled time");
+
+      // Requiring a participant from THIS Class prevents the old generic
+      // Course/Site active-attempt check from opening the wrong classroom.
+      const [audience]=await tx.select({id:canonicalClassEnrollments.id})
+        .from(canonicalClassEnrollments)
+        .innerJoin(learnerCourseAttempts,and(
+          eq(learnerCourseAttempts.id,canonicalClassEnrollments.courseAttemptId),
+          eq(learnerCourseAttempts.classEnrollmentId,canonicalClassEnrollments.id),
+          eq(learnerCourseAttempts.courseVersionId,instance.courseVersionId),
+          eq(learnerCourseAttempts.deploymentId,instance.deploymentId),
+          eq(learnerCourseAttempts.adoptionId,instance.adoptionId),
+          eq(learnerCourseAttempts.offeringVersionId,instance.offeringVersionId),
+          eq(learnerCourseAttempts.status,"active"),
+          isNull(learnerCourseAttempts.enrollmentId),
+          isNull(learnerCourseAttempts.noncreditRegistrationId),
+        )).where(and(
+          eq(canonicalClassEnrollments.classId,instance.id),
+          eq(canonicalClassEnrollments.status,"active"),
+        )).limit(1);
+      if(!audience)throw new AuthorizationError("at least one enrolled Class learner before opening a room");
+      const room=await createFacilitatedRoomForHost(tx,host,{
+        deploymentId:instance.deploymentId,courseVersionId:instance.courseVersionId,
+        siteId:instance.siteId!,
+      });
+      await tx.update(facilitatedClassroomPlans).set({
+        state:"started",facilitatedSessionId:room.facilitatedSessionId,
+        updatedAt:now,
+      }).where(eq(facilitatedClassroomPlans.id,plan.id));
+      await tx.insert(auditEvents).values({
+        actorPersonId:host.actor.actorPersonId!,
+        owningOrganizationId:host.organizationId,
+        eventCode:"class.session.started",
+        entityKind:"class_session",entityId:link.id,
+        payload:{classId:instance.id,planId:plan.id,
+          facilitatedSessionId:room.facilitatedSessionId},
+      });
+      await tx.insert(domainEvents).values({
+        actorPersonId:host.actor.actorPersonId!,
+        eventType:"ClassSessionStarted",aggregateType:"class",
+        aggregateId:instance.id,
+        payload:{classSessionId:link.id,facilitatedSessionId:room.facilitatedSessionId},
+      });
+      return {classSessionId:link.id,...room,alreadyStarted:false};
     });
   });
