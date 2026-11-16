@@ -13,6 +13,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
+import { assertNativeClassRepeatEligible } from "@/domain/native-class-lifecycle";
 
 /** The first Class-without-Offering enrollment pathway is deliberately
  * restricted to verified adult learners already affiliated with the Class's
@@ -87,8 +88,15 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         return {classEnrollmentId:existing.id,courseAttemptId:existing.courseAttemptId,
           alreadyEnrolled:true};
       }
-      if(previous.some(row=>row.status==="completed"))
-        throw new AuthorizationError("Class repeat requires separate approval");
+      // A last-five history window is not proof that no earlier completion
+      // exists. A prior completion requires an independently approved repeat.
+      const [completed]=await tx.select({id:canonicalClassEnrollments.id})
+        .from(canonicalClassEnrollments).where(and(
+          eq(canonicalClassEnrollments.classId,cls.id),
+          eq(canonicalClassEnrollments.learnerPersonId,person.id),
+          eq(canonicalClassEnrollments.status,"completed"),
+        )).limit(1);
+      assertNativeClassRepeatEligible(completed?["completed"]:[]);
       const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.classId,cls.id),
           inArray(canonicalClassEnrollments.status,["pending","active"])));
