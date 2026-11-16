@@ -50,6 +50,10 @@ Use disposable **synthetic** identities, two approved Sites (A and B), two appro
 - Wrong published Offering version rejects local readiness, and server creation rejects mismatched adoption/course combination
 - Published Course and assessment versions remain immutable; local variation limited to Class delivery fields, Session scheduling (WS4), staffing and presentation under their existing grants
 
+## Verified test01 structure, not app acceptance
+
+Read-only SQL was executed against the existing `test01` branch of Neon project `can-os`. The four native Class tables exist, each has forced RLS and one owner-only policy. `education_v30.offering_courses` exposes `offering_version_id`, `course_version_id`, `is_required`, `sequence_no`. `deployment_offering_adoptions` exposes `approval_status`, `valid_from`, `valid_through`, and pinned `offering_version_id`. `education_v30.deployment_sites` exists as the existing optional facilitated Site placement, not a new WS5 table. None of these metadata checks assert working restricted session grants, current deployment data, or runtime integration. No SQL mutation was performed.
+
 ## Migration and rollback boundaries
 
 **Database changes: none.** No new catalog, duplicate Offerings, migration, backfill, GRANT/RLS change, or production write is proposed. The existing schema, restricted role provisioning and `CAN_UNIFIED_CLASS_COMMANDS_ENABLED` release flag still govern runtime availability. Do **not** enable the flag until WS00 proves the native Class table/permissions exist on test01 and completes its release gates. Code rollback is revert of this feature branch's commits; no data rollback is required because this increment changes no data structures.
@@ -61,7 +65,8 @@ Use disposable **synthetic** identities, two approved Sites (A and B), two appro
 | TypeScript / ESLint / 6.1 | `npm run typecheck && npm run lint` on exact PR SHA | **UNRUN** |
 | Unit tests | `npx vitest run tests/unit/network-program-rollout.test.ts tests/unit/ws5-program-operations-boundaries.test.ts tests/unit/ws5-publisher-export-contract.test.ts tests/unit/network-class-launch.test.ts` | **UNRUN** |
 | Build | `npm run build && npm run build:cloudflare` | **UNRUN** |
-| test01 / restricted RLS | Isolated two-Site role/revocation and schema preflight | **UNRUN** |
+| test01 schema metadata | 2026-11-16, Neon project `can-os`, branch `test01`, database `neondb`: read-only `pg_class` / `pg_policies` / `information_schema.columns` queries. Confirmed `education_v30.classes`, `class_offerings`, `class_offering_versions`, `class_sessions`, Offering/Course and adoption/Deployment tables and expected columns. The four native Class tables show `relrowsecurity=true`, `relforcerowsecurity=true` and owner-only policy. No writes performed. | **STRUCTURAL CHECK ONLY** |
+| test01 / restricted RLS | Authenticated two-Site role grant, cross-Organization denial, Site B revocation, full app-path authorization | **UNRUN** |
 | Authenticated E2E | One-hour pilot, two-Site four-session pilot, school/guardian | **UNRUN** |
 
 The pure unit tests describe authorization differences but are **not database or authenticated browser evidence**. GitHub Actions has reported `startup_failure` without running test jobs, and the Cloudflare Workers build check has reported `failure` without exposing compiler diagnostics through GitHub. Neither is a pass. If CI cannot execute, this PR remains draft. WS00's provisional Participation Read Model v0.1.0 must be ratified before integrating dependent changes. **Shared-file collision:** WS2 PR #309 also edits `src/modules/classes/unified-class.functions.ts` and `src/routes/canonical.classes.tsx` in distinct hunks. WS00 must reconcile after WS2 integration, run both suites, and approve the shared-file handoff; see coordination comments on PRs #307 and #309.
