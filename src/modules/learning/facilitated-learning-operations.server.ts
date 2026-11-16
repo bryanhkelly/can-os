@@ -65,7 +65,7 @@ export async function recordRoomAuditAndEvent(
  * AND a current host/operator organization relationship at that same Site.
  * A separate network/denomination affiliation is never required.
  */
-export async export function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
+export async function authorizedHostDeployment(tx: Tx, host: Host, deploymentId: string, requiredSiteId?: string) {
   const now = new Date();
   const [deployment] = await tx.select({
     id: programDeployments.id, operationId: programDeployments.operationId,
@@ -113,7 +113,7 @@ export async export function authorizedHostDeployment(tx: Tx, host: Host, deploy
  * after a facilitator or Site relationship has been withdrawn. Failed checks
  * disclose neither the room nor its playback activity to a learner.
  */
-export async export function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.$inferSelect, now:Date) {
+export async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSessions.$inferSelect, now:Date) {
   const [host] = await tx.select({id:educationOperationSites.siteId})
     .from(programDeployments)
     .innerJoin(educationOperationOrganizationRoles,and(
@@ -165,7 +165,7 @@ export async export function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLea
     )).limit(1);
   return !!grant;
 }
-export async export function schoolAttemptIsPlacedAtSite(
+export async function schoolAttemptIsPlacedAtSite(
   tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,
 ) {
   const [placement] = await tx.select({id:classroomEnrollmentSitePlacements.id})
@@ -188,7 +188,7 @@ export async export function schoolAttemptIsPlacedAtSite(
     )).limit(1);
   return !!placement;
 }
-export async export function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
+export async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   const query = tx.select().from(facilitatedLearningSessions).where(and(
     eq(facilitatedLearningSessions.id,id),
     eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
@@ -355,7 +355,7 @@ export async function assertRoomMediaRightsForAudience(
 /** Apply the same room/asset/audience authorization to remote projector controls,
  * signed media URLs and recorded playback evidence. Never authorize through an
  * unrelated active learner in the Deployment. */
-export async export function assertAuthorizedFacilitatedRoomMedia(
+export async function assertAuthorizedFacilitatedRoomMedia(
   tx: Tx,
   room: typeof facilitatedLearningSessions.$inferSelect,
   lessonId: string,
@@ -374,7 +374,7 @@ export async export function assertAuthorizedFacilitatedRoomMedia(
  * path both execute exactly this audit, Site and course authorization logic.
  * Called only after requireCanonicalFacilitator() under the transaction.
  */
-export async export function createFacilitatedRoomForHost(
+export async function createFacilitatedRoomForHost(
   tx: Tx, host: Host,
   data: {deploymentId:string;courseVersionId:string;siteId:string},
 ) {
@@ -419,7 +419,7 @@ export async export function createFacilitatedRoomForHost(
  * independently registered online learners may attend an approved Site room
  * without creating a second registration or resetting learning progress.
  */
-export async export function selfEnrolledNoncreditRoomSitePermitted(
+export async function selfEnrolledNoncreditRoomSitePermitted(
   tx:Tx, access:{source:"school"|"noncredit";noncreditRegistrationId:string|null},
   roomSiteId:string,
 ):Promise<boolean> {
