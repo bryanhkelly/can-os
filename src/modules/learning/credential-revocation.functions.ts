@@ -11,6 +11,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCredentialIssuer } from "@/modules/identity/canonical-sensitive-authorization.server";
+import { assertSourceBoundCompletionEvidence } from "@/modules/learning/verified-completion-evidence.server";
 
 const input = z.object({
   issuanceId: z.string().uuid(),
@@ -70,6 +71,21 @@ export const revokeLearningAwardIssuance = createServerFn({ method: "POST" })
           (evidence.validThrough && evidence.validThrough < today))
         throw new AuthorizationError("independent current issuer-owned revocation evidence");
 
+      // Verified provider documents must also be independently approved for
+      // this exact issuance, recipient, immutable delivery Site and reason.
+      // Network membership or generic issuer ownership cannot grant it.
+      if (actor.scope.siteIds?.length!==1)
+        throw new AuthorizationError("exact issuer delivery Site");
+      await assertSourceBoundCompletionEvidence(tx,{
+        purpose:"award_revocation",issuanceId:issuance.id,
+      },{
+        evidenceVersionId:data.evidenceVersionId,
+        participantPersonId:decision.recipientPersonId,
+        organizationId:issuance.issuerOrganizationId,
+        deliverySiteId:actor.scope.siteIds[0]!,
+        actorPersonId:actor.actorPersonId,
+        reason:data.reason,
+      });
       // Issuer approval is revalidated and locked inside the same transaction.
       // A Site Admin role alone cannot revoke.
       await assertCurrentCredentialIssuer(tx,request,actor);
