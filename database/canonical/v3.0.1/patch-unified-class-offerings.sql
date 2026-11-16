@@ -417,6 +417,35 @@ CREATE TRIGGER canonical_class_survey_campaign_guard_trg
  BEFORE INSERT OR UPDATE OR DELETE ON education_v30.class_survey_campaigns
  FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_class_survey_campaign_guard();
 
+-- A campaign's Class attribution remains meaningful only if its canonical
+-- campaign owner, Deployment, Survey version and response mode cannot be
+-- silently moved after the link. Closing/pausing is still permitted.
+CREATE OR REPLACE FUNCTION education_v30.canonical_linked_survey_scope_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+BEGIN
+  IF EXISTS(SELECT 1 FROM education_v30.class_survey_campaigns
+            WHERE campaign_id=OLD.id) THEN
+    IF TG_OP='DELETE' THEN
+      RAISE EXCEPTION 'Class-attributed survey campaigns cannot be deleted'
+        USING ERRCODE='23514';
+    END IF;
+    IF ROW(OLD.deployment_id,OLD.operating_organization_id,
+           OLD.survey_version_id,OLD.response_mode)
+       IS DISTINCT FROM
+       ROW(NEW.deployment_id,NEW.operating_organization_id,
+           NEW.survey_version_id,NEW.response_mode) THEN
+      RAISE EXCEPTION 'Class-attributed survey campaign identity is immutable'
+        USING ERRCODE='23514';
+    END IF;
+  END IF;
+  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+END $;
+DROP TRIGGER IF EXISTS canonical_linked_survey_scope_guard_trg
+ ON education_v30.survey_campaigns;
+CREATE TRIGGER canonical_linked_survey_scope_guard_trg
+ BEFORE UPDATE OR DELETE ON education_v30.survey_campaigns
+ FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_linked_survey_scope_guard();
+
 -- Explicitly DENY new application roles until reviewed per-organization RLS
 -- and verified authorization commands are supplied. No public discovery grant.
 DO $$
