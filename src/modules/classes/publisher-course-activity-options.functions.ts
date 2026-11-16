@@ -18,7 +18,8 @@ export const getPublisherCourseActivityOptions=createServerFn({method:"GET"})
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
       throw new AuthorizationError("authorized publisher staff");
-    assertCapability(actor,"curriculum.publish");
+    if(!actor.capabilities.has("curriculum.publish"))
+      assertCapability(actor,"class.manage");
     const organizationId=actor.scope.organizationIds?.[0];
     if(!organizationId||actor.scope.organizationIds?.length!==1)
       throw new AuthorizationError("one Course publisher organization");
