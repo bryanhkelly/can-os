@@ -360,11 +360,17 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
   .validator((raw:unknown)=>z.object({
     search:z.string().trim().max(100).default(""),
     cursor:z.number().int().min(0).max(100000).default(0),
+    offeringVersionId:z.string().uuid().optional(),
+    courseVersionIds:z.array(z.string().uuid()).min(1).max(50).optional(),
+    siteId:z.string().uuid().optional(),
   }).strict().parse(raw))
   .handler(async({data})=>{
     requireClassFeature();
     const operator=await requireClassOperator();
-    if(!operator.siteIds.length)return {items:[],nextCursor:null as number|null};
+    if(data.siteId&&!operator.siteIds.includes(data.siteId))
+      throw new AuthorizationError("current Site scope for Course discovery");
+    const permittedSites=data.siteId?[data.siteId]:operator.siteIds;
+    if(!permittedSites.length)return {items:[],nextCursor:null as number|null};
     const now=new Date();
     const pageSize=50;
     const needle=data.search.replace(/[\\%_]/g,"\\$&");
@@ -408,6 +414,8 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
           eq(offerings.status,"active"),
           eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
           eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
+          data.offeringVersionId?eq(offeringVersions.id,data.offeringVersionId):undefined,
+          data.courseVersionIds?inArray(courseVersions.id,data.courseVersionIds):undefined,
           lte(deploymentOfferingAdoptions.validFrom,now),
           or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
           data.search?or(
@@ -439,7 +447,7 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
             ))
             .where(and(
               eq(educationOperationSites.operationId,programDeployments.operationId),
-              inArray(educationOperationSites.siteId,operator.siteIds),
+              inArray(educationOperationSites.siteId,permittedSites),
               lte(educationOperationSites.validFrom,now),
               or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
             ))),
@@ -472,7 +480,7 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
         ))
         .where(and(
           inArray(educationOperationSites.operationId,operationIds),
-          inArray(educationOperationSites.siteId,operator.siteIds),
+          inArray(educationOperationSites.siteId,permittedSites),
           lte(educationOperationSites.validFrom,now),
           or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
         ));
@@ -481,11 +489,11 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
         siteId:classroomDeploymentSites.siteId,
       }).from(classroomDeploymentSites).where(and(
         inArray(classroomDeploymentSites.deploymentId,deploymentIds),
-        inArray(classroomDeploymentSites.siteId,operator.siteIds),
+        inArray(classroomDeploymentSites.siteId,permittedSites),
       ));
       const names=await tx.select({
         id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
-      }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,operator.siteIds));
+      }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,permittedSites));
       const siteNames=new Map(names.map(site=>[site.id,site.name]));
       const siteByOperation=new Map<string,Set<string>>();
       for(const site of sites){
