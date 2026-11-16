@@ -41,9 +41,12 @@ function CanonicalAssessmentReviewerPage(){
     queryFn:()=>readCanonicalObjectiveApproval({data:{
       mode:"review",assessmentVersionId:selected,
     }}),
-    enabled:!!selected,retry:false,
+    enabled:!!selected,retry:false,gcTime:0,staleTime:0,
+    refetchOnMount:"always",refetchOnWindowFocus:"always",
   });
-  const data=detail.data;
+  // A reviewer-only correct-answer preview must never use cached data while
+  // revalidating authorization or after a failed request.
+  const data=detail.isSuccess&&!detail.isFetching?detail.data:undefined;
   const question=data?.items.find(x=>x.id===itemVersionId);
   const requiredKinds=objectiveReviewRequirements[target];
   const currentReviews=data?(target==="assessment"?data.reviews.assessment:
