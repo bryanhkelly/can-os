@@ -34,8 +34,12 @@ export async function assertCurrentCredentialIssuer(
   const result = await tx.execute(sql`
     SELECT approval.id
     FROM education_v30.v301_can_staff_session_context(${digest}::text) staff
+    JOIN public.access_sessions can_session
+      ON can_session.id=staff.session_id
+        AND can_session.secret_hash=${digest}::text
     JOIN education_v30.canonical_sensitive_capability_approvals approval
       ON approval.canonical_grant_id=staff.grant_id
+        AND approval.requested_by_can_account_id=can_session.account_id
     WHERE education_v30.v301_can_sensitive_capability(
       ${digest}::text,'credential.issue'::text
     )
