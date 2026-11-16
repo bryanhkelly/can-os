@@ -12,6 +12,7 @@ import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessi
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
+import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
 import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
@@ -273,6 +274,16 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
               onClick={()=>void grantKnowledgeCheck(row.enrollmentId)}>
               {grantBusy===row.enrollmentId?"Granting…":"Grant Course knowledge check"}
             </Button>}
+          {isOperator&&(row.status==="active"||row.status==="pending")&&
+            <NativeClassRosterLifecycleAction
+              classEnrollmentId={row.enrollmentId} status={row.status}
+              onChanged={async()=>{
+                await Promise.all([
+                  client.invalidateQueries({queryKey:["native-class-roster",workspace.classId]}),
+                  client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]}),
+                ]);
+              }}/>}
+
         </div>
       </li>)}
     </ul>}
