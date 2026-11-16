@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, gt, gte, lte, or, isNull, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, gt, gte, lte, or, isNull, isNotNull, notExists } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -44,7 +44,7 @@ async function classSurveyCampaignIds(tx:Tx,context:CommandContext & {actorPerso
       eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
       eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id),
       eq(canonicalClassEnrollments.learnerPersonId,context.actorPersonId),
-      eq(canonicalClassEnrollments.status,"active")))
+      inArray(canonicalClassEnrollments.status,["active","completed"])))
     .innerJoin(canonicalClasses,and(
       eq(canonicalClasses.id,canonicalClassEnrollments.classId),
       eq(canonicalClasses.state,"active"),
@@ -73,6 +73,13 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
   if(allowedClassCampaigns&&!allowedClassCampaigns.includes(data.campaignId))
     throw new AuthorizationError("survey campaign is not attributed to this Class");
+  if(access.source==="noncredit"&&
+      process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"){
+    const [classScoped]=await tx.select({campaignId:canonicalClassSurveyCampaigns.campaignId})
+      .from(canonicalClassSurveyCampaigns)
+      .where(eq(canonicalClassSurveyCampaigns.campaignId,data.campaignId)).limit(1);
+    if(classScoped)throw new AuthorizationError("Class-specific campaign cannot be claimed by noncredit registration");
+  }
   const [campaign]=await tx.select().from(surveyCampaigns)
     .where(and(eq(surveyCampaigns.id,data.campaignId),
       eq(surveyCampaigns.deploymentId,access.deploymentId))).limit(1);
@@ -143,6 +150,12 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
       const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
       if(allowedClassCampaigns?.length===0)return [];
       const now=new Date();
+      const noncreditIsolation=access.source==="noncredit"&&
+        process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"?
+        notExists(tx.select({id:canonicalClassSurveyCampaigns.campaignId})
+          .from(canonicalClassSurveyCampaigns)
+          .where(eq(canonicalClassSurveyCampaigns.campaignId,surveyCampaigns.id))):
+        undefined;
       const rows=await tx.select({
         campaignId:surveyCampaigns.id,title:surveyDefinitions.title,
         invitationId:surveyInvitations.id,
@@ -165,6 +178,7 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
       .where(and(
         eq(surveyCampaigns.deploymentId,access.deploymentId),
         allowedClassCampaigns?inArray(surveyCampaigns.id,allowedClassCampaigns):undefined,
+        noncreditIsolation,
         eq(surveyCampaigns.responseMode,"identified"),
         eq(surveyCampaigns.status,"active"),
         lte(surveyCampaigns.startsAt,now),
