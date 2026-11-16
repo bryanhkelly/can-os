@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { nativeClassSessionDisplayStatus } from "../../src/domain/native-class-sessions";
+import { nativeClassSessionDisplayStatus, canChangeUnopenedClassSession } from "../../src/domain/native-class-sessions";
 import {
   assertClassSessionAgendaReferences, assertClassSessionAgendaExpectedRevision,
   canPublishClassSessionAgenda,requiresClassSessionAgenda,
@@ -44,6 +44,29 @@ describe("WS4 immutable Course-linked Session agenda", () => {
     for (const state of ["started","cancelled"] as const)
       expect(canPublishClassSessionAgenda({planState:state,startsAt,now:before})).toBe(false);
     expect(canPublishClassSessionAgenda({planState:"scheduled",startsAt,now:startsAt})).toBe(false);
+  });
+  it("only allows cancellation of future unopened Sessions", () => {
+    const now=new Date("2026-11-16T20:00:00Z");
+    const initial={
+      planState:"scheduled" as const,facilitatedSessionId:null,
+      scheduledStartsAt:new Date("2026-11-16T21:00:00Z"),now,
+    };
+    expect(canChangeUnopenedClassSession(initial)).toBe(true);
+    expect(canChangeUnopenedClassSession({
+      ...initial,planState:"cancelled",
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,planState:"started",
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,facilitatedSessionId:"11111111-1111-4111-8111-111111111111",
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,scheduledStartsAt:now,
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,scheduledStartsAt:new Date("invalid"),
+    })).toBe(false);
   });
   it("does not treat a missed Session as verified absence or completion", () => {
     const window={state:"scheduled" as const,roomState:null,endsAt:"2026-11-02T20:00:00Z"};
