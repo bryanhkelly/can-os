@@ -8,7 +8,10 @@ import {
   learnerCourseAttempts,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
-import { planNativeClassExit } from "@/domain/native-class-lifecycle";
+import {
+  planNativeClassExit, assertNativeClassOperatorExitScope,
+  assertNativeClassLearnerSessionForExit,
+} from "@/domain/native-class-lifecycle";
 import {
   canonicalSessionDigestFromRequest, getCanonicalCommandContext,
 } from "@/modules/identity/canonical-command-context.server";
@@ -68,12 +71,7 @@ async function exitNativeClass(command:ExitRequest){
     if(!cls)throw new AuthorizationError("Class participation source");
 
     if(command.action==="cancel"){
-      if(!cls.siteId ||
-         actor.scope.organizationIds?.length!==1 ||
-         actor.scope.siteIds?.length!==1 ||
-         actor.scope.organizationIds?.[0]!==cls.operatingOrganizationId ||
-         actor.scope.siteIds?.[0]!==cls.siteId)
-        throw new AuthorizationError("exact active Class Site operator");
+      assertNativeClassOperatorExitScope(actor,cls);
       // Session and current exact Site grant are revalidated inside the same
       // transaction, including when the underlying Class was closed.
       await assertCurrentCanonicalStaffForMutation(tx,request,actor);
@@ -89,11 +87,9 @@ async function exitNativeClass(command:ExitRequest){
         throw new AuthorizationError("current canonical learner session");
       }
       const grant=session.rows[0] as Record<string,unknown>;
-      if(grant.person_id!==actor.actorPersonId ||
-         grant.role_code!=="learner" ||
-         grant.organization_id!==cls.operatingOrganizationId ||
-         grant.site_id!==null)
-        throw new AuthorizationError("unchanged provider-scoped learner grant");
+      assertNativeClassLearnerSessionForExit(
+        grant,actor.actorPersonId,cls.operatingOrganizationId,
+      );
     }
     const [enrollment]=await tx.select().from(canonicalClassEnrollments)
       .where(and(eq(canonicalClassEnrollments.id,command.classEnrollmentId),
