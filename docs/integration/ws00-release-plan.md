@@ -21,7 +21,7 @@ All seven branches were created from the **same** main commit; branches are neve
 
 ## Change-control and ownership
 
-1. WS1 exclusively owns the versioned PRM DTO and personal history projection. Other agents consume it and propose adjustments through an explicit contract PR/issue; no local forks.
+1. WS1 exclusively owns the versioned PRM DTO, \`/learn/activity\` and person-centered history projection; preserve existing learner route links/redirects during migration. Other agents consume it and propose adjustments through an explicit contract PR/issue; no local forks.
 2. WS2 owns authoritative enrollment lifecycle integration, not new Course Attempt or grading tables.
 3. WS3 owns completion and award **integrations to existing authorities**, not a second assessment/gradebook.
 4. WS4 owns delivery evidence, not source enrollment decisions or an alternate attendance ledger.
