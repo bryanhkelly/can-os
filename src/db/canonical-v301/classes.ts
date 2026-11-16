@@ -1,5 +1,6 @@
-import { boolean, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
+import { boolean, index, integer, jsonb, numeric, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { educationV30, educationV30Secure } from "./core";
+import type { FeedbackPrompt } from "@/domain/native-course-activities";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Additive canonical model. A Class is an instance of one Course version;
@@ -129,3 +130,59 @@ export const canonicalClassSessions=educationV30.table("class_sessions",{
   uniqueIndex("canonical_class_session_request_uq").on(t.classId,t.facilitatorPersonId,t.requestId),
   index("canonical_class_session_class_idx").on(t.classId,t.createdAt),
 ]);
+
+
+/** One reusable, versioned, publisher-approved learning check and feedback
+ * contract per canonical Course version, shared across all authorized Classes.
+ * Keys and raw personal feedback live in the secure schema, NEVER in public
+ * Class or projector data.
+ */
+export const canonicalCourseActivitySets=educationV30.table("course_activity_sets",{
+  id:id(),courseVersionId:uuid("course_version_id").notNull(),
+  publisherOrganizationId:uuid("publisher_organization_id").notNull(),
+  versionNo:integer("version_no").notNull(),
+  title:text("title").notNull(),
+  quizQuestions:jsonb("quiz_questions").$type<Array<{
+    key:string;prompt:string;choices:string[];
+  }>>().notNull(),
+  feedbackQuestions:jsonb("feedback_questions").$type<FeedbackPrompt[]>().notNull(),
+  passingFraction:numeric("passing_fraction",{precision:6,scale:5}).notNull(),
+  requireAllLessons:boolean("require_all_lessons").notNull().default(false),
+  feedbackRequired:boolean("feedback_required").notNull().default(false),
+  feedbackConsentVersion:text("feedback_consent_version").notNull(),
+  feedbackConsentText:text("feedback_consent_text").notNull(),
+  state:text("state").$type<"published"|"closed">().notNull().default("published"),
+  createdByPersonId:uuid("created_by_person_id").notNull(),
+  publishedAt:timestamp("published_at",{withTimezone:true}).notNull().defaultNow(),
+  closedAt:timestamp("closed_at",{withTimezone:true}),
+},t=>[uniqueIndex("course_activity_version_uq").on(t.courseVersionId,t.versionNo)]);
+export const canonicalCourseActivityAnswerKeys=educationV30Secure.table("course_activity_answer_keys",{
+  activitySetId:uuid("activity_set_id").primaryKey(),
+  answerKeys:jsonb("answer_keys").$type<Record<string,number>>().notNull(),
+});
+export const canonicalClassActivityPins=educationV30.table("class_activity_enrollment_pins",{
+  classEnrollmentId:uuid("class_enrollment_id").primaryKey(),
+  activitySetId:uuid("activity_set_id").notNull(),
+  pinnedAt:timestamp("pinned_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[index("class_activity_pins_by_set_idx").on(t.activitySetId)]);
+export const canonicalClassActivitySubmissions=educationV30.table("class_activity_submissions",{
+  id:id(),
+  classEnrollmentId:uuid("class_enrollment_id").notNull(),
+  activitySetId:uuid("activity_set_id").notNull(),
+  kind:text("kind").$type<"quiz"|"feedback">().notNull(),
+  requestId:uuid("request_id").notNull(),
+  quizFraction:numeric("quiz_fraction",{precision:6,scale:5}),
+  quizPassed:boolean("quiz_passed"),
+  feedbackConsentVersion:text("feedback_consent_version"),
+  feedbackConsentSha256:text("feedback_consent_sha256"),
+  feedbackConsentedAt:timestamp("feedback_consented_at",{withTimezone:true}),
+  submittedAt:timestamp("submitted_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("class_activity_submission_one_uq").on(t.classEnrollmentId,t.activitySetId,t.kind),
+  uniqueIndex("class_activity_submission_request_uq").on(t.classEnrollmentId,t.requestId),
+]);
+export const canonicalClassActivityAnswers=educationV30Secure.table("class_activity_submission_answers",{
+  submissionId:uuid("submission_id").primaryKey(),
+  answers:jsonb("answers").$type<unknown[]>().notNull(),
+  recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().defaultNow(),
+});
