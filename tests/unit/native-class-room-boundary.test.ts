@@ -33,6 +33,10 @@ describe("native Class room isolation contract",()=>{
     expect(sql).toContain("canonical_class_session_guard_trg");
     expect(sql).toContain("canonical_class_plan_boundary_trg");
     expect(sql).toContain("NEW.enrollment_release_id IS NOT NULL");
+    // A previously native Class room must never become unbound and fall
+    // through to legacy Course/Site pairing or playback rules.
+    expect(sql).toContain("NEW.facilitated_session_id IS DISTINCT FROM OLD.facilitated_session_id");
+    expect(sql).toContain("OLD.state='started' AND NEW.state<>'started'");
     const scheduling=read("src/modules/learning/classroom-scheduling.functions.ts");
     expect(scheduling).toContain("native Class room controls are not yet released");
     expect(scheduling).toContain("canonicalClassStaffAssignments");
