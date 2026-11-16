@@ -13,7 +13,7 @@ describe("Site-owned website content channels", () => {
     const privateBlocks = resolveSiteContentBlocks(config, {
       mode: "private", preferences: {delivery: proposed.delivery, interestIds: [...proposed.interestIds]},
     });
-    expect(privateBlocks).toHaveLength(1); // Noncredit feed is empty; only proposed programs render.
+    expect(privateBlocks).toHaveLength(1); // Setup has no supplied Site identity; only interests render.
     expect(privateBlocks[0]!.items.map(item => item.title))
       .toEqual(["Afterschool", "Adult Learning"]);
     expect(privateBlocks[0]!.items.every(item => !item.link)).toBe(true);
@@ -22,16 +22,55 @@ describe("Site-owned website content channels", () => {
     })).toEqual([]);
   });
 
+  it("upgrades V1 Site settings without erasing the operator's existing block choices", () => {
+    const previous={version:1,revision:7,blocks:[
+      {...defaultSiteContentChannelConfig.blocks.find(block=>block.channel==="learning.interests")!,
+        title:"My selected interests"},
+    ]};
+    const migrated=readSiteContentChannelConfig(previous);
+    expect(migrated.version).toBe(2);
+    expect(migrated.revision).toBe(7);
+    expect(migrated.blocks[0]?.title).toBe("My selected interests");
+    expect(migrated.blocks.some(block=>block.channel==="site.setup")).toBe(true);
+    expect(migrated.blocks.some(block=>block.channel==="site.network")).toBe(true);
+    expect(readSiteContentChannelConfig(migrated)).toEqual(migrated);
+  });
+  it("the private preview has a home for every saved Site Setup fact",()=>{
+    const blocks=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
+      mode:"private",siteSetup:{name:"Valor School",organizationName:"Example Church",
+        city:"Brentwood",state:"CA",timezone:"America/Los_Angeles"},
+      preferences:{delivery:"both",interestIds:["afterschool","grades-9-12"]},
+      networkStatusKnown:true,networkAffiliations:[
+        {name:"Example network",status:"pending"},
+      ],
+    });
+    const setup=blocks.find(block=>block.channel==="site.setup");
+    expect(setup?.items.map(item=>item.id)).toEqual([
+      "site-name","responsible-organization","planning-location","site-timezone","delivery-intent",
+    ]);
+    expect(setup?.items.find(item=>item.id==="planning-location")?.description).toBe("Brentwood, CA");
+    expect(setup?.items.find(item=>item.id==="delivery-intent")?.description).toBe("Physical and digital");
+    expect(blocks.find(block=>block.channel==="site.network")?.items[0]?.label).toBe("Affiliation: pending");
+    expect(blocks.find(block=>block.channel==="learning.interests")?.items).toHaveLength(2);
+    const published=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
+      mode:"public",preferences:{delivery:"both",interestIds:["afterschool"]},
+      siteSetup:{name:"Valor School",organizationName:"Example Church",
+        city:"Brentwood",state:"CA",timezone:"America/Los_Angeles"},
+      networkStatusKnown:true,networkAffiliations:[{name:"Example network",status:"approved"}],
+    });
+    expect(published.some(block=>["site.setup","site.network","learning.interests"].includes(block.channel)))
+      .toBe(false);
+  });
   it("rejects duplicate feeds and unapproved institutional copy", () => {
     const block = defaultSiteContentChannelConfig.blocks[0]!;
     expect(() => siteContentChannelConfigSchema.parse({
-      version: 1, revision: 0, blocks: [block, {...block, id: "second"}],
+      version: 2, revision: 0, blocks: [block, {...block, id: "second"}],
     })).toThrow();
     expect(() => siteContentChannelConfigSchema.parse({
-      version: 1, revision: 0, blocks: [{...block, title: "<script>bad</script>"}],
+      version: 2, revision: 0, blocks: [{...block, title: "<script>bad</script>"}],
     })).toThrow();
     expect(() => siteContentChannelConfigSchema.parse({
-      version: 1, revision: 0, blocks: [{...block, title: "Accredited school"}],
+      version: 2, revision: 0, blocks: [{...block, title: "Accredited school"}],
     })).toThrow();
   });
 

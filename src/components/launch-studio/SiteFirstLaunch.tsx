@@ -19,7 +19,7 @@ import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { usStatesAndTerritories } from "@/domain/site-setup-configuration";
-import { readSiteLaunchPreferences, saveSiteLaunchPreferences } from "@/modules/programs/site-launch-preferences.functions";
+import { saveSiteLaunchPreferences } from "@/modules/programs/site-launch-preferences.functions";
 
 type Options = Awaited<ReturnType<typeof listLaunchOptions>>;
 type Delivery = "physical" | "digital" | "both";
@@ -73,10 +73,9 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
     setError("");
     if(siteId) {
       try {
-        const preferences=await readSiteLaunchPreferences({data:{siteId}});
-        if(preferences){setDelivery(preferences.delivery);setChosen(preferences.interestIds);}
+        await saveSiteLaunchPreferences({data:{siteId,preferences:{delivery,interestIds:chosen}}});
         goTo("network");
-      } catch(cause) {setError(mutationErrorMessage(cause,"Unable to read this Site’s saved launch preferences."));}
+      } catch(cause) {setError(mutationErrorMessage(cause,"Unable to save this Site’s selected delivery mode."));}
       return;
     }
     try {
@@ -86,6 +85,11 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
       }});
       if(saved.status==="ignored")return;
       setSiteId(saved.value.siteId);
+      // Persist intended delivery at the first step. A visitor can leave
+      // before choosing any Programs and still resume that original choice.
+      await saveSiteLaunchPreferences({data:{
+        siteId:saved.value.siteId,preferences:{delivery,interestIds:chosen},
+      }});
       goTo("network",saved.value.siteId);
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to establish your Site. Nothing has been published."));}
   }
@@ -126,7 +130,11 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
         <h2 className="font-serif text-3xl">Your Site</h2>
         <p className="text-sm text-muted-foreground">A Site is the home for all your programs. Start with the essentials and add details later. Return here without recreating a Site.</p>
         {options.sites.length>0&&<Field label="Continue with an existing Site">
-          <Select value={siteId} onChange={e=>{setSiteId(e.target.value);setError("");}}>
+          <Select value={siteId} onChange={e=>{
+            setError("");
+            void router.navigate({to:"/launch/site",
+              search:{siteId:e.target.value||undefined,step:"site"},replace:true});
+          }}>
             <option value="">Create a new Site</option>{options.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
           </Select>
         </Field>}

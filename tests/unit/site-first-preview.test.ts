@@ -38,6 +38,22 @@ describe("Private Site preview pulls data channels through the actual template",
     }
   });
 
+  it("renders all of the Site Setup choices inside every template's native layout",()=>{
+    const chosen=resolveSiteContentBlocks(defaultSiteContentChannelConfig,{
+      mode:"private",preferences:{delivery:"digital",interestIds:["summer"]},
+      siteSetup:{name:"Valor School",organizationName:"Example Church",
+        city:"Brentwood",state:"CA",timezone:"America/Los_Angeles"},
+      networkStatusKnown:true,networkAffiliations:[{name:"COGIC",status:"pending"}],
+    });
+    for(const templateId of siteTemplateIds){
+      const html=renderPublicSiteHtml({...base(templateId),contentBlocks:chosen},{localPreview:true});
+      for(const field of ["Valor School","Example Church","Brentwood, CA",
+        "America/Los_Angeles","Digital / online","COGIC","Summer &amp; Breaks"])
+        expect(html,templateId+" missing "+field).toContain(field);
+      for(const channel of ["site.setup","site.network","learning.interests"])
+        expect(html).toContain('data-content-channel="'+channel+'"');
+    }
+  });
   it("keeps a dark modern theme for programs instead of a mismatched white insert", () => {
     const html = renderPublicSiteHtml({...base("modern"), contentBlocks: channels}, {localPreview: true});
     expect(html).toContain("body.template-modern .site-content-block .site-channel-card");

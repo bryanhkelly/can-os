@@ -12,7 +12,7 @@ import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/do
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
-import { siteInformationSchema } from "@/domain/site-setup-configuration";
+import { schoolPlanningLocationSchema, siteInformationSchema } from "@/domain/site-setup-configuration";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
@@ -64,7 +64,7 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const previewContent = candidate && siteLocalImagePublicationGaps(candidate.branding.heroImage).length
     ? { ...candidate, branding: { ...candidate.branding, heroImage: null } }
     : candidate;
-  const [siteConfiguration] = await db.select({metadata: sites.metadata})
+  const [siteConfiguration] = await db.select({metadata: sites.metadata,timezone:sites.timezone})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
@@ -82,9 +82,14 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const noncreditReleases = host ? await readOptionalSiteNoncreditReleases(site.id) : [];
   const contentConfig = safeReadSiteContentChannelConfig(siteConfiguration?.metadata?.websiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
+  const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
   const contentBlocks = resolveSiteContentBlocks(
     contentConfig, {
       mode: "private", preferences: preferences.success ? preferences.data : null,
+      siteSetup:{name:site.name,organizationName:site.organizationName,
+        city:planningLocation.success?planningLocation.data.city:null,
+        state:planningLocation.success?planningLocation.data.state:null,
+        timezone:siteConfiguration?.timezone??null},
       academicPrograms: authorizedPrograms, enrichment: offerings,
       noncredit: noncreditReleases,
       enrollmentOrigin: noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),

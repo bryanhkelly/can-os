@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { organizations, sitePublications, sites } from "@/db/schema";
+import { organizations, siteAffiliations, sitePublications, sites } from "@/db/schema";
+import { schoolPlanningLocationSchema } from "@/domain/site-setup-configuration";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { AuthorizationError } from "@/domain/command-context";
@@ -44,7 +45,7 @@ export const Route=createFileRoute("/launch/site-preview")({
         const actor=await getCommandContext(request);
         const [site]=await db.select({
           id:sites.id, organizationId:sites.organizationId, name:sites.name,slug:sites.slug,
-          metadata:sites.metadata, organizationName:organizations.name,
+          timezone:sites.timezone, metadata:sites.metadata, organizationName:organizations.name,
         }).from(sites).innerJoin(organizations,eq(organizations.id,sites.organizationId))
           .where(eq(sites.id,ids[0]!)).limit(1);
         assertSiteSetupScope(actor,site,"program.launch.start");
@@ -89,10 +90,28 @@ export const Route=createFileRoute("/launch/site-preview")({
           localContent,
         };
         const parsed=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
+        const location=schoolPlanningLocationSchema.safeParse(site.metadata.schoolPlanningLocation);
+        // Read only exact-Site affiliations when the active operator is granted
+        // network read authority. These are NEVER public brand claims.
+        const networkRows=actor.capabilities.has("network.affiliations.read")
+          ? await db.select({name:organizations.name,status:siteAffiliations.status})
+              .from(siteAffiliations)
+              .innerJoin(organizations,eq(organizations.id,siteAffiliations.denominationOrganizationId))
+              .where(eq(siteAffiliations.siteId,site.id)).limit(20)
+          : null;
+        const networkAffiliations=networkRows?.flatMap(row =>
+          (["pending","approved","rejected","revoked"] as const).includes(
+            row.status as "pending"|"approved"|"rejected"|"revoked")
+            ? [{name:row.name,status:row.status as "pending"|"approved"|"rejected"|"revoked"}]
+            : []) ?? null;
         const config=safeReadSiteContentChannelConfig(site.metadata.websiteContentChannels);
         page.contentBlocks=resolveSiteContentBlocks(config,{
           mode:"private",
           preferences:parsed.success?parsed.data:null,
+          siteSetup:{name:site.name,organizationName:site.organizationName,
+            city:location.success?location.data.city:null,
+            state:location.success?location.data.state:null,timezone:site.timezone},
+          networkAffiliations,networkStatusKnown:networkRows!==null,
           academicPrograms:academics, enrichment:page.offerings,
           noncredit:noncreditReleases,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
