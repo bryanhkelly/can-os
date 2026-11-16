@@ -239,6 +239,17 @@ function CourseActivityPublisher(){
         </label>
         <textarea id="quiz-authoring-package" value={quizPackage} readOnly rows={7}
           className="w-full border border-border bg-muted/20 p-3 font-mono text-xs"/>
+        <div className="flex flex-wrap gap-3">
+          <Button type="button" variant="outline" onClick={()=>void navigator.clipboard
+            .writeText(quizPackage)
+            .then(()=>setNotice("Publisher-only knowledge-check draft copied. It is not published."))
+            .catch(()=>setError("Clipboard access is unavailable. Select the authoring package above and copy manually."))}>
+            Copy unpublished authoring package
+          </Button>
+          <Link to="/canonical/lab/readiness" className="self-center text-sm font-semibold underline">
+            Existing canonical assessment inventory
+          </Link>
+        </div>
         <p className="text-xs text-muted-foreground">
           This is an export, NOT a saved assessment. Never give this source to learners.
           Canonical publication requires separate author/reviewer authorization.
