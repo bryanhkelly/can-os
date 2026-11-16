@@ -189,6 +189,56 @@ CREATE TRIGGER canonical_class_staff_guard_trg BEFORE UPDATE OR DELETE
  ON education_v30.class_staff_assignments FOR EACH ROW
  EXECUTE FUNCTION education_v30.canonical_class_staff_guard();
 
+-- One Class owns an exact dated canonical delivery Session and its classroom
+-- plan. A plan at the same Site/Course must NEVER enroll an unrelated Class.
+CREATE TABLE IF NOT EXISTS education_v30.class_sessions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ class_id uuid NOT NULL REFERENCES education_v30.classes(id),
+ classroom_plan_id uuid NOT NULL UNIQUE
+   REFERENCES education_v30.facilitated_classroom_plans(id),
+ delivery_session_id uuid NOT NULL UNIQUE
+   REFERENCES education_v30.delivery_sessions(id),
+ facilitator_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
+ request_id uuid NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT canonical_class_session_request_uq UNIQUE(class_id,facilitator_person_id,request_id)
+);
+CREATE INDEX IF NOT EXISTS canonical_class_session_class_idx
+ ON education_v30.class_sessions(class_id,created_at);
+
+CREATE OR REPLACE FUNCTION education_v30.canonical_class_session_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+DECLARE bound record;
+BEGIN
+ IF TG_OP='UPDATE' OR TG_OP='DELETE' THEN
+   RAISE EXCEPTION 'Class Session identity is immutable' USING ERRCODE='23514';
+ END IF;
+ SELECT c.id AS class_id,p.id AS plan_id,p.delivery_session_id,
+   p.facilitator_person_id,p.request_id
+ INTO bound FROM education_v30.classes c
+ JOIN education_v30.facilitated_classroom_plans p ON
+   p.deployment_id=c.deployment_id AND p.course_version_id=c.course_version_id
+   AND p.site_id=c.site_id AND p.host_organization_id=c.operating_organization_id
+ JOIN education_v30.delivery_sessions d ON d.id=p.delivery_session_id
+   AND d.deployment_id=c.deployment_id AND d.site_id=c.site_id
+ WHERE c.id=NEW.class_id AND c.state='active'
+   AND c.site_id IS NOT NULL AND p.id=NEW.classroom_plan_id
+   AND p.delivery_session_id=NEW.delivery_session_id
+   AND p.state='scheduled'
+   AND p.enrollment_release_id IS NULL;
+ IF NOT FOUND OR bound.facilitator_person_id<>NEW.facilitator_person_id
+   OR bound.request_id<>NEW.request_id THEN
+   RAISE EXCEPTION 'Class Session must match exactly one scheduled Class/plan'
+     USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS canonical_class_session_guard_trg
+ ON education_v30.class_sessions;
+CREATE TRIGGER canonical_class_session_guard_trg
+ BEFORE INSERT OR UPDATE OR DELETE ON education_v30.class_sessions
+ FOR EACH ROW EXECUTE FUNCTION education_v30.canonical_class_session_guard();
+
 -- A Class cannot silently change to a different Course/adoption after creation.
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_identity_guard()
 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -249,7 +299,7 @@ DECLARE obj text;
 BEGIN
  FOREACH obj IN ARRAY ARRAY[
  'classes','class_offerings','class_offering_versions',
- 'class_enrollments','class_outcomes','class_awards','class_staff_assignments'
+ 'class_enrollments','class_outcomes','class_awards','class_staff_assignments','class_sessions'
  ] LOOP
   EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',obj);
   EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',obj);
