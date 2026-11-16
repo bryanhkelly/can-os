@@ -41,10 +41,13 @@ export function projectSchoolSections(
       startAt: null, endAt: null, nextAt: null,
       progress: null,
       // Enrollment completion is not a grade or a credential decision.
-      outcome: status === "completed" ? {label: "Section marked completed"} : null,
+      // Official assessment/completion evidence is provided only by WS3.
+      outcome: null,
       action: status === "active"
         ? {label: "Open school class", href: "/student/courses?section=" + hrefId(section.id)}
-        : {label: "View course registration", href: "/student/courses?section=" + hrefId(section.id)},
+        : status === "scheduled"
+        ? {label: "View course registration", href: "/student/courses?section=" + hrefId(section.id)}
+        : null,
     }, now);
   });
 }
@@ -73,7 +76,7 @@ export function projectNativeClasses(
       subject: {kind: "self", displayName: null},
       startAt: null, endAt: null, nextAt: null,
       progress: null,
-      outcome: status === "completed" ? {label: "Class enrollment marked completed"} : null,
+      outcome: null,
       action: hasLearningAccess ? {
         label: "Open class", href: "/classes/" + hrefId(item.classId) + "?view=learn&tab=lessons",
       } : null,
@@ -116,7 +119,7 @@ export function projectNoncreditCourses(
       subject: {kind: "self", displayName: null},
       startAt: null, endAt: null, nextAt: next,
       progress: null,
-      outcome: status === "completed" ? {label: "Course attempt marked completed"} : null,
+      outcome: null,
       // Resume command enforces current native entitlement before a course opens.
       action: status === "active" ? {
         label: "Manage training", href: "/learn/my-courses",
@@ -151,7 +154,7 @@ export function projectFamilyEnrichment(
       subject: {kind: "dependent", displayName: childNames.get(item.studentProfileId) ?? null},
       startAt: iso(item.startsOn), endAt: iso(item.endsOn), nextAt: null,
       progress: null,
-      outcome: status === "completed" ? {label: "Registration marked completed"} : null,
+      outcome: null,
       action: {label: "Manage family program", href: "/guardian/enrichment"},
     }, now);
   });
