@@ -330,7 +330,7 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         throw new AuthorizationError("close the previous published Class Offering first");
       const [created]=await tx.insert(canonicalClassOfferingVersions).values({
         classId:instance.id,classOfferingId:offering.id,versionNo:current.versionNo+1,
-        visibility:data.terms.visibility,enrollmentMethod:data.terms.enrollmentMethod,
+        visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
         capacity:data.terms.capacity,consentVersion:data.terms.consentVersion,
