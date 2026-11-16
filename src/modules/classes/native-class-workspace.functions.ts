@@ -52,6 +52,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       let canManage=false;
       let learner:{classEnrollmentId:string;courseAttemptId:string;creditMode:string;status:string}|null=null;
       let staffRole:"teacher"|"facilitator"|null=null;
+      let canVerifyAttendance=false;
 
       // A Person's individual learning record is not exposed merely because
       // they teach, operate or administer the same Class.
@@ -87,6 +88,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           actor.scope.organizationIds?.includes(instance.operatingOrganizationId)){
         const assignments=await tx.select({
           roleCode:canonicalClassStaffAssignments.roleCode,
+          attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
         }).from(canonicalClassStaffAssignments).where(and(
           eq(canonicalClassStaffAssignments.classId,instance.id),
           eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
@@ -101,6 +103,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           // authority and teaching access disappears immediately.
           await currentClassAuthority(tx,instance.id,now);
           staffRole=assignments.some(x=>x.roleCode==="teacher")?"teacher":"facilitator";
+          canVerifyAttendance=assignments.some(x=>x.attendanceAuthorized);
           canTeach=true;
         }
       }
@@ -147,8 +150,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       // Only the Class operator or an explicitly assigned teacher receives
       // personally identifying roster information. A facilitator sees counts.
       // A teaching assignment is not, by itself, permission to read minor or adult learner identities.
-      const rosterAllowed=canManage||(view==="teach"&&staffRole==="teacher"&&
-        actor.capabilities.has("class.roster.view"));
+      const rosterAllowed=canManage||(view==="teach"&&canVerifyAttendance);
       let roster:Array<{enrollmentId:string;personId:string;name:string;status:string;creditMode:string}>=[];
       let rosterCount=0;
       if((view==="teach"||view==="manage")){
@@ -205,7 +207,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
 
 
       let staffCandidates:Array<{personId:string;name:string}>=[];
-      let staffAssignments:Array<{id:string;personId:string;roleCode:string;name:string}>=[];
+      let staffAssignments:Array<{id:string;personId:string;roleCode:string;name:string;attendanceAuthorized:boolean}>=[];
       if(view==="manage" && instance.siteId){
         const candidateRows=await tx.select({
           personId:canonicalPersons.id,
@@ -234,6 +236,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           id:canonicalClassStaffAssignments.id,
           personId:canonicalClassStaffAssignments.personId,
           roleCode:canonicalClassStaffAssignments.roleCode,
+          attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
           firstName:canonicalPersons.legalFirstName,
           lastName:canonicalPersons.legalLastName,
           preferredName:canonicalPersons.preferredName,
@@ -247,6 +250,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           .limit(100);
         staffAssignments=assigned.map(row=>({
           id:row.id,personId:row.personId,roleCode:row.roleCode,
+          attendanceAuthorized:row.attendanceAuthorized,
           name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Staff"),
         }));
       }
@@ -327,7 +331,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         deliveryMode:instance.deliveryMode,state:instance.state,
         view,tab,availableViews:permittedViews,
         availableTabs:classTabs[view],
-        learner,staffRole,
+        learner,staffRole,canVerifyAttendance,
         canViewRoster:rosterAllowed,
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
         offering,lessons,staffCandidates,staffAssignments,learnerCandidates,
