@@ -94,6 +94,23 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
             </li>)}
           </ol>}
       </section>
+      <section aria-label="Award current validity" className="space-y-2">
+        <h3 className="font-serif text-xl">Issued achievements</h3>
+        <p className="text-xs text-muted-foreground">
+          Current validity is computed from the canonical credential authority.
+          A superseded completion, revocation or expiry can invalidate an award
+          without deleting its original issuance.
+        </p>
+        {query.data.awards.length===0
+          ?<p className="text-sm text-muted-foreground">No issued achievements.</p>
+          :<ul className="divide-y divide-border border border-border">
+            {query.data.awards.map(award=><li key={award.issuanceId}
+              className="flex items-center justify-between gap-4 p-3 text-sm">
+              <span>Issued {new Date(award.issuedAt).toLocaleDateString()}</span>
+              <strong>{award.currentlyValid?"Currently valid":"No longer valid"}</strong>
+            </li>)}
+          </ul>}
+      </section>
       {isValidDecision && current && current.state!=="unavailable" &&
         current.state!=="not_decided" &&
       <form className="space-y-3 border-t border-border pt-4" onSubmit={event=>{
