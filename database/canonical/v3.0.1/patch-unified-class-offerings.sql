@@ -81,7 +81,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS canonical_class_offering_one_published_uq
 CREATE TABLE IF NOT EXISTS education_v30.class_enrollments (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  class_id uuid NOT NULL REFERENCES education_v30.classes(id),
- class_offering_version_id uuid NOT NULL,
+ class_offering_version_id uuid,
  learner_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
  enrollment_method text NOT NULL CHECK(enrollment_method IN ('self','invitation','assignment','approval')),
  credit_mode text NOT NULL DEFAULT 'not_applicable'
@@ -96,6 +96,9 @@ CREATE TABLE IF NOT EXISTS education_v30.class_enrollments (
  CONSTRAINT canonical_class_enrollment_consent_ck CHECK(
   (enrollment_method='self' AND consent_version IS NOT NULL AND consent_sha256 IS NOT NULL AND consented_at IS NOT NULL)
   OR (enrollment_method<>'self' AND consent_version IS NULL AND consent_sha256 IS NULL AND consented_at IS NULL)
+ ),
+ CONSTRAINT canonical_class_enroll_publication_ck CHECK (
+   enrollment_method='assignment' OR class_offering_version_id IS NOT NULL
  ),
  enrolled_at timestamptz NOT NULL DEFAULT now(),
  CONSTRAINT canonical_class_enroll_offering_fk FOREIGN KEY(class_offering_version_id,class_id)
