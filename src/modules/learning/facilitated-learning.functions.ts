@@ -1,6 +1,7 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
-import { assertNativeClassRoomStaff, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
+import { assertNativeClassRoomStaff, nativeClassRoomParticipant, nativeClassForRoom } from "@/modules/classes/native-class-room-boundary.server";
+import { assertCurrentNativeClassFacilitatorSession } from "@/modules/classes/native-class-facilitator-session.server";
 import { randomInt, createHmac } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -701,6 +702,8 @@ export const endFacilitatedLearningRoom = createServerFn({method:"POST"})
     const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
+      if(await nativeClassForRoom(tx,room))
+        await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
       if(room.state==="ended")return {ended:true,alreadyEnded:true};
       await tx.update(facilitatedLearningSessions)
         .set({state:"ended",endedAt:new Date()})
