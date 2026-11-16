@@ -112,6 +112,33 @@ application origin, never a real school or church roster.
 - Regression: the existing school and noncredit paths must be unchanged,
   and a revoked or cross-Site actor must fail closed for Class records.
 
+## Shared publisher activities and exact Class survey attribution
+
+- Publisher-authorized Course Activities page shows the same published
+  canonical assessment versions available for a Course; it never exposes
+  secure answers or grants national publisher rights to local Site managers.
+- The five-question objective quiz editor prepares a **local, unpublished
+  authoring handoff** while canonical assessment write/review permission is
+  not yet available. Do not claim that quiz forms were persisted or published.
+- The five-question survey editor saves a real **canonical survey draft** only
+  through the existing restricted survey-draft command. Independent approval,
+  campaign creation and per-person invitations are still required.
+- One national publisher-approved Survey version may back distinct local
+  campaigns, each immutably attributed to exactly one Class **before**
+  invitations or responses. Same learner, same Course, same Deployment but
+  different Class must not see or submit another Class's survey campaign.
+- A noncredit registration must not read a Class-attributed campaign even
+  when the Deployment and Person match. Existing noncredit-only campaigns
+  remain available without a new Class migration while the Class feature is off.
+- Campaign attribution requires exact Deployment, operating Organization,
+  active Class and verified survey permission. Campaign links are immutable
+  and must reject attempts to reassign after invitations exist.
+- National Course publisher retains assessment definition ownership. Local
+  authorized operators use provider-specific administrations and assessment
+  grants without changing the published publisher-owned form or answer keys.
+- Checklist UI describes observed lesson/assessment/outcome evidence without
+  claiming a verified completion policy, attendance minutes or award.
+
 ## Classroom resilience and operational acceptance
 
 - The hosting Site's IANA timezone governs one-off, weekly and custom
