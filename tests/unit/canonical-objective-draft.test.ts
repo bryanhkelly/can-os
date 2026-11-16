@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   canonicalAssessmentDraftDatabaseRole,canonicalObjectiveDraftInput,
+  assertPublisherObjectiveAttemptLimit,
 } from "@/domain/canonical-objective-draft";
 import {
   sealNoncreditAnswerKey,openNoncreditAnswerKey,
@@ -53,6 +54,15 @@ describe("canonical Course objective draft authoring",()=>{
     expect(()=>canonicalAssessmentDraftDatabaseRole({
       scope:{organizationIds:[org,org]},capabilities:new Set(["curriculum.publish"]),
     })).toThrow();
+  });
+  it("prevents a local Site from increasing a nationally published retake cap",()=>{
+    const approved={source:"course-activities",maxAttempts:3};
+    expect(()=>assertPublisherObjectiveAttemptLimit(approved,3)).not.toThrow();
+    expect(()=>assertPublisherObjectiveAttemptLimit(approved,2)).not.toThrow();
+    expect(()=>assertPublisherObjectiveAttemptLimit(approved,4)).toThrow();
+    expect(()=>assertPublisherObjectiveAttemptLimit(
+      {source:"course-activities",maxAttempts:null},1)).toThrow();
+    expect(()=>assertPublisherObjectiveAttemptLimit({},4)).not.toThrow();
   });
   it("seals keys with per-item authenticated encryption, not plaintext or a client-readable key",()=>{
     const key="ad".repeat(32);
