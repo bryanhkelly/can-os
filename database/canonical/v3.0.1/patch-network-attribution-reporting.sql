@@ -87,7 +87,7 @@ CREATE TRIGGER network_unit_parent_guard BEFORE INSERT OR UPDATE OF parent_unit_
 
 -- Organizational affiliation is independent of physical Site ownership.
 -- Membership verification does NOT verify that an individual is a church member.
-CREATE TABLE IF NOT EXISTS education_v30.network_memberships (
+CREATE TABLE IF NOT EXISTS education_v30.network_reporting_memberships (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   network_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
   member_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
@@ -110,10 +110,10 @@ CREATE TABLE IF NOT EXISTS education_v30.network_memberships (
   CONSTRAINT network_membership_unit_fk FOREIGN KEY(reporting_unit_id,network_organization_id)
     REFERENCES education_v30.network_units(id,network_organization_id) ON DELETE RESTRICT
 );
-CREATE INDEX IF NOT EXISTS network_memberships_member_idx
-  ON education_v30.network_memberships(member_organization_id,network_organization_id,status);
-CREATE INDEX IF NOT EXISTS network_memberships_unit_idx
-  ON education_v30.network_memberships(network_organization_id,reporting_unit_id,status);
+CREATE INDEX IF NOT EXISTS network_reporting_memberships_member_idx
+  ON education_v30.network_reporting_memberships(member_organization_id,network_organization_id,status);
+CREATE INDEX IF NOT EXISTS network_reporting_memberships_unit_idx
+  ON education_v30.network_reporting_memberships(network_organization_id,reporting_unit_id,status);
 
 CREATE OR REPLACE FUNCTION education_v30.v301_validate_network_membership()
 RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $membership_scope$
@@ -124,7 +124,7 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtext(
       'network_membership:'||NEW.network_organization_id::text||':'||NEW.member_organization_id::text));
     IF EXISTS (
-      SELECT 1 FROM network_memberships m
+      SELECT 1 FROM network_reporting_memberships m
       WHERE m.id<>NEW.id AND m.status='approved'
         AND m.network_organization_id=NEW.network_organization_id
         AND m.member_organization_id=NEW.member_organization_id
@@ -136,9 +136,9 @@ BEGIN
   END IF;
   RETURN NEW;
 END $membership_scope$;
-DROP TRIGGER IF EXISTS network_membership_path_guard ON education_v30.network_memberships;
+DROP TRIGGER IF EXISTS network_membership_path_guard ON education_v30.network_reporting_memberships;
 CREATE TRIGGER network_membership_path_guard
-  BEFORE INSERT OR UPDATE ON education_v30.network_memberships
+  BEFORE INSERT OR UPDATE ON education_v30.network_reporting_memberships
   FOR EACH ROW EXECUTE FUNCTION education_v30.v301_validate_network_membership();
 
 -- External church / affiliate numbers are namespaced by the issuing network.
@@ -146,7 +146,7 @@ CREATE TRIGGER network_membership_path_guard
 CREATE TABLE IF NOT EXISTS education_v30.network_member_identifiers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   network_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
-  network_membership_id uuid NOT NULL REFERENCES education_v30.network_memberships(id) ON DELETE RESTRICT,
+  network_membership_id uuid NOT NULL REFERENCES education_v30.network_reporting_memberships(id) ON DELETE RESTRICT,
   identifier_type text NOT NULL,
   identifier_value text NOT NULL,
   evidence_version_id uuid REFERENCES education_v30.evidence_document_versions(id) ON DELETE RESTRICT,
@@ -164,7 +164,7 @@ CREATE INDEX IF NOT EXISTS network_member_identifiers_membership_idx
 CREATE OR REPLACE FUNCTION education_v30.v301_validate_network_member_identifier()
 RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $external_id$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM network_memberships m
+  IF NOT EXISTS (SELECT 1 FROM network_reporting_memberships m
       WHERE m.id=NEW.network_membership_id
         AND m.network_organization_id=NEW.network_organization_id) THEN
     RAISE EXCEPTION 'External affiliate ID belongs to a different network';
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS education_v30.participation_attributions (
   delivery_site_id uuid NOT NULL REFERENCES education_v30.sites(id) ON DELETE RESTRICT,
   reporting_site_id uuid NOT NULL REFERENCES education_v30.sites(id) ON DELETE RESTRICT,
   credited_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
-  network_membership_id uuid REFERENCES education_v30.network_memberships(id) ON DELETE RESTRICT,
+  network_membership_id uuid REFERENCES education_v30.network_reporting_memberships(id) ON DELETE RESTRICT,
   attribution_basis text NOT NULL DEFAULT 'provider_default'
     CHECK (attribution_basis IN ('provider_default','self_reported','verified_member')),
   relationship_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -343,7 +343,7 @@ BEGIN
       'basis',NEW.attribution_basis);
   ELSE
     SELECT * INTO membership_row
-      FROM network_memberships WHERE id=NEW.network_membership_id
+      FROM network_reporting_memberships WHERE id=NEW.network_membership_id
         AND status='approved' AND valid_from<=NEW.attributed_at
         AND (valid_through IS NULL OR valid_through>NEW.attributed_at);
     IF membership_row.id IS NULL OR
@@ -419,7 +419,7 @@ DO $network_rls$
 DECLARE table_name text; owner_role text:=current_user;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
-    'network_units','network_memberships','network_member_identifiers',
+    'network_units','network_reporting_memberships','network_member_identifiers',
     'network_reporting_grants','participation_attributions'
   ] LOOP
     EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',table_name);
