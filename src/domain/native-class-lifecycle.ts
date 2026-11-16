@@ -64,3 +64,35 @@ export function assertNativeClassRepeatEligible(
     throw new AuthorizationError("completed Class repeat requires approved policy");
   }
 }
+import type { CommandContext } from "./command-context";
+
+export function assertNativeClassOperatorExitScope(
+  actor: CommandContext,
+  instance: {operatingOrganizationId:string;siteId:string|null},
+):void{
+  if(!actor.actorPersonId ||
+     !["site_admin","registrar"].includes(actor.role??"") ||
+     !actor.capabilities.has("class.manage") ||
+     !instance.siteId ||
+     actor.scope.organizationIds?.length!==1 ||
+     actor.scope.siteIds?.length!==1 ||
+     actor.scope.organizationIds[0]!==instance.operatingOrganizationId ||
+     actor.scope.siteIds[0]!==instance.siteId){
+    throw new AuthorizationError("exact active Class Site operator");
+  }
+}
+
+/** Typed against the restricted canonical session-function result, not a
+ * caller-supplied Person or a role picked in the browser. */
+export function assertNativeClassLearnerSessionForExit(
+  row:Record<string,unknown>,
+  actorPersonId:string,
+  operatingOrganizationId:string,
+):void{
+  if(row.person_id!==actorPersonId ||
+     row.role_code!=="learner" ||
+     row.organization_id!==operatingOrganizationId ||
+     row.site_id!==null){
+    throw new AuthorizationError("unchanged provider-scoped learner grant");
+  }
+}
