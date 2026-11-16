@@ -9,7 +9,7 @@ import {
   educationOperations, offeringVersions, offerings, programDeployments,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { publishedOfferingKind } from "@/domain/network-program-rollout";
+import { publishedOfferingKind, assertCompletePortableCourseComposition } from "@/domain/network-program-rollout";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 
 const inputSchema=z.object({
@@ -91,24 +91,25 @@ export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
         courseVersionId:courseVersions.id,courseTitle:courses.title,
         isRequired:canonicalOfferingCourses.isRequired,
         sequenceNo:canonicalOfferingCourses.sequenceNo,
+        lifecycle:courseVersions.lifecycle,
+        publishedAt:courseVersions.publishedAt,
       }).from(canonicalOfferingCourses)
         .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
         .innerJoin(courses,eq(courses.id,courseVersions.courseId))
-        .where(and(
-          eq(canonicalOfferingCourses.offeringVersionId,approved.offeringVersionId),
-          eq(courseVersions.lifecycle,"published"),
-          isNotNull(courseVersions.publishedAt),
-        ))
+        .where(eq(canonicalOfferingCourses.offeringVersionId,approved.offeringVersionId))
         .orderBy(asc(canonicalOfferingCourses.sequenceNo),asc(courses.title)).limit(51);
-      if(!rows.length)throw new AuthorizationError("Offering has no published Course components for Class rollout");
-      if(rows.length>50)throw new AuthorizationError("Offering exceeds the maximum portable Course rollout size");
+      assertCompletePortableCourseComposition(approved.productDefinition,rows);
       return {
         offeringVersionId:approved.offeringVersionId,
         offeringVersionNo:approved.offeringVersionNo,
         latestPublishedVersionNo:latest?.versionNo??approved.offeringVersionNo,
         offeringTitle:approved.offeringTitle,
         offeringKind:publishedOfferingKind(approved.productDefinition),
-        courses:rows,
+        compositionScope:"courses_only" as const,
+        // Do not expose publisher-only lifecycle or timestamps in shared JSON.
+        courses:rows.map(({courseVersionId,courseTitle,isRequired,sequenceNo})=>({
+          courseVersionId,courseTitle,isRequired,sequenceNo,
+        })),
       };
     });
   });
