@@ -149,7 +149,7 @@ export const createUnifiedClassDraft = createServerFn({method:"POST"})
         visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
-        capacity:data.terms.capacity,
+        capacity:data.terms.capacity,allowedCreditModes:data.terms.allowedCreditModes,
         consentVersion:data.terms.consentVersion,consentText:data.terms.consentText,state:"draft",
         createdByPersonId:operator.actor.actorPersonId!,
       }).returning({id:canonicalClassOfferingVersions.id});
@@ -333,7 +333,8 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
-        capacity:data.terms.capacity,consentVersion:data.terms.consentVersion,
+        capacity:data.terms.capacity,allowedCreditModes:data.terms.allowedCreditModes,
+        consentVersion:data.terms.consentVersion,
         consentText:data.terms.consentText,createdByPersonId:operator.actor.actorPersonId!,
         state:"draft",
       }).returning({id:canonicalClassOfferingVersions.id});
