@@ -14,7 +14,8 @@ import { requireNativeClassSessionHost } from "./native-class-session-host.serve
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
-import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
+import { validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
+import { scheduleOneClassroom } from "@/modules/learning/classroom-schedule-operations.server";
 import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning-operations.server";
 import { canOpenScheduledClassroom } from "@/domain/classroom-scheduling";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
