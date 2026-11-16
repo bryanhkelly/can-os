@@ -32,9 +32,12 @@ export function renderPrivateWebsitePreviewHtml(
   kind: "site" | "school" = "school",
 ): string {
   const links = new Set(availablePages.filter(isPublicSitePagePath));
+  const siteFirstUrl = (page:PublicSitePath) =>
+    "/launch/site-preview?siteId="+encodeURIComponent(siteId)+"&page="+encodeURIComponent(page);
   const converted = html.replace(/href="(\/[a-z-]*)"/g, (_match, path: string) =>
     isPublicSitePagePath(path) && links.has(path)
-      ? `href="${privateWebsitePreviewUrl(siteId, path)}"` : 'aria-disabled="true"');
+      ? `href="${kind==="site"?siteFirstUrl(path):privateWebsitePreviewUrl(siteId, path)}"`
+      : 'aria-disabled="true"');
   const editor = `/launch/website?siteId=${encodeURIComponent(siteId)}&returnToHub=true&step=preview`;
   const banner = `<aside class="can-private-preview" role="status">
   <strong>Private ${kind === "site" ? "Site" : "school"} website preview</strong>

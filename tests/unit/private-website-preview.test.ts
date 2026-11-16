@@ -55,6 +55,18 @@ describe("authenticated school full-page preview", () => {
     expect(fullPage).not.toContain('href="/about"');
   });
 
+  it("keeps Site-first preview navigation inside the authorized Site preview route",()=>{
+    const siteHtml='<html><head><title>Site</title></head><body>'+
+      '<a href="/courses">Courses</a><a href="/classes">Classes</a>'+
+      '<a href="/admissions">Admissions</a></body></html>';
+    const html=renderPrivateWebsitePreviewHtml(siteHtml,siteId,
+      ["/","/courses","/classes"],true,"site");
+    expect(html).toContain('href="/launch/site-preview?siteId='+siteId+'&page=%2Fcourses"');
+    expect(html).toContain('href="/launch/site-preview?siteId='+siteId+'&page=%2Fclasses"');
+    expect(html).not.toContain('href="/admissions"');
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).not.toContain("<script");
+  });
   it("uses Site-neutral wording for Site-first quick previews", () => {
     const html = '<html><head><title>Sample</title></head><body></body></html>';
     const result = renderPrivateWebsitePreviewHtml(html, siteId, [], false, "site");

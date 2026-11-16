@@ -12,7 +12,8 @@ import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { readCurrentLocalContent, readLocalContentHistory } from "@/modules/sites/site-local-content.server";
 import { emptySiteLocalContent, emptySiteLocalBranding, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
-import { renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
+import { availablePublicSitePaths, renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-html";
+import { isPublicSitePagePath } from "@/domain/public-site-paths";
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
@@ -39,9 +40,13 @@ export const Route=createFileRoute("/launch/site-preview")({
     GET:async ({request})=>{
       const url=new URL(request.url);
       const ids=url.searchParams.getAll("siteId");
-      if(ids.length!==1 || [...url.searchParams.keys()].some(k=>k!=="siteId") ||
-          !/^[a-f\d]{8}-[a-f\d]{4}-[1-8a-f\d]{4}-[89ab\d]{4}-[a-f\d]{12}$/i.test(ids[0]??""))
-        return failure(404,"Site preview unavailable","Select an authorized Site in Launch Studio.");
+      const pages=url.searchParams.getAll("page");
+      const path=pages[0]??"/";
+      if(ids.length!==1 || pages.length>1 ||
+          [...url.searchParams.keys()].some(k=>k!=="siteId"&&k!=="page") ||
+          !/^[a-f\d]{8}-[a-f\d]{4}-[1-8a-f\d]{4}-[89ab\d]{4}-[a-f\d]{12}$/i.test(ids[0]??"") ||
+          !isPublicSitePagePath(path))
+        return failure(404,"Site preview unavailable","Select an authorized Site and website page in Launch Studio.");
 
       try {
         const actor=await getCommandContext(request);
@@ -124,9 +129,12 @@ export const Route=createFileRoute("/launch/site-preview")({
           noncredit:noncreditReleases,classes,classTimezone:site.timezone,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
-        const rendered=renderPublicSiteHtml(page,{path:"/",localPreview:true});
+        const availablePages=availablePublicSitePaths(page);
+        if(!availablePages.includes(path))
+          return failure(404,"Page not available","This Site has not published the data required for this preview page.");
+        const rendered=renderPublicSiteHtml(page,{path,localPreview:true});
         const html=renderPrivateWebsitePreviewHtml(
-          rendered,site.id,[],Boolean(history.length),"site",
+          rendered,site.id,availablePages,Boolean(history.length),"site",
         );
         return new Response(html,{status:200,headers:siteFirstPreviewHeaders});
       }catch(error){
