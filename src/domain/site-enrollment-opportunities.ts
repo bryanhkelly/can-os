@@ -53,7 +53,8 @@ export function projectSiteEnrollmentOpportunities(
     return {
       id:"course:"+item.releaseId,kind:"course" as const,
       targetId:item.releaseId,title:item.title,description:item.siteName,
-      status:canRegister?"register" as const:canWaitlist?"waitlist" as const:"closed" as const,
+      status:canRegister?"register" as const:canWaitlist?"waitlist" as const:
+        !origin?"explore" as const:"closed" as const,
       ...(canRegister||canWaitlist?{action:{
         href:origin!+"/learn/enroll?release="+encodeURIComponent(item.releaseId),
         label:canRegister?"Register for Course":"Join Course waitlist",

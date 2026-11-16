@@ -344,7 +344,7 @@ export function resolveSiteContentBlocks(
       const second=b.startsAt ? Date.parse(b.startsAt) : Number.POSITIVE_INFINITY;
       return first-second || a.title.localeCompare(b.title);
     });
-    if (block.limit) items=items.slice(0,block.limit);
+    items=items.slice(0,block.limit??12);
     return items.length ? [{...block, items}] : [];
   });
 }

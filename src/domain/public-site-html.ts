@@ -462,7 +462,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
           ? "We are gathering interest from founding families. A request for information is not an application or an enrollment offer."
           : academicCards
             ? "Inquire about published programs; applications are not currently open through this website."
-            : "Check back for published educational opportunities."),
+            : opportunities.length
+              ? "Availability and enrollment depend on each published opportunity's current terms."
+              : "Check back for published educational opportunities."),
     actions:
       (availablePaths.includes(experienceCopy.heroExplorePath)
         ? '<a class="hero-button" href="'+experienceCopy.heroExplorePath+'">'+experienceCopy.heroExplore+'</a>'
@@ -883,9 +885,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
       demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection + educatorPortraitSection),
     "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
-      demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection, approachSection + creativeSampleSection),
+      demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection + pageBlocks("/academics"), approachSection + creativeSampleSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", demo ? "Find your people. Follow your curiosity." : "Student life",
-      demo ? "From creative exploration to service and student-led projects, the most memorable lessons often happen together." : "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection, studentPortraitSampleSection),
+      demo ? "From creative exploration to service and student-led projects, the most memorable lessons often happen together." : "Learn about the activities and experiences currently available beyond academic lessons."), enrichmentSection + pageBlocks("/student-life"), studentPortraitSampleSection),
     "/school-day": composePublicSiteInterior(templateId, secondaryHero("Learning together", demo ? "A day designed for more than lessons." : "What a day of learning looks like",
       demo ? "A thoughtful rhythm of independent discovery, academic guidance, and time to connect." : "See how learning is organized, with confirmed schedules and attendance details where available."),
       reviewedSchoolDay + (demo ? "" : schoolDayProgramNav + `<section aria-label="Program delivery patterns" class="grid">${schoolDay}</section>` +
