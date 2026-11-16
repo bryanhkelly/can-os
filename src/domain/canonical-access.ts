@@ -42,7 +42,7 @@ export function projectCanonicalPrincipalContext(row: Pick<CanonicalSessionRow,
       ? ["blueprint.read", "blueprint.review"]
       : row.role_code === "survey_reviewer"
         ? ["survey.review"]
-      : ["learning.room.facilitate", "blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start", "noncredit.completion.decide", "noncredit.assessment.finalize", "noncredit.assessment.provision", "credential.issue", "survey.draft.create", "survey.publish"];
+      : ["learning.room.facilitate", "blueprint.read", "blueprint.configure", "blueprint.execute", "program.launch.start", "noncredit.completion.decide", "noncredit.assessment.finalize", "noncredit.assessment.provision", "credential.issue", "survey.draft.create", "survey.publish", ...(["site_admin","registrar"].includes(row.role_code) ? ["class.manage"] : [])];
   return {
     actorPersonId: row.person_id,
     role: row.role_code,
