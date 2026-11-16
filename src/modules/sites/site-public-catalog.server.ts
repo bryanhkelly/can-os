@@ -1,5 +1,5 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
-import { siteContentChannelConfigSchema, defaultSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { and, eq, isNotNull } from "drizzle-orm";
@@ -83,9 +83,9 @@ export async function readPublishedSiteCatalog(slug: string) {
     const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
     const noncreditReleases = await readOptionalSiteNoncreditReleases(site.id, tx);
     const enrollmentAppOrigin = noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
-    const parsedContentChannels = siteContentChannelConfigSchema.safeParse(site.metadata.publishedWebsiteContentChannels);
+    const contentConfig = safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const contentBlocks = resolveSiteContentBlocks(
-      parsedContentChannels.success ? parsedContentChannels.data : defaultSiteContentChannelConfig, {
+      contentConfig, {
         mode: "public", academicPrograms: authorizedPrograms,
         enrichment: publicOfferings, noncredit: noncreditReleases,
         enrollmentOrigin: enrollmentAppOrigin,

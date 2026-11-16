@@ -15,7 +15,7 @@ import { renderPublicSiteHtml, type PublicSitePage } from "@/domain/public-site-
 import { renderPrivateWebsitePreviewHtml, privateWebsitePreviewErrorPage } from "@/domain/private-website-preview";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { siteFirstPreviewHeaders } from "@/domain/site-first-preview";
-import { siteContentChannelConfigSchema, defaultSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredit-releases.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 
@@ -89,8 +89,7 @@ export const Route=createFileRoute("/launch/site-preview")({
           localContent,
         };
         const parsed=siteLaunchPreferencesSchema.safeParse(site.metadata.launchPreferences);
-        const settings=siteContentChannelConfigSchema.safeParse(site.metadata.websiteContentChannels);
-        const config=settings.success?settings.data:defaultSiteContentChannelConfig;
+        const config=safeReadSiteContentChannelConfig(site.metadata.websiteContentChannels);
         page.contentBlocks=resolveSiteContentBlocks(config,{
           mode:"private",
           preferences:parsed.success?parsed.data:null,

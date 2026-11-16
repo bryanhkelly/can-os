@@ -48,7 +48,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
   }
   async function save(){
     if(!siteId||saving)return;
-    const parsed=siteContentChannelConfigSchema.safeParse({version:1,revision,blocks});
+    const parsed=siteContentChannelConfigSchema.safeParse({version:2,revision,blocks});
     if(!parsed.success){setError(parsed.error.issues[0]?.message??"Review channel settings.");return;}
     setError("");setSaving(true);
     try{

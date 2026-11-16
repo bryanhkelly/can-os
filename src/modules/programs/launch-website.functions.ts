@@ -8,7 +8,7 @@ import {AuthorizationError} from "@/domain/command-context";
 import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
 import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
-import {siteContentChannelConfigSchema,defaultSiteContentChannelConfig,resolveSiteContentBlocks} from "@/domain/site-content-channels";
+import {safeReadSiteContentChannelConfig,resolveSiteContentBlocks} from "@/domain/site-content-channels";
 import {siteLaunchPreferencesSchema} from "@/domain/site-launch-preferences";
 import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-program-publication";
 import {createIllustrativeSchoolContent,emptySiteLocalContent} from "@/domain/site-local-content";
@@ -82,10 +82,10 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       });
   const site={name:school.siteName,organizationName:school.organizationName};
   const academicPrograms=[...approvedPrograms,...planning];
-  const config=siteContentChannelConfigSchema.safeParse(siteFlags?.metadata?.websiteContentChannels);
+  const config=safeReadSiteContentChannelConfig(siteFlags?.metadata?.websiteContentChannels);
   const launchPrefs=siteLaunchPreferencesSchema.safeParse(siteFlags?.metadata?.launchPreferences);
   const contentBlocks=resolveSiteContentBlocks(
-    config.success?config.data:defaultSiteContentChannelConfig,{
+    config,{
       mode:"private",preferences:launchPrefs.success?launchPrefs.data:null,
       academicPrograms,enrichment:offerings,
     });

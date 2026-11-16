@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { sites } from "@/db/schema";
 import { siteContentChannelConfigSchema, readSiteContentChannelConfig,
-  type SiteContentBlock } from "@/domain/site-content-channels";
+  safeReadSiteContentChannelConfig, type SiteContentBlock } from "@/domain/site-content-channels";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -34,7 +34,7 @@ export async function saveAuthorizedSiteContentChannels(input: {
     if (current.revision !== input.expectedRevision)
       throw new Error("Site content channels have changed. Reload before saving.");
     const next = siteContentChannelConfigSchema.parse({
-      version: 1, revision: current.revision + 1, blocks: input.blocks,
+      version: 2, revision: current.revision + 1, blocks: input.blocks,
     });
     if (JSON.stringify(current.blocks) === JSON.stringify(next.blocks))
       return current;
@@ -72,8 +72,9 @@ export async function publishAuthorizedSiteContentChannels(input: {
     const draft = readSiteContentChannelConfig(site.metadata.websiteContentChannels);
     if (draft.revision !== input.expectedRevision)
       throw new Error("Website channel revision has changed. Reload before publishing.");
-    const published = siteContentChannelConfigSchema.safeParse(site.metadata.publishedWebsiteContentChannels);
-    if (published.success && published.data.revision === draft.revision)
+    const published = site.metadata.publishedWebsiteContentChannels == null ? null :
+      safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
+    if (published && published.revision === draft.revision)
       return {siteId: site.id, publishedRevision: draft.revision, changed: false};
     const [updated] = await tx.update(sites).set({
       metadata: {...site.metadata, publishedWebsiteContentChannels: draft},
@@ -84,7 +85,7 @@ export async function publishAuthorizedSiteContentChannels(input: {
       action: "site.website.content_channels.publish",
       entityType: "site", entityId: site.id,
       scope: {siteId: site.id, organizationId: site.organizationId},
-      before: {publishedRevision: published.success ? published.data.revision : null},
+      before: {publishedRevision: published?.revision ?? null},
       after: {publishedRevision: draft.revision,
         publishedSources: draft.blocks.filter(b => b.enabled && b.channel !== "learning.interests")
           .map(b => b.channel)},
