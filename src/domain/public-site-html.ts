@@ -810,11 +810,36 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   // Site channels are composed as native template sections. Preview routes
   // supply data; they do not splice a second page into the rendered HTML.
   const contentBlocks = page.contentBlocks ?? [];
+  const homeBlocks=contentBlocks.filter(block=>(block.page??"/")==="/");
   const hasContentChannel = (channel: SiteContentBlockProjection["channel"]) =>
-    contentBlocks.some(block => block.channel === channel && block.items.length > 0);
+    homeBlocks.some(block => block.channel === channel && block.items.length > 0);
   const contentChannelAt = (placement: SiteContentBlockProjection["placement"]) =>
-    contentBlocks.filter(block => block.placement === placement)
+    homeBlocks.filter(block => block.placement === placement)
       .map(renderSiteContentChannelBlock).join("");
+  const pageBlocks=(route:PublicSitePath)=>contentBlocks
+    .filter(block=>block.page===route).map(renderSiteContentChannelBlock).join("");
+  const renderOpportunityDirectory=(kind:"program"|"course"|"class",
+    title:string,description:string):string=>{
+    const authored=pageBlocks(kind==="program"?"/programs":
+      kind==="course"?"/courses":"/classes");
+    if(authored)return authored;
+    const records=opportunities.filter(item=>item.kind===kind);
+    if(!records.length)return "";
+    return renderSiteContentChannelBlock({
+      id:"auto-"+kind,channel:"learning.opportunities",
+      placement:"learning",layout:"cards",enabled:true,
+      eyebrow:"Published learning opportunities",title,description,
+      items:records.map(item=>({
+        id:item.id,title:item.title,description:item.description,
+        startsAt:item.startsAt,
+        label:item.kind.charAt(0).toUpperCase()+item.kind.slice(1)+" · "+
+          (item.status==="register"?"Enrollment available":
+            item.status==="waitlist"?"Waitlist available":
+            item.status==="closed"?"Registration unavailable":"Explore"),
+        ...(item.action?{link:item.action}:{}),
+      })),
+    });
+  };
   // Distinct template composition, one source of approved academic and Site facts.
   const homePage = composePublicSiteHome(templateId, {
     hero,
@@ -826,7 +851,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
     channelsLearning: contentChannelAt("learning"),
     enrichment: hasContentChannel("learning.enrichment") ? "" :
       page.offerings.length || (demo && local) ? enrichmentSection
-      : !academicCards && !contentBlocks.length ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
+      : !academicCards && !homeBlocks.length ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
     channelsCommunity: contentChannelAt("community"),
     closing: demo ? `<section class="closing-action"><p class="tag">The possibilities ahead</p>
       <h2>Every student has a story worth discovering.</h2>
@@ -840,6 +865,21 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   });
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
+    "/programs": composePublicSiteInterior(templateId,
+      secondaryHero("Community programs","Programs for every stage of learning",
+        "Explore independently published enrichment and community Programs. Check each Program for its current registration options."),
+      renderOpportunityDirectory("program","Discover Programs",
+        "Learn more about current Programs. Registration is handled through an approved Program workflow.")),
+    "/courses": composePublicSiteInterior(templateId,
+      secondaryHero("Independent learning","Courses to explore",
+        "Discover published Courses and register only when an independently approved enrollment release is available."),
+      renderOpportunityDirectory("course","Explore Courses",
+        "Published Courses are linked to their current, verified enrollment release.")),
+    "/classes": composePublicSiteInterior(templateId,
+      secondaryHero("Learn together","Classes and scheduled Sessions",
+        "Browse public Classes and their learning formats. Enrollment depends on each Class Offering's approved terms."),
+      renderOpportunityDirectory("class","Explore Classes",
+        "Class availability and registration methods are rechecked at the enrollment service.")),
     "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
       demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection + educatorPortraitSection),
     "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
