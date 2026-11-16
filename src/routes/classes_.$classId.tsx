@@ -346,7 +346,8 @@ function ManagingClass({workspace}:{workspace:Workspace}){
               onClick={()=>void assignLearner()}>Assign to Class</Button>
           </div>
         </>}
-        {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}/>}
+        {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
+          canRevoke onChanged={refresh}/>}
         {workspace.tab==="reports"&&<>
           <h2 className="font-serif text-2xl">Reporting</h2>
           <p className="mt-3 text-sm text-muted-foreground">
