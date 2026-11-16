@@ -33,6 +33,7 @@ function CourseActivityPublisher(){
   const [quiz,setQuiz]=useState<QuizPrompt[]>(initialQuiz);
   const [feedback,setFeedback]=useState<FeedbackPrompt[]>(initialFeedback);
   const [passing,setPassing]=useState(0.8);
+  const [maxQuizAttempts,setMaxQuizAttempts]=useState(3);
   const [allLessons,setAllLessons]=useState(true);
   const [feedbackRequired,setFeedbackRequired]=useState(true);
   const [consentVersion,setConsentVersion]=useState("feedback-v1");
@@ -58,6 +59,7 @@ function CourseActivityPublisher(){
       const saved=await publishNativeCourseActivitySet({data:{
         courseVersionId:courseId,title:title.trim(),
         quizQuestions:quiz,feedbackQuestions:feedback,passingFraction:passing,
+        maxQuizAttempts,
         requireAllLessons:allLessons,feedbackRequired,
         feedbackConsentVersion:consentVersion.trim(),
         feedbackConsentText:consentText.trim(),
@@ -137,6 +139,15 @@ function CourseActivityPublisher(){
             </label>
           </fieldset>
         </div>
+        <label className="mt-4 block text-sm font-semibold">
+          Knowledge-check attempts
+          <select value={maxQuizAttempts} onChange={e=>setMaxQuizAttempts(Number(e.target.value))}
+            className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+            {[1,2,3,4,5].map(n=><option value={n} key={n}>
+              {n} {n===1?"attempt":"attempts"} maximum
+            </option>)}
+          </select>
+        </label>
         <p className="mt-3 text-xs text-muted-foreground">
           These low-stakes requirements never automatically issue academic credit, grades,
           participation awards, certificates or credentials.
