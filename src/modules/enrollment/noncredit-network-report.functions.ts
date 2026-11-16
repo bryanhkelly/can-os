@@ -11,6 +11,7 @@ import {
   networkUnits,canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
+import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
  * grant from a label, favorite Site, or marketing affiliation.
@@ -171,61 +172,32 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       verifiedAttendees:sites.reduce((n,x)=>n+x.verifiedAttendees,0),
       linkedRooms:sites.reduce((n,x)=>n+x.linkedRooms,0),
     };
-    // Provider-private reporting across its own registrations: participating
-    // affiliates are separate from delivery Sites. Neither creates another
-    // learner, attendance fact, completion or network read grant.
+    // Delivery Site and credited Organization are distinct dimensions.
+    // Each attributed registration is one unique source fact; the same
+    // fact may appear at multiple ancestor network units without duplication.
     const attendanceFor=(claim:{releaseId:string;registrationId:string})=>
       (attemptsByRegistration.get(claim.registrationId)??[]).some(attempt=>
         (roomsByRelease.get(claim.releaseId)??[]).some(room=>present.has(room+":"+attempt)));
-    const affiliateMap=new Map<string,{
-      organizationId:string;organizationName:string;reportingUnitId:string|null;
-      reportingUnitName:string|null;basis:"provider_default"|"self_reported"|"verified_member";
-      registrations:number;completed:number;verifiedAttendees:number;
-    }>();
-    const unitMap=new Map<string,{
-      unitId:string;unitName:string;unitCode:string;
-      registrations:number;completed:number;verifiedAttendees:number;
-    }>();
-    for(const claim of claims){
-      const a=attributionByRegistration.get(claim.registrationId);
-      if(!a)throw new Error("Missing registration attribution");
-      const key=a.creditedOrganizationId+":"+String(a.networkMembershipId??"");
-      const group=affiliateMap.get(key)??{
-        organizationId:a.creditedOrganizationId,organizationName:a.organizationName,
-        reportingUnitId:a.reportingUnitId,reportingUnitName:a.reportingUnitName,
-        basis:a.attributionBasis,registrations:0,completed:0,verifiedAttendees:0,
-      };
-      group.registrations++;
-      const completed=lastDecision.get(claim.registrationId)==="completed";
-      if(completed)group.completed++;
-      const attended=attendanceFor(claim);
-      if(attended)group.verifiedAttendees++;
-      affiliateMap.set(key,group);
-      // Count each sourced registration once in EACH level of its own
-      // snapshotted path. Do not sum levels to produce a national total.
-      const nodes=a.relationshipSnapshot.reportingPath;
-      const seen=new Set<string>();
-      if(Array.isArray(nodes))for(const node of nodes){
-        if(!node||typeof node!=="object"||Array.isArray(node))continue;
-        const id=node.id,name=node.name,code=node.code;
-        if(typeof id!=="string"||typeof name!=="string"||
-          typeof code!=="string"||seen.has(id))continue;
-        seen.add(id);
-        const unit=unitMap.get(id)??{
-          unitId:id,unitName:name,unitCode:code,
-          registrations:0,completed:0,verifiedAttendees:0,
+    const {affiliations,networkUnits:unitRollups,uniqueRegistrations}=rollupAttributionEvidence(
+      claims.map(claim=>{
+        const attribution=attributionByRegistration.get(claim.registrationId);
+        if(!attribution)throw new Error("Missing immutable registration attribution");
+        return {
+          registrationId:claim.registrationId,
+          creditedOrganizationId:attribution.creditedOrganizationId,
+          organizationName:attribution.organizationName,
+          networkMembershipId:attribution.networkMembershipId,
+          reportingUnitId:attribution.reportingUnitId,
+          reportingUnitName:attribution.reportingUnitName,
+          basis:attribution.attributionBasis,
+          path:decodeHistoricalNetworkPath(
+            attribution.relationshipSnapshot.reportingPath),
+          completed:lastDecision.get(claim.registrationId)==="completed",
+          verifiedAttendee:attendanceFor(claim),
         };
-        unit.registrations++;
-        if(completed)unit.completed++;
-        if(attended)unit.verifiedAttendees++;
-        unitMap.set(id,unit);
-      }
-    }
-    const affiliations=[...affiliateMap.values()].sort((a,b)=>
-      a.organizationName.localeCompare(b.organizationName));
-    const unitRollups=[...unitMap.values()].sort((a,b)=>
-      a.unitName.localeCompare(b.unitName));
-    if(affiliations.reduce((n,a)=>n+a.registrations,0)!==totals.registrations)
+      }),
+    );
+    if(uniqueRegistrations!==totals.registrations)
       throw new Error("Affiliate attribution did not reconcile to source totals");
     const minimumCell=10;
     const safe=sites.filter(s=>s.registrations>=minimumCell).map(s=>({
