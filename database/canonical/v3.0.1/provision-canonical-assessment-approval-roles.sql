@@ -54,6 +54,9 @@ SELECT format('GRANT %I,%I TO %I WITH INHERIT FALSE, SET TRUE',
 SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v28_role_can_access_org(uuid,text) TO %I,%I',
  :'reviewer_role',:'publisher_role')
 \gexec
+SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v301_list_objective_review_queue(uuid,uuid,text) TO %I,%I',
+ :'reviewer_role',:'publisher_role')
+\gexec
 SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v301_objective_assessment_snapshot(uuid,uuid,uuid,text) TO %I,%I',
  :'reviewer_role',:'publisher_role')
 \gexec
