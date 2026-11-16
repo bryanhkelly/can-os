@@ -10,7 +10,7 @@ import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstr
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
-import { NativeCourseActivitiesPanel } from "@/components/learning/NativeCourseActivitiesPanel";
+import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
@@ -160,7 +160,7 @@ function LearnerClass({workspace}:{workspace:Workspace}){
       </>}
     </section>}
     {workspace.tab==="assignments"&&
-      <NativeCourseActivitiesPanel classEnrollmentId={learner.classEnrollmentId}/>}
+      <NativeClassCanonicalEvidencePanel classEnrollmentId={learner.classEnrollmentId}/>}
     {workspace.tab==="sessions"&&<>
       <NativeClassSessionsPanel workspace={workspace}/>
       {learner.status==="active"&&<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>}
