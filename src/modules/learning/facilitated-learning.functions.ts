@@ -314,9 +314,13 @@ async function currentRoomMediaAudience(
       throw new AuthorizationError("bounded native Class audience for recording rights");
     const adoptions=new Map<string,typeof learnerCourseAttempts.$inferSelect>();
     for(const candidate of candidates){
-      await nativeClassRoomParticipant(tx,room,candidate.attempt.id,candidate.personId);
-      if(!adoptions.has(candidate.attempt.adoptionId))
+      // The SQL join verifies exact active Class/Attempt identity for every
+      // candidate. Run the more expensive authority guard once per distinct
+      // adoption, rather than once for each learner on every 2.5s poll.
+      if(!adoptions.has(candidate.attempt.adoptionId)){
+        await nativeClassRoomParticipant(tx,room,candidate.attempt.id,candidate.personId);
         adoptions.set(candidate.attempt.adoptionId,candidate.attempt);
+      }
     }
     return [...adoptions.values()];
   }
