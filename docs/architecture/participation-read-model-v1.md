@@ -1,4 +1,4 @@
-# WS1: Participation Read Model contract v1.0.0
+# WS1: Participation Read Model contract v1.1.0
 
 **Status:** Proposed cross-workstream interface. Published from main baseline
 `5e50d26c197330b3f01403c221f6646f8cbef823`.
@@ -19,7 +19,7 @@ Each display item carries:
   `sourceId` with domain-specific `refs`. IDs from different sources are never conflated.
 - `kind`: `learning | program | event | other`.
   *Event* is an available filter, not a claim that an Event source exists today.
-- `bucket`: `current | upcoming | history`.
+- `bucket`: `current | upcoming | history` for actual participation only.
   Terminal source states take precedence. Dates alone never complete learning,
   award credit, or revoke access. Pending/waitlisted/invited are upcoming. Registered
   activities already started are current; missing start dates remain upcoming.
@@ -31,8 +31,8 @@ Each display item carries:
   **source-backed** progress and official outcome references. Unknown fields are null, not guessed.
 - An optional action/deep link that opens the **existing** authorized workspace.
   The target service must recheck access and cannot trust this projection as authority.
-- Per-source state `ready | unavailable | not_applicable`.
-  An unauthorized, disabled, broken or disconnected reader is **not** interpreted as an empty source.
+- Per-source state `ready | unavailable | not_applicable` and coverage `complete | partial | unknown | not_applicable`.
+  An unauthorized, disabled, broken or disconnected reader is **not** interpreted as an empty source. All current authorized readers report **partial** until exhaustive history/pagination is proven.
 
 **Time convention:** timestamps are ISO-8601 UTC; date-only source terms become ISO
 calendar dates for display. The current clock is server-supplied; original Site and
@@ -49,7 +49,7 @@ as an exhaustive history view.
 | Native Class | `getMyNativeClassEnrollments` | Own canonical learner identity and feature gate; preserves Class Enrollment, Class, and Course Attempt references; not derived from CAN guardian or Site staff access |
 | Noncredit Course | `getMyNoncreditSelfEnrollments` | Existing explicit CAN-to-canonical adult account bridge; private registered Course Attempt; cross-Site personal read |
 | Family enrichment | `getEnrichmentFamily` | Current verified guardian relationship and enrollment-management permission; unmatched child IDs fail closed |
-| Noncredit waitlist | `getMyNoncreditWaitlist` | Explicit verified adult account; invitations are *not* enrollments and expiration does not imply completion |
+| Noncredit waitlist opportunity | `getMyNoncreditWaitlist` | Distinct `opportunities[]`, not `records[]`; invitations are not enrollments; expiry never means cancellation of an Enrollment |
 
 No arbitrary person ID, unverified site ID, selected UI persona, account email, or
 guardian relationship supplied by the browser can grant access. The current CAN session
@@ -75,11 +75,11 @@ Switching workspace revalidates identity and purges old cached state.
 must agree on event names/payload semantics, authoritative IDs, idempotency keys,
 occurred/effective timestamps, and terminal status precedence in their own contracts.
 WS1 creates no events or event handlers; report aggregation stays with WS6.
-Any proposed contract change must bump the version and receive WS00 approval.
+The v1.1.0 pre-ratification revision moves waitlist entries out of `records[]` and into `opportunities[]`, and adds explicit per-source coverage. This is a **breaking preview contract change** requiring WS00 and consumer review. Any later contract change must bump the version and receive WS00 approval.
 
 ## Route migration
 
-- New primary entry: `/learn/my-activity`.
+- Primary user-facing entry: `/learn/my-activity`. `/learn/activity` is the WS00-compatible authenticated redirect. WS00 ratifies the canonical URL before merge.
 - Former `/learn/my-programs`: authentication-preserving redirect to the new entry.
 - Former `/learn/my-courses`: intentionally retained as a **compatibility
   workspace** for Course resume, withdrawal, invitations and waitlist cancellation.
@@ -104,3 +104,13 @@ production readiness, delivery/deployment gates, CI green, audit-grade history,
 or cross-workstream agreement. This version deliberately shows partial-source
 unavailability rather than inventing a complete historical record. WS00 may merge
 only after the full requested release gates pass.
+
+## WS00 contract reconciliation and outstanding gates
+
+WS00's provisional `docs/integration/participation-read-model-v0.1.0.md` describes an audit-grade row with verified `personId`, `operatorOrganizationId`, `actualDeliverySiteId`, `creditedOrganizationId`, `reportingUnitId`, `enrollmentReleaseId`, official completion decision and certificate references, and provenance timestamps. These are **not exposed by every current authoritative reader**. WS1 must not substitute the active actor Person ID for a dependent, infer immutable delivery Site attribution from navigation choices, or invent a certificate from an enrollment status. WS2–WS6 need to publish authorized fields/readers before these can enter an audit-grade contract.
+
+**Collections:** `records[]` contains authorized participation keyed by authoritative Enrollment/Registration identity. `opportunities[]` contains pending waitlist/invitation views keyed by release only within the verified viewer's account. The current waitlist reader returns the release ID, not the waitlist row ID. An opportunity display key is **not** enrollment identity, audit event identity, or a metric denominator. An expired invitation is **not** a cancelled Enrollment.
+
+**Current read coverage:** all source adapters may omit historical records. School Sections are currently active-catalog scoped; native Class/noncredit/waitlist readers cap at 100; this dashboard does not iterate inactive role grants. Ready readers therefore report `coverage: partial`, while failed/unverified readers report `state: unavailable, coverage: unknown`. `generatedAt` records query time, not a transactionally consistent multi-source snapshot.
+
+**P0 gates:** WS00 ratification, cross-team DTO fixtures, exact-commit typecheck/build, nested server-function execution on target runtime, and authenticated RLS/E2E. **P1 source-team dependencies:** cursor-based durable history, independently authorized multi-grant personal activity, official outcome decisions, schedule/attendance evidence, and verified Person/Organization/Site attribution. None is silently fabricated or labeled complete in WS1.
