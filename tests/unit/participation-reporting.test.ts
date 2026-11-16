@@ -46,7 +46,8 @@ describe("WS6 evidence reconciliation",()=>{
  it("does not move historical enrollment into a different period",()=>{
    const m=aggregateClassEvidence({...base,from:"2026-11-10T00:00:00Z"}).metrics;
    expect(m.registrations).toBe(0);
-   expect(m.formalCompletions).toBe(0);
+   // A prior registrant completing during the selected window still counts.
+   expect(m.formalCompletions).toBe(1);
  });
  it("excludes prior superseded present assertions",()=>{
    expect(aggregateClassEvidence(base).metrics.verifiedAttendees).toBe(1);
