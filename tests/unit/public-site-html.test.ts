@@ -114,7 +114,7 @@ describe("standalone public site HTML", () => {
       demonstration:true,offerings:[],
     });
     const paths=availablePublicSitePaths(demo);
-    expect(paths).toHaveLength(10);
+    expect(paths).toHaveLength(13);
     const checks: Array<[typeof paths[number],string]> = [
       ["/academics","Humanities &amp; Communication"],
       ["/student-life","Robotics &amp; Design Lab"],
@@ -679,7 +679,7 @@ it("connects all twelve editorial photo roles to fictional school pages only whe
       "admissions","portrait_01","portrait_02","portrait_03"]) {
       expect(all).toContain(`/template-photo/heritage/${role}?v=20261109`);
     }
-    expect((all.match(/class="demo-banner"/g)??[]).toHaveLength(10);
+    expect((all.match(/class="demo-banner"/g)??[]).toHaveLength(13);
     expect(all).not.toContain("Demonstration only");
     expect(all).not.toContain("Illustrative template photography");
     expect(all).not.toContain("<form");
