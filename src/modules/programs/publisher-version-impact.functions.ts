@@ -4,7 +4,7 @@ import { and, asc, desc, eq, exists, gt, inArray, isNotNull, isNull, lte, or, sq
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalClasses, catalogSites, deploymentOfferingAdoptions,
+  canonicalClasses, canonicalClassOfferingVersions, catalogSites, deploymentOfferingAdoptions,
   educationOperationOrganizationRoles, educationOperationSites,
   educationOperations, offeringVersions, offerings, programDeployments,
   siteOrganizationRoles,
@@ -119,6 +119,22 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
           inArray(canonicalClasses.siteId,siteIds),
         ))
         .groupBy(canonicalClasses.offeringVersionId,canonicalClasses.siteId,canonicalClasses.state);
+      const publishedListings=await tx.select({
+        offeringVersionId:canonicalClasses.offeringVersionId,
+        siteId:canonicalClasses.siteId,
+        classCount:sql<number>`count(distinct ${canonicalClasses.id})::integer`,
+      }).from(canonicalClasses)
+        .innerJoin(offeringVersions,eq(offeringVersions.id,canonicalClasses.offeringVersionId))
+        .innerJoin(canonicalClassOfferingVersions,and(
+          eq(canonicalClassOfferingVersions.classId,canonicalClasses.id),
+          eq(canonicalClassOfferingVersions.state,"published"),
+        ))
+        .where(and(
+          eq(offeringVersions.offeringId,data.offeringId),
+          eq(canonicalClasses.operatingOrganizationId,organizationId),
+          inArray(canonicalClasses.siteId,siteIds),
+        ))
+        .groupBy(canonicalClasses.offeringVersionId,canonicalClasses.siteId);
       return {
         offeringId:data.offeringId,offeringTitle:offering.title,
         latestPublishedVersionNo:versions[0]?.versionNo??null,
@@ -131,6 +147,7 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
         // Counts are exact for the current operator's authorized Site IDs;
         // never describe them as all national/affiliate Classes.
         localClassImpact:impacts,
+        publishedClassOfferings:publishedListings,
       };
     });
   });
