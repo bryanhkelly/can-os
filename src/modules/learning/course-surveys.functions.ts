@@ -5,12 +5,15 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { auditEvents, domainEvents, surveyDefinitions, surveyVersions, surveyQuestions,
   surveyQuestionOptions, surveyQuestionBranchRules, surveyCampaigns, surveyInvitations,
-  surveyResponses, surveyAnswers, surveyAnswerChoices } from "@/db/canonical-v301";
+  surveyResponses, surveyAnswers, surveyAnswerChoices,
+  canonicalClassSurveyCampaigns, canonicalClassEnrollments, canonicalClasses,
+  learnerCourseAttempts } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { validateCourseSurveyAnswers, type SurveyQuestion } from "@/domain/course-survey";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { evidenceDocumentVersions } from "@/db/canonical-v301";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
+import type { CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
 
 const id=z.string().uuid();
 const scope=z.object({courseAttemptId:id,campaignId:id}).strict();
@@ -25,6 +28,38 @@ function requireLearner(context:CommandContext): asserts context is CommandConte
 }
 const privateResult=()=>setResponseHeader("Cache-Control","private, no-store");
 
+/** Class survey invitations must target a campaign bound to EXACTLY the
+ * active Class of this Person's authorized canonical Course Attempt.
+ * Course/Deployment equality alone is insufficient when a learner attends
+ * several Classes delivered under the same published Course.
+ */
+async function classSurveyCampaignIds(tx:Tx,context:CommandContext & {actorPersonId:string},
+  access:CanonicalParticipationAccess):Promise<string[]|null>{
+  if(access.source!=="class")return null;
+  if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+    throw new AuthorizationError("Class survey attribution not released");
+  const [row]=await tx.select({classId:canonicalClasses.id})
+    .from(learnerCourseAttempts)
+    .innerJoin(canonicalClassEnrollments,and(
+      eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
+      eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id),
+      eq(canonicalClassEnrollments.learnerPersonId,context.actorPersonId),
+      eq(canonicalClassEnrollments.status,"active")))
+    .innerJoin(canonicalClasses,and(
+      eq(canonicalClasses.id,canonicalClassEnrollments.classId),
+      eq(canonicalClasses.state,"active"),
+      eq(canonicalClasses.deploymentId,access.deploymentId),
+      eq(canonicalClasses.courseVersionId,access.courseVersionId)))
+    .where(eq(learnerCourseAttempts.id,access.courseAttemptId)).limit(1);
+  if(!row)throw new AuthorizationError("exact active Class survey participation");
+  const links=await tx.select({campaignId:canonicalClassSurveyCampaigns.campaignId})
+    .from(canonicalClassSurveyCampaigns)
+    .where(eq(canonicalClassSurveyCampaigns.classId,row.classId)).limit(51);
+  if(links.length>50)throw new AuthorizationError("Class survey campaigns require pagination");
+  return links.map(link=>link.campaignId);
+}
+
+
 /**
  * Identified survey only: person-bound invitations, published versions, and
  * deployment-scoped campaign permissions. Anonymous/confidential surveys,
@@ -35,6 +70,9 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId,true);
   if(access.source!=="noncredit"&&access.source!=="class")
     throw new AuthorizationError("active registered Course or Class participant");
+  const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
+  if(allowedClassCampaigns&&!allowedClassCampaigns.includes(data.campaignId))
+    throw new AuthorizationError("survey campaign is not attributed to this Class");
   const [campaign]=await tx.select().from(surveyCampaigns)
     .where(and(eq(surveyCampaigns.id,data.campaignId),
       eq(surveyCampaigns.deploymentId,access.deploymentId))).limit(1);
@@ -102,6 +140,8 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
       const access=await authorizeCanonicalCourseAttempt(tx,context,data.courseAttemptId,true);
       if(access.source!=="noncredit"&&access.source!=="class")
         throw new AuthorizationError("authorized learner Course survey participation");
+      const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
+      if(allowedClassCampaigns?.length===0)return [];
       const now=new Date();
       const rows=await tx.select({
         campaignId:surveyCampaigns.id,title:surveyDefinitions.title,
@@ -124,6 +164,7 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
         eq(evidenceDocumentVersions.id,surveyCampaigns.surveyPermissionEvidenceId))
       .where(and(
         eq(surveyCampaigns.deploymentId,access.deploymentId),
+        allowedClassCampaigns?inArray(surveyCampaigns.id,allowedClassCampaigns):undefined,
         eq(surveyCampaigns.responseMode,"identified"),
         eq(surveyCampaigns.status,"active"),
         lte(surveyCampaigns.startsAt,now),
@@ -187,6 +228,7 @@ export const submitCourseSurvey=createServerFn({method:"POST"})
         );
       }
       const metadata={courseAttemptId:survey.access.courseAttemptId,
+        source:survey.access.source,
         campaignId:survey.campaign.id,questionCount:answers.length};
       await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,
         owningOrganizationId:survey.campaign.operatingOrganizationId,
