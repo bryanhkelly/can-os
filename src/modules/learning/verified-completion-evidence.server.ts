@@ -5,17 +5,11 @@ import {
   learningCompletionEvidenceBindings,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { matchesApprovedEvidenceBinding, type EvidenceTarget } from "@/domain/completion-evidence-bindings";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-export type CompletionEvidenceTarget =
-  | {
-      purpose:"completion_correction";
-      registrationId:string;
-      expectedDecisionId:string;
-      approvedCorrectionOutcome:"not_yet_completed"|"voided";
-    }
-  | {purpose:"award_revocation"; issuanceId:string};
+export type CompletionEvidenceTarget = EvidenceTarget;
 
 /**
  * Generic evidence verification alone cannot authorize corrections/revocation.
@@ -50,20 +44,11 @@ export async function assertSourceBoundCompletionEvidence(
       scopeCondition,
     )).limit(2);
   const bound=bindings[0];
-  if (bindings.length!==1 || !bound ||
-      bound.participantPersonId!==input.participantPersonId ||
-      bound.providerOrganizationId!==input.organizationId ||
-      bound.deliverySiteId!==input.deliverySiteId ||
-      bound.reviewReason!==input.reason ||
-      bound.submittedByPersonId!==input.actorPersonId ||
-      bound.approvedByPersonId===input.actorPersonId ||
-      bound.approvedByPersonId===input.participantPersonId ||
-      bound.approvedByPersonId===bound.submittedByPersonId)
+  const now=new Date();
+  if (bindings.length!==1 || !matchesApprovedEvidenceBinding(
+      bound,target,input,now))
     throw new AuthorizationError("independently approved evidence for exact Person and source");
 
-  const now=new Date();
-  if (!bound.approvedAt || bound.approvedAt>now)
-    throw new AuthorizationError("current independently approved source evidence");
   const [evidence]=await tx.select({
     verifiedAt:evidenceDocumentVersions.verifiedAt,
     verifiedByPersonId:evidenceDocumentVersions.verifiedByPersonId,
