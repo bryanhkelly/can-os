@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  offerings, offeringVersions, canonicalOfferingCourses,
+  offerings, offeringVersions, canonicalOfferingCourses, courseVersions, courses,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 
@@ -18,13 +18,18 @@ export async function getCanonicalClassPublisher(
   tx:Tx,input:{offeringVersionId:string;courseVersionId:string},
 ){
   const [owner]=await tx.select({
-    publisherOrganizationId:offerings.publisherOrganizationId,
+    publisherOrganizationId:courses.publisherOrganizationId,
   }).from(offeringVersions)
     .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
     .innerJoin(canonicalOfferingCourses,and(
       eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id),
       eq(canonicalOfferingCourses.courseVersionId,input.courseVersionId),
     ))
+    .innerJoin(courseVersions,and(
+      eq(courseVersions.id,canonicalOfferingCourses.courseVersionId),
+      eq(courseVersions.lifecycle,"published"),
+    ))
+    .innerJoin(courses,eq(courses.id,courseVersions.courseId))
     .where(and(eq(offeringVersions.id,input.offeringVersionId),
       eq(offeringVersions.lifecycle,"published"),
       eq(offerings.status,"active"))).limit(1);
