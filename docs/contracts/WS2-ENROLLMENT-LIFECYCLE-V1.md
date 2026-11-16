@@ -138,8 +138,9 @@ state stored in the DB. WS1 owns its exact read-model shape.
 - Historical `completed`, `withdrawn`, `cancelled` belongs in personal
   Activity history; it never confers future content, session or assessment access.
 
-WS1's provisional [PRM v0.1.0](../integration/participation-read-model-v0.1.0.md)
-owns the DTO, including `contractVersion: "0.1.0"`,
+WS1's provisional PRM v0.1.0 (integration-owned file:
+`docs/integration/participation-read-model-v0.1.0.md`) owns the DTO,
+including `contractVersion: "0.1.0"`,
 `(sourceKind,sourceId)` identity, `personId`,
 `courseAttemptId`, `classId`, `sectionId`, `deploymentId`,
 `adoptionId`, `offeringVersionId`, `courseVersionId`,
