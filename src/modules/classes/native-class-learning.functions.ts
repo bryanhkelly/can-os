@@ -4,13 +4,12 @@ import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalClassEnrollments, canonicalClasses, learnerCourseAttempts,
-  programDeployments, deploymentOfferingAdoptions, offeringVersions, courseVersions,
+  canonicalClassEnrollments, canonicalClasses,
   courseLessons, courseUnits, learnerLessonProgress,
   canonicalClassOutcomes, canonicalClassAwards,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
-import { authorizeNativeClassAttempt } from "@/domain/native-class-enrollment";
+import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
@@ -35,27 +34,19 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
         throw new AuthorizationError("own Class Enrollment and Course Attempt");
       const [instance]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
-      const [attempt]=await tx.select().from(learnerCourseAttempts)
-        .where(eq(learnerCourseAttempts.id,enrollment.courseAttemptId)).limit(1);
-      const [deployment]=instance?await tx.select().from(programDeployments)
-        .where(eq(programDeployments.id,instance.deploymentId)).limit(1):[];
-      const [adoption]=instance?await tx.select().from(deploymentOfferingAdoptions)
-        .where(and(eq(deploymentOfferingAdoptions.id,instance.adoptionId),
-          eq(deploymentOfferingAdoptions.deploymentId,instance.deploymentId),
-          eq(deploymentOfferingAdoptions.offeringVersionId,instance.offeringVersionId))).limit(1):[];
-      const [course]=instance?await tx.select().from(courseVersions)
-        .where(eq(courseVersions.id,instance.courseVersionId)).limit(1):[];
-      const [offering]=instance?await tx.select().from(offeringVersions)
-        .where(eq(offeringVersions.id,instance.offeringVersionId)).limit(1):[];
-      const scope=authorizeNativeClassAttempt({
-        actorPersonId:actor.actorPersonId,attempt:attempt??null,enrollment,
-        classInstance:instance??null,
-        authority:deployment&&adoption&&course&&offering?{
-          deploymentState:deployment.status,adoptionState:adoption.approvalStatus,
-          adoptionValidFrom:adoption.validFrom,adoptionValidThrough:adoption.validThrough,
-          coursePublished:course.lifecycle==="published",offeringPublished:offering.lifecycle==="published",
-        }:null,now:new Date(),historicalRead:true,
-      });
+      if(!instance)throw new AuthorizationError("own Class");
+      // Use the same native Course Attempt gate as recorded instructors,
+      // playback, practice and other learner services. This also rejects
+      // suspended adoption or revoked Site authority, not only wrong Person.
+      const access=await authorizeCanonicalCourseAttempt(
+        tx,actor,enrollment.courseAttemptId,true,
+      );
+      if(access.source!=="class"||access.sectionId!==null)
+        throw new AuthorizationError("native Class Course Attempt");
+      const scope={
+        classId:instance.id,classEnrollmentId:enrollment.id,
+        courseAttemptId:access.courseAttemptId,courseVersionId:access.courseVersionId,
+      };
       const lessons=await tx.select({
         unitId:courseUnits.id,unitTitle:courseUnits.title,
         unitOrder:courseUnits.sequenceNo,
