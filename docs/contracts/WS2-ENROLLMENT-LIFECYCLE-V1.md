@@ -64,6 +64,48 @@ withdrawn *before* closing its Class Enrollment, satisfying the canonical
 source trigger. Completed and previously withdrawn attempts are not
 rewritten. Terminal events and audit are written atomically with the update.
 
+## Capacity and staff mutation policy
+
+A Class has exactly one seat pool. Open participation means `pending` or
+`active` regardless of enrollment method or Offering publication.
+Enrollment commands first lock the canonical `classes` row `FOR UPDATE`,
+then query *only* open enrollments for the exact Class and Person, denying
+duplicate open identities rather than silently selecting a recent record.
+This is not a five-record history search; completed-history repeat policy
+is independently checked across all prior completions.
+
+The Class's `capacity` is the universal maximum for both direct assignment
+and self-enrollment. An optional published Class Offering `capacity` is a
+**stricter marketing-registration ceiling** applying only to self-enrollment
+using that Offering version; it neither reserves seats for a separate pool
+nor permits assignment to exceed Class capacity. Its occupancy measurement
+still includes **all** currently open Class enrollments. Pending and active
+enrollments occupy one seat; withdrawn/cancelled/completed do not.
+The domain policy rejects negative, fractional or otherwise invalid counts.
+
+Adult direct assignment, Class cancellation and withdrawal use current
+single-login identity and authoritative scope. Registrar and Site Admin
+mutation scope must resolve to **one exact Organization and one exact Site**
+at mutation time; accepting an explicit Class ID from a broad multi-Site
+principal is not a grant. A future multi-Site delegation mechanism must
+resolve its selected Site to a current *single-Site* mutation grant with
+WS00/identity approval, rather than weakening this gate.
+
+The `not_eligible` cancellation reason is valid only for a `pending`
+request; `requested` belongs only to learner-initiated withdrawals.
+`operator_decision` and `session_cancelled` are available for operator
+cancellation. Idempotent retries of an already-terminal cancellation
+produce no new outbox/audit events even if the original pending reason
+cannot be reconstructed from the terminal row.
+
+Classroom and assessment write entry points must continue to call the
+canonical current-participation authorization. An ended Class enrollment
+must deny **future** learning writes, playback/session joining and
+assessments, while allowing only deliberately authorized historical
+evidence reads. WS4/WS3 own the independent integration tests for their
+respective commands; WS2's pure policy suite covers revoked Class status
+and withdrawn Course Attempt denial.
+
 ## WS1 participation-status projection
 
 This is a **source-to-display mapping proposal**, not a second lifecycle
@@ -141,6 +183,19 @@ cross-stream interfaces, not an authorization to overwrite other agents. The exi
 still a prerequisite; disabled means denial, not a partial workflow.
 
 Required integration acceptance **not yet claimed**:
+- Run `tests/unit/native-class-optional-offering.test.ts`,
+  `tests/unit/native-class-mutation-authority.test.ts`,
+  `tests/unit/native-class-enrollment.test.ts`, and
+  `src/domain/native-class-lifecycle.test.ts` after each integration merge.
+- Verify `src/modules/classes/native-class-authority.server.ts` compiles with
+  the required Drizzle `isNull` import.
+- Prove seat-pool contention between direct assignment and self-registration
+  using two real concurrent `test01` transactions, including one remaining
+  seat, an Offering limit stricter than Class capacity, a cancelled retry,
+  and an old open enrollment outside the latest five historical records.
+- Prove only one cancellation/withdrawal outbox event per real transition,
+  preserving completed Attempt and award history.
+
 1. Verify current staff session/grant on both local/CAN and canonical paths;
    reject cross-Site, cross-Org, revoked/expired grants, role mismatch and
    another learner's enrollment; test repeat/capacity under concurrent requests.
