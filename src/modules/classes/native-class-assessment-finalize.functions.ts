@@ -12,7 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { evaluateKnowledgeCheckResult } from "@/domain/noncredit-knowledge-check";
-import { validateClassAuthority } from "@/modules/classes/unified-class.functions";
+import { validateClassAuthority } from "@/modules/classes/unified-class-authority.server";
 import { assertPublisherObjectiveAttemptLimit } from "@/domain/canonical-objective-draft";
 import { getCanonicalClassPublisher } from "./native-class-publisher.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
