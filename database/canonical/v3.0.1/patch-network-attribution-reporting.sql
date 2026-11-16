@@ -290,6 +290,7 @@ DECLARE lineage_snapshot jsonb;
 BEGIN
   IF NEW.noncredit_registration_id IS NOT NULL THEN
     SELECT r.id,r.site_id,r.registering_organization_id,
+           r.provider_organization_id,
            NULL::uuid AS operating_organization_id,r.status,c.registration_id
       INTO source_row
       FROM noncredit_self_enrollment_releases r
@@ -301,6 +302,7 @@ BEGIN
     END IF;
   ELSE
     SELECT cl.id,cl.site_id,cl.operating_organization_id,
+           NULL::uuid AS provider_organization_id,
            NULL::uuid AS registering_organization_id
       INTO source_row
       FROM class_enrollments ce JOIN classes cl ON cl.id=ce.class_id
@@ -311,6 +313,12 @@ BEGIN
     END IF;
   END IF;
 
+  -- Reporting Site remains the delivery Site until a separately authorized
+  -- local Site affiliation workflow proves a different reporting location.
+  -- Crediting a local organization alone must never invent a local Site.
+  IF NEW.reporting_site_id IS DISTINCT FROM NEW.delivery_site_id THEN
+    RAISE EXCEPTION 'Reporting Site must be the verified enrollment delivery Site';
+  END IF;
   IF NEW.attribution_basis='provider_default' THEN
     IF NEW.credited_organization_id IS DISTINCT FROM
        COALESCE(source_row.registering_organization_id,source_row.operating_organization_id)
@@ -323,7 +331,14 @@ BEGIN
         AND status='approved' AND valid_from<=NEW.attributed_at
         AND (valid_through IS NULL OR valid_through>NEW.attributed_at);
     IF membership_row.id IS NULL OR
-       membership_row.member_organization_id IS DISTINCT FROM NEW.credited_organization_id THEN
+       membership_row.member_organization_id IS DISTINCT FROM NEW.credited_organization_id
+       OR membership_row.network_organization_id IS DISTINCT FROM
+          COALESCE(source_row.provider_organization_id,
+                   source_row.operating_organization_id,
+                   source_row.registering_organization_id)
+       AND membership_row.network_organization_id IS DISTINCT FROM
+          COALESCE(source_row.registering_organization_id,
+                   source_row.operating_organization_id) THEN
       RAISE EXCEPTION 'Network attribution requires an approved effective membership';
     END IF;
     IF NEW.attribution_basis='verified_member' THEN
