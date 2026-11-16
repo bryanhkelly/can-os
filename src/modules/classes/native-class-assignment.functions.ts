@@ -6,7 +6,7 @@ import { db } from "@/db/client";
 import {
   auditEvents,domainEvents,canonicalClasses,canonicalClassEnrollments,
   canonicalAccountGrants,canonicalAccounts,canonicalPersons,
-  learnerCourseAttempts,
+  learnerCourseAttempts,participationAttributions,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -49,6 +49,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
          (!cls.siteId && cls.createdByPersonId!==actor.actorPersonId))
         throw new AuthorizationError("exact authorized Class and operating Organization");
       const current=await currentClassAuthority(tx,cls.id,new Date());
+      if(!current.siteId)throw new AuthorizationError("assigned Class enrollment requires a Site");
 
       const [person]=await tx.select({id:canonicalPersons.id,
         birthDate:canonicalPersons.birthDate})
@@ -105,6 +106,14 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         consentVersion:null,consentSha256:null,consentedAt:null,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Cannot save assigned Class Enrollment");
+      await tx.insert(participationAttributions).values({
+        classEnrollmentId:enrollment.id,
+        deliverySiteId:current.siteId,reportingSiteId:current.siteId,
+        creditedOrganizationId:current.operatingOrganizationId,
+        attributionBasis:"provider_default",
+        relationshipSnapshot:{kind:"provider_default",classId:cls.id,
+          organizationId:current.operatingOrganizationId,siteId:current.siteId},
+      });
       const [attempt]=await tx.insert(learnerCourseAttempts).values({
         classEnrollmentId:enrollment.id,enrollmentId:null,
         noncreditRegistrationId:null,sectionId:null,
