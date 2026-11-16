@@ -8,11 +8,11 @@ if(process.env.CAN_NATIVE_CLASS_SCHEMA_VALIDATION!=="1")
   throw new Error("Explicit CAN_NATIVE_CLASS_SCHEMA_VALIDATION=1 required");
 if(!process.env.DATABASE_URL)throw new Error("Select an isolated QA DATABASE_URL");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
-const tables=["classes","class_offerings","class_offering_versions","class_enrollments","class_outcomes","class_awards","class_staff_assignments","class_sessions"];
+const tables=["classes","class_offerings","class_offering_versions","class_enrollments","class_outcomes","class_awards","class_staff_assignments","class_sessions","class_survey_campaigns"];
 const allTriggers=["learner_course_attempt_source_gate","class_enrollment_attempt_guard",
   "canonical_class_offering_guard_trg","canonical_class_staff_guard_trg",
   "canonical_class_enrollment_identity_guard_trg","canonical_class_session_guard_trg",
-  "canonical_class_plan_boundary_trg"];
+  "canonical_class_plan_boundary_trg","canonical_class_survey_campaign_guard_trg"];
 try{
   const [relations,cols,checks,triggers,functions]=await Promise.all([
     pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity, EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS grants_public FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])",[tables]),
@@ -49,6 +49,8 @@ try{
     "class_sessions.classroom_plan_id",
     "class_sessions.delivery_session_id",
     "class_sessions.facilitator_person_id",
+    "class_survey_campaigns.campaign_id",
+    "class_survey_campaigns.class_id",
     "learner_course_attempts.class_enrollment_id",
 
   ]) assert(have.has(name),"Missing native Class column "+name);
