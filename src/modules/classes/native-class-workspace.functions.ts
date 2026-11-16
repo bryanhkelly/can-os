@@ -7,6 +7,7 @@ import {
   canonicalClasses, canonicalClassStaffAssignments, canonicalClassEnrollments,
   canonicalClassOfferings, canonicalClassOfferingVersions, canonicalPersons,
   canonicalAccountGrants, canonicalAccounts, courseLessons, courseUnits,
+  canonicalClassSessions, canonicalDeliverySessions, facilitatedClassroomPlans,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { classViews, classTabs, selectClassTab, selectClassView } from "@/domain/class-views";
@@ -245,6 +246,37 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Staff"),
         }));
       }
+      const scheduleRows=await tx.select({
+        id:canonicalClassSessions.id,
+        planId:facilitatedClassroomPlans.id,
+        state:facilitatedClassroomPlans.state,
+        startsAt:canonicalDeliverySessions.startsAt,
+        endsAt:canonicalDeliverySessions.endsAt,
+        facilitatorPersonId:canonicalClassSessions.facilitatorPersonId,
+      }).from(canonicalClassSessions)
+        .innerJoin(facilitatedClassroomPlans,and(
+          eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId),
+          eq(facilitatedClassroomPlans.deliverySessionId,canonicalClassSessions.deliverySessionId),
+          eq(facilitatedClassroomPlans.deploymentId,instance.deploymentId),
+          eq(facilitatedClassroomPlans.courseVersionId,instance.courseVersionId),
+          eq(facilitatedClassroomPlans.siteId,instance.siteId??"00000000-0000-0000-0000-000000000000"),
+          eq(facilitatedClassroomPlans.hostOrganizationId,instance.operatingOrganizationId),
+        ))
+        .innerJoin(canonicalDeliverySessions,and(
+          eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId),
+          eq(canonicalDeliverySessions.deploymentId,instance.deploymentId),
+          eq(canonicalDeliverySessions.siteId,instance.siteId??"00000000-0000-0000-0000-000000000000"),
+        ))
+        .where(eq(canonicalClassSessions.classId,instance.id))
+        .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+      const sessions=scheduleRows.slice(0,100).map(row=>({
+        id:row.id,
+        planId:view==="learn"?null:row.planId,
+        state:row.state,
+        startsAt:row.startsAt.toISOString(),
+        endsAt:row.endsAt.toISOString(),
+        isMySession:row.facilitatorPersonId===actor.actorPersonId,
+      }));
       return {
         classId:instance.id,title:instance.title,
         courseVersionId:instance.courseVersionId,siteId:instance.siteId,
@@ -255,6 +287,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         canViewRoster:rosterAllowed,
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
         offering,lessons,staffCandidates,staffAssignments,
+        sessions,sessionsTruncated:scheduleRows.length>100,
         selectedLessonId:data.lesson??null,
         selectedSessionId:data.session??null,
       };
