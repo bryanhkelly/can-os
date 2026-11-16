@@ -61,8 +61,8 @@ function CourseActivityPublisher(){
   const chosen=courses.data?.courses.find(row=>row.courseVersionId===courseVersionId);
 
   function editQuiz(key:string,change:Partial<Quiz>){
+    if(quizDraft||quizBusy)return;
     setQuiz(current=>current.map(row=>row.key===key?{...row,...change}:row));
-    if(quizDraft)return;
   }
   function editFeedback(key:string,change:Partial<Feedback>){
     setFeedback(current=>current.map(row=>row.key===key?{...row,...change}:row));
