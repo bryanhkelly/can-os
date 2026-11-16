@@ -105,3 +105,38 @@ evidence on rollback. The feature flag must remain OFF until migration,
 TypeScript, unit/integration, negative auth, browser and CI gates pass.
 Testing blocked by GitHub Actions `startup_failure` or missing native Class
 schema must be reported as NOT RUN, never as a passing test.
+
+
+## Updated read-only QA inspection: November 16, 2026
+
+Neon project `can-os`, branch `test01` (not the project default/main branch)
+was inspected using read-only SQL. Unlike the November 15 readiness document,
+`education_v30.classes` and `education_v30.class_sessions` now exist. The
+new WS4 `class_session_agenda_revisions` relation does not yet exist, as
+expected because its migration remains pending integration-owner approval.
+
+Current QA data contains **zero Classes, zero native Class Sessions, zero native
+Class Enrollments, zero published Course lessons and two published Course
+versions**. Therefore test01 cannot currently demonstrate the four-week
+two-Site flow, even though the native Class schema is installed. Native Class
+and Session tables both have forced RLS with owner-only policies. Existing
+Course lesson, official assignment and assessment tables have no forced RLS;
+existing application role boundaries must be independently reviewed and cannot
+be assumed from native Class RLS. No schema or data mutation was performed in
+this inspection.
+
+After explicit schema migration approval on a disposable copy, validate using:
+
+```sh
+CAN_WS4_SCHEMA_VALIDATION=1 DATABASE_URL='<isolated-qa-only>' \
+  node scripts/acceptance/check-ws4-class-session-agenda.mjs
+npm run typecheck
+npx vitest run tests/unit/native-class-session-agenda.test.ts \
+  tests/unit/native-class-session-agenda-integration-contract.test.ts
+```
+
+These commands are documented acceptance steps, **not evidence of successful
+execution**. GitHub Actions on `feature/class-delivery` returns
+`startup_failure` before jobs run. WS00 must supply an isolated migration,
+synthetic two-Site fixtures, real authorized operators and learners, and an
+operational CI/browsing environment before any release claim can be made.
