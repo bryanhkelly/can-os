@@ -3,6 +3,8 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Building2, Check, Globe2, GraduationCap, Monitor, Sparkles, Users } from "lucide-react";
 import { PageFrame, PageHeader } from "@/components/workspace";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
+import { SiteLaunchActivationPanel } from "./SiteLaunchActivationPanel";
+import type { listLaunches } from "@/modules/programs/launch.functions";
 import { siteFirstLaunchSteps, type SiteFirstLaunchStep } from "@/domain/launch-studio";
 import type { SiteLaunchPreferences } from "@/domain/site-launch-preferences";
 import { Button } from "@/components/ui/button";
@@ -34,9 +36,11 @@ const steps = ["Your Site", "Network", "Program interests", "Website reveal"] as
 
 /** A lightweight, explicitly private preview. No made-up Program or enrollment
  * release is created by choosing interests; publication remains server-owned. */
-export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",initialPreferences=null,selectionError=null}:{
+export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",initialPreferences=null,selectionError=null,sitePrograms=null,programsState="empty"}:{
   options:Options;selectedSiteId?:string;initialStep?:SiteFirstLaunchStep;
   initialPreferences?:SiteLaunchPreferences|null;selectionError?:string|null;
+  sitePrograms?:Awaited<ReturnType<typeof listLaunches>>["launches"]|null;
+  programsState?:"ready"|"empty"|"unauthorized"|"unavailable";
 }) {
   const router=useRouter();
   const [siteId,setSiteId] = useState(selectedSiteId);
@@ -58,7 +62,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const siteState=known?.planningLocation?.state??state;
 
   function goTo(next:SiteFirstLaunchStep,nextSiteId=siteId) {
-    void router.navigate({to:"/launch/site",search:{siteId:nextSiteId||undefined,step:next},replace:true})
+    void router.navigate({to:"/launch/site",search:{siteId:nextSiteId||undefined,step:next},replace:!selectedSiteId && Boolean(nextSiteId)})
       .catch(()=>setError("Your Site remains saved, but navigation failed. Reload this page to resume."));
   }
   async function saveSite(e:FormEvent) {
@@ -242,6 +246,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
           </details>
         </aside>
       </div>
+      <SiteLaunchActivationPanel siteId={siteId} site={known??null} programs={sitePrograms} readState={programsState}/>
     </section>}
   </PageFrame>;
 }
