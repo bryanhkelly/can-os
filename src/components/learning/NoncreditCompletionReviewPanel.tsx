@@ -34,8 +34,10 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
     },
   });
   const current=query.data?.current;
-  const isValidDecision=!!current && !["unavailable","not_decided"].includes(current.state);
-  const correctionReady=isValidDecision && evidenceVersionId.trim().length===36 &&
+  const isValidDecision=current?.state==="completed" ||
+    current?.state==="not_yet_completed" || current?.state==="voided";
+  const correctionReady=isValidDecision &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(evidenceVersionId.trim()) &&
     reason.trim().length>=10 && !correction.isPending;
   return <section className="space-y-5 border border-border bg-card p-5"
     aria-label="Noncredit completion review">
@@ -69,7 +71,7 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
           <strong>{current?.state==="unavailable"
             ?"Unable to establish valid decision history"
             :current?.state==="not_decided"?"No decision recorded"
-            :current?.outcome.label}</strong>
+            :isValidDecision ? current.outcome.label : "Unavailable"}</strong>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Applicable policy</p>
@@ -92,7 +94,8 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
             </li>)}
           </ol>}
       </section>
-      {isValidDecision && current.state!=="unavailable" && current.state!=="not_decided" &&
+      {isValidDecision && current && current.state!=="unavailable" &&
+        current.state!=="not_decided" &&
       <form className="space-y-3 border-t border-border pt-4" onSubmit={event=>{
         event.preventDefault();
         if(correctionReady) correction.mutate(current.decisionId);
