@@ -110,7 +110,7 @@ export function activityStatus(raw: string | null | undefined): ParticipationSta
     case "pending": case "requested": return "pending";
     case "completed": case "complete": case "approved_complete": return "completed";
     case "withdrawn": case "dropped": return "withdrawn";
-    case "cancelled": case "canceled": case "expired": return "cancelled";
+    case "cancelled": case "canceled": return "cancelled";
     case "waiting": case "waitlisted": return "waitlisted";
     case "invited": return "invited";
     default: return "unknown";
