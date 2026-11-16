@@ -45,8 +45,8 @@ describe("unified Class and Class Offering contract", () => {
   it("separates Class assignment from optional publication",()=>{
     expect(enrollmentNeedsOffering("assignment")).toBe(false);
     expect(enrollmentNeedsOffering("self")).toBe(true);
-    expect(enrollmentNeedsOffering("invitation")).toBe(true);
-    expect(enrollmentNeedsOffering("approval")).toBe(true);
+    expect(enrollmentNeedsOffering("invitation")).toBe(false);
+    expect(enrollmentNeedsOffering("approval")).toBe(false);
   });
   it("requires explicit publisher classification", () => {
     expect(validOfferingProductKind("course",1,false)).toBe(true);
