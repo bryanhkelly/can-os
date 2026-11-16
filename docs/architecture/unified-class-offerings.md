@@ -1,6 +1,6 @@
 # CAN OS unified Class and Class Offering architecture
 
-Status: **design and additive code committed on a feature branch; not applied to a live database**.
+Status: **native replacement model on a feature branch; not applied to a live database**.
 Canonical v3.0.1 remains the governing source of publisher rights, site/operation authority,
 learning identity, progress, school records, registration and completion evidence.
 
@@ -45,10 +45,11 @@ silently amend the published Course. Deployment/adoption, Site readiness, profes
 content rights, safeguarding and any required local approval remain enforceable at each action.
 Student Person/guardian identity and privacy are not derived from network membership.
 
-Academic Section enrollments and noncredit registrations currently have different storage and
-policy enforcement. They become **source adapters** to the common Class Enrollment contract,
-not permanently separate business concepts. Existing official grades, transcripts, consent,
-assessment versions and attendance records must be preserved as authoritative evidence.
+**No backward compatibility is required.** The target is one native Class, Class Offering,
+Class Enrollment, Course Attempt, Outcome and Award model. New commands will not call
+legacy Section or noncredit-registration services, and there are no importers, backfills,
+dual writes, source adapters or fallback endpoints. Existing live data and workflows remain
+unmodified on main until a separately approved replacement deployment.
 
 ## Branch implementation
 
@@ -77,14 +78,14 @@ it is safer to build the model first than to mint unverified grades or awards.
   releases and enrollment methods with transactional capacity locks.
 - Versioned policies must record eligibility, consent, any guardian approval and award intent.
 
-### P0: Unified enrollment commands
-- One enrollment identity with proof of verified Person, Class Offering version and
-  authorizing enrollment mechanism. No separate noncredit learner identity.
-- Source links to academic Section enrollment and noncredit registration must be exact,
-  auditable and idempotent. Reuse the canonical Course attempt rather than duplicating it.
-- Do not automatically migrate legacy course_template_versions by matching names:
-  require publisher-verified canonical Course version mapping.
-- Avoid double counts across a person, Class, Site, registration window or release.
+### P0: Native enrollment commands
+- One Class Enrollment identity with verified Person, Class Offering version and
+  authorized enrollment mechanism, regardless of credit or certification intent.
+- Class Enrollment becomes the source for canonical Course Attempts; remove existing
+  school/noncredit source assumptions in the new authorization and learning paths.
+- No source adapters or legacy Section/noncredit linkage. New learning activity and
+  grading must be driven by Class Enrollment, published Course versions and policy.
+- Enforce capacity, duplicate-active-enrollment and idempotency under transaction locks.
 
 ### P0: Outcomes and credit/credentials
 - Read existing gradebook/assessment/completion evidence as source of results.
@@ -93,12 +94,12 @@ it is safer to build the model first than to mint unverified grades or awards.
   any credit or certificate issuance; retain revocation and corrections as events.
 - A learner may take a credit-eligible Class for audit and receive no academic credit.
 
-### P1: Unified screens and reporting
+### P1: Native screens and reporting
 - Publisher: Course/Program Offerings, approved adoptions.
 - Operator: Classes → Class Offering → Enrollment → Sessions → Outcomes.
 - Learner: Explore Classes; My Classes; Course player; Progress and earned awards.
-- Keep existing /classes, /learn/course and noncredit endpoints compatible until
-  cross-role and cross-Site acceptance is demonstrated.
+- Replace prior pages and services at cutover rather than maintaining dual routes.
+  Old screens continue unchanged on main until the native workflows are proven.
 
 ## Acceptance gates before activation
 
@@ -110,7 +111,7 @@ it is safer to build the model first than to mint unverified grades or awards.
 - Same Class, different recorded instructors; grades and progress remain stable.
 - One Class, multiple publication versions; no duplicate active enrollment, no oversold seats.
 - Revoked Site/adoption blocks new acts without rewriting historic completion and credit.
-- Exact-source gradebook, attendance, prior consent and guardian relationships preserved.
+- New canonical grading, attendance, consent and guardian policy enforcement verified.
 - Pass typecheck, lint, unit/integration, browser E2E and restricted RLS before release.
 
 **Do not run this migration on production or switch live routes to the new tables without
