@@ -118,6 +118,7 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
       opensAt:canonicalClassOfferingVersions.opensAt,
       closesAt:canonicalClassOfferingVersions.closesAt,
       capacity:canonicalClassOfferingVersions.capacity,
+      allowedCreditModes:canonicalClassOfferingVersions.allowedCreditModes,
       consentText:canonicalClassOfferingVersions.consentText,
     }).from(canonicalClassOfferingVersions)
       .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassOfferingVersions.classId))
@@ -189,6 +190,8 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.classId,instance.id),
           inArray(canonicalClassEnrollments.status,["pending","active"])));
+      if(!version.allowedCreditModes.includes(data.creditMode))
+        throw new AuthorizationError("allowed learner credit/audit participation mode");
       if(version.capacity!==null && (occupancy?.total??0)>=version.capacity)
         throw new AuthorizationError("Class is at capacity");
       const consentSha256=createHash("sha256")
