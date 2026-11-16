@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
+import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -188,6 +189,14 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         return {classSessionId:link.id,facilitatedSessionId:room.id,
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,
           alreadyStarted:true};
+      }
+      if(process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true"){
+        const [agenda]=await tx.select({id:classSessionAgendaRevisions.id})
+          .from(classSessionAgendaRevisions).where(and(
+            eq(classSessionAgendaRevisions.classSessionId,link.id),
+            eq(classSessionAgendaRevisions.courseVersionId,instance.courseVersionId),
+          )).limit(1);
+        if(!agenda)throw new AuthorizationError("publish a Course-linked Class Session study plan before opening");
       }
       if(plan.state!=="scheduled"||plan.facilitatedSessionId!==null||
          !canOpenScheduledClassroom(delivery.startsAt,delivery.endsAt,now))
