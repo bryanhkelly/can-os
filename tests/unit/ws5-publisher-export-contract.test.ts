@@ -11,7 +11,7 @@ describe("WS5 publisher composition export and Site launch boundaries",()=>{
     expect(fn).toContain("canonicalOfferingCourses");
     expect(fn).toContain(".orderBy(asc(canonicalOfferingCourses.sequenceNo)");
     expect(fn).toContain(".limit(51)");
-    expect(fn).toContain("if(rows.length>50)");
+    expect(fn).toContain("assertCompletePortableCourseComposition(approved.productDefinition,rows)");
     expect(page).toContain("await getPublisherRolloutTemplate({data:{");
     expect(page).not.toContain("const rows=(options.data??[])");
   });
@@ -25,8 +25,8 @@ describe("WS5 publisher composition export and Site launch boundaries",()=>{
       'eq(deploymentOfferingAdoptions.approvalStatus,"approved")',
       'eq(offeringVersions.id,data.offeringVersionId)',
       'eq(offerings.status,"active")',
-      'eq(courseVersions.lifecycle,"published")',
-      'isNotNull(courseVersions.publishedAt)',
+      'lifecycle:courseVersions.lifecycle',
+      'publishedAt:courseVersions.publishedAt',
     ])expect(fn).toContain(check);
     expect(fn).not.toContain("networkMembership");
     expect(fn).not.toContain("insert(");
@@ -35,8 +35,8 @@ describe("WS5 publisher composition export and Site launch boundaries",()=>{
   it("keeps local Site modes and activation independent from portable instructions",()=>{
     const fn=read("src/modules/classes/unified-class.functions.ts");
     const page=read("src/routes/canonical.classes.tsx");
-    expect(fn).toContain('for(const mode of ["self_paced","facilitated"] as const)');
-    expect(fn).toContain('allowedDeliveryModes.push("scheduled","facilitated","hybrid")');
+    expect(fn).toContain('siteByOperation=new Map');
+    expect(fn).toContain('placementKeys.has(row.deploymentId+":"+id)');
     expect(page).toContain('site.allowedDeliveryModes.includes(deliveryMode)');
     expect(page).toContain('value={siteId} required');
     expect(page).toContain('disabled={busy||!item.siteId}');
