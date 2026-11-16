@@ -250,6 +250,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         id:canonicalClassSessions.id,
         planId:facilitatedClassroomPlans.id,
         state:facilitatedClassroomPlans.state,
+        roomId:facilitatedClassroomPlans.facilitatedSessionId,
         startsAt:canonicalDeliverySessions.startsAt,
         endsAt:canonicalDeliverySessions.endsAt,
         facilitatorPersonId:canonicalClassSessions.facilitatorPersonId,
@@ -272,6 +273,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       const sessions=scheduleRows.slice(0,100).map(row=>({
         id:row.id,
         planId:view==="learn"?null:row.planId,
+        roomId:view==="learn"?null:row.roomId,
         state:row.state,
         startsAt:row.startsAt.toISOString(),
         endsAt:row.endsAt.toISOString(),
