@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { ClassroomProjectorPlayer } from "@/components/learning/ClassroomProjectorPlayer";
+import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
+import { ClassroomPublicPromptControls } from "@/components/learning/ClassroomPublicPromptControls";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { classroomCodeFromFragment } from "@/domain/classroom-connect";
 import { getClassroomPresentationState } from "@/modules/learning/classroom-evidence.functions";
@@ -14,10 +17,14 @@ import { getClassroomPresentationState } from "@/modules/learning/classroom-evid
  */
 export const Route = createFileRoute("/classroom/$sessionId/presentation")({
   head: () => ({ meta: [{ name: "referrer", content: "no-referrer" }] }),
+  validateSearch:(raw:Record<string,unknown>)=>z.object({
+    layout:z.enum(["presentation","single"]).default("presentation"),
+  }).strip().parse(raw),
   component: ClassroomPresentation,
 });
 function ClassroomPresentation() {
   const { sessionId } = Route.useParams();
+  const { layout } = Route.useSearch();
   const [pair, setPair] = useState<{ code: string; expiresAt: string } | null>(null);
   useEffect(() => {
     const hash = window.location.hash;
@@ -74,7 +81,18 @@ function ClassroomPresentation() {
       This room is {state.data.roomState}. The presentation is closed.
     </p>}
     {state.isSuccess && state.data && live && <div className="mx-auto mt-6 grid max-w-screen-2xl gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
-      <div><ClassroomProjectorPlayer facilitatedSessionId={sessionId}/></div>
+      <div className="space-y-4">
+        <ClassroomProjectorPlayer facilitatedSessionId={sessionId}/>
+        {layout==="single"&&<section className="border border-border bg-card p-4">
+          <h2 className="font-serif text-xl font-semibold">One-device classroom controls</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This public-screen mode intentionally excludes learner names, attendance,
+            raw answers, and aggregate results. Facilitate video and questions here.
+          </p>
+          <ClassroomPlaybackControls facilitatedSessionId={sessionId}/>
+          <ClassroomPublicPromptControls facilitatedSessionId={sessionId}/>
+        </section>}
+      </div>
       <aside className="space-y-4">
         {pair ? <section className="border border-border bg-card p-4"
           aria-label="Audience join code and QR">
