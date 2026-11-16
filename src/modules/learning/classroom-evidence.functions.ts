@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   courseLessons, learnerCourseAttempts, noncreditSelfEnrollmentClaims,
+  canonicalClassEnrollments,
   facilitatedLearningParticipants, facilitatedLearningSessions,
   facilitatedRoomActivityReleases, facilitatedRoomActivityResponses,
   facilitatedRoomPresenceEvents,
@@ -19,6 +20,7 @@ import {
   ownedRoom, roomHostIsCurrent, schoolAttemptIsPlacedAtSite,
 } from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
+import { nativeClassForRoom } from "@/modules/classes/native-class-room-boundary.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid = z.string().uuid();
@@ -285,6 +287,32 @@ export const getClassroomHostActivity = createServerFn({ method: "GET" })
       // Historical pairings created before a room was associated with a
       // release are never counted as this cohort's current participants.
       const allowed=new Set(paired.map(p=>p.courseAttemptId));
+      const native=await nativeClassForRoom(tx,room);
+      if(native){
+        // A previously paired learner who transferred, withdrew or lost their
+        // Class Enrollment must disappear from the aggregate denominator.
+        // The Class ID is included BEFORE reading response counts.
+        allowed.clear();
+        const eligible=paired.length?await tx.select({
+          attemptId:learnerCourseAttempts.id,
+          personId:canonicalClassEnrollments.learnerPersonId,
+        }).from(canonicalClassEnrollments)
+          .innerJoin(learnerCourseAttempts,and(
+            eq(learnerCourseAttempts.id,canonicalClassEnrollments.courseAttemptId),
+            eq(learnerCourseAttempts.classEnrollmentId,canonicalClassEnrollments.id),
+            eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+            eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+            eq(learnerCourseAttempts.status,"active"),
+          ))
+          .where(and(
+            eq(canonicalClassEnrollments.classId,native.classId),
+            eq(canonicalClassEnrollments.status,"active"),
+            inArray(learnerCourseAttempts.id,paired.map(p=>p.courseAttemptId)),
+          )):[];
+        const identities=new Set(paired.map(p=>p.courseAttemptId+":"+p.participantPersonId));
+        for(const member of eligible)if(identities.has(member.attemptId+":"+member.personId))
+          allowed.add(member.attemptId);
+      }
       if(releaseScope){
         allowed.clear();
         const claims=paired.length?await tx.select({

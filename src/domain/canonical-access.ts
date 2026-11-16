@@ -27,6 +27,7 @@ const canonicalSiteStaffCapabilities = [
   "noncredit.completion.decide", "noncredit.assessment.finalize",
   "noncredit.assessment.provision",
   "credential.preview", "survey.draft.create", "survey.publish",
+  "class.manage",
 ] as const;
 
 /**

@@ -12,6 +12,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import { noncreditRegistrationRoute } from "@/domain/noncredit-seat-policy";
 import { useHydrated } from "@/lib/use-hydrated";
 import {getMyNoncreditWaitlist,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
+import {findNoncreditEnrollmentAffiliates} from "@/modules/enrollment/noncredit-affiliate-directory.functions";
 
 export const Route=createFileRoute("/learn/enroll")({
   validateSearch:(search:Record<string,unknown>):{release?:string;ref?:string}=>({
@@ -33,6 +34,7 @@ function PublicSelfEnrollment() {
   const {session}=useWorkspaceSession();
   const [accepted,setAccepted]=useState(false);
   const [adult,setAdult]=useState(false);
+  const [networkMembershipId,setNetworkMembershipId]=useState("");
   const [busy,setBusy]=useState(false);
   const [message,setMessage]=useState("");
   const [messageError,setMessageError]=useState(false);
@@ -66,7 +68,7 @@ function PublicSelfEnrollment() {
     hasValidInvitation:invited,
   })==="join_waitlist":false;
   const waitlistLoading=session?.authenticated===true&&session.role!=="student"&&waiting.isPending;
-  useEffect(()=>{setAccepted(false);setAdult(false);setMessage("");setMessageError(false);setEnrolled(null);setWaitlisted(false);},[search.release]);
+  useEffect(()=>{setAccepted(false);setAdult(false);setNetworkMembershipId("");setMessage("");setMessageError(false);setEnrolled(null);setWaitlisted(false);},[search.release]);
 
   const searchParams=new URLSearchParams();
   if(selected)searchParams.set("release",selected.id);
@@ -91,6 +93,7 @@ function PublicSelfEnrollment() {
           releaseId:selected.id,consentVersion:selected.consentVersion,
           consentSha256:selected.consentSha256,acceptedConsent:true,adultConfirmed:true,
           ...(search.ref?{referralCode:search.ref}:{}),
+          ...(networkMembershipId?{networkMembershipId}:{}),
         }});
         setEnrolled(result);
         setMessage(result.alreadyEnrolled?"You are already registered for this course.":
@@ -170,7 +173,8 @@ function PublicSelfEnrollment() {
           enrolled={enrolled} message={message} messageError={messageError} waitlisted={waitlisted}
           waitlistLoading={waitlistLoading} isStudent={session?.authenticated===true&&session.role==="student"}
           joinQueue={joinQueue} invited={invited} waitlistStatus={myWaitlist?.status??null}
-          onAccepted={setAccepted} onAdult={setAdult} onSubmit={()=>void submit()}/>}
+          onAccepted={setAccepted} onAdult={setAdult} onMembershipChange={setNetworkMembershipId}
+          onSubmit={()=>void submit()}/>}
       </div>
       <aside className="border border-border bg-card p-5 self-start">
         <h2 className="font-serif text-xl">One learner, one record</h2>
@@ -191,11 +195,12 @@ function PublicSelfEnrollment() {
   </WorkspaceShell>;
 }
 
-function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,message,messageError,waitlisted,waitlistLoading,isStudent,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onSubmit}:{
+function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,message,messageError,waitlisted,waitlistLoading,isStudent,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onMembershipChange,onSubmit}:{
   release:Release;signedIn:boolean;returnTo:string;accepted:boolean;adult:boolean;busy:boolean;
   enrolled:{courseAttemptId:string;alreadyEnrolled:boolean}|null;message:string;messageError:boolean;
   waitlisted:boolean;waitlistLoading:boolean;isStudent:boolean;joinQueue:boolean;invited:boolean;waitlistStatus:string|null;
-  onAccepted:(value:boolean)=>void;onAdult:(value:boolean)=>void;onSubmit:()=>void;
+  onAccepted:(value:boolean)=>void;onAdult:(value:boolean)=>void;
+  onMembershipChange:(value:string)=>void;onSubmit:()=>void;
 }) {
   const hydrated=useHydrated();
   return <section className="border border-border bg-card p-5" aria-labelledby="enroll-course-heading">
@@ -221,6 +226,7 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
         <p className="mt-2 text-sm text-muted-foreground">No dated meetings have been attached to this cohort. Ask the hosting Site for its schedule before registering.</p>}
       {release.schedulePartial&&<p className="mt-2 text-xs text-muted-foreground">Additional meeting dates are available from the Site.</p>}
     </section>}
+    {signedIn&&!isStudent&&<AffiliateAttributionSelector releaseId={release.id} onMembershipChange={onMembershipChange}/>}
     <div className="mt-5 border-t border-border pt-5">
       <h3 className="text-sm font-semibold">Participation and data-use terms · {release.consentVersion}</h3>
       <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{release.consentText}</p>
@@ -263,5 +269,49 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
         Go to my courses
       </Link>
     </div>}
+  </section>;
+}
+
+/** Affiliation is optional, explicitly self-reported, and distinct from the
+ * authorized delivery Site. Never infer it from a favorite or referral link. */
+function AffiliateAttributionSelector({releaseId,onMembershipChange}:{
+  releaseId:string;onMembershipChange:(value:string)=>void;
+}){
+  const [term,setTerm]=useState("");
+  const [choice,setChoice]=useState("");
+  const results=useQuery({
+    queryKey:["enrollment-affiliate-directory",releaseId,term.trim()],
+    queryFn:()=>findNoncreditEnrollmentAffiliates({data:{releaseId,query:term.trim()}}),
+    enabled:term.trim().length>=2,retry:false,staleTime:60_000,
+  });
+  return <section className="mt-5 border-t border-border pt-4" aria-label="Optional local organization attribution">
+    <h3 className="text-sm font-semibold">Representing a local organization? (optional)</h3>
+    <p className="mt-2 text-xs leading-5 text-muted-foreground">
+      You can credit a participating church or community organization while taking this
+      course online. This is your own statement, not proof of individual membership.
+      Leave this blank to record your participation at the provider's Site.
+    </p>
+    <label htmlFor="affiliate-search" className="mt-3 block text-sm font-medium">
+      Search approved participating organizations
+    </label>
+    <input id="affiliate-search" type="search" value={term}
+      onChange={event=>{setTerm(event.target.value);setChoice("");onMembershipChange("");}}
+      placeholder="Organization or church name" maxLength={80}
+      className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+    {results.isError&&term.trim().length>=2&&
+      <p className="mt-2 text-xs" role="alert">The affiliate directory is unavailable. You can register without local attribution.</p>}
+    {results.data&&<label htmlFor="affiliate-choice" className="mt-3 block text-sm font-medium">
+      Select your organization
+      <select id="affiliate-choice" value={choice} className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+        onChange={event=>{setChoice(event.target.value);onMembershipChange(event.target.value);}}>
+        <option value="">National / provider Site (no local affiliation)</option>
+        {results.data.items.map(item=><option key={item.id} value={item.id}>
+          {item.organizationName} · {item.reportingUnitName}
+        </option>)}
+      </select>
+    </label>}
+    {results.data?.hasMore&&<p className="mt-2 text-xs text-muted-foreground">
+      Refine the organization search to see more matches.
+    </p>}
   </section>;
 }

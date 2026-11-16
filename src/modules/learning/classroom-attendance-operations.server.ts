@@ -1,8 +1,9 @@
 /** Exact-Site and exact-release learner check, never client-importable. */
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { enrollments, noncreditSelfEnrollmentClaims, learnerCourseAttempts, learnerProfiles, noncreditRegistrations } from "@/db/canonical-v301";
+import { enrollments, noncreditSelfEnrollmentClaims, learnerCourseAttempts, learnerProfiles, noncreditRegistrations, canonicalClassEnrollments } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { nativeClassForRoom, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
 import { assignedClassroomRelease, attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
 import { ownedRoom, schoolAttemptIsPlacedAtSite, selfEnrolledNoncreditRoomSitePermitted } from "./facilitated-learning-operations.server";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -20,8 +21,22 @@ export async function registeredRoomParticipant(
     eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
     eq(learnerCourseAttempts.status,"active"),
   )).limit(1);
-  if(!attempt||Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId))
-    throw new AuthorizationError("current registered classroom Course attempt");
+  if(!attempt)throw new AuthorizationError("current registered classroom Course attempt");
+  const native=await nativeClassForRoom(tx,room);
+  if(native){
+    if(!attempt.classEnrollmentId)throw new AuthorizationError("native Class Course Attempt required");
+    const [member]=await tx.select({personId:canonicalClassEnrollments.learnerPersonId})
+      .from(canonicalClassEnrollments).where(and(
+        eq(canonicalClassEnrollments.id,attempt.classEnrollmentId),
+        eq(canonicalClassEnrollments.classId,native.classId),
+      )).limit(1);
+    if(!member||!await nativeClassRoomParticipant(tx,room,attempt.id,member.personId))
+      throw new AuthorizationError("enrolled learner in the exact native Class");
+    return {personId:member.personId,source:"class" as const};
+  }
+  if(attempt.classEnrollmentId||
+     Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId))
+    throw new AuthorizationError("native Class cannot use an unbound Course/Site room");
   if(attempt.enrollmentId){
     if(releaseId)throw new AuthorizationError("noncredit enrollment release participant");
     const [school]=await tx.select({

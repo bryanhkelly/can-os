@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
+import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
 import { CanonicalLearningActivityProvider, DisabledCanonicalLearningActivityProvider, useCanonicalLearningActivity } from "@/components/learning/CanonicalLearningTracker";
 import { getCanonicalLearningReleaseAvailability } from "@/modules/learning/canonical-learning-release.functions";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
@@ -32,29 +33,35 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
  * enrollment, official assignments, or grades. Lesson completion updates only
  * the canonical Course-attempt progress shared across recorded presenters.
  */
-export function RecordedInstructorWorkspace({ courseAttemptId }: { courseAttemptId: string }) {
+export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", initialLessonId }: {
+  courseAttemptId: string; mode?: "training" | "native";initialLessonId?:string|null;
+}) {
   const release = useQuery({
     queryKey: ["canonical-learning-release"],
     queryFn: () => getCanonicalLearningReleaseAvailability(),
     staleTime: 60_000,
     retry: false,
   });
-  const enabled = release.data?.activity === true;
-  const facilitatedEnabled = release.data?.facilitated === true;
+  // Native Course Attempts use the same recorded track, lesson and practice
+  // services. Optional activity/room telemetry remains disabled until native
+  // session and facilitated-room scope policies are independently proven.
+  const enabled = mode === "training" && release.data?.activity === true;
+  const facilitatedEnabled = mode === "training" && release.data?.facilitated === true;
   // Always preserve independent course enrollment, progress and assessments.
   // A missing release-status response fails closed for optional telemetry.
   if (enabled) return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled facilitatedEnabled={facilitatedEnabled}/>
+      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
   </CanonicalLearningActivityProvider>;
   return <DisabledCanonicalLearningActivityProvider key={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled={false} facilitatedEnabled={facilitatedEnabled}/>
+      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
   </DisabledCanonicalLearningActivityProvider>;
 }
 
-function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled }: {
+function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode, initialLessonId }: {
   courseAttemptId: string; activityEnabled: boolean; facilitatedEnabled: boolean;
+  mode: "training" | "native";initialLessonId?:string|null;
 }) {
   const { selectLesson, observe, observeNativeVideo } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
@@ -93,6 +100,14 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
       ).message))
       .finally(() => setLoading(false));
   }, [reload]);
+
+  // A deep link may select a published lesson, but it never changes
+  // the learner's saved instructor, evidence or completion state.
+  useEffect(()=>{
+    if(initialLessonId && instruction?.lessons.some(lesson=>lesson.id===initialLessonId)){
+      setLessonId(initialLessonId);
+    }
+  },[initialLessonId,instruction]);
 
   async function selectTeacher(trackVersionId: string) {
     if (!catalog || pending) return;
@@ -240,13 +255,17 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
             ariaLabel="Recorded course lesson completion"
             description="Recorded teacher selection never resets course progress. Lesson completion alone is not a grade, noncredit attendance, or certificate." />
         </div>
-        <nav aria-label="Recorded course lessons" className="mt-3 flex flex-wrap gap-2">
-          {instruction.lessons.map(lesson => <Button key={lesson.id} size="sm"
-            variant={currentLesson?.id === lesson.id ? "secondary" : "outline"}
-            onClick={() => { setLessonId(lesson.id); setAnswers({}); }}>
-            {lesson.title}{lesson.progress?.status === "completed" ? " ✓" : ""}
-          </Button>)}
-        </nav>
+        <div className="mt-3 max-h-96 overflow-y-auto">
+          <UnifiedLessonOutline selectedId={currentLesson?.id}
+            lessons={instruction.lessons.map(lesson=>({
+              id:lesson.id,title:lesson.title,
+              status:lesson.progress?.status==="completed"?"completed":
+                lesson.progress?.status==="waived"?"waived":"not_started",
+            }))}
+            label="Recorded course lessons"
+            renderAction={item=><button type="button" className="text-left underline-offset-2 hover:underline"
+              onClick={()=>{setLessonId(item.id);setAnswers({});}}>{item.title}</button>}/>
+        </div>
       </div>
 
       {currentLesson && <div className="space-y-4">
@@ -326,8 +345,8 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
     </>}
 
     {history.length > 0 && <RecordedPracticeHistory history={history}/>}
-    <NoncreditCourseActivities courseAttemptId={courseAttemptId}
-      lessonProgressRevision={lessonProgressRevision}/>
+    {mode === "training" && <NoncreditCourseActivities courseAttemptId={courseAttemptId}
+      lessonProgressRevision={lessonProgressRevision}/>}
     {activityEnabled && <CanonicalCourseEvidencePanel courseAttemptId={courseAttemptId}/>}
   </section>;
 }

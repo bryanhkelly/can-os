@@ -6,6 +6,7 @@ import {
   noncreditSelfEnrollmentReleases,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Room=typeof facilitatedLearningSessions.$inferSelect;
@@ -50,6 +51,15 @@ export async function attemptInAssignedClassroomRelease(
   tx:Tx,room:Room,courseAttemptId:string,participantPersonId:string,
   resolvedRelease?:string|null,
 ):Promise<boolean>{
+  // Native Class rooms can never use the old Course/Site or noncredit
+  // enrollment-release fallback. Check Class Enrollment and current adoption.
+  try {
+    if(await nativeClassRoomParticipant(tx,room,courseAttemptId,participantPersonId))
+      return true;
+  }catch(e){
+    if(e instanceof AuthorizationError)return false;
+    throw e;
+  }
   const releaseId=resolvedRelease===undefined
     ?await assignedClassroomRelease(tx,room):resolvedRelease;
   if(!releaseId)return true;

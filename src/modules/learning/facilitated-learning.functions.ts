@@ -1,5 +1,7 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
+import { nativeClassForRoom, assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
+import { assertCurrentNativeClassFacilitatorSession } from "@/modules/classes/native-class-facilitator-session.server";
 import { createServerFn } from "@tanstack/react-start";
 import { digestCode, generatePairingCode, displayCode, recordRoomAuditAndEvent, roomHostIsCurrent, schoolAttemptIsPlacedAtSite, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost, selfEnrolledNoncreditRoomSitePermitted } from "./facilitated-learning-operations.server";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -193,22 +195,22 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
       const choices=versions.flatMap(version=>visible.filter(row=>
         row.deploymentId===version.deploymentId,
       ).map(site=>({...version,siteId:site.siteId,deploymentName:site.deploymentName})));
-      const rooms=await tx.select({
-        id:facilitatedLearningSessions.id,
-        deploymentId:facilitatedLearningSessions.deploymentId,
-        courseVersionId:facilitatedLearningSessions.courseVersionId,
-        siteId:facilitatedLearningSessions.siteId,
-        state:facilitatedLearningSessions.state,
-        startedAt:facilitatedLearningSessions.startedAt,
-        pairingExpiresAt:facilitatedLearningSessions.pairingExpiresAt,
-        endedAt:facilitatedLearningSessions.endedAt,
-      }).from(facilitatedLearningSessions).where(and(
+      const rooms=await tx.select().from(facilitatedLearningSessions).where(and(
         eq(facilitatedLearningSessions.hostOrganizationId,host.organizationId),
         eq(facilitatedLearningSessions.facilitatorPersonId,host.actor.actorPersonId!),
         inArray(facilitatedLearningSessions.siteId,host.siteIds),
       )).orderBy(desc(facilitatedLearningSessions.startedAt)).limit(30);
-      const authorizedRooms=rooms.filter(room=>visible.some(
-        choice=>choice.deploymentId===room.deploymentId&&choice.siteId===room.siteId));
+      const authorizedRooms:typeof rooms=[];
+      for(const room of rooms){
+        if(!visible.some(choice=>
+          choice.deploymentId===room.deploymentId&&choice.siteId===room.siteId))continue;
+        try {
+          await assertNativeClassRoomStaff(tx,room);
+          authorizedRooms.push(room);
+        }catch(e){
+          if(!(e instanceof AuthorizationError))throw e;
+        }
+      }
       const ids=authorizedRooms.map(room=>room.id);
       const counts=ids.length ? await tx.select({
         id:facilitatedLearningParticipants.facilitatedSessionId,
@@ -285,6 +287,8 @@ export const endFacilitatedLearningRoom = createServerFn({method:"POST"})
     const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
+      if(await nativeClassForRoom(tx,room))
+        await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
       if(room.state==="ended")return {ended:true,alreadyEnded:true};
       await tx.update(facilitatedLearningSessions)
         .set({state:"ended",endedAt:new Date()})
@@ -378,7 +382,8 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
       if (attempt.source==="school" && !await schoolAttemptIsPlacedAtSite(
         tx,attempt.courseAttemptId,room.deploymentId,room.siteId,now,
       )) return null;
-      if (!await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId)) return null;
+      if(attempt.source!=="class" &&
+        !await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId))return null;
       if(!await attemptInAssignedClassroomRelease(
         tx,room,attempt.courseAttemptId,personId,
       )) return null;
@@ -473,7 +478,8 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
         if(access.source==="school" && !await schoolAttemptIsPlacedAtSite(
           tx,access.courseAttemptId,row.deploymentId,row.siteId,now,
         ))continue;
-        if(!await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
+        if(access.source!=="class" &&
+          !await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
         if(!await attemptInAssignedClassroomRelease(
           tx,room,access.courseAttemptId,actor.actorPersonId!,
         ))continue;

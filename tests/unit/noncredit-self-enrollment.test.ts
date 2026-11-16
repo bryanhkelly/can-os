@@ -15,7 +15,7 @@ const publication = {
   trainingVersionId: trainingId,
   courseVersionId: courseId,
   deliveryMode: "independent" as const,
-  siteId: null,
+  siteId: adoptionId,
   opensAt: "2026-11-14T18:00:00Z",
   closesAt: "2026-12-14T18:00:00Z",
   maxParticipants: 100,
@@ -33,10 +33,12 @@ const eligible = {
 };
 
 describe("Noncredit adult self-enrollment authority", () => {
-  it("publishes only bounded windows and valid facilitated Site choices", () => {
+  it("publishes only bounded windows and authorized Site choices for either mode", () => {
     expect(noncreditPublishCommand.parse(publication).deliveryMode).toBe("independent");
+    expect(noncreditPublishCommand.safeParse({...publication,siteId:null}).success).toBe(false);
+    expect(noncreditPublishCommand.safeParse({...publication,siteId:undefined}).success).toBe(false);
     expect(noncreditPublishCommand.safeParse({
-      ...publication, deliveryMode: "facilitated",
+      ...publication, deliveryMode: "facilitated",siteId:null,
     }).success).toBe(false);
     expect(noncreditPublishCommand.safeParse({
       ...publication, deliveryMode: "facilitated", siteId: adoptionId,

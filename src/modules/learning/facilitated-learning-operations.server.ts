@@ -4,10 +4,11 @@
 import { randomInt, createHmac } from "node:crypto";
 import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants, contentAssetVersions, courseLessons, courseVersions, enrollments, learnerProfiles, noncreditRegistrations, noncreditTrainingVersions, deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses, domainEvents, educationOperationOrganizationRoles, educationOperationSites, facilitatedLearningParticipants, facilitatedLearningSessions, learnerCourseAttempts, programDeployments, classroomDeploymentSites, classroomEnrollmentSitePlacements, siteOrganizationRoles, trackLessonPresentations, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
+import { auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants, contentAssetVersions, courseLessons, courseVersions, enrollments, learnerProfiles, canonicalClassEnrollments, noncreditRegistrations, noncreditTrainingVersions, deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses, domainEvents, educationOperationOrganizationRoles, educationOperationSites, facilitatedLearningParticipants, facilitatedLearningSessions, learnerCourseAttempts, programDeployments, classroomDeploymentSites, classroomEnrollmentSitePlacements, siteOrganizationRoles, trackLessonPresentations, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { facilitatedCodeAlphabet, facilitatedCodeLength, facilitatedPairingWindowMs, facilitatedRoomOperationalState, roomMediaAudienceEligible } from "@/domain/facilitated-learning";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
+import { assertNativeClassRoomStaff, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Host = Awaited<ReturnType<typeof requireCanonicalFacilitator>>;
@@ -163,7 +164,14 @@ export async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSe
       eq(canonicalAccountGrants.active,true),
       isNull(canonicalAccountGrants.revokedAt),
     )).limit(1);
-  return !!grant;
+  if(!grant)return false;
+  try {
+    await assertNativeClassRoomStaff(tx,room);
+  }catch(error){
+    if(error instanceof AuthorizationError)return false;
+    throw error;
+  }
+  return true;
 }
 export async function schoolAttemptIsPlacedAtSite(
   tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,
@@ -199,6 +207,7 @@ export async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   if(!room) throw new AuthorizationError("owned facilitated learning room");
   const access = await authorizedHostDeployment(tx,host,room.deploymentId,room.siteId);
   if(access.siteId!==room.siteId) throw new AuthorizationError("current Site hosting authority");
+  await assertNativeClassRoomStaff(tx,room);
   return room;
 }
 export function assertRoomLive(room: typeof facilitatedLearningSessions.$inferSelect, now:Date) {
@@ -243,6 +252,43 @@ export async function currentRoomMediaAudience(
   tx: Tx,
   room: typeof facilitatedLearningSessions.$inferSelect,
 ): Promise<Array<typeof learnerCourseAttempts.$inferSelect>> {
+  const nativeClass=await assertNativeClassRoomStaff(tx,room);
+  if(nativeClass){
+    // Approved native Class lessons can start before a learner scans the QR.
+    // Recording rights come from enrolled people in this exact Class,
+    // never a different Class sharing the same Course, Site or Deployment.
+    const candidates=await tx.select({
+      attempt:learnerCourseAttempts,
+      personId:canonicalClassEnrollments.learnerPersonId,
+    }).from(canonicalClassEnrollments)
+      .innerJoin(learnerCourseAttempts,and(
+        eq(learnerCourseAttempts.id,canonicalClassEnrollments.courseAttemptId),
+        eq(learnerCourseAttempts.classEnrollmentId,canonicalClassEnrollments.id),
+        eq(learnerCourseAttempts.courseVersionId,nativeClass.courseVersionId),
+        eq(learnerCourseAttempts.deploymentId,nativeClass.deploymentId),
+        eq(learnerCourseAttempts.adoptionId,nativeClass.adoptionId),
+        eq(learnerCourseAttempts.offeringVersionId,nativeClass.offeringVersionId),
+        eq(learnerCourseAttempts.status,"active"),
+        isNull(learnerCourseAttempts.enrollmentId),
+        isNull(learnerCourseAttempts.noncreditRegistrationId),
+      )).where(and(
+        eq(canonicalClassEnrollments.classId,nativeClass.classId),
+        eq(canonicalClassEnrollments.status,"active"),
+      )).limit(501);
+    if(candidates.length>500)
+      throw new AuthorizationError("bounded native Class audience for recording rights");
+    const adoptions=new Map<string,typeof learnerCourseAttempts.$inferSelect>();
+    for(const candidate of candidates){
+      // The SQL join verifies exact active Class/Attempt identity for every
+      // candidate. Run the more expensive authority guard once per distinct
+      // adoption, rather than once for each learner on every 2.5s poll.
+      if(!adoptions.has(candidate.attempt.adoptionId)){
+        await nativeClassRoomParticipant(tx,room,candidate.attempt.id,candidate.personId);
+        adoptions.set(candidate.attempt.adoptionId,candidate.attempt);
+      }
+    }
+    return [...adoptions.values()];
+  }
   const paired = await tx.select({
     attempt: learnerCourseAttempts,
     participantPersonId: facilitatedLearningParticipants.participantPersonId,
@@ -261,9 +307,15 @@ export async function currentRoomMediaAudience(
   for (const { attempt, participantPersonId } of paired) {
     let sourceCurrent = false;
     let currentRoomSitePlacement = false;
-    if (Boolean(attempt.enrollmentId) === Boolean(attempt.noncreditRegistrationId))
+    if (!attempt.classEnrollmentId &&
+        Boolean(attempt.enrollmentId) === Boolean(attempt.noncreditRegistrationId))
       throw new AuthorizationError("single current Course participation source");
-    if (attempt.enrollmentId) {
+    if (attempt.classEnrollmentId) {
+      const native=await nativeClassRoomParticipant(
+        tx,room,attempt.id,participantPersonId);
+      sourceCurrent=!!native;
+      currentRoomSitePlacement=!!native;
+    } else if (attempt.enrollmentId) {
       const [school] = await tx.select({ id: enrollments.id }).from(enrollments)
         .innerJoin(learnerProfiles, eq(enrollments.learnerId, learnerProfiles.id))
         .where(and(
@@ -420,9 +472,12 @@ export async function createFacilitatedRoomForHost(
  * without creating a second registration or resetting learning progress.
  */
 export async function selfEnrolledNoncreditRoomSitePermitted(
-  tx:Tx, access:{source:"school"|"noncredit";noncreditRegistrationId:string|null},
+  tx:Tx, access:{source:"school"|"noncredit"|"class";noncreditRegistrationId:string|null},
   roomSiteId:string,
 ):Promise<boolean> {
+  // Exact native Class→Session scope is checked elsewhere; never reuse a
+  // provider-wide noncredit Site claim as Class room authorization.
+  if(access.source==="class")return false;
   if(access.source!=="noncredit"||!access.noncreditRegistrationId)return true;
   try {
     const [claim]=await tx.select({siteId:noncreditSelfEnrollmentClaims.siteId})

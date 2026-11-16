@@ -13,7 +13,7 @@ export const noncreditSelfEnrollmentReleases = educationV30.table("noncredit_sel
   courseVersionId: uuid("course_version_id").notNull(),
   providerOrganizationId: uuid("provider_organization_id").notNull(),
   registeringOrganizationId: uuid("registering_organization_id").notNull(),
-  siteId: uuid("site_id"),
+  siteId: uuid("site_id").notNull(),
   deliveryMode: text("delivery_mode").$type<"independent"|"facilitated">().notNull(),
   status: text("status").$type<"published"|"closed">().notNull().default("published"),
   opensAt: timestamp("opens_at",{withTimezone:true}).notNull(),
@@ -35,7 +35,7 @@ export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_
   registrationId: uuid("registration_id").notNull(),
   participantPersonId: uuid("participant_person_id").notNull(),
   canonicalAccountId: uuid("canonical_account_id").notNull(),
-  siteId: uuid("site_id"),
+  siteId: uuid("site_id").notNull(),
   consentVersion: text("consent_version").notNull(),
   consentSha256: text("consent_sha256").notNull(),
   adultAttested: boolean("adult_attested").notNull(),
@@ -104,6 +104,7 @@ export const canonicalOfferingCourses = educationV30.table("offering_courses", {
 export const canonicalEnrollmentSites = educationV30.table("sites", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
+  timeZone: text("time_zone").notNull(),
   status: text("status").notNull(),
 });
 export const canonicalEnrollmentOrganizations = educationV30.table("organizations", {

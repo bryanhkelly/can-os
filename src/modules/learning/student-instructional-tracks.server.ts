@@ -26,6 +26,7 @@ import {
   instructionalTrackVersions,
   courseVersions,
   learnerCourseAttempts,
+  canonicalClassEnrollments,
   learnerLessonProgress,
   learnerProfiles,
   learnerTrackSelections,
@@ -148,6 +149,35 @@ async function loadAuthorizedParticipant(
   ) {
     throw new DomainError("UNAVAILABLE", "Active course participation is unavailable.");
   }
+  // Native Classes use the same recorded teacher/lesson/practice services.
+  // The Course Attempt's verified Class Enrollment is the sole learner source.
+  if (attempt.classEnrollmentId) {
+    // Native student and learner sessions must pass the SAME current
+    // Course/Deployment/Adoption/Site gate before a presenter is disclosed.
+    if (context.role !== "learner") {
+      await authorizeCanonicalCourseAttempt(tx,context,attempt.id,allowCompletedHistory);
+    }
+    assertLearningParticipantRole(context, "learner");
+    const [native] = await tx.select().from(canonicalClassEnrollments)
+      .where(eq(canonicalClassEnrollments.id,attempt.classEnrollmentId))
+      .limit(1);
+    if (!native || native.learnerPersonId !== context.actorPersonId ||
+        native.courseAttemptId !== attempt.id ||
+        (native.status !== "active" && !(allowCompletedHistory && native.status === "completed"))) {
+      throw new AuthorizationError("current own Class Enrollment");
+    }
+    // A recorded presenter never changes the Class Enrollment, credit
+    // selection, official results, or canonical Course Attempt.
+    const [profile] = await tx.select().from(learnerProfiles)
+      .where(eq(learnerProfiles.personId,native.learnerPersonId))
+      .limit(1);
+    return {attempt,participant:{
+      selectionSource:"learner",
+      participantPersonId:native.learnerPersonId,
+      learnerId:profile?.id??null,
+    }};
+  }
+
   if (attempt.sectionId) assertSectionScope(context, attempt.sectionId);
 
   if (attempt.enrollmentId) {
@@ -711,25 +741,25 @@ export async function readSelectedInstructionalTrack(
       conflict("The instructional policy changed after track selection.");
     }
 
-    const [lessons, progress] = await Promise.all([
-      tx.select({
-        id: courseLessons.id,
-        courseUnitId: courseLessons.courseUnitId,
-        title: courseLessons.title,
-        lessonOrder: courseLessons.lessonOrder,
-      }).from(courseLessons)
-        .where(eq(courseLessons.courseVersionId, attempt.courseVersionId))
-        .orderBy(courseLessons.lessonOrder),
-      tx.select({
-        lessonId: learnerLessonProgress.lessonId,
-        status: learnerLessonProgress.status,
-        observedAt: learnerLessonProgress.observedAt,
-      }).from(learnerLessonProgress)
-        .where(and(
-          eq(learnerLessonProgress.courseAttemptId, attempt.id),
-          eq(learnerLessonProgress.courseVersionId, attempt.courseVersionId),
-        )),
-    ]);
+    // Neon transactional Pool connections do not promise concurrent query
+    // execution. Keep the Class lesson and progress reads sequential.
+    const lessons = await tx.select({
+      id: courseLessons.id,
+      courseUnitId: courseLessons.courseUnitId,
+      title: courseLessons.title,
+      lessonOrder: courseLessons.lessonOrder,
+    }).from(courseLessons)
+      .where(eq(courseLessons.courseVersionId, attempt.courseVersionId))
+      .orderBy(courseLessons.lessonOrder);
+    const progress = await tx.select({
+      lessonId: learnerLessonProgress.lessonId,
+      status: learnerLessonProgress.status,
+      observedAt: learnerLessonProgress.observedAt,
+    }).from(learnerLessonProgress)
+      .where(and(
+        eq(learnerLessonProgress.courseAttemptId, attempt.id),
+        eq(learnerLessonProgress.courseVersionId, attempt.courseVersionId),
+      ));
     const recordedLessons = projectRecordedCourseLessons({
       lessons,
       progress,

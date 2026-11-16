@@ -7,6 +7,7 @@ import {
   auditEvents, canonicalDeliverySessions, classroomDeploymentSites,
   classroomOfferingCourses, courseVersions, deploymentOfferingAdoptions,
   domainEvents, facilitatedClassroomPlans, offeringVersions,
+  canonicalClassSessions, canonicalClassStaffAssignments,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import {
@@ -104,6 +105,24 @@ async function ownedPlan(tx:Tx,host:Host,planId:string,lock=false){
     row.plan.siteId!==row.delivery.siteId)
     throw new AuthorizationError("current owned classroom plan");
   await authorizedHostDeployment(tx,host,row.plan.deploymentId,row.plan.siteId);
+  // When a delivery plan belongs to a native Class, ownership of the Site and
+  // old plan alone is insufficient to change its schedule or start its room.
+  const [native]=await tx.select({classId:canonicalClassSessions.classId})
+    .from(canonicalClassSessions)
+    .where(eq(canonicalClassSessions.classroomPlanId,row.plan.id)).limit(1);
+  if(native){
+    const now=new Date();
+    const [current]=await tx.select({id:canonicalClassStaffAssignments.id})
+      .from(canonicalClassStaffAssignments).where(and(
+        eq(canonicalClassStaffAssignments.classId,native.classId),
+        eq(canonicalClassStaffAssignments.personId,host.actor.actorPersonId!),
+        eq(canonicalClassStaffAssignments.state,"approved"),
+        lte(canonicalClassStaffAssignments.beginsAt,now),
+        or(isNull(canonicalClassStaffAssignments.endsAt),
+          gt(canonicalClassStaffAssignments.endsAt,now)),
+      )).limit(1);
+    if(!current)throw new AuthorizationError("current Class teaching assignment for this delivery plan");
+  }
   return row;
 }
 export const getClassroomSchedule=createServerFn({method:"GET"})
@@ -142,7 +161,7 @@ export const getClassroomSchedule=createServerFn({method:"GET"})
     });
   });
 type ScheduleCommand=z.infer<typeof scheduleInput>;
-async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,now:Date){
+export async function scheduleOneClassroom(tx:Tx,host:Host,data:ScheduleCommand,now:Date){
   const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
   validateClassroomTimes(startsAt,endsAt,now);
   const deploymentSiteId=await approvedSiteCourse(
@@ -274,6 +293,13 @@ export const openScheduledClassroom=createServerFn({method:"POST"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const {plan,delivery}=await ownedPlan(tx,host,data.planId,true);
+      const [native]=await tx.select({id:canonicalClassSessions.id})
+        .from(canonicalClassSessions)
+        .where(eq(canonicalClassSessions.classroomPlanId,plan.id)).limit(1);
+      // Native Class-controlled playback requires exact Class Session audience
+      // enforcement across pairing, media and attendance. Never fall back to
+      // the old deployment/Course/Site room authorization.
+      if(native)throw new AuthorizationError("native Class room controls are not yet released");
       if(plan.state==="started" && plan.facilitatedSessionId)
         return {facilitatedSessionId:plan.facilitatedSessionId,
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,

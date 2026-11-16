@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowRight, BookOpen, Globe2, ShieldCheck, Users, CalendarDays, GraduationCap } from "lucide-react";
 import type { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
+import { SiteNativeClassHandoff } from "./SiteNativeClassHandoff";
 
 type Site=Awaited<ReturnType<typeof listLaunchOptions>>["sites"][number];
 type Program=Awaited<ReturnType<typeof listLaunches>>["launches"][number];
@@ -74,6 +75,7 @@ export function SiteLaunchActivationPanel({siteId,site,programs,readState}:{
       <Link to="/canonical/blueprints" search={{}} className="inline-flex min-h-11 items-center gap-2 border px-4 py-3 text-sm font-semibold text-primary">Plan approved offerings <ArrowRight className="size-4"/></Link>
       <Link to="/programs/noncredit/enrollment" search={{publicSiteId:siteId}} className="inline-flex min-h-11 items-center gap-2 border px-4 py-3 text-sm font-semibold text-primary">Configure noncredit enrollment <ArrowRight className="size-4"/></Link>
     </div>
+    <SiteNativeClassHandoff publicSiteId={siteId}/>
     <p className="mt-4 text-xs text-muted-foreground">The native Blueprint workspace requires separately verified canonical Site authority. Private interests do not grant a Program license, adoption, release or permission to enroll.</p>
   </section>;
 }

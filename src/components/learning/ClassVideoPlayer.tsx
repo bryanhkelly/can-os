@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { resolveClassVideo, safeClassVideoSourceLink } from "@/domain/class-video";
+import { ClassroomMediaSurface } from "@/components/learning/ClassroomMediaSurface";
 import { normalizeClientError } from "@/lib/client-error";
 import { Play, VideoOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -138,19 +139,17 @@ function ClassVideoPlayerSession({ title, url, loadUrl, resourceId, declaredVide
           ? "This video source is not supported for embedded playback. Use the source link below."
           : "This video source is unavailable or unsafe. Ask your school to replace the link."
         : "No video recording has been attached."}/>}
-    {source && video?.kind === "embed" && <iframe src={video.src} title={title}
-      className="aspect-video w-full rounded border" allow="fullscreen; picture-in-picture; encrypted-media"
-      allowFullScreen referrerPolicy="no-referrer" />}
-    {source && video?.kind === "file" && <video ref={attachPlayer} key={`${source}:${playbackRevision}`} src={video.src} controls playsInline
-      preload="metadata" aria-label={title} className="aspect-video w-full rounded bg-black"
+    {source && video && <ClassroomMediaSurface key={source+":"+playbackRevision}
+      video={video} title={title} videoRef={attachPlayer}
+      iframeClassName="aspect-video w-full rounded border"
+      videoClassName="aspect-video w-full rounded bg-black"
       onLoadedMetadata={event => setReady(Number.isFinite(event.currentTarget.duration))}
       onRateChange={event => setSpeed(event.currentTarget.playbackRate)}
       onPlay={() => { if (resourceId) onPlaybackEvent?.("video_played", resourceId); }}
       onEnded={() => { if (resourceId) onPlaybackEvent?.("video_ended", resourceId); }}
       onPause={event => { if (resourceId && !event.currentTarget.ended) onPlaybackEvent?.("video_paused", resourceId); }}
-      onError={() => { setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}>
-      Your browser does not support video playback.
-    </video>}
+      onError={() => { setReady(false); setError("This video could not be played. Retry playback or check the source format and permissions."); }}
+    />}
     </div>
     {presentation === "classroom" && <div className="classroom-player-footer">
       <div className="min-w-0">{presentation === "classroom" ? <h2 className="text-xs font-semibold">{title}</h2> : <h3 className="text-xs font-semibold">{title}</h3>}

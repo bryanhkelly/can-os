@@ -182,10 +182,8 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
       .where(and(
         eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
-        // A Site Admin cannot list another Site's releases within the
-        // same organization. Site-less releases remain organization-scoped.
-        or(isNull(noncreditSelfEnrollmentReleases.siteId),
-          inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)),
+        // A Site Admin can see only releases for their authorized Sites.
+        inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds),
       ))
       .orderBy(noncreditSelfEnrollmentReleases.createdAt).limit(100);
     return {candidates,published};
@@ -214,7 +212,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
       if(data.deliveryMode==="facilitated" &&
          !selected.siteOptions.some(option=>option.id===data.siteId))
         throw new AuthorizationError("authorized active Site for facilitated cohort");
-      if(data.deliveryMode==="independent" && data.siteId!==null &&
+      if(data.deliveryMode==="independent" &&
          !selected.digitalSiteOptions.some(option=>option.id===data.siteId))
         throw new AuthorizationError("authorized Site association for online release");
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
@@ -264,14 +262,14 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
           eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId)))
         .for("update").limit(1);
       if(!release)throw new AuthorizationError("provider-owned enrollment release");
-      if(release.siteId&&!provider.siteIds.includes(release.siteId))
+      if(!provider.siteIds.includes(release.siteId))
         throw new AuthorizationError("current facilitator Site");
       if(release.status==="closed")return {closed:true};
       const candidate=(await listReleaseCandidates(provider,tx))
         .find(row=>row.deploymentId===release.deploymentId);
       // If authority was withdrawn, closing must still be possible: current
       // original grant + same Site restricts who can close the release.
-      if(!candidate && !release.siteId)
+      if(!candidate && !provider.siteIds.includes(release.siteId))
         throw new AuthorizationError("current operator deployment");
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       await tx.update(noncreditSelfEnrollmentReleases)

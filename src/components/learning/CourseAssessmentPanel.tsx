@@ -10,14 +10,17 @@ import {
 type KnowledgeCheck = Awaited<ReturnType<typeof getNoncreditKnowledgeCheck>>;
 
 /** Reused within the existing recorded classroom, not a separate portal. */
-export function CourseAssessmentPanel({courseAttemptId,phase="final",onAssessmentCompleted}:{
+export function CourseAssessmentPanel({courseAttemptId,phase="final",onAssessmentCompleted,context="noncredit"}:{
   courseAttemptId:string;phase?:"baseline"|"final";onAssessmentCompleted?:()=>void;
+  context?:"noncredit"|"class";
 }) {
   return <KnowledgeCheckSession key={courseAttemptId+":"+phase}
-    courseAttemptId={courseAttemptId} phase={phase} onAssessmentCompleted={onAssessmentCompleted}/>;
+    courseAttemptId={courseAttemptId} phase={phase} context={context}
+    onAssessmentCompleted={onAssessmentCompleted}/>;
 }
-function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted}:{
+function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,context}:{
   courseAttemptId:string;phase:"baseline"|"final";onAssessmentCompleted?:()=>void;
+  context:"noncredit"|"class";
 }) {
   const [check,setCheck]=useState<KnowledgeCheck|null>(null);
   const [busy,setBusy]=useState(false);
@@ -63,7 +66,7 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted}:{
 
   if(error&&!check)return <p role="status" className="border p-3 text-sm">{error}</p>;
   if(!check)return <p role="status" className="text-sm">Loading knowledge check...</p>;
-  return <section aria-label={phase==="baseline"?"Before-course diagnostic":"Noncredit knowledge check"} className="space-y-4">
+  return <section aria-label={phase==="baseline"?"Before-course diagnostic":context==="class"?"Class knowledge check":"Noncredit knowledge check"} className="space-y-4">
     <div>
       <h3 className="font-serif text-xl font-semibold">
         {phase==="baseline"?"Before-course knowledge check":"After-course knowledge check"}
@@ -118,7 +121,7 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted}:{
       This timed knowledge check expired before submission.
     </p>}
     {check.state==="scored"&&<p role="status" className="border p-3 text-sm">
-      Your answers were submitted and automatically scored. Your noncredit result is awaiting provider confirmation.
+      Your answers were submitted and automatically scored. Your {context==="class"?"Class":"noncredit"} result is awaiting independent provider confirmation.
     </p>}
     {check.state==="submitted"&&<p role="status" className="border p-3 text-sm">
       Your knowledge check was submitted. Processing is in progress.
@@ -132,7 +135,7 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted}:{
           check.score?.outcome==="fail"?" · Additional learning recommended":""}.
       </p>
       <p className="mt-2 text-muted-foreground">
-        A confirmed knowledge-check result is separate from training completion, grades and credit.
+        A confirmed knowledge-check result is separate from Course completion, academic grades, credentials and credit.
       </p>
       {check.canStart&&check.remainingAttempts>0&&<Button className="mt-3" variant="outline"
         disabled={busy} onClick={()=>void begin()}>

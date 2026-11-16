@@ -2,16 +2,20 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { resolveClassVideo } from "@/domain/class-video";
+import { ClassroomMediaSurface } from "@/components/learning/ClassroomMediaSurface";
 import { getFacilitatedRoomMediaAccess, recordFacilitatedPlayback } from "@/modules/learning/facilitated-learning.functions";
 import { getClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 
-type Loaded={key:string;src:string};
+type Loaded={key:string;src:string;expiresAt:number|null;accessCommandId:string;refreshTick:number};
 export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSessionId:string}){
   const player=useRef<HTMLVideoElement>(null);
   const [enabled,setEnabled]=useState(false);
   const [loaded,setLoaded]=useState<Loaded|null>(null);
+  const [refreshTick,setRefreshTick]=useState(0);
   const [error,setError]=useState("");
   const [manualPlay,setManualPlay]=useState(false);
+  const recovery=useRef<{key:string;attempts:number}>({key:"",attempts:0});
+  const resumeAt=useRef<number|null>(null);
   const command=useQuery({
     queryKey:["classroom-projector-control",facilitatedSessionId],
     queryFn:()=>getClassroomProjectorCommand({data:{facilitatedSessionId}}),
@@ -22,16 +26,36 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
   const resolved=loaded&&loaded.key===identity?resolveClassVideo(loaded.src,true):null;
   const roomState=command.data?.roomState;
   useEffect(()=>{
-    if(!enabled||!current||command.data?.roomState!=="live"||!identity||loaded?.key===identity)return;
+    if(!enabled||!loaded?.expiresAt||roomState!=="live")return;
+    // Refresh the SHORT-LIVED signed R2 URL even when no new play command
+    // arrived. Keep the current video visible until the new URL succeeds.
+    const wait=Math.max(1000,loaded.expiresAt-Date.now());
+    const timer=window.setTimeout(()=>{
+      resumeAt.current=player.current?.currentTime??null;
+      setRefreshTick(tick=>tick+1);
+    },wait);
+    return ()=>window.clearTimeout(timer);
+  },[enabled,loaded?.expiresAt,loaded?.key,roomState]);
+  useEffect(()=>{
+    if(!enabled||!current||command.data?.roomState!=="live"||!identity)return;
+    const expiredForNewCommand=!!loaded && loaded.expiresAt!==null &&
+      Date.now()>=loaded.expiresAt && loaded.accessCommandId!==current.id;
+    if(loaded?.key===identity && !expiredForNewCommand &&
+       loaded.refreshTick===refreshTick)return;
     let active=true;
     setError("");setManualPlay(false);
     void getFacilitatedRoomMediaAccess({data:{
       facilitatedSessionId,lessonId:current.lessonId,assetVersionId:current.assetVersionId,
     }}).then(result=>{
-      if(active)setLoaded({key:identity,src:result.downloadUrl});
+      if(active)setLoaded({
+        key:identity,src:result.downloadUrl,accessCommandId:current.id,refreshTick,
+        expiresAt:result.expiresInSeconds>0?
+          Date.now()+Math.max(1,result.expiresInSeconds-5)*1000:null,
+      });
     }).catch(()=>{if(active)setError("The selected lesson is unavailable. Recheck approval or rights.");});
     return ()=>{active=false;};
-  },[enabled,current,identity,loaded?.key,facilitatedSessionId,command.data?.roomState]);
+  },[enabled,current,identity,loaded?.key,loaded?.expiresAt,loaded?.accessCommandId,
+    facilitatedSessionId,command.data?.roomState,refreshTick]);
   useEffect(()=>{
     const node=player.current;
     if(!enabled||!node||!current||command.data?.roomState!=="live"||!loaded||loaded.key!==identity||resolved?.kind!=="file")return;
@@ -39,8 +63,9 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
       if(!Number.isFinite(node.duration)||node.duration<=0)return;
       const drift=current.commandKind==="play"?
         Math.max(0,Math.min(10,(Date.now()-Date.parse(current.issuedAt))/1000)):0;
-      const position=current.commandKind==="stop"?0:current.positionSeconds+drift;
-      if(current.commandKind==="pause")return;
+      const position=current.commandKind==="stop"?0:
+        (resumeAt.current??current.positionSeconds)+drift;
+      resumeAt.current=null;
       if(Math.abs(node.currentTime-position)>2)
         node.currentTime=Math.max(0,Math.min(node.duration,position));
     };
@@ -98,23 +123,28 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
         Waiting for your facilitator to load a recording.</p>}
       {current&&!resolved&&<p role="status" className="flex aspect-video items-center justify-center border border-border">
         Checking approved playback access…</p>}
-      {resolved?.kind==="file"&&<video key={loaded?.key} ref={player} src={resolved.src}
-        playsInline controls preload="metadata" className="aspect-video w-full bg-black"
+      {resolved && <ClassroomMediaSurface video={resolved}
+        title="Approved classroom recording" videoRef={player}
+        videoClassName="aspect-video w-full bg-black"
+        iframeClassName="aspect-video w-full border border-border"
         onLoadedMetadata={()=>{void observed("opened");}}
         onPlay={()=>{void observed("played");}}
         onPause={e=>{if(!e.currentTarget.ended)void observed("paused");}}
-        onEnded={()=>{void observed("ended");}}>
-        Your browser does not support this recording.
-      </video>}
-      {resolved?.kind==="embed"&&<div>
-        <iframe title="Approved external classroom video" src={resolved.src}
-          allow="fullscreen; picture-in-picture; encrypted-media"
-          referrerPolicy="no-referrer" allowFullScreen className="aspect-video w-full border border-border"/>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Third-party providers have their own play and pause controls. CAN OS cannot independently
-          verify viewing or automatically synchronize these embeds.
-        </p>
-      </div>}
+        onEnded={()=>{void observed("ended");}}
+        onError={()=>{
+          if(recovery.current.key!==identity)recovery.current={key:identity,attempts:0};
+          if(recovery.current.attempts<1&&resolved.kind==="file"){
+            recovery.current.attempts+=1;
+            resumeAt.current=player.current?.currentTime??null;
+            setLoaded(null);
+            setError("Rechecking short-lived recording access…");
+          }else setError("Playback failed. Refresh the approved recording or check the media source.");
+        }}
+      />
+      {resolved?.kind==="embed"&&<p className="mt-2 text-xs text-muted-foreground">
+        Third-party providers have their own play and pause controls. CAN OS cannot independently
+        verify viewing or automatically synchronize these embeds.
+      </p>}
       {manualPlay&&<Button type="button" className="mt-3" onClick={()=>{
         void player.current?.play().catch(()=>setError("Playback requires a local gesture."));
       }}>Start projector playback</Button>}
@@ -122,6 +152,13 @@ export function ClassroomProjectorPlayer({facilitatedSessionId}:{facilitatedSess
         Latest control: {current.commandKind}. Commands are not proof that playback occurred.
       </p>}
     </div>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {error&&<div className="mt-3 space-y-2">
+      <p role="alert" className="text-sm text-destructive">{error}</p>
+      {enabled&&current&&roomState==="live"&&
+        <Button variant="outline" size="sm" onClick={()=>{
+          recovery.current={key:identity,attempts:0};
+          setLoaded(null);setError("");
+        }}>Recheck approved recording access</Button>}
+    </div>}
   </section>;
 }

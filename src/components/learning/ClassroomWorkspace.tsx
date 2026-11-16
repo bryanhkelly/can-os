@@ -4,11 +4,20 @@ import { ArrowLeft, PanelRightClose, PanelRightOpen, Share2 } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 
-export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPosition, metadata, actions, rail, children }: {
+export type ClassroomReturnTo = "academic" | "native" | "training";
+
+function ReturnToClasses({target}:{target:ClassroomReturnTo}){
+  return target==="academic"?<Link to="/classes" className="underline">My classes</Link>:
+    target==="native"?<Link to="/classes" search={{}} className="underline">My classes</Link>:
+    <Link to="/learn/my-courses" className="underline">My classes</Link>;
+}
+
+export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPosition, metadata, actions, rail, children, returnTo="academic" }: {
   title: string; subtitle: string; lessonTitle?: string; rail: ReactNode; children: ReactNode;
   lessonPosition?: { current: number; total: number };
   metadata?: ReactNode;
   actions?: ReactNode;
+  returnTo?: ClassroomReturnTo;
 }) {
   const [toolsVisible, setToolsVisible] = useState(true);
   const toolsId = useId();
@@ -32,12 +41,14 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
           {toolsVisible ? <PanelRightClose aria-hidden="true"/> : <PanelRightOpen aria-hidden="true"/>}
           {toolsVisible ? "Hide lesson tools" : "Show lesson tools"}
         </Button>
-        <Button variant="ghost" size="sm" asChild><Link to="/classes"><ArrowLeft aria-hidden="true"/>Exit classroom</Link></Button>
+        <Button variant="ghost" size="sm" asChild>{returnTo==="academic"?<Link to="/classes"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
+        returnTo==="native"?<Link to="/classes" search={{}}><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
+        <Link to="/learn/my-courses"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>}</Button>
       </div>
     </div>
     <div className="classroom-content">
       <header className="classroom-header">
-        <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap gap-2 text-xs text-muted-foreground"><Link to="/classes" className="underline">My classes</Link><span>/</span>{title}{lessonPosition && <><span>/</span><span>Lesson {lessonPosition.current}</span></>}</nav>
+        <nav aria-label="Breadcrumb" className="mb-4 flex flex-wrap gap-2 text-xs text-muted-foreground"><ReturnToClasses target={returnTo}/><span>/</span>{title}{lessonPosition && <><span>/</span><span>Lesson {lessonPosition.current}</span></>}</nav>
         <div className="flex flex-wrap items-end justify-between gap-4"><div className="min-w-0 flex-1">
         <p className="can-eyebrow">Your classroom</p>
         <h1 className="mt-2 font-serif text-2xl font-normal tracking-tight sm:text-3xl">{title}</h1>

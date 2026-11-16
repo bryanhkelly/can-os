@@ -1,0 +1,500 @@
+import { createServerFn } from "@tanstack/react-start";
+import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { z } from "zod";
+import { db } from "@/db/client";
+import {
+  auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
+  canonicalClassOfferingVersions, canonicalOfferingCourses, courseVersions, courses,
+  deploymentOfferingAdoptions, offeringVersions, offerings, programDeployments,
+  educationOperations, educationOperationOrganizationRoles, educationOperationSites,
+  siteOrganizationRoles, catalogSites, canonicalEnrollmentSites, classroomDeploymentSites,
+} from "@/db/canonical-v301";
+import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
+import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
+
+// These native commands are dormant until restricted RLS,
+// dedicated role provision and test01 acceptance are approved.
+function requireClassFeature() {
+  if (process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED !== "true") {
+    throw new AuthorizationError("unified Class release not activated");
+  }
+  setResponseHeader("Cache-Control", "private, no-store");
+}
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type ClassOperator = { actor: CommandContext; organizationId: string; siteIds: string[] };
+
+/** Site staff cannot manage another Site's Classes or a different creator's
+ * provider-wide Class merely by knowing its UUID. */
+function assertManagedClassScope(operator:ClassOperator, instance:{
+  siteId:string|null;createdByPersonId:string;
+}):void{
+  if(instance.siteId){
+    if(!operator.siteIds.includes(instance.siteId))
+      throw new AuthorizationError("current Class Site");
+  }else if(instance.createdByPersonId!==operator.actor.actorPersonId){
+    throw new AuthorizationError("owner of provider-wide Class");
+  }
+}
+
+
+async function requireClassOperator(): Promise<ClassOperator> {
+  const actor = await getCanonicalCommandContext(getRequest());
+  if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? "")) {
+    throw new AuthorizationError("authorized Class operator");
+  }
+  // Purpose-specific grant: unrelated program or Site membership alone
+  // must not authorize Class creation.
+  assertCapability(actor, "class.manage");
+  const ids = actor.scope.organizationIds ?? [];
+  if (ids.length !== 1) throw new AuthorizationError("one verified operating organization");
+  return { actor, organizationId: ids[0]!, siteIds: actor.scope.siteIds ?? [] };
+}
+
+export async function validateClassAuthority(tx: Tx, operator: ClassOperator, input: ReturnType<typeof classDefinitionSchema.parse>) {
+  if (input.operatingOrganizationId !== operator.organizationId) {
+    throw new AuthorizationError("current operating Organization");
+  }
+  if (input.siteId && !operator.siteIds.includes(input.siteId)) {
+    throw new AuthorizationError("current Site operator scope");
+  }
+  if (!input.siteId && input.deliveryMode !== "self_paced") {
+    throw new AuthorizationError("scheduled and facilitated Classes require an authorized Site");
+  }
+  const now = new Date();
+  const [catalog] = await tx.select({
+    courseVersionId: courseVersions.id,
+    courseTitle: courses.title,
+    operationId: programDeployments.operationId,
+  }).from(programDeployments)
+    .innerJoin(educationOperations, eq(educationOperations.id,programDeployments.operationId))
+    .innerJoin(deploymentOfferingAdoptions, and(
+      eq(deploymentOfferingAdoptions.id,input.adoptionId),
+      eq(deploymentOfferingAdoptions.deploymentId,programDeployments.id),
+      eq(deploymentOfferingAdoptions.offeringVersionId,input.offeringVersionId),
+    ))
+    .innerJoin(offeringVersions, and(
+      eq(offeringVersions.id,input.offeringVersionId),
+      eq(offeringVersions.offeringId,programDeployments.offeringId),
+    ))
+    .innerJoin(offerings, eq(offerings.id,offeringVersions.offeringId))
+    .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
+    .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
+    .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+    .where(and(
+      eq(programDeployments.id,input.deploymentId),
+      eq(programDeployments.status,"active"),
+      eq(educationOperations.status,"active"),
+      eq(offerings.status,"active"),
+      eq(offeringVersions.lifecycle,"published"),isNotNull(offeringVersions.publishedAt),
+      eq(courseVersions.id,input.courseVersionId),
+      eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
+      eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
+      lte(deploymentOfferingAdoptions.validFrom,now),
+      or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
+    )).limit(1);
+  if (!catalog) throw new AuthorizationError("currently published Course under approved Deployment/adoption");
+
+  const [operatorRole] = await tx.select({id:educationOperationOrganizationRoles.id})
+    .from(educationOperationOrganizationRoles).where(and(
+      eq(educationOperationOrganizationRoles.operationId,catalog.operationId),
+      eq(educationOperationOrganizationRoles.organizationId,operator.organizationId),
+      eq(educationOperationOrganizationRoles.roleCode,"operator"),
+      eq(educationOperationOrganizationRoles.status,"approved"),
+      lte(educationOperationOrganizationRoles.validFrom,now),
+      or(isNull(educationOperationOrganizationRoles.validThrough),
+        gt(educationOperationOrganizationRoles.validThrough,now)),
+    )).limit(1);
+  if (!operatorRole) throw new AuthorizationError("current authorized Operation operator");
+
+  if (input.siteId) {
+    const [site] = await tx.select({id:catalogSites.id}).from(catalogSites)
+      .innerJoin(educationOperationSites,and(
+        eq(educationOperationSites.siteId,catalogSites.id),
+        eq(educationOperationSites.operationId,catalog.operationId),
+        lte(educationOperationSites.validFrom,now),
+        or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+      ))
+      .innerJoin(siteOrganizationRoles,and(
+        eq(siteOrganizationRoles.siteId,catalogSites.id),
+        eq(siteOrganizationRoles.organizationId,operator.organizationId),
+        inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+        lte(siteOrganizationRoles.validFrom,now),
+        or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+      ))
+      .where(and(eq(catalogSites.id,input.siteId),eq(catalogSites.status,"active")))
+      .limit(1);
+    if (!site) throw new AuthorizationError("currently authorized Class Site");
+    if (["facilitated","hybrid","scheduled"].includes(input.deliveryMode)) {
+      const [placement] = await tx.select({id:classroomDeploymentSites.id})
+        .from(classroomDeploymentSites).where(and(
+          eq(classroomDeploymentSites.deploymentId,input.deploymentId),
+          eq(classroomDeploymentSites.siteId,input.siteId),
+        )).limit(1);
+      if (!placement) throw new AuthorizationError("current Deployment/Site placement");
+    }
+  }
+  return catalog;
+}
+
+/** Create the Class identity independently. Draft registration/publication terms
+ * are explicitly optional; school and organization assignments do not need
+ * a marketing or self-registration listing. */
+export const createUnifiedClassDraft = createServerFn({method:"POST"})
+  .validator((value:unknown) => {
+    const {definition, terms} = value && typeof value === "object" ?
+      value as Record<string,unknown> : {};
+    return {definition:classDefinitionSchema.parse(definition),
+      terms:terms==null?null:classOfferingTermsSchema.parse(terms)};
+  })
+  .handler(async({data})=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
+      await validateClassAuthority(tx,operator,data.definition);
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
+      const [created]=await tx.insert(canonicalClasses).values({
+        ...data.definition,state:"draft",
+        createdByPersonId:operator.actor.actorPersonId!,
+      }).returning({id:canonicalClasses.id});
+      if(!created)throw new Error("Class creation did not return an identity");
+      let classOfferingId:string|null=null;
+      let classOfferingVersionId:string|null=null;
+      if(data.terms){
+        const [offering]=await tx.insert(canonicalClassOfferings)
+          .values({classId:created.id}).returning({id:canonicalClassOfferings.id});
+        if(!offering)throw new Error("Class Offering creation did not return an identity");
+        const [version]=await tx.insert(canonicalClassOfferingVersions).values({
+          classOfferingId:offering.id,classId:created.id,versionNo:1,
+          visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
+          opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
+          closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
+          capacity:data.terms.capacity,allowedCreditModes:data.terms.allowedCreditModes,
+          consentVersion:data.terms.consentVersion,consentText:data.terms.consentText,
+          state:"draft",createdByPersonId:operator.actor.actorPersonId!,
+        }).returning({id:canonicalClassOfferingVersions.id});
+        if(!version)throw new Error("Class Offering terms could not be stored");
+        classOfferingId=offering.id;
+        classOfferingVersionId=version.id;
+      }
+      await tx.insert(auditEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,
+        owningOrganizationId:operator.organizationId,
+        eventCode:"class.draft_created",entityKind:"class",entityId:created.id,
+        payload:{courseVersionId:data.definition.courseVersionId,
+          deploymentId:data.definition.deploymentId,siteId:data.definition.siteId,
+          classOfferingVersionId},
+      });
+      await tx.insert(domainEvents).values({
+        eventType:"ClassDraftCreated",aggregateType:"class",aggregateId:created.id,
+        actorPersonId:operator.actor.actorPersonId!,
+        payload:{operatingOrganizationId:operator.organizationId,classOfferingVersionId},
+      });
+      return {classId:created.id,classOfferingId,
+        classOfferingVersionId,status:"draft" as const};
+    });
+  });
+
+/** Class activation is independent from registration publication. The
+ * publisher/Course/adoption/Site authorization is independently rechecked. */
+export const activateUnifiedClass=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>z.object({classId:z.string().uuid()}).strict().parse(raw))
+  .handler(async({data})=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
+      const [instance]=await tx.select().from(canonicalClasses)
+        .where(and(eq(canonicalClasses.id,data.classId),
+          eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
+        .for("update").limit(1);
+      if(!instance||!["draft","approved","active"].includes(instance.state))
+        throw new AuthorizationError("current owned Class");
+      assertManagedClassScope(operator,instance);
+      if(!instance.siteId)throw new AuthorizationError("authorized Site required before Class activation");
+      await validateClassAuthority(tx,operator,{
+        deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
+        offeringVersionId:instance.offeringVersionId,
+        courseVersionId:instance.courseVersionId,
+        operatingOrganizationId:instance.operatingOrganizationId,
+        siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
+      });
+      if(instance.state==="active")return {classId:instance.id,alreadyActive:true};
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
+      await tx.update(canonicalClasses).set({
+        state:"active",updatedAt:new Date(),
+      }).where(eq(canonicalClasses.id,instance.id));
+      await tx.insert(auditEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,
+        owningOrganizationId:operator.organizationId,
+        eventCode:"class.activated",entityKind:"class",entityId:instance.id,
+        payload:{classOfferingRequired:false},
+      });
+      await tx.insert(domainEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,
+        eventType:"ClassActivated",aggregateType:"class",aggregateId:instance.id,
+        payload:{classOfferingRequired:false},
+      });
+      return {classId:instance.id,alreadyActive:false};
+    });
+  });
+
+/** Private provider-scoped draft inspection. No public catalog exposure. */
+export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
+  .handler(async()=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.selectDistinctOn([canonicalClasses.id],{
+      classId:canonicalClasses.id,title:canonicalClasses.title,
+      capacity:canonicalClasses.capacity,
+      courseVersionId:canonicalClasses.courseVersionId,
+      deploymentId:canonicalClasses.deploymentId,siteId:canonicalClasses.siteId,
+      deliveryMode:canonicalClasses.deliveryMode,state:canonicalClasses.state,
+      classOfferingId:canonicalClassOfferings.id,
+      classOfferingVersionId:canonicalClassOfferingVersions.id,
+      versionNo:canonicalClassOfferingVersions.versionNo,
+      visibility:canonicalClassOfferingVersions.visibility,
+      enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
+      offeringState:canonicalClassOfferingVersions.state,
+    }).from(canonicalClasses)
+      .leftJoin(canonicalClassOfferings,eq(canonicalClassOfferings.classId,canonicalClasses.id))
+      .leftJoin(canonicalClassOfferingVersions,and(
+        eq(canonicalClassOfferingVersions.classId,canonicalClasses.id),
+        eq(canonicalClassOfferingVersions.classOfferingId,canonicalClassOfferings.id),
+      ))
+      .where(and(
+        eq(canonicalClasses.operatingOrganizationId,operator.organizationId),
+        or(
+          operator.siteIds.length?inArray(canonicalClasses.siteId,operator.siteIds):undefined,
+          and(isNull(canonicalClasses.siteId),eq(canonicalClasses.createdByPersonId,operator.actor.actorPersonId!)),
+        ),
+      )).orderBy(asc(canonicalClasses.id),desc(canonicalClassOfferingVersions.versionNo)).limit(100);
+  });
+
+
+const manageOfferingInput = z.object({
+  classId: z.string().uuid(),
+  classOfferingVersionId: z.string().uuid(),
+}).strict();
+
+/** Publish exact, immutable Class Offering terms, independent of whether public.
+ * Current publisher/deployment/Site authority is always checked again.
+ */
+export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
+  .validator((raw:unknown) => manageOfferingInput.parse(raw))
+  .handler(async ({data}) => {
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
+      const [instance]=await tx.select().from(canonicalClasses)
+        .where(and(eq(canonicalClasses.id,data.classId),
+          eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
+        .for("update").limit(1);
+      if(!instance || !["draft","approved","active"].includes(instance.state))
+        throw new AuthorizationError("Class available for publication");
+      assertManagedClassScope(operator,instance);
+      if(!instance.siteId)throw new AuthorizationError("authorized Site required before Class publication");
+      await validateClassAuthority(tx,operator,{
+        deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
+        offeringVersionId:instance.offeringVersionId,
+        courseVersionId:instance.courseVersionId,
+        operatingOrganizationId:instance.operatingOrganizationId,
+        siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
+      });
+      const [terms]=await tx.select({
+        id:canonicalClassOfferingVersions.id,state:canonicalClassOfferingVersions.state,
+      }).from(canonicalClassOfferingVersions)
+        .innerJoin(canonicalClassOfferings,and(
+          eq(canonicalClassOfferings.id,canonicalClassOfferingVersions.classOfferingId),
+          eq(canonicalClassOfferings.classId,instance.id),
+        ))
+        .where(and(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId),
+          eq(canonicalClassOfferingVersions.classId,instance.id)))
+        .for("update").limit(1);
+      if(!terms || terms.state!=="draft") throw new AuthorizationError("draft Class Offering version");
+      const now=new Date();
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
+      await tx.update(canonicalClassOfferingVersions)
+        .set({state:"published",publishedAt:now})
+        .where(eq(canonicalClassOfferingVersions.id,terms.id));
+      if(instance.state!=="active") await tx.update(canonicalClasses)
+        .set({state:"active",updatedAt:now})
+        .where(eq(canonicalClasses.id,instance.id));
+      await tx.insert(auditEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,
+        owningOrganizationId:operator.organizationId,
+        eventCode:"class.offering_published",entityKind:"class_offering_version",entityId:terms.id,
+        payload:{classId:instance.id,operatingOrganizationId:operator.organizationId},
+      });
+      await tx.insert(domainEvents).values({
+        eventType:"ClassOfferingPublished",aggregateType:"class",aggregateId:instance.id,
+        actorPersonId:operator.actor.actorPersonId!,
+        payload:{classOfferingVersionId:terms.id,organizationId:operator.organizationId},
+      });
+      return {classId:instance.id,classOfferingVersionId:terms.id,state:"published" as const};
+    });
+  });
+
+/** Stop registration while preserving learners and class history. */
+export const closeUnifiedClassOffering = createServerFn({method:"POST"})
+  .validator((raw:unknown) => manageOfferingInput.parse(raw))
+  .handler(async({data})=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
+      const [instance]=await tx.select().from(canonicalClasses)
+        .where(and(eq(canonicalClasses.id,data.classId),
+          eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
+        .for("update").limit(1);
+      if(!instance)throw new AuthorizationError("owned Class");
+      assertManagedClassScope(operator,instance);
+      const [terms]=await tx.select({
+        id:canonicalClassOfferingVersions.id,
+        state:canonicalClassOfferingVersions.state,
+      }).from(canonicalClassOfferingVersions)
+        .innerJoin(canonicalClassOfferings,and(
+          eq(canonicalClassOfferings.id,canonicalClassOfferingVersions.classOfferingId),
+          eq(canonicalClassOfferings.classId,instance.id),
+        ))
+        .where(and(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId),
+          eq(canonicalClassOfferingVersions.classId,instance.id)))
+        .for("update").limit(1);
+      if(!terms)throw new AuthorizationError("owned Class Offering");
+      if(terms.state==="closed")return {closed:true};
+      if(terms.state!=="published")
+        throw new AuthorizationError("only published Class Offerings can be closed");
+      const now=new Date();
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
+      await tx.update(canonicalClassOfferingVersions).set({state:"closed",closedAt:now})
+        .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId));
+      await tx.insert(auditEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,owningOrganizationId:operator.organizationId,
+        eventCode:"class.offering_closed",entityKind:"class_offering_version",entityId:data.classOfferingVersionId,
+        payload:{classId:instance.id},
+      });
+      return {closed:true};
+    });
+  });
+
+/** Re-open registration only by creating a fresh draft version of the terms. */
+export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POST"})
+  .validator((raw:unknown) => z.object({
+    classId:z.string().uuid(),terms:classOfferingTermsSchema,
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    return db.transaction(async tx=>{
+      const [instance]=await tx.select().from(canonicalClasses)
+        .where(and(eq(canonicalClasses.id,data.classId),
+          eq(canonicalClasses.operatingOrganizationId,operator.organizationId)))
+        .for("update").limit(1);
+      if(!instance || !["draft","approved","active"].includes(instance.state))
+        throw new AuthorizationError("current Class");
+      assertManagedClassScope(operator,instance);
+      await validateClassAuthority(tx,operator,{
+        deploymentId:instance.deploymentId,adoptionId:instance.adoptionId,
+        offeringVersionId:instance.offeringVersionId,courseVersionId:instance.courseVersionId,
+        operatingOrganizationId:instance.operatingOrganizationId,
+        siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
+      });
+      const [existingOffering]=await tx.select().from(canonicalClassOfferings)
+        .where(eq(canonicalClassOfferings.classId,instance.id)).limit(1);
+      const [current]=existingOffering
+        ?await tx.select().from(canonicalClassOfferingVersions)
+          .where(eq(canonicalClassOfferingVersions.classOfferingId,existingOffering.id))
+          .orderBy(desc(canonicalClassOfferingVersions.versionNo)).limit(1)
+        :[];
+      if(existingOffering && (!current || current.state!=="closed"))
+        throw new AuthorizationError("close the previous published Class Offering first");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
+      const offering=existingOffering??(await tx.insert(canonicalClassOfferings)
+        .values({classId:instance.id}).returning())[0];
+      if(!offering)throw new Error("Class Offering identity was not created");
+      const nextVersion=(current?.versionNo??0)+1;
+      const [created]=await tx.insert(canonicalClassOfferingVersions).values({
+        classId:instance.id,classOfferingId:offering.id,versionNo:nextVersion,
+        visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
+        opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
+        closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
+        capacity:data.terms.capacity,allowedCreditModes:data.terms.allowedCreditModes,
+        consentVersion:data.terms.consentVersion,
+        consentText:data.terms.consentText,createdByPersonId:operator.actor.actorPersonId!,
+        state:"draft",
+      }).returning({id:canonicalClassOfferingVersions.id});
+      if(!created)throw new Error("Cannot create Class Offering version");
+      await tx.insert(auditEvents).values({
+        actorPersonId:operator.actor.actorPersonId!,owningOrganizationId:operator.organizationId,
+        eventCode:"class.offering_new_draft",entityKind:"class_offering_version",
+        entityId:created.id,payload:{classId:instance.id,versionNo:nextVersion},
+      });
+      return {classOfferingVersionId:created.id,versionNo:nextVersion};
+    });
+  });
+
+
+/** Populate the native Class composer from actual published, adopted Courses.
+ * The creation command independently repeats every authorization check. */
+export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
+  .handler(async()=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    const now=new Date();
+    const available=await db.select({
+      deploymentId:programDeployments.id,
+      deploymentName:programDeployments.name,
+      adoptionId:deploymentOfferingAdoptions.id,
+      offeringVersionId:offeringVersions.id,
+      courseVersionId:courseVersions.id,
+      courseTitle:courses.title,
+    }).from(programDeployments)
+      .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
+      .innerJoin(deploymentOfferingAdoptions,eq(deploymentOfferingAdoptions.deploymentId,programDeployments.id))
+      .innerJoin(offeringVersions,and(
+        eq(offeringVersions.id,deploymentOfferingAdoptions.offeringVersionId),
+        eq(offeringVersions.offeringId,programDeployments.offeringId),
+      ))
+      .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
+      .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
+      .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
+      .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+      .where(and(
+        eq(programDeployments.status,"active"),eq(educationOperations.status,"active"),
+        eq(offeringVersions.lifecycle,"published"),isNotNull(offeringVersions.publishedAt),
+        eq(offerings.status,"active"),
+        eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
+        eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
+        lte(deploymentOfferingAdoptions.validFrom,now),
+        or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
+      )).orderBy(asc(courses.title)).limit(100);
+    const names=operator.siteIds.length?await db.select({
+      id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
+    }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,operator.siteIds)):[];
+    const options=[];
+    for(const row of available){
+      const instance={
+        deploymentId:row.deploymentId,adoptionId:row.adoptionId,
+        offeringVersionId:row.offeringVersionId,courseVersionId:row.courseVersionId,
+        operatingOrganizationId:operator.organizationId,
+        title:row.courseTitle,deliveryMode:"self_paced" as const,siteId:null,
+      };
+      try{
+        await db.transaction(tx=>validateClassAuthority(tx,operator,instance));
+      }catch(e){if(e instanceof AuthorizationError)continue;throw e;}
+      const authorizedSites=[];
+      for(const siteId of operator.siteIds){
+        try {
+          await db.transaction(tx=>validateClassAuthority(tx,operator,{
+            ...instance,siteId,deliveryMode:"facilitated",
+          }));
+          authorizedSites.push(siteId);
+        }catch(e){if(!(e instanceof AuthorizationError))throw e;}
+      }
+      options.push({...row,operatingOrganizationId:operator.organizationId,
+        siteOptions:authorizedSites.map(id=>({
+          id,name:names.find(site=>site.id===id)?.name??"Authorized Site",
+        }))});
+    }
+    return options;
+  });

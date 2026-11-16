@@ -57,14 +57,25 @@ function ClassroomJoinPage() {
     const form = event.currentTarget;
     const selected = new FormData(form).get("courseAttemptId");
     if (typeof selected !== "string" || !choices?.choices.some(c => c.courseAttemptId === selected)) {
-      setError("Select an eligible course."); return;
+      setError("Select your enrolled Class or Course Attempt."); return;
     }
     setBusy(true); setError("");
     try {
       await pairWithFacilitatedRoom({ data: { courseAttemptId: selected, pairingCode: normalized } });
       setCode("");
       try { window.sessionStorage.removeItem("can-classroom-pending-pair-code"); } catch { /* no persistent code required */ }
-      void navigate({ to: "/classroom/companion", search: { courseAttemptId: selected }, replace: true });
+      const chosen=choices.choices.find(choice=>choice.courseAttemptId===selected);
+      if(chosen?.classId){
+        // A native Class stays in the one shared Class workspace. The QR
+        // code is only a pairing pointer, never an alternate learner route.
+        void navigate({to:"/classes/$classId",params:{classId:chosen.classId},
+          search:{view:"learn",tab:"sessions"},replace:true});
+      }else{
+        // Older school/noncredit courses retain their existing companion
+        // until the coordinated non-native enrollment cutover.
+        void navigate({to:"/classroom/companion",
+          search:{courseAttemptId:selected},replace:true});
+      }
     } catch {
       setError("Pairing refused. Check the code, expiry, enrollment, and current Site assignment.");
     } finally { setBusy(false); }
@@ -84,16 +95,29 @@ function ClassroomJoinPage() {
           spellCheck={false} maxLength={11} placeholder="XXXXX-XXXXX" value={code}
           className="font-mono text-xl tracking-wider"
           onChange={e => setCode(e.target.value.toUpperCase())}/>
-        <label htmlFor="classroom-course" className="block text-sm font-medium">Your course</label>
+        <label htmlFor="classroom-course" className="block text-sm font-medium">Your enrolled Class or course</label>
         <select id="classroom-course" name="courseAttemptId" required
           className="w-full min-h-10 border border-border bg-background p-2 text-sm">
           <option value="">Choose an active course</option>
           {choices.choices.map(choice => <option key={choice.courseAttemptId}
             value={choice.courseAttemptId}>{choice.courseTitle}</option>)}
         </select>
-        {!choices.choices.length && <p role="status" className="text-sm text-muted-foreground">
-          No eligible courses were found for this account. Check your registration.
-        </p>}
+        {!choices.choices.length && <div role="status"
+          className="space-y-2 border border-border bg-muted/20 p-4 text-sm">
+          <p>No currently enrolled Class or Course Attempt is eligible to pair.</p>
+          <p className="text-muted-foreground">
+            Check the authorized Class catalog for public self-registration.
+            Private Classes require an invitation, approval, or an assignment
+            from your organization. Scanning a QR code never enrolls you.
+          </p>
+          <Link to="/learn/classes" className="inline-block font-semibold underline">
+            Explore available Classes
+          </Link>
+          <p className="text-xs text-muted-foreground">
+            This tab retains the short-lived pairing code while you sign in or
+            enroll. Return to Join after enrollment; expired codes must be renewed.
+          </p>
+        </div>}
         <Button disabled={busy || !choices.choices.length} type="submit">
           {busy ? "Pairing…" : "Pair my device"}
         </Button>

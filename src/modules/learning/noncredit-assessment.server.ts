@@ -17,6 +17,7 @@ import {
   openNoncreditAnswerKey, scoreNoncreditChoices,
 } from "@/domain/noncredit-knowledge-check";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
+import { loadNativeClassAssessmentScope } from "./native-class-assessment-scope.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type KnowledgePhase = "baseline" | "final";
@@ -43,6 +44,13 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
   readHistory=false,phase:KnowledgePhase="final") {
   requireLearner(context);
   const access=await authorizeCanonicalCourseAttempt(tx,context,courseAttemptId,readHistory);
+  // Reuse this SAME canonical scoring, attempts, forms and result pipeline for
+  // native Class. The Class source has no noncredit registration and must
+  // resolve to its actual Course Attempt, participant and provider-issued grant.
+  if(access.source==="class")
+    return loadNativeClassAssessmentScope(
+      tx,context as CommandContext & {actorPersonId:string},
+      access,readHistory,phase);
   if(access.source!=="noncredit"||!access.noncreditRegistrationId)
     throw new AuthorizationError("active noncredit course attempt");
   const [registration]=await tx.select().from(noncreditRegistrations)
@@ -150,8 +158,9 @@ async function loadNoncreditAssessment(tx:Tx,context:CommandContext,courseAttemp
     (!administration.opensAt||administration.opensAt<=now)&&
     (!administration.closesAt||administration.closesAt>now)&&
     access.sectionId===null;
-  return {access,registration,training,administration,form,grant,canStart,
-    phase,assessmentVersionId};
+  return {access,learnerId:registration.learnerId,
+    providerOrganizationId:training.providerOrganizationId,
+    administration,form,grant,canStart,phase,assessmentVersionId};
 }
 
 async function loadFormQuestions(tx:Tx,formVersionId:string) {
@@ -181,7 +190,7 @@ async function loadFormQuestions(tx:Tx,formVersionId:string) {
     if(choices.length<2)throw new Error("Objective questions require at least two options");
     const maxPoints=Number(f.pointsOverride??version.maximumPoints);
     if(!Number.isFinite(maxPoints)||maxPoints<=0)throw new Error("Invalid question points");
-    return {formItemId:f.id,itemVersionId:version.id,responseKind:kind,
+    return {formItemId:f.id,itemVersionId:version.id,responseKind:version.responseKind,
       prompt:publicText(version.itemPrompt,"prompt"),maxPoints,
       options:choices.map(o=>({id:o.id,label:publicText(o.displayContent,"option")}))};
   });
@@ -313,7 +322,7 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       .orderBy(desc(assessmentAccommodations.revisionNo)).limit(1);
     const [attempt]=await tx.insert(assessmentExecutionAttempts).values({
       accessGrantId:scope.grant.id,administrationId:scope.administration.id,
-      learnerId:scope.registration.learnerId!,formVersionId:scope.form.id,
+      learnerId:scope.learnerId,formVersionId:scope.form.id,
       attemptNo:(existing?.attemptNo??0)+1,
       selectionSeed:BigInt(randomInt(1,2147483647)),
       accommodationDecisionId:accommodation?.id??null,
@@ -333,15 +342,17 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       .where(eq(assessmentExecutionAttempts.id,attempt.id)).limit(1);
     const startedPayload={courseAttemptId:scope.access.courseAttemptId,
       assessmentAttemptId:attempt.id,assessmentVersionId:scope.assessmentVersionId,
-      noncreditPhase:scope.phase};
+      assessmentSource:scope.access.source,
+        assessmentPhase:scope.phase,
+        ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{})};
     await tx.insert(auditEvents).values({
       actorPersonId:context.actorPersonId,
-      owningOrganizationId:scope.training.providerOrganizationId,
-      eventCode:"noncredit.assessment.started",
+      owningOrganizationId:scope.providerOrganizationId,
+      eventCode:scope.access.source==="class"?"class.assessment.started":"noncredit.assessment.started",
       entityKind:"assessment_attempt",entityId:attempt.id,payload:startedPayload,
     });
     await tx.insert(domainEvents).values({
-      eventType:"NoncreditKnowledgeCheckStarted",
+      eventType:scope.access.source==="class"?"ClassKnowledgeCheckStarted":"NoncreditKnowledgeCheckStarted",
       aggregateType:"assessment_attempt",aggregateId:attempt.id,
       actorPersonId:context.actorPersonId,payload:startedPayload,
     });
@@ -363,7 +374,7 @@ export async function saveNoncreditKnowledgeCheckDraft(context:CommandContext,in
     const [attempt]=await tx.select().from(assessmentExecutionAttempts)
       .where(and(eq(assessmentExecutionAttempts.id,input.attemptId),
         eq(assessmentExecutionAttempts.accessGrantId,scope.grant.id),
-        eq(assessmentExecutionAttempts.learnerId,scope.registration.learnerId!)))
+        eq(assessmentExecutionAttempts.learnerId,scope.learnerId)))
       .for("update").limit(1);
     if(!attempt||attempt.state!=="in_progress"||
         (attempt.expiresAt!==null&&attempt.expiresAt<=new Date()))
@@ -412,7 +423,7 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     const [attempt]=await tx.select().from(assessmentExecutionAttempts)
       .where(and(eq(assessmentExecutionAttempts.id,input.attemptId),
         eq(assessmentExecutionAttempts.accessGrantId,scope.grant.id),
-        eq(assessmentExecutionAttempts.learnerId,scope.registration.learnerId!)))
+        eq(assessmentExecutionAttempts.learnerId,scope.learnerId)))
       .for("update").limit(1);
     if(!attempt)throw new AuthorizationError("personal knowledge check attempt");
     const maxAttempts=await allowedAttemptCount(tx,scope.grant.id,scope.administration.attemptLimit);
@@ -496,7 +507,8 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     );
     // Keep legacy canonical SQL deployments safe: until the additional
     // noncredit result gate is installed and verified, stay provisional.
-    const autoFinalize=process.env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true";
+    const autoFinalize=scope.access.source==="noncredit" &&
+      process.env.CAN_NONCREDIT_AUTO_FINALIZATION_ENABLED==="true";
     const [result]=await tx.insert(assessmentExecutionResults).values({
       attemptId:attempt.id,resultRevision:1,
       resultStatus:autoFinalize?"finalized":"provisional",
@@ -506,7 +518,9 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
       resultEvidence:{
         engine:NONCREDIT_SCORING_ENGINE,
         courseAttemptId:scope.access.courseAttemptId,
-        noncreditPhase:scope.phase,
+        assessmentSource:scope.access.source,
+        assessmentPhase:scope.phase,
+        ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{}),
         ...(autoFinalize?{noncreditAutoFinalized:"v1"}:{}),
       },
     }).returning({id:assessmentExecutionResults.id});
@@ -520,17 +534,19 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     const submittedPayload={
       courseAttemptId:scope.access.courseAttemptId,assessmentAttemptId:attempt.id,
       assessmentResultId:result.id,assessmentVersionId:scope.assessmentVersionId,
-      noncreditPhase:scope.phase,
+      assessmentSource:scope.access.source,
+        assessmentPhase:scope.phase,
+        ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{}),
       autoFinalized:autoFinalize,
     };
     await tx.insert(auditEvents).values({
       actorPersonId:context.actorPersonId,
-      owningOrganizationId:scope.training.providerOrganizationId,
-      eventCode:"noncredit.assessment.submitted",
+      owningOrganizationId:scope.providerOrganizationId,
+      eventCode:scope.access.source==="class"?"class.assessment.submitted":"noncredit.assessment.submitted",
       entityKind:"assessment_attempt",entityId:attempt.id,payload:submittedPayload,
     });
     await tx.insert(domainEvents).values({
-      eventType:"NoncreditKnowledgeCheckSubmitted",
+      eventType:scope.access.source==="class"?"ClassKnowledgeCheckSubmitted":"NoncreditKnowledgeCheckSubmitted",
       aggregateType:"assessment_attempt",aggregateId:attempt.id,
       actorPersonId:context.actorPersonId,payload:submittedPayload,
     });

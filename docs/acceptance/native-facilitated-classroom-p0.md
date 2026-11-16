@@ -1,0 +1,197 @@
+# P0 acceptance: Native facilitated classroom
+
+**Scope:** CAN OS, `feature/unified-class-offerings`. COGIC/COGBF phase 2 and any
+independent school/community site. Native Class identity is
+`/classes/:classId`. Instructor media is selected per Course version;
+each learner's evidence belongs to that learner's Course Attempt.
+
+**Status: SOURCE INTEGRATION ONLY. NOT RELEASED.** This plan is a release gate,
+not a claim that these cases already pass. Do not run against production.
+Migrate an isolated reviewed Neon QA database and provision purpose-specific
+RLS before enabling any Class server functions.
+
+## End-to-end user journey
+
+1. Authorized operator creates a single approved Class without requiring a
+   Class Offering. Optionally publish Class Offering terms for self-enrollment.
+2. Grant approved local facilitator a Class teaching assignment; separately
+   choose whether **attendance verification** is authorized. The latter is
+   an immutable, audited assignment privilege. Changing it requires ending
+   and reassigning the person's role.
+3. Facilitator opens `/classes/:classId?view=teach&tab=classroom`, schedules
+   four weekly dated Sessions, and opens one scheduled Session near its start.
+4. Shared-screen recorded lesson rights are checked against the **active
+   enrolled Course Attempts of that exact Class**, so the facilitator may
+   select content **before** anybody pairs a phone. This does not create
+   any learner watch-time or completion event.
+5. Presenters choose one of:
+   - **One laptop:** navigate to
+     `/classroom/:sessionId/presentation?layout=single`; this contains
+     approved playback and *public-safe question drafting only*. Do not
+     mirror the private facilitator console.
+   - **Dual screen:** use the private Class facilitator console on the
+     laptop, and the dedicated audience-only presentation on the TV.
+   - **Distributed:** TV presentation plus tablet facilitator console,
+     with learners on phones. The presentation browser must authenticate
+     with an authorized facilitator account; there is no public-display
+     privilege handoff or shared staff password.
+6. Show a QR generated locally from a short-lived pairing code. Its
+   `/join#pair=...` fragment is stripped on arrival. If sign-in is
+   required, the code is kept only in that tab; expired codes must be renewed.
+   Anyone without a permitted Class Enrollment is offered catalog navigation
+   or private invitation instructions. The QR does not enroll them.
+7. Signed-in participant pairs *their own* native Class Course Attempt, then
+   receives questions via `ClassroomCompanionRoom`; responses and presence
+   are recorded against their Course Attempt and room identity.
+8. Facilitation console sees response aggregates from currently enrolled,
+   active and correctly paired Class members only. Withdrawn/transferred
+   learners disappear from live aggregate denominators. Text answers,
+   named rosters, moderation and attendance never reach the projector API.
+9. If the manager explicitly approved attendance delegation, the facilitator
+   can attest present/absent/unknown with the existing append-only evidence
+   and no-device correction workflow. Device pairing, responding, verified
+   physical presence, course completion and mastery are separate facts.
+10. Facilitator confirms End Session. An authorized Site manager can
+    independently use **Emergency revoke room** with an audited reason even
+    if the facilitator's teaching role was revoked. The Class-to-plan link
+    remains immutable, so the room cannot accidentally fall back to generic
+    Course/Site authorization.
+11. No further pairing, new activity submissions or playback commands are
+    accepted after closure. Historical evidence and correction policy remain
+    distinct from the device connection history.
+
+## Isolation fixture
+
+Prepare two distinct Organizations/Sites and two active Classes using **the
+same publisher Course version**, plus 25 registered adult learners in each
+Class. Include one learner with no phone. Use fake/test people and a QA-only
+application origin, never a real school or church roster.
+
+| Test | Expected |
+| --- | --- |
+| Room A QR + current Class A learner | Pair succeeds |
+| Room A QR + Class B learner, same Course | Denied, rate-limited |
+| Room A QR + formerly enrolled/withdrawn Class A learner | Denied |
+| Class A Session ID with mismatched Site, Course, plan or facilitator | Denied |
+| Revoked operator/host/Site or Course adoption | Start, pairing, playback denied |
+| Revoked facilitator grant or Class staff assignment | Controls and projector fail closed |
+| Projector API and HTML state inspection | No names, roster, raw responses, attendance or moderation |
+| 25 paired devices, 25 distinct learner responses | Separate Course Attempt evidence, aggregate 25 |
+| Remove one learner from Class A after an earlier pairing | Live aggregate filters that learner out |
+| Correctly enrolled learner with no device | No phantom pairing; authorized facilitator may attest observation |
+| Assigned facilitator without attendance delegation | Cannot read personal roster or attest attendance |
+| Manager-approved attendance delegate for Class A | May view and attest **Class A only** |
+| Four dated sessions across DST transition | Correct local dates and duration |
+| Native presentation with no paired device but enrolled Class audience | Approved recording may load; no watch-time attribution |
+| Video on R2 signed URL after expiry | Rights rechecked; graceful refresh or explicit error |
+| YouTube/Vimeo embed | Playback/seek limitations explained; no invented synchronization |
+| End room, renew QR, retry stale question submission | No access to closed room or new evidence |
+| Manager emergency revokes live room after facilitator grant is removed | Exact Site manager may terminate with reason; learner and presenter access stay denied |
+
+## Canonical assessment, survey and completion reuse
+
+- The learner's native Class Course Attempt is the ONLY participation
+  authority. It is tied to an actual `class_enrollment_id`, never to a
+  fabricated noncredit registration or school Section.
+- The native Assignments tab queries canonical lesson-progress, assessment
+  access/result and Class outcome records. It cannot read another Person's
+  Course Attempt, leak answer keys or issue completion decisions.
+- Existing academic and noncredit assessment and survey records remain
+  authoritative. No parallel quiz, survey, consent or completion tables are
+  introduced by the unified Class migrations.
+- **Source integration, not accepted:** native Class now uses the canonical
+  assessment result and identified-survey endpoints, with exact Class Course
+  Attempt verification, provider-issued assessment access, independent
+  provisional-result confirmation and individually invited, permissioned
+  surveys. Validate published five-question forms and five-question campaigns
+  under real restricted DB roles before promising the pilot journey.
+- Require publisher-approved versions, matching Course and deployment,
+  independent verified staff access grants, consented survey invitations,
+  per-learner response isolation, immutable results and completion policy
+  provenance. No learner may independently finalize an assessment or award.
+- Regression: the existing school and noncredit paths must be unchanged,
+  and a revoked or cross-Site actor must fail closed for Class records.
+
+## Shared publisher activities and exact Class survey attribution
+
+- Publisher-authorized Course Activities page shows the same published
+  canonical assessment versions available for a Course; it never exposes
+  secure answers or grants national publisher rights to local Site managers.
+- The five-question objective quiz editor now uses the scoped canonical
+  **assessment draft writer**, storing the real definition, item bank,
+  versioned questions, form and encrypted keys without a parallel quiz
+  database. Confirm the saved version is visible after refreshing and that
+  no correct answers, raw keys or other publisher's drafts are returned.
+- **Draft is not publication**: `assessment_draft_author` has only two
+  restricted stored-function EXECUTE grants and no arbitrary SELECT/INSERT,
+  answer-key reads, review, publishing, administration or award access.
+  Publication requires separately governed canonical item, assessment and
+  form review decisions under the existing release triggers.
+- The five-question survey editor saves a real **canonical survey draft** only
+  through the existing restricted survey-draft command. Independent approval,
+  campaign creation and per-person invitations are still required.
+- One national publisher-approved Survey version may back distinct local
+  campaigns, each immutably attributed to exactly one Class **before**
+  invitations or responses. Same learner, same Course, same Deployment but
+  different Class must not see or submit another Class's survey campaign.
+- A noncredit registration must not read a Class-attributed campaign even
+  when the Deployment and Person match. Existing noncredit-only campaigns
+  remain available without a new Class migration while the Class feature is off.
+- Campaign attribution requires exact Deployment, operating Organization,
+  active Class and verified survey permission. Campaign links are immutable
+  and must reject attempts to reassign after invitations exist.
+- National Course publisher retains assessment definition ownership. Local
+  authorized operators use provider-specific administrations and assessment
+  grants without changing the published publisher-owned form or answer keys.
+- Checklist UI describes observed lesson/assessment/outcome evidence without
+  claiming a verified completion policy, attendance minutes or award.
+
+## Classroom resilience and operational acceptance
+
+- The hosting Site's IANA timezone governs one-off, weekly and custom
+  dates. Verify spring-forward, fall-back, ambiguous/missing local time,
+  ordering and overlapping-session rejection, including a laptop in
+  a DIFFERENT timezone.
+- Bring a phone offline with a drafted answer. The answer remains editable
+  on the open page; no offline submission or attendance is silently claimed.
+  Reconnection allows retry with the original idempotency key.
+- On an expiring signed R2 URL, the projector refreshes rights even without
+  a new play command. Verify resume position, no uncontrolled replay,
+  explicit failure state, revoked rights and remote command closure.
+- Public Class search pages beyond 100 items, including revoked entries
+  that must be filtered out. Verify no private/unlisted Class leaks and
+  stable results across cursor paging.
+- Manager roster over 100 enrolled people: pages require exact Site
+  operator authorization on EVERY request, never from public endpoints.
+- Import a shared network launch recipe at a second Site. The Site must
+  select its own authorized adoption and hosting location. A tampered
+  template containing operating-organization, Site, participant or
+  credential fields must be rejected.
+- Accessibility: keyboard-only scheduling, speaker display, questions
+  and learner navigation; semantic labels, caption-ready player controls,
+  200% zoom, projector text readability and screen reader status messages.
+
+## QA and deployment gates
+
+- Run `npm run typecheck`, `npm run test:classes:unit`,
+  `npm run db:canonical:classes` on an isolated QA DB with the explicit
+  read-only acceptance flag.
+- Run authenticated Playwright across **two Classes and two Sites** and the
+  three display configurations. Check negative access and revoked-grant cases.
+- Inspect network responses for the presentation route and projector media
+  for learner identifiers. Confirm Referrer-Policy and QR fragment scrubbing.
+- Verify current restricted RLS and grant boundaries under the actual
+  application database role (not just the database owner).
+- Confirm credential/academic credit issuance cannot be triggered by
+  pairing, video events, questions or attendance.
+- Confirm every required hosted-video right, publication approval and
+  instructor rights policy in the signed-media API.
+- Validate devices on a real TV, laptop, tablet and phones with browser
+  autoplay restrictions, accessibility, and poor/Wi-Fi-loss behavior.
+- Resolve GitHub Actions `startup_failure`: zero executed jobs cannot count
+  as passing CI.
+
+**Release decision:** hold until database migration, read/write role isolation,
+correct Class Session lifecycle, signed-in E2E and multi-Site negative tests
+have actual passing evidence. Do not merge to main or enable for users
+solely because source code exists.

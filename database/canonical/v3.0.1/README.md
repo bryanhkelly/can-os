@@ -450,6 +450,99 @@ runtime database are aligned for these tables, but credential feature flags
 remain disabled until restricted DB grants and role-based acceptance tests pass.
 See `verify-achievement-credentials.sql` for the reusable, read-only checks.
 
+### Optional canonical Course knowledge-check draft writer (not installed by default)
+
+The publisher Course Activities page uses the existing canonical assessment
+definition, version, form, item and encrypted answer-key schema. It does not
+create a new quiz or survey response ledger.
+
+On an approved **disposable QA database only**, a trusted administrator may
+apply the optional security-function patch. This does not install native
+Class tables, grant a publisher any learner records, publish assessments or
+authorize assessments for a local Site:
+
+```sh
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/patch-canonical-assessment-draft-authoring.sql
+
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v organization_id=YOUR_ACTIVE_PUBLISHER_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_NOINHERIT_LOGIN \
+  -f database/canonical/v3.0.1/provision-canonical-assessment-draft-role.sql
+```
+
+The role is named `can_v30_assess_draft_author_<organization-uuid-without-dashes>`
+and receives only EXECUTE on the canonical write and metadata readback
+functions, plus the organization-purpose binding verifier. It does not
+receive direct canonical assessment table DML or plaintext answer-key access.
+The stored function rechecks the bound DB role, active verified Person grant,
+current publisher Course identity, complete quiz configuration and
+in-transaction audit events.
+
+Enable `CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED=true` and a **server-only**
+`CAN_NONCREDIT_ASSESSMENT_KEY_HEX` (64 hex chars) on that isolated QA
+process, never in browsers, source, or build output. Default remains OFF.
+
+Use `CAN_CANONICAL_ASSESSMENT_DRAFT_PREFLIGHT=1` with
+`CAN_CANONICAL_ASSESSMENT_QA_ORGANIZATION_ID` and the QA `DATABASE_URL`
+before attempting writes:
+
+```sh
+npm run db:canonical:objective-draft:preflight
+npm run test:classes:unit
+npm run typecheck
+```
+
+This patch is **not** the retired third Unified Class activity migration.
+The original Class change remains two ordered SQL patches. Assessment
+item/form/version **publication still requires independent canonical
+reviews** and separate authorized release actions. See
+`docs/acceptance/canonical-objective-draft-authoring.md`.
+
+### Optional independent canonical assessment review and publication
+
+After the separately provisioned objective **draft** authoring patch, CAN OS
+can use the EXISTING canonical assessment item/form/version independent
+review records and publication triggers. The optional source-level review
+and publication capability creates **no new Class, quiz, response, survey
+or grade tables**. It must be DBA reviewed and applied **only to isolated QA**
+first:
+
+```sh
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/patch-canonical-assessment-review-publication.sql
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v organization_id=YOUR_PUBLISHER_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_NOINHERIT_LOGIN \
+  -f database/canonical/v3.0.1/provision-canonical-assessment-approval-roles.sql
+```
+
+The exact Organization-bound `can_v30_assess_reviewer_<uuid>` and
+`can_v30_assess_publisher_<uuid>` NOLOGIN roles have distinct function-only
+permissions. The organization must additionally record current,
+evidence-backed **Person-specific** appointments in existing
+`professional_role_assignments`, using `assessment_reviewer` or
+`assessment_publisher`. Without both the SQL role and the independent
+Person appointment, the action fails. This does not enable or implement
+one-account role switching.
+
+The reviewer can inspect the original questions and correct answers in a
+restricted publisher review page; the server decrypts the sealed key and
+never exposes raw ciphertext or the server secret to the browser. The
+publisher sees approval metadata, not correct answers. The latest
+independent approvals must cover **every item**, the assessment version,
+and the form; a different Person must review work authored by another.
+The atomic publish transaction retains the original canonical publication
+triggers. Neither role can authorize an examination administration,
+learner access grant, Course completion, grade or award.
+
+`CAN_CANONICAL_ASSESSMENT_REVIEW_ENABLED` and
+`CAN_CANONICAL_ASSESSMENT_PUBLICATION_ENABLED` both default to `false`.
+Do not enable either until DBA provision, negative permission testing,
+TypeScript checks and two-Site authenticated acceptance pass.
+
+See `docs/acceptance/canonical-objective-draft-authoring.md`.
+
 ### Optional survey draft writer (not installed by default)
 
 The temporary Capability Lab survey draft page is guarded by

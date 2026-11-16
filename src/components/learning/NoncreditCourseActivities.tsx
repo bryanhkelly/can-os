@@ -19,7 +19,7 @@ export function NoncreditCourseActivities({courseAttemptId,lessonProgressRevisio
 function NoncreditActivitiesSession({courseAttemptId,lessonProgressRevision}:{
   courseAttemptId:string;lessonProgressRevision:number;
 }) {
-  const [source,setSource]=useState<"school"|"noncredit"|null>(null);
+  const [source,setSource]=useState<"school"|"noncredit"|"class"|null>(null);
   const [hasBaseline,setHasBaseline]=useState(false);
   const [hasFinal,setHasFinal]=useState(false);
   const [readiness,setReadiness]=useState<Readiness|null>(null);

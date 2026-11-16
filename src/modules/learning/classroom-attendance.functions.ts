@@ -9,8 +9,10 @@ import {
   noncreditSelfEnrollmentClaims,
   facilitatedLearningParticipants, facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
+  canonicalClassEnrollments,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { nativeClassForRoom, assertNativeClassAttendanceReader } from "@/modules/classes/native-class-room-boundary.server";
 import { classroomAttestationOpen, classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import {assignedClassroomRelease,attemptInAssignedClassroomRelease} from "./classroom-release-boundary.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
@@ -40,8 +42,27 @@ export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       const releaseScope=await assignedClassroomRelease(tx,room);
+      const native=await nativeClassForRoom(tx,room);
+      // Native teacher assignment alone is not consent to expose a learner
+      // roster. A verified site manager may review attendance records.
+      if(native)
+        await assertNativeClassAttendanceReader(tx,room,host.actor.actorPersonId!);
       // Scope the SQL BEFORE LIMIT: other cohorts must not crowd out this roster.
-      const attempts=releaseScope
+      const attempts=native
+        ? await tx.select({id:learnerCourseAttempts.id})
+            .from(learnerCourseAttempts)
+            .innerJoin(canonicalClassEnrollments,and(
+              eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
+              eq(canonicalClassEnrollments.classId,native.classId),
+              eq(canonicalClassEnrollments.status,"active"),
+              eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id),
+            ))
+            .where(and(
+              eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+              eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+              eq(learnerCourseAttempts.status,"active"),
+            )).limit(301)
+        : releaseScope
         ? await tx.select({id:learnerCourseAttempts.id})
             .from(learnerCourseAttempts)
             .innerJoin(noncreditRegistrations,eq(
@@ -66,7 +87,7 @@ export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
               eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
               eq(learnerCourseAttempts.status,"active"),
             )).limit(301);
-      const eligible:{id:string;personId:string;source:"school"|"noncredit"}[]=[];
+      const eligible:{id:string;personId:string;source:"school"|"noncredit"|"class"}[]=[];
       for(const attempt of attempts.slice(0,300)){
         try {
           const person=await registeredRoomParticipant(tx,room,attempt.id,releaseScope);
@@ -130,6 +151,8 @@ export const attestClassroomParticipation=createServerFn({method:"POST"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId,true);
+      if(await nativeClassForRoom(tx,room))
+        await assertNativeClassAttendanceReader(tx,room,host.actor.actorPersonId!);
       if(!classroomAttestationOpen(room,new Date()))
         throw new AuthorizationError("attestation window is closed");
       const subject=await registeredRoomParticipant(tx,room,data.courseAttemptId);
