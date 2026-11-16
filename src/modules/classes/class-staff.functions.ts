@@ -11,6 +11,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { validateClassAuthority } from "./unified-class.functions";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 const uuid=z.string().uuid();
 const assignInput=z.object({
@@ -89,6 +90,7 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
           isNull(canonicalClassStaffAssignments.endsAt),
         )).limit(1);
       if(prior)return {assignmentId:prior.id,alreadyAssigned:true};
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),manager.actor);
       const [assignment]=await tx.insert(canonicalClassStaffAssignments).values({
         classId:instance.id,personId:data.personId,roleCode:data.roleCode,
         state:"approved",beginsAt:new Date(),assignedByPersonId:manager.actor.actorPersonId!,
@@ -125,6 +127,7 @@ export const endNativeClassStaffAssignment=createServerFn({method:"POST"})
       if(assignment.state==="ended"||assignment.state==="suspended")
         return {ended:true};
       const endedAt=new Date();
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),manager.actor);
       await tx.update(canonicalClassStaffAssignments)
         .set({state:"ended",endsAt:endedAt})
         .where(eq(canonicalClassStaffAssignments.id,assignment.id));
