@@ -9,7 +9,7 @@ import {
   canonicalClassOfferingVersions, canonicalClassEnrollments, canonicalPersons,
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
-  educationOperationSites, classroomDeploymentSites, catalogSites,
+  educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
   canonicalOfferingCourses,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -83,6 +83,13 @@ async function currentClassAuthority(tx:Tx,classId:string,now:Date){
   if(r.siteId){
     const [site]=await tx.select({id:catalogSites.id}).from(catalogSites)
       .innerJoin(programDeployments,eq(programDeployments.id,r.deploymentId))
+      .innerJoin(siteOrganizationRoles,and(
+        eq(siteOrganizationRoles.siteId,catalogSites.id),
+        eq(siteOrganizationRoles.organizationId,r.operatingOrganizationId),
+        inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+        lte(siteOrganizationRoles.validFrom,now),
+        or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+      ))
       .innerJoin(educationOperationSites,and(
         eq(educationOperationSites.siteId,catalogSites.id),
         eq(educationOperationSites.operationId,programDeployments.operationId),
