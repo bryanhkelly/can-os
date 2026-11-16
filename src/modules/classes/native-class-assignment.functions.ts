@@ -15,7 +15,9 @@ import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 
 /** The first Class-without-Offering enrollment pathway is deliberately
  * restricted to verified adult learners already affiliated with the Class's
- * authorized operating Organization and exact Site. Guardian/school placement
+ * authorized operating Organization. A learner's grant is organization-scoped
+ * (site_id NULL); Site hosting authority is verified on the Class itself.
+ * Guardian/school placement
  * must have a separately verified relationship, never a free-form Person UUID.
  */
 const assignSchema=z.object({
@@ -58,9 +60,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         .where(and(
           eq(canonicalAccountGrants.personId,person.id),
           eq(canonicalAccountGrants.organizationId,cls.operatingOrganizationId),
-          cls.siteId
-            ?eq(canonicalAccountGrants.siteId,cls.siteId)
-            :isNull(canonicalAccountGrants.siteId),
+          isNull(canonicalAccountGrants.siteId),
           eq(canonicalAccountGrants.roleCode,"learner"),
           eq(canonicalAccountGrants.active,true),
           isNull(canonicalAccountGrants.revokedAt),
@@ -68,7 +68,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
           isNull(canonicalAccounts.disabledAt),
           isNotNull(canonicalAccounts.emailVerifiedAt),
         )).limit(1);
-      if(!grant)throw new AuthorizationError("verified current learner membership at this Class Site");
+      if(!grant)throw new AuthorizationError("verified current organization-scoped learner grant");
 
       const previous=await tx.select({
         id:canonicalClassEnrollments.id,status:canonicalClassEnrollments.status,
