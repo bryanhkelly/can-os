@@ -109,3 +109,22 @@ export const canonicalClassStaffAssignments = educationV30.table("class_staff_as
   index("canonical_class_staff_class_idx").on(t.classId,t.state),
   index("canonical_class_staff_person_idx").on(t.personId,t.state),
 ]);
+
+
+/** A Class owns dated delivery by reference to the canonical Session and
+ * its existing facilitated classroom plan. Scheduling never creates a second
+ * learner identity, gradebook or Class Enrollment. */
+export const canonicalClassSessions=educationV30.table("class_sessions",{
+  id:id(),
+  classId:uuid("class_id").notNull(),
+  classroomPlanId:uuid("classroom_plan_id").notNull(),
+  deliverySessionId:uuid("delivery_session_id").notNull(),
+  facilitatorPersonId:uuid("facilitator_person_id").notNull(),
+  requestId:uuid("request_id").notNull(),
+  createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("canonical_class_session_plan_uq").on(t.classroomPlanId),
+  uniqueIndex("canonical_class_session_delivery_uq").on(t.deliverySessionId),
+  uniqueIndex("canonical_class_session_request_uq").on(t.classId,t.facilitatorPersonId,t.requestId),
+  index("canonical_class_session_class_idx").on(t.classId,t.createdAt),
+]);
