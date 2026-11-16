@@ -7,7 +7,7 @@ export type RouteNavigationMetadata = {
   owner: keyof FileRoutesByTo | Partial<Record<WorkspaceRole, keyof FileRoutesByTo>>;
 } | { visibility: "hidden" | "non-navigable"; personas: readonly WorkspaceRole[]; reason: string };
 
-const all = ["account_holder", "site_website_editor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead", "student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor", "network_admin", "can_network_steward", "can_jurisdiction_reviewer"] as const;
+const all = ["account_holder", "site_website_editor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead", "student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor", "network_admin", "can_network_steward", "can_credential_reviewer", "can_jurisdiction_reviewer"] as const;
 const messagingRoles = (Object.keys(roleCapabilities) as WorkspaceRole[])
   .filter(role => roleCapabilities[role]?.includes("communication.send"));
 const admins = ["registrar", "site_admin"] as const;
