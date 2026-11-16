@@ -8,6 +8,7 @@ import {
   canonicalClassOfferings, canonicalClassOfferingVersions, canonicalPersons,
   canonicalAccountGrants, canonicalAccounts, courseLessons, courseUnits,
   canonicalClassSessions, canonicalDeliverySessions, facilitatedClassroomPlans,
+  facilitatedLearningSessions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { classViews, classTabs, selectClassTab, selectClassView } from "@/domain/class-views";
@@ -287,10 +288,14 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         planId:facilitatedClassroomPlans.id,
         state:facilitatedClassroomPlans.state,
         roomId:facilitatedClassroomPlans.facilitatedSessionId,
+        roomState:facilitatedLearningSessions.state,
         startsAt:canonicalDeliverySessions.startsAt,
         endsAt:canonicalDeliverySessions.endsAt,
         facilitatorPersonId:canonicalClassSessions.facilitatorPersonId,
       }).from(canonicalClassSessions)
+        .leftJoin(facilitatedLearningSessions,eq(
+          facilitatedLearningSessions.id,facilitatedClassroomPlans.facilitatedSessionId,
+        ))
         .innerJoin(facilitatedClassroomPlans,and(
           eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId),
           eq(facilitatedClassroomPlans.deliverySessionId,canonicalClassSessions.deliverySessionId),
@@ -310,6 +315,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         id:row.id,
         planId:view==="learn"?null:row.planId,
         roomId:view==="learn"?null:row.roomId,
+        roomState:view==="learn"?null:row.roomState,
         state:row.state,
         startsAt:row.startsAt.toISOString(),
         endsAt:row.endsAt.toISOString(),
