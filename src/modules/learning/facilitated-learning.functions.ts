@@ -925,7 +925,8 @@ export const getLearnerFacilitatedRoom = createServerFn({method:"GET"})
         if(access.source==="school" && !await schoolAttemptIsPlacedAtSite(
           tx,access.courseAttemptId,row.deploymentId,row.siteId,now,
         ))continue;
-        if(!await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
+        if(access.source!=="class" &&
+          !await selfEnrolledNoncreditRoomSitePermitted(tx,access,row.siteId))continue;
         if(!await attemptInAssignedClassroomRelease(
           tx,room,access.courseAttemptId,actor.actorPersonId!,
         ))continue;
