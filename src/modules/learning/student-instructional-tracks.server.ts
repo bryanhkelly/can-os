@@ -741,25 +741,25 @@ export async function readSelectedInstructionalTrack(
       conflict("The instructional policy changed after track selection.");
     }
 
-    const [lessons, progress] = await Promise.all([
-      tx.select({
-        id: courseLessons.id,
-        courseUnitId: courseLessons.courseUnitId,
-        title: courseLessons.title,
-        lessonOrder: courseLessons.lessonOrder,
-      }).from(courseLessons)
-        .where(eq(courseLessons.courseVersionId, attempt.courseVersionId))
-        .orderBy(courseLessons.lessonOrder),
-      tx.select({
-        lessonId: learnerLessonProgress.lessonId,
-        status: learnerLessonProgress.status,
-        observedAt: learnerLessonProgress.observedAt,
-      }).from(learnerLessonProgress)
-        .where(and(
-          eq(learnerLessonProgress.courseAttemptId, attempt.id),
-          eq(learnerLessonProgress.courseVersionId, attempt.courseVersionId),
-        )),
-    ]);
+    // Neon transactional Pool connections do not promise concurrent query
+    // execution. Keep the Class lesson and progress reads sequential.
+    const lessons = await tx.select({
+      id: courseLessons.id,
+      courseUnitId: courseLessons.courseUnitId,
+      title: courseLessons.title,
+      lessonOrder: courseLessons.lessonOrder,
+    }).from(courseLessons)
+      .where(eq(courseLessons.courseVersionId, attempt.courseVersionId))
+      .orderBy(courseLessons.lessonOrder);
+    const progress = await tx.select({
+      lessonId: learnerLessonProgress.lessonId,
+      status: learnerLessonProgress.status,
+      observedAt: learnerLessonProgress.observedAt,
+    }).from(learnerLessonProgress)
+      .where(and(
+        eq(learnerLessonProgress.courseAttemptId, attempt.id),
+        eq(learnerLessonProgress.courseVersionId, attempt.courseVersionId),
+      ));
     const recordedLessons = projectRecordedCourseLessons({
       lessons,
       progress,
