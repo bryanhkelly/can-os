@@ -162,7 +162,8 @@ export function availablePublicSitePaths(page: PublicSitePage): PublicSitePath[]
     // Full fictional prospectus; these additional routes never grant real
     // admissions, pricing, schedule or program authority.
     return ["/", "/about", "/academics", "/student-life", "/school-day",
-      "/admissions", "/tuition", "/families", "/faq", "/contact"];
+      "/admissions", "/tuition", "/families", "/faq", "/contact",
+      "/programs", "/courses", "/classes"];
   }
   const educational=[
     ...(academic?["/academics","/school-day","/admissions"] as const:[]),
@@ -838,7 +839,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
           (item.status==="register"?"Enrollment available":
             item.status==="waitlist"?"Waitlist available":
             item.status==="closed"?"Registration unavailable":"Explore"),
-        ...(item.action?{link:item.action}:{}),
+        ...(item.action && !options?.localPreview && !options?.templateGallery
+          ? {link:item.action}:{}),
       })),
     });
   };

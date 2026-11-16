@@ -36,8 +36,9 @@ export function projectSiteEnrollmentOpportunities(
     id:"school:"+program.programId,kind:"school" as const,
     targetId:program.programId,title:program.title,description:program.summary,
     status:program.applicationOpen===true?"apply" as const:"explore" as const,
-    action:{href:"/academics",label:"Explore program"},
-    ...(program.applicationOpen===true?{action:{href:"/admissions",label:"Apply for admission"}}:{}),
+    action:program.applicationOpen===true
+      ?{href:"/admissions",label:"Apply for admission"}
+      :{href:"/academics",label:"Explore program"},
   }));
   const enrichment=(feeds.enrichment??[]).map(program=>({
     id:"program:"+program.seasonId,kind:"program" as const,

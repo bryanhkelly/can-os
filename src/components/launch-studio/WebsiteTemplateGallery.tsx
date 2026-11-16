@@ -12,6 +12,7 @@ const previewLabels: Record<PublicSitePath, string> = {
   "/school-day": "Learning model", "/student-life": "Student life",
   "/families": "Families", "/admissions": "Admissions", "/tuition": "Tuition & aid",
   "/faq": "FAQs", "/contact": "Contact",
+  "/programs": "Programs", "/courses": "Courses", "/classes": "Classes",
 };
 
 /** Keep the complete preview in view at every card width instead of clipping a fixed thumbnail. */
@@ -58,6 +59,16 @@ export function WebsiteTemplateGallery({ value, onChange, paletteId, typographyI
     host: "sample.can-os.com",
     demonstration: true,
     site: { name: schoolName, organizationName: "Illustrative template" }, offerings: [],
+    // Fictional-only examples let every Site template preview all enrollment
+    // page layouts. They never create a Course, Class or public application.
+    enrollmentOpportunities: [
+      {id:"program:fictional",targetId:"fictional",kind:"program" as const,
+        title:"Summer Learning",description:"Fictional community program",status:"explore" as const},
+      {id:"course:fictional",targetId:"fictional",kind:"course" as const,
+        title:"Digital Skills",description:"Fictional independent Course",status:"explore" as const},
+      {id:"class:fictional",targetId:"fictional",kind:"class" as const,
+        title:"AI Learning",description:"Fictional facilitated Class",status:"explore" as const},
+    ],
     academicPrograms: [
       { programId: "sample-learning", title: "Learning pathways", typeLabel: "Illustrative learning",
         summary: "Explore a fictional example of discovery and purposeful study.",
