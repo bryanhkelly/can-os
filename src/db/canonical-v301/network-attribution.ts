@@ -42,6 +42,24 @@ export const networkMemberships = educationV30.table("network_memberships",{
   index("network_memberships_unit_idx").on(t.networkOrganizationId,t.reportingUnitId,t.status),
 ]);
 
+/** A network-assigned church, chapter or affiliate number is a mapping
+ * onto an existing membership. It never replaces canonical identity. */
+export const networkMemberIdentifiers=educationV30.table("network_member_identifiers",{
+  id:id(),
+  networkOrganizationId:uuid("network_organization_id").notNull(),
+  networkMembershipId:uuid("network_membership_id").notNull(),
+  identifierType:text("identifier_type").notNull(),
+  identifierValue:text("identifier_value").notNull(),
+  evidenceVersionId:uuid("evidence_version_id"),
+  verifiedByPersonId:uuid("verified_by_person_id"),
+  verifiedAt:timestamp("verified_at",{withTimezone:true}),
+  recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[
+  uniqueIndex("network_member_external_id_uq")
+    .on(t.networkOrganizationId,t.identifierType,t.identifierValue),
+  index("network_member_identifiers_membership_idx").on(t.networkMembershipId),
+]);
+
 /** A member Site's affiliation never authorizes data exports or learner reads.
  * Each data-owning host separately permits named aggregate metrics. */
 export const networkReportingGrants = educationV30.table("network_reporting_grants",{
