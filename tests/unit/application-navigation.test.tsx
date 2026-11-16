@@ -264,7 +264,7 @@ describe("application contextual navigation",()=>{
     successful(siteData);
     const html=render(Site);
     expect(html).toContain('href="/home?siteId=school&amp;action=task"');
-    expect(html).toContain('href="/launch/school?siteId=school"');
+    expect(html).toContain('href="/launch/site?siteId=school"');
     expect(html).toContain('href="/admissions?siteId=school"');
     expect(html).toContain('href="/launch/school/program?siteId=school"');
     expect(html).toContain('href="/calendar?date=2030-01-01&amp;event=event"');
