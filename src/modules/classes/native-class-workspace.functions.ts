@@ -16,6 +16,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { currentClassAuthority } from "./native-class-enrollment.functions";
 import { validateClassAuthority } from "./unified-class.functions";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
+import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
 
 const uuid = z.string().uuid();
 const scope = z.object({
@@ -94,6 +95,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
             gt(canonicalClassStaffAssignments.endsAt,now)),
         )).limit(2);
         if(assignments.length){
+          await assertCurrentNativeTeachingGrant(tx,actor.actorPersonId,instance.operatingOrganizationId,instance.siteId);
           // Revoke or expire underlying publisher, deployment, adoption or Site
           // authority and teaching access disappears immediately.
           await currentClassAuthority(tx,instance.id,now);
