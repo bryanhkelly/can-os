@@ -94,3 +94,29 @@ All new mutations are disabled by default. Do **not** enable `CAN_NONCREDIT_COMP
 Source files and tests are committed to the WS3 feature branch. No authenticated environment, Neon schema migration, feature-flag activation, typecheck, build, unit/integration run, Playwright or deployment success has been verified by this document. Regressions are authored **but have not been demonstrated passing**.
 
 **Integration handoff:** WS00 to reconcile contract/policy schema with WS1/WS2/WS5/WS6, approve reviewed additive migrations, and schedule database/write-grant acceptance. WS1 may mount the learner component once completion payload is authorized; WS4 may mount the operator component without granting issuer rights. Do not merge WS3 to main individually.
+
+
+## November 16 continuation: security, UI, contract and QA update
+
+- **WS1 now has an implementation proposal v1.0.0** on `feature/my-activity`: `docs/architecture/participation-read-model-v1.md` and `src/domain/participation-read-model.ts`. The WS3 source extension consumes its existing `outcome: {label,referenceId?}|null` shape with no edits to WS1 files. Source identity for noncredit is `(noncredit_course, registrationId)` and native Class is `(native_class, classEnrollmentId)`; WS00 ratification is still required.
+- `src/modules/learning/verified-completion-site.server.ts` now requires a **matching immutable noncredit delivery Site attribution**, current exact Site/Organization staff context, and matching self-enrollment claim if one exists. This protects the existing noncredit completion command as well as WS3 corrections against cross-Site adjudication. An old registration without provable delivery-Site attribution **fails closed** until canonical repair is reviewed. A national provider role is not a cross-Site reviewer approval.
+- `src/domain/verified-completion-projection.ts` validates the original noncredit decision supersession graph and projects only the latest unambiguous decision. Invalid/branching history is **unavailable**, not automatically completed. The Class outcome projection remains null until policy approval; no Class completion is fabricated.
+- `src/modules/learning/noncredit-completion-review.functions.ts` is an exact-Site provider-verified read-only decision history, gated by `CAN_WS3_OPERATOR_REVIEW_ENABLED` (OFF). `src/components/learning/NoncreditCompletionReviewPanel.tsx` can render it and issue the independently verified correction command, but is **not wired to navigation or an authenticated route**; WS00 controls route placement.
+- Existing native Class canonical evidence reader and learner panel explicitly distinguish a recorded Class outcome from **independently policy-verified completion**. They do not issue an academic grade or award.
+- Regression additions: `tests/unit/verified-completion-projection.test.ts` plus cross-Site source guards in `tests/unit/ws3-completion-command-contract.test.ts`. All execution remains **NOT RUN**.
+- Added `scripts/acceptance/check-ws3-completion-readiness.mjs`, a **read-only** schema/RLS/trigger/function preflight requiring `CAN_WS3_SCHEMA_VALIDATION=1` and an explicit isolated `DATABASE_URL`. This is not a substitute for restricted-principal positive/negative transaction tests.
+- WS00 approval request: `docs/contracts/WS3-NATIVE-COMPLETION-AUTHORITY-PROPOSAL.md` proposes an additive participant-pinned native Class policy and provenance through existing `class_outcomes`. No DDL was created, applied, or enabled.
+
+### Actual Neon test01 read-only evidence (November 16, 2026)
+
+Neon project `can-os`, branch **test01**, not the default/production branch, was queried through read-only SELECT statements. The following canonical tables exist with RLS **enabled and forced**: `class_outcomes`, `class_awards`, `noncredit_completion_decisions`, `noncredit_completion_certificates`, `learning_award_issuances`, `learning_award_issuance_events`, `participation_attributions`, `noncredit_self_enrollment_claims`. Existing `v28_validate_completion()`, `v301_credential_is_current(uuid)` and `v301_can_sensitive_capability(text,text)` are present; relevant noncredit decision, Class outcome, and award revocation triggers exist.
+
+Observed data counts on test01: **0 native Classes, 0 native Class Enrollments, 0 noncredit Registrations, 0 noncredit Completion Decisions, 0 noncredit Attributions, 0 credential Issuances, 0 credential Revocation Events**. These are schema/preflight observations only. They do **not** prove a successful completion, correct issuer/RLS privilege under a restricted role, an authenticated learner review, or either pilot. Test fixtures and migration approval remain blockers. No database writes were performed.
+
+### Additional flags (OFF)
+
+`CAN_WS3_OPERATOR_REVIEW_ENABLED` protects the new provider history reader. `CAN_NONCREDIT_COMPLETION_CORRECTIONS_ENABLED` protects corrections. `CAN_WS3_AWARD_REVOCATION_ENABLED` protects revocation and requires the existing gated credential issuer authority. `CAN_WS3_SCHEMA_VALIDATION` is a **local script opt-in**, not an application flag. No toggle was changed in an environment.
+
+### Cross-workstream handoff
+
+WS1 receives current valid noncredit completion references and explicit unavailable Class completion (do not fabricate a verified result from the Class source). WS2 retains Class enrollment status authority; completion status transitions require an independently approved command. WS4 must provide only verified host attendance evidence, not Session agenda/device presence. WS5 and WS00 must approve native Class pinned policy and Program composition. WS6 must count current decisions by authoritative source and preserve correction/revocation event history, not sum every revision. No WS1, WS2, WS4, WS5 or WS6 implementation file has been modified here.
