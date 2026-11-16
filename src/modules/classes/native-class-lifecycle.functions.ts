@@ -160,13 +160,13 @@ async function exitNativeClass(command:ExitRequest){
       occurredAt:now.toISOString(),
     };
     await tx.insert(auditEvents).values({
-      actorPersonId:actor.actorPersonId,
+      actorPersonId:actor.actorPersonId,occurredAt:now,
       owningOrganizationId:cls.operatingOrganizationId,
       eventCode:"class.enrollment."+decision.enrollmentStatus,
       entityKind:"class_enrollment",entityId:enrollment.id,payload,
     });
     await tx.insert(domainEvents).values({
-      actorPersonId:actor.actorPersonId,eventType,
+      actorPersonId:actor.actorPersonId,occurredAt:now,eventType,
       aggregateType:"class_enrollment",aggregateId:enrollment.id,payload,
     });
     return {classEnrollmentId:enrollment.id,status:decision.enrollmentStatus,
