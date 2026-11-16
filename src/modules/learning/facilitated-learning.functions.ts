@@ -1,5 +1,6 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
+import { assertNativeClassRoomStaff, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
 import { randomInt, createHmac } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
@@ -196,7 +197,14 @@ export async function roomHostIsCurrent(tx:Tx, room:typeof facilitatedLearningSe
       eq(canonicalAccountGrants.active,true),
       isNull(canonicalAccountGrants.revokedAt),
     )).limit(1);
-  return !!grant;
+  if(!grant)return false;
+  try {
+    await assertNativeClassRoomStaff(tx,room);
+  }catch(error){
+    if(error instanceof AuthorizationError)return false;
+    throw error;
+  }
+  return true;
 }
 export async function schoolAttemptIsPlacedAtSite(
   tx:Tx, courseAttemptId:string, deploymentId:string, siteId:string, now:Date,
@@ -232,6 +240,7 @@ export async function ownedRoom(tx:Tx, host:Host, id:string, lock=false) {
   if(!room) throw new AuthorizationError("owned facilitated learning room");
   const access = await authorizedHostDeployment(tx,host,room.deploymentId,room.siteId);
   if(access.siteId!==room.siteId) throw new AuthorizationError("current Site hosting authority");
+  await assertNativeClassRoomStaff(tx,room);
   return room;
 }
 function assertRoomLive(room: typeof facilitatedLearningSessions.$inferSelect, now:Date) {
@@ -294,9 +303,14 @@ async function currentRoomMediaAudience(
   for (const { attempt, participantPersonId } of paired) {
     let sourceCurrent = false;
     let currentRoomSitePlacement = false;
-    if (Boolean(attempt.enrollmentId) === Boolean(attempt.noncreditRegistrationId))
+    if(!attempt.classEnrollmentId &&
+        Boolean(attempt.enrollmentId) === Boolean(attempt.noncreditRegistrationId))
       throw new AuthorizationError("single current Course participation source");
-    if (attempt.enrollmentId) {
+    if(attempt.classEnrollmentId){
+      const native=await nativeClassRoomParticipant(tx,room,attempt.id,participantPersonId);
+      sourceCurrent=!!native;
+      currentRoomSitePlacement=!!native;
+    } else if (attempt.enrollmentId) {
       const [school] = await tx.select({ id: enrollments.id }).from(enrollments)
         .innerJoin(learnerProfiles, eq(enrollments.learnerId, learnerProfiles.id))
         .where(and(
@@ -815,7 +829,8 @@ export const pairWithFacilitatedRoom = createServerFn({method:"POST"})
       if (attempt.source==="school" && !await schoolAttemptIsPlacedAtSite(
         tx,attempt.courseAttemptId,room.deploymentId,room.siteId,now,
       )) return null;
-      if (!await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId)) return null;
+      if(attempt.source!=="class" &&
+        !await selfEnrolledNoncreditRoomSitePermitted(tx,attempt,room.siteId))return null;
       if(!await attemptInAssignedClassroomRelease(
         tx,room,attempt.courseAttemptId,personId,
       )) return null;
