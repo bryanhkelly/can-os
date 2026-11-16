@@ -31,7 +31,7 @@ function MyNoncreditCourse(){
         <p className="mt-2 text-xs leading-6 text-muted-foreground">Choose your recorded teacher, complete published lessons, and save your own practice. Official awards remain governed by the Course and institution.</p>
         <nav className="mt-4 grid gap-3 text-sm" aria-label="Learning navigation">
           <a href="#course-recorded-lessons" className="underline">Lesson outline</a>
-          <Link to="/learn/my-programs" className="underline">My Learning &amp; Programs</Link>
+          <Link to="/learn/my-activity" className="underline">My Activity</Link>
         </nav>
       </section>
     </div>}>
