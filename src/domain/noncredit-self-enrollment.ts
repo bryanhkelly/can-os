@@ -8,6 +8,7 @@ export const noncreditEnrollCommand = z.object({
   acceptedConsent:z.literal(true),
   adultConfirmed:z.literal(true),
   referralCode:z.string().trim().max(64).regex(/^[a-zA-Z0-9_-]*$/).optional(),
+  networkMembershipId:z.string().uuid().optional(),
 }).strict();
 
 export const noncreditPublishCommand = z.object({
