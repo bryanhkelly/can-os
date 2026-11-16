@@ -243,6 +243,7 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
     const operator=await requireClassOperator();
     return db.select({
       classId:canonicalClasses.id,title:canonicalClasses.title,
+      capacity:canonicalClasses.capacity,
       courseVersionId:canonicalClasses.courseVersionId,
       deploymentId:canonicalClasses.deploymentId,siteId:canonicalClasses.siteId,
       deliveryMode:canonicalClasses.deliveryMode,state:canonicalClasses.state,
