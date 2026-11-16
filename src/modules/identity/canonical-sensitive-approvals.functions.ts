@@ -17,6 +17,8 @@ import { writeAudit } from "@/platform/mutation";
 import { getCommandContext } from "./command-context.server";
 import { getCanonicalCommandContext } from "./canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "./canonical-transaction-authorization.server";
+import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
+import type { AccessContext } from "@/domain/access-context";
 
 const uuid=z.string().uuid();
 const requestSchema=z.object({
@@ -48,6 +50,54 @@ async function requireIndependentInstitutionalReviewer() {
   }).from(organizations).where(eq(organizations.id,organizationId)).limit(1):[];
   assertCANIdentityReviewer(reviewer,organization);
   return reviewer;
+}
+
+/**
+ * Reviewer grants may be revoked while they are inspecting a queue.
+ * Recheck and lock the exact existing CAN reviewer session, active grant
+ * and institution within the decision transaction. No second login.
+ */
+async function assertCurrentReviewerInTransaction(
+  tx:Pick<typeof db,"execute">,reviewer:AccessContext,
+):Promise<void>{
+  const raw=(getRequest().headers.get("cookie")??"").split(";")
+    .map(part=>part.trim())
+    .find(part=>part.startsWith(accessSessionCookie+"="))
+    ?.slice(accessSessionCookie.length+1);
+  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
+  if(!raw||!/^[A-Za-z0-9_-]{40,}$/.test(raw)||!pepper||pepper.length<32)
+    throw new AuthorizationError("current institutional reviewer login");
+  const digest=hashAccessSecret(raw,pepper);
+  const result=await tx.execute(sql`
+    SELECT s.id
+    FROM public.access_sessions s
+    JOIN public.access_accounts account ON account.id=s.account_id
+    JOIN public.account_person_grants grant_row
+      ON grant_row.id=s.active_grant_id AND grant_row.account_id=account.id
+    JOIN public.organizations organization
+      ON organization.id=grant_row.organization_id
+    JOIN public.people person ON person.id=grant_row.person_id
+    WHERE s.secret_hash=${digest}::text
+      AND s.id=${reviewer.sessionId}::uuid
+      AND account.id=${reviewer.accountId}::uuid
+      AND grant_row.id=${reviewer.grantId}::uuid
+      AND grant_row.person_id=${reviewer.actorPersonId}::uuid
+      AND grant_row.role='can_network_steward'
+      AND grant_row.active=true
+      AND grant_row.site_id IS NULL
+      AND organization.type='can_network'
+      AND person.active=true
+      AND account.disabled=false
+      AND account.email_verified_at IS NOT NULL
+      AND s.revoked_at IS NULL
+      AND s.expires_at>clock_timestamp()
+      AND s.updated_at>clock_timestamp()-interval '30 minutes'
+      AND (NOT s.shared_device OR
+        s.last_activity_at>clock_timestamp()-interval '5 minutes')
+    FOR SHARE OF s,account,grant_row,organization,person
+  `);
+  if(result.rows.length!==1)
+    throw new AuthorizationError("current independent CAN institutional reviewer");
 }
 
 /** Existing CAN school staff may request, but never self-approve, issuer authority. */
@@ -237,6 +287,7 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
           )).limit(1);
         if(selfNative.length)throw new AuthorizationError("reviewer may not approve own native Person");
       }
+      await assertCurrentReviewerInTransaction(tx,reviewer);
       await tx.update(approvals).set({
         status:data.decision==="approve"?"approved":"rejected",
         reviewedByCanAccountId:reviewer.accountId,
@@ -274,6 +325,7 @@ export const revokeCanonicalCredentialIssuerApproval=createServerFn({method:"POS
         organizationId:canonicalAccountGrants.organizationId,
       }).from(canonicalAccountGrants)
         .where(eq(canonicalAccountGrants.id,approval.canonicalGrantId)).limit(1);
+      await assertCurrentReviewerInTransaction(tx,reviewer);
       await tx.update(approvals).set({
         status:"revoked",revokedAt:new Date(),
         revokedByCanAccountId:reviewer.accountId,
