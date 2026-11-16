@@ -84,6 +84,7 @@ export function NativeClassroomHostPanel({
         <Button asChild variant="outline">
           <Link to="/classroom/$sessionId/presentation"
             params={{sessionId:roomId}}
+            search={{layout:layout==="single"?"single":"presentation"}}
             target={layout==="single"?"_self":"_blank"}
             rel="noopener noreferrer"
             hash={fragment}>
