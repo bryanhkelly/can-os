@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { ClassroomAttendancePanel } from "@/components/learning/ClassroomAttendancePanel";
+import { getNativeClassSessionAgenda } from "@/modules/classes/native-class-session-agenda.functions";
 import {
   endFacilitatedLearningRoom, renewFacilitatedLearningPairing,
 } from "@/modules/learning/facilitated-learning.functions";
@@ -14,14 +16,24 @@ import {
  */
 type Layout="single"|"dual"|"distributed";
 export function NativeClassroomHostPanel({
-  roomId,canReviewAttendance,onClosed,initialCode=null,initialExpiry=null,
+  roomId,classId,classSessionId,canReviewAttendance,onClosed,initialCode=null,initialExpiry=null,
 }:{
-  roomId:string;
+  roomId:string;classId:string;classSessionId:string;
   canReviewAttendance:boolean;
   onClosed:()=>Promise<unknown>;
   initialCode?:string|null;
   initialExpiry?:string|null;
 }){
+  const planned=useQuery({
+    queryKey:["native-classroom-agenda",classId,classSessionId],
+    queryFn:()=>getNativeClassSessionAgenda({data:{classId,classSessionId}}),
+    retry:false,staleTime:30000,
+  });
+  // Only order the existing rights-checked room catalog; never pass an agenda
+  // reference directly to the projector as if it were a playback authorization.
+  const preferredLessonIds=planned.data?.items
+    .filter(item=>item.kind==="watch"||item.kind==="study")
+    .map(item=>item.referenceId)??[];
   const [layout,setLayout]=useState<Layout>("dual");
   const [joinCode,setJoinCode]=useState(initialCode);
   const [expiresAt,setExpiresAt]=useState(initialExpiry);
@@ -111,7 +123,12 @@ export function NativeClassroomHostPanel({
         attendance and moderation controls. Never mirror this private console.
       </p>
     </section>
-    <ClassroomFacilitatorConsole facilitatedSessionId={roomId}/>
+    {planned.data?.items.length?<p className="text-xs text-muted-foreground">
+      Approved recordings for this Session are listed first in the projector controls.
+      A Session agenda never grants extra playback or academic privileges.
+    </p>:null}
+    <ClassroomFacilitatorConsole facilitatedSessionId={roomId}
+      preferredLessonIds={preferredLessonIds}/>
     {canReviewAttendance?<ClassroomAttendancePanel facilitatedSessionId={roomId}/>:
       <p className="border border-border bg-card p-4 text-sm text-muted-foreground">
         Attendance evidence requires a separately authorized Class roster reader.
