@@ -17,7 +17,7 @@ export const saveSiteContentChannels = createServerFn({method: "POST"})
   .validator((input: unknown) => z.object({
     siteId: z.string().uuid(),
     expectedRevision: z.number().int().min(0),
-    blocks: z.array(siteContentBlockSchema).max(8),
+    blocks: z.array(siteContentBlockSchema).max(12),
   }).strict().parse(input))
   .handler(async ({data}) => {
     setResponseHeader("Cache-Control", "private, no-store");

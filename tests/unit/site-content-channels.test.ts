@@ -63,8 +63,12 @@ describe("Site-owned website content channels", () => {
   });
   it("rejects duplicate feeds and unapproved institutional copy", () => {
     const block = defaultSiteContentChannelConfig.blocks[0]!;
-    expect(() => siteContentChannelConfigSchema.parse({
+    // Multiple presentation blocks may share one authoritative source.
+    expect(siteContentChannelConfigSchema.parse({
       version: 2, revision: 0, blocks: [block, {...block, id: "second"}],
+    }).blocks).toHaveLength(2);
+    expect(() => siteContentChannelConfigSchema.parse({
+      version: 2, revision: 0, blocks: [block, {...block}],
     })).toThrow();
     expect(() => siteContentChannelConfigSchema.parse({
       version: 2, revision: 0, blocks: [{...block, title: "<script>bad</script>"}],

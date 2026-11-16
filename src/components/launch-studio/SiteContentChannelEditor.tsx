@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutGrid, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, LayoutGrid, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,14 @@ import {
 import { saveSiteContentChannels, publishSiteContentChannels } from "@/modules/sites/site-content-channels.functions";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 
+function newBlockId(channel:SiteContentChannelId,blocks:readonly SiteContentBlock[]):string{
+  const prefix=channel.replaceAll(".","-");
+  for(let n=1;n<=99;n++){
+    const id=prefix+"-"+n;
+    if(!blocks.some(block=>block.id===id))return id;
+  }
+  throw new Error("No available presentation block ID");
+}
 /** Site-owned presentation registry. Editors never input Program data, course
  * permissions or registration URLs; every channel pulls its own approved feed. */
 export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,onSaved}:{
@@ -29,21 +37,37 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
   const [saved,setSaved]=useState(false);
   const [publishing,setPublishing]=useState(false);
   const [published,setPublished]=useState(false);
-  const available=siteContentChannelIds.filter(id=>!blocks.some(b=>b.channel===id));
+  const available=siteContentChannelIds;
 
   function editBlock(id:string,change:Partial<SiteContentBlock>) {
     setBlocks(old=>old.map(block=>block.id===id?{...block,...change}:block));
     setSaved(false);setPublished(false);
   }
   function addBlock(){
-    if(!addChannel||blocks.some(b=>b.channel===addChannel))return;
+    if(!addChannel||blocks.length>=12)return;
     const info=siteContentChannelDescriptions[addChannel];
     setBlocks(old=>[...old,{
-      id:addChannel.replace(".", "-"),channel:addChannel,
+      id:newBlockId(addChannel,blocks),channel:addChannel,
       placement:"learning",layout:"cards",enabled:true,
       eyebrow:info.defaultEyebrow,title:info.defaultTitle,description:info.defaultDescription,
     }]);
     setAddChannel("");
+    setSaved(false);setPublished(false);
+  }
+  function moveBlock(id:string,offset:-1|1){
+    setBlocks(old=>{
+      const index=old.findIndex(block=>block.id===id);
+      const other=index+offset;
+      if(index<0||other<0||other>=old.length)return old;
+      const next=[...old];
+      [next[index],next[other]]=[next[other]!,next[index]!];
+      return next;
+    });
+    setSaved(false);setPublished(false);
+  }
+  function duplicateBlock(block:SiteContentBlock){
+    if(blocks.length>=12)return;
+    setBlocks(old=>[...old,{...block,id:newBlockId(block.channel,old)}]);
     setSaved(false);setPublished(false);
   }
   async function save(){
@@ -102,6 +126,15 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               onChange={e=>editBlock(block.id,{title:e.target.value})}/></Field>
             <Field label="Eyebrow"><Input value={block.eyebrow} maxLength={64}
               onChange={e=>editBlock(block.id,{eyebrow:e.target.value})}/></Field>
+            <Field label="Website page"><Select value={block.page??"/"}
+              onChange={e=>editBlock(block.id,{page:e.target.value as SiteContentBlock["page"]})}>
+              <option value="/">Homepage</option>
+              <option value="/programs">Programs page</option>
+              <option value="/courses">Courses page</option>
+              <option value="/classes">Classes page</option>
+              <option value="/academics">Academics page</option>
+              <option value="/student-life">Community experiences page</option>
+            </Select></Field>
             <Field label="Placement"><Select value={block.placement}
               onChange={e=>editBlock(block.id,{placement:e.target.value as SiteContentBlock["placement"]})}>
               <option value="learning">Learning / programs</option>
@@ -115,6 +148,37 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               <option value="featured">Featured content</option>
             </Select></Field>
           </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {block.channel==="learning.opportunities"&&<Field label="Enrollment type">
+              <Select value={block.targetKinds?.[0]??""}
+                onChange={e=>editBlock(block.id,{targetKinds:e.target.value
+                  ?[e.target.value as "school"|"program"|"course"|"class"]:[]})}>
+                <option value="">All enrollment types</option>
+                <option value="school">Schools</option>
+                <option value="program">Programs</option>
+                <option value="course">Courses</option>
+                <option value="class">Classes</option>
+              </Select>
+            </Field>}
+            <Field label="Order">
+              <Select value={block.sort??"source"}
+                onChange={e=>editBlock(block.id,{sort:e.target.value as SiteContentBlock["sort"]})}>
+                <option value="source">Source order</option>
+                <option value="title">Alphabetical</option>
+                <option value="upcoming">Next scheduled</option>
+              </Select>
+            </Field>
+            <Field label="Maximum items">
+              <Select value={String(block.limit??12)}
+                onChange={e=>editBlock(block.id,{limit:Number(e.target.value)})}>
+                <option value="3">3</option>
+                <option value="6">6</option>
+                <option value="12">12</option>
+                <option value="24">24</option>
+                <option value="40">40</option>
+              </Select>
+            </Field>
+          </div>
           <Field label="Section description" className="mt-4">
             <textarea value={block.description} maxLength={320} rows={3}
               onChange={e=>editBlock(block.id,{description:e.target.value})}
@@ -126,14 +190,21 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
                 onChange={e=>editBlock(block.id,{enabled:e.target.checked})}/>
               Show this block when source records are available
             </label>
-            <Button variant="outline" onClick={()=>{setBlocks(old=>old.filter(b=>b.id!==block.id));setSaved(false);setPublished(false);}}>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled={blocks[0]?.id===block.id}
+                onClick={()=>moveBlock(block.id,-1)}><ArrowUp/> Up</Button>
+              <Button variant="outline" disabled={blocks[blocks.length-1]?.id===block.id}
+                onClick={()=>moveBlock(block.id,1)}><ArrowDown/> Down</Button>
+              <Button variant="outline" disabled={blocks.length>=12}
+                onClick={()=>duplicateBlock(block)}><Copy/> Duplicate</Button>
+              <Button variant="outline" onClick={()=>{setBlocks(old=>old.filter(b=>b.id!==block.id));setSaved(false);setPublished(false);}}>
               <Trash2/> Remove block
             </Button>
           </div>
-        </fieldset>;
+        </fieldset>
       })}
     </div>
-    {available.length>0&&<div className="mt-5 flex flex-wrap items-end gap-3 border-t pt-5">
+    {blocks.length<12&&<div className="mt-5 flex flex-wrap items-end gap-3 border-t pt-5">
       <Field label="Add a content channel" className="min-w-[230px] flex-1">
         <Select value={addChannel} onChange={e=>setAddChannel(e.target.value as SiteContentChannelId|"")}>
           <option value="">Choose a data channel</option>
