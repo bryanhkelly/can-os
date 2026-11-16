@@ -13,7 +13,7 @@ Do not create a new enrollment-write API, duplicate the Course, infer student/gu
 | Public target | Source | Public action |
 | --- | --- | --- |
 | School / academic Program | Independently reviewed academic marketing record and positive, current family-start eligibility | Apply only when `applicationOpen` is verified; otherwise explore academics |
-| Community / enrichment Program | Published Site enrichment catalog | Explore Program. Direct Program registration is not yet connected to the canonical Site widget |
+| Community / enrichment Program | Published Site enrichment catalog with separately checked registration window and capacity | Link to the existing exact Season detail/guardian registration journey when open; otherwise informational or closed |
 | Independent Course | Current approved, published noncredit enrollment release linked to the Site | Register by verified release ID, join existing waitlist when allowed, or show closed |
 | Scheduled / facilitated / self-paced Class | Native Class with active Site and a separate published public Class Offering | Explore exact Class through filtered native Class directory; the enrollment service must recheck version, method, consent, age, capacity and learner authority |
 
@@ -38,7 +38,7 @@ An operator may reuse one authoritative source on the homepage and on the releva
 
 School: application availability remains owned by the academic admissions service, with a vetted `/admissions` destination.
 
-Program: `/student-life` is an informational destination. There is **no** newly manufactured registration link.
+Program: an approved, open enrichment Season with a verified UUID and trusted CAN application HTTPS origin links to `/enrichment/<seasonId>`, the existing Program details and guardian registration workflow. That service still checks permission, household, child, capacity, package and fee rules. Non-enrichment Program types have no speculative registration URL; their safe destination remains `/student-life`.
 
 Course: only an approved noncredit release UUID and a validated HTTPS CAN application origin can produce `/learn/enroll?release=<UUID>`. The POST checks are still authoritative.
 
@@ -48,7 +48,7 @@ Private previews and fictional template galleries suppress external enrollment a
 
 ## Release gaps that must not be misrepresented
 
-1. Program registration from the public Site still needs a verified, exact Program/Season registration route and domain-specific eligibility checks.
+1. Direct Site Program registration is supported for the existing published enrichment Season workflow only. Other Program types need verified, domain-specific enrollment destinations; no generic enrollment link has been invented.
 2. Class discovery now filters by the stable Class ID and revalidates public Class Offering publication. A future exact Class Offering-version URL could improve direct-registration UX, but must continue validating the current version, learner eligibility, capacity and consent.
 3. Site-independent provider-wide online Course discovery needs its own legitimate public provider profile if it is to appear outside a single Site.
 4. Payment and guardian/youth consent must remain owned by appropriate registered Program, Course or Class workflows. Do not infer them from public listing.

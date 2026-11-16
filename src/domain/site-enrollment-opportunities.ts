@@ -40,14 +40,22 @@ export function projectSiteEnrollmentOpportunities(
       ?{href:"/admissions",label:"Apply for admission"}
       :{href:"/academics",label:"Explore program"},
   }));
-  const enrichment=(feeds.enrichment??[]).map(program=>({
-    id:"program:"+program.seasonId,kind:"program" as const,
-    targetId:program.seasonId,title:program.title,description:program.programName,
-    // Publishing a marketing listing is not proof that the website has a
-    // direct, authorized Program registration endpoint.
-    status:"explore" as const,
-    action:{href:"/student-life",label:"View program information"},
-  }));
+  const enrichment=(feeds.enrichment??[]).map(program=>{
+    // This is an explicitly published enrichment Season, not an arbitrary
+    // Program marketing record. Reuse its independently authorized detail
+    // and guardian registration workflow; it rechecks consent and capacity.
+    const eligible=Boolean(origin)&&uuid.test(program.seasonId)&&program.registrationOpen;
+    return {
+      id:"program:"+program.seasonId,kind:"program" as const,
+      targetId:program.seasonId,title:program.title,description:program.programName,
+      status:eligible?"register" as const:
+        !program.registrationOpen?"closed" as const:"explore" as const,
+      action:eligible
+        ?{href:origin!+"/enrichment/"+encodeURIComponent(program.seasonId),
+          label:"View details and register"}
+        :{href:"/student-life",label:"View program information"},
+    };
+  });
   const courses=(feeds.noncredit??[]).filter(item=>uuid.test(item.releaseId)).map(item=>{
     const canRegister=Boolean(origin)&&item.seatsRemaining>0;
     const canWaitlist=Boolean(origin)&&!canRegister&&item.waitlistAvailable;

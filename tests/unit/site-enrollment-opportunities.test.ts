@@ -49,6 +49,39 @@ describe("Public Enrollment Opportunity read model",()=>{
     expect(program.status).toBe("explore");
     expect(program.action?.href).toBe("/student-life");
   });
+  it("links an eligible published enrichment Season to the existing guardian Program registration workflow",()=>{
+    const season="33333333-3333-4333-8333-333333333333";
+    const [published]=projectSiteEnrollmentOpportunities({
+      enrichment:[{seasonId:season,title:"Summer Arts",programName:"Youth Program",
+        registrationOpen:true}],
+      enrollmentOrigin:"https://app.example.org",
+    });
+    expect(published?.kind).toBe("program");
+    expect(published?.status).toBe("register");
+    expect(published?.action).toEqual({
+      href:"https://app.example.org/enrichment/"+season,
+      label:"View details and register",
+    });
+    const [closed]=projectSiteEnrollmentOpportunities({
+      enrichment:[{seasonId:season,title:"Summer Arts",programName:"Youth Program",
+        registrationOpen:false}],
+      enrollmentOrigin:"https://app.example.org",
+    });
+    expect(closed?.status).toBe("closed");
+    expect(closed?.action?.href).toBe("/student-life");
+    const [badOrigin]=projectSiteEnrollmentOpportunities({
+      enrichment:[{seasonId:season,title:"Summer Arts",programName:"Youth Program",
+        registrationOpen:true}],
+      enrollmentOrigin:"http://not-secure.example",
+    });
+    expect(badOrigin?.action?.href).toBe("/student-life");
+    const [unverifiedId]=projectSiteEnrollmentOpportunities({
+      enrichment:[{seasonId:"not-a-uuid",title:"Summer Arts",programName:"Youth Program",
+        registrationOpen:true}],
+      enrollmentOrigin:"https://app.example.org",
+    });
+    expect(unverifiedId?.action?.href).toBe("/student-life");
+  });
   it("links only real noncredit Course releases to verified HTTPS app enrollment",()=>{
     const [course]=projectSiteEnrollmentOpportunities({
       noncredit:catalog.noncredit,enrollmentOrigin:catalog.enrollmentOrigin,

@@ -280,14 +280,18 @@ export function resolveSiteContentBlocks(
           ...(feeds.mode === "public" ? {link: {href: "/academics", label: "Explore academic programs"}} : {}),
         }));
         break;
-      case "learning.enrichment":
-        items = (feeds.enrichment ?? []).map(item => ({
-          id: item.seasonId, title: item.title,
-          description: item.programName,
-          label: item.registrationOpen ? "Published program" : "Registration not open",
-          ...(feeds.mode === "public" ? {link: {href: "/student-life", label: "View program details"}} : {}),
+      case "learning.enrichment": {
+        const actions=new Map(projectSiteEnrollmentOpportunities(feeds)
+          .filter(opportunity=>opportunity.kind==="program")
+          .map(opportunity=>[opportunity.targetId,opportunity.action]));
+        items=(feeds.enrichment ?? []).map(item=>({
+          id:item.seasonId,title:item.title,description:item.programName,
+          label:item.registrationOpen?"Published program · enrollment available":"Registration not open",
+          ...(feeds.mode==="public" && actions.get(item.seasonId)
+            ?{link:actions.get(item.seasonId)!}:{}),
         }));
         break;
+      }
       case "learning.classes": {
         const labels = {
           self_paced:"Self-paced",scheduled:"Scheduled",facilitated:"Facilitated",

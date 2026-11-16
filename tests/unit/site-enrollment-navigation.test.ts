@@ -82,6 +82,23 @@ describe("Enrollment-driven public website navigation and templates",()=>{
     expect(html.split('data-content-channel="learning.opportunities"').length-1).toBe(1);
     expect(html).toContain("Digital Skills");
   });
+  it("renders approved Program registration on all seven templates using exact Season IDs",()=>{
+    const season="33333333-3333-4333-8333-333333333333";
+    const opportunities=projectSiteEnrollmentOpportunities({
+      enrichment:[{seasonId:season,title:"Summer Arts",programName:"Youth Program",
+        registrationOpen:true}],
+      enrollmentOrigin:"https://app.example.org",
+    });
+    for(const templateId of siteTemplateIds){
+      const site={...page(templateId),enrollmentOpportunities:opportunities};
+      const html=renderPublicSiteHtml(site,{path:"/programs"});
+      expect(html).toContain("Summer Arts");
+      expect(html).toContain("View details and register");
+      expect(html).toContain("https://app.example.org/enrichment/"+season);
+      const preview=renderPublicSiteHtml(site,{path:"/programs",localPreview:true});
+      expect(preview).not.toContain("https://app.example.org/enrichment/");
+    }
+  });
   it("hides direct enrollment actions in read-only preview, but retains content",()=>{
     const site=page("modern");
     for(const route of ["/courses","/classes"] as const){
