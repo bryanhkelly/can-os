@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
+import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 
 function meetings(first="2027-02-03T10:00:00-08:00"){
   const starts=Array.from({length:4},(_,i)=>{
@@ -54,5 +55,19 @@ describe("native Class Session scheduling",()=>{
     expect(()=>assertNativeClassSessionSeries(Array.from({length:13},(_,i)=>({
       ...meetings()[0]!,requestId:"request-"+i,
     })),"custom")).toThrow();
+  });
+  it("rejects reusing a room that has ended, been revoked or exceeded eight hours",()=>{
+    const now=new Date("2027-02-03T21:00:00.000Z");
+    const room={
+      state:"live" as const,
+      startedAt:new Date(now.getTime()-60_000),
+      endedAt:null as Date|null,
+    };
+    expect(facilitatedRoomOperationalState(room,now)).toBe("live");
+    expect(facilitatedRoomOperationalState({...room,state:"ended" as const},now)).toBe("ended");
+    expect(facilitatedRoomOperationalState({...room,endedAt:now},now)).toBe("ended");
+    expect(facilitatedRoomOperationalState({
+      ...room,startedAt:new Date(now.getTime()-8*60*60*1000),
+    },now)).toBe("expired");
   });
 });
