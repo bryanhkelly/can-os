@@ -87,6 +87,12 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     const session=source("src/modules/classes/native-class-sessions.functions.ts");
     const workspace=source("src/routes/classes_.$classId.tsx");
     expect(session).toContain("export const revokeNativeClassSession");
+    // An idempotent Class Session open cannot return an old, ended room.
+    expect(session).toContain('facilitatedRoomOperationalState(room,now)!=="live"');
+    expect(session).toContain("eq(facilitatedLearningSessions.id,plan.facilitatedSessionId)");
+    expect(session).toContain("eq(facilitatedLearningSessions.siteId,instance.siteId!)");
+    expect(session).toContain("eq(facilitatedLearningSessions.facilitatorPersonId,host.actor.actorPersonId!)");
+    expect(session).toContain("schedule a new Session");
     expect(session).toContain('eventCode:"class.session.revoked"');
     expect(session).toContain("await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
     expect(session).toContain('eq(facilitatedLearningSessions.siteId,cls.siteId)');
