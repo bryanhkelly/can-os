@@ -157,3 +157,37 @@ export function assertUniqueParticipationKeys(records: readonly ParticipationRec
     keys.add(record.key);
   }
 }
+
+/** Runtime fail-closed contract guard shared by WS1 and downstream consumers.
+ * It validates identities and collection separation, never authorizes a read. */
+export function assertParticipationReadModel(model: ParticipationReadModel): void {
+  if (model.version !== PARTICIPATION_READ_MODEL_VERSION)
+    throw new Error("Unsupported participation contract version");
+  assertUniqueParticipationKeys(model.records);
+  for (const record of model.records) {
+    if (!record.sourceId || record.key !== record.source + ":" + record.sourceId)
+      throw new Error("Invalid participation source identity");
+    const authoritative = record.source === "native_class" ? record.refs.classEnrollmentId
+      : record.source === "school_section" ? record.refs.enrollmentId
+      : record.refs.registrationId;
+    if (authoritative !== record.sourceId)
+      throw new Error("Participation identity must be authoritative enrollment or registration");
+  }
+  const opportunities = new Set<string>();
+  for (const item of model.opportunities) {
+    if (!item.releaseId || item.key !== "noncredit_waitlist_release:" + item.releaseId)
+      throw new Error("Invalid enrollment opportunity display identity");
+    if (opportunities.has(item.key))
+      throw new Error("Duplicate enrollment opportunity");
+    opportunities.add(item.key);
+  }
+  const sources = new Set<ActivitySource>();
+  for (const source of model.sources) {
+    if (sources.has(source.source)) throw new Error("Duplicate participation source coverage");
+    sources.add(source.source);
+    if (source.state !== "ready" && source.coverage === "complete")
+      throw new Error("Unavailable source cannot claim complete coverage");
+    if (source.state === "not_applicable" && source.coverage !== "not_applicable")
+      throw new Error("Not-applicable source has inconsistent coverage");
+  }
+}
