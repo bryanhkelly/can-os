@@ -1,5 +1,5 @@
 import { boolean, index, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { and, isNull } from "drizzle-orm";
+import { and, isNull, sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
@@ -49,8 +49,7 @@ export const canonicalSensitiveCapabilityApprovals = educationV30.table(
   }, t => [
     uniqueIndex("sensitive_approvals_open_grant_uq")
       .on(t.canonicalGrantId,t.capabilityCode)
-      .where(and(isNull(t.revokedAt), // rejects coexistence of pending or approved
-        isNull(t.revokedByCanAccountId))),
+      .where(sql`${t.status} IN ('pending','approved')`),
     index("sensitive_approvals_status_idx").on(t.status,t.requestedAt),
   ],
 );
