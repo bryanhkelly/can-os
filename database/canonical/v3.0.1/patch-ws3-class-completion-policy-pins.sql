@@ -88,7 +88,8 @@ CREATE TRIGGER ws3_class_completion_policy_guard_trg
 -- A Class without an eligible policy may enroll/deliver but cannot yet
 -- receive an independently validated official completion decision.
 CREATE OR REPLACE FUNCTION education_v30.ws3_pin_class_policy_on_enrollment()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
+SET search_path=education_v30,pg_catalog,pg_temp AS $
 DECLARE selected record;
 BEGIN
  SELECT p.id,p.course_version_id INTO selected
@@ -110,6 +111,11 @@ BEGIN
  END IF;
  RETURN NEW;
 END $$;
+-- The trigger must see owner-only policy rows even when the enrolled user has
+-- a restricted native enrollment role. Definer ownership/grants must be
+-- confirmed by WS00 on isolated QA before deployment.
+REVOKE ALL ON FUNCTION education_v30.ws3_pin_class_policy_on_enrollment()
+ FROM PUBLIC;
 DROP TRIGGER IF EXISTS ws3_class_enrollment_completion_pin_trg
  ON education_v30.class_enrollments;
 CREATE TRIGGER ws3_class_enrollment_completion_pin_trg
