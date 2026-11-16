@@ -100,6 +100,7 @@ export const canonicalClassStaffAssignments = educationV30.table("class_staff_as
   classId:uuid("class_id").notNull(),
   personId:uuid("person_id").notNull(),
   roleCode:text("role_code").$type<"teacher"|"facilitator">().notNull(),
+  attendanceAuthorized:boolean("attendance_authorized").notNull().default(false),
   state:text("state").$type<"approved"|"suspended"|"ended">().notNull().default("approved"),
   beginsAt:timestamp("begins_at",{withTimezone:true}).notNull(),
   endsAt:timestamp("ends_at",{withTimezone:true}),
