@@ -7,6 +7,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import {
   getUnifiedClassCourseOptions, getMyUnifiedClassDrafts, createUnifiedClassDraft,
   publishUnifiedClassOffering, closeUnifiedClassOffering,
+  activateUnifiedClass, createNextUnifiedClassOfferingVersion,
 } from "@/modules/classes/unified-class.functions";
 import type { ClassOfferingTerms } from "@/domain/unified-class";
 
@@ -41,6 +42,7 @@ function NativeClasses(){
   const [title,setTitle]=useState("");
   const [siteId,setSiteId]=useState("");
   const [deliveryMode,setDeliveryMode]=useState<(typeof deliveryOptions)[number]>("self_paced");
+  const [createWithOffering,setCreateWithOffering]=useState(false);
   const [visibility,setVisibility]=useState<ClassOfferingTerms["visibility"]>("private");
   const [methods,setMethods]=useState<Method[]>(["assignment"]);
   const [creditModes,setCreditModes]=useState<CreditMode[]>(["not_applicable"]);
@@ -61,7 +63,7 @@ function NativeClasses(){
   }
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
-    if(!selected||busy||methods.length===0||creditModes.length===0)return;
+    if(!selected||busy||(createWithOffering&&(methods.length===0||creditModes.length===0)))return;
     setBusy(true);setError("");setNotice("");
     try{
       const result=await createUnifiedClassDraft({data:{
@@ -71,18 +73,47 @@ function NativeClasses(){
           operatingOrganizationId:selected.operatingOrganizationId,
           siteId:siteId||null,title:title.trim(),deliveryMode,
         },
-        terms:{
+        terms:createWithOffering?{
           visibility,enrollmentMethods:methods,allowedCreditModes:creditModes,
           opensAt:utc(opensAt),closesAt:utc(closesAt),
           capacity:capacity?Number(capacity):null,
           consentVersion:methods.includes("self")?consentVersion.trim():null,
           consentText:methods.includes("self")?consentText.trim():null,
-        },
+        }:null,
       }});
-      setNotice("Class created with its own draft Class Offering. It is not yet published. Class ID: "+result.classId);
+      setNotice(result.classOfferingVersionId
+        ?"Class and optional draft Class Offering created. Class ID: "+result.classId
+        :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId);
       setChoice("");setTitle("");setSiteId("");
       await refresh();
     }catch(e){setError(normalizeClientError(e,"Could not create the native Class.").message)}
+    finally{setBusy(false)}
+  }
+  function currentTerms():ClassOfferingTerms{
+    return {
+      visibility,enrollmentMethods:methods,allowedCreditModes:creditModes,
+      opensAt:utc(opensAt),closesAt:utc(closesAt),
+      capacity:capacity?Number(capacity):null,
+      consentVersion:methods.includes("self")?consentVersion.trim():null,
+      consentText:methods.includes("self")?consentText.trim():null,
+    };
+  }
+  async function activate(classId:string){
+    if(busy)return;setBusy(true);setError("");setNotice("");
+    try{
+      await activateUnifiedClass({data:{classId}});
+      await refresh();
+      setNotice("Class activated independently of registration publication.");
+    }catch(e){setError(normalizeClientError(e,"Could not activate Class.").message)}
+    finally{setBusy(false)}
+  }
+  async function addOffering(classId:string){
+    if(busy)return;setBusy(true);setError("");setNotice("");
+    try{
+      await createNextUnifiedClassOfferingVersion({data:{classId,terms:currentTerms()}});
+      await refresh();
+      setNotice("Optional Class Offering draft created. Publish it when ready.");
+    }catch(e){setError(normalizeClientError(e,"Could not create Class Offering.").message)}
     finally{setBusy(false)}
   }
   async function action(classId:string,classOfferingVersionId:string,kind:"publish"|"close"){
@@ -100,12 +131,12 @@ function NativeClasses(){
     finally{setBusy(false)}
   }
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Classes" title="Class management"
-    subtitle="Create a Class from an adopted Course. Every Class has a Class Offering, whether private, unlisted or public. Enrollment method and academic credit are independent settings."
+    subtitle="Create a Class from an adopted Course. Class Offerings are optional: school and private assignment do not require a public or private registration listing."
     actions={<Link to="/canonical" className="text-sm font-semibold text-primary underline underline-offset-4">Canonical workspace</Link>}>
     <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,.8fr)]">
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Create Class</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Select an approved Course Offering and authorized delivery context. The Class receives one Course version and one Class Offering identity.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Select an approved Course and authorized delivery context. The Class identity is independent of registration publication.</p>
         {options.isPending&&<p role="status" className="mt-4 text-sm">Checking available Courses and operating authorizations…</p>}
         {options.isError&&<p role="alert" className="mt-4 border border-border p-3 text-sm">The native Class service is not available for this operator or environment. No changes were made.</p>}
         {options.data&&options.data.length===0&&<p role="status" className="mt-4 text-sm">No approved Course/Deployment combinations are currently available for your organization.</p>}
@@ -142,7 +173,13 @@ function NativeClasses(){
             </div>
           </div>
           <div className="border-t border-border pt-4">
-            <h3 className="text-base font-semibold">Class Offering</h3>
+            <label className="flex items-center gap-3 text-sm font-semibold">
+              <input type="checkbox" checked={createWithOffering}
+                onChange={event=>setCreateWithOffering(event.target.checked)}/>
+              Also create a draft Class Offering
+            </label>
+            {createWithOffering&&<div className="mt-4">
+            <h3 className="text-base font-semibold">Class Offering terms</h3>
             <p className="mt-1 text-sm text-muted-foreground">Availability and admission methods do not change the Course or Class identity.</p>
             <div className="mt-4">
               <label htmlFor="native-class-visibility" className="block text-sm font-semibold">Visibility</label>
@@ -192,31 +229,37 @@ function NativeClasses(){
                   onChange={e=>setConsentText(e.target.value)}
                   className="mt-1 w-full border border-border bg-background p-3 text-sm"/></div>
             </div>}
+            </div>}
           </div>
-          <Button disabled={busy||!selected||methods.length===0||creditModes.length===0} type="submit">
+          <Button disabled={busy||!selected||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
             {busy?"Working…":"Create draft Class"}
           </Button>
         </form>
       </section>
       <section className="border border-border bg-card p-5" aria-label="Managed Classes">
         <h2 className="font-serif text-2xl">My Classes</h2>
-        <p className="mt-2 text-sm text-muted-foreground">Current Class Offering versions in your authorized organization and Sites.</p>
+        <p className="mt-2 text-sm text-muted-foreground">Classes in your authorized organization and Sites, including Classes without an Offering.</p>
         {classes.isPending&&<p role="status" className="mt-4 text-sm">Loading Classes…</p>}
         {classes.isError&&<p role="alert" className="mt-4 text-sm">Class records are unavailable or the release is not enabled.</p>}
         <div className="mt-4 space-y-3">
-          {(classes.data??[]).map(item=><article key={item.classOfferingVersionId} className="border border-border p-4">
+          {(classes.data??[]).map(item=><article key={item.classOfferingVersionId??item.classId} className="border border-border p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {item.visibility} · {item.offeringState} · version {item.versionNo}
+              {item.classOfferingVersionId
+                ?`${item.visibility} · ${item.offeringState} · version ${item.versionNo}`
+                :"No Class Offering · internal Class"}
             </p>
             <h3 className="mt-1 text-base font-semibold"><Link to="/classes/$classId"
               params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
               className="underline-offset-2 hover:underline">{item.title}</Link></h3>
-            <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {item.enrollmentMethods.join(", ")}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {(item.enrollmentMethods??[]).join(", ")||"No registration publication"}</p>
             <Link to="/classes/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
               className="mt-2 inline-block text-sm font-semibold underline">Open Class workspace</Link>
-            {item.offeringState==="draft"&&<Button disabled={busy} className="mt-3"
+            {item.state!=="active"&&<Button disabled={busy} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
+            {!item.classOfferingVersionId&&<Button disabled={busy||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
+              onClick={()=>void addOffering(item.classId)}>Create draft Offering from form terms</Button>}
+            {item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3"
               onClick={()=>void action(item.classId,item.classOfferingVersionId,"publish")}>Publish Class Offering</Button>}
-            {item.offeringState==="published"&&<Button disabled={busy} className="mt-3" variant="outline"
+            {item.offeringState==="published"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3" variant="outline"
               onClick={()=>void action(item.classId,item.classOfferingVersionId,"close")}>Close enrollment</Button>}
           </article>)}
           {classes.data?.length===0&&<p className="text-sm text-muted-foreground">No Classes created yet.</p>}
