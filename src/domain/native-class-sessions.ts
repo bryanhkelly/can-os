@@ -63,3 +63,19 @@ export function nativeClassSessionDisplayStatus(input: {
      endsAt<=input.now.getTime())return "elapsed_unverified";
   return "scheduled";
 }
+
+/** Scheduled meetings are cancellable only before their start and before
+ * any live facilitated room is attached. No attendance or Class Enrollment
+ * state is inferred from a cancellation. */
+export function canChangeUnopenedClassSession(input:{
+  planState:"scheduled"|"started"|"cancelled";
+  facilitatedSessionId:string|null;
+  scheduledStartsAt:Date;
+  now:Date;
+}):boolean{
+  return input.planState==="scheduled"&&
+    input.facilitatedSessionId===null&&
+    Number.isFinite(input.scheduledStartsAt.getTime())&&
+    Number.isFinite(input.now.getTime())&&
+    input.scheduledStartsAt.getTime()>input.now.getTime();
+}
