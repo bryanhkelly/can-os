@@ -163,6 +163,52 @@ facilitated room pairing until native Class-to-Session release validation is
 implemented. Optional activity telemetry is similarly disabled on native Class
 attempts pending its restricted-reader grants.
 
+### Class-specific Sessions and facilitated classroom delivery
+
+The shared Class workspace now has a live **Sessions** tab in learner,
+teacher/facilitator and manager perspectives. School, independent, adult and
+church-hosted Classes use the same Class ID and canonical \`delivery_sessions\`
+dates instead of inventing an academic-only Cohort/Section timetable.
+
+Native implementation:
+- \`education_v30.class_sessions\` maps one immutable Class ID to one
+  \`facilitated_classroom_plans\` ID and one dated \`delivery_sessions\` ID.
+  The SQL trigger requires exact Deployment, Course version, Site,
+  host organization and facilitator identity; a plan linked to a Class
+  cannot later be repurposed as a noncredit enrollment release.
+- \`scheduleNativeClassSessions\` requires a currently active Class and
+  explicit Person-to-Class teaching assignment at an authorized Site.
+  It reuses the existing canonical booking transaction. The four-week
+  preset validates four weekly meetings with consistent duration and a
+  one-hour DST allowance. Other school or summer schedules may use custom
+  cadence.
+- \`openNativeClassSession\` verifies the exact Class/plan/delivery relationship,
+  current facilitator assignment and at least one **active enrollment from
+  this Class** before issuing a one-time room code near the scheduled start.
+- \`nativeClassRoomParticipant\` verifies the room's exact Class,
+  Person's Class Enrollment, and linked Course Attempt, including current
+  approved adoption, deployment, Course and Site authority. Course/Site
+  coincidence alone never permits pairing.
+- Projector control, playback and private media rights reuse the existing
+  shared screen/player, while revalidating native Class staff and each paired
+  learner's Class Enrollment on reads and commands. Native Class attempts
+  cannot pair into older unbound rooms, and older course attempts cannot pair
+  into a native Class room.
+- Native attendance rostering filters by exact Class **before pagination**.
+  Personally identifying learner names require \`class.manage\` or a separately
+  approved \`class.roster.view\` capability; a generic room facilitator
+  assignment does not grant roster PII. Device pairing, attendance and
+  official completion remain distinct evidence levels.
+- If native Class staff authorization expires, room playback and
+  management metadata fail closed; ending a Class Session does not erase
+  previously recorded learning evidence.
+
+These changes are **source-level implementation only**: the new SQL and
+purpose-specific RLS grants have not been applied, no successful tests
+or E2E classroom acceptance have been observed. Particularly, a live room
+must be exercised with two independent Classes using the same Course and Site,
+including revoked staff/learner/adoption, before release.
+
 ### Verified environment baseline
 
 On 2026-11-15, READ-ONLY Neon queries against `test01` confirmed
@@ -188,8 +234,9 @@ project, but the native schema has not been installed or tested there.
 ## Next phases to graduate the model
 
 ### P0: Authorized Class and publication lifecycle
-- On an isolated canonical QA database, validate and apply both SQL patches (including
-  `class_staff_assignments`); provision purpose-specific RLS,
+- On an isolated canonical QA database, validate and apply both SQL patches
+  (including `class_staff_assignments` and `class_sessions`); provision
+  purpose-specific RLS,
   never an unrestricted network role or broad public SELECT.
 - Exercise the newly implemented atomic Class/Offering draft command using approved
   Course, Deployment, Site and operator authority on an isolated QA database.
@@ -225,9 +272,10 @@ project, but the native schema has not been installed or tested there.
 ### P1: Native screens and reporting
 - Publisher: Course/Program Offerings, approved adoptions.
 - Operator: Classes → Class Offering → Enrollment → Sessions → Outcomes.
-- Learner: native Class catalog, shared recorded-teacher player, progress and
-  results view are committed; validate secure playback/practice and add
-  native assessment, Session planning and authorized outcome issuance.
+- Learner: native Class catalog, shared recorded-teacher player, progress,
+  dates, Course and results views are committed. Validate secure playback,
+  pairing, teacher projector access and attendance with the exact native
+  Class Enrollment; add governed assessment and authorized outcome issuance.
 - Replace prior pages and services at cutover, including old `/classes?section=`
   callers, noncredit catalog entry routes and route tests. Do not introduce
   old-to-new enrollment adapters or dual-write services; leave main untouched
