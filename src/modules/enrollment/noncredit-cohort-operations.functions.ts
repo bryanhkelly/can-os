@@ -12,31 +12,10 @@ import {
   noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
-import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
-import {assertCurrentCanonicalStaffForMutation} from "@/modules/identity/canonical-transaction-authorization.server";
-import {readEligibleSelfEnrollmentReleases} from "./noncredit-self-enrollment-catalog.server";
 
 const id=z.string().uuid();
 const releaseInput=z.object({releaseId:id}).strict();
 const attachInput=releaseInput.extend({planId:id}).strict();
-type Executor=Parameters<Parameters<typeof db.transaction>[0]>[0];
-
-/** Never infer a participant's Site from account favorites or an operator's
- * other Site. A provider can view only its own releases at authorized Sites. */
-async function scopedRelease(tx:Executor,releaseId:string,lock=false){
-  const provider=await requireCanonicalLabProvider();
-  const query=tx.select().from(noncreditSelfEnrollmentReleases)
-    .where(and(eq(noncreditSelfEnrollmentReleases.id,releaseId),
-      eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId)))
-    .limit(1);
-  const [release]=lock?await query.for("update"):await query;
-  if(!release || (release.siteId && !provider.siteIds.includes(release.siteId)))
-    throw new AuthorizationError("own release at an authorized Site");
-  // Every mutating operation requests the locked release. Recheck the
-  // underlying login and grant in that same transaction before any write.
-  if(lock)await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
-  return {provider,release};
-}
 function guard(){
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
@@ -48,6 +27,8 @@ function guard(){
 export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
   .validator((v:unknown)=>releaseInput.parse(v))
   .handler(async({data})=>{
+    const {scopedRelease}=await import("./noncredit-cohort-operations.server");
+    const {readEligibleSelfEnrollmentReleases}=await import("./noncredit-self-enrollment-catalog.server");
     guard();
     return db.transaction(async tx=>{
       const {provider,release}=await scopedRelease(tx,data.releaseId);
@@ -197,55 +178,10 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
  * release. The release lock serializes competing operators; each plan is
  * checked independently and both assignment and audit commit atomically.
  */
-type ScopedCohort=Awaited<ReturnType<typeof scopedRelease>>;
-async function assignCohortPlan(tx:Executor,scope:ScopedCohort,planId:string){
-  const {provider,release}=scope;
-  if(release.status!=="published"||release.deliveryMode!=="facilitated"||
-    !release.siteId)throw new AuthorizationError("open facilitated release");
-  const [plan]=await tx.select({
-    id:facilitatedClassroomPlans.id,
-    enrollmentReleaseId:facilitatedClassroomPlans.enrollmentReleaseId,
-    deploymentId:facilitatedClassroomPlans.deploymentId,
-    courseVersionId:facilitatedClassroomPlans.courseVersionId,
-    siteId:facilitatedClassroomPlans.siteId,
-    hostOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
-    state:facilitatedClassroomPlans.state,
-    startsAt:canonicalDeliverySessions.startsAt,
-  }).from(facilitatedClassroomPlans)
-    .innerJoin(canonicalDeliverySessions,eq(
-      canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
-    .where(eq(facilitatedClassroomPlans.id,planId))
-    .limit(1).for("update",{of:facilitatedClassroomPlans});
-  if(!plan||plan.deploymentId!==release.deploymentId||
-    plan.courseVersionId!==release.courseVersionId||
-    plan.siteId!==release.siteId||
-    plan.hostOrganizationId!==provider.organizationId)
-    throw new AuthorizationError("own scheduled Course at the exact approved Site");
-  if(plan.enrollmentReleaseId===release.id)return {planId,attached:true,duplicate:true};
-  if(plan.enrollmentReleaseId!==null||plan.state!=="scheduled"||
-    plan.startsAt<=new Date())
-    throw new AuthorizationError("unallocated future classroom meeting");
-  await tx.update(facilitatedClassroomPlans).set({
-    enrollmentReleaseId:release.id,updatedAt:new Date(),
-  }).where(eq(facilitatedClassroomPlans.id,plan.id));
-  const payload={releaseId:release.id,planId:plan.id,siteId:release.siteId};
-  await tx.insert(auditEvents).values({
-    actorPersonId:provider.actor.actorPersonId!,
-    owningOrganizationId:provider.organizationId,
-    eventCode:"noncredit.cohort.session_assigned",
-    entityKind:"facilitated_classroom_plan",entityId:plan.id,payload,
-  });
-  await tx.insert(domainEvents).values({
-    eventType:"NoncreditCohortSessionAssigned",
-    aggregateType:"noncredit_self_enrollment_release",
-    aggregateId:release.id,actorPersonId:provider.actor.actorPersonId!,
-    payload,
-  });
-  return {planId,attached:true,duplicate:false};
-}
 export const attachClassroomPlanToNoncreditRelease=createServerFn({method:"POST"})
   .validator((v:unknown)=>attachInput.parse(v))
   .handler(async({data})=>{
+    const {scopedRelease,assignCohortPlan}=await import("./noncredit-cohort-operations.server");
     guard();
     return db.transaction(async tx=>{
       const scope=await scopedRelease(tx,data.releaseId,true);
@@ -263,6 +199,7 @@ export const attachFourWeekCohortPlans=createServerFn({method:"POST"})
       "Every meeting must be distinct"),
   }).strict().parse(v))
   .handler(async({data})=>{
+    const {scopedRelease,assignCohortPlan}=await import("./noncredit-cohort-operations.server");
     guard();
     return db.transaction(async tx=>{
       const scope=await scopedRelease(tx,data.releaseId,true);
@@ -283,6 +220,7 @@ const seatInput=releaseInput.extend({
 export const releaseWithdrawnNoncreditSeat=createServerFn({method:"POST"})
   .validator((v:unknown)=>seatInput.parse(v))
   .handler(async({data})=>{
+    const {scopedRelease}=await import("./noncredit-cohort-operations.server");
     guard();
     return db.transaction(async tx=>{
       const {provider,release}=await scopedRelease(tx,data.releaseId,true);
@@ -344,6 +282,8 @@ const inviteInput=z.object({releaseId:id}).strict();
 export const inviteNextNoncreditWaitlist=createServerFn({method:"POST"})
   .validator((v:unknown)=>inviteInput.parse(v))
   .handler(async({data})=>{
+    const {scopedRelease}=await import("./noncredit-cohort-operations.server");
+    const {readEligibleSelfEnrollmentReleases}=await import("./noncredit-self-enrollment-catalog.server");
     guard();
     return db.transaction(async tx=>{
       const {provider,release}=await scopedRelease(tx,data.releaseId,true);
