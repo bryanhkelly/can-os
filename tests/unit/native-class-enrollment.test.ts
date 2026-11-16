@@ -3,6 +3,8 @@ import {
   verifiedAdultOn, assertNativeSelfEnrollmentEligible,
   authorizeNativeClassAttempt,
 } from "@/domain/native-class-enrollment";
+import { assertNativeClassSeatAvailable, assertNativeClassExitReason } from
+  "@/domain/native-class-lifecycle";
 
 const now=new Date("2026-11-15T15:00:00Z");
 const terms={
@@ -35,6 +37,26 @@ const authority={
   coursePublished:true,offeringPublished:true,
 };
 const access={actorPersonId:"person",attempt,enrollment,classInstance:cls,authority,now};
+
+describe("native Class capacity and cancellation contract",()=>{
+  it("counts assignment and self-registration against one Class limit",()=>{
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"self",activeOrPending:5,classCapacity:6,offeringCapacity:5,
+    })).toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"assignment",activeOrPending:5,classCapacity:6,offeringCapacity:5,
+    })).not.toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"assignment",activeOrPending:6,classCapacity:6,
+    })).toThrow();
+  });
+  it("requires accurate cancellation reason on active or pending participation",()=>{
+    expect(()=>assertNativeClassExitReason("pending","cancel","not_eligible")).not.toThrow();
+    expect(()=>assertNativeClassExitReason("active","cancel","not_eligible")).toThrow();
+    expect(()=>assertNativeClassExitReason("active","withdraw","requested")).not.toThrow();
+    expect(()=>assertNativeClassExitReason("active","withdraw","operator_decision")).toThrow();
+  });
+});
 
 describe("native Class learner policy",()=>{
   it("accepts adult DOB only with exact UTC age and real date",()=>{
