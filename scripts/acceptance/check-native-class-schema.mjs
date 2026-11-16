@@ -38,6 +38,7 @@ try{
     "class_staff_assignments.class_id",
     "class_staff_assignments.person_id",
     "class_staff_assignments.role_code",
+    "class_staff_assignments.attendance_authorized",
     "class_staff_assignments.state",
     "class_sessions.class_id",
     "class_sessions.classroom_plan_id",
