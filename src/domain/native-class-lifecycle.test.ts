@@ -4,7 +4,7 @@ import {
   planNativeClassExit,
   assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertOperationalClassOfferingTerms,
-  assertNativeClassAttemptForExit,
+  assertNativeClassAttemptForExit, assertVerifiedAdultNativeClassExit,
 } from "./native-class-lifecycle";
 import type { CommandContext } from "./command-context";
 
@@ -118,6 +118,17 @@ describe("WS2 negative enrollment authorization boundaries",()=>{
       {...grant,person_id:undefined},
     ];
     variants.forEach(value=>expect(()=>assertNativeClassLearnerSessionForExit(value,person,org)).toThrow());
+  });
+});
+
+describe("WS2 youth and guardian safety boundary",()=>{
+  const now=new Date("2026-11-16T12:00:00Z");
+  it("accepts only an independently verified adult birth date",()=>{
+    expect(()=>assertVerifiedAdultNativeClassExit("2008-11-16",now)).not.toThrow();
+    expect(()=>assertVerifiedAdultNativeClassExit("2008-11-17",now)).toThrow();
+    expect(()=>assertVerifiedAdultNativeClassExit("2015-03-01",now)).toThrow();
+    expect(()=>assertVerifiedAdultNativeClassExit(null,now)).toThrow();
+    expect(()=>assertVerifiedAdultNativeClassExit("not-verified",now)).toThrow();
   });
 });
 
