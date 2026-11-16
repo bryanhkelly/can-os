@@ -152,6 +152,11 @@ async function loadAuthorizedParticipant(
   // Native Classes use the same recorded teacher/lesson/practice services.
   // The Course Attempt's verified Class Enrollment is the sole learner source.
   if (attempt.classEnrollmentId) {
+    // Native student and learner sessions must pass the SAME current
+    // Course/Deployment/Adoption/Site gate before a presenter is disclosed.
+    if (context.role !== "learner") {
+      await authorizeCanonicalCourseAttempt(tx,context,attempt.id,allowCompletedHistory);
+    }
     assertLearningParticipantRole(context, "learner");
     const [native] = await tx.select().from(canonicalClassEnrollments)
       .where(eq(canonicalClassEnrollments.id,attempt.classEnrollmentId))
