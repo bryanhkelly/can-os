@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { nativeClassSessionDisplayStatus } from "../../src/domain/native-class-sessions";
 import {
-  assertClassSessionAgendaReferences, canPublishClassSessionAgenda,
+  assertClassSessionAgendaReferences, assertClassSessionAgendaExpectedRevision,
+  canPublishClassSessionAgenda,requiresClassSessionAgenda,
   classSessionAgendaItemsSchema, nextClassSessionAgendaRevision,
 } from "../../src/domain/native-class-session-agenda";
 
@@ -60,6 +61,36 @@ describe("WS4 immutable Course-linked Session agenda", () => {
       ...window,state:"started",roomState:"ended",
       now:new Date("2026-11-02T20:00:01Z"),
     })).toBe("ended");
+  });
+  it("requires the observed revision; concurrent stale edits are rejected", () => {
+    expect(()=>assertClassSessionAgendaExpectedRevision(0,0)).not.toThrow();
+    expect(()=>assertClassSessionAgendaExpectedRevision(1,1)).not.toThrow();
+    expect(()=>assertClassSessionAgendaExpectedRevision(1,2)).toThrow(/Reload/);
+    expect(()=>assertClassSessionAgendaExpectedRevision(0,1)).toThrow(/Reload/);
+    expect(()=>assertClassSessionAgendaExpectedRevision(-1,0)).toThrow();
+  });
+  it("can expose optional planning without retroactively blocking old Sessions", () => {
+    const cutoff="2026-11-16T22:00:00Z";
+    const old=new Date("2026-11-16T21:59:59Z");
+    const newSession=new Date("2026-11-16T22:00:00Z");
+    expect(requiresClassSessionAgenda({
+      featureEnabled:false,mandatoryFrom:cutoff,sessionCreatedAt:newSession,
+    })).toBe(false);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:undefined,sessionCreatedAt:newSession,
+    })).toBe(false);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:cutoff,sessionCreatedAt:old,
+    })).toBe(false);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:cutoff,sessionCreatedAt:newSession,
+    })).toBe(true);
+    expect(()=>requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-11-16",sessionCreatedAt:newSession,
+    })).toThrow(/UTC/);
+    expect(()=>requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-11-16T22:00:00+00:00",sessionCreatedAt:newSession,
+    })).toThrow(/UTC/);
   });
   it("allows append-only revision but denies a conflicting idempotency replay", () => {
     const first = nextClassSessionAgendaRevision(null,"req-1",items);
