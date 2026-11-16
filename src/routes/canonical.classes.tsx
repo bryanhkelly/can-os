@@ -27,7 +27,9 @@ const methodOptions: {value:Method;label:string}[]=[
 ];
 const creditOptions: {value:CreditMode;label:string}[]=[
   {value:"not_applicable",label:"No academic credit"},
-  {value:"audit",label:"Audit"},{value:"for_credit",label:"For credit (eligibility required)"},
+  {value:"audit",label:"Audit"},
+  // For-credit Class enrollment needs independent academic eligibility and
+  // issuer approval; the direct adult Class command does not establish these.
 ];
 const deliveryOptions=["self_paced","scheduled","facilitated","hybrid"] as const;
 function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:string;courseVersionId:string}){
