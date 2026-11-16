@@ -76,7 +76,7 @@ export function NativeClassSessionsPanel({
   function changeRow(id:string,update:Partial<Pick<CustomRow,"localStart"|"minutes">>){
     resetSchedule();
     setCustomRows(current=>current.map(row=>row.id===id?{
-      ...row,...update,id:crypto.randomUUID(),
+      ...row,...update,
     }:row));
   }
   async function start(classSessionId:string){
