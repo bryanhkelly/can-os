@@ -7,6 +7,8 @@ import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativePublicClassCatalogPage, getMyNativeClassEnrollments, enrollInNativeClass,
 } from "@/modules/classes/native-class-enrollment.functions";
+import { withdrawMyNativeClassEnrollment } from
+  "@/modules/classes/native-class-lifecycle.functions";
 
 export const Route=createFileRoute("/learn/classes")({
   validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string}=>({
@@ -83,6 +85,57 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
   </article>;
 }
+type EnrolledClass=Awaited<ReturnType<typeof getMyNativeClassEnrollments>>[number];
+function EnrolledClassCard({item,onChanged}:{item:EnrolledClass;onChanged:()=>Promise<void>}){
+  const [confirm,setConfirm]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  async function withdraw(){
+    if(!confirm||busy)return;
+    setBusy(true);setError("");setNotice("");
+    try{
+      await withdrawMyNativeClassEnrollment({data:{classEnrollmentId:item.classEnrollmentId}});
+      setNotice("Participation withdrawn. Your learning history is preserved.");
+      setConfirm(false);
+      await onChanged();
+    }catch(e){setError(normalizeClientError(e,"Unable to withdraw from Class.").message);}
+    finally{setBusy(false);}
+  }
+  const current=item.status==="active"||item.status==="pending";
+  return <article className="border border-border bg-card p-5">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {item.status} · {item.creditMode.replace("_"," ")}
+    </p>
+    <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
+    <p className="mt-2 text-sm text-muted-foreground">{item.deliveryMode.replace("_"," ")}</p>
+    {item.courseAttemptId&&["active","completed"].includes(item.status)&&
+      <Link to="/classes/$classId" params={{classId:item.classId}}
+        search={{view:"learn",tab:"lessons"}}
+        className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
+        Open Class
+      </Link>}
+    {current&&<div className="mt-4">
+      {!confirm?<Button type="button" size="sm" variant="outline"
+        onClick={()=>setConfirm(true)}>
+        {item.status==="pending"?"Cancel request":"Withdraw from Class"}
+      </Button>:<div className="border border-border bg-muted/20 p-3">
+        <p className="text-sm">This releases your place and ends future Class access.
+          Previous results and attendance are retained.</p>
+        <div className="mt-3 flex gap-2">
+          <Button type="button" size="sm" disabled={busy} onClick={()=>void withdraw()}>
+            {busy?"Saving…":"Confirm withdrawal"}
+          </Button>
+          <Button type="button" size="sm" variant="outline" disabled={busy}
+            onClick={()=>setConfirm(false)}>Keep my place</Button>
+        </div>
+      </div>}
+    </div>}
+    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
+    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+  </article>;
+}
+
 function NativeLearnerClasses(){
   const client=useQueryClient();
   const requested=Route.useSearch();
@@ -116,15 +169,8 @@ function NativeLearnerClasses(){
       {enrolled.isPending&&<p role="status" className="mt-3 text-sm">Loading your Classes…</p>}
       {enrolled.isError&&<p role="alert" className="mt-3 border border-border p-4 text-sm">Native Class records are not yet enabled for this session or environment.</p>}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {(enrolled.data??[]).map(item=><article key={item.classEnrollmentId} className="border border-border bg-card p-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.status} · {item.creditMode.replace("_"," ")}</p>
-          <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{item.deliveryMode.replace("_"," ")}</p>
-          {item.courseAttemptId&&<Link to="/classes/$classId"
-            params={{classId:item.classId}}
-            search={{view:"learn",tab:"lessons"}}
-            className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">Open Class</Link>}
-        </article>)}
+        {(enrolled.data??[]).map(item=><EnrolledClassCard
+          key={item.classEnrollmentId} item={item} onChanged={refresh}/>)}
       </div>
       {enrolled.isSuccess&&enrolled.data.length===0&&<p className="mt-4 text-sm text-muted-foreground">You have no native Class enrollments yet.</p>}
     </section>
