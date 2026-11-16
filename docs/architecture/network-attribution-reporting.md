@@ -30,8 +30,12 @@ records have been changed. These source changes MUST NOT deploy ahead of SQL.
   optional approved network membership credits the affiliated organization,
   retaining the actual delivery Site separately.
 - The immutable snapshot captures the reporting path's UUID, code and name
-  at registration time. A later district reassignment never silently rewrites
-  this historic attribution. Different hierarchy levels are **not additive**.
+  and the credited Organization display name at registration time. A later
+  district reassignment or Organization rename never silently rewrites historic
+  attribution. Affiliate summaries split old and new reporting-unit history;
+  hierarchy levels are **not additive**. For older records reconstructed in
+  migration, names reflect the backfill date rather than independently proven
+  historical naming.
 - `network_reporting_grants` records independently authorized aggregate
   reporting scopes. Membership alone never grants access to private records,
   school records, or cross-organization program data.
