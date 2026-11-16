@@ -28,27 +28,40 @@ export const objectiveReviewRequirements={
 } as const;
 
 export type AssessmentReviewDecision={
-  target:"item"|"assessment"|"form";kind:string;decision:string;
-  reviewerPersonId:string;decisionOrder:number;
+  itemVersionId?:string;
+  kind:string;decision:string;reviewerPersonId:string;order:number;
 };
-export function objectiveApprovalGate(rows:readonly AssessmentReviewDecision[],
-  authorPersonId:string,expectedItemCount:number,reviewedItemCount:number){
-  const groups=Object.entries(objectiveReviewRequirements).flatMap(([target,kinds])=>
-    kinds.map(kind=>({target,kind})));
-  const latest=new Map<string,AssessmentReviewDecision>();
-  for(const item of rows){
-    const key=item.target+":"+item.kind;
-    const prev=latest.get(key);
-    if(!prev||item.decisionOrder>prev.decisionOrder)latest.set(key,item);
+export type ObjectivePublicationReviewInput={
+  items:readonly {id:string;authorPersonId:string}[];
+  assessmentReviews:readonly AssessmentReviewDecision[];
+  formReviews:readonly AssessmentReviewDecision[];
+  itemReviews:readonly AssessmentReviewDecision[];
+};
+/** Every canonical question must have its own latest academic/rights/
+ * accessibility approval, all by someone other than any author of this
+ * Course assessment. An approval for question A NEVER approves question B.
+ * The DB repeats these checks while holding the publication advisory lock.
+ */
+export function objectiveApprovalGate(input:ObjectivePublicationReviewInput){
+  const authors=new Set(input.items.map(item=>item.authorPersonId));
+  function valid(rows:readonly AssessmentReviewDecision[],kind:string){
+    const latest=rows.filter(row=>row.kind===kind)
+      .sort((a,b)=>b.order-a.order)[0];
+    return !!latest&&latest.decision==="approved"&&
+      !authors.has(latest.reviewerPersonId);
   }
-  const requirements=groups.map(({target,kind})=>{
-    const match=latest.get(target+":"+kind);
-    return {target,kind,decision:match?.decision??null,
-      independent:Boolean(match&&match.reviewerPersonId!==authorPersonId)};
-  });
-  return {ready:reviewedItemCount===expectedItemCount&&expectedItemCount>0&&
-    requirements.every(x=>x.decision==="approved"&&x.independent),
-    requirements};
+  const items=input.items.map(item=>({
+    id:item.id,
+    ready:objectiveReviewRequirements.item.every(kind=>
+      valid(input.itemReviews.filter(row=>row.itemVersionId===item.id),kind)),
+  }));
+  const assessmentReady=objectiveReviewRequirements.assessment.every(kind=>
+    valid(input.assessmentReviews,kind));
+  const formReady=objectiveReviewRequirements.form.every(kind=>
+    valid(input.formReviews,kind));
+  return {items,assessmentReady,formReady,
+    ready:items.length>0&&items.length<=10&&items.every(item=>item.ready)&&
+      assessmentReady&&formReady};
 }
 /** App capability is only an initial gate. A separately provisioned,
  * NOLOGIN, exact-Organization PostgreSQL reviewer or publisher role is
