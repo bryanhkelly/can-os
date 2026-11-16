@@ -11,7 +11,7 @@ import {
   siteOrganizationRoles, catalogSites, canonicalEnrollmentSites, classroomDeploymentSites,
 } from "@/db/canonical-v301";
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
-import { assertOperationalClassEnrollmentMethods } from "@/domain/native-class-lifecycle";
+import { assertOperationalClassOfferingTerms } from "@/domain/native-class-lifecycle";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -222,6 +222,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       const [terms]=await tx.select({
         id:canonicalClassOfferingVersions.id,state:canonicalClassOfferingVersions.state,
         enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
+        allowedCreditModes:canonicalClassOfferingVersions.allowedCreditModes,
       }).from(canonicalClassOfferingVersions)
         .innerJoin(canonicalClassOfferings,and(
           eq(canonicalClassOfferings.id,canonicalClassOfferingVersions.classOfferingId),
@@ -233,7 +234,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       if(!terms || terms.state!=="draft") throw new AuthorizationError("draft Class Offering version");
       // The database enum is intentionally forward compatible. Only methods
       // with a complete, independently authorized command may be published.
-      assertOperationalClassEnrollmentMethods(terms.enrollmentMethods);
+      assertOperationalClassOfferingTerms(terms);
       const now=new Date();
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClassOfferingVersions)
