@@ -87,7 +87,8 @@ BEGIN
    OR p_title IS NULL OR length(btrim(p_title)) NOT BETWEEN 5 AND 160
    OR p_passing_fraction IS NULL OR p_passing_fraction<0.5 OR p_passing_fraction>1
    OR p_max_attempts IS NULL OR p_max_attempts NOT BETWEEN 1 AND 5
-   OR jsonb_typeof(p_questions)<>'array'
+   OR p_questions IS NULL
+   OR jsonb_typeof(p_questions) IS DISTINCT FROM 'array'
    OR jsonb_array_length(p_questions) NOT BETWEEN 1 AND 10 THEN
    RAISE EXCEPTION 'Invalid objective assessment draft authoring input'
      USING ERRCODE='22023';
@@ -133,7 +134,7 @@ BEGIN
      question->>'itemVersionId' IS NULL OR
      question->>'encryptedKeyBase64' IS NULL OR
      length(question->>'encryptedKeyBase64')>4096 OR
-     question->>'keyRef'<>'can-noncredit-objective-aes256gcm-v1' THEN
+     question->>'keyRef' IS DISTINCT FROM 'can-noncredit-objective-aes256gcm-v1' THEN
      RAISE EXCEPTION 'Invalid objective question' USING ERRCODE='22023';
    END IF;
    item_version:=(question->>'itemVersionId')::uuid;
