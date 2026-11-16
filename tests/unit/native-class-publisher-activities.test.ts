@@ -60,7 +60,9 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(page).toContain("independent approval");
     expect(page).not.toContain("publishNativeCourseActivitySet");
     expect(page).not.toContain("tx.insert(assessmentExecutionResults)");
-    expect(options).toContain('assertCapability(actor,"curriculum.publish")');
+    expect(options).toContain('assertCapability(actor,"class.manage")');
+    expect(page).toContain("/canonical/assessment-reviews");
+    expect(page).toContain("/canonical/assessment-publications");
     expect(options).toContain("eq(courses.publisherOrganizationId,organizationId)");
     expect(options).toContain("eq(assessmentDefinitions.ownerOrganizationId,organizationId)");
     expect(packageJson).not.toContain("native-course-activities.test.ts");
