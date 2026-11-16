@@ -41,26 +41,34 @@ CREATE OR REPLACE FUNCTION education_v30.v301_assert_assessment_actor_session(
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET search_path=pg_catalog,education_v30,pg_temp AS $session$
 DECLARE digest text:=current_setting('can.assessment.session_hash',true);
+        can_staff_authorized boolean:=false;
 BEGIN
  IF digest IS NULL OR digest !~ '^[a-f0-9]{64}$' OR
     p_actor IS NULL OR p_org IS NULL THEN
    RAISE EXCEPTION 'Authenticated assessment staff session required'
      USING ERRCODE='42501';
  END IF;
- IF NOT (
-   EXISTS(
-     SELECT 1 FROM education_v30.v301_can_staff_session_context(digest) st
-     WHERE st.person_id=p_actor AND st.organization_id=p_org
-       AND st.role_code IN ('site_admin','registrar')
-   ) OR EXISTS(
-     SELECT 1 FROM education_v30.v301_canonical_session_context(digest) st
-     WHERE st.person_id=p_actor AND st.organization_id=p_org
-       AND st.role_code IN ('site_admin','registrar')
-   )
+ IF EXISTS(
+   SELECT 1 FROM education_v30.v301_canonical_session_context(digest) st
+   WHERE st.person_id=p_actor AND st.organization_id=p_org
+     AND st.role_code IN ('site_admin','registrar')
  ) THEN
-   RAISE EXCEPTION 'Assessment Person must match the current verified session'
-     USING ERRCODE='42501';
+   RETURN;
  END IF;
+ -- The CAN legacy crosswalk exists on some branches but not on the
+ -- production canonical main branch. Resolve it dynamically only when
+ -- present; an absent bridge must not disable native canonical sessions.
+ IF to_regprocedure(
+   'education_v30.v301_can_staff_session_context(text)') IS NOT NULL THEN
+   EXECUTE 'SELECT EXISTS (
+     SELECT 1 FROM education_v30.v301_can_staff_session_context($1) st
+     WHERE st.person_id=$2 AND st.organization_id=$3
+       AND st.role_code IN (''site_admin'',''registrar'')
+   )' INTO can_staff_authorized USING digest,p_actor,p_org;
+   IF can_staff_authorized THEN RETURN; END IF;
+ END IF;
+ RAISE EXCEPTION 'Assessment Person must match the current verified session'
+   USING ERRCODE='42501';
 END $session$;
 
 CREATE OR REPLACE FUNCTION education_v30.v301_create_objective_assessment_draft(
