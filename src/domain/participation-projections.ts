@@ -1,6 +1,6 @@
 import {
   activityBucket, activityStatus, sortParticipation,
-  type ParticipationRecord, type ParticipationStatus,
+  type ParticipationRecord, type ParticipationStatus, type ParticipationOpportunity,
 } from "./participation-read-model";
 
 type DateValue = Date | string | null | undefined;
@@ -161,25 +161,37 @@ export interface NoncreditWaitlistActivity {
   releaseId: string; title: string; status: string;
   joinedAt: DateValue; inviteExpiresAt: DateValue; invitationActive: boolean;
 }
-export function projectNoncreditWaitlists(
-  rows: readonly NoncreditWaitlistActivity[], now: Date,
-): ParticipationRecord[] {
-  return rows.map(item => {
-    // A waitlist or invitation is not a Course enrollment, attendance or outcome.
-    const status = item.invitationActive ? "invited" as const : state(item.status);
-    return base({
-      key: "noncredit_waitlist:" + item.releaseId, source: "noncredit_waitlist",
-      sourceId: item.releaseId, refs: {releaseId: item.releaseId},
-      kind: "program", status, sourceStatus: item.status,
-      title: item.title, detail: "Not enrolled · waiting list",
-      organizationId: null, organizationName: null, siteId: null, siteName: null,
-      subject: {kind: "self", displayName: null},
-      startAt: null, endAt: iso(item.inviteExpiresAt), nextAt: null,
-      progress: null, outcome: null,
-      action: item.invitationActive ? {
+/** Waitlist opportunities never enter the participation/enrollment read collection. */
+export function projectNoncreditOpportunities(
+  rows: readonly NoncreditWaitlistActivity[],
+): ParticipationOpportunity[] {
+  const seen = new Set<string>();
+  return rows.flatMap(item => {
+    // The existing personal reader supplies one current row per release, but not
+    // its authoritative waitlist row ID. Use a release-scoped display key only.
+    if (seen.has(item.releaseId)) return [];
+    seen.add(item.releaseId);
+    const state: ParticipationOpportunity["state"] = item.invitationActive
+      ? "invited" : item.status === "expired" ? "expired"
+      : item.status === "waiting" ? "waiting" : "unknown";
+    return [{
+      key: "noncredit_waitlist_release:" + item.releaseId,
+      source: "noncredit_waitlist" as const,
+      releaseId: item.releaseId,
+      state,
+      sourceStatus: item.status,
+      title: item.title,
+      joinedAt: iso(item.joinedAt),
+      expiresAt: iso(item.inviteExpiresAt),
+      action: state === "invited" ? {
         label: "Claim invitation", href: "/learn/enroll?release=" + hrefId(item.releaseId),
-      } : {label: "Manage waiting list", href: "/learn/my-courses"},
-    }, now);
+      } : {
+        label: "Manage waiting list", href: "/learn/my-courses",
+      },
+    }];
+  }).sort((a, b) => {
+    const rank = {invited: 0, waiting: 1, expired: 2, unknown: 3};
+    return rank[a.state] - rank[b.state] || a.title.localeCompare(b.title);
   });
 }
 export function assembleParticipation(records: readonly ParticipationRecord[]): ParticipationRecord[] {
