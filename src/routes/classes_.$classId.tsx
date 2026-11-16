@@ -8,6 +8,7 @@ import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
+import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
 import { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import {
@@ -162,15 +163,11 @@ function LearnerClass({workspace}:{workspace:Workspace}){
         Recorded teacher practice is accessible through Lessons and does not change official assessment requirements.
       </p>
     </section>}
-    {workspace.tab==="sessions"&&<section className="border border-border bg-card p-5">
-      <h2 className="font-serif text-2xl">Class sessions</h2>
-      <p className="mt-3 text-sm text-muted-foreground">
-        Session scheduling and instructor-controlled classroom pairing will appear after Class-to-Session authorization is enabled.
-      </p>
-    </section>}
+    {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}/>}
   </UnifiedCoursePlayer>;
 }
 function TeachingClass({workspace}:{workspace:Workspace}){
+  const client=useQueryClient();
   const canSeeNames=workspace.canViewRoster;
   return <UnifiedCoursePlayer context="native" title={workspace.title}
     subtitle="Class delivery and instructional preparation. This view never exposes a learner's personal Course Attempt or official awarding authority."
@@ -213,6 +210,8 @@ function TeachingClass({workspace}:{workspace:Workspace}){
         Selected: {workspace.lessons.find(x=>x.id===workspace.selectedLessonId)?.title??"Unavailable lesson"}.
       </p>}
     </section>}
+    {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
+      canSchedule onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
     {workspace.tab==="classroom"&&<section className="border border-border bg-card p-5">
       <h2 className="font-serif text-2xl">Classroom presentation</h2>
       <p className="mt-3 text-sm text-muted-foreground">
@@ -296,13 +295,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           </Link>
         </>}
         {workspace.tab==="roster"&&<Roster workspace={workspace} namesAllowed={true}/>}
-        {workspace.tab==="sessions"&&<>
-          <h2 className="font-serif text-2xl">Sessions</h2>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Native dated Sessions and room assignment are not yet connected to Class operations.
-            Do not treat a room code as permission to access this Class.
-          </p>
-        </>}
+        {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}/>}
         {workspace.tab==="reports"&&<>
           <h2 className="font-serif text-2xl">Reporting</h2>
           <p className="mt-3 text-sm text-muted-foreground">
