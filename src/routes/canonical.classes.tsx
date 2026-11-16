@@ -11,6 +11,7 @@ import {
   activateUnifiedClass, createNextUnifiedClassOfferingVersion,
 } from "@/modules/classes/unified-class.functions";
 import type { ClassOfferingTerms } from "@/domain/unified-class";
+import { getPublisherRolloutTemplate } from "@/modules/programs/publisher-rollout.functions";
 import { assessLocalRollout, parsePortableRollout, serializeProgramRollout, type ProgramRolloutRecipe } from "@/domain/network-program-rollout";
 
 export const Route=createFileRoute("/canonical/classes")({
@@ -121,18 +122,19 @@ function NativeClasses(){
   async function exportLaunchRecipe(){
     if(!selected)return;
     try{
-      // Export the available Course components of this one published Offering
-      // version. Never embed a Site grant, enrollment, assessment or content.
-      const rows=(options.data??[])
-        .filter(row=>row.offeringVersionId===selected.offeringVersionId)
-        .filter((row,index,all)=>all.findIndex(candidate=>candidate.courseVersionId===row.courseVersionId)===index)
-        .sort((a,b)=>(a.sequenceNo??Number.MAX_SAFE_INTEGER)-(b.sequenceNo??Number.MAX_SAFE_INTEGER)||
-          a.courseTitle.localeCompare(b.courseTitle));
+      // The picker is bounded and may be incomplete. Re-read ALL canonical
+      // Offering/Course components under the current operator/adoption grant,
+      // rather than accidentally exporting a partial national Program.
+      const source=await getPublisherRolloutTemplate({data:{
+        deploymentId:selected.deploymentId,
+        adoptionId:selected.adoptionId,
+        offeringVersionId:selected.offeringVersionId,
+      }});
       const plan:ProgramRolloutRecipe={
         version:2,revision:1,
-        offeringVersionId:selected.offeringVersionId,
-        offeringTitle:selected.offeringTitle,offeringKind:selected.offeringKind,
-        courses:rows.map(row=>({
+        offeringVersionId:source.offeringVersionId,
+        offeringTitle:source.offeringTitle,offeringKind:source.offeringKind,
+        courses:source.courses.map(row=>({
           courseVersionId:row.courseVersionId,courseTitle:row.courseTitle,
           isRequired:row.isRequired,sequenceNo:row.sequenceNo,
           suggestedClassTitle:row.courseVersionId===selected.courseVersionId&&title.trim()
@@ -147,7 +149,7 @@ function NativeClasses(){
       setRecipeOfferingVersionId(plan.offeringVersionId);
       try{
         await navigator.clipboard.writeText(value);
-        setNotice("Versioned publisher rollout copied. Every receiving operator must independently adopt the Offering and authorize its Site.");
+        setNotice("Published Offering v"+source.offeringVersionNo+" rollout copied with all Course components. Receiving operators must independently adopt and authorize delivery.");
       }catch{
         setNotice("Versioned publisher rollout prepared below. Copy it to share with another authorized operator.");
       }
