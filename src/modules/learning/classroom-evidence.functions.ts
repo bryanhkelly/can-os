@@ -17,7 +17,7 @@ import { authorizeCanonicalCourseAttempt } from "./canonical-course-participatio
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   ownedRoom, roomHostIsCurrent, schoolAttemptIsPlacedAtSite,
-} from "./facilitated-learning.functions";
+} from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
