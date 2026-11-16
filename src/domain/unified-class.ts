@@ -21,6 +21,7 @@ export const classDefinitionSchema = z.object({
   operatingOrganizationId: uuid,
   siteId: uuid.nullable(),
   title: z.string().trim().min(3).max(200),
+  capacity:z.number().int().positive().nullable().optional(),
   deliveryMode: classDeliveryModeSchema,
 }).strict();
 export type ClassDefinition = z.infer<typeof classDefinitionSchema>;
