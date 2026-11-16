@@ -219,10 +219,12 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
             isNull(canonicalAccounts.disabledAt),
             isNotNull(canonicalAccounts.emailVerifiedAt),
           )).limit(100);
-        staffCandidates=[...new Map(candidateRows.map(row=>[
-          row.personId,{personId:row.personId,
-            name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Facilitator")},
-        ])).values()];
+        staffCandidates=[...new Map<string,{personId:string;name:string}>(
+          candidateRows.map(row=>[row.personId,{
+            personId:row.personId,
+            name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Facilitator"),
+          }] as const),
+        ).values()];
         const assigned=await tx.select({
           id:canonicalClassStaffAssignments.id,
           personId:canonicalClassStaffAssignments.personId,
