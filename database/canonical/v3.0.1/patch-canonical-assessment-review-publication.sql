@@ -60,6 +60,30 @@ BEGIN
    RAISE EXCEPTION 'Current independently verified organization staff grant required'
      USING ERRCODE='42501';
  END IF;
+ -- An organization-wide SQL role alone must NEVER make every Site staffer
+ -- a reviewer or publisher. Each Person requires a separate, current,
+ -- evidence-backed professional appointment in the existing canonical model.
+ -- This does not introduce account-switching or a second sign-in.
+ IF NOT EXISTS (
+   SELECT 1 FROM professional_role_assignments assignment
+   JOIN evidence_document_versions e ON e.id=assignment.authority_evidence_id
+   JOIN evidence_documents document ON document.id=e.document_id
+   WHERE assignment.person_id=p_actor
+     AND assignment.appointing_organization_id=p_org
+     AND assignment.organization_id=p_org
+     AND assignment.role_code=p_purpose
+     AND assignment.state='approved'
+     AND assignment.begins_at<=clock_timestamp()
+     AND (assignment.ends_at IS NULL OR assignment.ends_at>clock_timestamp())
+     AND e.verified_at IS NOT NULL AND e.verified_by_person_id IS NOT NULL
+     AND e.verified_at<=clock_timestamp()
+     AND (e.valid_from IS NULL OR e.valid_from<=CURRENT_DATE)
+     AND (e.valid_through IS NULL OR e.valid_through>=CURRENT_DATE)
+     AND document.owning_organization_id=p_org
+ ) THEN
+   RAISE EXCEPTION 'Current person-specific evidence-backed assessment appointment required'
+     USING ERRCODE='42501';
+ END IF;
 END $authority$;
 
 -- Reviewer preview includes encrypted private key bytes ONLY for the
