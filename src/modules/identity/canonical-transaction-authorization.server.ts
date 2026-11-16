@@ -38,7 +38,7 @@ export async function assertCurrentCanonicalStaffForMutation(
     .find(cookie => cookie.startsWith(accessSessionCookie + "="))
     ?.slice(accessSessionCookie.length + 1);
 
-  let result: Awaited<ReturnType<CanonicalWriteTransaction["execute"]>>;
+  let rows: unknown[];
   if (rawCanSession !== undefined) {
     if (!/^[A-Za-z0-9_-]{40,}$/.test(rawCanSession) ||
         !process.env.CAN_ACCESS_TOKEN_PEPPER ||
@@ -46,24 +46,26 @@ export async function assertCurrentCanonicalStaffForMutation(
       throw new AuthorizationError("current CAN staff session");
     }
     const digest = hashAccessSecret(rawCanSession, process.env.CAN_ACCESS_TOKEN_PEPPER);
-    result = await tx.execute(sql`
+    const result = await tx.execute(sql`
       SELECT account_id,session_id,grant_id,person_id,
         role_code,organization_id,site_id
       FROM education_v30.v301_can_staff_session_context(${digest}::text)
     `);
+    rows = result.rows;
   } else {
     const digest = canonicalSessionDigestFromRequest(request);
-    result = await tx.execute(sql`
+    const result = await tx.execute(sql`
       SELECT account_id,session_id,grant_id,person_id,
         role_code,organization_id,site_id
       FROM education_v30.v301_canonical_session_context(${digest}::text)
     `);
+    rows = result.rows;
   }
 
-  if (result.rows.length !== 1) {
+  if (rows.length !== 1) {
     throw new AuthorizationError("current canonical staff grant");
   }
-  const current = canonicalSessionRowSchema.parse(result.rows[0]);
+  const current = canonicalSessionRowSchema.parse(rows[0]);
   const projected = projectCanonicalCommandContext(current);
   if (projected.actorPersonId !== actor.actorPersonId ||
       projected.role !== actor.role ||
