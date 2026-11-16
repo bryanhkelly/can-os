@@ -176,7 +176,12 @@ function NativeClasses(){
   }
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Classes" title="Class management"
     subtitle="Create a Class from an adopted Course. Class Offerings are optional: school and private assignment do not require a public or private registration listing."
-    actions={<Link to="/canonical" className="text-sm font-semibold text-primary underline underline-offset-4">Canonical workspace</Link>}>
+    actions={<div className="flex flex-wrap gap-4 text-sm font-semibold">
+      <Link to="/canonical/course-activities" className="underline underline-offset-4">
+        Publisher Course activities
+      </Link>
+      <Link to="/canonical" className="underline underline-offset-4">Canonical workspace</Link>
+    </div>}>
     <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,.8fr)]">
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Create Class</h2>
