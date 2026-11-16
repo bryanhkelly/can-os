@@ -164,7 +164,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS canonical_class_staff_one_live_role_uq
  WHERE state='approved';
 
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_staff_guard()
-RETURNS trigger LANGUAGE plpgsql AS $
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
  IF TG_OP='DELETE' THEN
    RAISE EXCEPTION 'Class staff assignment history must be preserved' USING ERRCODE='23514';
@@ -186,7 +186,7 @@ BEGIN
    RAISE EXCEPTION 'Ending staff authority requires an end time' USING ERRCODE='23514';
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS canonical_class_staff_guard_trg
  ON education_v30.class_staff_assignments;
 CREATE TRIGGER canonical_class_staff_guard_trg BEFORE UPDATE OR DELETE
@@ -211,7 +211,7 @@ CREATE INDEX IF NOT EXISTS canonical_class_session_class_idx
  ON education_v30.class_sessions(class_id,created_at);
 
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_session_guard()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 DECLARE bound record;
 BEGIN
  IF TG_OP='UPDATE' OR TG_OP='DELETE' THEN
@@ -236,7 +236,7 @@ BEGIN
      USING ERRCODE='23514';
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS canonical_class_session_guard_trg
  ON education_v30.class_sessions;
 CREATE TRIGGER canonical_class_session_guard_trg
@@ -247,7 +247,7 @@ CREATE TRIGGER canonical_class_session_guard_trg
 -- to another Site/Course or resurrected after cancellation. Keep scheduling
 -- times in delivery_sessions; controlled updates to plan state remain audited.
 CREATE OR REPLACE FUNCTION education_v30.canonical_class_plan_boundary()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
  IF EXISTS(SELECT 1 FROM education_v30.class_sessions
    WHERE classroom_plan_id=OLD.id) THEN
@@ -265,7 +265,7 @@ BEGIN
   END IF;
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS canonical_class_plan_boundary_trg
  ON education_v30.facilitated_classroom_plans;
 CREATE TRIGGER canonical_class_plan_boundary_trg
