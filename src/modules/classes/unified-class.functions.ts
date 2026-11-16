@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -11,6 +11,7 @@ import {
   siteOrganizationRoles, catalogSites, canonicalEnrollmentSites, classroomDeploymentSites,
 } from "@/db/canonical-v301";
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
+import { publishedOfferingKind } from "@/domain/network-program-rollout";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -361,9 +362,19 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
       deploymentId:programDeployments.id,
       deploymentName:programDeployments.name,
       adoptionId:deploymentOfferingAdoptions.id,
+      offeringId:offerings.id,
+      offeringTitle:offerings.title,
+      offeringPublisherOrganizationId:offerings.publisherOrganizationId,
       offeringVersionId:offeringVersions.id,
+      offeringVersionNo:offeringVersions.versionNo,
+      productDefinition:offeringVersions.productDefinition,
+      courseId:courses.id,
       courseVersionId:courseVersions.id,
+      courseVersionNo:courseVersions.versionNo,
+      courseCode:courses.courseCode,
       courseTitle:courses.title,
+      isRequired:canonicalOfferingCourses.isRequired,
+      sequenceNo:canonicalOfferingCourses.sequenceNo,
     }).from(programDeployments)
       .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
       .innerJoin(deploymentOfferingAdoptions,eq(deploymentOfferingAdoptions.deploymentId,programDeployments.id))
@@ -383,7 +394,19 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
         eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
         lte(deploymentOfferingAdoptions.validFrom,now),
         or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
-      )).orderBy(asc(courses.title)).limit(100);
+        // Scope before bounding the result: unrelated national Courses must
+        // not consume the first page or disclose publisher catalogue content.
+        exists(db.select({id:educationOperationOrganizationRoles.id})
+          .from(educationOperationOrganizationRoles).where(and(
+            eq(educationOperationOrganizationRoles.operationId,programDeployments.operationId),
+            eq(educationOperationOrganizationRoles.organizationId,operator.organizationId),
+            eq(educationOperationOrganizationRoles.roleCode,"operator"),
+            eq(educationOperationOrganizationRoles.status,"approved"),
+            lte(educationOperationOrganizationRoles.validFrom,now),
+            or(isNull(educationOperationOrganizationRoles.validThrough),
+              gt(educationOperationOrganizationRoles.validThrough,now)),
+          ))),
+      )).orderBy(asc(offerings.title),asc(courses.title)).limit(500);
     const names=operator.siteIds.length?await db.select({
       id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
     }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,operator.siteIds)):[];
@@ -407,7 +430,11 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
           authorizedSites.push(siteId);
         }catch(e){if(!(e instanceof AuthorizationError))throw e;}
       }
-      options.push({...row,operatingOrganizationId:operator.organizationId,
+      // productDefinition is publisher-owned; return classification only.
+      // A recipe cannot import or edit academic content or assessment rules.
+      const {productDefinition,...publicRow}=row;
+      options.push({...publicRow,offeringKind:publishedOfferingKind(productDefinition),
+        operatingOrganizationId:operator.organizationId,
         siteOptions:authorizedSites.map(id=>({
           id,name:names.find(site=>site.id===id)?.name??"Authorized Site",
         }))});
