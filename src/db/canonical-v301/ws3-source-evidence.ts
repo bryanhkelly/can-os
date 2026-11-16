@@ -13,6 +13,10 @@ export const learningCompletionEvidenceBindings=educationV30.table(
       .$type<"completion_correction"|"award_revocation">().notNull(),
     evidenceVersionId:uuid("evidence_version_id").notNull(),
     noncreditRegistrationId:uuid("noncredit_registration_id"),
+    expectedDecisionId:uuid("expected_decision_id"),
+    approvedCorrectionOutcome:text("approved_correction_outcome")
+      .$type<"not_yet_completed"|"voided">(),
+    reviewReason:text("review_reason").notNull(),
     awardIssuanceId:uuid("award_issuance_id"),
     participantPersonId:uuid("participant_person_id").notNull(),
     providerOrganizationId:uuid("provider_organization_id").notNull(),
