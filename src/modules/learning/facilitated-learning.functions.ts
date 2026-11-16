@@ -1,6 +1,6 @@
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
-import { nativeClassForRoom } from "@/modules/classes/native-class-room-boundary.server";
+import { nativeClassForRoom, assertNativeClassRoomStaff } from "@/modules/classes/native-class-room-boundary.server";
 import { assertCurrentNativeClassFacilitatorSession } from "@/modules/classes/native-class-facilitator-session.server";
 import { createServerFn } from "@tanstack/react-start";
 import { digestCode, generatePairingCode, displayCode, recordRoomAuditAndEvent, roomHostIsCurrent, schoolAttemptIsPlacedAtSite, ownedRoom, assertRoomLive, currentRoomMediaAudience, assertRoomMediaRightsForAudience, assertAuthorizedFacilitatedRoomMedia, createFacilitatedRoomForHost, selfEnrolledNoncreditRoomSitePermitted } from "./facilitated-learning-operations.server";
