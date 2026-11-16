@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gt, isNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -76,6 +76,7 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
           eq(canonicalAccountGrants.active,true),
           isNull(canonicalAccountGrants.revokedAt),
           isNull(canonicalAccounts.disabledAt),
+          isNotNull(canonicalAccounts.emailVerifiedAt),
           lte(canonicalAccountGrants.grantedAt,new Date()),
         )).limit(1);
       if(!grant)throw new AuthorizationError("current verified room-facilitator grant at this Site");
