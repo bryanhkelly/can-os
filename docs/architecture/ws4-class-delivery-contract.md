@@ -175,6 +175,19 @@ verified QA; never use today's date as an automatic default. Disabling
 requests and mandatory gating. The existing room emergency stop is never
 hidden behind this flag.
 
+### Visible readiness at the authoritative Class boundary
+
+When and only when both Class and WS4 agenda flags are enabled, the
+authorized native Class workspace performs a bounded read of the existing
+Session IDs and their published agenda revision IDs. It returns only
+`agendaRequired` and `agendaReady` per exact Class Session. The Class
+interface distinguishes optional pre-activation plans from mandatory new
+Session preparation, and refreshes the Class readiness after publication.
+No agenda query is issued while the flag is off, and no network/affiliate
+association grants cross-Site visibility. Publishing still requires the
+independently verified assigned facilitator; learner/manager readiness is
+read-only context.
+
 ### Cancel or replace a future Session without rewriting history
 
 `changeNativeClassSessionSchedule` uses the existing canonical Class lock,
