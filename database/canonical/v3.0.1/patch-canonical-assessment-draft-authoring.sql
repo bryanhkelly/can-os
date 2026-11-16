@@ -52,7 +52,7 @@ DECLARE course_id uuid; definition_id uuid; version_id uuid; form_id uuid;
         current_role_name text:=current_setting('role',true);
 BEGIN
  IF current_role_name IS NULL OR current_role_name IN ('','none') OR
-    current_role_name<>'can_v30_assessment_draft_author_'||
+    current_role_name<>'can_v30_assess_draft_author_'||
       replace(p_organization_id::text,'-','') OR
     NOT education_v30.v28_role_can_access_org(
       p_organization_id,'assessment_draft_author') THEN
@@ -203,7 +203,7 @@ SET search_path=education_v30,pg_catalog AS $readback$
 BEGIN
  IF current_setting('role',true) IS NULL OR
     current_setting('role',true) IN ('','none') OR
-    current_setting('role',true)<>'can_v30_assessment_draft_author_'||
+    current_setting('role',true)<>'can_v30_assess_draft_author_'||
       replace(p_organization_id::text,'-','') OR
     NOT education_v30.v28_role_can_access_org(
       p_organization_id,'assessment_draft_author') THEN
