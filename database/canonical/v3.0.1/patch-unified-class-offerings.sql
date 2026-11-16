@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS education_v30.classes (
  operating_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id),
  site_id uuid REFERENCES education_v30.sites(id),
  title text NOT NULL CHECK(length(btrim(title)) BETWEEN 3 AND 200),
+ capacity integer CHECK(capacity IS NULL OR capacity>0),
  delivery_mode text NOT NULL CHECK(delivery_mode IN ('self_paced','scheduled','facilitated','hybrid')),
  state text NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','approved','active','completed','cancelled')),
  created_by_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
