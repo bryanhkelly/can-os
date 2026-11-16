@@ -10,6 +10,7 @@ import {
   activateUnifiedClass, createNextUnifiedClassOfferingVersion,
 } from "@/modules/classes/unified-class.functions";
 import type { ClassOfferingTerms } from "@/domain/unified-class";
+import { parseNetworkClassLaunchRecipe, serializeNetworkClassLaunchRecipe } from "@/domain/network-class-launch";
 
 export const Route=createFileRoute("/canonical/classes")({component:NativeClasses});
 
@@ -39,6 +40,8 @@ function NativeClasses(){
   const classes=useQuery({queryKey:["native-class-operator-classes"],
     queryFn:()=>getMyUnifiedClassDrafts(),retry:false});
   const [choice,setChoice]=useState("");
+  const [recipeText,setRecipeText]=useState("");
+  const [recipeCourseId,setRecipeCourseId]=useState<string|null>(null);
   const [title,setTitle]=useState("");
   const [classCapacity,setClassCapacity]=useState("");
   const [siteId,setSiteId]=useState("");
@@ -56,6 +59,44 @@ function NativeClasses(){
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const selected=options.data?.find(row=>optionKey(row)===choice);
+  const visibleOptions=(options.data??[]).filter(row=>
+    !recipeCourseId||row.courseVersionId===recipeCourseId);
+  async function exportLaunchRecipe(){
+    if(!selected)return;
+    const value=serializeNetworkClassLaunchRecipe({
+      version:1,courseVersionId:selected.courseVersionId,
+      courseTitle:selected.courseTitle,
+      suggestedClassTitle:title.trim()||selected.courseTitle,
+      deliveryMode,capacity:classCapacity?Number(classCapacity):null,
+      recommendedSessionMinutes:60,
+    });
+    setRecipeText(value);
+    try{
+      await navigator.clipboard.writeText(value);
+      setNotice("Reusable Class setup copied. Receiving Sites must verify their own Course adoption and Site rights.");
+    }catch{
+      setNotice("Class setup prepared below. Copy the text to share with another authorized Site.");
+    }
+  }
+  function importLaunchRecipe(){
+    try{
+      const recipe=parseNetworkClassLaunchRecipe(recipeText);
+      if(!(options.data??[]).some(row=>row.courseVersionId===recipe.courseVersionId))
+        throw new Error("This Course is not currently approved for your organization. No Class was created.");
+      // Never import an external Organization, Site, adoption or learner list.
+      // The receiving operator chooses their own authorized delivery context.
+      setRecipeCourseId(recipe.courseVersionId);
+      setChoice("");setSiteId("");
+      setTitle(recipe.suggestedClassTitle);
+      setDeliveryMode(recipe.deliveryMode);
+      setClassCapacity(recipe.capacity===null?"":String(recipe.capacity));
+      setCreateWithOffering(false);
+      setError("");
+      setNotice("Class launch setup loaded. Select your organization's approved Course Offering and hosting Site, then review before creating. Suggested Session duration: "+recipe.recommendedSessionMinutes+" minutes.");
+    }catch(error){
+      setError(normalizeClientError(error,"Invalid or unauthorized Class launch recipe.").message);
+    }
+  }
   async function refresh(){
     await Promise.all([
       client.invalidateQueries({queryKey:["native-class-course-options"]}),
@@ -87,6 +128,7 @@ function NativeClasses(){
         ?"Class and optional draft Class Offering created. Class ID: "+result.classId
         :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId);
       setChoice("");setTitle("");setSiteId("");setClassCapacity("");
+      setRecipeCourseId(null);
       await refresh();
     }catch(e){setError(normalizeClientError(e,"Could not create the native Class.").message)}
     finally{setBusy(false)}
@@ -142,13 +184,42 @@ function NativeClasses(){
         {options.isPending&&<p role="status" className="mt-4 text-sm">Checking available Courses and operating authorizations…</p>}
         {options.isError&&<p role="alert" className="mt-4 border border-border p-3 text-sm">The native Class service is not available for this operator or environment. No changes were made.</p>}
         {options.data&&options.data.length===0&&<p role="status" className="mt-4 text-sm">No approved Course/Deployment combinations are currently available for your organization.</p>}
+        <section className="mt-5 border border-border bg-muted/20 p-4"
+          aria-label="Network Class launch recipe">
+          <h3 className="font-semibold">Launch the same Course at another Site</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Share a small setup recipe instead of copying videos, questionnaires,
+            student records, or Course content. Each Site independently chooses
+            its authorized Course, delivery Site and Class publication.
+          </p>
+          <label className="mt-3 block text-sm font-semibold" htmlFor="native-network-recipe">
+            Portable Class launch recipe (JSON)
+          </label>
+          <textarea id="native-network-recipe" value={recipeText} rows={4}
+            maxLength={4000} onChange={e=>setRecipeText(e.target.value)}
+            placeholder="Paste a Class launch recipe from an approved partner"
+            className="mt-1 w-full border border-border bg-background p-3 font-mono text-xs"/>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" disabled={!selected}
+              onClick={()=>void exportLaunchRecipe()}>Copy this Class setup</Button>
+            <Button type="button" variant="outline" disabled={!recipeText.trim()}
+              onClick={importLaunchRecipe}>Load setup for this Site</Button>
+            {recipeCourseId&&<Button type="button" variant="outline"
+              onClick={()=>{setRecipeCourseId(null);setChoice("");setSiteId("");}}>
+              Show all approved Courses
+            </Button>}
+          </div>
+          {recipeCourseId&&<p role="status" className="mt-2 text-xs">
+            Only locally approved Course options matching this recipe are available below.
+          </p>}
+        </section>
         <form onSubmit={event=>void create(event)} className="mt-5 space-y-5">
           <div>
             <label className="block text-sm font-semibold" htmlFor="native-class-course">Approved Course Offering</label>
             <select id="native-class-course" required value={choice} onChange={e=>{setChoice(e.target.value);setSiteId("");}}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Select an authorized Course</option>
-              {(options.data??[]).map(row=><option key={optionKey(row)} value={optionKey(row)}>
+              {visibleOptions.map(row=><option key={optionKey(row)} value={optionKey(row)}>
                 {row.courseTitle} · {row.deploymentName}
               </option>)}
             </select>
