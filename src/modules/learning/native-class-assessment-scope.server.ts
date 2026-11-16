@@ -8,6 +8,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import type { CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
+import { assertPublisherObjectiveAttemptLimit } from "@/domain/canonical-objective-draft";
 import { getCanonicalClassPublisher } from "@/modules/classes/native-class-publisher.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -78,6 +79,7 @@ export async function loadNativeClassAssessmentScope(
   if(phaseRows.length!==1)throw new AuthorizationError(
     "one approved Class Course assessment administration for this phase");
   const {administration,version}=phaseRows[0]!;
+  assertPublisherObjectiveAttemptLimit(version.blueprint,administration.attemptLimit);
   const [form]=await tx.select().from(assessmentFormVersions)
     .where(and(eq(assessmentFormVersions.id,administration.formVersionId),
       eq(assessmentFormVersions.assessmentVersionId,version.id),

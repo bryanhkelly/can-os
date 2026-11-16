@@ -13,6 +13,7 @@ import {
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { evaluateKnowledgeCheckResult } from "@/domain/noncredit-knowledge-check";
 import { validateClassAuthority } from "@/modules/classes/unified-class.functions";
+import { assertPublisherObjectiveAttemptLimit } from "@/domain/canonical-objective-draft";
 import { getCanonicalClassPublisher } from "./native-class-publisher.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -181,6 +182,7 @@ export const finalizeNativeClassKnowledgeCheck=createServerFn({method:"POST"})
           form.id!==administration.formVersionId||
           form.assessmentVersionId!==version.id)
         throw new AuthorizationError("published objective Course knowledge check");
+      assertPublisherObjectiveAttemptLimit(version.blueprint,administration.attemptLimit);
       // Independent reviewer session is checked again inside the transaction,
       // including when the result was already finalized.
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);

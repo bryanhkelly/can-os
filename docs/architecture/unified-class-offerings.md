@@ -222,6 +222,99 @@ identified `course-surveys.functions.ts` now also accepts native Class
 Course Attempts when an authorized campaign, published survey, verified
 consent evidence and personal invitation exist.
 
+### Publisher-friendly Course Activities without duplicated engines
+
+`/canonical/course-activities` restores the original five-question quiz and
+five-question feedback authoring **experience**, but uses existing canonical
+ownership and publication boundaries. A national publisher sees only its
+published Course versions and the approved, publisher-owned objective
+assessment inventory; a local Class operator cannot edit those questions.
+The five-question quiz composer now uses `createCanonicalObjectiveDraft`
+to **persist a real canonical assessment draft**, including the existing
+assessment definition, version, fixed form, item bank, item versions, choices
+and server-side AES-256-GCM-sealed answer keys. Neither the role nor the
+authoring API can publish forms, administer tests or expose answer keys to a
+learner. It also provides restricted, metadata-only draft readback after
+refresh. Draft authoring requires an optional, separately provisioned
+`assessment_draft_author` NOLOGIN database role scoped to exactly one
+Organization, `curriculum.publish` capability and
+`CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED=true`. The role receives EXECUTE
+only on two purpose-built, SECURITY DEFINER functions, rather than direct
+DML against canonical assessment tables. The encryption key
+`CAN_NONCREDIT_ASSESSMENT_KEY_HEX` must be configured server-side.
+
+The **separate canonical assessment authoring-security patch** creates no
+new learner, quiz, survey, or assessment result tables. It is not a third
+Unified Class schema migration. Saving a draft is not independent review,
+publication or a local Class administration.
+
+The optional canonical approval extension now adds the independent review
+and publication **commands and workspaces**, with no duplicate review tables.
+Reviewers use `/canonical/assessment-reviews` to inspect each question and
+its server-decrypted designated correct choice under a bound reviewer role,
+and record append-only item (academic/rights/accessibility), version (those
+three plus independent), and form (academic/rights/accessibility) decisions.
+Authors cannot independently review their own items. The publisher at
+`/canonical/assessment-publications` sees current approval metadata, never
+correct answer keys, and publishes items, version and form atomically only
+after all required independent approvals. Original canonical publication
+triggers remain authoritative.
+
+SQL roles are insufficient on their own: each reviewer/publisher Person must
+also have a current, separately appointed, evidence-backed role in the
+EXISTING `professional_role_assignments` table for the exact owning
+Organization. A general Class staff grant does not confer that appointment.
+These are optional gated authoring/approval capability policies, **not** the
+retired third Class activities migration. One-account role switching,
+network reporting and invitations remain explicitly deferred until after
+merging with main. The approval commands and per-Person authorization
+have been committed but not migrated, typechecked or runtime-accepted.
+
+For feedback, the page calls the existing
+`createCanonicalSurveyDraft` command, which writes to the canonical Survey
+model only when the independent survey-draft author role, database
+provisioning and feature flag permit it. Survey drafts still require
+independent privacy/accessibility/safeguarding reviews, approved publication,
+a verified identified campaign and recipient invitations. Saving the draft
+does not bypass any of those gates.
+
+One published Survey version may be used through many separately operated
+local campaigns. The native Class SQL patch now introduces an **immutable
+Class-to-campaign attribution link**, not a competing survey response engine.
+A link requires the campaign's exact Deployment and operating Organization,
+an eligible Class, and verified survey permission, and it must be created
+before any invitations or responses. Changing a linked campaign's publisher
+Survey version, Deployment, operating Organization or response mode is
+forbidden. The learner survey service checks the exact person's Class
+Enrollment, Course Attempt and linked campaign, never Course/Deployment
+coincidence alone. The noncredit path does not expose a Class-attributed
+campaign once native Class is activated.
+
+For knowledge checks, `getCanonicalClassPublisher` resolves **Course content
+ownership** from the canonical Course publisher, independently from an
+Offering distributor, while verifying current published Offering/Course
+membership. Local Class operators may administer an authorized
+publisher-owned canonical assessment under their own governed Deployment
+without becoming the content publisher or altering secure answers. Provisioning, submissions and independent result
+confirmation retain separate authorization and audit boundaries.
+
+The Class learner's Assignments view now includes a clearer, deliberately
+non-authoritative completion checklist: recorded lesson milestones,
+finalized knowledge-check results, provider-reviewed participation evidence
+and an independently recorded Class Outcome. The UI never equates video
+playback, draft lesson progress, quiz pass or identified survey feedback
+with automatically earned credit, completion or a credential.
+
+**Still required before release:** reviewed and accepted isolated-QA
+installation of the optional restricted canonical assessment draft, independent
+review and publication functions, approved per-Person appointments,
+person-scoped negative permission tests, campaign creation and individual
+survey invitations, completion-policy mapping, real application-role
+permissions and two-Site end-to-end acceptance. Source-level review and
+publication exist; no successful runtime release claim is made. One new native attribution relation is included
+in the **existing first Class migration**; the removed parallel activity
+migration must not be reintroduced.
+
 **Unproven and not yet a release claim:** These are source-level changes, not
 a successful Class assessment/survey/grading acceptance test. In particular,
 restricted DB roles, canonical assessment fixtures, survey invitation

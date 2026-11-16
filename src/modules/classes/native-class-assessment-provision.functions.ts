@@ -13,6 +13,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { validateClassAuthority } from "@/modules/classes/unified-class.functions";
+import { assertPublisherObjectiveAttemptLimit } from "@/domain/canonical-objective-draft";
 import { getCanonicalClassPublisher } from "./native-class-publisher.server";
 
 /** Provider-administered canonical assessment ACCESS for a native Class.
@@ -75,6 +76,7 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
         purpose:assessmentDefinitions.purpose,
         ownerOrganizationId:assessmentDefinitions.ownerOrganizationId,
         versionLifecycle:assessmentVersions.lifecycle,
+        versionBlueprint:assessmentVersions.blueprint,
         versionCourseId:assessmentVersions.courseVersionId,
         formLifecycle:assessmentFormVersions.lifecycle,
         formShuffle:assessmentFormVersions.shuffleQuestions,
@@ -103,6 +105,8 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
       if(available.length!==1)
         throw new AuthorizationError("one approved published objective knowledge check for this Class");
       const administration=available[0]!.administration;
+      assertPublisherObjectiveAttemptLimit(
+        available[0]!.versionBlueprint,administration.attemptLimit);
       // Requesting staff must remain authorized at mutation time. No account
       // or role assertion from the untrusted browser is accepted.
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);

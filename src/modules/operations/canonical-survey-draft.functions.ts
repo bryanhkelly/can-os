@@ -17,8 +17,12 @@ async function surveyAuthor() {
   if (process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED !== "true")
     throw new AuthorizationError("survey draft authoring not enabled");
   const actor = await getCanonicalCommandContext(getRequest());
-  if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? "") ||
-      !actor.scope.siteIds?.length) throw new AuthorizationError("canonical survey staff");
+  // Publisher-owned survey drafts need a currently authorized Organization,
+  // not a fabricated local Site. The organization-bound restricted SQL role,
+  // survey.draft.create capability and v28_role_can_access_org checks below
+  // remain mandatory for both national and local publishers.
+  if (!actor.actorPersonId || !["site_admin", "registrar"].includes(actor.role ?? ""))
+    throw new AuthorizationError("canonical survey publisher staff");
   const role = canonicalSurveyDraftDatabaseRole(actor);
   return { actorPersonId: actor.actorPersonId, organizationId: actor.scope.organizationIds![0]!, role };
 }

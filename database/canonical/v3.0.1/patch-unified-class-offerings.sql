@@ -438,7 +438,8 @@ BEGIN
         USING ERRCODE='23514';
     END IF;
   END IF;
-  RETURN CASE WHEN TG_OP='DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
 END $;
 DROP TRIGGER IF EXISTS canonical_linked_survey_scope_guard_trg
  ON education_v30.survey_campaigns;

@@ -3,8 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
 import {
-  offerings, offeringVersions, canonicalOfferingCourses, courseVersions,
-  courses, assessmentDefinitions, assessmentVersions,
+  courseVersions, courses, assessmentDefinitions, assessmentVersions,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -19,7 +18,8 @@ export const getPublisherCourseActivityOptions=createServerFn({method:"GET"})
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
       throw new AuthorizationError("authorized publisher staff");
-    assertCapability(actor,"curriculum.publish");
+    if(!actor.capabilities.has("curriculum.publish"))
+      assertCapability(actor,"class.manage");
     const organizationId=actor.scope.organizationIds?.[0];
     if(!organizationId||actor.scope.organizationIds?.length!==1)
       throw new AuthorizationError("one Course publisher organization");
@@ -28,17 +28,8 @@ export const getPublisherCourseActivityOptions=createServerFn({method:"GET"})
       courseCode:courses.courseCode,
     }).from(courseVersions)
       .innerJoin(courses,eq(courses.id,courseVersions.courseId))
-      .innerJoin(canonicalOfferingCourses,
-        eq(canonicalOfferingCourses.courseVersionId,courseVersions.id))
-      .innerJoin(offeringVersions,and(
-        eq(offeringVersions.id,canonicalOfferingCourses.offeringVersionId),
-        eq(offeringVersions.lifecycle,"published"),
-        isNotNull(offeringVersions.publishedAt)))
-      .innerJoin(offerings,and(
-        eq(offerings.id,offeringVersions.offeringId),
-        eq(offerings.publisherOrganizationId,organizationId),
-        eq(offerings.status,"active")))
-      .where(and(eq(courseVersions.lifecycle,"published"),
+      .where(and(eq(courses.publisherOrganizationId,organizationId),
+        eq(courseVersions.lifecycle,"published"),
         isNotNull(courseVersions.publishedAt)))
       .orderBy(asc(courses.title)).limit(201);
     const unique=[...new Map(rows.slice(0,200)
