@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Building2, Check, ExternalLink, Globe2, Graduati
 import { PageFrame, PageHeader } from "@/components/workspace";
 import { SiteAffiliationPanel } from "@/components/operations/SiteAffiliationPanel";
 import { SiteLaunchActivationPanel } from "./SiteLaunchActivationPanel";
+import { SiteContentChannelEditor } from "./SiteContentChannelEditor";
+import type { SiteContentChannelConfig } from "@/domain/site-content-channels";
 import type { listLaunches } from "@/modules/programs/launch.functions";
 import { siteFirstLaunchSteps, type SiteFirstLaunchStep } from "@/domain/launch-studio";
 import type { SiteLaunchPreferences } from "@/domain/site-launch-preferences";
@@ -36,9 +38,9 @@ const steps = ["Your Site", "Network", "Program interests", "Website reveal", "L
 
 /** A lightweight, explicitly private preview. No made-up Program or enrollment
  * release is created by choosing interests; publication remains server-owned. */
-export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",initialPreferences=null,selectionError=null,sitePrograms=null,programsState="empty"}:{
+export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",initialPreferences=null,initialChannels=null,selectionError=null,sitePrograms=null,programsState="empty"}:{
   options:Options;selectedSiteId?:string;initialStep?:SiteFirstLaunchStep;
-  initialPreferences?:SiteLaunchPreferences|null;selectionError?:string|null;
+  initialPreferences?:SiteLaunchPreferences|null;initialChannels?:SiteContentChannelConfig|null;selectionError?:string|null;
   sitePrograms?:Awaited<ReturnType<typeof listLaunches>>["launches"]|null;
   programsState?:"ready"|"empty"|"unauthorized"|"unavailable";
 }) {
@@ -251,6 +253,8 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
           </details>
         </aside>
       </div>
+      {siteId&&<SiteContentChannelEditor siteId={siteId} initialConfig={initialChannels}
+        onSaved={()=>setPreviewKey(k=>k+1)}/>}
     </section>}
     {step===4&&<section className="mt-6">
       <Button variant="outline" onClick={backward} className="mb-4"><ArrowLeft className="size-4"/> Return to website preview</Button>
