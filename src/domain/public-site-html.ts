@@ -477,18 +477,19 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         ? '<a class="hero-text-link" href="' + firstInquiryHref + '">Request information</a>' : "") +
       (availablePaths.includes("/about") ? '<a class="hero-text-link" href="/about">Our story →</a>' : "") +
       (!availablePaths.includes("/academics") && availablePaths.includes("/contact")
-        ? '<a class="hero-text-link" href="/contact">School information →</a>' : ""),
+        ? '<a class="hero-text-link" href="/contact">Contact information →</a>' : ""),
     image: heroPhotoSrc?heroPhotoElement(heroPhotoSrc,heroPhotoAlt,image?undefined:heroMedia??undefined):"",
     mosaicImages: campusMosaicImages,
   });
-  // The homepage introduces the school; detailed church content belongs on
+  // The homepage introduces the Site; detailed local content belongs on
   // About. No invented academic facts or unapproved identity records are used.
   const homeStory = local && availablePaths.includes("/about") ? `<section class="home-story editorial-section" aria-labelledby="home-story-title">
     <div class="home-story-heading"><p class="tag">Our community</p>
-      <h2 id="home-story-title">${local.schoolVision ? "A community where every student has room to grow." : "More than lessons. A place to be known."}</h2></div>
+      <h2 id="home-story-title">${local.schoolVision && profile==="school"
+        ? "A community where every student has room to grow." : experienceCopy.storyTitle}</h2></div>
     <div class="home-story-copy"><p>${escapePublicHtml(local.localDescription || local.schoolVision ||
       local.churchHistory || local.leadershipWelcome || "Learn about the people and purpose behind this community.")}</p>
-      <a class="text-action" href="/about">Get to know our school →</a></div>
+      <a class="text-action" href="/about">Get to know our community →</a></div>
   </section>` : "";
   const programOverview = academicCards ? `<section class="program-overview editorial-section" aria-labelledby="academic-title">
     <div class="program-overview-heading"><div><p class="tag">Learning pathways</p>
@@ -527,8 +528,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   const reviewedAddress = parentAddress?.canDisplay && parentAddress.value?.trim()
     ? escapePublicHtml(parentAddress.value) : "";
   const contactSection = `<section id="contact" aria-labelledby="contact-title" class="church-section">
-    <p class="tag">School information</p>
-    <h2 id="contact-title">Connect with our school</h2>
+    <p class="tag">${profile==="school"?"School information":"Contact information"}</p>
+    <h2 id="contact-title">Connect with ${profile==="school"?"our school":"our learning community"}</h2>
     ${reviewedContact || reviewedAddress ? `<div class="contact-details">
       ${reviewedContact ? `<div><h3>Published contact information</h3><p>${reviewedContact}</p></div>` : ""}
       ${reviewedAddress ? `<div><h3>Published location</h3><p>${reviewedAddress}</p>
@@ -541,8 +542,8 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       : academicCards
         ? "For academic program questions, use the request-information form for a published program below."
         : reviewedContact
-          ? "Use the school's published contact information for current next steps."
-          : "No public inquiry channel is currently available. The school has not published a verified contact method."}
+          ? "Use the Site's published contact information for current next steps."
+          : "No public inquiry channel is currently available. This Site has not published a verified contact method."}
     ${!options?.localPreview && academicCards
       ? "An inquiry does not guarantee admission or enrollment." : ""}</p></section>`;
   const approvedSchedules = ((page.parentInformation as
@@ -887,8 +888,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         "Browse public Classes and their learning formats. Enrollment depends on each Class Offering's approved terms."),
       renderOpportunityDirectory("class","Explore Classes",
         "Class availability and registration methods are rechecked at the enrollment service.")),
-    "/about": composePublicSiteInterior(templateId, secondaryHero("Our community", "A school shaped by purpose and the people around it.",
-      demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." : "Meet the vision, values, and local community behind this school."), localSection, peopleSection + educatorPortraitSection),
+    "/about": composePublicSiteInterior(templateId,
+      secondaryHero("Our community",profile==="school"
+        ?"A school shaped by purpose and the people around it.":experienceCopy.storyTitle,
+      demo ? "Get to know the values, people-first philosophy, and shared ambition behind our community." :
+        "Meet the people, vision and local community behind this learning Site."),
+      localSection, peopleSection + educatorPortraitSection),
     "/academics": composePublicSiteInterior(templateId, secondaryHero("Learning", "Serious learning. A more personal path.",
       demo ? "Learning becomes meaningful when students can think independently, explore challenging ideas, and see the world differently." : "See the academic opportunities currently available and how different learning approaches may fit your child."), academicSection + pageBlocks("/academics"), approachSection + creativeSampleSection),
     "/student-life": composePublicSiteInterior(templateId, secondaryHero("Beyond the classroom", demo ? "Find your people. Follow your curiosity." : "Student life",
@@ -1064,7 +1069,7 @@ ${sevenSchoolCss}
 </head>
 <body class="theme-${theme} template-${templateId}" style="${visualCss}">
 ${demo ? `<div class="demo-banner" role="note"><strong>DEMONSTRATION SCHOOL</strong> · ${school} is fictional. All school experiences shown are examples, not real-world offerings.</div>` : ""}
-${!demo&&!options?.templateGallery&&!options?.localPreview&&page.operatingStatus&&page.operatingStatus!=="authorized" ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"School opening authorization is not currently verified.":"School in development · Not yet open for enrollment."}</strong> Academic plans and opening dates remain subject to review and applicable requirements.</div>` : ""}
+${!demo&&!options?.templateGallery&&!options?.localPreview&&Boolean(page.academicPrograms?.length)&&page.operatingStatus&&page.operatingStatus!=="authorized" ? `<div class="launch-status-banner" role="note"><strong>${page.operatingStatus==="review_required"?"School opening authorization is not currently verified.":"School in development · Not yet open for enrollment."}</strong> Academic plans and opening dates remain subject to review and applicable requirements.</div>` : ""}
 <a class="skip-link" href="#main-content">Skip to main content</a>
 ${composePublicSiteChrome(templateId, {
   brand: logo ? `<img class="school-logo" src="${escapePublicHtml(logo.dataUrl)}" alt="${escapePublicHtml(logo.altText)}" width="48" height="48" decoding="async"/>${school}` : school,
@@ -1073,7 +1078,7 @@ ${composePublicSiteChrome(templateId, {
   navigation,
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="${experienceCopy.navLabel}">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
-  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual students or facilities of this school.</p>` : ""}
+  main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual learners or facilities of this Site.</p>` : ""}
   ${pageContent[path]}\n  <!-- Content channels are composed inside the Site template, never appended here. -->\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
 })}
