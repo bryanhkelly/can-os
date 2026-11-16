@@ -229,10 +229,24 @@ five-question feedback authoring **experience**, but uses existing canonical
 ownership and publication boundaries. A national publisher sees only its
 published Course versions and the approved, publisher-owned objective
 assessment inventory; a local Class operator cannot edit those questions.
-The five-question quiz composer currently produces an explicitly **unpublished
-publisher-only authoring package**. There is not yet a restricted canonical
-assessment-draft write service, so exporting the template does NOT publish or
-save an assessment to the database.
+The five-question quiz composer now uses `createCanonicalObjectiveDraft`
+to **persist a real canonical assessment draft**, including the existing
+assessment definition, version, fixed form, item bank, item versions, choices
+and server-side AES-256-GCM-sealed answer keys. Neither the role nor the
+authoring API can publish forms, administer tests or expose answer keys to a
+learner. It also provides restricted, metadata-only draft readback after
+refresh. Draft authoring requires an optional, separately provisioned
+`assessment_draft_author` NOLOGIN database role scoped to exactly one
+Organization, `curriculum.publish` capability and
+`CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED=true`. The role receives EXECUTE
+only on two purpose-built, SECURITY DEFINER functions, rather than direct
+DML against canonical assessment tables. The encryption key
+`CAN_NONCREDIT_ASSESSMENT_KEY_HEX` must be configured server-side.
+
+The **separate canonical assessment authoring-security patch** creates no
+new learner, quiz, survey, or assessment result tables. It is not a third
+Unified Class schema migration. Saving a draft is not independent review,
+publication or a local Class administration.
 
 For feedback, the page calls the existing
 `createCanonicalSurveyDraft` command, which writes to the canonical Survey
@@ -269,11 +283,12 @@ and an independently recorded Class Outcome. The UI never equates video
 playback, draft lesson progress, quiz pass or identified survey feedback
 with automatically earned credit, completion or a credential.
 
-**Still required before release:** the canonical assessment authoring
-command and approved publication workflow for the simple quiz composer,
-campaign creation and individual survey invitation delivery, approved
-completion-policy mapping, fully restricted app-role RLS and two-Site
-end-to-end acceptance. One new native attribution relation is included
+**Still required before release:** a reviewed and accepted isolated-QA
+installation of the optional restricted canonical assessment draft writer
+and role, the **existing assessment's independent review and publication**
+workflow, campaign creation and individual survey invitation delivery,
+approved completion-policy mapping, real application-role permissions
+and two-Site end-to-end acceptance. One new native attribution relation is included
 in the **existing first Class migration**; the removed parallel activity
 migration must not be reintroduced.
 
