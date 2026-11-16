@@ -9,6 +9,7 @@ import { auditEvents, domainEvents, learnerCourseAttempts, noncreditRegistration
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
+import { assertNoncreditCompletionSiteScope } from "@/modules/learning/verified-completion-site.server";
 
 const schema=z.object({
   courseAttemptId:z.string().uuid(),
@@ -46,6 +47,7 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
          registration.offeringVersionId!==attempt.offeringVersionId||
          registration.participantPersonId===actor.actorPersonId)
         throw new AuthorizationError("current independent noncredit registration");
+      await assertNoncreditCompletionSiteScope(tx,actor,registration);
       const [training]=await tx.select().from(noncreditTrainingVersions)
         .where(and(eq(noncreditTrainingVersions.id,registration.trainingVersionId),
           eq(noncreditTrainingVersions.offeringVersionId,attempt.offeringVersionId))).limit(1);
