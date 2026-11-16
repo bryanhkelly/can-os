@@ -8,8 +8,10 @@ import {
   noncreditSelfEnrollmentClaims,
   facilitatedLearningParticipants, facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
+  canonicalClassEnrollments,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { nativeClassForRoom, nativeClassRoomParticipant } from "@/modules/classes/native-class-room-boundary.server";
 import { classroomAttestationOpen, classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import {assignedClassroomRelease,attemptInAssignedClassroomRelease} from "./classroom-release-boundary.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
@@ -47,8 +49,21 @@ export async function registeredRoomParticipant(
     eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
     eq(learnerCourseAttempts.status,"active"),
   )).limit(1);
-  if(!attempt||Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId))
-    throw new AuthorizationError("current registered classroom Course attempt");
+  if(!attempt)throw new AuthorizationError("current registered classroom Course attempt");
+  const native=await nativeClassForRoom(tx,room);
+  if(native){
+    const [member]=await tx.select({personId:canonicalClassEnrollments.learnerPersonId})
+      .from(canonicalClassEnrollments).where(and(
+        eq(canonicalClassEnrollments.id,attempt.classEnrollmentId!),
+        eq(canonicalClassEnrollments.classId,native.classId),
+      )).limit(1);
+    if(!member||!await nativeClassRoomParticipant(tx,room,attempt.id,member.personId))
+      throw new AuthorizationError("enrolled learner in the exact native Class");
+    return {personId:member.personId,source:"class" as const};
+  }
+  if(attempt.classEnrollmentId||
+     Boolean(attempt.enrollmentId)===Boolean(attempt.noncreditRegistrationId))
+    throw new AuthorizationError("native Class cannot use an unbound Course/Site room");
   if(attempt.enrollmentId){
     if(releaseId)throw new AuthorizationError("noncredit enrollment release participant");
     const [school]=await tx.select({
@@ -100,8 +115,29 @@ export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
     return db.transaction(async tx=>{
       const room=await ownedRoom(tx,host,data.facilitatedSessionId);
       const releaseScope=await assignedClassroomRelease(tx,room);
+      const native=await nativeClassForRoom(tx,room);
+      // Native teacher assignment alone is not consent to expose a learner
+      // roster. A verified site manager may review attendance records.
+      if(native &&
+         !host.actor.capabilities.has("class.manage") &&
+         !host.actor.capabilities.has("class.roster.view"))
+        throw new AuthorizationError("separately authorized native Class roster reader");
       // Scope the SQL BEFORE LIMIT: other cohorts must not crowd out this roster.
-      const attempts=releaseScope
+      const attempts=native
+        ? await tx.select({id:learnerCourseAttempts.id})
+            .from(learnerCourseAttempts)
+            .innerJoin(canonicalClassEnrollments,and(
+              eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
+              eq(canonicalClassEnrollments.classId,native.classId),
+              eq(canonicalClassEnrollments.status,"active"),
+              eq(canonicalClassEnrollments.courseAttemptId,learnerCourseAttempts.id),
+            ))
+            .where(and(
+              eq(learnerCourseAttempts.deploymentId,room.deploymentId),
+              eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
+              eq(learnerCourseAttempts.status,"active"),
+            )).limit(301)
+        : releaseScope
         ? await tx.select({id:learnerCourseAttempts.id})
             .from(learnerCourseAttempts)
             .innerJoin(noncreditRegistrations,eq(
@@ -126,7 +162,7 @@ export const getClassroomAttendanceRoster=createServerFn({method:"GET"})
               eq(learnerCourseAttempts.courseVersionId,room.courseVersionId),
               eq(learnerCourseAttempts.status,"active"),
             )).limit(301);
-      const eligible:{id:string;personId:string;source:"school"|"noncredit"}[]=[];
+      const eligible:{id:string;personId:string;source:"school"|"noncredit"|"class"}[]=[];
       for(const attempt of attempts.slice(0,300)){
         try {
           const person=await registeredRoomParticipant(tx,room,attempt.id,releaseScope);
