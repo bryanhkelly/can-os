@@ -141,7 +141,9 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
 
       // Only the Class operator or an explicitly assigned teacher receives
       // personally identifying roster information. A facilitator sees counts.
-      const rosterAllowed=canManage||(view==="teach"&&staffRole==="teacher");
+      // A teaching assignment is not, by itself, permission to read minor or adult learner identities.
+      const rosterAllowed=canManage||(view==="teach"&&staffRole==="teacher"&&
+        actor.capabilities.has("class.roster.view"));
       let roster:Array<{enrollmentId:string;personId:string;name:string;status:string;creditMode:string}>=[];
       let rosterCount=0;
       if((view==="teach"||view==="manage")){
