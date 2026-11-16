@@ -11,6 +11,7 @@ import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch
 export const siteContentChannelIds = [
   "learning.interests", "learning.academics",
   "learning.enrichment", "learning.noncredit",
+  "site.setup", "site.network",
 ] as const;
 export type SiteContentChannelId = typeof siteContentChannelIds[number];
 
@@ -31,9 +32,9 @@ export const siteContentBlockSchema = z.object({
 }).strict();
 
 export const siteContentChannelConfigSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
   revision: z.number().int().min(0).max(2147483647),
-  blocks: z.array(siteContentBlockSchema).max(8)
+  blocks: z.array(siteContentBlockSchema).max(12)
     .superRefine((blocks, ctx) => {
       const seenIds = new Set<string>();
       const seenChannels = new Set<string>();
@@ -51,9 +52,21 @@ export type SiteContentBlock = z.infer<typeof siteContentBlockSchema>;
 export type SiteContentChannelConfig = z.infer<typeof siteContentChannelConfigSchema>;
 
 export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
-  version: 1,
+  version: 2,
   revision: 0,
   blocks: [{
+    id: "site-setup", channel: "site.setup",
+    placement: "community", layout: "list", enabled: true,
+    eyebrow: "Your Site",
+    title: "How your learning Site is taking shape",
+    description: "Private setup facts. These do not certify facilities, program delivery or operating approval.",
+  }, {
+    id: "site-network", channel: "site.network",
+    placement: "closing", layout: "list", enabled: true,
+    eyebrow: "Your network",
+    title: "Community and network",
+    description: "Affiliations are reviewed separately. A pending request does not confer network authority.",
+  }, {
     id: "planning-interests", channel: "learning.interests",
     placement: "learning", layout: "cards", enabled: true,
     eyebrow: "Your learning community",
@@ -68,17 +81,45 @@ export const defaultSiteContentChannelConfig: SiteContentChannelConfig = {
   }],
 };
 
-/** Unconfigured historical Sites inherit only a PRIVATE proposed-program block.
- * A published website never renders private interests from this default. */
+/** V1 Site settings lacked a home for identity, location, delivery and network.
+ * An explicit V2 save can remove/rearrange these private blocks normally.
+ * An existing V1 document is upcast without destroying its own block choices. */
+const legacySiteContentChannelConfigSchema = siteContentChannelConfigSchema.extend({
+  version: z.literal(1),
+});
 export function readSiteContentChannelConfig(raw: unknown): SiteContentChannelConfig {
   if (raw === undefined || raw === null) return defaultSiteContentChannelConfig;
-  return siteContentChannelConfigSchema.parse(raw);
+  const v2 = siteContentChannelConfigSchema.safeParse(raw);
+  if (v2.success) return v2.data;
+  const v1 = legacySiteContentChannelConfigSchema.parse(raw);
+  const missing = defaultSiteContentChannelConfig.blocks.filter(block =>
+    (block.channel === "site.setup" || block.channel === "site.network") &&
+    !v1.blocks.some(existing => existing.channel === block.channel));
+  return siteContentChannelConfigSchema.parse({
+    ...v1, version: 2, blocks: [...v1.blocks, ...missing],
+  });
+}
+export function safeReadSiteContentChannelConfig(raw: unknown): SiteContentChannelConfig {
+  try { return readSiteContentChannelConfig(raw); }
+  catch { return defaultSiteContentChannelConfig; }
 }
 
 export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   label: string; description: string; privateOnly: boolean;
   defaultTitle: string; defaultEyebrow: string; defaultDescription: string;
 }> = {
+  "site.setup": {
+    label: "Site setup facts", privateOnly: true,
+    description: "Private Site identity, planning location, time zone and selected delivery mode.",
+    defaultTitle: "How your learning Site is taking shape", defaultEyebrow: "Your Site",
+    defaultDescription: "These details are planned, not verified public operating claims.",
+  },
+  "site.network": {
+    label: "Network affiliation status", privateOnly: true,
+    description: "Private affiliation status from network review. Never a public brand endorsement.",
+    defaultTitle: "Community and network", defaultEyebrow: "Your network",
+    defaultDescription: "Network requests do not automatically grant membership or brand rights.",
+  },
   "learning.interests": {
     label: "Proposed learning programs", privateOnly: true,
     description: "Private plans selected in Launch Studio. Never publish these as offerings.",
@@ -126,6 +167,13 @@ export type SiteContentChannelFeeds = {
   /** The Site, not the preview route, resolves its channel sources. */
   mode: "private" | "public";
   preferences?: SiteLaunchPreferences | null;
+  siteSetup?: {
+    name: string; organizationName: string; city?: string | null;
+    state?: string | null; timezone?: string | null;
+  } | null;
+  /** Only Site-authorized preview readers supply independently reviewed statuses. */
+  networkAffiliations?: readonly {name:string;status:"pending"|"approved"|"rejected"|"revoked"}[] | null;
+  networkStatusKnown?: boolean;
   academicPrograms?: readonly PublicAcademicProgram[];
   enrichment?: readonly {
     seasonId: string; title: string; programName: string;
@@ -144,9 +192,45 @@ export function resolveSiteContentBlocks(
   const origin = noncreditEnrollmentOrigin(feeds.enrollmentOrigin);
   return config.blocks.flatMap(block => {
     if (!block.enabled) return [];
-    if (block.channel === "learning.interests" && feeds.mode !== "private") return [];
+    if ((block.channel === "learning.interests" || block.channel === "site.setup" ||
+      block.channel === "site.network") && feeds.mode !== "private") return [];
     let items: SiteContentItem[] = [];
     switch (block.channel) {
+      case "site.setup": {
+        const setup=feeds.siteSetup;
+        if (setup) {
+          items = [
+            {id:"site-name",title:"Site name",description:setup.name,label:"Saved Site"},
+            {id:"responsible-organization",title:"Responsible organization",
+              description:setup.organizationName,label:"Saved Site"},
+            ...(setup.city && setup.state ? [{id:"planning-location",title:"Planned location",
+              description:setup.city+", "+setup.state,label:"Planning information · not verified"}] : []),
+            ...(setup.timezone ? [{id:"site-timezone",title:"Site time zone",
+              description:setup.timezone,label:"Scheduling reference · not a public timetable"}] : []),
+            ...(feeds.preferences ? [{id:"delivery-intent",title:"Intended delivery",
+              description:feeds.preferences.delivery==="both" ? "Physical and digital" :
+                feeds.preferences.delivery==="physical" ? "Physical / in person" : "Digital / online",
+              label:"Planning intent · not an approved delivery mode"}] : []),
+          ];
+        }
+        break;
+      }
+      case "site.network":
+        if (feeds.networkStatusKnown) {
+          items = feeds.networkAffiliations?.length ? feeds.networkAffiliations.map((network,index)=>({
+            id:"network-"+index,title:network.name,
+            description:network.status==="approved"
+              ? "Affiliation approved. Public branding and program use require separate authority."
+              : network.status==="pending" ? "Requested. Network HQ review is pending."
+              : network.status==="revoked" ? "Affiliation revoked." : "Affiliation not approved.",
+            label:"Affiliation: "+network.status,
+          })) : [{
+            id:"independent",title:"Independent Site",
+            description:"No network affiliation is currently requested or approved.",
+            label:"Independent operation",
+          }];
+        }
+        break;
       case "learning.interests":
         items = (feeds.preferences?.interestIds ?? []).map(id => ({
           id, title: interestCopy[id].title, description: interestCopy[id].description,
