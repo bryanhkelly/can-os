@@ -1,4 +1,4 @@
-import { AuthorizationError } from "./command-context";
+import { AuthorizationError, type CommandContext } from "./command-context";
 import type { z } from "zod";
 import { classEnrollmentStatusSchema } from "./unified-class";
 type ClassEnrollmentStatus = z.infer<typeof classEnrollmentStatusSchema>;
@@ -64,8 +64,6 @@ export function assertNativeClassRepeatEligible(
     throw new AuthorizationError("completed Class repeat requires approved policy");
   }
 }
-import type { CommandContext } from "./command-context";
-
 export function assertNativeClassOperatorExitScope(
   actor: CommandContext,
   instance: {operatingOrganizationId:string;siteId:string|null},
