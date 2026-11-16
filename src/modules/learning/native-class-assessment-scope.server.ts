@@ -8,6 +8,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import type { CanonicalParticipationAccess } from "@/domain/canonical-course-participation";
+import { getCanonicalClassPublisher } from "@/modules/classes/native-class-publisher.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Phase="baseline"|"final";
@@ -40,6 +41,9 @@ export async function loadNativeClassAssessmentScope(
       cls.courseVersionId!==access.courseVersionId||
       cls.deploymentId!==access.deploymentId)
     throw new AuthorizationError("current Class learner and Course Attempt");
+  const publisherOrganizationId=await getCanonicalClassPublisher(tx,{
+    offeringVersionId:cls.offeringVersionId,courseVersionId:cls.courseVersionId,
+  });
   const [profile]=await tx.select({id:learnerProfiles.id})
     .from(learnerProfiles).where(eq(learnerProfiles.personId,context.actorPersonId)).limit(1);
   if(!profile)throw new AuthorizationError("provider-issued canonical assessment learner identity");
@@ -61,6 +65,10 @@ export async function loadNativeClassAssessmentScope(
       readHistory?undefined:eq(assessmentFormAdministrations.status,"open"),
       eq(assessmentVersions.lifecycle,"published"),
       eq(assessmentVersions.courseVersionId,access.courseVersionId),
+      // The national publisher owns the immutable assessment definition.
+      // The local operator administers its approved Class deployment, not
+      // an arbitrary different publisher's or locally altered answer key.
+      eq(assessmentDefinitions.ownerOrganizationId,publisherOrganizationId),
     )).limit(51);
   if(administrations.length>50)
     throw new AuthorizationError("assessment administrations require a narrower Course publication");
