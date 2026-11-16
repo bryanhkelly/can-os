@@ -77,6 +77,27 @@ describe("canonical Course objective draft authoring",()=>{
     expect(()=>openNoncreditAnswerKey(key,randomUUID(),sealed)).toThrow();
     expect(()=>openNoncreditAnswerKey("01".repeat(32),itemVersionId,sealed)).toThrow();
   });
+  it("requires actual CAN/native session proof for both draft creation and readback",()=>{
+    const patch=read("database/canonical/v3.0.1/patch-canonical-assessment-draft-authoring.sql");
+    const service=read("src/modules/classes/canonical-objective-draft.functions.ts");
+    const binding=read("src/modules/identity/canonical-assessment-session.server.ts");
+    const provision=read("database/canonical/v3.0.1/provision-canonical-assessment-draft-role.sql");
+    const reviewPatch=read("database/canonical/v3.0.1/patch-canonical-assessment-review-publication.sql");
+    expect(patch.match(/CREATE OR REPLACE FUNCTION/g)).toHaveLength(3);
+    expect(patch).toContain("digest !~ '^[a-f0-9]{64}$'");
+    expect(patch).toContain("v301_can_staff_session_context(digest)");
+    expect(patch).toContain("v301_canonical_session_context(digest)");
+    expect(patch).toContain("p_organization_id uuid,p_course_version_id uuid,p_actor_person_id uuid");
+    expect(patch).toContain("REVOKE ALL ON FUNCTION education_v30.v301_assert_assessment_actor_session(");
+    expect(patch).toContain("uuid,uuid,uuid) FROM PUBLIC;");
+    expect(provision).toContain("v301_list_objective_assessment_drafts(uuid,uuid,uuid)");
+    expect(reviewPatch).toContain("PERFORM education_v30.v301_assert_assessment_actor_session(p_org,p_actor)");
+    expect(binding).toContain("canonicalSessionDigestFromRequest(request)");
+    expect(binding).toContain("hashAccessSecret(rawCanSession");
+    expect(binding).toContain("set_config('can.assessment.session_hash'");
+    expect(service.match(/await bindCanonicalAssessmentSession\(tx,getRequest\(\)\)/g)).toHaveLength(2);
+    expect(patch.trimEnd().endsWith("COMMIT;")).toBe(true);
+  });
   it("never grants table-wide DML or public access to the canonical answer keys",()=>{
     const patch=read("database/canonical/v3.0.1/patch-canonical-assessment-draft-authoring.sql");
     const provision=read("database/canonical/v3.0.1/provision-canonical-assessment-draft-role.sql");
