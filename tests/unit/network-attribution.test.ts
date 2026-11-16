@@ -80,6 +80,29 @@ describe("network attribution is not a parallel enrollment system",()=>{
     expect(()=>rollupAttributionEvidence([attributed({basis:"provider_default"})])).toThrow(/cannot claim/);
     expect(()=>decodeHistoricalNetworkPath([{id:"one",code:"X"}])).toThrow(/Invalid/);
   });
+  it("preserves a church\'s historical district when its network hierarchy changes",()=>{
+    const nextDistrict={id:"district-new",name:"New District",code:"NEW"};
+    const report=rollupAttributionEvidence([
+      attributed({registrationId:"older",path:[root,state,district],
+        reportingUnitId:"district",reportingUnitName:"District"}),
+      attributed({registrationId:"newer",path:[root,state,nextDistrict],
+        reportingUnitId:"district-new",reportingUnitName:"New District"}),
+    ]);
+    expect(report.uniqueRegistrations).toBe(2);
+    expect(report.affiliations).toHaveLength(2);
+    expect(report.affiliations.map(a=>a.reportingUnitId).sort())
+      .toEqual(["district","district-new"].sort());
+    expect(report.networkUnits.find(x=>x.unitId==="root")?.registrations).toBe(2);
+    expect(report.networkUnits.find(x=>x.unitId==="district")?.registrations).toBe(1);
+    expect(report.networkUnits.find(x=>x.unitId==="district-new")?.registrations).toBe(1);
+    expect(()=>rollupAttributionEvidence([
+      attributed({reportingUnitId:"district-new",reportingUnitName:"New District",
+        path:[root,state,district]}),
+    ])).toThrow(/immutable historical path/);
+    const service=read("src/modules/enrollment/noncredit-network-report.functions.ts");
+    expect(service).toContain("const historicalLeaf=historicalPath?.length");
+    expect(service).not.toContain("networkMemberships.reportingUnitId");
+  });
   it("keeps private learner records behind policy and immutable event evidence",()=>{
     const migration=read("database/canonical/v3.0.1/patch-network-attribution-reporting.sql");
     expect(migration).toContain("ALTER COLUMN site_id SET NOT NULL");
