@@ -28,7 +28,7 @@ export function NativeClassSessionsPanel({
   const [customRows,setCustomRows]=useState<CustomRow[]>([newCustomRow()]);
   const [requestIds,setRequestIds]=useState<string[]>([]);
   const [scheduled,setScheduled]=useState(false);
-  const [prepared,setPrepared]=useState({media:false,display:false,room:false});
+  const [prepared,setPrepared]=useState({media:false,display:false,room:false,captions:false,backup:false});
   const siteTimeZone=workspace.siteTimeZone;
   const [busy,setBusy]=useState(false);
   const [opened,setOpened]=useState<{roomId:string;pairingCode:string|null;expiresAt:string|null}|null>(null);
@@ -158,6 +158,8 @@ export function NativeClassSessionsPanel({
           ["media","Approved lesson and captions checked"],
           ["display","TV, audio and projected text checked"],
           ["room","Participant joining instructions ready"],
+          ["captions","Captions/transcript and readable slides checked"],
+          ["backup","Bandwidth and facilitator recovery plan checked"],
         ] as const).map(([key,label])=><label key={key}
           className="flex min-h-11 items-start gap-2 border border-border p-3 text-sm">
           <input type="checkbox" checked={prepared[key]}
@@ -167,7 +169,7 @@ export function NativeClassSessionsPanel({
         </label>)}
       </div>
       {!Object.values(prepared).every(Boolean)&&<p className="mt-2 text-xs text-muted-foreground">
-        {Object.values(prepared).filter(Boolean).length} of 3 preparation checks acknowledged.
+        {Object.values(prepared).filter(Boolean).length} of {Object.values(prepared).length} preparation checks acknowledged.
         You can still open a classroom if you need to.
       </p>}
     </section>}
@@ -290,7 +292,7 @@ export function NativeClassSessionsPanel({
           {session.roomId&&session.roomState==="live"&&<Link
             to="/classes/$classId" params={{classId:workspace.classId}}
             search={{view:"teach",tab:"classroom",session:session.id,lesson:undefined}}
-            className="text-sm font-semibold underline">Private class controls</Link>}
+            className="text-sm font-semibold underline">Resume authorized live controls</Link>}
           {session.roomId&&session.roomState==="live"&&<Link to="/classroom/$sessionId/presentation"
             params={{sessionId:session.roomId}}
             className="text-sm font-semibold underline">Audience display</Link>}
