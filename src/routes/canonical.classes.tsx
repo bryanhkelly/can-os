@@ -208,8 +208,12 @@ function NativeClasses(){
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {item.visibility} · {item.offeringState} · version {item.versionNo}
             </p>
-            <h3 className="mt-1 text-base font-semibold">{item.title}</h3>
+            <h3 className="mt-1 text-base font-semibold"><Link to="/classes/$classId"
+              params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
+              className="underline-offset-2 hover:underline">{item.title}</Link></h3>
             <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {item.enrollmentMethods.join(", ")}</p>
+            <Link to="/classes/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
+              className="mt-2 inline-block text-sm font-semibold underline">Open Class workspace</Link>
             {item.offeringState==="draft"&&<Button disabled={busy} className="mt-3"
               onClick={()=>void action(item.classId,item.classOfferingVersionId,"publish")}>Publish Class Offering</Button>}
             {item.offeringState==="published"&&<Button disabled={busy} className="mt-3" variant="outline"
