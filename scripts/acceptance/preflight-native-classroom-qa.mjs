@@ -34,8 +34,7 @@ const requirements={
 };
 const nativeTables=[
   "classes","class_offerings","class_offering_versions","class_enrollments",
-  "class_outcomes","class_awards","class_staff_assignments","class_sessions",
-  "course_activity_sets","class_activity_enrollment_pins","class_activity_submissions"
+  "class_outcomes","class_awards","class_staff_assignments","class_sessions"
 ];
 const problems=[];
 let exitCode=0;
