@@ -7,7 +7,7 @@
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
     "prebuild": "npm run assets:prepare",
-    "prebuild:cloudflare": "npm run assets:prepare",
+    "prebuild:cloudflare": "node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
     "prebuild-storybook": "npm run assets:prepare",
     "prestorybook": "npm run assets:prepare",
     "preview": "node scripts/preview.mjs",
