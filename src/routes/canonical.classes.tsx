@@ -40,6 +40,7 @@ function NativeClasses(){
     queryFn:()=>getMyUnifiedClassDrafts(),retry:false});
   const [choice,setChoice]=useState("");
   const [title,setTitle]=useState("");
+  const [classCapacity,setClassCapacity]=useState("");
   const [siteId,setSiteId]=useState("");
   const [deliveryMode,setDeliveryMode]=useState<(typeof deliveryOptions)[number]>("self_paced");
   const [createWithOffering,setCreateWithOffering]=useState(false);
@@ -72,6 +73,7 @@ function NativeClasses(){
           offeringVersionId:selected.offeringVersionId,courseVersionId:selected.courseVersionId,
           operatingOrganizationId:selected.operatingOrganizationId,
           siteId:siteId||null,title:title.trim(),deliveryMode,
+          capacity:classCapacity?Number(classCapacity):null,
         },
         terms:createWithOffering?{
           visibility,enrollmentMethods:methods,allowedCreditModes:creditModes,
@@ -84,7 +86,7 @@ function NativeClasses(){
       setNotice(result.classOfferingVersionId
         ?"Class and optional draft Class Offering created. Class ID: "+result.classId
         :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId);
-      setChoice("");setTitle("");setSiteId("");
+      setChoice("");setTitle("");setSiteId("");setClassCapacity("");
       await refresh();
     }catch(e){setError(normalizeClientError(e,"Could not create the native Class.").message)}
     finally{setBusy(false)}
@@ -155,6 +157,19 @@ function NativeClasses(){
             <input id="native-class-title" required minLength={3} maxLength={200} value={title}
               onChange={e=>setTitle(e.target.value)} placeholder="AI Literacy · January 2027"
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold" htmlFor="native-class-overall-capacity">
+              Class capacity
+            </label>
+            <input id="native-class-overall-capacity" type="number" min={1}
+              value={classCapacity} placeholder="Unlimited"
+              onChange={event=>setClassCapacity(event.target.value)}
+              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            <p className="mt-2 text-xs text-muted-foreground">
+              This is the total number of seats in the Class across every enrollment method.
+              A Class Offering may impose an additional, lower registration limit.
+            </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div><label className="block text-sm font-semibold" htmlFor="native-class-mode">Delivery</label>
