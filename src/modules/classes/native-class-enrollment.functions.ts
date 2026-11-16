@@ -10,6 +10,7 @@ import {
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
+  educationOperationOrganizationRoles,
   canonicalOfferingCourses,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -42,7 +43,7 @@ async function requireLearner(){
 
 /** A live Class is permitted only while publisher/adoption/deployment and
  * its authorized Site are current, regardless of catalog visibility. */
-async function currentClassAuthority(tx:Tx,classId:string,now:Date){
+export async function currentClassAuthority(tx:Tx,classId:string,now:Date){
   const [r]=await tx.select({
     classId:canonicalClasses.id,classTitle:canonicalClasses.title,
     classState:canonicalClasses.state,
@@ -80,6 +81,19 @@ async function currentClassAuthority(tx:Tx,classId:string,now:Date){
       or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
     )).limit(1);
   if(!r || r.classState!=="active")throw new AuthorizationError("currently authorized Class");
+  const [operator]=await tx.select({id:educationOperationOrganizationRoles.id})
+    .from(educationOperationOrganizationRoles)
+    .innerJoin(programDeployments,eq(programDeployments.operationId,educationOperationOrganizationRoles.operationId))
+    .where(and(
+      eq(programDeployments.id,r.deploymentId),
+      eq(educationOperationOrganizationRoles.organizationId,r.operatingOrganizationId),
+      eq(educationOperationOrganizationRoles.roleCode,"operator"),
+      eq(educationOperationOrganizationRoles.status,"approved"),
+      lte(educationOperationOrganizationRoles.validFrom,now),
+      or(isNull(educationOperationOrganizationRoles.validThrough),
+        gt(educationOperationOrganizationRoles.validThrough,now)),
+    )).limit(1);
+  if(!operator)throw new AuthorizationError("current operating organization authority");
   if(r.siteId){
     const [site]=await tx.select({id:catalogSites.id}).from(catalogSites)
       .innerJoin(programDeployments,eq(programDeployments.id,r.deploymentId))
