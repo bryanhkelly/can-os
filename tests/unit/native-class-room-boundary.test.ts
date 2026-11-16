@@ -26,7 +26,7 @@ describe("native Class room isolation contract",()=>{
     expect(room).toContain("nativeClassRoomParticipant(tx,room,attempt.id,participantPersonId)");
     const attendance=read("src/modules/learning/classroom-attendance.functions.ts");
     expect(attendance).toContain("eq(canonicalClassEnrollments.classId,native.classId)");
-    expect(attendance).toContain('host.actor.capabilities.has("class.roster.view")');
+    expect(attendance).toContain("assertNativeClassAttendanceReader");
   });
   it("keeps native Class Session plans immutable and disjoint from noncredit releases",()=>{
     const sql=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
