@@ -70,7 +70,8 @@
     "test:e2e:noncredit": "playwright test --config=playwright.noncredit-self-enrollment.config.ts",
     "db:check:main": "node scripts/acceptance/check-production-drizzle-parity.mjs",
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
-    "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts"
+    "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts",
+    "test:site:channels": "vitest run tests/unit/site-content-channels.test.ts tests/unit/site-content-channels-integration.test.ts tests/unit/site-first-preview.test.ts tests/unit/website-studio-templates.test.tsx"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
