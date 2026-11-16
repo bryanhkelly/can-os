@@ -106,8 +106,11 @@ WS00/identity approval, rather than weakening this gate.
 
 The `not_eligible` cancellation reason is valid only for a `pending`
 request; `requested` belongs only to learner-initiated withdrawals.
-`operator_decision` and `session_cancelled` are available for operator
-cancellation. Idempotent retries of an already-terminal cancellation
+`operator_decision` is available for operator cancellation.
+`session_cancelled` remains unavailable here until a canonical Session
+closure ID and matching exact-Class proof are validated; the operator cannot
+assert a session ended merely by choosing a reason label.
+Idempotent retries of an already-terminal cancellation
 produce no new outbox/audit events even if the original pending reason
 cannot be reconstructed from the terminal row.
 
