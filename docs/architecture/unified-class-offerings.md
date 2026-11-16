@@ -10,7 +10,7 @@ learning identity, progress, school records, registration and completion evidenc
 - **Course Offering**: one publisher-owned, explicitly classified single-Course product made available for approved organizational adoption.
 - **Program Offering**: a publisher-owned, versioned bundle of learning experiences (one or many Courses, possibly other components).
 - **Class**: a governed instantiation of *exactly one Course version* within one current Deployment/adoption and operating organization, optionally at a Site. No schedule is required for self-paced learning.
-- **Class Offering**: the required enrollment contract of that Class, even when entirely private or assigned. One identity, versioned terms. Visibility is separate from one or more permitted enrollment methods.
+- **Class Offering**: an optional, versioned registration/publication contract. A Class can exist, operate and receive authorized assigned students without any Class Offering. Visibility and enrollment methods do not change the Class identity.
 - **Class Enrollment**: one person's enrollment regardless of how participation began. Learners may participate for credit, audit or without academic-credit applicability. Certificates and other awards are independent outcomes, not separate enrollment types.
 - **Individual Course Attempt**: authoritative individual Course activity/progress, not duplicated for classrooms or recorded teacher selection.
 - **Class Outcome**: independently supported evidence of achievement or assessment. A result may exist without an award.
@@ -21,7 +21,7 @@ learning identity, progress, school records, registration and completion evidenc
 
 1. Course 1 → many Classes. Each Class references exactly one immutable published Course version.
 2. Publisher Offering 1 → one/many Course versions. Only an explicitly classified single-Course publisher Offering is a Course Offering.
-3. Class 1 → one Class Offering identity; Class Offering 1 → many immutable publication versions over time.
+3. Class 1 → zero/one Class Offering identity; when present, an Offering has many immutable publication versions over time.
 4. Class 1 → zero/many Sessions; Class 1 → zero/many learner Enrollments.
 5. Enrollment 1 → one person and one Class; Enrollment → individual outcomes, possible separate awards.
 6. Program registration may coordinate enrollment in several Courses/Classes, but must not pretend a Program is a single Course attempt.
@@ -30,7 +30,7 @@ learning identity, progress, school records, registration and completion evidenc
 
 Class Offering visibility: public, unlisted, private.
 Class Offering enrollment methods: any explicitly permitted combination of self, invitation, assignment and approval.
-These are orthogonal. A private Class can assign learners; a public Class can still require approval.
+These are orthogonal. A private Class can assign learners directly, without any Class Offering. A public Class Offering can still require approval.
 Publication does not imply public advertising or open self-service.
 
 An evergreen self-paced Class can have no Site or meeting date.
@@ -45,8 +45,8 @@ silently amend the published Course. Deployment/adoption, Site readiness, profes
 content rights, safeguarding and any required local approval remain enforceable at each action.
 Student Person/guardian identity and privacy are not derived from network membership.
 
-**No backward compatibility is required.** The target is one native Class, Class Offering,
-Class Enrollment, Course Attempt, Outcome and Award model. New commands will not call
+**No backward compatibility is required.** The target is one native Class,
+optional Class Offering, Class Enrollment, Course Attempt, Outcome and Award model. New commands will not call
 legacy Section or noncredit-registration services, and there are no importers, backfills,
 dual writes, source adapters or fallback endpoints. Existing live data and workflows remain
 unmodified on main until a separately approved replacement deployment.
@@ -64,11 +64,18 @@ unmodified on main until a separately approved replacement deployment.
 - Native **adult self-enrollment** with current adult DOB verification, consent
   hashing, class-level capacity lock, idempotent duplicate handling and atomic
   Class Enrollment/Course Attempt: src/modules/classes/native-class-enrollment.functions.ts.
+- Native **direct adult assignment** for verified existing Organization/Site learners,
+  with no Class Offering, independent Class-wide capacity, one Course Attempt,
+  audit trail and no implicit academic-credit award:
+  src/modules/classes/native-class-assignment.functions.ts.
+- Class creation and activation are independent of publication. An optional
+  Class Offering can be created at Class creation or added later.
 - Native Course Attempt authorization, Course lesson/progress and outcomes/awards
   **read model**: src/modules/classes/native-class-learning.functions.ts.
   The same recorded-instructor lesson, selection, practice and signed-media
   services now authorize the native Class Enrollment / Course Attempt source.
-  Native credit/assessment issuance and facilitated pairing are NOT yet enabled.
+  Native credit/assessment issuance remains disabled. Class-specific scheduled
+  room pairing and projector services have branch implementations but are unverified.
 - Global Class creation and Class Offering publishing: /canonical/classes.
 - Native catalog/self-enrollment entry: /learn/classes (directory cutover pending).
 - Shared Class workspace for learner, teacher/facilitator, and manager:
@@ -247,8 +254,10 @@ project, but the native schema has not been installed or tested there.
 - Versioned policies must record eligibility, consent, any guardian approval and any credit/audit selection. Certificates and credentials remain independently governed awards.
 
 ### P0: Native enrollment commands
-- One Class Enrollment identity with verified Person, Class Offering version and
-  authorized enrollment mechanism, regardless of credit or certification intent.
+- One Class Enrollment identity with verified Person and an authorized enrollment
+  mechanism. The Class Offering version is optional for direct assignment and
+  required for self-registration. Credit or certificate intent does not select
+  a different enrollment system.
 - Verify the implemented native Course Attempt source constraint, trigger and atomic
   enrollment command. It must work without creating a school/noncredit source row.
 - Add purpose-specific learner RLS and restricted media rights binding for native
@@ -289,7 +298,9 @@ project, but the native schema has not been installed or tested there.
 - One Class supports credit and auditing learners; certificates may be separately awarded when authorized and earned.
 - A Program with three Courses records three Course-level attempts and appropriate Classes.
 - Same Class, different recorded instructors; grades and progress remain stable.
-- One Class, multiple publication versions; no duplicate active enrollment, no oversold seats.
+- One Class without publication can still accept authorized assignment; optional
+  publication versions do not change Class identity or Class-wide capacity.
+- No duplicate active enrollment, no oversold seats across assignment and registration.
 - Revoked Site/adoption blocks new acts without rewriting historic completion and credit.
 - New canonical grading, attendance, consent and guardian policy enforcement verified.
 - Pass typecheck, lint, unit/integration, browser E2E and restricted RLS before release.
