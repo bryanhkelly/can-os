@@ -1,4 +1,5 @@
 import { resolveSiteTheme, resolveSiteTemplateId, type SiteTemplateId } from "./site-theme";
+import type { SiteContentBlockProjection } from "./site-content-channels";
 import { renderSiteNoncreditOfferings, type SiteNoncreditListing } from "./site-noncredit-public";
 import { composePublicSiteChrome, composePublicSiteHero, composePublicSiteInterior, composePublicSiteHome, publicSiteTemplateCss, sevenSchoolCss } from "./public-site-templates";
 import { schoolBrandMonogram } from "./school-brand-identity";
@@ -32,6 +33,8 @@ export type PublicSitePage = {
   /** Explicitly eligible canonical noncredit enrollment releases from reviewed Site identity link. */
   noncreditReleases?: readonly SiteNoncreditListing[];
   enrollmentAppOrigin?: string | null;
+  /** Site-owned, source-resolved website content channels. */
+  contentBlocks?: readonly SiteContentBlockProjection[];
 };
 
 /** Non-persisted, clearly fictional starter copy for read-only synthetic previews only. */
@@ -77,6 +80,33 @@ export function escapePublicHtml(value: string): string {
   return value.replace(/[&<>"']/g, character => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
   })[character]!);
+}
+
+
+/** A Site-owned block inherits the selected template's typography and surfaces.
+ * The editor configures presentation, while authoritative sources supply items. */
+function renderSiteContentChannelBlock(block: SiteContentBlockProjection): string {
+  const heading = '<div class="program-overview-heading"><div><p class="tag">' +
+    escapePublicHtml(block.eyebrow) + '</p><h2>' + escapePublicHtml(block.title) +
+    '</h2></div><p>' + escapePublicHtml(block.description) + '</p></div>';
+  const items = block.items.map(item => {
+    const label = '<p class="tag">' + escapePublicHtml(item.label) + '</p>';
+    const title = '<h3>' + escapePublicHtml(item.title) + '</h3>';
+    const detail = '<p>' + escapePublicHtml(item.description) + '</p>';
+    // No URLs can be entered in Site block settings. Navigation comes solely
+    // from verified public catalog adapters; all values are escaped.
+    const safeHref = item.link?.href && (/^\/[a-zA-Z0-9/?=&%-]+$/.test(item.link.href) ||
+      /^https:\/\/[a-zA-Z0-9.-]+\/learn\/enroll\?release=[a-f0-9-]+$/i.test(item.link.href));
+    const action = safeHref ?
+      '<a class="text-action site-channel-action" href="' +
+      escapePublicHtml(item.link!.href) + '">' +
+      escapePublicHtml(item.link!.label) + ' →</a>' : '';
+    return '<article class="card site-channel-card">' + label + title + detail + action + '</article>';
+  }).join('');
+  return '<section class="site-content-block program-overview editorial-section site-channel-' +
+    escapePublicHtml(block.layout) + '" data-content-channel="' + escapePublicHtml(block.channel) +
+    '" aria-label="' + escapePublicHtml(block.title) + '">' +
+    heading + '<div class="grid site-channel-grid">' + items + '</div></section>';
 }
 
 export function renderPublicSiteClaimsHtml(page: PublicSiteProjection): string {
@@ -735,6 +765,14 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
         <span class="explore-copy"><strong>${link.label}</strong><span>${link.description}</span></span>
         <span class="explore-arrow" aria-hidden="true">→</span></a>`).join("")}</div></section>`
     : "";
+  // Site channels are composed as native template sections. Preview routes
+  // supply data; they do not splice a second page into the rendered HTML.
+  const contentBlocks = page.contentBlocks ?? [];
+  const hasContentChannel = (channel: SiteContentBlockProjection["channel"]) =>
+    contentBlocks.some(block => block.channel === channel && block.items.length > 0);
+  const contentChannelAt = (placement: SiteContentBlockProjection["placement"]) =>
+    contentBlocks.filter(block => block.placement === placement)
+      .map(renderSiteContentChannelBlock).join("");
   // Distinct template composition, one source of approved academic and Site facts.
   const homePage = composePublicSiteHome(templateId, {
     hero,
@@ -742,9 +780,12 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       ? `<section class="vision-feature" aria-labelledby="vision-title"><div class="vision-number" aria-hidden="true">V.</div><div><p class="tag">Our vision</p><h2 id="vision-title">Helping students discover who they are and what they can become.</h2><p>${escapePublicHtml(local.schoolVision)}</p></div></section>` : "",
     story: homeStory,
     explore: exploreSection,
-    academics: programOverview || (demo ? demoAcademicCards : ""),
-    enrichment: page.offerings.length || (demo && local) ? enrichmentSection
-      : !academicCards ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
+    academics: hasContentChannel("learning.academics") ? "" : programOverview || (demo ? demoAcademicCards : ""),
+    channelsLearning: contentChannelAt("learning"),
+    enrichment: hasContentChannel("learning.enrichment") ? "" :
+      page.offerings.length || (demo && local) ? enrichmentSection
+      : !academicCards && !contentBlocks.length ? `<p class="empty" role="status">There are no programs to display at this time.</p>` : "",
+    channelsCommunity: contentChannelAt("community"),
     closing: demo ? `<section class="closing-action"><p class="tag">The possibilities ahead</p>
       <h2>Every student has a story worth discovering.</h2>
       <p>Explore what happens when purposeful instruction and a connected school community give students room to learn, create, and grow.</p>
@@ -753,6 +794,7 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       <p>The right educational environment can make a lasting difference. Explore available programs, ask questions, and decide what fits your family.</p>
       <a href="/academics" class="hero-button">Explore available programs</a></section>` : "",
     contact: reviewedContact || reviewedAddress ? contactSection : "",
+    channelsClosing: contentChannelAt("closing"),
   });
   const pageContent: Record<PublicSitePath, string> = {
     "/": homePage,
@@ -892,6 +934,28 @@ main{padding-top:clamp(22px,3vw,48px)}
 .compact-hero::after{display:none}
 .compact-hero h1{font-size:clamp(2.6rem,5.5vw,5.6rem);line-height:1.04}
 @media(max-width:700px){.public-hero:not(.compact-hero){min-height:510px;padding:32px}.public-hero:not(.compact-hero) h1{font-size:clamp(3.2rem,12vw,5.2rem)}.public-hero .hero-subtitle{font-size:clamp(1.6rem,6vw,2.4rem)}.compact-hero{min-height:240px}}
+
+/* A Site content block uses template fonts, layout and tokens, not an injected white box. */
+.site-content-block{background:transparent;color:inherit;min-width:0;max-width:100%}
+.site-content-block .program-overview-heading h2{font-family:var(--site-display);letter-spacing:-.045em}
+.site-content-block .program-overview-heading>p{color:var(--site-muted)}
+.site-content-block .site-channel-card{min-width:0;border-radius:2px;box-shadow:none;color:var(--site-ink);background:var(--site-paper);border:1px solid var(--site-secondary);padding:clamp(22px,3vw,34px)}
+.site-content-block .site-channel-card h3{font-family:var(--site-display);font-size:clamp(1.35rem,2.2vw,2rem);font-weight:500;line-height:1.18}
+.site-content-block .site-channel-card>p:not(.tag){color:var(--site-muted);line-height:1.65}
+.site-content-block .site-channel-grid{margin-top:18px;grid-template-columns:repeat(auto-fit,minmax(min(100%,245px),1fr))}
+.site-content-block.site-channel-list .site-channel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.site-content-block.site-channel-list .site-channel-card{background:transparent;border:0;border-top:2px solid var(--site-ink);padding:22px 0}
+.site-content-block.site-channel-featured .site-channel-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.site-content-block.site-channel-featured .site-channel-card:first-child{grid-row:span 2;background:var(--site-secondary);color:#fff;border-color:var(--site-secondary)}
+.site-content-block.site-channel-featured .site-channel-card:first-child>p,.site-content-block.site-channel-featured .site-channel-card:first-child .tag{color:inherit}
+body.template-modern .site-content-block .site-channel-card{background:#142b44;border-color:#36506d;color:#eaf3ff}
+body.template-modern .site-content-block .site-channel-card>p:not(.tag){color:#c0d0e1}
+body.template-modern .site-content-block .site-channel-card .tag{color:#83e4f1}
+body.template-modern .site-content-block .program-overview-heading>p{color:#c0d0e1}
+body.template-modern .site-content-block.site-channel-list .site-channel-card{background:transparent;border-color:#607b97}
+body.template-modern .site-content-block.site-channel-featured .site-channel-card:first-child{background:#225064;color:#eaf3ff}
+@media(max-width:760px){.site-content-block.site-channel-list .site-channel-grid,.site-content-block.site-channel-featured .site-channel-grid{grid-template-columns:1fr}}
+
 ${publicSiteTemplateCss}
 /* Consistent public preopening disclosure across all seven school designs. */
 .launch-status-banner{padding:14px clamp(20px,4vw,52px);background:#fff3d8;color:#3d2d15;border-bottom:1px solid #c9a663;font:600 14px/1.55 system-ui,sans-serif}
@@ -920,7 +984,7 @@ ${composePublicSiteChrome(templateId, {
   cta: `<a class="site-nav-cta" href="${navigationCtaPath}">${navigationCtaLabel}</a>`,
   mobile: `<details class="mobile-menu"><summary>Menu</summary><nav class="mobile-links" aria-label="Mobile school navigation">${mobileNavigation}<a href="${navigationCtaPath}">${navigationCtaLabel}</a></nav></details>`,
   main: `<main id="main-content">\n  ${options?.localPreview && !demo ? `<p role="status">${submissionsEnabled ? "Local preview. Eligible inquiry forms submit to the development database; an inquiry does not create an application or enrollment." : "Private website preview. Forms are disabled."}</p>` : ""}\n  ${showingSamplePhotography && options?.localPreview && !demo ? `<p role="note" class="template-photo-disclosure">Template photography — not actual students or facilities of this school.</p>` : ""}
-  ${pageContent[path]}\n  ${path === "/" ? renderSiteNoncreditOfferings(page.noncreditReleases ?? [], page.enrollmentAppOrigin) : ""}\n</main>`,
+  ${pageContent[path]}\n  ${path === "/" ? !hasContentChannel("learning.noncredit") ? renderSiteNoncreditOfferings(page.noncreditReleases ?? [], page.enrollmentAppOrigin) : "" : ""}\n</main>`,
   footer: `<footer><strong>${school}</strong> · ${org} <span class="platform-credit"> · Supported by CAN Academy · ${host}</span></footer>`,
 })}
 </body>
