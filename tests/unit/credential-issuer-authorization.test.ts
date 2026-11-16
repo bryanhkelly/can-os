@@ -25,6 +25,8 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(authorization).toContain("v301_can_staff_session_context");
     expect(authorization).toContain("v301_can_sensitive_capability");
     expect(authorization).toContain("FOR SHARE OF approval");
+    expect(authorization).toContain("approval.requested_by_can_account_id=can_session.account_id");
+    expect(authorization).toContain("can_session.secret_hash=");
     expect(authorization).not.toContain("canonicalSessionCookie");
   });
   it("sensitive capability checks are restricted, revocable and time bounded",()=>{
@@ -43,7 +45,12 @@ describe("P0 independent credential issuer authorization",()=>{
       "ENABLE ROW LEVEL SECURITY",
       "FORCE ROW LEVEL SECURITY",
       "sensitive_approvals_open_grant_uq",
+      "approval.requested_by_can_account_id=source_session.account_id",
+      "source_session.secret_hash=p_can_session_hash",
     ]) expect(sql).toContain(marker);
+    const hotfix=file("database/canonical/v3.0.1/patch-sensitive-credential-issuer-account-binding.sql");
+    expect(hotfix).toContain("approval.requested_by_can_account_id=source_session.account_id");
+    expect(hotfix).toContain("REVOKE ALL ON FUNCTION");
     expect(sql).not.toContain("GRANT SELECT ON education_v30.canonical_sensitive_capability_approvals");
   });
   it("separates staff requests from reviewer decisions and revocation",()=>{
@@ -71,6 +78,7 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(test).toContain("pending issuer request granted authority");
     expect(test).toContain("independent active issuer authority not recognized");
     expect(test).toContain("expired issuer approval remains usable");
+    expect(test).toContain("issuer approval transferred to another CAN account");
     expect(test).toContain("revoked issuer approval remains usable");
     expect(test).toContain("ROLLBACK TO SAVEPOINT");
   });
