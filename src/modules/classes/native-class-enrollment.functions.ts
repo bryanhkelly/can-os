@@ -154,8 +154,12 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
     const allowed=[];
     for(const row of rows){
       try{
-        await db.transaction(tx=>currentClassAuthority(tx,row.classId,now));
-        allowed.push(row);
+        const authority=await db.transaction(tx=>currentClassAuthority(tx,row.classId,now));
+        // Do not advertise a larger publication limit than the underlying
+        // Class can actually seat across assignment and self-registration.
+        const limits=[row.capacity,authority.classCapacity]
+          .filter((n):n is number=>n!==null);
+        allowed.push({...row,capacity:limits.length?Math.min(...limits):null});
       }catch(e){if(!(e instanceof AuthorizationError))throw e;}
     }
     return allowed;
