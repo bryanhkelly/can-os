@@ -21,8 +21,11 @@ export function planNativeClassExit(
   current: ClassEnrollmentStatus,
   action: ClassClosureAction,
 ): ClassExitDecision {
+  // A learner withdrawing a pending request produces "cancelled".
+  // Its retry must remain idempotent even though the final status differs
+  // from an active learner's "withdrawn" terminal state.
   const target = action === "withdraw"
-    ? current === "pending" ? "cancelled" : "withdrawn"
+    ? current === "pending" || current === "cancelled" ? "cancelled" : "withdrawn"
     : "cancelled";
   if (current === target) return {
     enrollmentStatus: target, attemptStatus: null,
