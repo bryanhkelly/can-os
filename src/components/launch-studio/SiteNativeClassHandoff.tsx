@@ -77,7 +77,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
      </div>:<Link to="/canonical/classes" search={{siteId:canonicalSiteId}}
        className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
        Activate draft Class <ArrowRight className="size-4"/>
-     </Link>
+     </Link>}
     </li>)}</ul>}
    </>}
   </>}
