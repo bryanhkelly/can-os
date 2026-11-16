@@ -8,7 +8,7 @@ if(process.env.CAN_NETWORK_SCHEMA_VALIDATION!=="1" || process.env.APP_ENV!=="tes
 const url=process.env.TEST_DATABASE_URL;
 if(!url)throw new Error("Set TEST_DATABASE_URL to an isolated nonproduction branch");
 const pool=new Pool({connectionString:url,max:1});
-const tables=["network_units","network_memberships",
+const tables=["network_units","network_memberships","network_member_identifiers",
   "network_reporting_grants","participation_attributions"];
 try{
   const [catalog,siteColumns,triggers,policies]=await Promise.all([
@@ -26,7 +26,9 @@ try{
       JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname='education_v30' AND NOT t.tgisinternal
       AND t.tgname IN ('network_unit_parent_guard','network_membership_path_guard',
-        'participation_attribution_scope_guard','participation_attribution_history_guard')`),
+        'participation_attribution_scope_guard','participation_attribution_history_guard',
+        'network_member_identifier_guard','v301_noncredit_attribution_required',
+        'v301_class_attribution_required')`),
     pool.query(`SELECT tablename,policyname FROM pg_policies
       WHERE schemaname='education_v30' AND tablename=ANY($1::text[])`,[tables]),
   ]);
@@ -41,19 +43,20 @@ try{
   }
   assert.equal(siteColumns.rows.length,2,"Both noncredit release and claim Site columns required");
   assert(siteColumns.rows.every(r=>r.is_nullable==="NO"),"A release/claim Site must be NOT NULL");
-  assert.equal(triggers.rows.length,4,"Required authorization and history triggers missing");
+  assert.equal(triggers.rows.length,7,"Required authorization and history triggers missing");
   const [{rows:checks},{rows:counts}]=await Promise.all([
     pool.query(`SELECT conname,contype FROM pg_constraint
       WHERE connamespace='education_v30'::regnamespace
       AND conname IN ('network_membership_unit_fk','network_units_parent_fk',
-        'participation_attribution_source_ck','participation_attribution_membership_ck')`),
+        'participation_attribution_source_ck','participation_attribution_membership_ck',
+        'native_class_active_site_ck','network_member_external_id_verified_ck')`),
     pool.query(`SELECT
       (SELECT count(*) FROM education_v30.noncredit_self_enrollment_releases WHERE site_id IS NULL)
         AS null_releases,
       (SELECT count(*) FROM education_v30.noncredit_self_enrollment_claims WHERE site_id IS NULL)
         AS null_claims`),
   ]);
-  assert.equal(checks.length,4,"Required ownership and source constraints missing");
+  assert.equal(checks.length,6,"Required ownership and source constraints missing");
   assert.equal(Number(counts[0].null_releases),0,"Site-less releases must be reconciled");
   assert.equal(Number(counts[0].null_claims),0,"Site-less claims must be reconciled");
   console.log("Verified network attribution structure, RLS, Site requirements and immutability guards");
