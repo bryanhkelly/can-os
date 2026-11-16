@@ -16,11 +16,9 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { noncreditPublishCommand, publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
-import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
-import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 type Executor = Pick<typeof db,"select">;
-type Provider = Awaited<ReturnType<typeof requireCanonicalLabProvider>>;
+type Provider = { organizationId: string; siteIds: string[] };
 
 /** Provider's real, currently approved training/deployment/adoption combinations.
  * Listing is NOT the same as a public enrollment release. */
@@ -165,6 +163,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
 
 export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
   .handler(async()=>{
+    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
     setResponseHeader("Cache-Control","private, no-store");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
     const candidates=await listReleaseCandidates(provider);
@@ -197,6 +196,8 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
 export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
   .validator((value:unknown)=>noncreditPublishCommand.parse(value))
   .handler(async({data})=>{
+    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
+    const {assertCurrentCanonicalStaffForMutation}=await import("@/modules/identity/canonical-transaction-authorization.server");
     setResponseHeader("Cache-Control","private, no-store");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     const now=new Date();
@@ -253,6 +254,8 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
 export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({releaseId:z.string().uuid()}).strict().parse(value))
   .handler(async({data})=>{
+    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
+    const {assertCurrentCanonicalStaffForMutation}=await import("@/modules/identity/canonical-transaction-authorization.server");
     setResponseHeader("Cache-Control","private, no-store");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     return db.transaction(async tx=>{
@@ -307,6 +310,8 @@ const multiSitePublishInput=z.object({
 export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"})
   .validator((v:unknown)=>multiSitePublishInput.parse(v))
   .handler(async({data})=>{
+    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
+    const {assertCurrentCanonicalStaffForMutation}=await import("@/modules/identity/canonical-transaction-authorization.server");
     setResponseHeader("Cache-Control","private, no-store");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     if(new Date(data.closesAt)<=new Date())

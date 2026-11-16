@@ -9,7 +9,6 @@ import {
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
   noncreditTrainingVersions,
 } from "@/db/canonical-v301";
-import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
  * grant from a label, favorite Site, or marketing affiliation.
@@ -19,6 +18,7 @@ import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capabi
 export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
     const provider=await requireCanonicalLabProvider();
     const releases=await db.select({
       id:noncreditSelfEnrollmentReleases.id,
