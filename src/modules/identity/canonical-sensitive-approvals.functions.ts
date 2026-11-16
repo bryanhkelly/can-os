@@ -110,6 +110,30 @@ async function assertCurrentReviewerInTransaction(
     throw new AuthorizationError("current independent CAN institutional reviewer");
 }
 
+/**
+ * The application's broad SQL connection must not mutate issuer approvals
+ * directly. Enter the dedicated NOLOGIN/NOBYPASSRLS role only for the
+ * previously authorized INSERT or UPDATE, then reset before audit writes.
+ * Missing deployment membership fails closed, never retries as owner.
+ */
+async function withSensitiveApprovalWriter<T>(
+  tx:Pick<typeof db,"execute">,
+  action:"request"|"review"|"revoke",
+  actorAccountId:string,
+  mutation:()=>Promise<T>,
+):Promise<T>{
+  await tx.execute(sql`SELECT set_config('can.issuer_approval_action',${action},true)`);
+  await tx.execute(sql`SELECT set_config('can.issuer_approval_actor',${actorAccountId},true)`);
+  await tx.execute(sql.raw("SET LOCAL ROLE can_v30_sensitive_approval_writer"));
+  try {
+    return await mutation();
+  } finally {
+    // An aborted transaction can reject RESET ROLE. The outer transaction
+    // will roll back, and the original error must not be hidden.
+    await tx.execute(sql.raw("RESET ROLE")).catch(()=>{});
+  }
+}
+
 /** Existing CAN school staff may request, but never self-approve, issuer authority. */
 export const requestCanonicalCredentialIssuerApproval=createServerFn({method:"POST"})
   .validator((value:unknown)=>requestSchema.parse(value))
@@ -151,11 +175,13 @@ export const requestCanonicalCredentialIssuerApproval=createServerFn({method:"PO
           eq(approvals.capabilityCode,"credential.issue"),
           sql`${approvals.status} IN ('pending','approved')`)).limit(1);
       if(existing.length)throw new AuthorizationError("issuer approval already requested or approved");
-      const [created]=await tx.insert(approvals).values({
-        canonicalGrantId:grantId,capabilityCode:"credential.issue",
-        requestedByCanAccountId:can.accountId,
-        requestEvidenceReference:data.evidenceReference,
-      }).returning({id:approvals.id});
+      const [created]=await withSensitiveApprovalWriter(
+        tx,"request",can.accountId,()=>tx.insert(approvals).values({
+          canonicalGrantId:grantId,capabilityCode:"credential.issue",
+          requestedByCanAccountId:can.accountId,
+          requestEvidenceReference:data.evidenceReference,
+        }).returning({id:approvals.id}),
+      );
       if(!created)throw new Error("Issuer approval request was not saved");
       await writeAudit(tx,can,{
         action:"canonical.credential_issuer.requested",
@@ -326,13 +352,15 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
         if(selfNative.length)throw new AuthorizationError("reviewer may not approve own native Person");
       }
       await assertCurrentReviewerInTransaction(tx,reviewer);
-      await tx.update(approvals).set({
-        status:data.decision==="approve"?"approved":"rejected",
-        reviewedByCanAccountId:reviewer.accountId,
-        reviewedAt:now,
-        reviewEvidenceReference:data.evidenceReference,
-        approvedUntil:data.decision==="approve"?expiresAt:null,
-      }).where(eq(approvals.id,approval.id));
+      await withSensitiveApprovalWriter(tx,"review",reviewer.accountId,
+        ()=>tx.update(approvals).set({
+          status:data.decision==="approve"?"approved":"rejected",
+          reviewedByCanAccountId:reviewer.accountId,
+          reviewedAt:now,
+          reviewEvidenceReference:data.evidenceReference,
+          approvedUntil:data.decision==="approve"?expiresAt:null,
+        }).where(eq(approvals.id,approval.id)),
+      );
       await writeAudit(tx,reviewer,{
         action:data.decision==="approve"?
           "canonical.credential_issuer.approved":"canonical.credential_issuer.rejected",
@@ -364,11 +392,13 @@ export const revokeCanonicalCredentialIssuerApproval=createServerFn({method:"POS
       }).from(canonicalAccountGrants)
         .where(eq(canonicalAccountGrants.id,approval.canonicalGrantId)).limit(1);
       await assertCurrentReviewerInTransaction(tx,reviewer);
-      await tx.update(approvals).set({
-        status:"revoked",revokedAt:new Date(),
-        revokedByCanAccountId:reviewer.accountId,
-        revokedReason:data.reason,
-      }).where(eq(approvals.id,approval.id));
+      await withSensitiveApprovalWriter(tx,"revoke",reviewer.accountId,
+        ()=>tx.update(approvals).set({
+          status:"revoked",revokedAt:new Date(),
+          revokedByCanAccountId:reviewer.accountId,
+          revokedReason:data.reason,
+        }).where(eq(approvals.id,approval.id)),
+      );
       await writeAudit(tx,reviewer,{
         action:"canonical.credential_issuer.revoked",
         entityType:"canonical_sensitive_capability_approval",
