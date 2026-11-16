@@ -14,6 +14,7 @@ import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeC
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
+import { provisionNativeClassKnowledgeCheckAccess } from "@/modules/classes/native-class-assessment-provision.functions";
 import {
   assignNativeClassStaff, endNativeClassStaffAssignment,
 } from "@/modules/classes/class-staff.functions";
@@ -220,7 +221,25 @@ function TeachingClass({workspace}:{workspace:Workspace}){
   </UnifiedCoursePlayer>;
 }
 function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boolean}){
+  const client=useQueryClient();
+  const [grantBusy,setGrantBusy]=useState<string|null>(null);
+  const [grantMessage,setGrantMessage]=useState("");
+  const [grantError,setGrantError]=useState("");
   const isOperator=workspace.view==="manage"&&namesAllowed;
+  async function grantKnowledgeCheck(classEnrollmentId:string){
+    if(grantBusy)return;
+    setGrantBusy(classEnrollmentId);setGrantError("");setGrantMessage("");
+    try{
+      const issued=await provisionNativeClassKnowledgeCheckAccess({data:{classEnrollmentId}});
+      setGrantMessage(issued.alreadyGranted?
+        "Canonical assessment access already exists for this learner.":
+        "Canonical assessment access granted under the published Course administration.");
+      await client.invalidateQueries({queryKey:["native-class-roster",workspace.classId]});
+    }catch(error){
+      setGrantError(normalizeClientError(error,
+        "No approved Course assessment administration is available, or your provider grant is insufficient.").message);
+    }finally{setGrantBusy(null);}
+  }
   const pages=useInfiniteQuery({
     queryKey:["native-class-roster",workspace.classId],
     initialPageParam:0,
@@ -243,11 +262,20 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
       Roster access is unavailable. Check your current Site authorization.
     </p>}
     {namesAllowed&&<ul className="mt-4 divide-y divide-border">
-      {rows.map(row=><li key={row.enrollmentId} className="grid grid-cols-[1fr_auto] gap-4 py-3 text-sm">
+      {rows.map(row=><li key={row.enrollmentId} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
         <span className="font-semibold">{row.name}</span>
-        <span className="text-muted-foreground">{row.status} · {row.creditMode.replaceAll("_"," ")}</span>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-muted-foreground">{row.status} · {row.creditMode.replaceAll("_"," ")}</span>
+          {isOperator&&"courseAttemptId" in row&&row.courseAttemptId&&row.status==="active"&&
+            <Button type="button" size="sm" variant="outline" disabled={!!grantBusy}
+              onClick={()=>void grantKnowledgeCheck(row.enrollmentId)}>
+              {grantBusy===row.enrollmentId?"Granting…":"Grant Course knowledge check"}
+            </Button>}
+        </div>
       </li>)}
     </ul>}
+    {grantMessage&&<p role="status" className="mt-3 text-sm">{grantMessage}</p>}
+    {grantError&&<p role="alert" className="mt-3 text-sm text-destructive">{grantError}</p>}
     {isOperator&&pages.hasNextPage&&<Button className="mt-4" variant="outline"
       disabled={pages.isFetchingNextPage} onClick={()=>void pages.fetchNextPage()}>
       {pages.isFetchingNextPage?"Loading…":"Load more learners"}
