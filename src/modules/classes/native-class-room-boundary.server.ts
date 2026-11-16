@@ -1,9 +1,9 @@
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions, canonicalClassEnrollments,
   canonicalClassStaffAssignments, facilitatedClassroomPlans,
-  learnerCourseAttempts,
+  learnerCourseAttempts, canonicalAccountGrants, canonicalAccounts,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-enrollment.functions";
@@ -11,6 +11,30 @@ import type { facilitatedLearningSessions } from "@/db/canonical-v301";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Room=typeof facilitatedLearningSessions.$inferSelect;
+
+/** Class assignment must be backed by a *currently active*, separately
+ * verified Site facilitator grant. A manager's Site role does not silently
+ * become a teaching grant and revoking the facilitator grant takes effect
+ * on the next player, pairing or scheduling request. */
+export async function assertCurrentNativeTeachingGrant(
+  tx:Tx,personId:string,organizationId:string,siteId:string,
+):Promise<void>{
+  const [grant]=await tx.select({id:canonicalAccountGrants.id})
+    .from(canonicalAccountGrants)
+    .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+    .where(and(
+      eq(canonicalAccountGrants.personId,personId),
+      eq(canonicalAccountGrants.organizationId,organizationId),
+      eq(canonicalAccountGrants.siteId,siteId),
+      eq(canonicalAccountGrants.roleCode,"room_facilitator"),
+      eq(canonicalAccountGrants.active,true),
+      isNull(canonicalAccountGrants.revokedAt),
+      lte(canonicalAccountGrants.grantedAt,new Date()),
+      isNull(canonicalAccounts.disabledAt),
+      isNotNull(canonicalAccounts.emailVerifiedAt),
+    )).limit(1);
+  if(!grant)throw new AuthorizationError("current verified Class facilitator grant");
+}
 
 /** Returns null only for a genuinely non-Class room. Once a room has a Class
  * link, any mismatched plan, Course, facilitator, Site or revoked adoption
@@ -77,6 +101,7 @@ export async function assertNativeClassRoomStaff(tx:Tx,room:Room){
         gt(canonicalClassStaffAssignments.endsAt,now)),
     )).limit(1);
   if(!staff)throw new AuthorizationError("current instructor assignment to the exact Class");
+  await assertCurrentNativeTeachingGrant(tx,room.facilitatorPersonId,room.hostOrganizationId,room.siteId);
   return linked;
 }
 
