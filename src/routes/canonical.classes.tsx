@@ -80,6 +80,18 @@ function NativeClasses(){
     (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
   const rolloutReadiness=recipePlan
     ?assessLocalRollout(recipePlan,options.data??[],siteId||preferredSiteId||null):[];
+  // Offering versions remain canonical publisher products. Each authorized
+  // adoption may support many Course components and local Classes; no extra
+  // Program records are synthesized for standalone Courses.
+  const offeringGroups=Array.from(new Set((options.data??[]).map(row=>row.offeringVersionId)))
+    .map(id=>{
+      const rows=(options.data??[]).filter(row=>row.offeringVersionId===id);
+      const components=rows
+        .filter((row,index)=>rows.findIndex(other=>other.courseVersionId===row.courseVersionId)===index)
+        .sort((a,b)=>(a.sequenceNo??Number.MAX_SAFE_INTEGER)-(b.sequenceNo??Number.MAX_SAFE_INTEGER)||
+          a.courseTitle.localeCompare(b.courseTitle));
+      return {id,first:rows[0]!,components};
+    });
   function chooseRolloutCourse(course:ProgramRolloutRecipe["courses"][number]){
     setRecipeCourseId(course.courseVersionId);
     setChoice("");setSiteId("");
@@ -240,6 +252,54 @@ function NativeClasses(){
         Canonical workspace
       </Link>
     </div>}>
+    <section className="mt-5 border border-border bg-card p-5" aria-label="Approved Offering hierarchy">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="font-serif text-2xl">Programs, Courses and local Classes</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Published publisher products are adopted once per authorized Deployment.
+            Each Course retains its published version; local Classes configure delivery without rewriting content.
+            Standalone Courses do not require a Program or network membership.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-4 text-sm font-semibold">
+          <Link to="/canonical/blueprints" className="underline">Approved Blueprints</Link>
+          <Link to="/canonical/lab/deployments" className="underline">Deployments and adoptions</Link>
+          <Link to="/canonical/course-activities" className="underline">Learning activities</Link>
+        </div>
+      </div>
+      {options.data&&offeringGroups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
+        No currently authorized published Course adoption is available. Publisher approval and local adoption are separate from this workspace.
+      </p>}
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {offeringGroups.map(group=><article key={group.id} className="border border-border p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {group.first.offeringKind==="program"?"Program Offering":group.first.offeringKind==="course"?"Course Offering":"Published Offering"} · v{group.first.offeringVersionNo}
+          </p>
+          <h3 className="mt-1 text-base font-semibold">{group.first.offeringTitle}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {group.components.length} available Course component(s) · Publisher content is read-only
+          </p>
+          <ul className="mt-3 space-y-2">
+            {group.components.map(row=><li key={row.courseVersionId} className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-2 text-sm">
+              <div>
+                <p className="font-semibold">{row.courseTitle} · v{row.courseVersionNo}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {row.isRequired?"Required":"Optional"} · {row.siteOptions.length} authorized delivery Site(s)
+                </p>
+              </div>
+              <Button type="button" size="sm" variant="outline"
+                onClick={()=>{
+                  setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
+                  setChoice(optionKey(row));setTitle(row.courseTitle);
+                  setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId)?preferredSiteId:"");
+                  setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
+                }}>Configure Class</Button>
+            </li>)}
+          </ul>
+        </article>)}
+      </div>
+    </section>
     <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,.8fr)]">
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-2xl">Create Class</h2>
