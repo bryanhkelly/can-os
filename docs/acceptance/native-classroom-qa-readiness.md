@@ -56,24 +56,24 @@ roll-back options. A Git merge alone is not a safe deployment.
    `npm run db:canonical:classes:preflight`.
    This command is **read-only**. Review column/FK prerequisites, original
    Course Attempt constraint, roles, schema state and forced RLS.
-4. On that isolated QA copy only, review/apply both migrations in sequence:
+4. On that isolated QA copy only, review/apply **two** migrations in order:
    `patch-unified-class-offerings.sql`, then
-   `patch-unified-class-course-attempts.sql`, then
-   `patch-unified-class-activities.sql`. The final migration installs Course-wide
-   versioned questionnaires, immutable learner policy pins and separately
-   secured answer/feedback bodies. The second replaces a
-   canonical Course Attempt constraint and trigger, so it MUST NOT run
-   against real users without approved impact/recovery review.
+   `patch-unified-class-course-attempts.sql`. The second replaces a canonical
+   Course Attempt source constraint and trigger, so it MUST NOT run
+   against real users without approved impact/recovery review. The parallel
+   Course quiz/survey migration was removed; do not apply it.
 5. Design and verify exact application-role permissions and row-level
    policies for the new tables and the existing shared classroom tables.
    Do not replace owner-only RLS with a `PUBLIC` grant or unconditional
    `USING(true)` policy for unrestricted roles.
 6. Run `CAN_NATIVE_CLASS_SCHEMA_VALIDATION=1
    npm run db:canonical:classes` using the isolated branch connection.
-   Also verify the private secure-schema answer tables cannot be SELECTed by
-   general app roles, that quiz keys never appear in learner/projector JSON,
-   that identified feedback requires consent, and that published activity versions
-   preserve previous enrolled learners' pinned requirements.
+   Verify existing canonical assessment, survey and completion policies retain
+   their prior school/noncredit behavior and restricted app-role permissions.
+   Confirm the new native Class evidence adapter reads only the signed-in
+   learner's authorized Course Attempt and NEVER writes assessments or outcomes.
+   Extend and test the existing canonical assessment/survey engines for native
+   Class attempts before enabling native questionnaire submission.
    Run both `npm run typecheck` and `npm run test:classes:unit` in a
    working test environment. Neither has yet been observed passing.
 7. Exercise a real authenticated two-Site/25-learner acceptance journey,
