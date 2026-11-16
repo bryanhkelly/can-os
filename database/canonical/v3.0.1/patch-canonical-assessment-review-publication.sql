@@ -33,7 +33,7 @@ END $policy$;
 CREATE OR REPLACE FUNCTION education_v30.v301_assess_approval_authority(
  p_org uuid,p_actor uuid,p_purpose text
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $authority$
+SET search_path=pg_catalog,education_v30,pg_temp AS $authority$
 DECLARE r text;
 BEGIN
  PERFORM education_v30.v301_assert_assessment_actor_session(p_org,p_actor);
@@ -98,7 +98,7 @@ CREATE OR REPLACE FUNCTION education_v30.v301_list_objective_review_queue(
 ) RETURNS TABLE(assessment_version_id uuid,title text,assessment_key text,
  question_count bigint)
 LANGUAGE plpgsql STABLE SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $queue$
+SET search_path=pg_catalog,education_v30,pg_temp AS $queue$
 BEGIN
  PERFORM education_v30.v301_assess_approval_authority(p_org,p_actor,p_purpose);
  RETURN QUERY SELECT v.id,d.title,d.assessment_key,count(fi.id)
@@ -118,7 +118,7 @@ END $queue$;
 CREATE OR REPLACE FUNCTION education_v30.v301_objective_assessment_snapshot(
  p_org uuid,p_actor uuid,p_version uuid,p_purpose text
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $snapshot$
+SET search_path=pg_catalog,education_v30,pg_temp AS $snapshot$
 DECLARE doc jsonb; rec record; payload jsonb; items jsonb;
 BEGIN
  PERFORM education_v30.v301_assess_approval_authority(p_org,p_actor,p_purpose);
@@ -187,7 +187,7 @@ CREATE OR REPLACE FUNCTION education_v30.v301_record_objective_assessment_review
  p_org uuid,p_actor uuid,p_version uuid,p_target text,
  p_item_version uuid,p_kind text,p_decision text,p_rationale text
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $review$
+SET search_path=pg_catalog,education_v30,pg_temp AS $review$
 DECLARE owner_id uuid; form_id uuid; saved uuid; author_id uuid;
   required_kind text[]; author_count integer; item_count integer;
 BEGIN
@@ -273,7 +273,7 @@ END $review$;
 CREATE OR REPLACE FUNCTION education_v30.v301_publish_objective_assessment(
  p_org uuid,p_actor uuid,p_version uuid
 ) RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $publish$
+SET search_path=pg_catalog,education_v30,pg_temp AS $publish$
 DECLARE rec record; fi record; k text; recent record; author_id uuid;
   n integer:=0;
 BEGIN
