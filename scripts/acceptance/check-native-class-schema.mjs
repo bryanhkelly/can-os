@@ -12,7 +12,8 @@ const tables=["classes","class_offerings","class_offering_versions","class_enrol
 const allTriggers=["learner_course_attempt_source_gate","class_enrollment_attempt_guard",
   "canonical_class_offering_guard_trg","canonical_class_staff_guard_trg",
   "canonical_class_enrollment_identity_guard_trg","canonical_class_session_guard_trg",
-  "canonical_class_plan_boundary_trg","canonical_class_survey_campaign_guard_trg"];
+  "canonical_class_plan_boundary_trg","canonical_class_survey_campaign_guard_trg",
+  "canonical_linked_survey_scope_guard_trg"];
 try{
   const [relations,cols,checks,triggers,functions]=await Promise.all([
     pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity, EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS grants_public FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])",[tables]),
