@@ -35,7 +35,7 @@ const groups = [
     description: "Run participant registration, learning delivery, and evidence of completion.",
     icon: GraduationCap,
     links: [
-      { title: "Class Offerings · Training", detail: "Publish current adult training Class Offerings and enrollment windows", path: "/programs/noncredit/enrollment" },
+      { title: "Noncredit enrollment", detail: "Publish enrollment windows and delivery options", path: "/programs/noncredit/enrollment" },
       { title: "Enrollment lab", detail: "Inspect enrollment journeys", path: "/canonical/lab/enrollment" },
       { title: "Noncredit learning lab", detail: "Review attempts, assessments, and completion decisions", path: "/canonical/lab/noncredit" },
       { title: "Facilitated learning lab", detail: "Explore local in-room learning delivery", path: "/canonical/lab/facilitated" },
