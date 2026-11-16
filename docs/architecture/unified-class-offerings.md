@@ -69,12 +69,14 @@ unmodified on main until a separately approved replacement deployment.
   The same recorded-instructor lesson, selection, practice and signed-media
   services now authorize the native Class Enrollment / Course Attempt source.
   Native credit/assessment issuance and facilitated pairing are NOT yet enabled.
-- Operator 6.1 workspace: /canonical/classes.
-- Learner listing/enrollment: /learn/classes.
-- Learner Course progress: /learn/class/$classEnrollmentId.
+- Global Class creation and Class Offering publishing: /canonical/classes.
+- Native catalog/self-enrollment entry: /learn/classes (directory cutover pending).
+- Shared Class workspace for learner, teacher/facilitator, and manager:
+  /classes/:classId (role-gated view and tab query modifiers).
 - Unit contracts: tests/unit/unified-class.test.ts,
-  tests/unit/native-class-enrollment.test.ts and
-  tests/unit/unified-classroom-player.test.tsx.
+  tests/unit/native-class-enrollment.test.ts,
+  tests/unit/unified-classroom-player.test.tsx and
+  tests/unit/class-views.test.ts.
 - Read-only isolated schema verification:
   scripts/acceptance/check-native-class-schema.mjs.
 
@@ -86,10 +88,59 @@ but setting this alone is NOT a release approval.
 
 ## One classroom player across delivery modes
 
-These routes now use the same focus-mode `UnifiedCoursePlayer` shell:
-- Academic /classes (existing school curriculum/grade workflows still governed).
-- /learn/course/$courseAttemptId (older noncredit registration source until cutover).
-- /learn/class/$classEnrollmentId (native Class Enrollment identity, recorded tracks).
+The **canonical native Class workspace is now one address: `/classes/:classId`**,
+implemented at `src/routes/classes_.$classId.tsx` (TanStack non-nested route).
+It supports server-verified views with query modifiers:
+
+- `/classes/:classId?view=learn&tab=lessons&lesson=:lessonId`
+- `/classes/:classId?view=teach&tab=classroom`
+- `/classes/:classId?view=manage&tab=offering`
+
+The `view`, `tab`, `lesson` and `session` parameters select navigation state,
+**never Person identity, rights, course progress or teaching authorization**.
+Requests for disallowed views or tabs fail closed. The default perspective is
+derived from the current verified Class relationship. A person can switch
+perspectives only when the verified current session/grants and Class
+relationships support more than one.
+
+`UnifiedCoursePlayer` is the shared focus-mode classroom shell, used by this
+native Class route and the previously implemented legacy academic and training
+surfaces. Only one native Class detail route remains: the redundant
+`/learn/class/:classEnrollmentId` route was deleted. Native learner and
+operator entry-point links now address `/classes/:classId`.
+
+**Not a backwards-compatibility plan:** The original `/classes?section=...`
+school route and `/learn/course/:courseAttemptId` training route still exist
+for old live workflows and numerous other callers/tests. Their removal is a
+coordinated cutover gate, not an adapter between old and new enrollments.
+Replacing the old `/classes` directory without updating those dependencies
+would break school users and regression tests.
+
+### Student, teacher, and administrator authority
+
+- **Learner:** a current Person-specific Class Enrollment and the matching
+  Course Attempt must pass publisher, Deployment, Site and adoption checks.
+  Selected recorded teacher, lesson progress and practice remain individual.
+- **Teacher/facilitator:** requires a current verified Site/organization
+  facilitator role **and** a separate approved Person-to-Class
+  `class_staff_assignments` row. A published recording or a generic Site role
+  never authorizes teaching this Class.
+- **Manager:** requires current `class.manage` scope, relevant operation
+  authority and exact Site/organization ownership (or creator scope for
+  provider-wide self-paced Classes).
+- **Roster confidentiality:** even an assigned teacher receives only
+  aggregate counts until independently approved `class.roster.view`
+  permission is implemented. Student names are restricted to verified
+  operating managers in this branch. The teacher's role does not authorize
+  official grading or credit issuance.
+- **Multiple roles:** current session grant governs the perspectives exposed
+  in the switcher; changing `?view=` never activates a different grant.
+
+An operator can assign or end Class-specific teaching roles in the new
+workspace only for people with a verified, active room-facilitator grant
+at that same Site. Assignment is audited and has an immutable history.
+For youth/school delivery, safeguarding clearance and professional
+eligibility must be enforced before granting expanded learner-record access.
 
 `UnifiedLessonOutline` renders the same lesson navigation pattern in the
 academic classroom, recorded-instructor player, and native Class overview.
@@ -131,14 +182,14 @@ Replacing the underlying fresh-install schema will be an explicit cutover task.
 
 **Verification:** no successful branch typecheck, unit run, database acceptance
 or browser E2E has been observed. GitHub Actions push runs are reporting
-`startup_failure` rather than executing tests. The original test01 database
-credentials were unavailable during the earlier integration work; this migration
-has not been executed or tested there.
+`startup_failure` rather than executing tests. Read-only `test01` inspection is available through the connected Neon
+project, but the native schema has not been installed or tested there.
 
 ## Next phases to graduate the model
 
 ### P0: Authorized Class and publication lifecycle
-- On an isolated canonical QA database, validate and apply both SQL patches; provision purpose-specific RLS,
+- On an isolated canonical QA database, validate and apply both SQL patches (including
+  `class_staff_assignments`); provision purpose-specific RLS,
   never an unrestricted network role or broad public SELECT.
 - Exercise the newly implemented atomic Class/Offering draft command using approved
   Course, Deployment, Site and operator authority on an isolated QA database.
@@ -157,6 +208,8 @@ has not been executed or tested there.
   Class Course Attempts, without exposing raw lesson media to unenrolled people.
 - Complete native Class guardian/child enrollment, assignment, invitation, approval,
   withdrawals, repeats and seat release with verified policy and consent.
+- Add explicit, evidence-backed teacher safeguarding/roster-read and academic
+  grading permissions. Site facilitator assignment alone grants neither.
 - Execute the newly wired independent instructor choice, recorded playback
   and practice against native Class Attempt RLS on isolated QA. Integrate
   official assessments without resetting learners or duplicating Attempts.
@@ -175,8 +228,10 @@ has not been executed or tested there.
 - Learner: native Class catalog, shared recorded-teacher player, progress and
   results view are committed; validate secure playback/practice and add
   native assessment, Session planning and authorized outcome issuance.
-- Replace prior pages and services at cutover rather than maintaining dual routes.
-  Old screens continue unchanged on main until the native workflows are proven.
+- Replace prior pages and services at cutover, including old `/classes?section=`
+  callers, noncredit catalog entry routes and route tests. Do not introduce
+  old-to-new enrollment adapters or dual-write services; leave main untouched
+  until the native workflows are proven.
 
 ## Acceptance gates before activation
 
