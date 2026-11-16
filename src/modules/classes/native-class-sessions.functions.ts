@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
 import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
+import { requiresClassSessionAgenda } from "@/domain/native-class-session-agenda";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -190,7 +191,11 @@ export const openNativeClassSession=createServerFn({method:"POST"})
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,
           alreadyStarted:true};
       }
-      if(process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true"){
+      if(requiresClassSessionAgenda({
+        featureEnabled:process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true",
+        mandatoryFrom:process.env.CAN_WS4_AGENDA_REQUIRED_FROM,
+        sessionCreatedAt:link.createdAt,
+      })){
         const [agenda]=await tx.select({id:classSessionAgendaRevisions.id})
           .from(classSessionAgendaRevisions).where(and(
             eq(classSessionAgendaRevisions.classSessionId,link.id),
