@@ -91,6 +91,7 @@ export const Route = createFileRoute("/home")({
     if (session.role === "account_holder") throw redirect({to:"/account/"});
     if (session.role === "academic_content_creator") throw redirect({to:"/canonical/content"});
     if (session.role === "academic_content_reviewer") throw redirect({to:"/canonical/content-reviews"});
+    if (session.role === "can_credential_reviewer") throw redirect({to:"/canonical/issuer-access"});
     return loadHomeDashboard(session.role, deps);
   },
   component: HomePage,
