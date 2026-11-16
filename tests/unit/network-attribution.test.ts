@@ -116,6 +116,8 @@ describe("network attribution is not a parallel enrollment system",()=>{
     expect(migration).toContain("v301_freeze_participation_attribution");
     expect(migration).toContain("Overlapping approved network membership reporting paths");
     expect(migration).toContain("Network hierarchy cannot contain cycles");
+    expect(migration).toContain("Network reporting path is not active and effective");
+    expect(migration).toContain("valid_from<=NEW.attributed_at");
     expect(migration).toContain("Self-reported selection is limited");
     expect(migration).toContain("v301_noncredit_attribution_required");
     expect(migration).toContain("v301_class_attribution_required");
