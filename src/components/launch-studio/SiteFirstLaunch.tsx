@@ -254,7 +254,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
         </aside>
       </div>
       {siteId&&<SiteContentChannelEditor siteId={siteId} initialConfig={initialChannels}
-        onSaved={()=>setPreviewKey(k=>k+1)}/>}
+        canPublish={Boolean(options.schoolSetupAdministrator)} onSaved={()=>setPreviewKey(k=>k+1)}/>}
     </section>}
     {step===4&&<section className="mt-6">
       <Button variant="outline" onClick={backward} className="mb-4"><ArrowLeft className="size-4"/> Return to website preview</Button>

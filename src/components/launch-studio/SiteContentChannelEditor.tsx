@@ -9,14 +9,15 @@ import {
   siteContentChannelIds, siteContentChannelDescriptions,
   type SiteContentBlock, type SiteContentChannelConfig, type SiteContentChannelId,
 } from "@/domain/site-content-channels";
-import { saveSiteContentChannels } from "@/modules/sites/site-content-channels.functions";
+import { saveSiteContentChannels, publishSiteContentChannels } from "@/modules/sites/site-content-channels.functions";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 
 /** Site-owned presentation registry. Editors never input Program data, course
  * permissions or registration URLs; every channel pulls its own approved feed. */
-export function SiteContentChannelEditor({siteId,initialConfig,onSaved}:{
+export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,onSaved}:{
   siteId:string;
   initialConfig?:SiteContentChannelConfig|null;
+  canPublish?:boolean;
   onSaved:()=>void;
 }) {
   const initial=initialConfig??defaultSiteContentChannelConfig;
@@ -26,11 +27,13 @@ export function SiteContentChannelEditor({siteId,initialConfig,onSaved}:{
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
   const [saved,setSaved]=useState(false);
+  const [publishing,setPublishing]=useState(false);
+  const [published,setPublished]=useState(false);
   const available=siteContentChannelIds.filter(id=>!blocks.some(b=>b.channel===id));
 
   function editBlock(id:string,change:Partial<SiteContentBlock>) {
     setBlocks(old=>old.map(block=>block.id===id?{...block,...change}:block));
-    setSaved(false);
+    setSaved(false);setPublished(false);
   }
   function addBlock(){
     if(!addChannel||blocks.some(b=>b.channel===addChannel))return;
@@ -41,7 +44,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,onSaved}:{
       eyebrow:info.defaultEyebrow,title:info.defaultTitle,description:info.defaultDescription,
     }]);
     setAddChannel("");
-    setSaved(false);
+    setSaved(false);setPublished(false);
   }
   async function save(){
     if(!siteId||saving)return;
@@ -55,9 +58,21 @@ export function SiteContentChannelEditor({siteId,initialConfig,onSaved}:{
       setRevision(next.revision);
       setBlocks(next.blocks.map(block=>({...block})));
       setSaved(true);
+      setPublished(false);
       onSaved();
     }catch(e){setError(mutationErrorMessage(e,"Unable to save Site content channels. Reload if another editor changed them."));}
     finally{setSaving(false);}
+  }
+  async function publish(){
+    if(!siteId||saving||publishing)return;
+    setError("");setPublishing(true);
+    try{
+      const outcome=await publishSiteContentChannels({data:{siteId,expectedRevision:revision}});
+      setPublished(true);
+      setSaved(false);
+      if(!outcome.changed)onSaved();
+    }catch(e){setError(mutationErrorMessage(e,"Publication requires an authorized Site website publisher. No public content changed."));}
+    finally{setPublishing(false);}
   }
   return <section className="border bg-card p-6 sm:p-8" aria-labelledby="site-channel-editor-title">
     <div className="flex flex-wrap items-start justify-between gap-4">
@@ -111,7 +126,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,onSaved}:{
                 onChange={e=>editBlock(block.id,{enabled:e.target.checked})}/>
               Show this block when source records are available
             </label>
-            <Button variant="outline" onClick={()=>{setBlocks(old=>old.filter(b=>b.id!==block.id));setSaved(false);}}>
+            <Button variant="outline" onClick={()=>{setBlocks(old=>old.filter(b=>b.id!==block.id));setSaved(false);setPublished(false);}}>
               <Trash2/> Remove block
             </Button>
           </div>
@@ -128,15 +143,22 @@ export function SiteContentChannelEditor({siteId,initialConfig,onSaved}:{
       <Button variant="outline" disabled={!addChannel} onClick={addBlock}><Plus/> Add block</Button>
     </div>}
     {error&&<p role="alert" className="mt-4 border border-destructive p-3 text-sm text-destructive">{error}</p>}
-    {saved&&<p role="status" className="mt-4 text-sm text-success">Saved to this Site. The website preview has been refreshed.</p>}
+    {saved&&<p role="status" className="mt-4 text-sm text-success">Saved as a private Site configuration. The preview has been refreshed. Publish separately to update the public website.</p>}
+    {published&&<p role="status" className="mt-4 text-sm text-success">Website content block settings published. This does not approve Programs or make a Site publicly reachable.</p>}
     <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
       <p className="max-w-xl text-xs leading-5 text-muted-foreground">
         Site blocks customize presentation only. Planning interests remain private;
         approved programs retain their existing content and publication reviews.
       </p>
-      <Button disabled={saving||!siteId} onClick={()=>void save()}>
-        <Save/>{saving?"Saving channels…":"Save blocks and refresh website"}
-      </Button>
+      <div className="flex flex-wrap gap-3">
+        <Button disabled={saving||publishing||!siteId} onClick={()=>void save()}>
+          <Save/>{saving?"Saving channels…":"Save private blocks"}
+        </Button>
+        {canPublish&&<Button variant="outline" disabled={saving||publishing||!siteId||!saved}
+          onClick={()=>void publish()}>
+          {publishing?"Publishing…":"Publish approved content blocks"}
+        </Button>}
+      </div>
     </div>
   </section>;
 }

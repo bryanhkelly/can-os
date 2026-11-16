@@ -24,3 +24,14 @@ export const saveSiteContentChannels = createServerFn({method: "POST"})
     const {saveAuthorizedSiteContentChannels} = await import("./site-content-channels.server");
     return saveAuthorizedSiteContentChannels(data);
   });
+
+
+export const publishSiteContentChannels = createServerFn({method: "POST"})
+  .validator((input: unknown) => z.object({
+    siteId: z.string().uuid(), expectedRevision: z.number().int().min(0),
+  }).strict().parse(input))
+  .handler(async ({data}) => {
+    setResponseHeader("Cache-Control", "private, no-store");
+    const {publishAuthorizedSiteContentChannels} = await import("./site-content-channels.server");
+    return publishAuthorizedSiteContentChannels(data);
+  });

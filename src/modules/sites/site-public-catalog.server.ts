@@ -83,7 +83,7 @@ export async function readPublishedSiteCatalog(slug: string) {
     const authorizedPrograms = withVerifiedPublicApplications(academicPrograms, parentExtras.admissions);
     const noncreditReleases = await readOptionalSiteNoncreditReleases(site.id, tx);
     const enrollmentAppOrigin = noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
-    const parsedContentChannels = siteContentChannelConfigSchema.safeParse(site.metadata.websiteContentChannels);
+    const parsedContentChannels = siteContentChannelConfigSchema.safeParse(site.metadata.publishedWebsiteContentChannels);
     const contentBlocks = resolveSiteContentBlocks(
       parsedContentChannels.success ? parsedContentChannels.data : defaultSiteContentChannelConfig, {
         mode: "public", academicPrograms: authorizedPrograms,
