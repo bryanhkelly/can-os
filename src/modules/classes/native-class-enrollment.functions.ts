@@ -16,7 +16,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
-  assertNativeClassRepeatEligible, assertOperationalClassEnrollmentMethods,
+  assertNativeClassRepeatEligible, assertOperationalClassOfferingTerms,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
@@ -80,7 +80,7 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
       try{
         // Previously published, unsupported methods remain invisible until
         // fully authorized invitation/approval commands are delivered.
-        assertOperationalClassEnrollmentMethods(row.enrollmentMethods);
+        assertOperationalClassOfferingTerms(row);
         const authority=await db.transaction(tx=>currentClassAuthority(tx,row.classId,now));
         // Do not advertise a larger publication limit than the underlying
         // Class can actually seat across assignment and self-registration.
@@ -141,7 +141,7 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
       const items=[];
       for(const row of page){
         try{
-          assertOperationalClassEnrollmentMethods(row.enrollmentMethods);
+          assertOperationalClassOfferingTerms(row);
           const authority=await currentClassAuthority(tx,row.classId,now);
           const limits=[row.capacity,authority.classCapacity]
             .filter((n):n is number=>n!==null);
@@ -216,6 +216,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.classId,instance.id),
           inArray(canonicalClassEnrollments.status,["pending","active"])));
+      assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
       if((current.classCapacity!==null && (occupancy?.total??0)>=current.classCapacity)||
