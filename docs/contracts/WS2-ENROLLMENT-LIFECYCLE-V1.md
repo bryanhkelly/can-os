@@ -63,8 +63,9 @@ state stored in the DB. WS1 owns its exact read-model shape.
 
 - Class: `pending` → pending, `active` → active, `completed` → completed,
   `withdrawn` → withdrawn, `cancelled` → cancelled.
-- Noncredit: `registered` and `active` → active; `completed` →
-  completed; `withdrawn` → withdrawn; `cancelled` → cancelled.
+- Noncredit: `registered` → registered; `active` → active;
+  `completed` → completed; `withdrawn` → withdrawn;
+  `cancelled` → cancelled. This preserves WS1's provisional PRM v0.1.0.
   Waitlist `waiting` or `invited` is **not** participation or Course work.
 - Course Attempts: `planned`, `active`, `completed`, `withdrawn` are
   evidence/work statuses, not enrollment decisions. An attempted Course
@@ -74,13 +75,17 @@ state stored in the DB. WS1 owns its exact read-model shape.
 - Historical `completed`, `withdrawn`, `cancelled` belongs in personal
   Activity history; it never confers future content, session or assessment access.
 
-The unified read model should include `sourceKind`, `sourceId`,
-`personId`, exact `courseAttemptId` (nullable), `classId` (nullable),
-`classOfferingVersionId` (nullable), `deploymentId`, `offeringVersionId`,
-`courseVersionId`, `deliverySiteId`, `reportingSiteId`,
-`creditedOrganizationId`, originating status, display status, and
-`enrolledAt`. Do not synthesize null Site attribution for physically hosted
-participation. Audit-domain event time is the v1 closure timestamp; there
+WS1's provisional [PRM v0.1.0](../integration/participation-read-model-v0.1.0.md)
+owns the DTO, including `contractVersion: "0.1.0"`,
+`(sourceKind,sourceId)` identity, `personId`,
+`courseAttemptId`, `classId`, `sectionId`, `deploymentId`,
+`adoptionId`, `offeringVersionId`, `courseVersionId`,
+`operatorOrganizationId`, `actualDeliverySiteId`,
+`creditedOrganizationId`, `state` and `sourceState`. The Class source
+also retains its exact `classOfferingVersionId` and separate
+`participation_attributions` reporting Site; WS1 and WS6 will determine
+whether these enter an additive DTO revision. Do not synthesize null Site
+attribution for physically hosted participation. Audit-domain event time is the v1 closure timestamp; there
 is no newly added terminal timestamp column.
 
 ## WS6 event contract
@@ -112,9 +117,12 @@ outcomes. WS3 alone makes completion decisions and issues awards.
 
 ## Safety, regression and deployment notes
 
-No migration, new table, production write, new role grant, feature-toggle
-activation, or modification to the WS1/WS3/WS4/WS5/WS6-owned systems is
-part of this PR. The existing `CAN_UNIFIED_CLASS_COMMANDS_ENABLED` flag is
+No migration, new table, production write, new role grant, or feature-toggle
+activation is part of this PR. The changes to the shared
+`unified-class.functions.ts` publication boundary and
+`classes_.$classId.tsx` roster surface require WS00/WS5 and WS00/WS4
+ownership review respectively before integration; these are deliberate
+cross-stream interfaces, not an authorization to overwrite other agents. The existing `CAN_UNIFIED_CLASS_COMMANDS_ENABLED` flag is
 still a prerequisite; disabled means denial, not a partial workflow.
 
 Required integration acceptance **not yet claimed**:
