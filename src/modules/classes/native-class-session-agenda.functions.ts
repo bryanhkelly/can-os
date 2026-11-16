@@ -131,15 +131,19 @@ export const getNativeClassSessionAgenda=createServerFn({method:"GET"})
       let canEdit=false;
       if(actor.role==="learner"){
         assertCapability(actor,"learning.participate");
-        const [member]=await tx.select({
+        const members=await tx.select({
           courseAttemptId:canonicalClassEnrollments.courseAttemptId,
           status:canonicalClassEnrollments.status,
         }).from(canonicalClassEnrollments).where(and(
           eq(canonicalClassEnrollments.classId,data.classId),
           eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!),
           inArray(canonicalClassEnrollments.status,["active","completed"]),
-        )).limit(1);
-        if(!member?.courseAttemptId)throw new AuthorizationError("own active Class participation");
+        )).limit(2);
+        // Never arbitrarily choose one of two active/historical enrollments:
+        // the existing unified Class workspace already rejects ambiguity.
+        if(members.length!==1||!members[0]?.courseAttemptId)
+          throw new AuthorizationError("one verified Class enrollment and Course Attempt");
+        const member=members[0];
         const authorized=await authorizeCanonicalCourseAttempt(
           tx,actor,member.courseAttemptId,true,
         );
