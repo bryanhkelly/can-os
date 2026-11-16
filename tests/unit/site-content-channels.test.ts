@@ -75,7 +75,7 @@ describe("Site-owned website content channels", () => {
   });
 
   it("derives reviewed academic blocks only from the supplied approved catalog", () => {
-    const config = {version: 1 as const, revision: 1, blocks: [{
+    const config = {version: 2 as const, revision: 1, blocks: [{
       id: "approved-academics", channel: "learning.academics" as const,
       placement: "learning" as const, layout: "list" as const,
       enabled: true, eyebrow: "Academics", title: "Learning here",
@@ -109,7 +109,7 @@ describe("Site-owned website content channels", () => {
     expect(published[0]?.items[0]?.link).toBeUndefined();
   });
   it("private previews cannot enable registration links", () => {
-    const config = {version: 1 as const, revision: 1, blocks: [{
+    const config = {version: 2 as const, revision: 1, blocks: [{
       id: "training", channel: "learning.noncredit" as const,
       placement: "learning" as const, layout: "cards" as const,
       enabled: true, eyebrow: "Training", title: "Learn", description: "",
@@ -123,7 +123,7 @@ describe("Site-owned website content channels", () => {
   });
 
   it("noncredit registration links require an eligible release and trusted HTTPS origin", () => {
-    const config = {version: 1 as const, revision: 1, blocks: [{
+    const config = {version: 2 as const, revision: 1, blocks: [{
       id: "training", channel: "learning.noncredit" as const,
       placement: "learning" as const, layout: "cards" as const,
       enabled: true, eyebrow: "Training", title: "Learn", description: "",
