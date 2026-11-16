@@ -59,8 +59,8 @@ function MyNoncreditCourses(){
       setWithdrawBusy(null);
     }
   }
-  return <WorkspaceShell eyebrow="My CAN" width="wide" title="My courses"
-    subtitle="Your noncredit course registrations and learning history are tied to your own verified CAN identity."
+  return <WorkspaceShell eyebrow="My CAN" width="wide" title="My Classes"
+    subtitle="Your enrolled training Classes and Course progress are tied to your verified CAN identity. School Classes remain available in My Learning & Programs."
     actions={<Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link>}>
     {query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
     {query.isError && <p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
@@ -152,7 +152,7 @@ function MyNoncreditCourses(){
       {!query.data.length&&<div className="border border-border bg-card p-6">
         <h2 className="font-serif text-2xl">Your learning starts here</h2>
         <p className="mt-3 text-sm text-muted-foreground">You have no noncredit registrations yet. Find a published training and enroll when it opens.</p>
-        <Link to="/learn/enroll" search={{}} className="mt-4 inline-block font-semibold text-primary underline underline-offset-4">Explore courses</Link>
+        <Link to="/learn/enroll" search={{}} className="mt-4 inline-block font-semibold text-primary underline underline-offset-4">Explore Classes</Link>
       </div>}
     </div>}
   </WorkspaceShell>;
