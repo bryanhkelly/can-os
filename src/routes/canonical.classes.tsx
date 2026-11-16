@@ -66,6 +66,23 @@ function NativeClasses(){
   const [recipeOfferingVersionId,setRecipeOfferingVersionId]=useState<string|null>(null);
   const [recipePlan,setRecipePlan]=useState<ProgramRolloutRecipe|null>(null);
   const [rolloutSiteId,setRolloutSiteId]=useState(preferredSiteId??"");
+  const exactRolloutOptions=useInfiniteQuery({
+    queryKey:["native-class-rollout-options",recipePlan?.offeringVersionId,rolloutSiteId,
+      recipePlan?.courses.map(course=>course.courseVersionId)],
+    initialPageParam:0,
+    enabled:!!recipePlan&&!!rolloutSiteId,
+    queryFn:({pageParam})=>getUnifiedClassCourseOptions({data:{
+      search:"",cursor:pageParam,
+      offeringVersionId:recipePlan?.offeringVersionId,
+      courseVersionIds:recipePlan?.courses.map(course=>course.courseVersionId),
+      siteId:rolloutSiteId||undefined,
+    }}),
+    getNextPageParam:last=>last.nextCursor??undefined,
+    retry:false,
+  });
+  const exactRolloutData=exactRolloutOptions.data?.pages.flatMap(page=>page.items)??[];
+  const combinedOptions=[...optionsData,...exactRolloutData]
+    .filter((row,index,items)=>items.findIndex(candidate=>optionKey(candidate)===optionKey(row))===index);
   const [title,setTitle]=useState("");
   const [classCapacity,setClassCapacity]=useState("");
   const [siteId,setSiteId]=useState("");
@@ -82,17 +99,17 @@ function NativeClasses(){
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
-  const selected=optionsData.find(row=>optionKey(row)===choice);
+  const selected=combinedOptions.find(row=>optionKey(row)===choice);
   // A deep link is only a suggestion; the server independently validates
   // current Course adoption and operating Site rights on Class creation.
-  const visibleOptions=optionsData.filter(row=>
+  const visibleOptions=combinedOptions.filter(row=>
     (!recipeCourseId||row.courseVersionId===recipeCourseId) &&
     (!recipeOfferingVersionId||row.offeringVersionId===recipeOfferingVersionId) &&
     (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
   const rolloutReadiness=recipePlan
-    ?assessLocalRollout(recipePlan,optionsData,rolloutSiteId||null):[];
+    ?assessLocalRollout(recipePlan,exactRolloutData,rolloutSiteId||null):[];
   const rolloutSiteOptions=Array.from(new Map(
-    optionsData.flatMap(row=>row.siteOptions.map(site=>[site.id,site] as const))
+    combinedOptions.flatMap(row=>row.siteOptions.map(site=>[site.id,site] as const))
   ).values()).sort((a,b)=>a.name.localeCompare(b.name));
   // Offering versions remain canonical publisher products. Each authorized
   // adoption may support many Course components and local Classes; no extra
@@ -114,7 +131,7 @@ function NativeClasses(){
     if(!recipePlan||!rolloutSiteId)return;
     // Select an eligible local Deployment/adoption, never a publisher supplied
     // Organization, Site or permission reference.
-    const available=optionsData.find(row=>
+    const available=combinedOptions.find(row=>
       row.offeringVersionId===recipePlan.offeringVersionId &&
       row.courseVersionId===course.courseVersionId &&
       row.siteOptions.some(site=>site.id===rolloutSiteId &&
@@ -409,11 +426,18 @@ function NativeClasses(){
               {rolloutSiteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
             </select>
             <p className="text-xs text-muted-foreground">
-              Readiness is advisory and based on the loaded authorized Course pages. Search or load more when a Course is missing; no Class is created automatically.
+              Readiness uses a separate exact Offering, Course version and Site authorization query.
+              No Class is created automatically; live authorization is rechecked when submitted.
               Every Class and optional Class Offering is created independently under a server-side authorization check.
             </p>
+            {exactRolloutOptions.isError&&rolloutSiteId&&
+              <p role="alert" className="text-sm">Could not verify rollout permissions. No Course may be prepared until the lookup succeeds.</p>}
+            {exactRolloutOptions.isFetching&&
+              <p role="status" className="text-xs text-muted-foreground">Checking current local adoption and Site rights…</p>}
             {recipePlan.courses.map((course,index)=>{
               const status=rolloutReadiness[index]?.status??"adoption_required";
+              const incomplete=!!exactRolloutOptions.hasNextPage||exactRolloutOptions.isPending||
+                exactRolloutOptions.isError||exactRolloutOptions.isFetching;
               return <div key={course.courseVersionId} className="flex flex-wrap items-center justify-between gap-3 border border-border bg-card p-3 text-sm">
                 <div>
                   <p className="font-semibold">{course.courseTitle} {course.isRequired?"· Required":"· Optional"}</p>
@@ -421,13 +445,19 @@ function NativeClasses(){
                     {status==="ready"?"Approved local adoption and Site mode found. Review staffing and terms before launch."
                       :status==="site_selection_required"?"Choose a receiving Site to check delivery permissions."
                       :status==="site_authorization_required"?"Selected Site lacks permission for this Course delivery mode."
+                      :incomplete?"Checking other approved Deployment/adoption results…"
                       :"No approved adoption of this Offering version for your organization."}
                   </p>
                 </div>
-                <Button type="button" variant="outline" disabled={status!=="ready"}
+                <Button type="button" variant="outline" disabled={status!=="ready"||exactRolloutOptions.isError}
                   onClick={()=>chooseRolloutCourse(course)}>Prepare Class</Button>
               </div>;
             })}
+            {exactRolloutOptions.hasNextPage&&<Button type="button" variant="outline"
+              disabled={exactRolloutOptions.isFetchingNextPage}
+              onClick={()=>void exactRolloutOptions.fetchNextPage()}>
+              {exactRolloutOptions.isFetchingNextPage?"Checking…":"Check remaining authorized rollout deployments"}
+            </Button>}
           </div>}
           {recipeCourseId&&<p role="status" className="mt-2 text-xs">
             Only locally approved Course options matching this recipe are available below.
