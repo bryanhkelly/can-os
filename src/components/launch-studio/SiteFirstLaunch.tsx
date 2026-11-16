@@ -210,7 +210,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-primary">Live Site renderer · private preview</p>
           <h2 className="mt-1 font-serif text-3xl">Your Site is taking shape.</h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">This uses your Site's actual website design engine and saved plans. Proposed interests are marked as such. Your Site is not published and enrollment is not open by default.</p>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">This uses your Site's actual website design engine and saved plans. Proposed interests are marked as such. Your Site is not published and enrollment is not open by default. Pages without approved content show an explicitly private layout preview.</p>
         </div>
         <div className="flex flex-wrap items-end gap-2">
           <Field label="Preview page" className="min-w-[170px]">

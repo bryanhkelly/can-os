@@ -130,9 +130,11 @@ export const Route=createFileRoute("/launch/site-preview")({
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
         const availablePages=availablePublicSitePaths(page);
-        if(!availablePages.includes(path))
-          return failure(404,"Page not available","This Site has not published the data required for this preview page.");
-        const rendered=renderPublicSiteHtml(page,{path,localPreview:true});
+        // Authorized operators can inspect a page before it becomes publicly
+        // eligible, without publishing a false Program or enrollment action.
+        const rendered=renderPublicSiteHtml(page,{
+          path,localPreview:true,privateDraftPages:true,
+        });
         const html=renderPrivateWebsitePreviewHtml(
           rendered,site.id,availablePages,Boolean(history.length),"site",
         );

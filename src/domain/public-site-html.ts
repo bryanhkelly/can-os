@@ -195,6 +195,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   sampleTemplate?: SiteTemplateId;
   path?: PublicSitePath;
   localPreview?: boolean;
+  /** The authenticated Site-first renderer may show an unapproved page's
+   * layout as a private draft; public routing never accepts the empty route. */
+  privateDraftPages?: boolean;
   /** Trusted server-resolved Site slug for local-only multipage preview. */
   localPreviewSlug?: string;
   /** Local forms are enabled only by a database-attested development server. */
@@ -208,7 +211,9 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
   });
   const profile=resolveSiteExperienceProfile(opportunities);
   const experienceCopy=siteExperienceCopy[profile];
-  if (!availablePaths.includes(path)) throw new Error("This public page is not available");
+  const privateDraftPages=options?.localPreview===true && options.privateDraftPages===true;
+  if (!availablePaths.includes(path) && !privateDraftPages)
+    throw new Error("This public page is not available");
   const school = escapePublicHtml(page.site.name);
   const org = escapePublicHtml(page.site.organizationName);
   const host = escapePublicHtml(page.host);
@@ -842,7 +847,16 @@ export function renderPublicSiteHtml(page: PublicSitePage, options?: {
       (kind==="class" && block.channel==="learning.classes"));
     if(coversTarget)return authored;
     const records=opportunities.filter(item=>item.kind===kind);
-    if(!records.length)return authored;
+    if(!records.length) {
+      if(authored || !privateDraftPages)return authored;
+      const label=kind==="program"?"Programs":kind==="course"?"Courses":"Classes";
+      return '<section class="editorial-section site-private-empty-preview" role="status">'+
+        '<p class="tag">Private design preview · not published</p>'+
+        '<h2>No approved '+label+' to display yet</h2>'+
+        '<p>Once an eligible Offering is independently approved and published, '+
+        'this page will pull its current content and permitted registration actions. '+
+        'The public website does not show an empty catalog page.</p></section>';
+    }
     return authored+renderSiteContentChannelBlock({
       id:"auto-"+kind,channel:"learning.opportunities",
       placement:"learning",layout:"cards",enabled:true,

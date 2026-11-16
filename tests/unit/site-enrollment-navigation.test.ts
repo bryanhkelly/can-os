@@ -103,6 +103,13 @@ describe("Enrollment-driven public website navigation and templates",()=>{
     expect(paths).not.toContain("/courses");
     expect(paths).not.toContain("/classes");
     expect(()=>renderPublicSiteHtml(site,{path:"/courses"})).toThrow();
+    const preview=renderPublicSiteHtml(site,{
+      path:"/courses",localPreview:true,privateDraftPages:true,
+    });
+    expect(preview).toContain("No approved Courses to display yet");
+    expect(preview).toContain("Private design preview · not published");
+    expect(preview).not.toContain("Register for Course");
+    expect(preview).not.toContain("<form");
   });
   it("includes real Program discovery without promising unverified enrollment",()=>{
     const site={...page("community"),enrollmentOpportunities:
