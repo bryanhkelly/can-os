@@ -391,16 +391,21 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         operatingOrganizationId:instance.operatingOrganizationId,
         siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
       });
-      const [offering]=await tx.select().from(canonicalClassOfferings)
+      const [existingOffering]=await tx.select().from(canonicalClassOfferings)
         .where(eq(canonicalClassOfferings.classId,instance.id)).limit(1);
-      if(!offering)throw new AuthorizationError("Class Offering identity");
-      const [current]=await tx.select().from(canonicalClassOfferingVersions)
-        .where(eq(canonicalClassOfferingVersions.classOfferingId,offering.id))
-        .orderBy(desc(canonicalClassOfferingVersions.versionNo)).limit(1);
-      if(!current || current.state!=="closed")
+      const [current]=existingOffering
+        ?await tx.select().from(canonicalClassOfferingVersions)
+          .where(eq(canonicalClassOfferingVersions.classOfferingId,existingOffering.id))
+          .orderBy(desc(canonicalClassOfferingVersions.versionNo)).limit(1)
+        :[];
+      if(existingOffering && (!current || current.state!=="closed"))
         throw new AuthorizationError("close the previous published Class Offering first");
+      const offering=existingOffering??(await tx.insert(canonicalClassOfferings)
+        .values({classId:instance.id}).returning())[0];
+      if(!offering)throw new Error("Class Offering identity was not created");
+      const nextVersion=(current?.versionNo??0)+1;
       const [created]=await tx.insert(canonicalClassOfferingVersions).values({
-        classId:instance.id,classOfferingId:offering.id,versionNo:current.versionNo+1,
+        classId:instance.id,classOfferingId:offering.id,versionNo:nextVersion,
         visibility:data.terms.visibility,enrollmentMethods:data.terms.enrollmentMethods,
         opensAt:data.terms.opensAt?new Date(data.terms.opensAt):null,
         closesAt:data.terms.closesAt?new Date(data.terms.closesAt):null,
@@ -413,9 +418,9 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
       await tx.insert(auditEvents).values({
         actorPersonId:operator.actor.actorPersonId!,owningOrganizationId:operator.organizationId,
         eventCode:"class.offering_new_draft",entityKind:"class_offering_version",
-        entityId:created.id,payload:{classId:instance.id,versionNo:current.versionNo+1},
+        entityId:created.id,payload:{classId:instance.id,versionNo:nextVersion},
       });
-      return {classOfferingVersionId:created.id,versionNo:current.versionNo+1};
+      return {classOfferingVersionId:created.id,versionNo:nextVersion};
     });
   });
 
