@@ -56,8 +56,11 @@ export function objectiveApprovalGate(rows:readonly AssessmentReviewDecision[],
  */
 export function canonicalAssessmentApprovalRole(actor:Pick<CommandContext,"scope"|"capabilities">,
   purpose:"assessment_reviewer"|"assessment_publisher"){
-  if(!actor.capabilities.has("curriculum.publish"))
-    throw new AuthorizationError("curriculum.publish");
+  // Reviewer/publisher *database* roles are the separate positive authority;
+  // a generic staff capability alone never grants either one.
+  if(!actor.capabilities.has("curriculum.publish")&&
+     !actor.capabilities.has("class.manage"))
+    throw new AuthorizationError("publisher staff authority");
   const ids=actor.scope.organizationIds??[];
   if(ids.length!==1||!z.string().uuid().safeParse(ids[0]).success)
     throw new AuthorizationError("single publisher organization");
