@@ -1,10 +1,8 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
-import {z} from "zod";
 import {WorkspaceShell} from "@/components/workspace";
 import {NativeClassReportPanel} from "@/components/reports/NativeClassReportPanel";
 
 export const Route=createFileRoute("/reports/classes_/$classId")({
-  parseParams:params=>({classId:z.string().uuid().parse(params.classId)}),
   component:ClassReportPage,
 });
 function ClassReportPage(){
