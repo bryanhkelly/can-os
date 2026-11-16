@@ -39,7 +39,7 @@ export const programRolloutRecipeSchema = z.object({
 });
 export type ProgramRolloutRecipe = z.infer<typeof programRolloutRecipeSchema>;
 
-export const portableRolloutSchema = z.discriminatedUnion("version", [
+export const portableRolloutSchema = z.union([
   networkClassLaunchRecipeSchema, programRolloutRecipeSchema,
 ]);
 export type PortableRolloutRecipe = z.infer<typeof portableRolloutSchema>;
