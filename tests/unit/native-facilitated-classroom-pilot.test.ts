@@ -107,6 +107,22 @@ describe("native facilitated classroom end-to-end wiring",()=>{
       .toBeLessThan(emergency.indexOf('if(room.state==="ended")'));
     expect(workspace).toContain("canRevoke onChanged={refresh}");
   });
+  it("keeps projector media refresh and captions rights-checked, without claiming attendance",()=>{
+    const projector=source("src/components/learning/ClassroomProjectorPlayer.tsx");
+    const media=source("src/components/learning/ClassroomMediaSurface.tsx");
+    expect(projector).toContain("loaded.refreshTick===refreshTick");
+    expect(projector).toContain("getFacilitatedRoomMediaAccess");
+    expect(projector).toContain("resumeAt.current");
+    expect(media).toContain("captionTracks.filter(validCaptionTrack)");
+    expect(media).toContain('url.protocol==="https:"');
+    expect(media).toContain('kind="captions"');
+    expect(media).toContain("does not");
+    const companion=source("src/components/learning/ClassroomCompanionRoom.tsx");
+    expect(companion).toContain("setOnline(navigator.onLine)");
+    expect(companion).toContain("refetchOnReconnect:true");
+    expect(companion).toContain("You're offline");
+    expect(companion).toContain("retryIds.current[key]");
+  });
   it("disambiguates same-Course enrollments by exact native Class and Site",()=>{
     const choices=source("src/modules/learning/classroom-connect.functions.ts");
     const join=source("src/routes/join.tsx");
