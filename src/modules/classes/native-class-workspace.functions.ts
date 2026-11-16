@@ -293,9 +293,6 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         endsAt:canonicalDeliverySessions.endsAt,
         facilitatorPersonId:canonicalClassSessions.facilitatorPersonId,
       }).from(canonicalClassSessions)
-        .leftJoin(facilitatedLearningSessions,eq(
-          facilitatedLearningSessions.id,facilitatedClassroomPlans.facilitatedSessionId,
-        ))
         .innerJoin(facilitatedClassroomPlans,and(
           eq(facilitatedClassroomPlans.id,canonicalClassSessions.classroomPlanId),
           eq(facilitatedClassroomPlans.deliverySessionId,canonicalClassSessions.deliverySessionId),
@@ -303,6 +300,9 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           eq(facilitatedClassroomPlans.courseVersionId,instance.courseVersionId),
           eq(facilitatedClassroomPlans.siteId,instance.siteId??"00000000-0000-0000-0000-000000000000"),
           eq(facilitatedClassroomPlans.hostOrganizationId,instance.operatingOrganizationId),
+        ))
+        .leftJoin(facilitatedLearningSessions,eq(
+          facilitatedLearningSessions.id,facilitatedClassroomPlans.facilitatedSessionId,
         ))
         .innerJoin(canonicalDeliverySessions,and(
           eq(canonicalDeliverySessions.id,canonicalClassSessions.deliverySessionId),
