@@ -11,6 +11,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { currentClassAuthority } from "./native-class-enrollment.functions";
 import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
+import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
@@ -53,6 +54,7 @@ export async function requireNativeClassSessionHost(
         gt(canonicalClassStaffAssignments.endsAt,now)),
     )).limit(1);
   if(!assignment)throw new AuthorizationError("explicit active Class teaching assignment");
+  await assertCurrentNativeTeachingGrant(tx,host.actor.actorPersonId!,host.organizationId,instance.siteId);
   return instance;
 }
 
