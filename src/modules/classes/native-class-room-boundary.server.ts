@@ -105,6 +105,31 @@ export async function assertNativeClassRoomStaff(tx:Tx,room:Room){
   return linked;
 }
 
+/** Personal learner/attendance data is visible only when a verified Class
+ * manager explicitly granted the room facilitator attendance permission
+ * on the immutable, audited Person-to-Class teaching assignment.
+ */
+export async function assertNativeClassAttendanceReader(
+  tx:Tx,room:Room,actorPersonId:string,
+):Promise<void>{
+  const linked=await assertNativeClassRoomStaff(tx,room);
+  if(!linked||actorPersonId!==room.facilitatorPersonId)
+    throw new AuthorizationError("exact native Class room facilitator");
+  const now=new Date();
+  const [delegated]=await tx.select({id:canonicalClassStaffAssignments.id})
+    .from(canonicalClassStaffAssignments).where(and(
+      eq(canonicalClassStaffAssignments.classId,linked.classId),
+      eq(canonicalClassStaffAssignments.personId,actorPersonId),
+      eq(canonicalClassStaffAssignments.state,"approved"),
+      eq(canonicalClassStaffAssignments.attendanceAuthorized,true),
+      lte(canonicalClassStaffAssignments.beginsAt,now),
+      or(isNull(canonicalClassStaffAssignments.endsAt),
+        gt(canonicalClassStaffAssignments.endsAt,now)),
+    )).limit(1);
+  if(!delegated)
+    throw new AuthorizationError("Class manager-approved attendance verification permission");
+}
+
 /** Native participant identity is Class Enrollment, NEVER deployment/Course
  * alone. A non-native Course Attempt cannot join a native Class room.
  */
