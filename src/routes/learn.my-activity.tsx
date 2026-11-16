@@ -142,6 +142,10 @@ function MyActivityPage() {
           <span className="mt-1 block font-serif text-3xl">
             {activity.data ? records.filter(record => record.bucket === view.id).length : "—"}
           </span>
+          {view.id === "upcoming" && activity.data && activity.data.opportunities.length > 0 &&
+            <span className="mt-1 block text-xs text-muted-foreground">
+              +{activity.data.opportunities.length} enrollment opportunities
+            </span>}
         </span>
       </button>)}
     </section>
@@ -185,7 +189,7 @@ function MyActivityPage() {
       <section className="mt-6" aria-label={bucket + " activity"}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-serif text-2xl">{views.find(view => view.id === bucket)?.title} activity</h2>
-          <p className="text-sm text-muted-foreground">{shown.length} {shown.length === 1 ? "participation" : "participations"}{opportunities.length > 0 ? ` · ${opportunities.length} enrollment opportunities` : ""}</p>
+          <p className="text-sm text-muted-foreground">{shown.length} participation {shown.length === 1 ? "record" : "records"}{opportunities.length > 0 ? ` · ${opportunities.length} enrollment opportunities` : ""}</p>
         </div>
         {shown.length ? <div className="mt-3 grid gap-3">
           {shown.map(item => <ActivityCard key={item.key} item={item}/>)}
