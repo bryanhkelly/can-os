@@ -77,7 +77,7 @@ function uniqueIds<T extends {id:string}>(rows:readonly T[],name:string){
 }
 export function aggregateClassEvidence(input:EvidenceInput){
   const from=timestamp(input.from),to=timestamp(input.to),asOf=timestamp(input.asOf);
-  if(!(from<to && to<=asOf+1))throw new Error("Invalid reporting interval or future period");
+  if(!(from<to && from<=asOf))throw new Error("Invalid reporting interval or future period");
   const inPeriod=(value:string)=>{const t=timestamp(value);return t>=from&&t<to&&t<=asOf;};
   const throughAsOf=(value:string)=>timestamp(value)<=asOf;
   uniqueIds(input.enrollments,"Class Enrollment");
@@ -97,7 +97,9 @@ export function aggregateClassEvidence(input:EvidenceInput){
     if(previous && previous!==r.personId)throw new Error("Course Attempt belongs to multiple people");
     attemptToPerson.set(r.courseAttemptId,r.personId);
   }
-  const eligibleAttempts=new Set(registered.flatMap(r=>r.courseAttemptId?[r.courseAttemptId]:[]));
+  // In-period attendance and assessments may belong to participants who registered earlier.
+  const eligibleAttempts=new Set(input.enrollments.filter(r=>throughAsOf(r.enrolledAt))
+    .flatMap(r=>r.courseAttemptId?[r.courseAttemptId]:[]));
   const periodSessions=input.sessions.filter(s=>inPeriod(s.scheduledAt));
   const roomIds=new Set(periodSessions.filter(s=>s.roomId).map(s=>s.roomId!));
   const latestAttendance=new Map<string,EvidenceInput["attendance"][number]>();
@@ -122,7 +124,7 @@ export function aggregateClassEvidence(input:EvidenceInput){
        (result.revision===prior.revision && result.id>prior.id))
       lastResult.set(result.attemptId,result);
   }
-  const enrollmentIds=new Set(registered.map(r=>r.id));
+  const enrollmentIds=new Set(input.enrollments.filter(r=>throughAsOf(r.enrolledAt)).map(r=>r.id));
   const completed=new Set(input.outcomes.filter(o=>
     enrollmentIds.has(o.enrollmentId)&&o.kind==="completion"&&
     o.resultCode==="completed"&&inPeriod(o.recordedAt)).map(o=>o.enrollmentId));
@@ -150,9 +152,9 @@ export function aggregateClassEvidence(input:EvidenceInput){
     awardsRevoked:input.awards.filter(a=>scopedOutcomes.has(a.outcomeId)&&a.revokedAt&&
       inPeriod(a.revokedAt)).length,
   };
-  if(metrics.uniquePeople!>metrics.registrations!)
+  if(metrics.uniquePeople! > metrics.registrations!)
     throw new Error("Unique people exceed registrations");
-  if(metrics.sessionsDelivered!>metrics.sessionsScheduled!)
+  if(metrics.sessionsDelivered! > metrics.sessionsScheduled!)
     throw new Error("Delivered sessions exceed scheduled sessions");
   return {contractVersion:CLASS_REPORT_CONTRACT_VERSION,asOf:input.asOf,
     classId:input.classId,period:{from:input.from,to:input.to},
