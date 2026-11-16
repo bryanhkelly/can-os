@@ -38,6 +38,7 @@ export const routeNavigation = {
   "/calendar-export": endpoint,
   "/canonical/blueprints": hidden("Native v3.0.1 Site-scoped Blueprint planning; requires a canonical session", []),
   "/canonical/blueprint-reviews": hidden("Native v3.0.1 independent Blueprint reviewer; requires a canonical session", []),
+  "/canonical/program-operations": hidden("Authorized local Program Operations; requires canonical Class operator grant", ["site_admin","registrar"]),
   "/canonical/content": hidden("Verified provider content creator workspace on canonical course records", []),
   "/canonical/content/$trackVersionId": hidden("Author-owned instructional track content editor", []),
   "/canonical/content-reviews": hidden("Independent provider instructional track review workspace", []),
