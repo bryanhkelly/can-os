@@ -14,7 +14,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { classViews, classTabs, selectClassTab, selectClassView } from "@/domain/class-views";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
-import { currentClassAuthority } from "./native-class-enrollment.functions";
+import { currentClassAuthority } from "./native-class-authority.server";
 import { validateClassAuthority } from "./unified-class.functions";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
