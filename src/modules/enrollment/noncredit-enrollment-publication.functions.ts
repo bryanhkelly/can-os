@@ -181,7 +181,13 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
-      .where(eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId))
+      .where(and(
+        eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
+        // A Site Admin cannot list another Site's releases within the
+        // same organization. Site-less releases remain organization-scoped.
+        or(isNull(noncreditSelfEnrollmentReleases.siteId),
+          inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)),
+      ))
       .orderBy(noncreditSelfEnrollmentReleases.createdAt).limit(100);
     return {candidates,published};
   });
