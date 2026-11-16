@@ -14,7 +14,7 @@ if(!process.env.DATABASE_URL)
 const org=process.env.CAN_CANONICAL_ASSESSMENT_QA_ORGANIZATION_ID;
 if(!org||!/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(org))
   throw new Error("Specify CAN_CANONICAL_ASSESSMENT_QA_ORGANIZATION_ID as UUID");
-const role="can_v30_assessment_draft_author_"+org.replaceAll("-","").toLowerCase();
+const role="can_v30_assess_draft_author_"+org.replaceAll("-","").toLowerCase();
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:2});
 const problems=[];
 try{
