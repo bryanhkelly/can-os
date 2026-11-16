@@ -109,12 +109,16 @@ export function NativeCourseActivitiesPanel({classEnrollmentId}:{
     <section className="border border-border bg-card p-5" aria-label="Knowledge check">
       <h3 className="font-serif text-xl">Knowledge check</h3>
       <p className="mt-2 text-sm text-muted-foreground">
-        {data.quizSubmitted?data.quizPassed?
-          "Submitted · published knowledge threshold met.":
-          "Submitted · threshold not yet met. Ask your facilitator about next steps.":
+        {data.quizPassed?
+          "Published knowledge threshold met. Your successful attempt is preserved.":
+          data.quizSubmitted?
+            data.quizAttempts<data.maxQuizAttempts?
+              "Attempt "+data.quizAttempts+" did not meet the threshold. You may retry.":
+              "Attempt limit reached without meeting the threshold. Ask your facilitator about next steps.":
           "Answer each question. This formative check is not a graded academic assessment."}
+        {" · "}{data.quizAttempts} of {data.maxQuizAttempts} allowed attempts used.
       </p>
-      {!data.quizSubmitted&&<form className="mt-4 space-y-5" aria-busy={busy==="quiz"}
+      {!data.quizPassed&&data.quizAttempts<data.maxQuizAttempts&&<form className="mt-4 space-y-5" aria-busy={busy==="quiz"}
         onSubmit={event=>{event.preventDefault();void submit("quiz");}}>
         {data.quizQuestions.map((question,index)=><fieldset key={question.key}
           className="border-t border-border pt-4">
@@ -130,7 +134,8 @@ export function NativeCourseActivitiesPanel({classEnrollmentId}:{
           </div>
         </fieldset>)}
         <Button type="submit" disabled={!!busy||!readyQuiz}>
-          {busy==="quiz"?"Submitting…":"Submit knowledge check"}
+          {busy==="quiz"?"Submitting…":
+            data.quizAttempts>0?"Retry knowledge check":"Submit knowledge check"}
         </Button>
       </form>}
     </section>
