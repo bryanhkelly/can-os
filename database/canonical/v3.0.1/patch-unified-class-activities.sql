@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS education_v30.class_activity_enrollment_pins (
 );
 CREATE INDEX IF NOT EXISTS class_activity_pins_by_set_idx
  ON education_v30.class_activity_enrollment_pins(activity_set_id);
+ALTER TABLE education_v30.class_activity_enrollment_pins
+ ADD CONSTRAINT class_activity_pins_pair_uq UNIQUE (class_enrollment_id,activity_set_id);
 
 CREATE TABLE IF NOT EXISTS education_v30.class_activity_submissions (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -73,9 +75,6 @@ CREATE TABLE IF NOT EXISTS education_v30.class_activity_submissions (
  CONSTRAINT class_activity_pin_fk FOREIGN KEY (class_enrollment_id,activity_set_id)
    REFERENCES education_v30.class_activity_enrollment_pins(class_enrollment_id,activity_set_id)
 );
-ALTER TABLE education_v30.class_activity_enrollment_pins
- ADD CONSTRAINT class_activity_pins_pair_uq UNIQUE (class_enrollment_id,activity_set_id);
-
 CREATE TABLE IF NOT EXISTS education_v30_secure.class_activity_submission_answers (
  submission_id uuid PRIMARY KEY REFERENCES education_v30.class_activity_submissions(id),
  answers jsonb NOT NULL CHECK(jsonb_typeof(answers)='array'),
