@@ -11,7 +11,7 @@ import {
   activateUnifiedClass, createNextUnifiedClassOfferingVersion,
 } from "@/modules/classes/unified-class.functions";
 import type { ClassOfferingTerms } from "@/domain/unified-class";
-import { parseNetworkClassLaunchRecipe, serializeNetworkClassLaunchRecipe } from "@/domain/network-class-launch";
+import { assessLocalRollout, parsePortableRollout, serializeProgramRollout, type ProgramRolloutRecipe } from "@/domain/network-program-rollout";
 
 export const Route=createFileRoute("/canonical/classes")({
  validateSearch:(raw:Record<string,unknown>)=>z.object({siteId:z.string().uuid().optional()}).strip().parse(raw),
@@ -53,6 +53,8 @@ function NativeClasses(){
   const [choice,setChoice]=useState("");
   const [recipeText,setRecipeText]=useState("");
   const [recipeCourseId,setRecipeCourseId]=useState<string|null>(null);
+  const [recipeOfferingVersionId,setRecipeOfferingVersionId]=useState<string|null>(null);
+  const [recipePlan,setRecipePlan]=useState<ProgramRolloutRecipe|null>(null);
   const [title,setTitle]=useState("");
   const [classCapacity,setClassCapacity]=useState("");
   const [siteId,setSiteId]=useState("");
@@ -74,41 +76,81 @@ function NativeClasses(){
   // current Course adoption and operating Site rights on Class creation.
   const visibleOptions=(options.data??[]).filter(row=>
     (!recipeCourseId||row.courseVersionId===recipeCourseId) &&
+    (!recipeOfferingVersionId||row.offeringVersionId===recipeOfferingVersionId) &&
     (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
+  const rolloutReadiness=recipePlan
+    ?assessLocalRollout(recipePlan,options.data??[],siteId||preferredSiteId||null):[];
+  function chooseRolloutCourse(course:ProgramRolloutRecipe["courses"][number]){
+    setRecipeCourseId(course.courseVersionId);
+    setChoice("");setSiteId("");
+    setTitle(course.suggestedClassTitle);
+    setDeliveryMode(course.deliveryMode);
+    setClassCapacity(course.capacity===null?"":String(course.capacity));
+    setCreateWithOffering(false);
+    setNotice("Review the local Course adoption, Site and Class terms. Loading a recipe never publishes or enrolls anyone.");
+  }
   async function exportLaunchRecipe(){
     if(!selected)return;
-    const value=serializeNetworkClassLaunchRecipe({
-      version:1,courseVersionId:selected.courseVersionId,
-      courseTitle:selected.courseTitle,
-      suggestedClassTitle:title.trim()||selected.courseTitle,
-      deliveryMode,capacity:classCapacity?Number(classCapacity):null,
-      recommendedSessionMinutes:60,
-    });
-    setRecipeText(value);
     try{
-      await navigator.clipboard.writeText(value);
-      setNotice("Reusable Class setup copied. Receiving Sites must verify their own Course adoption and Site rights.");
-    }catch{
-      setNotice("Class setup prepared below. Copy the text to share with another authorized Site.");
+      // Export the available Course components of this one published Offering
+      // version. Never embed a Site grant, enrollment, assessment or content.
+      const rows=(options.data??[])
+        .filter(row=>row.offeringVersionId===selected.offeringVersionId)
+        .filter((row,index,all)=>all.findIndex(candidate=>candidate.courseVersionId===row.courseVersionId)===index)
+        .sort((a,b)=>(a.sequenceNo??Number.MAX_SAFE_INTEGER)-(b.sequenceNo??Number.MAX_SAFE_INTEGER)||
+          a.courseTitle.localeCompare(b.courseTitle));
+      const plan:ProgramRolloutRecipe={
+        version:2,revision:1,
+        offeringVersionId:selected.offeringVersionId,
+        offeringTitle:selected.offeringTitle,offeringKind:selected.offeringKind,
+        courses:rows.map(row=>({
+          courseVersionId:row.courseVersionId,courseTitle:row.courseTitle,
+          isRequired:row.isRequired,sequenceNo:row.sequenceNo,
+          suggestedClassTitle:row.courseVersionId===selected.courseVersionId&&title.trim()
+            ?title.trim():row.courseTitle,
+          deliveryMode:row.courseVersionId===selected.courseVersionId?deliveryMode:"facilitated",
+          capacity:row.courseVersionId===selected.courseVersionId&&classCapacity?Number(classCapacity):null,
+          recommendedSessionMinutes:60,
+        })),
+      };
+      const value=serializeProgramRollout(plan);
+      setRecipeText(value);setRecipePlan(plan);
+      setRecipeOfferingVersionId(plan.offeringVersionId);
+      try{
+        await navigator.clipboard.writeText(value);
+        setNotice("Versioned publisher rollout copied. Every receiving operator must independently adopt the Offering and authorize its Site.");
+      }catch{
+        setNotice("Versioned publisher rollout prepared below. Copy it to share with another authorized operator.");
+      }
+      setError("");
+    }catch(error){
+      setError(normalizeClientError(error,"Cannot prepare rollout instructions.").message);
     }
   }
   function importLaunchRecipe(){
     try{
-      const recipe=parseNetworkClassLaunchRecipe(recipeText);
-      if(!(options.data??[]).some(row=>row.courseVersionId===recipe.courseVersionId))
-        throw new Error("This Course is not currently approved for your organization. No Class was created.");
-      // Never import an external Organization, Site, adoption or learner list.
-      // The receiving operator chooses their own authorized delivery context.
-      setRecipeCourseId(recipe.courseVersionId);
-      setChoice("");setSiteId("");
-      setTitle(recipe.suggestedClassTitle);
-      setDeliveryMode(recipe.deliveryMode);
-      setClassCapacity(recipe.capacity===null?"":String(recipe.capacity));
-      setCreateWithOffering(false);
+      const recipe=parsePortableRollout(recipeText);
+      // Neither v1 nor v2 carries a Site or Organization grant.
+      setChoice("");setSiteId("");setCreateWithOffering(false);
+      if(recipe.version===1){
+        if(!(options.data??[]).some(row=>row.courseVersionId===recipe.courseVersionId))
+          throw new Error("This Course is not currently approved for your organization. No Class was created.");
+        setRecipePlan(null);setRecipeOfferingVersionId(null);
+        setRecipeCourseId(recipe.courseVersionId);
+        setTitle(recipe.suggestedClassTitle);
+        setDeliveryMode(recipe.deliveryMode);
+        setClassCapacity(recipe.capacity===null?"":String(recipe.capacity));
+        setNotice("Legacy Class setup loaded. Select your approved Course Offering and Site. Suggested Session duration: "+recipe.recommendedSessionMinutes+" minutes.");
+      }else{
+        setRecipePlan(recipe);
+        setRecipeOfferingVersionId(recipe.offeringVersionId);
+        setRecipeCourseId(null);
+        setTitle("");setClassCapacity("");
+        setNotice("Published Offering version "+recipe.revision+" rollout instructions loaded. Select each approved Course below. Missing adoptions must be approved separately before creating Classes.");
+      }
       setError("");
-      setNotice("Class launch setup loaded. Select your organization's approved Course Offering and hosting Site, then review before creating. Suggested Session duration: "+recipe.recommendedSessionMinutes+" minutes.");
     }catch(error){
-      setError(normalizeClientError(error,"Invalid or unauthorized Class launch recipe.").message);
+      setError(normalizeClientError(error,"Invalid rollout instructions.").message);
     }
   }
   async function refresh(){
@@ -209,14 +251,14 @@ function NativeClasses(){
         </p>}
         <section className="mt-5 border border-border bg-muted/20 p-4"
           aria-label="Network Class launch recipe">
-          <h3 className="font-semibold">Launch the same Course at another Site</h3>
+          <h3 className="font-semibold">Roll out a published Course or Program</h3>
           <p className="mt-2 text-sm text-muted-foreground">
-            Share a small setup recipe instead of copying videos, questionnaires,
-            student records, or Course content. Each Site independently chooses
-            its authorized Course, delivery Site and Class publication.
+            Share versioned setup instructions for one approved Offering and its Course components,
+            without copying instructional content or records. Each independent or network operator
+            must adopt the published Offering and separately authorize local Classes.
           </p>
           <label className="mt-3 block text-sm font-semibold" htmlFor="native-network-recipe">
-            Portable Class launch recipe (JSON)
+            Portable publisher rollout (JSON, legacy Class recipes also accepted)
           </label>
           <textarea id="native-network-recipe" value={recipeText} rows={4}
             maxLength={4000} onChange={e=>setRecipeText(e.target.value)}
@@ -224,14 +266,37 @@ function NativeClasses(){
             className="mt-1 w-full border border-border bg-background p-3 font-mono text-xs"/>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button type="button" variant="outline" disabled={!selected}
-              onClick={()=>void exportLaunchRecipe()}>Copy this Class setup</Button>
+              onClick={()=>void exportLaunchRecipe()}>Copy Offering rollout</Button>
             <Button type="button" variant="outline" disabled={!recipeText.trim()}
-              onClick={importLaunchRecipe}>Load setup for this Site</Button>
-            {recipeCourseId&&<Button type="button" variant="outline"
-              onClick={()=>{setRecipeCourseId(null);setChoice("");setSiteId("");}}>
-              Show all approved Courses
+              onClick={importLaunchRecipe}>Review local rollout</Button>
+            {(recipePlan||recipeCourseId)&&<Button type="button" variant="outline"
+              onClick={()=>{setRecipeCourseId(null);setRecipeOfferingVersionId(null);
+                setRecipePlan(null);setChoice("");setSiteId("");}}>
+              Clear rollout filter
             </Button>}
           </div>
+          {recipePlan&&<div className="mt-4 space-y-2" aria-label="Local rollout checklist">
+            <p className="text-sm font-semibold">{recipePlan.offeringTitle} · rollout v{recipePlan.revision}</p>
+            <p className="text-xs text-muted-foreground">
+              Readiness reflects current visible local Course options only. It is not a grant or publication approval.
+              Every Class and optional Class Offering is created independently under a server-side authorization check.
+            </p>
+            {recipePlan.courses.map((course,index)=>{
+              const status=rolloutReadiness[index]?.status??"adoption_required";
+              return <div key={course.courseVersionId} className="flex flex-wrap items-center justify-between gap-3 border border-border bg-card p-3 text-sm">
+                <div>
+                  <p className="font-semibold">{course.courseTitle} {course.isRequired?"· Required":"· Optional"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {status==="ready"?"Approved local adoption found. Review Site and staffing before launch."
+                      :status==="site_authorization_required"?"Current Site is not authorized for this Course."
+                      :"No approved adoption of this Offering version for your organization."}
+                  </p>
+                </div>
+                <Button type="button" variant="outline" disabled={status!=="ready"}
+                  onClick={()=>chooseRolloutCourse(course)}>Prepare Class</Button>
+              </div>;
+            })}
+          </div>}
           {recipeCourseId&&<p role="status" className="mt-2 text-xs">
             Only locally approved Course options matching this recipe are available below.
           </p>}
@@ -247,10 +312,23 @@ function NativeClasses(){
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Select an authorized Course</option>
               {visibleOptions.map(row=><option key={optionKey(row)} value={optionKey(row)}>
-                {row.courseTitle} · {row.deploymentName}
+                {row.offeringTitle} · {row.courseTitle} (v{row.courseVersionNo}) · {row.deploymentName}
               </option>)}
             </select>
           </div>
+          {selected&&<aside className="border border-border bg-muted/20 p-4 text-sm">
+            <p className="font-semibold">{selected.offeringKind==="program"?"Program":selected.offeringKind==="course"?"Course Offering":"Published Offering"} · {selected.offeringTitle} (v{selected.offeringVersionNo})</p>
+            <p className="mt-1 text-muted-foreground">
+              Adopted Course: {selected.courseTitle}, version {selected.courseVersionNo}
+              {selected.isRequired?" · required component":" · optional component"}.
+              Local Classes retain this published Course version.
+            </p>
+            <p className="mt-2 flex flex-wrap gap-4 text-xs font-semibold">
+              <Link to="/canonical/lab/deployments" className="underline">Deployment and adoption</Link>
+              <Link to="/operations/curriculum" className="underline">Curriculum</Link>
+              <Link to="/canonical/course-activities" className="underline">Course activities</Link>
+            </p>
+          </aside>}
           <div><label className="block text-sm font-semibold" htmlFor="native-class-title">Class name</label>
             <input id="native-class-title" required minLength={3} maxLength={200} value={title}
               onChange={e=>setTitle(e.target.value)} placeholder="AI Literacy · January 2027"
