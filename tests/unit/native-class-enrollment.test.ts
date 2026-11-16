@@ -76,6 +76,9 @@ describe("native Class learner policy",()=>{
     expect(()=>authorizeNativeClassAttempt({...access,attempt:{...attempt,enrollmentId:"school"}})).toThrow();
     expect(()=>authorizeNativeClassAttempt({...access,attempt:{...attempt,classEnrollmentId:null}})).toThrow();
     expect(()=>authorizeNativeClassAttempt({...access,enrollment:{...enrollment,status:"withdrawn"}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...access,enrollment:{...enrollment,status:"cancelled"}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...access,attempt:{...attempt,status:"withdrawn"}})).toThrow();
+    expect(()=>authorizeNativeClassAttempt({...access,classInstance:{...cls,state:"cancelled"}})).toThrow();
     expect(()=>authorizeNativeClassAttempt({...access,authority:{...authority,adoptionState:"suspended"}})).toThrow();
     expect(()=>authorizeNativeClassAttempt({...access,authority:{...authority,adoptionValidThrough:new Date("2026-10-01")}})).toThrow();
   });
