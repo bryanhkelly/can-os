@@ -159,12 +159,27 @@ export const getPublisherNativeCourseActivityOptions=createServerFn({method:"GET
         eq(offeringVersions.lifecycle,"published"),
         isNotNull(offeringVersions.publishedAt)))
       .orderBy(asc(courses.title)).limit(201);
-    return {courses:[...new Map(rows.slice(0,200).map(row=>
-      [row.courseVersionId,row] as const)).values()],truncated:rows.length>200};
+    const unique=[...new Map(rows.slice(0,200).map(row=>
+      [row.courseVersionId,row] as const)).values()];
+    const published=unique.length?await db.select({
+      courseVersionId:canonicalCourseActivitySets.courseVersionId,
+      versionNo:canonicalCourseActivitySets.versionNo,
+      title:canonicalCourseActivitySets.title,
+    }).from(canonicalCourseActivitySets)
+      .where(and(inArray(canonicalCourseActivitySets.courseVersionId,
+        unique.map(row=>row.courseVersionId)),
+        eq(canonicalCourseActivitySets.state,"published"))):[];
+    const revisions=new Map(published.map(row=>[row.courseVersionId,row]));
+    return {courses:unique.map(row=>({...row,
+      publishedVersion:revisions.get(row.courseVersionId)?.versionNo??null,
+      publishedTitle:revisions.get(row.courseVersionId)?.title??null,
+    })),truncated:rows.length>200};
   });
 
 export const publishNativeCourseActivitySet=createServerFn({method:"POST"})
-  .validator((raw:unknown)=>courseActivityPublicationSchema.parse(raw))
+  .validator((raw:unknown)=>courseActivityPublicationSchema.extend({
+    replaceCurrentPublished:z.boolean().default(false),
+  }).parse(raw))
   .handler(async({data})=>{
     privateResult();
     const actor=await getCanonicalCommandContext(getRequest());
@@ -183,6 +198,8 @@ export const publishNativeCourseActivitySet=createServerFn({method:"POST"})
         .where(eq(canonicalCourseActivitySets.courseVersionId,course.id))
         .orderBy(desc(canonicalCourseActivitySets.versionNo)).limit(1);
       const now=new Date();
+      if(latest?.state==="published"&&!data.replaceCurrentPublished)
+        throw new AuthorizationError("existing published Course activity set; explicitly confirm a new version");
       if(latest?.state==="published")await tx.update(canonicalCourseActivitySets)
         .set({state:"closed",closedAt:now})
         .where(eq(canonicalCourseActivitySets.id,latest.id));
