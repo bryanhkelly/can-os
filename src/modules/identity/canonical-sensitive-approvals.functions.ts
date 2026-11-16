@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, accessAccountCanonicalPrincipals,
-  organizations, siteCanonicalIdentityLinks,
+  organizations,
 } from "@/db/schema";
 import {
   canonicalAccountGrants, canonicalAccounts,
@@ -161,16 +161,19 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
           eq(accessAccountCanonicalPrincipals.canonicalPrincipalId,grant.personId),
           isNull(accessAccountCanonicalPrincipals.revokedAt),
         ))
-        .innerJoin(siteCanonicalIdentityLinks,and(
-          eq(siteCanonicalIdentityLinks.publicSiteId,accountPersonGrants.siteId),
-          eq(siteCanonicalIdentityLinks.canonicalSiteId,grant.siteId),
-          eq(siteCanonicalIdentityLinks.status,"approved"),
-        ))
         .where(and(
           eq(accountPersonGrants.accountId,approval.requestedByCanAccountId),
           eq(accountPersonGrants.role,grant.roleCode),
           eq(accountPersonGrants.active,true),
           eq(accessAccounts.disabled,false),
+          sql`EXISTS (
+            SELECT 1 FROM public.site_canonical_identity_links link
+            WHERE link.public_site_id=${accountPersonGrants.siteId}
+              AND link.canonical_site_id=${grant.siteId}::uuid
+              AND link.status='approved'
+              AND link.confirmed_at IS NOT NULL
+              AND link.reviewed_at IS NOT NULL
+          )`,
         )).limit(2);
       if(requesterMembership.length!==1||
          requesterMembership[0]?.personId===reviewer.actorPersonId)
