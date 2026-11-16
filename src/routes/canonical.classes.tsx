@@ -152,7 +152,7 @@ function NativeClasses(){
         setTitle(recipe.suggestedClassTitle);
         setDeliveryMode(recipe.deliveryMode);
         setClassCapacity(recipe.capacity===null?"":String(recipe.capacity));
-        setNotice("Legacy Class setup loaded. Select your approved Course Offering and Site. Suggested Session duration: "+recipe.recommendedSessionMinutes+" minutes.");
+        setNotice("Legacy Class setup loaded. Select your organization's approved Course Offering and Site. Suggested Session duration: "+recipe.recommendedSessionMinutes+" minutes.");
       }else{
         setRecipePlan(recipe);
         setRecipeOfferingVersionId(recipe.offeringVersionId);
