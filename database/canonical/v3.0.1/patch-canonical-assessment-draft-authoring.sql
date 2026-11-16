@@ -189,7 +189,46 @@ BEGIN
  RETURN QUERY SELECT version_id,form_version,question_index;
 END $draft$;
 
+-- Restricted publisher readback: only its own draft metadata, never answer
+-- options, correct keys, raw response content or another Organization's data.
+CREATE OR REPLACE FUNCTION education_v30.v301_list_objective_assessment_drafts(
+ p_organization_id uuid,p_course_version_id uuid
+)
+RETURNS TABLE(
+ assessment_version_id uuid,assessment_key text,title text,
+ question_count bigint,passing_fraction numeric,max_attempts integer
+)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog AS $readback$
+BEGIN
+ IF current_setting('role',true) IS NULL OR
+    current_setting('role',true) IN ('','none') OR
+    current_setting('role',true)<>'can_v30_assessment_draft_author_'||
+      replace(p_organization_id::text,'-','') OR
+    NOT education_v30.v28_role_can_access_org(
+      p_organization_id,'assessment_draft_author') THEN
+    RAISE EXCEPTION 'Bound Course publisher draft readback only'
+      USING ERRCODE='42501';
+ END IF;
+ RETURN QUERY
+ SELECT v.id,d.assessment_key,d.title,count(fi.id),
+        f.passing_fraction,(v.blueprint->>'maxAttempts')::integer
+ FROM assessment_versions v
+ JOIN assessment_definitions d ON d.id=v.assessment_id
+ JOIN assessment_form_versions f ON f.assessment_version_id=v.id
+ LEFT JOIN assessment_form_items fi ON fi.form_version_id=f.id
+ WHERE d.owner_organization_id=p_organization_id
+   AND v.course_version_id=p_course_version_id
+   AND d.status='active' AND v.lifecycle='draft' AND f.lifecycle='draft'
+   AND v.blueprint->>'source'='course-activities'
+ GROUP BY v.id,d.assessment_key,d.title,f.passing_fraction
+ ORDER BY d.title
+ LIMIT 50;
+END $readback$;
+
 -- No unbound login, PUBLIC or other publisher may call the definer.
 REVOKE ALL ON FUNCTION education_v30.v301_create_objective_assessment_draft(
  uuid,uuid,uuid,text,text,numeric,integer,jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION education_v30.v301_list_objective_assessment_drafts(
+ uuid,uuid) FROM PUBLIC;
 COMMIT;
