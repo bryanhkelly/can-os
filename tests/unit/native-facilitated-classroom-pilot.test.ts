@@ -63,6 +63,26 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(projector).toContain("getFacilitatedRoomMediaAccess");
     expect(projector).toContain("Recheck approved recording access");
   });
+  it("can start native Class recordings before QR pairing, using only the exact Class's enrollment rights",()=>{
+    const rooms=source("src/modules/learning/facilitated-learning.functions.ts");
+    expect(rooms).toContain("const nativeClass=await assertNativeClassRoomStaff(tx,room)");
+    expect(rooms).toContain("eq(canonicalClassEnrollments.classId,nativeClass.classId)");
+    expect(rooms).toContain("nativeClassRoomParticipant(tx,room,candidate.attempt.id,candidate.personId)");
+    expect(rooms).toContain("if(candidates.length>500)");
+  });
+  it("requires explicit audited Class staff attendance approval before personal roster or roll call",()=>{
+    const staff=source("src/modules/classes/class-staff.functions.ts");
+    const roster=source("src/modules/learning/classroom-attendance.functions.ts");
+    const boundary=source("src/modules/classes/native-class-room-boundary.server.ts");
+    const sql=source("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
+    expect(staff).toContain("attendanceAuthorized:data.canVerifyAttendance");
+    expect(staff).toContain("end and reassign to change attendance permissions");
+    expect(sql).toContain("attendance_authorized boolean NOT NULL DEFAULT false");
+    expect(sql).toContain("OLD.attendance_authorized");
+    expect(boundary).toContain("assertNativeClassAttendanceReader");
+    expect(boundary).toContain('eq(canonicalClassStaffAssignments.attendanceAuthorized,true)');
+    expect(roster).toContain("await assertNativeClassAttendanceReader(tx,room,host.actor.actorPersonId!)");
+  });
   it("shows a permitted enrollment path without silently enrolling QR visitors",()=>{
     const join=source("src/routes/join.tsx");
     expect(join).toContain('to="/learn/classes"');
