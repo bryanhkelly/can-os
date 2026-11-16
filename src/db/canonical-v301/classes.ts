@@ -24,6 +24,16 @@ export const canonicalClasses = educationV30.table("classes", {
   index("canonical_classes_course_idx").on(t.courseVersionId,t.deploymentId),
 ]);
 
+/** Immutable attribution of a canonical identified survey campaign to one
+ * authorized Class. A published Survey definition remains reusable across Sites.
+ */
+export const canonicalClassSurveyCampaigns = educationV30.table("class_survey_campaigns",{
+  campaignId:uuid("campaign_id").primaryKey(),
+  classId:uuid("class_id").notNull(),
+  linkedByPersonId:uuid("linked_by_person_id").notNull(),
+  linkedAt:timestamp("linked_at",{withTimezone:true}).notNull().defaultNow(),
+},t=>[index("class_survey_campaign_class_idx").on(t.classId)]);
+
 export const canonicalClassOfferings = educationV30.table("class_offerings", {
   id:id(),classId:uuid("class_id").notNull(),
   createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
