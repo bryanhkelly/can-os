@@ -60,6 +60,9 @@ export async function readLinkedSitePublishedClasses(
     INNER JOIN education_v30.offerings catalog
       ON catalog.id=ov.offering_id AND catalog.status='active'
       AND catalog.id=pd.offering_id
+    INNER JOIN education_v30.offering_courses pairing
+      ON pairing.offering_version_id=ov.id
+      AND pairing.course_version_id=c.course_version_id
     INNER JOIN education_v30.course_versions course
       ON course.id=c.course_version_id AND course.lifecycle='published'
       AND course.published_at IS NOT NULL
