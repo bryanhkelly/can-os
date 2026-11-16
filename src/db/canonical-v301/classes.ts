@@ -1,4 +1,4 @@
-import { index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
