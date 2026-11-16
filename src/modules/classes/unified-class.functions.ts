@@ -182,6 +182,8 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
       deploymentId:canonicalClasses.deploymentId,siteId:canonicalClasses.siteId,
       deliveryMode:canonicalClasses.deliveryMode,state:canonicalClasses.state,
       classOfferingId:canonicalClassOfferings.id,
+      classOfferingVersionId:canonicalClassOfferingVersions.id,
+      versionNo:canonicalClassOfferingVersions.versionNo,
       visibility:canonicalClassOfferingVersions.visibility,
       enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
       offeringState:canonicalClassOfferingVersions.state,
