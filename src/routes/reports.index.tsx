@@ -1,6 +1,6 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
 import {WorkspaceShell} from "@/components/workspace";
-import {NoncreditNetworkReportPanel} from "@/components/enrollment/NoncreditNetworkReportPanel";
+import {NoncreditProviderEvidencePanel} from "@/components/reports/NoncreditProviderEvidencePanel";
 
 export const Route=createFileRoute("/reports/")({component:ReportingHome});
 
@@ -36,7 +36,7 @@ function ReportingHome(){
         </Link>
       </section>
     </div>
-    <NoncreditNetworkReportPanel/>
+    <NoncreditProviderEvidencePanel/>
     <p className="mt-5 border-t border-border pt-4 text-xs text-muted-foreground">
       Network affiliation is not a reporting entitlement. Cross-provider network
       reports and externally published impact summaries require independently approved
