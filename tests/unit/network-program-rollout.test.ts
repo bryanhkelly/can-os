@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
-  assessLocalRollout, parsePortableRollout, publishedOfferingKind,
-  serializeProgramRollout, type ProgramRolloutRecipe,
+  assessLocalRollout, assertCompletePortableCourseComposition,
+  parsePortableRollout, publishedOfferingKind, serializeProgramRollout,
+  type ProgramRolloutRecipe,
 } from "@/domain/network-program-rollout";
 
 const offering = "00000000-0000-4000-8000-000000000010";
@@ -61,6 +62,34 @@ describe("WS5 governed publisher rollout", () => {
       .toEqual(["site_authorization_required","adoption_required"]);
     expect(assessLocalRollout(plan,options.map(x=>({...x,offeringVersionId:second})),north)
       .map(x=>x.status)).toEqual(["adoption_required","adoption_required"]);
+  });
+  it("rejects partial publisher composition when a Course is unpublished or missing",()=>{
+    const ready=[
+      {courseVersionId:first,lifecycle:"published",publishedAt:new Date()},
+      {courseVersionId:second,lifecycle:"published",publishedAt:new Date()},
+    ];
+    expect(()=>assertCompletePortableCourseComposition({kind:"program"},ready)).not.toThrow();
+    expect(()=>assertCompletePortableCourseComposition({kind:"program"},[
+      ready[0]!,{...ready[1]!,lifecycle:"draft"},
+    ])).toThrow(/partial Program/);
+    expect(()=>assertCompletePortableCourseComposition({kind:"program"},[
+      ready[0]!,{...ready[1]!,publishedAt:null},
+    ])).toThrow(/partial Program/);
+    expect(()=>assertCompletePortableCourseComposition({},[])).toThrow();
+    expect(()=>assertCompletePortableCourseComposition({},[ready[0]!,ready[0]!])).toThrow(/duplicate/);
+  });
+  it("requires independent Blueprint governance for non-Course Program components",()=>{
+    const ready=[{courseVersionId:first,lifecycle:"published",publishedAt:new Date()}];
+    for(const declaration of [
+      {activities:[{title:"Community service"}]},
+      {requiredActivities:[{title:"Workshop"}]},
+      {components:[{kind:"course"},{kind:"club"}]},
+      {nonCourseComponents:[{kind:"experience"}]},
+    ])expect(()=>assertCompletePortableCourseComposition(declaration,ready))
+      .toThrow(/non-Course/);
+    expect(()=>assertCompletePortableCourseComposition({
+      components:[{kind:"course"}],
+    },ready)).not.toThrow();
   });
   it("rejects Course duplicates, unapproved mutation fields and absurd plans", () => {
     expect(() => serializeProgramRollout({...plan,courses:[plan.courses[0]!,plan.courses[0]!]})).toThrow();
