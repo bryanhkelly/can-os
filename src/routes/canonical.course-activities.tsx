@@ -322,9 +322,14 @@ function CourseActivityPublisher(){
           is not published or accessible to learners. Independent assessment
           publication approval and local administration are still required.
         </p>
-        <Link to="/canonical/lab/readiness" className="inline-block font-semibold underline">
-          Canonical assessment inventory
-        </Link>
+        <div className="flex flex-wrap gap-4">
+          <Link to="/canonical/assessment-reviews" className="inline-block font-semibold underline">
+            Independent assessment review
+          </Link>
+          <Link to="/canonical/assessment-publications" className="inline-block font-semibold underline">
+            Publish approved assessment
+          </Link>
+        </div>
       </div>}
     </section>
     <form className="mt-5 border border-border bg-card p-5" onSubmit={e=>void saveSurvey(e)}
