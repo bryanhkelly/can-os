@@ -7,7 +7,7 @@ export const classDeliveryModeSchema = z.enum(["self_paced", "scheduled", "facil
 export const classVisibilitySchema = z.enum(["public", "unlisted", "private"]);
 export const classEnrollmentMethodSchema = z.enum(["self", "invitation", "assignment", "approval"]);
 export const classEnrollmentStatusSchema = z.enum(["pending", "active", "completed", "withdrawn", "cancelled"]);
-export const learnerAwardIntentSchema = z.enum(["credit", "certificate", "participation", "audit", "unspecified"]);
+export const classCreditModeSchema = z.enum(["for_credit", "audit", "not_applicable"]);
 export const classAwardKindSchema = z.enum(["academic_credit", "certificate", "credential", "participation"]);
 const uuid = z.string().uuid();
 
@@ -30,7 +30,8 @@ const dateTime = z.string().datetime({ offset: true });
 // and its enrollment mechanism are independent settings.
 export const classOfferingTermsSchema = z.object({
   visibility: classVisibilitySchema,
-  enrollmentMethod: classEnrollmentMethodSchema,
+  enrollmentMethods: z.array(classEnrollmentMethodSchema).min(1).max(4)
+    .refine(methods => new Set(methods).size === methods.length, "Enrollment methods must be unique"),
   opensAt: dateTime.nullable(),
   closesAt: dateTime.nullable(),
   capacity: z.number().int().min(1).nullable(),
@@ -50,7 +51,7 @@ export const classEnrollmentRequestSchema = z.object({
   classOfferingVersionId: uuid,
   learnerPersonId: uuid,
   enrollmentMethod: classEnrollmentMethodSchema,
-  awardIntent: learnerAwardIntentSchema,
+  creditMode: classCreditModeSchema,
 }).strict();
 export type ClassEnrollmentRequest = z.infer<typeof classEnrollmentRequestSchema>;
 
@@ -82,13 +83,10 @@ export type ClassAwardDecision = {
 };
 export function mayIssueClassAward(
   decision: ClassAwardDecision,
-  intent: z.infer<typeof learnerAwardIntentSchema>,
+  creditMode: z.infer<typeof classCreditModeSchema>,
   awardKind: z.infer<typeof classAwardKindSchema>,
 ): boolean {
-  if (intent === "audit" || intent === "unspecified") return false;
-  if (awardKind === "academic_credit" && intent !== "credit") return false;
-  if ((awardKind === "certificate" || awardKind === "credential") && intent !== "certificate") return false;
-  if (awardKind === "participation" && intent !== "participation") return false;
+  if (awardKind === "academic_credit" && creditMode !== "for_credit") return false;
   return decision.outcomeRecorded && decision.requirementsSatisfied &&
     decision.learnerEligible && decision.issuerAuthorized &&
     decision.policyApproved && decision.awarded;
