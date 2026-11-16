@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import {
   courses, courseVersions, enrollments, learnerCourseAttempts,
   learnerProfiles, noncreditRegistrations, canonicalClassEnrollments, canonicalClasses,
+  canonicalEnrollmentSites,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -59,6 +60,9 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
       // before accepting the learner's pairing code.
       const native = await tx.select({
         ...common,
+        classId:canonicalClasses.id,
+        classTitle:canonicalClasses.title,
+        siteName:canonicalEnrollmentSites.name,
       }).from(learnerCourseAttempts)
         .innerJoin(canonicalClassEnrollments,and(
           eq(canonicalClassEnrollments.id,learnerCourseAttempts.classEnrollmentId),
@@ -71,18 +75,26 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
           eq(canonicalClasses.state,"active"),
           eq(canonicalClasses.courseVersionId,learnerCourseAttempts.courseVersionId),
         ))
+        .leftJoin(canonicalEnrollmentSites,
+          eq(canonicalEnrollmentSites.id,canonicalClasses.siteId))
         .innerJoin(courseVersions,eq(courseVersions.id,learnerCourseAttempts.courseVersionId))
         .innerJoin(courses,eq(courses.id,courseVersions.courseId))
         .where(eq(learnerCourseAttempts.status,"active"))
         .orderBy(desc(learnerCourseAttempts.startedAt)).limit(30);
-      const choices = new Map<string, { courseAttemptId: string; courseTitle: string }>();
+      const choices = new Map<string, {
+        courseAttemptId:string;courseTitle:string;classId:string|null;
+      }>();
       for (const candidate of [...school, ...noncredit, ...native]) {
         if (choices.has(candidate.courseAttemptId)) continue;
         try {
           await authorizeCanonicalCourseAttempt(tx, actor, candidate.courseAttemptId);
+          const isNative="classId" in candidate && typeof candidate.classId==="string";
           choices.set(candidate.courseAttemptId, {
-            courseAttemptId: candidate.courseAttemptId,
-            courseTitle: candidate.courseTitle,
+            courseAttemptId:candidate.courseAttemptId,
+            courseTitle:isNative
+              ?`${candidate.classTitle} · ${candidate.siteName??"Online"} · ${candidate.courseTitle}`
+              :candidate.courseTitle,
+            classId:isNative?candidate.classId:null,
           });
         } catch (error) {
           if (!(error instanceof AuthorizationError) && !(error instanceof DomainError)) throw error;
