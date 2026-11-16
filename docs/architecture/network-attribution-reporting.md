@@ -36,6 +36,16 @@ records have been changed. These source changes MUST NOT deploy ahead of SQL.
   reporting scopes. Membership alone never grants access to private records,
   school records, or cross-organization program data.
 
+- `network_member_identifiers` maps denomination-assigned church/affiliate
+  numbers to existing canonical memberships, unique within each issuing network
+  and identifier namespace. Partner numbers never replace CAN UUIDs.
+- Existing canonical registrations with provable authorized Sites are attributed
+  by an additive, explicitly marked historical backfill. Deferred constraints
+  require every new noncredit self-enrollment claim and native Class Enrollment
+  to have a corresponding immutable attribution before transaction commit.
+- Authorized staff-assigned adult Class Enrollment uses the same atomic
+  attribution contract as adult self-enrollment.
+
 ## Actual source integration
 
 - `noncreditPublishCommand` and the publisher require a Site for independent
