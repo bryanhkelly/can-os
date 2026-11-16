@@ -11,6 +11,7 @@ import {
 import { openNoncreditAnswerKey } from "@/domain/noncredit-knowledge-check";
 import { getCanonicalCommandContext } from
   "@/modules/identity/canonical-command-context.server";
+import { bindCanonicalAssessmentSession } from "@/modules/identity/canonical-assessment-session.server";
 
 type Purpose="assessment_reviewer"|"assessment_publisher";
 const uuid=z.string().uuid();
@@ -61,6 +62,7 @@ async function withApprovalRole<T>(purpose:Purpose,
     tx:Parameters<Parameters<typeof db.transaction>[0]>[0])=>Promise<T>){
   const ctx=await approvalAuthority(purpose);
   return db.transaction(async tx=>{
+    await bindCanonicalAssessmentSession(tx,getRequest());
     await tx.execute(sql.raw(`SET LOCAL ROLE ${ctx.role}`));
     const bound=await tx.execute(sql`
       SELECT education_v30.v28_role_can_access_org(
