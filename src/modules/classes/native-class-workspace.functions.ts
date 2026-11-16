@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -215,6 +215,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
             eq(canonicalAccountGrants.active,true),
             isNull(canonicalAccountGrants.revokedAt),
             isNull(canonicalAccounts.disabledAt),
+            isNotNull(canonicalAccounts.emailVerifiedAt),
           )).limit(100);
         staffCandidates=[...new Map(candidateRows.map(row=>[
           row.personId,{personId:row.personId,
