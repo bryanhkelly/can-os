@@ -87,6 +87,72 @@ Organization-bound NOLOGIN writer role.
 - Existing school/noncredit assessment and survey permissions, content
   publication triggers and current learner scoring remain unaffected.
 
+## Independent canonical review and publication (new source workflow)
+
+The feature branch now contains `/canonical/assessment-reviews` and
+`/canonical/assessment-publications`, with a separate optional policy-only
+SQL patch and role provisioning:
+
+```sh
+# Only on an approved isolated QA database, after the draft author patch:
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -f database/canonical/v3.0.1/patch-canonical-assessment-review-publication.sql
+
+psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 \
+  -v organization_id=YOUR_PUBLISHER_ORGANIZATION_UUID \
+  -v application_role=YOUR_RESTRICTED_NOINHERIT_LOGIN \
+  -f database/canonical/v3.0.1/provision-canonical-assessment-approval-roles.sql
+```
+
+A trusted Organization administrator must **also record an explicit
+Person-specific appointment in existing
+`education_v30.professional_role_assignments`**, with
+`role_code='assessment_reviewer'` or
+`role_code='assessment_publisher'` as appropriate, the exact appointing
+and operating Organization, `state='approved'`, an effective current
+appointment, and verified Organization-owned, unexpired
+`authority_evidence_id`. A broad Site Admin login or Organization-wide
+SQL membership alone is **not** sufficient. These are independently
+appointed roles without adding a second login or a new role table.
+
+Enable the optional flags only in that isolated QA runtime:
+
+```sh
+CAN_CANONICAL_ASSESSMENT_REVIEW_ENABLED=true
+CAN_CANONICAL_ASSESSMENT_PUBLICATION_ENABLED=true
+```
+
+The reviewer role can load the publisher's draft questions and options,
+and the server decrypts private correct option keys in memory solely
+for the verified reviewer display. The browser never receives ciphertext,
+the server secret, or an arbitrary direct database key read. Review
+decisions are append-only canonical records, written separately at the
+item (academic, rights, accessibility), assessment version (those three
+plus independent), and form (those three) levels. A reviewer may not
+approve any question they authored. The most recent decision in each
+domain controls.
+
+The publisher role is distinct: it can view readiness **without correct
+answer keys** and publish ONLY when **every** question and all other
+required levels have independently approved latest decisions. The
+underlying canonical version/item/form publication triggers continue
+to execute and the transaction reverts everything if any gate fails.
+Publication grants no Class enrollment, attempt, learner consent,
+certificate, course completion or academic credit.
+
+QA must attempt, and see rejection of, all of the following: revoked
+per-Person role assignment, expired role evidence, cross-Organization
+publisher, author self-review, review with a latest rejection,
+missing approval for a second question, reviewer trying to publish,
+publisher trying to record a review, public/direct access to secure
+keys, a missing server encryption secret and a publication that fails
+one canonical database trigger.
+
+**Source code and SQL have been committed but these reviewer and
+publisher database roles, appointments, SQL patches, live requests,
+typecheck and authenticated E2E journeys have not been independently
+validated. Do not enable the flags or merge based on static checks.**
+
 ## Outstanding release boundaries
 
 Saving a draft **does not publish** its assessment, form or item versions.
