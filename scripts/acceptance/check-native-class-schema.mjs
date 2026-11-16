@@ -8,13 +8,13 @@ if(process.env.CAN_NATIVE_CLASS_SCHEMA_VALIDATION!=="1")
   throw new Error("Explicit CAN_NATIVE_CLASS_SCHEMA_VALIDATION=1 required");
 if(!process.env.DATABASE_URL)throw new Error("Select an isolated QA DATABASE_URL");
 const pool=new Pool({connectionString:process.env.DATABASE_URL});
-const tables=["classes","class_offerings","class_offering_versions","class_enrollments","class_outcomes","class_awards"];
+const tables=["classes","class_offerings","class_offering_versions","class_enrollments","class_outcomes","class_awards","class_staff_assignments"];
 try{
   const [relations,cols,checks,triggers,functions]=await Promise.all([
     pool.query("SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity, EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a WHERE a.grantee=0) AS grants_public FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])",[tables]),
     pool.query("SELECT table_name,column_name FROM information_schema.columns WHERE table_schema='education_v30' AND table_name=ANY($1::text[])",[[...tables,"learner_course_attempts"]]),
     pool.query("SELECT conname,pg_get_constraintdef(oid) AS definition FROM pg_constraint WHERE conrelid='education_v30.learner_course_attempts'::regclass AND conname='native_course_attempt_one_source_ck'"),
-    pool.query("SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='education_v30' AND NOT t.tgisinternal AND tgname=ANY($1::text[])",[["learner_course_attempt_source_gate","class_enrollment_attempt_guard","canonical_class_offering_guard_trg"]]),
+    pool.query("SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='education_v30' AND NOT t.tgisinternal AND tgname=ANY($1::text[])",[["learner_course_attempt_source_gate","class_enrollment_attempt_guard","canonical_class_offering_guard_trg","canonical_class_staff_guard_trg"]]),
     pool.query("SELECT pg_get_functiondef('education_v30.validate_course_attempt_source()'::regprocedure) AS body"),
   ]);
   assert.equal(relations.rows.length,tables.length,"Missing unified Class relation");
@@ -35,6 +35,10 @@ try{
     "class_enrollments.credit_mode",
     "class_outcomes.class_enrollment_id",
     "class_awards.policy_evidence_version_id",
+    "class_staff_assignments.class_id",
+    "class_staff_assignments.person_id",
+    "class_staff_assignments.role_code",
+    "class_staff_assignments.state",
     "learner_course_attempts.class_enrollment_id",
   ]) assert(have.has(name),"Missing native Class column "+name);
   assert.equal(checks.rows.length,1,"Native Course Attempt single-source guard missing");
