@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,or,isNull} from "drizzle-orm";
+import {and,desc,eq,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
 import {
   canonicalEnrollmentSites,facilitatedClassroomPlans,
@@ -29,12 +29,11 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
-      .leftJoin(canonicalEnrollmentSites,eq(
+      .innerJoin(canonicalEnrollmentSites,eq(
         canonicalEnrollmentSites.id,noncreditSelfEnrollmentReleases.siteId))
       .where(and(
         eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
-        or(isNull(noncreditSelfEnrollmentReleases.siteId),
-          inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)),
+        inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds),
       )).limit(1001);
     if(releases.length>1000)throw new Error("Organization has more than 1000 releases; use an interval report");
     if(!releases.length)return {asOf:new Date().toISOString(),totals:{
@@ -117,7 +116,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         (attemptsByRegistration.get(c.registrationId)??[]).some(a=>
           roomIds.some(room=>present.has(room+":"+a)))).length;
       return {
-        releaseId:r.id,siteId:r.siteId,siteName:r.siteName??"Independent online",
+        releaseId:r.id,siteId:r.siteId,siteName:r.siteName,
         trainingTitle:r.title,deliveryMode:r.deliveryMode,
         registrations:local.length,
         active:local.filter(x=>["registered","active"].includes(x.status)).length,
@@ -126,12 +125,12 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         verifiedAttendees,linkedRooms:roomIds.length,
       };
     });
-    const siteKeys=[...new Set(cohorts.map(c=>c.siteId??"independent"))];
+    const siteKeys=[...new Set(cohorts.map(c=>c.siteId))];
     const sites=siteKeys.map(key=>{
-      const local=cohorts.filter(c=>(c.siteId??"independent")===key);
+      const local=cohorts.filter(c=>c.siteId===key);
       return {
-        siteId:key==="independent"?null:key,
-        siteName:local[0]?.siteName??"Independent online",
+        siteId:key,
+        siteName:local[0]?.siteName??"Unknown authorized Site",
         registrations:local.reduce((n,x)=>n+x.registrations,0),
         active:local.reduce((n,x)=>n+x.active,0),
         withdrawn:local.reduce((n,x)=>n+x.withdrawn,0),
