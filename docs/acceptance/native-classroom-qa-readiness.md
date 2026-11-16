@@ -58,7 +58,10 @@ roll-back options. A Git merge alone is not a safe deployment.
    Course Attempt constraint, roles, schema state and forced RLS.
 4. On that isolated QA copy only, review/apply both migrations in sequence:
    `patch-unified-class-offerings.sql`, then
-   `patch-unified-class-course-attempts.sql`. The second replaces a
+   `patch-unified-class-course-attempts.sql`, then
+   `patch-unified-class-activities.sql`. The final migration installs Course-wide
+   versioned questionnaires, immutable learner policy pins and separately
+   secured answer/feedback bodies. The second replaces a
    canonical Course Attempt constraint and trigger, so it MUST NOT run
    against real users without approved impact/recovery review.
 5. Design and verify exact application-role permissions and row-level
@@ -67,6 +70,10 @@ roll-back options. A Git merge alone is not a safe deployment.
    `USING(true)` policy for unrestricted roles.
 6. Run `CAN_NATIVE_CLASS_SCHEMA_VALIDATION=1
    npm run db:canonical:classes` using the isolated branch connection.
+   Also verify the private secure-schema answer tables cannot be SELECTed by
+   general app roles, that quiz keys never appear in learner/projector JSON,
+   that identified feedback requires consent, and that published activity versions
+   preserve previous enrolled learners' pinned requirements.
    Run both `npm run typecheck` and `npm run test:classes:unit` in a
    working test environment. Neither has yet been observed passing.
 7. Exercise a real authenticated two-Site/25-learner acceptance journey,
