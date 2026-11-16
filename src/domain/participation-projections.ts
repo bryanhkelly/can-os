@@ -6,6 +6,8 @@ import {
 type DateValue = Date | string | null | undefined;
 function iso(value: DateValue): string | null {
   if (!value) return null;
+  // A date-only term is a calendar date, not midnight in the viewer timezone.
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
