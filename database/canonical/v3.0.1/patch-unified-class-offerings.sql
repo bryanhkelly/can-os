@@ -63,7 +63,11 @@ CREATE TABLE IF NOT EXISTS education_v30.class_offering_versions (
  CONSTRAINT canonical_class_offering_version_class_uq UNIQUE(id,class_id),
  CONSTRAINT canonical_class_offering_window_ck CHECK(opens_at IS NULL OR closes_at IS NULL OR closes_at>opens_at),
  CONSTRAINT canonical_class_offering_consent_ck CHECK(
-   NOT('self'=ANY(enrollment_methods)) OR (length(btrim(consent_version)) BETWEEN 3 AND 80 AND length(btrim(consent_text)) BETWEEN 25 AND 10000)
+   NOT('self'=ANY(enrollment_methods)) OR (
+      consent_version IS NOT NULL AND consent_text IS NOT NULL
+      AND length(btrim(consent_version)) BETWEEN 3 AND 80
+      AND length(btrim(consent_text)) BETWEEN 25 AND 10000
+   )
  ),
  CONSTRAINT canonical_class_offering_publication_ck CHECK (
   (state='draft' AND published_at IS NULL AND closed_at IS NULL)
