@@ -16,9 +16,10 @@ import {
  */
 type Layout="single"|"dual"|"distributed";
 export function NativeClassroomHostPanel({
-  roomId,classId,classSessionId,canReviewAttendance,onClosed,initialCode=null,initialExpiry=null,
+  roomId,classId,classSessionId,agendasEnabled=false,canReviewAttendance,onClosed,initialCode=null,initialExpiry=null,
 }:{
   roomId:string;classId:string;classSessionId:string;
+  agendasEnabled?:boolean;
   canReviewAttendance:boolean;
   onClosed:()=>Promise<unknown>;
   initialCode?:string|null;
@@ -27,7 +28,7 @@ export function NativeClassroomHostPanel({
   const planned=useQuery({
     queryKey:["native-classroom-agenda",classId,classSessionId],
     queryFn:()=>getNativeClassSessionAgenda({data:{classId,classSessionId}}),
-    retry:false,staleTime:30000,
+    retry:false,staleTime:30000,enabled:agendasEnabled,
   });
   // Only order the existing rights-checked room catalog; never pass an agenda
   // reference directly to the projector as if it were a playback authorization.
