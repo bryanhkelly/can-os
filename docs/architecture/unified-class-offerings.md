@@ -66,13 +66,15 @@ unmodified on main until a separately approved replacement deployment.
   Class Enrollment/Course Attempt: src/modules/classes/native-class-enrollment.functions.ts.
 - Native Course Attempt authorization, Course lesson/progress and outcomes/awards
   **read model**: src/modules/classes/native-class-learning.functions.ts.
-  Recorded media, assessments and independent instructor delivery are NOT yet
-  wired into the new native learner context.
+  The same recorded-instructor lesson, selection, practice and signed-media
+  services now authorize the native Class Enrollment / Course Attempt source.
+  Native credit/assessment issuance and facilitated pairing are NOT yet enabled.
 - Operator 6.1 workspace: /canonical/classes.
 - Learner listing/enrollment: /learn/classes.
 - Learner Course progress: /learn/class/$classEnrollmentId.
-- Unit contracts: tests/unit/unified-class.test.ts and
-  tests/unit/native-class-enrollment.test.ts.
+- Unit contracts: tests/unit/unified-class.test.ts,
+  tests/unit/native-class-enrollment.test.ts and
+  tests/unit/unified-classroom-player.test.tsx.
 - Read-only isolated schema verification:
   scripts/acceptance/check-native-class-schema.mjs.
 
@@ -81,6 +83,43 @@ access to the new tables. All six new tables have forced RLS, initially owner-on
 policies, and are not safely available to application roles until reviewed scoped
 authorization. Native server functions require CAN_UNIFIED_CLASS_COMMANDS_ENABLED=true,
 but setting this alone is NOT a release approval.
+
+## One classroom player across delivery modes
+
+These routes now use the same focus-mode `UnifiedCoursePlayer` shell:
+- Academic /classes (existing school curriculum/grade workflows still governed).
+- /learn/course/$courseAttemptId (older noncredit registration source until cutover).
+- /learn/class/$classEnrollmentId (native Class Enrollment identity, recorded tracks).
+
+`UnifiedLessonOutline` renders the same lesson navigation pattern in the
+academic classroom, recorded-instructor player, and native Class overview.
+`ClassroomMediaSurface` is the single validated native MP4/WebM or
+YouTube/Vimeo media renderer used by `ClassVideoPlayer` and
+`ClassroomProjectorPlayer`. The facilitator projector still owns
+its separate room command loop, synchronization and optional QR experience:
+projector commands never count as individual attendance or completion.
+
+Native Class learners may switch approved recorded presenters while retaining
+one canonical Course Attempt, lesson progress and practice history. Their
+recorded-instructor and media requests now pass the native Enrollment →
+Class → Course/Offering adoption → operator/Site authorization checks.
+Academic assignments, grades and transcript credit are never inferred from
+a chosen presenter or video play event.
+
+The native player intentionally **does not** render noncredit-specific
+knowledge checks, completion readiness or surveys, and it does not enable
+facilitated room pairing until native Class-to-Session release validation is
+implemented. Optional activity telemetry is similarly disabled on native Class
+attempts pending its restricted-reader grants.
+
+### Verified environment baseline
+
+On 2026-11-15, READ-ONLY Neon queries against `test01` confirmed
+that the original canonical Course Attempt, Offerings, Deployments, authority
+and Course tables exist, as do the expected two-source legacy Attempt check and
+publisher-adoption keys. `education_v30.classes` does NOT exist
+there yet. No migration or other database mutation was executed in this pass.
+The native schema and application role grants remain unproven.
 
 The publisher Course/Program Offering kind currently has a domain contract;
 it is NOT yet a persisted, governed publisher publication classifier.
@@ -118,8 +157,9 @@ has not been executed or tested there.
   Class Course Attempts, without exposing raw lesson media to unenrolled people.
 - Complete native Class guardian/child enrollment, assignment, invitation, approval,
   withdrawals, repeats and seat release with verified policy and consent.
-- Integrate independent instructor choice, practice progress and official
-  assessments without resetting learners or duplicating Course attempts.
+- Execute the newly wired independent instructor choice, recorded playback
+  and practice against native Class Attempt RLS on isolated QA. Integrate
+  official assessments without resetting learners or duplicating Attempts.
 
 ### P0: Outcomes and credit/credentials
 - Produce native outcomes from canonical assessment, grading and completion evidence,
@@ -132,8 +172,9 @@ has not been executed or tested there.
 ### P1: Native screens and reporting
 - Publisher: Course/Program Offerings, approved adoptions.
 - Operator: Classes → Class Offering → Enrollment → Sessions → Outcomes.
-- Learner: native Class catalog and lesson/progress read view are committed;
-  add authorized playback, practice, assessment, schedule and awarded outcomes.
+- Learner: native Class catalog, shared recorded-teacher player, progress and
+  results view are committed; validate secure playback/practice and add
+  native assessment, Session planning and authorized outcome issuance.
 - Replace prior pages and services at cutover rather than maintaining dual routes.
   Old screens continue unchanged on main until the native workflows are proven.
 
