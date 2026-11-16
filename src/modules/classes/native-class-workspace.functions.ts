@@ -70,6 +70,7 @@ export const getNativeClassRosterPage=createServerFn({method:"GET"})
           inArray(canonicalClassEnrollments.status,["pending","active"])));
       const rows=await tx.select({
         enrollmentId:canonicalClassEnrollments.id,personId:canonicalPersons.id,
+        courseAttemptId:canonicalClassEnrollments.courseAttemptId,
         preferredName:canonicalPersons.preferredName,
         firstName:canonicalPersons.legalFirstName,
         lastName:canonicalPersons.legalLastName,
@@ -88,6 +89,7 @@ export const getNativeClassRosterPage=createServerFn({method:"GET"})
       return {
         members:page.map(row=>({
           enrollmentId:row.enrollmentId,personId:row.personId,
+          courseAttemptId:row.courseAttemptId,
           name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Learner"),
           status:row.status,creditMode:row.creditMode,
         })),
