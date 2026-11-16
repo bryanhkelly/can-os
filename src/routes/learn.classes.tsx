@@ -7,7 +7,6 @@ import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativePublicClassCatalog, getMyNativeClassEnrollments, enrollInNativeClass,
 } from "@/modules/classes/native-class-enrollment.functions";
-import type { ClassCreditMode } from "@/domain/native-class-enrollment";
 
 export const Route=createFileRoute("/learn/classes")({component:NativeLearnerClasses});
 type Item=Awaited<ReturnType<typeof getNativePublicClassCatalog>>[number];
