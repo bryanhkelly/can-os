@@ -11,7 +11,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
-import { validateClassAuthority } from "./unified-class.functions";
+import { validateClassAuthority } from "./unified-class-authority.server";
 
 const uuid=z.string().uuid();
 const select=z.object({classId:uuid}).strict();
