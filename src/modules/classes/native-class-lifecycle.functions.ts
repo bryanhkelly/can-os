@@ -97,18 +97,18 @@ async function exitNativeClass(command:ExitRequest){
         eq(canonicalClassEnrollments.classId,cls.id)))
       .for("update").limit(1);
     if(!enrollment)throw new AuthorizationError("current exact Class enrollment");
-    if(command.action==="withdraw"){
-      if(enrollment.learnerPersonId!==actor.actorPersonId)
-        throw new AuthorizationError("own Class participation");
-      // Existing native Class self-enrollment/assignment pathways are
-      // adult-only. Any future minor exit must use the approved guardian
-      // and school authority flow, never adult learner self-service.
-      const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
-        .from(canonicalPersons).where(eq(canonicalPersons.id,actor.actorPersonId))
-        .limit(1);
-      if(!verifiedAdultOn(person?.birthDate,new Date()))
-        throw new AuthorizationError("verified adult Class withdrawal");
-    }
+    if(command.action==="withdraw" &&
+       enrollment.learnerPersonId!==actor.actorPersonId)
+      throw new AuthorizationError("own Class participation");
+    // Native Class enrollment commands are adult-only today. A guardian or
+    // school-supervised learner must not be cancelled through an adult
+    // Class lifecycle shortcut, even by an otherwise authorized registrar.
+    const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
+      .from(canonicalPersons)
+      .where(eq(canonicalPersons.id,enrollment.learnerPersonId))
+      .limit(1);
+    if(!verifiedAdultOn(person?.birthDate,new Date()))
+      throw new AuthorizationError("verified adult Class lifecycle");
 
     const decision=planNativeClassExit(enrollment.status,command.action);
     if(decision.alreadyClosed)return {
