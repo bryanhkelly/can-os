@@ -265,9 +265,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
           .where(and(
             eq(canonicalAccountGrants.organizationId,instance.operatingOrganizationId),
-            instance.siteId
-              ?eq(canonicalAccountGrants.siteId,instance.siteId)
-              :isNull(canonicalAccountGrants.siteId),
+            isNull(canonicalAccountGrants.siteId),
             eq(canonicalAccountGrants.roleCode,"learner"),
             eq(canonicalAccountGrants.active,true),
             isNull(canonicalAccountGrants.revokedAt),
