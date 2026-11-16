@@ -88,6 +88,14 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         scheduledAt:canonicalDeliverySessions.startsAt,
         planState:facilitatedClassroomPlans.state,
         roomId:facilitatedClassroomPlans.facilitatedSessionId,
+        planDeploymentId:facilitatedClassroomPlans.deploymentId,
+        planCourseVersionId:facilitatedClassroomPlans.courseVersionId,
+        planSiteId:facilitatedClassroomPlans.siteId,
+        planOrganizationId:facilitatedClassroomPlans.hostOrganizationId,
+        deliverySiteId:canonicalDeliverySessions.siteId,
+        roomSiteId:facilitatedLearningSessions.siteId,
+        roomCourseVersionId:facilitatedLearningSessions.courseVersionId,
+        roomOrganizationId:facilitatedLearningSessions.hostOrganizationId,
         roomState:facilitatedLearningSessions.state,
         roomEndedAt:facilitatedLearningSessions.endedAt,
       }).from(canonicalClassSessions)
@@ -99,6 +107,22 @@ export const getNativeClassReport=createServerFn({method:"GET"})
           facilitatedLearningSessions.id,facilitatedClassroomPlans.facilitatedSessionId))
         .where(eq(canonicalClassSessions.classId,cls.id)).limit(2001),
         2000,"Class Sessions");
+      // Cross-check the actual delivery identities before any aggregated
+      // metric can be returned. A joined room must not be borrowed from a
+      // different Course, Site, Deployment or operator.
+      for(const session of sessions){
+        if(session.planDeploymentId!==cls.deploymentId ||
+          session.planCourseVersionId!==cls.courseVersionId ||
+          session.planSiteId!==cls.siteId ||
+          session.planOrganizationId!==cls.operatingOrganizationId ||
+          (session.deliverySiteId && session.deliverySiteId!==cls.siteId) ||
+          (session.roomId && (
+            session.roomSiteId!==cls.siteId ||
+            session.roomCourseVersionId!==cls.courseVersionId ||
+            session.roomOrganizationId!==cls.operatingOrganizationId
+          )))
+          throw new Error("Class reporting Session authority does not reconcile");
+      }
       const attemptIds=[...new Set(enrollments.map(e=>e.courseAttemptId)
         .filter((id):id is string=>id!==null))];
       const roomIds=[...new Set(sessions.map(s=>s.roomId)
