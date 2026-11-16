@@ -47,7 +47,7 @@ describe("canonical Course objective draft authoring",()=>{
   it("derives the NOLOGIN author role only from a single verified organization and curriculum capability",()=>{
     expect(canonicalAssessmentDraftDatabaseRole({
       scope:{organizationIds:[org]},capabilities:new Set(["curriculum.publish"]),
-    })).toBe("can_v30_assessment_draft_author_11110000000040008000000000000001");
+    })).toBe("can_v30_assess_draft_author_11110000000040008000000000000001");
     expect(()=>canonicalAssessmentDraftDatabaseRole({
       scope:{organizationIds:[org]},capabilities:new Set(),
     })).toThrow();
