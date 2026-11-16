@@ -8,7 +8,10 @@ export const PARTICIPATION_READ_MODEL_VERSION = "1.0.0" as const;
 
 export type ParticipationSource =
   | "school_section" | "native_class" | "noncredit_course"
-  | "family_enrichment" | "noncredit_waitlist";
+  | "family_enrichment";
+export type ParticipationOpportunitySource = "noncredit_waitlist";
+export type ActivitySource = ParticipationSource | ParticipationOpportunitySource;
+export type SourceCoverage = "complete" | "partial" | "unknown" | "not_applicable";
 export type ParticipationKind = "learning" | "program" | "event" | "other";
 export type ParticipationStatus =
   | "active" | "scheduled" | "pending" | "completed"
@@ -52,6 +55,20 @@ export interface ParticipationRecord {
   outcome: { label: string; referenceId?: string } | null;
   action: { label: string; href: string } | null;
 }
+/** Waitlists and invitations are enrollment opportunities, never enrollments. */
+export interface ParticipationOpportunity {
+  /** Release-scoped, per authorized viewer; not an enrollment or waitlist row ID. */
+  key: string;
+  source: ParticipationOpportunitySource;
+  releaseId: string;
+  state: "waiting" | "invited" | "expired" | "unknown";
+  sourceStatus: string;
+  title: string;
+  joinedAt: string | null;
+  expiresAt: string | null;
+  action: { label: string; href: string } | null;
+}
+
 export interface ParticipationReadModel {
   version: typeof PARTICIPATION_READ_MODEL_VERSION;
   generatedAt: string;
@@ -59,9 +76,12 @@ export interface ParticipationReadModel {
   viewerRole: string;
   activeGrantId: string;
   records: ParticipationRecord[];
+  /** Not included in participation counts or official completion reporting. */
+  opportunities: ParticipationOpportunity[];
   sources: Array<{
-    source: ParticipationSource;
+    source: ActivitySource;
     state: ActivitySourceState;
+    coverage: SourceCoverage;
     /** Generic diagnostic; do not reveal unauthorized record existence. */
     message: string | null;
   }>;
