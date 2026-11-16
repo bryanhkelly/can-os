@@ -115,18 +115,25 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       const valid=results.filter(row=>!superseded.has(row.id)&&
         row.resultStatus==="finalized"&&
         attempts.some(a=>a.id===row.attemptId&&a.state==="finalized"));
-      const [completion]=await tx.select({id:canonicalClassOutcomes.id})
-        .from(canonicalClassOutcomes)
+      const completionRecords=await tx.select({
+        id:canonicalClassOutcomes.id,
+        resultCode:canonicalClassOutcomes.resultCode,
+        sourceKind:canonicalClassOutcomes.sourceKind,
+      }).from(canonicalClassOutcomes)
         .where(and(eq(canonicalClassOutcomes.classEnrollmentId,enrollment.id),
-          eq(canonicalClassOutcomes.outcomeKind,"completion"))).limit(1);
+          eq(canonicalClassOutcomes.outcomeKind,"completion"))).limit(101);
+      if(completionRecords.length>100)
+        throw new AuthorizationError("Class completion history needs pagination");
       return {
         courseAttemptId:access.courseAttemptId,
         completedLessons,totalLessons:lessons.length,
         currentAssessmentGrants:currentGrants.length,
         finalizedAssessments:valid.length,
         finalizedPassed:valid.filter(row=>row.outcome==="pass").length,
-        classCompletionOutcomeRecorded:!!completion,
-        note:"Canonical assessment results and Class outcomes are separate from lesson ticks, room playback, attendance and award issuance. Native Class assessment submission requires a published exact-Course administration and provider-issued grant; scores still require independent confirmation.",
+        classCompletionOutcomeRecorded:completionRecords.length>0,
+        classCompletionAuthorityVerified:false,
+        classCompletionEvidenceCount:completionRecords.length,
+        note:"Recorded Class outcome evidence is not a verified completion decision until an independently approved participant-pinned completion policy and authorized decision are established. Finalized assessments, lesson ticks, room playback and attendance cannot grant a certificate, academic credit or award.",
       };
     });
   });
