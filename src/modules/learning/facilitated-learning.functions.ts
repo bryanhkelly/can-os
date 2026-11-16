@@ -741,9 +741,12 @@ export const recordFacilitatedPlayback = createServerFn({method:"POST"})
  * without creating a second registration or resetting learning progress.
  */
 export export async function selfEnrolledNoncreditRoomSitePermitted(
-  tx:Tx, access:{source:"school"|"noncredit";noncreditRegistrationId:string|null},
+  tx:Tx, access:{source:"school"|"noncredit"|"class";noncreditRegistrationId:string|null},
   roomSiteId:string,
 ):Promise<boolean> {
+  // Native Class room delivery requires a verified Class→Session/Site release.
+  // Do not treat it like legacy school or provider-wide noncredit pairing.
+  if(access.source==="class")return false;
   if(access.source!=="noncredit"||!access.noncreditRegistrationId)return true;
   try {
     const [claim]=await tx.select({siteId:noncreditSelfEnrollmentClaims.siteId})
