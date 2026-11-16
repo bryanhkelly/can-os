@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -163,6 +163,67 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
       }catch(e){if(!(e instanceof AuthorizationError))throw e;}
     }
     return allowed;
+  });
+
+const nativeCatalogPageInput=z.object({
+  search:z.string().trim().max(100).default(""),
+  cursor:z.object({title:z.string().min(1).max(200),classId:uuid}).strict().nullable().default(null),
+}).strict();
+
+/** Keyset-paginated public discovery: never expose a private/unlisted Class.
+ * Authorization is checked on every candidate. A page can be sparse when
+ * adoption or Site authority was revoked; the cursor still advances.
+ * Server-side search and pagination avoid the legacy first-100 ceiling.
+ */
+export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>nativeCatalogPageInput.parse(raw))
+  .handler(async({data})=>{
+    guard();
+    const now=new Date();
+    const escaped=data.search.replace(/[\\%_]/g,character=>"\\"+character);
+    return db.transaction(async tx=>{
+      const rows=await tx.select({
+        classId:canonicalClasses.id,classTitle:canonicalClasses.title,
+        courseVersionId:canonicalClasses.courseVersionId,
+        deliveryMode:canonicalClasses.deliveryMode,siteId:canonicalClasses.siteId,
+        classOfferingVersionId:canonicalClassOfferingVersions.id,
+        enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
+        opensAt:canonicalClassOfferingVersions.opensAt,
+        closesAt:canonicalClassOfferingVersions.closesAt,
+        capacity:canonicalClassOfferingVersions.capacity,
+        allowedCreditModes:canonicalClassOfferingVersions.allowedCreditModes,
+        consentText:canonicalClassOfferingVersions.consentText,
+      }).from(canonicalClassOfferingVersions)
+        .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassOfferingVersions.classId))
+        .where(and(
+          eq(canonicalClassOfferingVersions.state,"published"),
+          eq(canonicalClassOfferingVersions.visibility,"public"),
+          eq(canonicalClasses.state,"active"),
+          or(isNull(canonicalClassOfferingVersions.opensAt),lte(canonicalClassOfferingVersions.opensAt,now)),
+          or(isNull(canonicalClassOfferingVersions.closesAt),gt(canonicalClassOfferingVersions.closesAt,now)),
+          data.search?ilike(canonicalClasses.title,"%"+escaped+"%"):undefined,
+          data.cursor?or(
+            gt(canonicalClasses.title,data.cursor.title),
+            and(eq(canonicalClasses.title,data.cursor.title),
+              gt(canonicalClasses.id,data.cursor.classId)),
+          ):undefined,
+        )).orderBy(asc(canonicalClasses.title),asc(canonicalClasses.id)).limit(25);
+      const page=rows.slice(0,24);
+      const items=[];
+      for(const row of page){
+        try{
+          const authority=await currentClassAuthority(tx,row.classId,now);
+          const limits=[row.capacity,authority.classCapacity]
+            .filter((n):n is number=>n!==null);
+          items.push({...row,capacity:limits.length?Math.min(...limits):null});
+        }catch(error){
+          if(!(error instanceof AuthorizationError))throw error;
+        }
+      }
+      const last=page[page.length-1];
+      return {items,nextCursor:rows.length>24&&last?
+        {title:last.classTitle,classId:last.classId}:null};
+    });
   });
 
 /** Transactionally creates one Class Enrollment and one canonical Course Attempt.
