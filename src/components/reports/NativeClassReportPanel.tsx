@@ -3,6 +3,7 @@ import {useQuery} from "@tanstack/react-query";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
 
 function datePlus(value:string,days:number){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return "";
   const d=new Date(value+"T00:00:00.000Z");
   d.setUTCDate(d.getUTCDate()+days);
   return d.toISOString().slice(0,10);
@@ -49,7 +50,7 @@ export function NativeClassReportPanel({classId}:{classId:string}){
     Date.parse(from+"T00:00:00Z"))/86400000);
   const previousFrom=datePlus(from,-length);
   const previous=useClassReport(classId,previousFrom,from,compare&&length>0&&length<=366);
-  const valid=from<=toInclusive&&length<=366;
+  const valid=!!from&&!!toInclusive&&from<=toInclusive&&length>0&&length<=366;
   const data=valid?report.data:null;
   return <section aria-label="Class participation reports" className="space-y-5">
     <div className="flex flex-wrap items-end justify-between gap-4">
