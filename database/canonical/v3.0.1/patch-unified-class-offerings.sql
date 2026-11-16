@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS education_v30.class_enrollments (
  class_id uuid NOT NULL REFERENCES education_v30.classes(id),
  class_offering_version_id uuid NOT NULL,
  learner_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
- enrollment_method text NOT NULL CHECK(enrollment_method IN ('self','invitation','assignment','approval')),
+ enrollment_method text NOT NULL CHECK(enrollment_method IN ('self','invitation','assignment','approval','imported')),
  award_intent text NOT NULL DEFAULT 'unspecified'
   CHECK(award_intent IN ('credit','certificate','participation','audit','unspecified')),
  status text NOT NULL DEFAULT 'pending'
