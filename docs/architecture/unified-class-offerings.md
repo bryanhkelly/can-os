@@ -222,6 +222,60 @@ identified `course-surveys.functions.ts` now also accepts native Class
 Course Attempts when an authorized campaign, published survey, verified
 consent evidence and personal invitation exist.
 
+### Publisher-friendly Course Activities without duplicated engines
+
+`/canonical/course-activities` restores the original five-question quiz and
+five-question feedback authoring **experience**, but uses existing canonical
+ownership and publication boundaries. A national publisher sees only its
+published Course versions and the approved, publisher-owned objective
+assessment inventory; a local Class operator cannot edit those questions.
+The five-question quiz composer currently produces an explicitly **unpublished
+publisher-only authoring package**. There is not yet a restricted canonical
+assessment-draft write service, so exporting the template does NOT publish or
+save an assessment to the database.
+
+For feedback, the page calls the existing
+`createCanonicalSurveyDraft` command, which writes to the canonical Survey
+model only when the independent survey-draft author role, database
+provisioning and feature flag permit it. Survey drafts still require
+independent privacy/accessibility/safeguarding reviews, approved publication,
+a verified identified campaign and recipient invitations. Saving the draft
+does not bypass any of those gates.
+
+One published Survey version may be used through many separately operated
+local campaigns. The native Class SQL patch now introduces an **immutable
+Class-to-campaign attribution link**, not a competing survey response engine.
+A link requires the campaign's exact Deployment and operating Organization,
+an eligible Class, and verified survey permission, and it must be created
+before any invitations or responses. Changing a linked campaign's publisher
+Survey version, Deployment, operating Organization or response mode is
+forbidden. The learner survey service checks the exact person's Class
+Enrollment, Course Attempt and linked campaign, never Course/Deployment
+coincidence alone. The noncredit path does not expose a Class-attributed
+campaign once native Class is activated.
+
+For knowledge checks, `getCanonicalClassPublisher` resolves content
+ownership through the published Offering. Local Class operators may
+administer an authorized publisher-owned canonical assessment under their
+own governed Deployment without becoming the content publisher or
+altering secure answers. Provisioning, submissions and independent result
+confirmation retain separate authorization and audit boundaries.
+
+The Class learner's Assignments view now includes a clearer, deliberately
+non-authoritative completion checklist: recorded lesson milestones,
+finalized knowledge-check results, provider-reviewed participation evidence
+and an independently recorded Class Outcome. The UI never equates video
+playback, draft lesson progress, quiz pass or identified survey feedback
+with automatically earned credit, completion or a credential.
+
+**Still required before release:** the canonical assessment authoring
+command and approved publication workflow for the simple quiz composer,
+campaign creation and individual survey invitation delivery, approved
+completion-policy mapping, fully restricted app-role RLS and two-Site
+end-to-end acceptance. One new native attribution relation is included
+in the **existing first Class migration**; the removed parallel activity
+migration must not be reintroduced.
+
 **Unproven and not yet a release claim:** These are source-level changes, not
 a successful Class assessment/survey/grading acceptance test. In particular,
 restricted DB roles, canonical assessment fixtures, survey invitation
