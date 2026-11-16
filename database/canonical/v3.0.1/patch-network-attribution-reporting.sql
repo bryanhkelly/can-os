@@ -141,6 +141,40 @@ CREATE TRIGGER network_membership_path_guard
   BEFORE INSERT OR UPDATE ON education_v30.network_memberships
   FOR EACH ROW EXECUTE FUNCTION education_v30.v301_validate_network_membership();
 
+-- External church / affiliate numbers are namespaced by the issuing network.
+-- Canonical UUIDs remain stable and never become partner-provided identifiers.
+CREATE TABLE IF NOT EXISTS education_v30.network_member_identifiers (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  network_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id) ON DELETE RESTRICT,
+  network_membership_id uuid NOT NULL REFERENCES education_v30.network_memberships(id) ON DELETE RESTRICT,
+  identifier_type text NOT NULL,
+  identifier_value text NOT NULL,
+  evidence_version_id uuid REFERENCES education_v30.evidence_document_versions(id) ON DELETE RESTRICT,
+  verified_by_person_id uuid REFERENCES education_v30.persons(id) ON DELETE RESTRICT,
+  verified_at timestamptz,
+  recorded_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT network_member_external_id_uq UNIQUE(
+    network_organization_id,identifier_type,identifier_value),
+  CONSTRAINT network_member_external_id_verified_ck CHECK(
+    verified_at IS NULL OR (verified_by_person_id IS NOT NULL AND evidence_version_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS network_member_identifiers_membership_idx
+  ON education_v30.network_member_identifiers(network_membership_id);
+
+CREATE OR REPLACE FUNCTION education_v30.v301_validate_network_member_identifier()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $external_id$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM network_memberships m
+      WHERE m.id=NEW.network_membership_id
+        AND m.network_organization_id=NEW.network_organization_id) THEN
+    RAISE EXCEPTION 'External affiliate ID belongs to a different network';
+  END IF;
+  RETURN NEW;
+END $external_id$;
+CREATE TRIGGER network_member_identifier_guard
+ BEFORE INSERT OR UPDATE ON education_v30.network_member_identifiers
+ FOR EACH ROW EXECUTE FUNCTION education_v30.v301_validate_network_member_identifier();
+
 -- A network does not gain individual learner access by accepting an affiliate.
 -- This grant is explicitly negotiated with each independent data-owning host.
 CREATE TABLE IF NOT EXISTS education_v30.network_reporting_grants (
@@ -345,7 +379,8 @@ DO $network_rls$
 DECLARE table_name text; owner_role text:=current_user;
 BEGIN
   FOREACH table_name IN ARRAY ARRAY[
-    'network_units','network_memberships','network_reporting_grants','participation_attributions'
+    'network_units','network_memberships','network_member_identifiers',
+    'network_reporting_grants','participation_attributions'
   ] LOOP
     EXECUTE format('ALTER TABLE education_v30.%I ENABLE ROW LEVEL SECURITY',table_name);
     EXECUTE format('ALTER TABLE education_v30.%I FORCE ROW LEVEL SECURITY',table_name);
