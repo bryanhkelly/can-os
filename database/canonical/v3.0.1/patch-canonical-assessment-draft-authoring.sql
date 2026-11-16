@@ -39,7 +39,7 @@ END $policy$;
 CREATE OR REPLACE FUNCTION education_v30.v301_assert_assessment_actor_session(
  p_org uuid,p_actor uuid
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $session$
+SET search_path=pg_catalog,education_v30,pg_temp AS $session$
 DECLARE digest text:=current_setting('can.assessment.session_hash',true);
 BEGIN
  IF digest IS NULL OR digest !~ '^[a-f0-9]{64}$' OR
@@ -75,7 +75,7 @@ CREATE OR REPLACE FUNCTION education_v30.v301_create_objective_assessment_draft(
 )
 RETURNS TABLE(assessment_version_id uuid,form_version_id uuid,question_count integer)
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $draft$
+SET search_path=pg_catalog,education_v30,pg_temp AS $draft$
 DECLARE course_id uuid; definition_id uuid; version_id uuid; form_id uuid;
         form_version uuid; section_id uuid; bank_id uuid; item_id uuid;
         item_version uuid; question jsonb; option jsonb; option_id uuid;
@@ -232,7 +232,7 @@ RETURNS TABLE(
  question_count bigint,passing_fraction numeric,max_attempts integer
 )
 LANGUAGE plpgsql STABLE SECURITY DEFINER
-SET search_path=education_v30,pg_catalog AS $readback$
+SET search_path=pg_catalog,education_v30,pg_temp AS $readback$
 BEGIN
  PERFORM education_v30.v301_assert_assessment_actor_session(
    p_organization_id,p_actor_person_id);
