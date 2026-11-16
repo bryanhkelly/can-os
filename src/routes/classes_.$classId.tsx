@@ -217,13 +217,9 @@ function TeachingClass({workspace}:{workspace:Workspace}){
     </section>}
     {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
       canSchedule onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
-    {workspace.tab==="classroom"&&<section className="border border-border bg-card p-5">
-      <h2 className="font-serif text-2xl">Classroom presentation</h2>
-      <p className="mt-3 text-sm text-muted-foreground">
-        The shared classroom player and projector use the same validated media renderer.
-        Live room controls remain disabled until a Session is explicitly attached to this Class and your facilitator authorization is verified.
-      </p>
-    </section>}
+    {workspace.tab==="classroom"&&<NativeClassSessionsPanel workspace={workspace}
+      canSchedule showConsole
+      onChanged={()=>client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]})}/>}
     {workspace.tab==="roster"&&<Roster workspace={workspace} namesAllowed={canSeeNames}/>}
   </UnifiedCoursePlayer>;
 }
