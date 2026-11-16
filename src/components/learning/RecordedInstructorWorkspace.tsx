@@ -33,8 +33,8 @@ type PracticeHistory = Awaited<ReturnType<typeof getRecordedInstructorPracticeHi
  * enrollment, official assignments, or grades. Lesson completion updates only
  * the canonical Course-attempt progress shared across recorded presenters.
  */
-export function RecordedInstructorWorkspace({ courseAttemptId, mode="training" }: {
-  courseAttemptId: string; mode?: "training" | "native";
+export function RecordedInstructorWorkspace({ courseAttemptId, mode="training", initialLessonId }: {
+  courseAttemptId: string; mode?: "training" | "native";initialLessonId?:string|null;
 }) {
   const release = useQuery({
     queryKey: ["canonical-learning-release"],
@@ -51,17 +51,17 @@ export function RecordedInstructorWorkspace({ courseAttemptId, mode="training" }
   // A missing release-status response fails closed for optional telemetry.
   if (enabled) return <CanonicalLearningActivityProvider key={courseAttemptId} courseAttemptId={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode}/>
+      activityEnabled facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
   </CanonicalLearningActivityProvider>;
   return <DisabledCanonicalLearningActivityProvider key={courseAttemptId}>
     <RecordedInstructorCourseSession courseAttemptId={courseAttemptId}
-      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode}/>
+      activityEnabled={false} facilitatedEnabled={facilitatedEnabled} mode={mode} initialLessonId={initialLessonId}/>
   </DisabledCanonicalLearningActivityProvider>;
 }
 
-function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode }: {
+function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, facilitatedEnabled, mode, initialLessonId }: {
   courseAttemptId: string; activityEnabled: boolean; facilitatedEnabled: boolean;
-  mode: "training" | "native";
+  mode: "training" | "native";initialLessonId?:string|null;
 }) {
   const { selectLesson, observe, observeNativeVideo } = useCanonicalLearningActivity();
   const [catalog, setCatalog] = useState<InstructorCatalog | null>(null);
@@ -100,6 +100,14 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
       ).message))
       .finally(() => setLoading(false));
   }, [reload]);
+
+  // A deep link may select a published lesson, but it never changes
+  // the learner's saved instructor, evidence or completion state.
+  useEffect(()=>{
+    if(initialLessonId && instruction?.lessons.some(lesson=>lesson.id===initialLessonId)){
+      setLessonId(initialLessonId);
+    }
+  },[initialLessonId,instruction]);
 
   async function selectTeacher(trackVersionId: string) {
     if (!catalog || pending) return;
