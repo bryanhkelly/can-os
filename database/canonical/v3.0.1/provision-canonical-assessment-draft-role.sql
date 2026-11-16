@@ -28,7 +28,7 @@ SELECT (
 \echo 'Requires active publisher organization and restricted NOINHERIT application login'
 \quit 3
 \endif
-SELECT 'can_v30_assessment_draft_author_' ||
+SELECT 'can_v30_assess_draft_author_' ||
  lower(replace(:'organization_id','-','')) AS draft_role
 \gset
 SELECT format('CREATE ROLE %I NOLOGIN NOINHERIT NOBYPASSRLS NOCREATEDB NOCREATEROLE',
