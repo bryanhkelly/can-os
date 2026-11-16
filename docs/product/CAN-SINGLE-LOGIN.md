@@ -79,10 +79,59 @@ delivered. Do not silently infer reviewer power from a CAN Site Admin grant.
 
 ## Database and release order
 
-Additive migration:
-`database/canonical/v3.0.1/patch-can-staff-single-login.sql`.
+Additive migrations, in order:
 
-- **test01**: migration applied and RLS/index existence verified.
+1. `database/canonical/v3.0.1/patch-can-staff-single-login.sql`
+2. `database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql`
+
+The second creates `education_v30.v301_can_staff_session_context(text)`.
+The interactive CAN session supplies the only bearer secret. The server hashes
+it and calls the new SQL projection using the existing restricted canonical
+authentication login with `SET LOCAL ROLE can_v30_canonical_auth_reader`.
+The returned context contains only the uniquely authorized native account,
+session, grant, Person, role, Organization and Site. No general application
+connection reads raw canonical identities for staff authentication.
+
+A user with a valid CAN session may have **no** canonical staff access: the
+function denies unmapped Sites, absent/ambiguous independently reviewed Person
+links, stale grants, revoked sessions, conflicting Persons and mismatched roles.
+A shared demo login never acquires production-grade canonical staff privileges.
+
+Staff mutation endpoints also use
+`assertCurrentCanonicalStaffForMutation` in the same database transaction as
+publishing, cohort changes, completion decisions, completion policies and
+credential writes. This rechecks the current scope before mutation. It reduces
+stale preflight authority, but without row-locking every identity record it is
+**not** a guarantee against all concurrent revocation/commit races. Existing
+operation-specific database policies and resource gates remain mandatory.
+
+The canonical role matrix now distinguishes `noncredit.enrollment.read`,
+`noncredit.enrollment.manage`, `credential.preview`, and
+`credential.issue`. Neither `site_admin` nor `registrar` inherits
+`credential.issue` automatically. Credential issuance is intentionally
+inaccessible until independently approved issuer authority exists; merely
+enabling `CAN_CREDENTIAL_ISSUANCE_ENABLED` is insufficient.
+
+- **test01**: principal-link migration and restricted staff reader applied.
+  The test branch was missing `access_sessions.last_activity_at` and
+  `shared_device` despite those columns being present in production and
+  declared in `drizzle/0079_session_device_evidence.sql`. Both were added
+  *only on test01* before installing the reader; existing session activity was
+  bounded by `updated_at`.
+- **test01 authorization acceptance passed**: the SQL function returned one
+  synthetic authorized Site Admin, then denied revoked sessions, inactive
+  staff membership, revoked Person links, revoked Site links and an ambiguous
+  second Person. Acceptance used a savepoint and rollback; no synthetic
+  source accounts, grants or links persisted.
+- **Restricted-role evidence on test01**: `can_os_canonical_auth_app`
+  successfully entered the dedicated `can_v30_canonical_auth_reader` role
+  and executed the new function with a nonmatching test digest (zero rows).
+  The reader can execute the function but cannot directly SELECT raw
+  public CAN sessions, CAN/native principal mappings or native grants.
+  Public EXECUTE on the function is revoked.
+- **TypeScript tests, build and signed-in Playwright**: source tests were
+  committed, but no successful CI or browser execution is evidenced yet.
+  Do not treat a GitHub commit as a production release.
 - **production main Neon**: when inspected November 15, 2026, the staff
   principal-link table was absent, there were **zero** approved Site identity
   links, and **zero** active native `site_admin`/`registrar` grants.

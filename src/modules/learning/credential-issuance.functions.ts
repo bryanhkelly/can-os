@@ -13,6 +13,7 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { credentialIsCurrent, evaluateAchievementAward } from "@/domain/credential-awards";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 const inputSchema = z.object({
   credentialDefinitionVersionId: z.string().uuid(),
@@ -125,6 +126,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
       }
       if (existing) throw new AuthorizationError("incomplete credential issuance");
 
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
       const [award] = await tx.insert(learnerAchievementDecisions).values({
         credentialDefinitionVersionId: definition.versionId,
         recipientPersonId: registration.participantPersonId,

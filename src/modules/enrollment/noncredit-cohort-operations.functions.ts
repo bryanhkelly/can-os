@@ -1,5 +1,5 @@
 import {createServerFn} from "@tanstack/react-start";
-import {setResponseHeader} from "@tanstack/react-start/server";
+import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,asc,desc,eq,inArray,lte,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
@@ -13,6 +13,7 @@ import {
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
+import {assertCurrentCanonicalStaffForMutation} from "@/modules/identity/canonical-transaction-authorization.server";
 import {readEligibleSelfEnrollmentReleases} from "./noncredit-self-enrollment-catalog.server";
 
 const id=z.string().uuid();
@@ -31,6 +32,9 @@ async function scopedRelease(tx:Executor,releaseId:string,lock=false){
   const [release]=lock?await query.for("update"):await query;
   if(!release || (release.siteId && !provider.siteIds.includes(release.siteId)))
     throw new AuthorizationError("own release at an authorized Site");
+  // Every mutating operation requests the locked release. Recheck the
+  // underlying login and grant in that same transaction before any write.
+  if(lock)await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
   return {provider,release};
 }
 function guard(){

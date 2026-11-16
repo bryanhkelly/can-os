@@ -17,6 +17,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { noncreditPublishCommand, publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 type Executor = Pick<typeof db,"select">;
 type Provider = Awaited<ReturnType<typeof requireCanonicalLabProvider>>;
@@ -165,7 +166,7 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
 export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
     const candidates=await listReleaseCandidates(provider);
     const published=await db.select({
       id:noncreditSelfEnrollmentReleases.id,
@@ -180,7 +181,13 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
     }).from(noncreditSelfEnrollmentReleases)
       .innerJoin(noncreditTrainingVersions,eq(
         noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
-      .where(eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId))
+      .where(and(
+        eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,provider.organizationId),
+        // A Site Admin cannot list another Site's releases within the
+        // same organization. Site-less releases remain organization-scoped.
+        or(isNull(noncreditSelfEnrollmentReleases.siteId),
+          inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)),
+      ))
       .orderBy(noncreditSelfEnrollmentReleases.createdAt).limit(100);
     return {candidates,published};
   });
@@ -191,7 +198,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
   .validator((value:unknown)=>noncreditPublishCommand.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     const now=new Date();
     if(new Date(data.closesAt)<=now)
       throw new AuthorizationError("Enrollment closing must be in the future");
@@ -209,6 +216,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
       if(data.deliveryMode==="independent" && data.siteId!==null &&
          !selected.digitalSiteOptions.some(option=>option.id===data.siteId))
         throw new AuthorizationError("authorized Site association for online release");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       const [release]=await tx.insert(noncreditSelfEnrollmentReleases).values({
         deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
         trainingVersionId:selected.trainingVersionId,courseVersionId:selected.courseVersionId,
@@ -246,7 +254,7 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
   .validator((value:unknown)=>z.object({releaseId:z.string().uuid()}).strict().parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     return db.transaction(async tx=>{
       const [release]=await tx.select().from(noncreditSelfEnrollmentReleases)
         .where(and(eq(noncreditSelfEnrollmentReleases.id,data.releaseId),
@@ -262,6 +270,7 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
       // original grant + same Site restricts who can close the release.
       if(!candidate && !release.siteId)
         throw new AuthorizationError("current operator deployment");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       await tx.update(noncreditSelfEnrollmentReleases)
         .set({status:"closed",closedAt:new Date()})
         .where(eq(noncreditSelfEnrollmentReleases.id,release.id));
@@ -299,7 +308,7 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
   .validator((v:unknown)=>multiSitePublishInput.parse(v))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const provider=await requireCanonicalLabProvider();
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.manage");
     if(new Date(data.closesAt)<=new Date())
       throw new AuthorizationError("future registration closing");
     const ids=[...new Set(data.siteIds)];
@@ -317,6 +326,7 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
       if(!selected || !ids.every(siteId=>
         selected.siteOptions.some(option=>option.id===siteId)))
         throw new AuthorizationError("approved training at each authorized host Site");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor);
       const released:{siteId:string;releaseId:string;alreadyPublished:boolean}[]=[];
       for(const siteId of ids){
         const existing=await tx.select().from(noncreditSelfEnrollmentReleases)

@@ -8,6 +8,7 @@ import { auditEvents, domainEvents, learnerCourseAttempts, noncreditRegistration
   noncreditCompletionDecisions } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 const schema=z.object({
   courseAttemptId:z.string().uuid(),
@@ -66,6 +67,7 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
       const superseded=new Set(decisions.flatMap(row=>row.supersedesId?[row.supersedesId]:[]));
       const latest=decisions.find(row=>!superseded.has(row.id));
       if(latest?.outcome==="completed")return {decisionId:latest.id,alreadyCompleted:true};
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
       const [created]=await tx.insert(noncreditCompletionDecisions).values({
         registrationId:registration.id,policyId:policy.id,
         assessmentResultId:data.assessmentResultId,outcome:"completed",

@@ -147,7 +147,7 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   if (hasCan) {
     const actor = await getCommandContext(request);
     if (actor.role === "site_admin" || actor.role === "registrar") {
-      return resolveCanonicalSiteStaffFromCan(actor);
+      return resolveCanonicalSiteStaffFromCan(actor, request);
     }
     if (!hasNative || !actor.actorPersonId || actor.sessionAccountId) {
       throw new AuthorizationError("authorized canonical identity for active CAN account");

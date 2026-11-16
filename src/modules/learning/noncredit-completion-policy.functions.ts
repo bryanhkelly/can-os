@@ -8,6 +8,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 /** Read-only provider scope for test and production policy authoring panels. */
 export const getNoncreditCompletionPolicyCatalog=createServerFn({method:"GET"})
@@ -97,6 +98,7 @@ export const publishNoncreditCompletionPolicy=createServerFn({method:"POST"})
         .orderBy(desc(noncreditCompletionPolicies.policyVersion)).limit(1);
       if((previous?.policyVersion??null)!==data.expectedLatestPolicyVersion)
         throw new Error("Completion policy version changed; reload before publishing");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
       const [policy]=await tx.insert(noncreditCompletionPolicies).values({
         trainingVersionId:training.id,policyVersion:(previous?.policyVersion??0)+1,
         minParticipationMinutes:data.minParticipationMinutes,
