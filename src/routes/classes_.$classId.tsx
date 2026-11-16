@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstr
 import { CourseLessonProgress } from "@/components/learning/CourseLessonProgress";
 import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessionsPanel";
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
-import { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
+import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
 import {
@@ -224,20 +224,43 @@ function TeachingClass({workspace}:{workspace:Workspace}){
   </UnifiedCoursePlayer>;
 }
 function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boolean}){
+  const isOperator=workspace.view==="manage"&&namesAllowed;
+  const pages=useInfiniteQuery({
+    queryKey:["native-class-roster",workspace.classId],
+    initialPageParam:0,
+    queryFn:({pageParam})=>getNativeClassRosterPage({
+      data:{classId:workspace.classId,offset:pageParam},
+    }),
+    getNextPageParam:last=>last.nextOffset,
+    enabled:isOperator,retry:false,
+  });
+  const rows=isOperator?pages.data?.pages.flatMap(page=>page.members)??[]:workspace.roster;
+  const total=isOperator?pages.data?.pages[0]?.total??workspace.rosterCount:workspace.rosterCount;
   return <section className="border border-border bg-card p-5">
     <h2 className="font-serif text-2xl">Class roster</h2>
     <p className="mt-2 text-sm text-muted-foreground">
-      {workspace.rosterCount} active or pending enrollments.
-      {!namesAllowed&&" Your instructional assignment permits roster counts. Learner identities require a separately approved roster-read permission."}
+      {total} active or pending enrollments.
+      {!namesAllowed&&" Your instructional assignment permits roster counts. Learner identities require separately approved authorization."}
     </p>
+    {isOperator&&pages.isPending&&<p role="status" className="mt-3 text-sm">Loading your authorized Class roster…</p>}
+    {isOperator&&pages.isError&&<p role="alert" className="mt-3 text-sm">
+      Roster access is unavailable. Check your current Site authorization.
+    </p>}
     {namesAllowed&&<ul className="mt-4 divide-y divide-border">
-      {workspace.roster.map(row=><li key={row.enrollmentId} className="grid grid-cols-[1fr_auto] gap-4 py-3 text-sm">
+      {rows.map(row=><li key={row.enrollmentId} className="grid grid-cols-[1fr_auto] gap-4 py-3 text-sm">
         <span className="font-semibold">{row.name}</span>
         <span className="text-muted-foreground">{row.status} · {row.creditMode.replaceAll("_"," ")}</span>
       </li>)}
     </ul>}
-    {workspace.rosterTruncated&&<p className="mt-4 text-sm text-muted-foreground">
-      Displaying the first 100 records. Pagination is required before this roster can be used for complete reporting.
+    {isOperator&&pages.hasNextPage&&<Button className="mt-4" variant="outline"
+      disabled={pages.isFetchingNextPage} onClick={()=>void pages.fetchNextPage()}>
+      {pages.isFetchingNextPage?"Loading…":"Load more learners"}
+    </Button>}
+    {isOperator&&pages.isSuccess&&<p className="mt-3 text-xs text-muted-foreground">
+      Showing {rows.length} of {total} learners. Identity access is reverified on every page.
+    </p>}
+    {!isOperator&&workspace.rosterTruncated&&<p className="mt-4 text-sm text-muted-foreground">
+      Displaying the first 100 records. Ask your authorized Class manager for the complete roster.
     </p>}
   </section>;
 }
