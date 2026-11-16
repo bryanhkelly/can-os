@@ -32,10 +32,11 @@ grant, and Site context is not nullable merely to make a report roll up.
 | Approval | no Class approval queue with verified guardian/eligibility decisions yet | **Blocked** at publish |
 | Youth/guardian | existing school and enrichment registration services only | **No native youth Class endpoint** until existing verified relationships/consents are integrated |
 
-`publishUnifiedClassOffering` rejects non-operational method lists. Both
-Class public catalog readers suppress older published versions that still
-advertise unimplemented methods. The operator composer exposes only the two
-operational choices.
+`publishUnifiedClassOffering` rejects non-operational methods and native
+`for_credit` participation while independent academic eligibility is not
+implemented. Both Class catalogs suppress already-published versions
+advertising unimplemented methods or for-credit access; the write command
+rechecks the same policy. The composer exposes only operational choices.
 
 | From | Command | To | Course Attempt | Seat |
 | --- | --- | --- | --- | --- |
@@ -50,11 +51,13 @@ operational choices.
 
 The original `class_enrollments` row is never resurrected. Repeated same
 terminal command returns `alreadyClosed=true`, makes no second event and
-does not release capacity again. Exactly one Class-row `FOR UPDATE` lock
-serializes seats across self-enrollment, assignment and exit. The Course
-Attempt is withdrawn *before* closing the Class Enrollment to satisfy the
-existing canonical source trigger. Terminal events and audit are written
-atomically with the status update.
+does not release capacity again. Repeating a pending learner withdrawal,
+which has status `cancelled` once processed, is also a no-op. Exactly one Class-row `FOR UPDATE` lock
+serializes seats across self-enrollment, assignment and exit. Every linked *active* Course Attempt, including retakes, is verified
+against the exact Class, Deployment, Offering and Course version and
+withdrawn *before* closing its Class Enrollment, satisfying the canonical
+source trigger. Completed and previously withdrawn attempts are not
+rewritten. Terminal events and audit are written atomically with the update.
 
 ## WS1 participation-status projection
 
@@ -108,7 +111,8 @@ with `aggregateType=class_enrollment`,
   `classOfferingVersionId` (nullable);
 - `previousStatus`, `status` (terminal native status),
   `reason` (fixed policy code), `capacityReleased=true`,
-  and ISO-8601 `occurredAt`.
+  `courseAttemptIdsWithdrawn` (all linked active Course Attempt IDs,
+  empty for pending cancellation), and ISO-8601 `occurredAt`.
 
 WS6 must count only *distinct authoritative participation identities*
 with domain-specific transitions, never count the audit and domain event as
