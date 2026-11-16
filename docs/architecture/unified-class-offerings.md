@@ -7,8 +7,8 @@ learning identity, progress, school records, registration and completion evidenc
 ## November 16 workstream boundary
 
 The feature branch includes scheduling, scalable discovery, a portable
-network launch recipe, facilitator reliability improvements and a reusable
-Course learning-activity source. This work deliberately excludes single-login
+network launch recipe, facilitator reliability improvements and a read-only
+bridge to the existing canonical educational evidence engines. This work deliberately excludes single-login
 multi-role completion, pilot impact reports and Class enrollment invitation /
 approval flows. Those remain post-merge product work and are not release claims.
 
@@ -95,7 +95,7 @@ unmodified on main until a separately approved replacement deployment.
 - SQL, in order, on an isolated reviewed database only:
   1. database/canonical/v3.0.1/patch-unified-class-offerings.sql
   2. database/canonical/v3.0.1/patch-unified-class-course-attempts.sql
-  3. database/canonical/v3.0.1/patch-unified-class-activities.sql
+
 - Native operator creation/publishing/closing/revision commands:
   src/modules/classes/unified-class.functions.ts.
 - Native **adult self-enrollment** with current adult DOB verification, consent
@@ -201,18 +201,24 @@ Class → Course/Offering adoption → operator/Site authorization checks.
 Academic assignments, grades and transcript credit are never inferred from
 a chosen presenter or video play event.
 
-The native learner's **Assignments** tab now has reusable publisher-owned
-Course-version knowledge checks, consented identified feedback and a noncredit
-completion-evidence confirmation. Correct quiz choices and submitted feedback
-bodies are kept in `education_v30_secure`, never projected to the learner or
-classroom host. This low-stakes check does **not** reuse noncredit registration,
-issue academic grades or certificates, or attribute classroom screen playback
-as individual completion. The first submission pins the learner to the
-published Course activity version; later publisher revisions cannot rewrite
-their historical responses or requirements. The publisher's authoring surface
-is `/canonical/course-activities` and is restricted by current organization
-ownership and verified staff authority. The Courses themselves are still
-centrally governed and are not copied to each Site.
+The native learner's **Assignments** tab now reads the EXISTING canonical
+Course Attempt, lesson progress, assessment-grant/result and Class Outcome
+tables through `getNativeClassCanonicalEvidence`. It does not create
+a separate quiz, survey response, completion or certificate ledger.
+The earlier, unshipped `course_activity_sets` /
+`class_activity_submissions` proposal and its migration were **removed**
+before activation because CAN already has authoritative assessment,
+survey and completion capabilities.
+
+**Remaining compatibility work:** Existing noncredit knowledge-check and
+course-survey services currently require `source="noncredit"` and an actual
+noncredit registration; native Class attempts have `source="class"` and a
+`class_enrollment_id` instead. Provider-governed assessment administration,
+provisioning, questionnaire submissions, consented survey invitations, and
+independent completion decisions must be extended to Class attempts using
+the canonical engines. The read-only adapter is not a finished Class quiz or
+survey journey. No one may create a fictitious noncredit registration just
+to satisfy legacy requirements.
 
 The Class Session planner now accepts a one-off Session, four weekly Sessions
 or up to twelve custom dated Sessions. Wall-clock input is interpreted in
