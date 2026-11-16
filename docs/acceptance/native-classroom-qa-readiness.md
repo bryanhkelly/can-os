@@ -90,3 +90,42 @@ roll-back options. A Git merge alone is not a safe deployment.
    database **only after** all security and E2E evidence passes.
 
 No database changes or role grants were made during this inspection.
+
+## Launch Studio ↔ native Classroom acceptance additions
+
+The two-Site QA must include an authorized Site-first operator preview and
+specific `/launch/site?siteId=<public UUID>&step=preview` reentry before
+testing native Class launch. The public Site is NOT the education_v30 Site.
+
+1. No public-to-native identity link: native Class commands are never queried
+   from the Site-first handoff and the identity review route is shown.
+2. Pending, rejected or revoked links: no native Class roster or creation
+   shortcut is displayed. A reviewer cannot impersonate the Site operator.
+3. Approved three-party identity + matching canonical operator: native Class
+   list displays only the canonical Site mapped to this exact public Site.
+4. Same canonical account authorized across two Sites: switch legacy Site and
+   verify the active Site's Classes never include the sibling Site's classes.
+   Switch the canonical Class composer Site and verify unsaved previous Course
+   selection is cleared.
+5. Valid mapped Site but stale/expired Class staff grant, revoked Course adoption,
+   or disabled native Class feature: the handoff reports inability to continue,
+   not a false green readiness or empty-Class claim.
+6. Select a current published, adopted Course through
+   `/canonical/classes?siteId=<approved canonical UUID>`; confirm options are
+   scoped to the Site and that the server refuses tampered Site IDs.
+7. Activate one facilitated Class, assign an independently authorized local
+   facilitator, schedule four weekly Sessions in the verified Site timezone,
+   and open/revoke a room under correct teaching authority. Class managers may
+   review Sessions but cannot impersonate facilitators.
+8. Verify private Class assignment without mandatory Class Offering, and
+   separately validate public self-enrollment only under a published Class
+   Offering. Neither process grants credit/credential by default.
+9. Confirm website publication, Class activation, Class Offering publication,
+   minor safety requirements, public enrollment and Course outcome approvals
+   remain independent.
+10. Perform two-Site negative cases and legacy school/noncredit regressions
+    after the schema-first staging migration. Do not deploy the app first.
+
+The focused `npm run test:classes:unit` script now includes source contract
+tests for the Launch Studio/Classroom handoff and existing Site-first activation.
+These source tests are not substitute for real QA browser or database evidence.

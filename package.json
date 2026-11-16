@@ -72,7 +72,7 @@
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
     "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts",
     "db:canonical:classes": "node scripts/acceptance/check-native-class-schema.mjs",
-    "test:classes:unit": "vitest run tests/unit/unified-class.test.ts tests/unit/native-class-enrollment.test.ts tests/unit/unified-classroom-player.test.tsx tests/unit/class-views.test.ts tests/unit/native-class-sessions.test.ts tests/unit/native-class-room-boundary.test.ts tests/unit/native-class-optional-offering.test.ts tests/unit/native-class-mutation-authority.test.ts tests/unit/native-facilitated-classroom-pilot.test.ts tests/unit/native-class-canonical-evidence.test.ts tests/unit/native-class-shared-activity-contract.test.ts tests/unit/class-session-local-time.test.ts tests/unit/network-class-launch.test.ts",
+    "test:classes:unit": "vitest run tests/unit/unified-class.test.ts tests/unit/native-class-enrollment.test.ts tests/unit/unified-classroom-player.test.tsx tests/unit/class-views.test.ts tests/unit/native-class-sessions.test.ts tests/unit/native-class-room-boundary.test.ts tests/unit/native-class-optional-offering.test.ts tests/unit/native-class-mutation-authority.test.ts tests/unit/native-facilitated-classroom-pilot.test.ts tests/unit/native-class-canonical-evidence.test.ts tests/unit/native-class-shared-activity-contract.test.ts tests/unit/class-session-local-time.test.ts tests/unit/network-class-launch.test.ts tests/unit/site-native-class-launch-handoff.test.ts tests/unit/site-first-launch-activation.test.ts",
     "db:canonical:classes:preflight": "node scripts/acceptance/preflight-native-classroom-qa.mjs"
   },
   "dependencies": {
