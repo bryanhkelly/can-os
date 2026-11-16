@@ -230,10 +230,11 @@ Native implementation:
   cannot pair into older unbound rooms, and older course attempts cannot pair
   into a native Class room.
 - Native attendance rostering filters by exact Class **before pagination**.
-  Personally identifying learner names require \`class.manage\` or a separately
-  approved \`class.roster.view\` capability; a generic room facilitator
-  assignment does not grant roster PII. Device pairing, attendance and
-  official completion remain distinct evidence levels.
+  Administrative roster access is restricted to authorized Class managers.
+  Facilitator roll call requires an explicit, immutable and audited
+  class_staff_assignments.attendance_authorized delegation for that Class.
+  Generic teaching rights do not grant roster identities. Device pairing,
+  attendance and official completion remain distinct evidence levels.
 - If native Class staff authorization expires, room playback and
   management metadata fail closed; ending a Class Session does not erase
   previously recorded learning evidence.
