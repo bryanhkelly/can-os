@@ -36,10 +36,16 @@ export function rollupAttributionEvidence(rows:readonly AttributionEvidence[]){
       throw new Error("Network attribution requires historical membership and path");
     if(row.basis==="provider_default"&&row.networkMembershipId)
       throw new Error("A provider-default attribution cannot claim a membership");
-    const affiliateKey=row.creditedOrganizationId+":"+String(row.networkMembershipId??"");
+    // A single membership can be reassigned to a different district. Preserve
+    // separate historic affiliate groups rather than attaching old counts to
+    // whichever district happened to be recorded first.
+    const historicalLeaf=row.path?.length?row.path[row.path.length-1]:null;
+    const affiliateKey=[row.creditedOrganizationId,row.networkMembershipId??"",
+      historicalLeaf?.id??"",row.basis].join(":");
     const aggregate=affiliates.get(affiliateKey)??{
       organizationId:row.creditedOrganizationId,organizationName:row.organizationName,
-      reportingUnitId:row.reportingUnitId,reportingUnitName:row.reportingUnitName,
+      reportingUnitId:historicalLeaf?.id??null,
+      reportingUnitName:historicalLeaf?.name??null,
       basis:row.basis,registrations:0,completed:0,verifiedAttendees:0,
     };
     aggregate.registrations++;
@@ -62,6 +68,10 @@ export function rollupAttributionEvidence(rows:readonly AttributionEvidence[]){
       if(row.verifiedAttendee)unit.verifiedAttendees++;
       units.set(node.id,unit);
     }
+    if(row.basis!=="provider_default" &&
+      (row.reportingUnitId!==historicalLeaf?.id ||
+       row.reportingUnitName!==historicalLeaf?.name))
+      throw new Error("Attributed reporting unit differs from immutable historical path");
   }
   const groups=[...affiliates.values()].sort((a,b)=>
     a.organizationName.localeCompare(b.organizationName));
