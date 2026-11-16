@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -10,12 +10,12 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
-  assertNativeClassLearnerSessionForExit, assertNativeClassAttemptForExit,
+  assertNativeClassAttemptForExit,
   assertVerifiedAdultNativeClassExit, assertNativeClassExitReason,
 } from "@/domain/native-class-lifecycle";
-import {
-  canonicalSessionDigestFromRequest, getCanonicalCommandContext,
-} from "@/modules/identity/canonical-command-context.server";
+import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentNativeClassLearnerForMutation } from
+  "./native-class-learner-session.server";
 import { assertCurrentCanonicalStaffForMutation } from
   "@/modules/identity/canonical-transaction-authorization.server";
 
@@ -77,22 +77,9 @@ async function exitNativeClass(command:ExitRequest){
       // transaction, including when the underlying Class was closed.
       await assertCurrentCanonicalStaffForMutation(tx,request,actor);
     }else{
-      // A stale or revoked learner cookie cannot withdraw a participant after
-      // its canonical grant has changed. No Site-wide learner role is inferred.
-      const digest=canonicalSessionDigestFromRequest(request);
-      const session=await tx.execute(sql`
-        SELECT person_id,role_code,organization_id,site_id
-        FROM education_v30.v301_canonical_session_context(${digest}::text)
-      `);
-      if(session.rows.length!==1){
-        throw new AuthorizationError("current canonical learner session");
-      }
-      const grant=session.rows[0] as Record<string,unknown>;
-      if(actor.scope.organizationIds?.length!==1)
-        throw new AuthorizationError("one verified learner home Organization");
-      assertNativeClassLearnerSessionForExit(
-        grant,actor.actorPersonId,actor.scope.organizationIds[0],
-      );
+      // The same current verified home-Organization session works when a
+      // public Class is provided by another Organization.
+      await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
     }
     const [enrollment]=await tx.select().from(canonicalClassEnrollments)
       .where(and(eq(canonicalClassEnrollments.id,command.classEnrollmentId),
