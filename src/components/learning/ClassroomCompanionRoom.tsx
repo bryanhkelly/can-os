@@ -15,13 +15,32 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [online,setOnline]=useState(true);
   const instance=useRef<string>("");
   const retryIds=useRef<Record<string,string>>({});
   const state=useQuery({
     queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId],
     queryFn:()=>getClassroomLearnerActivities({data:{courseAttemptId,facilitatedSessionId}}),
-    refetchInterval:8000,retry:false,staleTime:0,gcTime:0,
+    refetchInterval:online?8000:false,refetchOnReconnect:true,
+    retry:false,staleTime:0,gcTime:0,
   });
+  useEffect(()=>{
+    // Browser connectivity is advisory, never permission. A transient
+    // failure must not discard the form answer or rotate the retry identity.
+    const reconnect=()=>{
+      setOnline(navigator.onLine);
+      if(navigator.onLine)void queryClient.invalidateQueries({
+        queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId],
+      });
+    };
+    reconnect();
+    window.addEventListener("online",reconnect);
+    window.addEventListener("offline",reconnect);
+    return ()=>{
+      window.removeEventListener("online",reconnect);
+      window.removeEventListener("offline",reconnect);
+    };
+  },[queryClient,facilitatedSessionId,courseAttemptId]);
   useEffect(()=>{
     instance.current=accessClientInstance();
     const send=(eventKind:"joined"|"heartbeat"|"away")=>{
@@ -42,6 +61,10 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
 
   async function submit(activity:{id:string;answerType:"single_choice"|"text";choices:string[]}){
     if(busy)return;
+    if(!online){
+      setError("You're offline. Your answer is still in this form. Reconnect before submitting.");
+      return;
+    }
     const answer=answers[activity.id]??"";
     if(!answer.trim())return;
     const key=activity.id;
@@ -59,12 +82,19 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
       delete retryIds.current[key];
       setNotice("Response saved. This is formative work, not a graded submission.");
       await queryClient.invalidateQueries({queryKey:["classroom-activities",facilitatedSessionId,courseAttemptId]});
-    }catch{setError("Response was not confirmed. You may retry without creating a duplicate.");}
+    }catch{
+      setError("Response was not confirmed. Keep this page open and retry after reconnecting. Your retry ID is preserved to prevent duplicates.");
+    }
     finally{setBusy("");}
   }
 
   return <section className="mt-5 space-y-4" aria-label="Classroom activities">
     <h3 className="font-serif text-xl font-semibold">Activities from your facilitator</h3>
+    {!online&&<p role="status" aria-live="polite"
+      className="border border-border bg-muted/30 p-3 text-sm">
+      Connection unavailable. You can continue drafting in this open page.
+      Responses will NOT be sent or counted until you reconnect and submit.
+    </p>}
     {state.isPending&&<p role="status">Checking released activities…</p>}
     {state.isError&&<p role="alert">Activities are temporarily unavailable. Your room connection may have ended.</p>}
     {state.isSuccess&&state.data.activities.length===0&&
@@ -78,6 +108,7 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
         {activity.closed?"Closed":"Open for responses"} · {activity.responded?"Response saved":"Not yet answered"}
       </p>
       {!activity.closed&&!activity.responded&&<form className="mt-3 space-y-2"
+        aria-busy={busy===activity.id}
         onSubmit={e=>{e.preventDefault();void submit(activity);}}>
         {activity.answerType==="single_choice"?
           <fieldset className="space-y-2">
@@ -96,7 +127,7 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
               onChange={e=>setAnswers(prev=>({...prev,[activity.id]:e.target.value}))}
               className="mt-1 w-full border border-border bg-background p-3" rows={3}/>
           </label>}
-        <Button disabled={!!busy||!(answers[activity.id]??"").trim()}>
+        <Button disabled={!online||!!busy||!(answers[activity.id]??"").trim()}>
           {busy===activity.id?"Saving…":"Submit response"}
         </Button>
       </form>}
