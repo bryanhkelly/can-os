@@ -200,7 +200,11 @@ export function assertNativeClassExitReason(
   action:ClassClosureAction,
   reason:"requested"|"not_eligible"|"session_cancelled"|"operator_decision",
 ):void{
-  if(action==="withdraw" && reason!=="requested" ||
+  // "session_cancelled" requires a verified canonical Session closure
+  // reference, which this Class-enrollment endpoint does not yet accept.
+  // A browser-supplied reason code is not evidence that a Session ended.
+  if(reason==="session_cancelled" ||
+     action==="withdraw" && reason!=="requested" ||
      action==="cancel" && reason==="requested" ||
      reason==="not_eligible" && status!=="pending"){
     throw new AuthorizationError("consistent Class lifecycle reason");
