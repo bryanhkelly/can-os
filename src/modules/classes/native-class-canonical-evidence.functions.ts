@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, gt, lte, or, desc } from "drizzle-orm";
+import { and, eq, inArray, desc } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -71,23 +71,28 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       const now=new Date();
       const grants=learner?await tx.select({
         id:assessmentAccess.id,
-        administrationId:assessmentFormAdministrations.id,
+        accessStatus:assessmentAccess.accessStatus,
+        validFrom:assessmentAccess.validFrom,
+        validThrough:assessmentAccess.validThrough,
+        administrationStatus:assessmentFormAdministrations.status,
+        opensAt:assessmentFormAdministrations.opensAt,
+        closesAt:assessmentFormAdministrations.closesAt,
       }).from(assessmentAccess)
         .innerJoin(assessmentFormAdministrations,
           eq(assessmentFormAdministrations.id,assessmentAccess.administrationId))
         .where(and(
           eq(assessmentAccess.learnerId,learner.id),
           eq(assessmentAccess.courseAttemptId,access.courseAttemptId),
-          eq(assessmentAccess.accessStatus,"approved"),
-          lte(assessmentAccess.validFrom,now),
-          or(isNull(assessmentAccess.validThrough),gt(assessmentAccess.validThrough,now)),
-          eq(assessmentFormAdministrations.status,"open"),
           eq(assessmentFormAdministrations.courseVersionId,access.courseVersionId),
           eq(assessmentFormAdministrations.deploymentId,access.deploymentId),
-          or(isNull(assessmentFormAdministrations.opensAt),lte(assessmentFormAdministrations.opensAt,now)),
-          or(isNull(assessmentFormAdministrations.closesAt),gt(assessmentFormAdministrations.closesAt,now)),
         )).limit(101):[];
       if(grants.length>100)throw new AuthorizationError("Assessment grants require pagination");
+      // A closed administration or expired grant is no longer launchable,
+      // but its finalized result remains part of the learner's own history.
+      const currentGrants=grants.filter(g=>g.accessStatus==="approved"&&
+        g.administrationStatus==="open"&&g.validFrom<=now&&
+        (!g.validThrough||g.validThrough>now)&&
+        (!g.opensAt||g.opensAt<=now)&&(!g.closesAt||g.closesAt>now));
       const grantIds=grants.map(g=>g.id);
       const attempts=grantIds.length?await tx.select({
         id:assessmentExecutionAttempts.id,
@@ -117,7 +122,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       return {
         courseAttemptId:access.courseAttemptId,
         completedLessons,totalLessons:lessons.length,
-        currentAssessmentGrants:grants.length,
+        currentAssessmentGrants:currentGrants.length,
         finalizedAssessments:valid.length,
         finalizedPassed:valid.filter(row=>row.outcome==="pass").length,
         classCompletionOutcomeRecorded:!!completion,
