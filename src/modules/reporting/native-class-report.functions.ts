@@ -11,7 +11,8 @@ import {
   facilitatedRoomAttendanceAssertions,assessmentAccess,
   assessmentExecutionAttempts,assessmentExecutionResults,
 } from "@/db/canonical-v301";
-import {AuthorizationError,assertCapability} from "@/domain/command-context";
+import {AuthorizationError} from "@/domain/command-context";
+import {assertExactClassReportingScope} from "@/domain/participation-reporting-authority";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {validateClassAuthority} from "@/modules/classes/unified-class-authority.server";
 import {aggregateClassEvidence} from "@/domain/participation-reporting";
@@ -49,17 +50,11 @@ export const getNativeClassReport=createServerFn({method:"GET"})
       from.getTime()>=to.getTime() || to.getTime()-from.getTime()>366*86400000 ||
       from.getTime()>asOf.getTime())throw new Error("Choose a valid UTC report window of up to 366 days");
     const actor=await getCanonicalCommandContext(getRequest());
-    if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
-      throw new AuthorizationError("current Class reporting operator");
-    assertCapability(actor,"class.manage");
     return db.transaction(async tx=>{
       const [cls]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId)).limit(1);
-      const organizations=actor.scope.organizationIds??[];
-      if(!cls||organizations.length!==1||
-        organizations[0]!==cls.operatingOrganizationId||
-        !cls.siteId||!actor.scope.siteIds?.includes(cls.siteId))
-        throw new AuthorizationError("Class at a currently authorized Site");
+      if(!cls)throw new AuthorizationError("Class at a currently authorized Site");
+      assertExactClassReportingScope(actor,cls);
       await validateClassAuthority(tx,{
         actor,organizationId:cls.operatingOrganizationId,siteIds:actor.scope.siteIds??[],
       },{
