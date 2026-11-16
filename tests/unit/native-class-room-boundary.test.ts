@@ -28,6 +28,18 @@ describe("native Class room isolation contract",()=>{
     expect(attendance).toContain("eq(canonicalClassEnrollments.classId,native.classId)");
     expect(attendance).toContain("assertNativeClassAttendanceReader");
   });
+  it("prevents learner identity, enrollment provenance or consent from being reassigned",()=>{
+    const sql=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
+    expect(sql).toContain("canonical_class_enrollment_identity_guard_trg");
+    expect(sql).toContain("OLD.learner_person_id");
+    expect(sql).toContain("OLD.class_offering_version_id");
+    expect(sql).toContain("OLD.consent_sha256");
+    expect(sql).toContain("OLD.credit_mode");
+    expect(sql).toContain("OLD.status IN ('completed','withdrawn','cancelled')");
+    expect(sql).toContain("Class Enrollment history must be preserved");
+    const schema=read("scripts/acceptance/check-native-class-schema.mjs");
+    expect(schema).toContain("canonical_class_enrollment_identity_guard_trg");
+  });
   it("keeps native Class Session plans immutable and disjoint from noncredit releases",()=>{
     const sql=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
     expect(sql).toContain("canonical_class_session_guard_trg");
