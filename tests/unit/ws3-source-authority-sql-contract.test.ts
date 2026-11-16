@@ -57,6 +57,8 @@ describe("WS3 completion evidence source and credential-current contracts",()=>{
 describe("WS3 Class policy source-of-truth and no backdating",()=>{
   it("pins a policy only at first insertion and never through a changed offering",()=>{
     expect(classSql).toContain("AFTER INSERT ON education_v30.class_enrollments");
+    expect(classSql).toContain("SECURITY DEFINER");
+    expect(classSql).toContain("REVOKE ALL ON FUNCTION education_v30.ws3_pin_class_policy_on_enrollment()");
     expect(classSql).toContain("p.published_at<=NEW.enrolled_at");
     expect(classSql).toContain("p.effective_at<=NEW.enrolled_at");
     expect(classSql).toContain("completion_policy_version_id");
