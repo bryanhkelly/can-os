@@ -1,6 +1,7 @@
 import {useMemo,useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
+import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
 
 /** Source-safe CSV for private operator use. Protect spreadsheets from
  * formula injection in user-/publisher-authored titles and display names. */
@@ -25,11 +26,13 @@ function savePrivateCsv(rows:readonly (readonly (string|number|null)[])[],filena
  * canonical principal, role and scoped permitted Sites on every request.
  */
 export function NoncreditProviderEvidencePanel(){
+  const grantKey=useActiveWorkspaceMember()?.id??"unbound-canonical-session";
   const [requestedSite,setRequestedSite]=useState("");
   const [showDefinitions,setShowDefinitions]=useState(false);
   const response=useQuery({
-    queryKey:["noncredit-operator-network-report"],
-    queryFn:()=>getNoncreditOperatorNetworkSummary(),retry:false,staleTime:30_000,
+    queryKey:["ws6-private-noncredit-report",grantKey],
+    queryFn:()=>getNoncreditOperatorNetworkSummary(),retry:false,
+    staleTime:0,gcTime:0,refetchOnMount:"always",
   });
   const data=response.data;
   const site=data?.sites.find(s=>s.siteId===requestedSite)??null;
