@@ -83,6 +83,16 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(boundary).toContain('eq(canonicalClassStaffAssignments.attendanceAuthorized,true)');
     expect(roster).toContain("await assertNativeClassAttendanceReader(tx,room,host.actor.actorPersonId!)");
   });
+  it("requires an audited exact-Site administrator emergency revocation path",()=>{
+    const session=source("src/modules/classes/native-class-sessions.functions.ts");
+    const workspace=source("src/routes/classes_.$classId.tsx");
+    expect(session).toContain("export const revokeNativeClassSession");
+    expect(session).toContain('eventCode:"class.session.revoked"');
+    expect(session).toContain("await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
+    expect(session).toContain('eq(facilitatedLearningSessions.siteId,cls.siteId)');
+    expect(session).toContain('state:"ended",endedAt:now');
+    expect(workspace).toContain("canRevoke onChanged={refresh}");
+  });
   it("shows a permitted enrollment path without silently enrolling QR visitors",()=>{
     const join=source("src/routes/join.tsx");
     expect(join).toContain('to="/learn/classes"');
