@@ -4,7 +4,7 @@
  * attendance, grades, outcomes and grants stay authoritative in their services.
  * NEVER grant access from a displayed Site, Organization, status or URL.
  */
-export const PARTICIPATION_READ_MODEL_VERSION = "1.0.0" as const;
+export const PARTICIPATION_READ_MODEL_VERSION = "1.1.0" as const;
 
 export type ParticipationSource =
   | "school_section" | "native_class" | "noncredit_course"
