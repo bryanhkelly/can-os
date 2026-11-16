@@ -55,8 +55,8 @@ function MyPrograms(){
     </section>
     {adult&&<section className="mt-6" aria-label="Personal training registrations">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-serif text-2xl">My Classes</h2>
-        <Link to="/learn/enroll" search={{}} className="text-sm underline text-primary">Explore Classes</Link>
+        <h2 className="font-serif text-2xl">My training</h2>
+        <Link to="/learn/enroll" search={{}} className="text-sm underline text-primary">Find training</Link>
       </div>
       {noncredit.isPending&&<p role="status" className="mt-3 text-sm">Loading your personal training records…</p>}
       {noncredit.isError&&<p role="alert" className="mt-3 border border-border p-3 text-sm">
@@ -106,8 +106,8 @@ function MyPrograms(){
     </section>}
     {student&&<section className="mt-7" aria-label="Current school classes">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="font-serif text-2xl">My Classes</h2>
-        <Link to="/student/courses" className="text-sm underline text-primary">Class registration</Link>
+        <h2 className="font-serif text-2xl">School classes</h2>
+        <Link to="/student/courses" className="text-sm underline text-primary">Course registration</Link>
       </div>
       {school.isPending&&<p role="status" className="mt-3 text-sm">Loading your enrolled classes…</p>}
       {school.isError&&<p role="alert" className="mt-3 border border-border p-3 text-sm">School courses are unavailable in the current student workspace.</p>}
