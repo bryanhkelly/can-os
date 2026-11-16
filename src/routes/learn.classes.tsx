@@ -1,15 +1,15 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  getNativePublicClassCatalog, getMyNativeClassEnrollments, enrollInNativeClass,
+  getNativePublicClassCatalogPage, getMyNativeClassEnrollments, enrollInNativeClass,
 } from "@/modules/classes/native-class-enrollment.functions";
 
 export const Route=createFileRoute("/learn/classes")({component:NativeLearnerClasses});
-type Item=Awaited<ReturnType<typeof getNativePublicClassCatalog>>[number];
+type Item=Awaited<ReturnType<typeof getNativePublicClassCatalogPage>>["items"][number];
 type CreditMode="for_credit"|"audit"|"not_applicable";
 const creditName:Record<CreditMode,string>={
   for_credit:"For credit (eligibility required)",
@@ -76,13 +76,23 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
 }
 function NativeLearnerClasses(){
   const client=useQueryClient();
-  const catalog=useQuery({queryKey:["native-public-class-catalog"],
-    queryFn:()=>getNativePublicClassCatalog(),retry:false});
+  const [searchText,setSearchText]=useState("");
+  const [search,setSearch]=useState("");
+  const catalog=useInfiniteQuery({
+    queryKey:["native-public-class-catalog",search],
+    initialPageParam:null as {title:string;classId:string}|null,
+    queryFn:({pageParam})=>getNativePublicClassCatalogPage({data:{
+      search,cursor:pageParam,
+    }}),
+    getNextPageParam:last=>last.nextCursor,
+    retry:false,
+  });
+  const catalogItems=catalog.data?.pages.flatMap(page=>page.items)??[];
   const enrolled=useQuery({queryKey:["native-my-class-enrollments"],
     queryFn:()=>getMyNativeClassEnrollments(),retry:false});
   async function refresh(){
     await Promise.all([
-      client.invalidateQueries({queryKey:["native-public-class-catalog"]}),
+      client.invalidateQueries({queryKey:["native-public-class-catalog",search]}),
       client.invalidateQueries({queryKey:["native-my-class-enrollments"]}),
     ]);
   }
@@ -109,12 +119,31 @@ function NativeLearnerClasses(){
     <section className="mt-8">
       <h2 className="font-serif text-2xl">Explore Classes</h2>
       <p className="mt-2 text-sm text-muted-foreground">Only currently published public Class Offerings are listed. Private and unlisted Classes are not shown.</p>
+      <form className="mt-4 flex flex-wrap gap-2" role="search"
+        onSubmit={event=>{event.preventDefault();setSearch(searchText.trim());}}>
+        <label className="sr-only" htmlFor="native-class-catalog-search">Search Classes</label>
+        <input id="native-class-catalog-search" type="search" maxLength={100}
+          value={searchText} onChange={event=>setSearchText(event.target.value)}
+          placeholder="Search by Class name"
+          className="min-h-11 min-w-[14rem] flex-1 border border-border bg-background px-3 text-sm"/>
+        <Button type="submit">Search Classes</Button>
+        {search&&<Button type="button" variant="outline"
+          onClick={()=>{setSearch("");setSearchText("");}}>Clear</Button>}
+      </form>
       {catalog.isPending&&<p role="status" className="mt-4 text-sm">Checking currently offered Classes…</p>}
       {catalog.isError&&<p role="alert" className="mt-4 border border-border p-4 text-sm">Public Class discovery is not enabled or is unavailable.</p>}
-      {catalog.isSuccess&&catalog.data.length===0&&<p className="mt-4 text-sm text-muted-foreground">No public Class Offerings are currently accepting enrollment.</p>}
+      {catalog.isSuccess&&catalogItems.length===0&&<p className="mt-4 text-sm text-muted-foreground">No public Class Offerings are currently accepting enrollment.</p>}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        {(catalog.data??[]).map(item=><OfferingCard key={item.classOfferingVersionId} item={item} onJoined={refresh}/>)}
+        {catalogItems.map(item=><OfferingCard key={item.classOfferingVersionId} item={item} onJoined={refresh}/>)}
       </div>
+      {catalog.hasNextPage&&<Button variant="outline" className="mt-4"
+        disabled={catalog.isFetchingNextPage}
+        onClick={()=>void catalog.fetchNextPage()}>
+        {catalog.isFetchingNextPage?"Loading Classes…":"Load more Classes"}
+      </Button>}
+      {catalog.isSuccess&&catalogItems.length>0&&!catalog.hasNextPage&&
+        <p className="mt-3 text-xs text-muted-foreground">End of matching Classes.</p>}
+
     </section>
   </WorkspaceShell>;
 }
