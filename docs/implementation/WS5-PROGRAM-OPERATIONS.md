@@ -70,5 +70,5 @@ The pure unit tests describe authorization differences but are **not database or
 
 - V2 rollout recipes are **portable versioned instructions**, not a persisted rollout approval ledger or automatic multi-Site publish engine. Formal publisher-approved variation and durable rollout approvals require WS00-approved governance and schema migration sequence before implementing.
 - Publisher classification is displayed only when `offering_versions.product_definition.kind` explicitly contains an approved kind. Otherwise display `Published Offering`; never infer product type from Course count.
-- The current operator option query is bounded to 500 authorized Course rows; server-side search/pagination is still needed at very large catalog scale.
+- The current operator option query is bounded to 100 authorized Course rows; server-side search/pagination is still needed at very large catalog scale.
 - Blueprint-contained non-Course activities retain their own governed editor and lifecycle. Do not expose them as native Classes without a real Course-version reference. Launch Studio remains unchanged.
