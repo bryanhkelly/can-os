@@ -14,16 +14,20 @@ import { requireNativeClassSessionHost } from "./native-class-session-host.serve
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
-import { validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
+
 import { scheduleOneClassroom } from "@/modules/learning/classroom-schedule-operations.server";
 import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning-operations.server";
-import { canOpenScheduledClassroom } from "@/domain/classroom-scheduling";
+import { canOpenScheduledClassroom, validClassroomScheduleWindow } from "@/domain/classroom-scheduling";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 const uuid=z.string().uuid();
 const datetime=z.string().datetime({offset:true});
+function validateClassroomTimes(start:Date,end:Date,now:Date){
+  if(!validClassroomScheduleWindow(start,end,now))
+    throw new AuthorizationError("future classroom window between 15 minutes and eight hours");
+}
 export const nativeClassSessionScheduleSchema=z.object({
   classId:uuid,
   cadence:z.enum(["custom","weekly"]).default("custom"),
