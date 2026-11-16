@@ -1,5 +1,5 @@
 import { PublishedLessonContent } from "@/components/learning/PublishedLessonContent";
-import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
+import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { ClassLessonOutline } from "@/components/learning/ClassLessonOutline";
 import { ClassroomLessonTabs } from "@/components/learning/ClassroomLessonTabs";
 import { PrivateLessonNotes } from "@/components/learning/PrivateLessonNotes";
@@ -277,7 +277,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     "This published assignment has no submitted response yet." :
     lessons.length > 0 ? "Continue published lessons or review your assignments. Video playback does not mark a lesson complete." :
     "Your teacher's assignments remain available while the published lesson sequence is being prepared.";
-  return <ClassroomWorkspace title={data.section.title}
+  return <UnifiedCoursePlayer context="academic" title={data.section.title}
     lessonTitle={tab === "lessons" ? lesson?.title : undefined}
     lessonPosition={tab === "lessons" && lesson ? {current:lessonIndex+1,total:lessons.length} : undefined}
     subtitle={tab === "lessons" && lesson ? `Lesson ${lessonIndex+1} of ${lessons.length} · ${data.section.code} · ${data.section.subject}` :
@@ -532,6 +532,6 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         }} />}
       <ClassAnnouncementFeed announcements={data.announcements} timezone={data.section.timezone} />
     </div>}
-  </ClassroomWorkspace>;
+  </UnifiedCoursePlayer>;
 }
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
