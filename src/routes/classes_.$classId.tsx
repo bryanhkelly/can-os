@@ -12,6 +12,7 @@ import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessi
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
+import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
@@ -364,6 +365,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         {workspace.tab==="roster"&&<>
           <Roster workspace={workspace} namesAllowed={true}/>
           <NativeClassAssessmentReviewPanel classId={workspace.classId}/>
+          <NativeClassSurveyCampaignPanel classId={workspace.classId}/>
           <div className="mt-6 border-t border-border pt-5">
             <h3 className="text-base font-semibold">Assign an existing adult learner</h3>
             <p className="mt-2 text-sm text-muted-foreground">
