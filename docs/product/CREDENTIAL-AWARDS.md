@@ -128,3 +128,27 @@ misclassify it as a noncredit learning award.
   There is no cross-organization wallet sharing without a separate verified
   access grant.
 - No creator/approver/issuer workflow UI is in scope for this implementation.
+
+## P0 issuer governance update: one CAN login
+
+The issuer approval source is now committed to `main`. The additive
+`patch-sensitive-credential-issuer-approvals.sql` is installed on `test01`.
+The `/canonical/issuer-access` workspace lets verified Site Admins and
+Registrars request `credential.issue`; an independent, verified,
+non-demo CAN institutional reviewer may approve for at most 366 days,
+reject or revoke it. All decisions have audit events.
+
+The real issuance endpoint is no longer granted authority simply because
+the user's role is Site Admin or Registrar. It checks the same CAN login,
+a current exact-Site staff grant, the active independent approval, and
+holds a shared lock on the approved row inside the award transaction.
+`credential.preview` is separate from `credential.issue`.
+
+**This is not a release approval.** No approved issuer records exist on
+`test01` and the production role/migrations have not been activated.
+The SQL reader passed read-only negative checks, but the committed
+rollback-only positive issuer acceptance transaction could not be
+executed and must be run on an independently authorized test branch.
+`CAN_CREDENTIAL_ISSUANCE_ENABLED` must stay disabled until a dedicated
+runtime writer privilege plan, positive DB acceptance, award/credential
+end-to-end tests, artifact generation and revocation all pass.
