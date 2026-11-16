@@ -1,6 +1,7 @@
 import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {getNativeClassReport} from "@/modules/reporting/native-class-report.functions";
+import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
 
 function datePlus(value:string,days:number){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(value))return "";
@@ -28,11 +29,11 @@ function exportReport(report:NonNullable<ReturnType<typeof useClassReport>["data
   document.body.appendChild(link);link.click();link.remove();
   URL.revokeObjectURL(url);
 }
-function useClassReport(classId:string,from:string,to:string,enabled=true){
+function useClassReport(classId:string,from:string,to:string,grantKey:string,enabled=true){
   return useQuery({
-    queryKey:["ws6-class-report",classId,from,to],
+    queryKey:["ws6-class-report",grantKey,classId,from,to],
     queryFn:()=>getNativeClassReport({data:{classId,from,to}}),
-    enabled:enabled&&from<to,retry:false,staleTime:30_000,
+    enabled:enabled&&from<to,retry:false,staleTime:0,gcTime:0,refetchOnMount:"always",
   });
 }
 
@@ -40,16 +41,17 @@ function useClassReport(classId:string,from:string,to:string,enabled=true){
  * rectangular panels. No cross-provider publish button is exposed. */
 export function NativeClassReportPanel({classId}:{classId:string}){
   const today=new Date().toISOString().slice(0,10);
+  const grantKey=useActiveWorkspaceMember()?.id??"unbound-canonical-session";
   const [from,setFrom]=useState(()=>datePlus(today,-30));
   const [toInclusive,setToInclusive]=useState(today);
   const [compare,setCompare]=useState(false);
   const [expanded,setExpanded]=useState(false);
   const to=datePlus(toInclusive,1);
-  const report=useClassReport(classId,from,to);
+  const report=useClassReport(classId,from,to,grantKey);
   const length=Math.round((Date.parse(to+"T00:00:00Z")-
     Date.parse(from+"T00:00:00Z"))/86400000);
   const previousFrom=datePlus(from,-length);
-  const previous=useClassReport(classId,previousFrom,from,compare&&length>0&&length<=366);
+  const previous=useClassReport(classId,previousFrom,from,grantKey,compare&&length>0&&length<=366);
   const valid=!!from&&!!toInclusive&&from<=toInclusive&&length>0&&length<=366;
   const data=valid?report.data:null;
   return <section aria-label="Class participation reports" className="space-y-5">
