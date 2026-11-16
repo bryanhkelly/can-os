@@ -186,7 +186,9 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         return {
           registrationId:claim.registrationId,
           creditedOrganizationId:attribution.creditedOrganizationId,
-          organizationName:attribution.organizationName,
+          organizationName:typeof attribution.relationshipSnapshot.creditedOrganizationName==="string"
+            ?attribution.relationshipSnapshot.creditedOrganizationName
+            :attribution.organizationName,
           networkMembershipId:attribution.networkMembershipId,
           reportingUnitId:historicalLeaf?.id??null,
           reportingUnitName:historicalLeaf?.name??null,
