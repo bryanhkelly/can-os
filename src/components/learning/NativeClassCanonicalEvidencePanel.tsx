@@ -1,5 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { CourseAssessmentPanel } from "@/components/learning/CourseAssessmentPanel";
+import { NoncreditCourseSurveys } from "@/components/learning/NoncreditCourseSurveys";
 import { getNativeClassCanonicalEvidence } from "@/modules/classes/native-class-canonical-evidence.functions";
 
 /** Existing canonical evidence only. No parallel Class quiz or completion authority. */
@@ -54,9 +56,15 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
       </div>
       <p className="text-sm text-muted-foreground">
         {query.data.currentAssessmentGrants>0
-          ?"There is an approved Course assessment grant. Your provider must enable the shared assessment journey for native Class participation before a new attempt can be submitted."
-          :"No currently authorized assessment is assigned to this Class Course Attempt. Your existing lesson progress remains available."}
+          ?"An approved canonical Course assessment grant is available. Open your knowledge check below. Final results require the responsible provider's independent confirmation."
+          :"No currently authorized knowledge check is assigned to this Course Attempt. Your provider can grant access to a published Class knowledge check. Your existing lesson progress remains available."}
       </p>
+      {query.data.currentAssessmentGrants>0&&<section
+        className="border-t border-border pt-4" aria-label="Authorized Course knowledge check">
+        <CourseAssessmentPanel courseAttemptId={query.data.courseAttemptId}
+          phase="final" onAssessmentCompleted={()=>void query.refetch()}/>
+      </section>}
+      <NoncreditCourseSurveys courseAttemptId={query.data.courseAttemptId}/>
       <p className="text-xs text-muted-foreground">{query.data.note}</p>
       <Button variant="outline" type="button"
         disabled={query.isFetching} onClick={()=>void query.refetch()}>
