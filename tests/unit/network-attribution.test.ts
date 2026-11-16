@@ -72,6 +72,19 @@ describe("network attribution is not a parallel enrollment system",()=>{
     expect(networkUnits.find(x=>x.unitId==="local")?.registrations).toBe(1);
     expect(networkUnits.reduce((sum,x)=>sum+x.registrations,0)).toBeGreaterThan(3);
   });
+  it("keeps separate membership identities even when their reporting unit matches",()=>{
+    const result=rollupAttributionEvidence([
+      attributed({registrationId:"first",networkMembershipId:"membership-older"}),
+      attributed({registrationId:"second",networkMembershipId:"membership-newer"}),
+    ]);
+    expect(result.affiliations).toHaveLength(2);
+    expect(result.affiliations.map(x=>x.networkMembershipId).sort())
+      .toEqual(["membership-newer","membership-older"]);
+    expect(result.networkUnits.find(x=>x.unitId==="district")?.registrations).toBe(2);
+    const panel=read("src/components/enrollment/NoncreditNetworkReportPanel.tsx");
+    expect(panel).toContain("row.networkMembershipId??\"provider\"");
+    expect(panel).toContain("Reporting unit at registration");
+  });
   it("rejects duplicate registrations, forged or cyclic snapshot paths",()=>{
     expect(()=>rollupAttributionEvidence([attributed(),attributed()])).toThrow(/twice/);
     expect(()=>rollupAttributionEvidence([attributed({path:[root,state,root]})])).toThrow(/cyclic/);
@@ -90,6 +103,7 @@ describe("network attribution is not a parallel enrollment system",()=>{
     ]);
     expect(report.uniqueRegistrations).toBe(2);
     expect(report.affiliations).toHaveLength(2);
+    expect(report.affiliations.every(a=>a.networkMembershipId==="membership-a")).toBe(true);
     expect(report.affiliations.map(a=>a.reportingUnitId).sort())
       .toEqual(["district","district-new"].sort());
     expect(report.networkUnits.find(x=>x.unitId==="root")?.registrations).toBe(2);
