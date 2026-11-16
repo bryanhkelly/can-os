@@ -62,6 +62,16 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(options).toContain("eq(assessmentDefinitions.ownerOrganizationId,organizationId)");
     expect(packageJson).not.toContain("native-course-activities.test.ts");
   });
+  it("permits national survey authors without a synthetic Site while retaining capability and SQL role",()=>{
+    const drafts=source("src/modules/operations/canonical-survey-draft.functions.ts");
+    const role=source("src/domain/canonical-survey-draft.ts");
+    expect(drafts).not.toContain("!actor.scope.siteIds?.length");
+    expect(drafts).toContain("canonicalSurveyDraftDatabaseRole(actor)");
+    expect(drafts).toContain("SET LOCAL ROLE");
+    expect(drafts).toContain("v28_role_can_access_org");
+    expect(role).toContain('actor.capabilities.has("survey.draft.create")');
+    expect(role).toContain("actor.scope.organizationIds");
+  });
   it("offers a non-misleading completion checklist and contextual Class language",()=>{
     const view=source("src/components/learning/NativeClassCanonicalEvidencePanel.tsx");
     const assessment=source("src/components/learning/CourseAssessmentPanel.tsx");
