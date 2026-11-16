@@ -19,8 +19,8 @@ const base:EvidenceInput={
   {id:"a3",roomId:"r1",courseAttemptId:"ca3",status:"present",assertedAt:"2026-11-08T10:11:00Z"},
   {id:"a4",roomId:"unrelated-room",courseAttemptId:"ca2",status:"present",assertedAt:"2026-11-08T10:12:00Z"}],
  assessments:[
-  {id:"k1",courseAttemptId:"ca3",state:"finalized",createdAt:"2026-11-07T12:00:00Z"},
-  {id:"k2",courseAttemptId:"ca1",state:"submitted",createdAt:"2026-11-08T12:00:00Z"}],
+  {id:"k1",courseAttemptId:"ca3",state:"finalized",createdAt:"2026-11-07T12:00:00Z",submittedAt:"2026-11-09T12:00:00Z"},
+  {id:"k2",courseAttemptId:"ca1",state:"submitted",createdAt:"2026-11-08T12:00:00Z",submittedAt:"2026-11-10T12:00:00Z"}],
  results:[
   {id:"rs1",attemptId:"k1",revision:1,status:"finalized"},
   {id:"rs2",attemptId:"k1",revision:2,status:"voided"}],
@@ -33,7 +33,7 @@ describe("WS6 evidence reconciliation",()=>{
    expect(m).toMatchObject({publishedOpportunities:1,registrations:3,uniquePeople:2,
      withdrawn:1,sessionsScheduled:2,sessionsDelivered:1,verifiedAttendance:1,
      verifiedAttendees:1,assessmentsSubmitted:2,assessmentsFinalized:0,
-     formalCompletions:1,awardsIssued:1,awardsRevoked:1,waitlisted:null});
+     recordedCompletionOutcomes:1,formalCompletions:null,awardsIssued:1,awardsRevoked:1,waitlisted:null});
  });
  it("does not count device presence or unlinked rooms as attendance",()=>{
    const m=aggregateClassEvidence({...base,attendance:base.attendance.filter(a=>a.id==="a4")}).metrics;
@@ -47,7 +47,8 @@ describe("WS6 evidence reconciliation",()=>{
    const m=aggregateClassEvidence({...base,from:"2026-11-10T00:00:00Z"}).metrics;
    expect(m.registrations).toBe(0);
    // A prior registrant completing during the selected window still counts.
-   expect(m.formalCompletions).toBe(1);
+   expect(m.recordedCompletionOutcomes).toBe(1);
+   expect(m.formalCompletions).toBeNull();
  });
  it("excludes prior superseded present assertions",()=>{
    expect(aggregateClassEvidence(base).metrics.verifiedAttendees).toBe(1);
@@ -56,5 +57,16 @@ describe("WS6 evidence reconciliation",()=>{
    const records=base.enrollments.map(x=>x.id==="e2"?{...x,courseAttemptId:"ca3"}:x);
    expect(()=>aggregateClassEvidence({...base,enrollments:records}))
      .toThrow("Course Attempt belongs to multiple people");
+ });
+ it("uses submission time rather than draft creation time for assessment counts",()=>{
+   const earlierDraft=base.assessments.map(a=>({...a,createdAt:"2026-09-01T12:00:00Z"}));
+   expect(aggregateClassEvidence({...base,assessments:earlierDraft}).metrics.assessmentsSubmitted).toBe(2);
+   const missingSubmission=base.assessments.map(a=>a.id==="k2"?{...a,submittedAt:null}:a);
+   expect(aggregateClassEvidence({...base,assessments:missingSubmission}).metrics.assessmentsSubmitted).toBe(1);
+ });
+ it("never promotes a recorded outcome into independently verified completion",()=>{
+   const {metrics}=aggregateClassEvidence(base);
+   expect(metrics.recordedCompletionOutcomes).toBe(1);
+   expect(metrics.formalCompletions).toBeNull();
  });
 });
