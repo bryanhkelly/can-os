@@ -42,15 +42,19 @@ BEGIN
  IF TG_OP<>'INSERT' THEN
   RAISE EXCEPTION 'Class Session agenda history is immutable' USING ERRCODE='23514';
  END IF;
- SELECT c.course_version_id,p.state,d.starts_at,cs.facilitator_person_id
+ SELECT c.course_version_id,c.state AS class_state,p.state,d.starts_at,
+   cs.facilitator_person_id,v.lifecycle AS course_lifecycle,v.published_at AS course_published_at
   INTO bound FROM education_v30.class_sessions cs
   JOIN education_v30.classes c ON c.id=cs.class_id
+  JOIN education_v30.course_versions v ON v.id=c.course_version_id
   JOIN education_v30.facilitated_classroom_plans p ON
    p.id=cs.classroom_plan_id AND p.delivery_session_id=cs.delivery_session_id
   JOIN education_v30.delivery_sessions d ON d.id=cs.delivery_session_id
   WHERE cs.id=NEW.class_session_id FOR UPDATE OF cs;
  IF NOT FOUND OR bound.course_version_id<>NEW.course_version_id
    OR bound.facilitator_person_id<>NEW.created_by_person_id
+   OR bound.class_state<>'active'
+   OR bound.course_lifecycle<>'published' OR bound.course_published_at IS NULL
    OR bound.state<>'scheduled' OR bound.starts_at<=now() THEN
    RAISE EXCEPTION 'Agenda requires own future scheduled Class Session and Course'
      USING ERRCODE='23514';
@@ -75,9 +79,12 @@ BEGIN
        WHERE id=(item->>'referenceId')::uuid AND course_version_id=NEW.course_version_id
      )) OR
      (item->>'kind'='assessment' AND NOT EXISTS(
-      SELECT 1 FROM education_v30.assessment_versions
-       WHERE id=(item->>'referenceId')::uuid AND course_version_id=NEW.course_version_id
-        AND lifecycle='published'
+      SELECT 1 FROM education_v30.assessment_versions av
+       JOIN education_v30.assessment_definitions ad ON ad.id=av.assessment_id
+       WHERE av.id=(item->>'referenceId')::uuid
+        AND av.course_version_id=NEW.course_version_id
+        AND av.lifecycle='published' AND av.published_at IS NOT NULL
+        AND ad.status='active'
      )) THEN
    RAISE EXCEPTION 'Content reference belongs to another Course or is unpublished'
      USING ERRCODE='23514';
