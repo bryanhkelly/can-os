@@ -406,7 +406,7 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
             or(isNull(educationOperationOrganizationRoles.validThrough),
               gt(educationOperationOrganizationRoles.validThrough,now)),
           ))),
-      )).orderBy(asc(offerings.title),asc(courses.title)).limit(500);
+      )).orderBy(asc(offerings.title),asc(courses.title)).limit(100);
     const names=operator.siteIds.length?await db.select({
       id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
     }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,operator.siteIds)):[];
