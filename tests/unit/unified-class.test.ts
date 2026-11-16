@@ -7,7 +7,7 @@ import {
 const id = "5d9bd7cb-b6b8-443b-8732-087e7ea6a236";
 const aClass = {deploymentId:id,adoptionId:id,offeringVersionId:id,courseVersionId:id,
   operatingOrganizationId:id,siteId:null,title:"AI Literacy Evergreen",deliveryMode:"self_paced" as const};
-const terms = {visibility:"private" as const,enrollmentMethod:"assignment" as const,
+const terms = {visibility:"private" as const,enrollmentMethods:["assignment"] as const,
   opensAt:null,closesAt:null,capacity:null};
 const fulfilled = {outcomeRecorded:true,requirementsSatisfied:true,
   learnerEligible:true,issuerAuthorized:true,policyApproved:true,awarded:true};
@@ -20,20 +20,21 @@ describe("unified Class and Class Offering contract", () => {
   });
   it("supports private assignment and public self enrollment using the same terms", () => {
     expect(classOfferingTermsSchema.parse(terms).visibility).toBe("private");
-    expect(classOfferingTermsSchema.safeParse({...terms,visibility:"public",enrollmentMethod:"self"}).success).toBe(true);
+    expect(classOfferingTermsSchema.safeParse({...terms,visibility:"public",enrollmentMethods:["self","assignment"]}).success).toBe(true);
     expect(visibleInPublicCatalog("private")).toBe(false);
     expect(visibleInPublicCatalog("unlisted")).toBe(false);
     expect(visibleInPublicCatalog("public")).toBe(true);
   });
   it("validates optional registration windows and seat counts", () => {
     expect(classOfferingTermsSchema.safeParse({...terms,capacity:0}).success).toBe(false);
+    expect(classOfferingTermsSchema.safeParse({...terms,enrollmentMethods:["self","self"]}).success).toBe(false);
     expect(classOfferingTermsSchema.safeParse({...terms,
       opensAt:"2027-01-20T10:00:00-08:00",closesAt:"2027-01-15T10:00:00-08:00"}).success).toBe(false);
   });
-  it("represents academic credit, audit and certificate as individual intents", () => {
+  it("separates credit pursuit from enrollment methods and potential certificates", () => {
     const e={classId:id,classOfferingVersionId:id,learnerPersonId:id,enrollmentMethod:"assignment"};
-    for(const awardIntent of ["credit","audit","certificate","participation","unspecified"]) {
-      expect(classEnrollmentRequestSchema.safeParse({...e,awardIntent}).success).toBe(true);
+    for(const creditMode of ["for_credit","audit","not_applicable"]) {
+      expect(classEnrollmentRequestSchema.safeParse({...e,creditMode}).success).toBe(true);
     }
   });
   it("requires explicit publisher classification", () => {
@@ -47,11 +48,11 @@ describe("unified Class and Class Offering contract", () => {
   });
   it("allows mastery without credit for an auditing learner", () => {
     expect(mayIssueClassAward(fulfilled,"audit","academic_credit")).toBe(false);
-    expect(mayIssueClassAward(fulfilled,"credit","academic_credit")).toBe(true);
-    expect(mayIssueClassAward({...fulfilled,issuerAuthorized:false},"credit","academic_credit")).toBe(false);
-    expect(mayIssueClassAward({...fulfilled,policyApproved:false},"credit","academic_credit")).toBe(false);
-    expect(mayIssueClassAward({...fulfilled,awarded:false},"credit","academic_credit")).toBe(false);
-    expect(mayIssueClassAward(fulfilled,"certificate","certificate")).toBe(true);
-    expect(mayIssueClassAward(fulfilled,"participation","participation")).toBe(true);
+    expect(mayIssueClassAward(fulfilled,"for_credit","academic_credit")).toBe(true);
+    expect(mayIssueClassAward({...fulfilled,issuerAuthorized:false},"for_credit","academic_credit")).toBe(false);
+    expect(mayIssueClassAward({...fulfilled,policyApproved:false},"for_credit","academic_credit")).toBe(false);
+    expect(mayIssueClassAward({...fulfilled,awarded:false},"for_credit","academic_credit")).toBe(false);
+    expect(mayIssueClassAward(fulfilled,"audit","certificate")).toBe(true);
+    expect(mayIssueClassAward(fulfilled,"not_applicable","participation")).toBe(true);
   });
 });
