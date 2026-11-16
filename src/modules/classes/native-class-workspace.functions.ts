@@ -15,6 +15,7 @@ import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-co
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { currentClassAuthority } from "./native-class-enrollment.functions";
 import { validateClassAuthority } from "./unified-class.functions";
+import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 
 const uuid = z.string().uuid();
 const scope = z.object({
@@ -246,6 +247,41 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Staff"),
         }));
       }
+      // Only managers can discover possible direct-assign participants.
+      // Every target must already have a verified adult learner account
+      // granted to this exact operating Organization and Site.
+      let learnerCandidates:Array<{personId:string;name:string}>=[];
+      if(view==="manage" && tab==="roster"){
+        const rows=await tx.select({
+          personId:canonicalPersons.id,
+          birthDate:canonicalPersons.birthDate,
+          preferredName:canonicalPersons.preferredName,
+          firstName:canonicalPersons.legalFirstName,
+          lastName:canonicalPersons.legalLastName,
+        }).from(canonicalAccountGrants)
+          .innerJoin(canonicalPersons,eq(canonicalPersons.id,canonicalAccountGrants.personId))
+          .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+          .where(and(
+            eq(canonicalAccountGrants.organizationId,instance.operatingOrganizationId),
+            instance.siteId
+              ?eq(canonicalAccountGrants.siteId,instance.siteId)
+              :isNull(canonicalAccountGrants.siteId),
+            eq(canonicalAccountGrants.roleCode,"learner"),
+            eq(canonicalAccountGrants.active,true),
+            isNull(canonicalAccountGrants.revokedAt),
+            isNull(canonicalAccounts.disabledAt),
+            isNotNull(canonicalAccounts.emailVerifiedAt),
+            lte(canonicalAccountGrants.grantedAt,now),
+          )).limit(101);
+        const enrolled=new Set(roster.map(item=>item.personId));
+        learnerCandidates=[...new Map<string,{personId:string;name:string}>(
+          rows.filter(row=>verifiedAdultOn(row.birthDate,now)&&!enrolled.has(row.personId))
+            .map(row=>[row.personId,{
+              personId:row.personId,
+              name:row.preferredName??([row.firstName,row.lastName].filter(Boolean).join(" ")||"Learner"),
+            }] as const),
+        ).values()];
+      }
       const scheduleRows=await tx.select({
         id:canonicalClassSessions.id,
         planId:facilitatedClassroomPlans.id,
@@ -288,7 +324,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         learner,staffRole,
         canViewRoster:rosterAllowed,
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
-        offering,lessons,staffCandidates,staffAssignments,
+        offering,lessons,staffCandidates,staffAssignments,learnerCandidates,
         sessions,sessionsTruncated:scheduleRows.length>100,
         selectedLessonId:data.lesson??null,
         selectedSessionId:data.session??null,
