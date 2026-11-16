@@ -74,9 +74,11 @@ export function activityBucket(
   now: Date,
 ): ParticipationBucket {
   if (historical.has(status)) return "history";
-  if (status === "pending" || status === "scheduled" ||
-      status === "waitlisted" || status === "invited") return "upcoming";
+  if (status === "pending" || status === "waitlisted" || status === "invited")
+    return "upcoming";
   const start = startAt ? Date.parse(startAt) : NaN;
+  if (status === "scheduled" && (!Number.isFinite(start) || start > now.getTime()))
+    return "upcoming";
   if (Number.isFinite(start) && start > now.getTime()) return "upcoming";
   return "current";
 }
