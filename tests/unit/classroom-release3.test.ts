@@ -45,6 +45,13 @@ describe("Release 3 canonical scheduled classroom windows",()=>{
 });
 
 describe("Release 3 independent facilitator and assisted activity evidence",()=>{
+  it("keeps canonical facilitated server-function exports compatible with TanStack Babel parsing",()=>{
+    const server=read("src/modules/learning/facilitated-learning.functions.ts");
+    // The TypeScript transpiler accepts duplicate export keywords, but the
+    // TanStack server-fn Babel parser rejects them during Cloudflare builds.
+    expect(server).not.toMatch(/\\bexport\\s+export\\b/);
+    expect(server).toContain("export async function selfEnrolledNoncreditRoomSitePermitted(");
+  });
   it("supports a 48-hour append-only correction period",()=>{
     const room={startedAt:now,endedAt:after(60*minute)};
     expect(classroomAttestationOpen(room,after(60*minute))).toBe(true);
