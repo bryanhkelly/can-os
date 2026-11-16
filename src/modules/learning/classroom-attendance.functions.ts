@@ -52,9 +52,10 @@ export async function registeredRoomParticipant(
   if(!attempt)throw new AuthorizationError("current registered classroom Course attempt");
   const native=await nativeClassForRoom(tx,room);
   if(native){
+    if(!attempt.classEnrollmentId)throw new AuthorizationError("native Class Course Attempt required");
     const [member]=await tx.select({personId:canonicalClassEnrollments.learnerPersonId})
       .from(canonicalClassEnrollments).where(and(
-        eq(canonicalClassEnrollments.id,attempt.classEnrollmentId!),
+        eq(canonicalClassEnrollments.id,attempt.classEnrollmentId),
         eq(canonicalClassEnrollments.classId,native.classId),
       )).limit(1);
     if(!member||!await nativeClassRoomParticipant(tx,room,attempt.id,member.personId))
