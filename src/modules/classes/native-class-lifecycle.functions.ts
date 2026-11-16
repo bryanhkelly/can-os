@@ -11,7 +11,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
   assertNativeClassLearnerSessionForExit, assertNativeClassAttemptForExit,
-  assertVerifiedAdultNativeClassExit,
+  assertVerifiedAdultNativeClassExit, assertNativeClassExitReason,
 } from "@/domain/native-class-lifecycle";
 import {
   canonicalSessionDigestFromRequest, getCanonicalCommandContext,
@@ -114,6 +114,9 @@ async function exitNativeClass(command:ExitRequest){
       classEnrollmentId:enrollment.id,status:decision.enrollmentStatus,
       releasedSeat:false,alreadyClosed:true,
     };
+    // A pending rejection is not an active Class cancellation; the reason
+    // is checked against the authoritative status under the Class lock.
+    assertNativeClassExitReason(enrollment.status,command.action,command.reason);
 
     let closedAttemptIds:string[]=[];
     if(enrollment.status==="active"){
