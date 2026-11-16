@@ -20,8 +20,8 @@ export interface AttributionEvidence {
 export function rollupAttributionEvidence(rows:readonly AttributionEvidence[]){
   const registrations=new Set<string>();
   const affiliates=new Map<string,{
-    organizationId:string;organizationName:string;reportingUnitId:string|null;
-    reportingUnitName:string|null;basis:NetworkAttributionBasis;
+    organizationId:string;organizationName:string;networkMembershipId:string|null;
+    reportingUnitId:string|null;reportingUnitName:string|null;basis:NetworkAttributionBasis;
     registrations:number;completed:number;verifiedAttendees:number;
   }>();
   const units=new Map<string,{
@@ -44,6 +44,7 @@ export function rollupAttributionEvidence(rows:readonly AttributionEvidence[]){
       historicalLeaf?.id??"",row.basis].join(":");
     const aggregate=affiliates.get(affiliateKey)??{
       organizationId:row.creditedOrganizationId,organizationName:row.organizationName,
+      networkMembershipId:row.networkMembershipId,
       reportingUnitId:historicalLeaf?.id??null,
       reportingUnitName:historicalLeaf?.name??null,
       basis:row.basis,registrations:0,completed:0,verifiedAttendees:0,
