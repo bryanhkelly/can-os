@@ -66,6 +66,30 @@ END $authority$;
 -- individually bound reviewer SQL role. The server decrypts and projects a
 -- correct-answer label after validating its own AES key; ciphertext is never
 -- included in a browser response. The publisher can inspect only metadata.
+-- Discover only the current publisher's draft version IDs and titles.
+-- This is a queue, not a general content search or private answer export.
+CREATE OR REPLACE FUNCTION education_v30.v301_list_objective_review_queue(
+ p_org uuid,p_actor uuid,p_purpose text
+) RETURNS TABLE(assessment_version_id uuid,title text,assessment_key text,
+ question_count bigint)
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path=education_v30,pg_catalog AS $queue$
+BEGIN
+ PERFORM education_v30.v301_assess_approval_authority(p_org,p_actor,p_purpose);
+ RETURN QUERY SELECT v.id,d.title,d.assessment_key,count(fi.id)
+ FROM assessment_versions v
+ JOIN assessment_definitions d ON d.id=v.assessment_id
+ JOIN courses c ON c.id=d.course_id
+ JOIN assessment_form_versions f ON f.assessment_version_id=v.id
+ LEFT JOIN assessment_form_items fi ON fi.form_version_id=f.id
+ WHERE d.owner_organization_id=p_org
+ AND c.publisher_organization_id=p_org AND d.status='active'
+ AND v.lifecycle='draft' AND f.lifecycle='draft' AND f.version_no=1
+ AND v.blueprint->>'source'='course-activities'
+ GROUP BY v.id,d.title,d.assessment_key
+ ORDER BY d.title LIMIT 100;
+END $queue$;
+
 CREATE OR REPLACE FUNCTION education_v30.v301_objective_assessment_snapshot(
  p_org uuid,p_actor uuid,p_version uuid,p_purpose text
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER
@@ -325,6 +349,8 @@ END $publish$;
 -- Stored commands are the only privilege boundary. Neither restricted role
 -- receives SELECT on answer keys, review tables, versions or learner results.
 REVOKE ALL ON FUNCTION education_v30.v301_assess_approval_authority(
+ uuid,uuid,text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION education_v30.v301_list_objective_review_queue(
  uuid,uuid,text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION education_v30.v301_objective_assessment_snapshot(
  uuid,uuid,uuid,text) FROM PUBLIC;
