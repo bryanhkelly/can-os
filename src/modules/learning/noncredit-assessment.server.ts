@@ -342,7 +342,9 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       .where(eq(assessmentExecutionAttempts.id,attempt.id)).limit(1);
     const startedPayload={courseAttemptId:scope.access.courseAttemptId,
       assessmentAttemptId:attempt.id,assessmentVersionId:scope.assessmentVersionId,
-      noncreditPhase:scope.phase};
+      assessmentSource:scope.access.source,
+        assessmentPhase:scope.phase,
+        ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{})};
     await tx.insert(auditEvents).values({
       actorPersonId:context.actorPersonId,
       owningOrganizationId:scope.providerOrganizationId,
@@ -516,7 +518,9 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
       resultEvidence:{
         engine:NONCREDIT_SCORING_ENGINE,
         courseAttemptId:scope.access.courseAttemptId,
-        noncreditPhase:scope.phase,
+        assessmentSource:scope.access.source,
+        assessmentPhase:scope.phase,
+        ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{}),
         ...(autoFinalize?{noncreditAutoFinalized:"v1"}:{}),
       },
     }).returning({id:assessmentExecutionResults.id});
@@ -530,7 +534,9 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
     const submittedPayload={
       courseAttemptId:scope.access.courseAttemptId,assessmentAttemptId:attempt.id,
       assessmentResultId:result.id,assessmentVersionId:scope.assessmentVersionId,
-      noncreditPhase:scope.phase,
+      assessmentSource:scope.access.source,
+        assessmentPhase:scope.phase,
+        ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{}),
       autoFinalized:autoFinalize,
     };
     await tx.insert(auditEvents).values({
