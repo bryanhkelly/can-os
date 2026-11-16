@@ -13,6 +13,7 @@ import {
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 // These native commands are dormant until restricted RLS,
 // dedicated role provision and test01 acceptance are approved.
@@ -153,6 +154,7 @@ export const createUnifiedClassDraft = createServerFn({method:"POST"})
     const operator=await requireClassOperator();
     return db.transaction(async tx=>{
       await validateClassAuthority(tx,operator,data.definition);
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       const [created]=await tx.insert(canonicalClasses).values({
         ...data.definition,state:"draft",
         createdByPersonId:operator.actor.actorPersonId!,
@@ -218,6 +220,7 @@ export const activateUnifiedClass=createServerFn({method:"POST"})
         siteId:instance.siteId,title:instance.title,deliveryMode:instance.deliveryMode,
       });
       if(instance.state==="active")return {classId:instance.id,alreadyActive:true};
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClasses).set({
         state:"active",updatedAt:new Date(),
       }).where(eq(canonicalClasses.id,instance.id));
@@ -309,6 +312,7 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
         .for("update").limit(1);
       if(!terms || terms.state!=="draft") throw new AuthorizationError("draft Class Offering version");
       const now=new Date();
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClassOfferingVersions)
         .set({state:"published",publishedAt:now})
         .where(eq(canonicalClassOfferingVersions.id,terms.id));
@@ -359,6 +363,7 @@ export const closeUnifiedClassOffering = createServerFn({method:"POST"})
       if(terms.state!=="published")
         throw new AuthorizationError("only published Class Offerings can be closed");
       const now=new Date();
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClassOfferingVersions).set({state:"closed",closedAt:now})
         .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId));
       await tx.insert(auditEvents).values({
@@ -401,6 +406,7 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         :[];
       if(existingOffering && (!current || current.state!=="closed"))
         throw new AuthorizationError("close the previous published Class Offering first");
+      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       const offering=existingOffering??(await tx.insert(canonicalClassOfferings)
         .values({classId:instance.id}).returning())[0];
       if(!offering)throw new Error("Class Offering identity was not created");
