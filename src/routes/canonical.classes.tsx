@@ -137,7 +137,7 @@ function NativeClasses(){
                 onChange={e=>setSiteId(e.target.value)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 <option value="">No physical Site (self-paced only)</option>
-                {(selected?.siteIds??[]).map(id=><option key={id} value={id}>Authorized Site · {id.slice(0,8)}</option>)}
+                {(selected?.siteOptions??[]).map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
               </select>
             </div>
           </div>
