@@ -90,6 +90,15 @@ BEGIN
      USING ERRCODE='23514';
   END IF;
  END LOOP;
+ -- A privileged direct writer cannot bypass the API's duplicate-item guard.
+ -- Repeating the same kind+reference in one revision is never meaningful.
+ IF EXISTS(
+   SELECT 1 FROM jsonb_array_elements(NEW.items) AS e(value)
+   GROUP BY value->>'kind',value->>'referenceId'
+   HAVING count(*)>1
+ ) THEN
+   RAISE EXCEPTION 'Duplicate Session agenda activity' USING ERRCODE='23514';
+ END IF;
  SELECT coalesce(max(revision_no),0) INTO previous_no
   FROM education_v30.class_session_agenda_revisions
   WHERE class_session_id=NEW.class_session_id;
