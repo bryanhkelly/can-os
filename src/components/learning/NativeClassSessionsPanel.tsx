@@ -152,11 +152,12 @@ export function NativeClassSessionsPanel({
               session.state==="scheduled"?"Scheduled":
               session.state==="started"?"Started":"Cancelled"}
           </p>
-          <Button type="button" variant="outline" size="sm" className="mt-2"
+          {workspace.sessionAgendasEnabled&&<Button type="button" variant="outline"
+            size="sm" className="mt-2"
             onClick={()=>setAgendaSession(current=>current===session.id?null:session.id)}>
             {agendaSession===session.id?"Hide study plan":"View study plan"}
-          </Button>
-          {agendaSession===session.id&&
+          </Button>}
+          {workspace.sessionAgendasEnabled&&agendaSession===session.id&&
             <NativeClassSessionAgenda key={session.id}
               classId={workspace.classId} classSessionId={session.id}
               canEdit={canSchedule&&session.isMySession&&session.state==="scheduled"}/>}
