@@ -301,6 +301,15 @@
       "writeBoundary": "POST review decision through canonical server function; reviewer independence, current verified evidence, component decisions, and audit required; review cannot activate a school or Offering"
     },
     {
+      "file": "src/routes/canonical.program-operations.tsx",
+      "route": "/canonical/program-operations",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "Verified canonical site_admin or registrar with class.manage; independent operator Site adoption overview; deny cross-Org and unapproved Site",
+      "readBoundary": "Only current operation-operator Organization grants with active approved Offering adoptions and authorized Site roles; version impact limited to visible Site IDs",
+      "writeBoundary": "Read-only dashboard; Class mutation and publisher approval require existing separately authorized commands"
+    },
+    {
       "file": "src/routes/canonical.blueprints.tsx",
       "route": "/canonical/blueprints",
       "owner": "blueprints",
