@@ -13,12 +13,19 @@ if (!process.env.DATABASE_URL)
   throw new Error("An explicitly selected isolated QA DATABASE_URL is required");
 
 const pool = new Pool({connectionString:process.env.DATABASE_URL});
+const proposed = [
+  "learning_completion_evidence_bindings",
+  "class_completion_policy_versions",
+  "class_enrollment_completion_pins",
+];
+const requireProposed = process.env.CAN_WS3_REQUIRE_PROPOSED_SCHEMA==="1";
 const critical = [
   "class_enrollments","class_outcomes","class_awards",
   "noncredit_registrations","noncredit_completion_policies",
   "noncredit_completion_decisions","noncredit_completion_certificates",
   "learning_award_issuances","learning_award_issuance_events",
   "participation_attributions","noncredit_self_enrollment_claims",
+  ...(requireProposed ? proposed : []),
 ];
 try {
   const client=await pool.connect();
@@ -75,6 +82,7 @@ try {
       f.validates_noncredit&&f.checks_award_current&&f.checks_issuer_access;
     console.log(JSON.stringify({
       preflight:"WS3 read-only canonical completion authority",pass:!!okay,
+      requireProposed,
       missing,unsafe,noTriggers,functionPresence:f,
       counts:counts[0],rowLevelSecurity:objects,
       warning:"Schema readiness only; does not test a real learner, operator, approved policy, award grant, or authenticated UI.",
