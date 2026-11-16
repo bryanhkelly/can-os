@@ -45,6 +45,25 @@ describe("Release 3 canonical scheduled classroom windows",()=>{
 });
 
 describe("Release 3 independent facilitator and assisted activity evidence",()=>{
+  it("keeps canonical facilitated server-function exports compatible with TanStack Babel parsing",()=>{
+    const facade=read("src/modules/learning/facilitated-learning.functions.ts");
+    const privileged=read("src/modules/learning/facilitated-learning-operations.server.ts");
+    const attendance=read("src/modules/learning/classroom-attendance.functions.ts");
+    const attendancePrivileged=read("src/modules/learning/classroom-attendance-operations.server.ts");
+    for(const source of [facade,privileged,attendance,attendancePrivileged]){
+      expect(source).not.toMatch(/\bexport\s+export\b|\bexport\s+async\s+export\b/);
+    }
+    // Browser-importable facades export server functions, not internal
+    // database helpers whose server-only imports would leak to the client.
+    expect(facade).not.toMatch(/export async function /);
+    expect(attendance).not.toMatch(/export async function /);
+    expect(facade).not.toContain('from "node:crypto"');
+    expect(privileged).toContain("export async function selfEnrolledNoncreditRoomSitePermitted(");
+    expect(privileged).toContain("attemptInAssignedClassroomRelease(");
+    expect(attendancePrivileged).toContain("export async function registeredRoomParticipant(");
+    expect(attendancePrivileged).toContain("attemptInAssignedClassroomRelease(");
+    expect(attendancePrivileged).toContain("eq(noncreditSelfEnrollmentClaims.releaseId,releaseId)");
+  });
   it("supports a 48-hour append-only correction period",()=>{
     const room={startedAt:now,endedAt:after(60*minute)};
     expect(classroomAttestationOpen(room,after(60*minute))).toBe(true);
@@ -67,8 +86,9 @@ describe("Release 3 independent facilitator and assisted activity evidence",()=>
     const assisted=read("src/modules/learning/classroom-assisted-activity.functions.ts");
     const sql=read("database/canonical/v3.0.1/patch-facilitated-assisted-activity.sql");
     expect(service).toContain("registeredRoomParticipant(tx,room");
-    expect(service).toContain("schoolAttemptIsPlacedAtSite(");
-    expect(service).toContain("selfEnrolledNoncreditRoomSitePermitted");
+    const privileged=read("src/modules/learning/classroom-attendance-operations.server.ts");
+    expect(privileged).toContain("schoolAttemptIsPlacedAtSite(");
+    expect(privileged).toContain("selfEnrolledNoncreditRoomSitePermitted");
     expect(service).toContain("facilitatedRoomAttendanceAssertions");
     expect(service).toContain("learning.classroom.attendance.corrected");
     expect(assisted).toContain("registeredRoomParticipant(tx,room,data.courseAttemptId)");

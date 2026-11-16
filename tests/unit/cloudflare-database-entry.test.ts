@@ -50,6 +50,11 @@ describe("Cloudflare database scope at the Worker entry", () => {
     expect(calls.scopedConnections).toEqual([env.DATABASE_URL]);
     expect(calls.handlerCalls).toBe(1);
     expect(response.headers.get("X-Frame-Options")).toBe("DENY");
+    // The parent may load a separately authorized same-origin private preview.
+    // Other sites still cannot frame the CAN OS application.
+    const csp = response.headers.get("Content-Security-Policy");
+    expect(csp).toContain("frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com");
+    expect(csp).toContain("frame-ancestors 'none'");
     expect(response.headers.get("Cache-Control")).toBe("private, no-store");
   });
 

@@ -81,6 +81,22 @@ test("school administrator reviews, publishes and renames a standalone school we
   await page.goto(`/sites/${siteId}/publish`);
   await page.getByLabel("Public site subdomain").fill(publicSlug);
   await page.getByRole("button", { name: "Reserve address" }).click();
+  // Site-first Launch Studio must display its actual authenticated preview,
+  // not an empty/blocked frame. This catches endpoint errors in browser QA;
+  // the Cloudflare Worker CSP source is separately verified in unit tests.
+  await page.goto(`/launch/site?siteId=${siteId}&step=preview`);
+  await expect(page.getByRole("heading", { name: "Your Site is taking shape." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open full-page preview" })).toHaveAttribute(
+    "href", `/launch/site-preview?siteId=${siteId}`,
+  );
+  const siteFrame = page.frameLocator('iframe[title^="Private rendered website preview for"]');
+  await expect(siteFrame.getByText("Private Site website preview")).toBeVisible();
+  await expect(siteFrame.locator("body")).toContainText(name);
+  const embeddedResponse = await page.request.get(`/launch/site-preview?siteId=${siteId}`);
+  expect(embeddedResponse.status()).toBe(200);
+  expect(embeddedResponse.headers()["x-frame-options"]).toBe("SAMEORIGIN");
+  expect(embeddedResponse.headers()["content-security-policy"]).toContain("frame-ancestors 'self'");
+  await page.goto(`/sites/${siteId}/publish`);
   await expect(page.getByRole("button", { name: "Save school name and address" })).toBeVisible();
   const card = page.getByRole("article").filter({ has: page.getByRole("heading", { name: programName, exact: true }) }).filter({
     has: page.getByRole("button", { name: "Approve academic listing" }),

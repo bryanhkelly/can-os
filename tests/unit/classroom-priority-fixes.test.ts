@@ -6,20 +6,22 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8"
 describe("Classroom Connect P1 authorization and feedback boundaries", () => {
   it("does not use an arbitrary Course attempt to authorize facilitator media", () => {
     const api = read("src/modules/learning/facilitated-learning.functions.ts");
+    const privileged = read("src/modules/learning/facilitated-learning-operations.server.ts");
     expect(api).not.toContain("representativeAttempt");
     expect(api).toContain("currentRoomMediaAudience");
-    expect(api).toContain("facilitatedLearningParticipants.courseAttemptId");
-    expect(api).toContain("isNull(facilitatedLearningParticipants.leftAt)");
+    expect(privileged).toContain("facilitatedLearningParticipants.courseAttemptId");
+    expect(privileged).toContain("isNull(facilitatedLearningParticipants.leftAt)");
     expect(api).toContain("schoolAttemptIsPlacedAtSite(");
-    expect(api).toContain("eq(learnerProfiles.personId, participantPersonId)");
-    expect(api).toContain("eq(noncreditRegistrations.participantPersonId, participantPersonId)");
-    expect(api).toContain("eligibleAdoptions.set(attempt.adoptionId, attempt)");
+    expect(privileged).toContain("eq(learnerProfiles.personId, participantPersonId)");
+    expect(privileged).toContain("eq(noncreditRegistrations.participantPersonId, participantPersonId)");
+    expect(privileged).toContain("eligibleAdoptions.set(attempt.adoptionId, attempt)");
     expect(api).toContain("assertRoomMediaRightsForAudience");
-    expect(api.split("assertAuthorizedFacilitatedRoomMedia(").length - 1).toBe(3);
+    expect(api.split("assertAuthorizedFacilitatedRoomMedia(").length - 1).toBe(2);
+    expect(privileged).toContain("export async function assertAuthorizedFacilitatedRoomMedia(");
     // Media lists, signed URLs, and playback event writes all pass through
     // the same current audience / adoption enforcement, not a stale token.
-    expect(api.split("currentRoomMediaAudience(tx, room)").length - 1).toBe(2);
-    expect(api.split("assertRoomMediaRightsForAudience(").length - 1).toBe(3);
+    expect((api+privileged).split("currentRoomMediaAudience(tx, room)").length - 1).toBe(2);
+    expect((api+privileged).split("assertRoomMediaRightsForAudience(").length - 1).toBe(3);
   });
 
   it("derives operational expiry on the server and updates the open browser", () => {

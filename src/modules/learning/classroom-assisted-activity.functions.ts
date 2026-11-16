@@ -10,8 +10,8 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { classroomAttestationOpen } from "@/domain/classroom-attendance";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
-import { ownedRoom } from "./facilitated-learning.functions";
-import { registeredRoomParticipant } from "./classroom-attendance.functions";
+import { ownedRoom } from "./facilitated-learning-operations.server";
+import { registeredRoomParticipant } from "./classroom-attendance-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 
 const id=z.string().uuid();

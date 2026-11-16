@@ -64,7 +64,7 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(projector).toContain("Recheck approved recording access");
   });
   it("can start native Class recordings before QR pairing, using only the exact Class's enrollment rights",()=>{
-    const rooms=source("src/modules/learning/facilitated-learning.functions.ts");
+    const rooms=source("src/modules/learning/facilitated-learning-operations.server.ts");
     expect(rooms).toContain("const nativeClass=await assertNativeClassRoomStaff(tx,room)");
     expect(rooms).toContain("eq(canonicalClassEnrollments.classId,nativeClass.classId)");
     expect(rooms).toContain("nativeClassRoomParticipant(tx,room,candidate.attempt.id,candidate.personId)");

@@ -48,6 +48,7 @@ describe("canonical standalone Launch Studio", () => {
     expect(siteFirstLaunchSearch.parse({siteId:"exact-site",step:"preview"}))
       .toEqual({siteId:"exact-site",step:"preview"});
     expect(siteFirstLaunchSearch.parse({step:"invalid"}).step).toBe("site");
+    expect(siteFirstLaunchSearch.parse({step:"setup"}).step).toBe("setup");
     const route = source("src/routes/launch.site.tsx");
     expect(route).toContain("readSiteLaunchPreferences");
     expect(route).toContain("selectionError");

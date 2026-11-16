@@ -19,6 +19,7 @@ export const siteTemplateCatalog: ReadonlyArray<{
 export type PublicSiteHomeSections = {
   hero: string; vision: string; story: string; explore: string; academics: string;
   enrichment: string; closing: string; contact: string;
+  channelsLearning: string; channelsCommunity: string; channelsClosing: string;
 };
 
 /** Each design has a distinct content rhythm while preserving all approved facts. */
@@ -29,31 +30,31 @@ export function composePublicSiteHome(template: SiteTemplateId, sections: Public
     case "heritage": return sections.hero +
       '<div class="home-composition home-heritage"><div class="heritage-editorial-pair">' +
       join(["vision","story"]) + '</div>' +
-      join(["explore","academics","enrichment","closing","contact"]) + '</div>';
+      join(["explore","academics","channelsLearning","enrichment","channelsCommunity","closing","channelsClosing","contact"]) + '</div>';
     case "community": return sections.hero +
       '<div class="home-composition home-community"><div class="community-people-first">' +
-      join(["story","enrichment"]) + '</div>' +
-      join(["vision","explore","academics","contact","closing"]) + '</div>';
+      join(["story","enrichment","channelsCommunity"]) + '</div>' +
+      join(["vision","explore","academics","channelsLearning","contact","closing","channelsClosing"]) + '</div>';
     case "modern": return sections.hero +
       '<div class="home-composition home-modern"><div class="modern-information-first">' +
-      join(["academics","explore"]) + '</div>' +
-      join(["story","enrichment","vision","closing","contact"]) + '</div>';
+      join(["academics","channelsLearning","explore"]) + '</div>' +
+      join(["story","enrichment","channelsCommunity","vision","closing","channelsClosing","contact"]) + '</div>';
     case "bright-futures": return sections.hero +
       '<div class="home-composition home-bright"><div class="bright-family-first">' +
-      join(["explore","enrichment"]) + '</div>' +
-      join(["academics","vision","story","contact","closing"]) + '</div>';
+      join(["explore","enrichment","channelsCommunity"]) + '</div>' +
+      join(["academics","channelsLearning","vision","story","contact","closing","channelsClosing"]) + '</div>';
     case "summit": return sections.hero +
       '<div class="home-composition home-summit"><div class="summit-manifesto">' +
       sections.vision + '</div>' +
-      join(["academics","story","enrichment","explore","closing","contact"]) + '</div>';
+      join(["academics","channelsLearning","story","enrichment","channelsCommunity","explore","closing","channelsClosing","contact"]) + '</div>';
     case "classic": return sections.hero +
       '<div class="home-composition home-classic"><div class="classic-pillars">' +
-      join(["academics","vision","enrichment"]) + '</div>' +
-      join(["story","explore","closing","contact"]) + '</div>';
+      join(["academics","channelsLearning","vision","enrichment","channelsCommunity"]) + '</div>' +
+      join(["story","explore","closing","channelsClosing","contact"]) + '</div>';
     case "campus": return sections.hero +
       '<div class="home-composition home-campus"><div class="campus-stories">' +
-      join(["story","enrichment","explore"]) + '</div>' +
-      join(["vision","academics","closing","contact"]) + '</div>';
+      join(["story","enrichment","channelsCommunity","explore"]) + '</div>' +
+      join(["vision","academics","channelsLearning","closing","channelsClosing","contact"]) + '</div>';
   }
 }
 

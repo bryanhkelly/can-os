@@ -16,7 +16,7 @@ import { resolveClassVideo } from "@/domain/class-video";
 import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
 import { signPrivateObjectUrl } from "@/platform/storage/r2";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
-import { authorizedHostDeployment } from "./facilitated-learning.functions";
+import { authorizedHostDeployment } from "./facilitated-learning-operations.server";
 import { assertFacilitatedInstructionalPreview } from "./student-instructional-tracks.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 

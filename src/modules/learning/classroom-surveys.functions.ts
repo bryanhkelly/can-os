@@ -16,7 +16,7 @@ import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "./canonical-course-participation.server";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
-import { ownedRoom, roomHostIsCurrent } from "./facilitated-learning.functions";
+import { ownedRoom, roomHostIsCurrent } from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];

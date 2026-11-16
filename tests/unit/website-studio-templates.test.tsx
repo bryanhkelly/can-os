@@ -11,7 +11,8 @@ describe("Website Studio seven-template contract", () => {
   it("lists seven different layout systems, each with a complete ordered composition", () => {
     expect(siteTemplateCatalog.map(item => item.id)).toEqual([...siteTemplateIds]);
     const sections={hero:"HERO",vision:"VISION",story:"STORY",explore:"EXPLORE",
-      academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT"};
+      academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT",
+      channelsLearning:"__CHANNEL_LEARNING__",channelsCommunity:"__CHANNEL_COMMUNITY__",channelsClosing:"__CHANNEL_CLOSING__"};
     const layouts=siteTemplateIds.map(id=>composePublicSiteHome(id,sections));
     expect(new Set(layouts).size).toBe(7);
     for (const layout of layouts) for (const value of Object.values(sections))
@@ -21,7 +22,8 @@ describe("Website Studio seven-template contract", () => {
 
   it("renders seven distinct homepage structures with responsive hero styles", () => {
     const sections={hero:"HERO",vision:"VISION",story:"STORY",explore:"EXPLORE",
-      academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT"};
+      academics:"ACADEMICS",enrichment:"ENRICHMENT",closing:"CLOSING",contact:"CONTACT",
+      channelsLearning:"__CHANNEL_LEARNING__",channelsCommunity:"__CHANNEL_COMMUNITY__",channelsClosing:"__CHANNEL_CLOSING__"};
     const interiors=siteTemplateIds.map(id=>composePublicSiteInterior(id,"HERO","PRIMARY","SECONDARY"));
     expect(new Set(interiors).size).toBe(7);
     for(const id of siteTemplateIds) {

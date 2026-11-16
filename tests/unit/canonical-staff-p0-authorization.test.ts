@@ -80,12 +80,17 @@ describe("canonical single-login P0 authorization boundaries", () => {
     expect((publication.match(/requireCanonicalLabProvider\("noncredit.enrollment.manage"\)/g)??[]).length)
       .toBe(3);
     expect((publication.match(/assertCurrentCanonicalStaffForMutation/g)??[]).length)
-      .toBe(4); // import + three protected mutations
+      .toBe(6); // three server-handler imports + three protected mutations
     expect(publication).toContain(
       "inArray(noncreditSelfEnrollmentReleases.siteId,provider.siteIds)");
-    const cohorts=source("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
+    expect(publication).not.toContain('import { requireCanonicalLabProvider } from');
+    expect(publication).toContain('await import("@/modules/operations/canonical-capability-lab-access.server")');
+    const cohorts=source("src/modules/enrollment/noncredit-cohort-operations.server.ts");
+    const rpc=source("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
     expect(cohorts).toContain(
       "if(lock)await assertCurrentCanonicalStaffForMutation(tx,getRequest(),provider.actor)");
+    expect(rpc).not.toContain('from "@/modules/operations/canonical-capability-lab-access.server"');
+    expect(rpc).toContain('await import("./noncredit-cohort-operations.server")');
     const decisions=source(
       "src/modules/learning/noncredit-completion-decisions.functions.ts");
     const policy=source(

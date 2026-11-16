@@ -12,7 +12,7 @@ describe("generated workspace navigation", () => {
 
   it("preserves only the destination's supported institutional context", () => {
     const search = `?siteId=${siteId}&programId=${programId}&section=${section}&action=private&thread=private`;
-    expect(workspaceDestination("/launch/school", search)).toBe(`/launch/school?siteId=${siteId}&programId=${programId}`);
+    expect(workspaceDestination("/launch/site", search)).toBe(`/launch/site?siteId=${siteId}`);
     expect(workspaceDestination("/operations/curriculum", search)).toBe(`/operations/curriculum?programId=${programId}`);
     expect(workspaceDestination("/messages", search)).toBe("/messages");
   });
@@ -141,12 +141,12 @@ describe("generated workspace navigation", () => {
   it("assigns explicit nested operations journeys to administrator destinations", () => {
     for (const path of [
       "/operations/interest-events",
-      "/launch/school/00000000-0000-4000-8000-000000000001",
+      "/launch/site",
       "/operations/school-years/00000000-0000-4000-8000-000000000001",
       "/operations/school-years/new",
     ]) {
-      const owner = path.startsWith("/launch/school") || path === "/operations/interest-events"
-        ? "/launch/school"
+      const owner = path === "/launch/site" || path === "/operations/interest-events"
+        ? "/launch/site"
         : path.startsWith("/operations/school-years") ? "/operations/school-years" : "/home";
       expect(getActiveWorkspacePath(workspaceLinks.site_admin, path)).toBe(owner);
       expect(getActiveWorkspacePath(workspaceLinks.registrar, path)).toBe(owner);

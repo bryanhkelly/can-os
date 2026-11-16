@@ -16,7 +16,7 @@ import {
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   authorizedHostDeployment, createFacilitatedRoomForHost,
-} from "./facilitated-learning.functions";
+} from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];

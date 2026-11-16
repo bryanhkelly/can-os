@@ -16,7 +16,7 @@ import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facil
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
 import { requireFacilitatedLearningEnabled } from "@/modules/learning/canonical-learning-release.server";
 import { scheduleOneClassroom, validateClassroomTimes } from "@/modules/learning/classroom-scheduling.functions";
-import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning.functions";
+import { createFacilitatedRoomForHost } from "@/modules/learning/facilitated-learning-operations.server";
 import { canOpenScheduledClassroom } from "@/domain/classroom-scheduling";
 import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";

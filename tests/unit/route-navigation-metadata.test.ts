@@ -32,8 +32,8 @@ describe("route navigation metadata", () => {
   });
   it("owns Interest Events under Launch for both school administrator personas", () => {
     for (const role of ["site_admin", "registrar"] as const) {
-      expect(workspaceLinks[role].some(item => item.path === "/launch/school")).toBe(true);
-      expect(getActiveWorkspacePath(workspaceLinks[role], "/operations/interest-events")).toBe("/launch/school");
+      expect(workspaceLinks[role].some(item => item.path === "/launch/site")).toBe(true);
+      expect(getActiveWorkspacePath(workspaceLinks[role], "/operations/interest-events")).toBe("/launch/site");
     }
   });
 });

@@ -8,6 +8,8 @@ import {AuthorizationError} from "@/domain/command-context";
 import {requireActor} from "@/modules/identity/actors.server";
 import {publicSiteHost} from "@/domain/public-site-address";
 import {availablePublicSitePaths,renderPublicSiteHtml} from "@/domain/public-site-html";
+import {siteContentChannelConfigSchema,defaultSiteContentChannelConfig,resolveSiteContentBlocks} from "@/domain/site-content-channels";
+import {siteLaunchPreferencesSchema} from "@/domain/site-launch-preferences";
 import {isAcademicMarketingType,publicAcademicProgram} from "@/domain/academic-program-publication";
 import {createIllustrativeSchoolContent,emptySiteLocalContent} from "@/domain/site-local-content";
 import {launchOpeningDate} from "@/domain/launch-opening-date";
@@ -80,11 +82,18 @@ export const getLaunchWebsitePreparation=createServerFn({method:"GET"})
       });
   const site={name:school.siteName,organizationName:school.organizationName};
   const academicPrograms=[...approvedPrograms,...planning];
+  const config=siteContentChannelConfigSchema.safeParse(siteFlags?.metadata?.websiteContentChannels);
+  const launchPrefs=siteLaunchPreferencesSchema.safeParse(siteFlags?.metadata?.launchPreferences);
+  const contentBlocks=resolveSiteContentBlocks(
+    config.success?config.data:defaultSiteContentChannelConfig,{
+      mode:"private",preferences:launchPrefs.success?launchPrefs.data:null,
+      academicPrograms,enrichment:offerings,
+    });
   const page={host:base.host!,demonstration:siteFlags?.metadata?.synthetic===true,
     site,offerings,academicPrograms,localContent,media:projectApprovedSchoolSiteMedia(school.siteId,base.host!,photos),
     parentInformation:projectApprovedParentInformation({
       site,academicPrograms,offerings,localContent,...parentExtras,
-    }),
+    }),contentBlocks,
   };
   // The launch preview is private and intentionally form-inactive, even if
   // the school has other programs with independently authorized applications.

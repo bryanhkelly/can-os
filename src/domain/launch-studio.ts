@@ -2,7 +2,7 @@ import { z } from "zod";
 import { siteProgramSelectionSchema, optionalSearchString } from "@/lib/route-search";
 
 export const schoolLaunchSteps = ["welcome", "school", "academics", "website", "families", "readiness", "next"] as const;
-export const siteFirstLaunchSteps = ["site", "network", "interests", "preview"] as const;
+export const siteFirstLaunchSteps = ["site", "network", "interests", "preview", "setup"] as const;
 export type SiteFirstLaunchStep = typeof siteFirstLaunchSteps[number];
 export const siteFirstLaunchSearch = z.object({
   siteId: z.string().optional(),

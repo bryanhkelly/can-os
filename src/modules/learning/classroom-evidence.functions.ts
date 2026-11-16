@@ -18,7 +18,7 @@ import { authorizeCanonicalCourseAttempt } from "./canonical-course-participatio
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   ownedRoom, roomHostIsCurrent, schoolAttemptIsPlacedAtSite,
-} from "./facilitated-learning.functions";
+} from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 import { nativeClassForRoom } from "@/modules/classes/native-class-room-boundary.server";
 

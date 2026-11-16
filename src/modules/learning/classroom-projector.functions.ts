@@ -10,7 +10,7 @@ import { facilitatedRoomOperationalState } from "@/domain/facilitated-learning";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   ownedRoom, assertAuthorizedFacilitatedRoomMedia,
-} from "./facilitated-learning.functions";
+} from "./facilitated-learning-operations.server";
 import { requireFacilitatedLearningEnabled } from "./canonical-learning-release.server";
 
 const uuid = z.string().uuid();

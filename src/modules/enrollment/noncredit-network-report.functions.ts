@@ -10,7 +10,6 @@ import {
   noncreditTrainingVersions,participationAttributions,
   canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
-import {requireCanonicalLabProvider} from "@/modules/operations/canonical-capability-lab-access.server";
 import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
@@ -21,6 +20,7 @@ import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/ne
 export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
   .handler(async()=>{
     setResponseHeader("Cache-Control","private, no-store");
+    const {requireCanonicalLabProvider}=await import("@/modules/operations/canonical-capability-lab-access.server");
     const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
     const releases=await db.select({
       id:noncreditSelfEnrollmentReleases.id,

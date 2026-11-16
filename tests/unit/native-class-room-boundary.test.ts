@@ -18,15 +18,16 @@ describe("native Class room isolation contract",()=>{
     expect(source).toContain("eq(canonicalAccountGrants.roleCode,\"room_facilitator\")");
     expect(source).toContain("canonicalClassStaffAssignments");
     expect(source).toContain("currentClassAuthority");
-    const room=read("src/modules/learning/facilitated-learning.functions.ts");
+    const room=read("src/modules/learning/facilitated-learning-operations.server.ts");
     expect(room).toContain("await assertNativeClassRoomStaff(tx,room)");
   });
   it("prevents room playback and roll calls from selecting a different Class",()=>{
-    const room=read("src/modules/learning/facilitated-learning.functions.ts");
+    const room=read("src/modules/learning/facilitated-learning-operations.server.ts");
     expect(room).toContain("nativeClassRoomParticipant(tx,room,attempt.id,participantPersonId)");
-    const attendance=read("src/modules/learning/classroom-attendance.functions.ts");
+    const attendance=read("src/modules/learning/classroom-attendance-operations.server.ts");
     expect(attendance).toContain("eq(canonicalClassEnrollments.classId,native.classId)");
-    expect(attendance).toContain("assertNativeClassAttendanceReader");
+    const roster=read("src/modules/learning/classroom-attendance.functions.ts");
+    expect(roster).toContain("assertNativeClassAttendanceReader");
   });
   it("prevents learner identity, enrollment provenance or consent from being reassigned",()=>{
     const sql=read("database/canonical/v3.0.1/patch-unified-class-offerings.sql");
