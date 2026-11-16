@@ -68,7 +68,9 @@
     "test:e2e:noncredit": "playwright test --config=playwright.noncredit-self-enrollment.config.ts",
     "db:check:main": "node scripts/acceptance/check-production-drizzle-parity.mjs",
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
-    "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts"
+    "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts",
+    "db:canonical:classes": "node scripts/acceptance/check-native-class-schema.mjs",
+    "test:classes:unit": "vitest run tests/unit/unified-class.test.ts tests/unit/native-class-enrollment.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
