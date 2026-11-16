@@ -33,7 +33,10 @@ const filters: {id: ParticipationKind | "all"; title: string}[] = [
 ];
 function displayDate(value: string | null): string | null {
   if (!value) return null;
-  const parsed = new Date(value);
+  // Preserve date-only activity seasons across browser timezones.
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10)))
+    : new Date(value);
   return Number.isFinite(parsed.getTime()) ? parsed.toLocaleDateString(undefined, {
     year: "numeric", month: "short", day: "numeric",
   }) : null;
