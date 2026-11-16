@@ -36,3 +36,6 @@ export * from "./network-attribution";
 
 // WS3 approved-source evidence proposal; gated services until migration approval.
 export * from "./ws3-source-evidence";
+
+// WS3 reviewed Class completion policies and immutable enrollment pins (migration gated).
+export * from "./ws3-class-completion";
