@@ -4,6 +4,14 @@ Status: **native replacement model on a feature branch; not applied to a live da
 Canonical v3.0.1 remains the governing source of publisher rights, site/operation authority,
 learning identity, progress, school records, registration and completion evidence.
 
+## November 16 workstream boundary
+
+The feature branch includes scheduling, scalable discovery, a portable
+network launch recipe, facilitator reliability improvements and a reusable
+Course learning-activity source. This work deliberately excludes single-login
+multi-role completion, pilot impact reports and Class enrollment invitation /
+approval flows. Those remain post-merge product work and are not release claims.
+
 ## November 15 integration checkpoint
 
 The feature branch has incorporated the latest `main` authorization and
@@ -87,6 +95,7 @@ unmodified on main until a separately approved replacement deployment.
 - SQL, in order, on an isolated reviewed database only:
   1. database/canonical/v3.0.1/patch-unified-class-offerings.sql
   2. database/canonical/v3.0.1/patch-unified-class-course-attempts.sql
+  3. database/canonical/v3.0.1/patch-unified-class-activities.sql
 - Native operator creation/publishing/closing/revision commands:
   src/modules/classes/unified-class.functions.ts.
 - Native **adult self-enrollment** with current adult DOB verification, consent
@@ -116,7 +125,7 @@ unmodified on main until a separately approved replacement deployment.
   scripts/acceptance/check-native-class-schema.mjs.
 
 **Not activated:** no database migration was applied and no app role was granted
-access to the new tables. All six new tables have forced RLS, initially owner-only
+access to the new tables. All new native and private activity tables have forced RLS, initially owner-only
 policies, and are not safely available to application roles until reviewed scoped
 authorization. Native server functions require CAN_UNIFIED_CLASS_COMMANDS_ENABLED=true,
 but setting this alone is NOT a release approval.
@@ -192,11 +201,37 @@ Class → Course/Offering adoption → operator/Site authorization checks.
 Academic assignments, grades and transcript credit are never inferred from
 a chosen presenter or video play event.
 
-The native player intentionally **does not** render noncredit-specific
-knowledge checks, completion readiness or surveys, and it does not enable
-facilitated room pairing until native Class-to-Session release validation is
-implemented. Optional activity telemetry is similarly disabled on native Class
-attempts pending its restricted-reader grants.
+The native learner's **Assignments** tab now has reusable publisher-owned
+Course-version knowledge checks, consented identified feedback and a noncredit
+completion-evidence confirmation. Correct quiz choices and submitted feedback
+bodies are kept in `education_v30_secure`, never projected to the learner or
+classroom host. This low-stakes check does **not** reuse noncredit registration,
+issue academic grades or certificates, or attribute classroom screen playback
+as individual completion. The first submission pins the learner to the
+published Course activity version; later publisher revisions cannot rewrite
+their historical responses or requirements. The publisher's authoring surface
+is `/canonical/course-activities` and is restricted by current organization
+ownership and verified staff authority. The Courses themselves are still
+centrally governed and are not copied to each Site.
+
+The Class Session planner now accepts a one-off Session, four weekly Sessions
+or up to twelve custom dated Sessions. Wall-clock input is interpreted in
+the canonical hosting Site's `time_zone`; invalid or ambiguous daylight-saving
+times are rejected. The facilitator sees preparation checks, live controls
+and session closure in one flow. Existing presenter-screen authentication
+remains mandatory; an untrusted-display handoff is NOT enabled.
+
+The learner directory has server-side search, stable keyset pagination and
+a Course title index. The manager roster has separately authorized paging.
+A portable network Class launch recipe carries only Course identity and
+proposed setup defaults, never enrollment, Site grants or publisher rights.
+Each receiving Site must validate its own current adoption and create its
+own Class using the existing governed creation command.
+
+All of these changes are **source-level implementation only**, pending
+an isolated database migration with actual restricted app-role tests,
+working CI and authenticated cross-Site acceptance. The native
+Class-to-Session and Course Attempt authorization checks remain mandatory.
 
 ### Class-specific Sessions and facilitated classroom delivery
 
