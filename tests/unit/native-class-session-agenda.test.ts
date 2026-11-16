@@ -85,6 +85,14 @@ describe("WS4 immutable Course-linked Session agenda", () => {
     expect(requiresClassSessionAgenda({
       featureEnabled:true,mandatoryFrom:cutoff,sessionCreatedAt:newSession,
     })).toBe(true);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-11-16T22:00:00.000Z",
+      sessionCreatedAt:newSession,
+    })).toBe(true);
+    expect(()=>requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-02-30T22:00:00Z",
+      sessionCreatedAt:newSession,
+    })).toThrow(/UTC/);
     expect(()=>requiresClassSessionAgenda({
       featureEnabled:true,mandatoryFrom:"2026-11-16",sessionCreatedAt:newSession,
     })).toThrow(/UTC/);
