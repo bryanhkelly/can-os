@@ -10,10 +10,10 @@ import {
   noncreditCompletionCertificates, noncreditCompletionDecisions,
   noncreditRegistrations, noncreditTrainingVersions,
 } from "@/db/canonical-v301";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { AuthorizationError } from "@/domain/command-context";
 import { credentialIsCurrent, evaluateAchievementAward } from "@/domain/credential-awards";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
-import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
+import { assertCurrentCredentialIssuer } from "@/modules/identity/canonical-sensitive-authorization.server";
 
 const inputSchema = z.object({
   credentialDefinitionVersionId: z.string().uuid(),
@@ -34,7 +34,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
     const actor = await getCanonicalCommandContext(getRequest());
     if (!actor.actorPersonId || !["registrar", "site_admin"].includes(actor.role ?? ""))
       throw new AuthorizationError("authorized credential issuer");
-    assertCapability(actor, "credential.issue");
+    // Credential issuance is NOT a role capability. A current, independently\n    // reviewed, expiring issuer approval is required inside the write transaction.
 
     return db.transaction(async tx => {
       const [definition] = await tx.select({
@@ -126,7 +126,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
       }
       if (existing) throw new AuthorizationError("incomplete credential issuance");
 
-      await assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor);
+      await assertCurrentCredentialIssuer(tx,getRequest(),actor);
       const [award] = await tx.insert(learnerAchievementDecisions).values({
         credentialDefinitionVersionId: definition.versionId,
         recipientPersonId: registration.participantPersonId,
