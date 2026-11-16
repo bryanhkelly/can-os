@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
 import { scheduleNativeClassSessions, openNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
+import { NativeClassroomHostPanel } from "@/components/learning/NativeClassroomHostPanel";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
 type ClassWorkspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
@@ -27,9 +28,10 @@ function buildFourWeekMeetings(firstLocal:string,durationMinutes:number,ids:stri
 }
 
 export function NativeClassSessionsPanel({
-  workspace,canSchedule=false,onChanged,
+  workspace,canSchedule=false,showConsole=false,onChanged,
 }:{
-  workspace:ClassWorkspace;canSchedule?:boolean;onChanged?:()=>Promise<unknown>;
+  workspace:ClassWorkspace;canSchedule?:boolean;showConsole?:boolean;
+  onChanged?:()=>Promise<unknown>;
 }){
   const [first,setFirst]=useState("");
   const [minutes,setMinutes]=useState(60);
@@ -38,6 +40,10 @@ export function NativeClassSessionsPanel({
   const [opened,setOpened]=useState<{roomId:string;pairingCode:string|null;expiresAt:string|null}|null>(null);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
+  const activeSession=workspace.sessions.find(session=>
+    session.id===workspace.selectedSessionId &&
+    session.isMySession && session.roomState==="live") ??
+    workspace.sessions.find(session=>session.isMySession && session.roomState==="live");
   async function createFour(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
     if(busy||!canSchedule||!workspace.siteId)return;
@@ -86,16 +92,21 @@ export function NativeClassSessionsPanel({
           <p className="mt-1 text-sm">{utcDisplay(session.startsAt)}
             {" to "}{utcDisplay(session.endsAt)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Status: {session.state==="scheduled"?"Scheduled":
+            Status: {session.roomState==="ended"?"Ended":
+              session.state==="scheduled"?"Scheduled":
               session.state==="started"?"Started":"Cancelled"}
           </p>
         </div>
         {canSchedule&&session.isMySession&&<div className="flex flex-wrap items-center gap-2">
           {session.state==="scheduled"&&<Button size="sm" variant="outline" disabled={busy}
             onClick={()=>void start(session.id)}>Open room</Button>}
-          {session.roomId&&<Link to="/classroom/$sessionId/presentation"
+          {session.roomId&&session.roomState==="live"&&<Link
+            to="/classes/$classId" params={{classId:workspace.classId}}
+            search={{view:"teach",tab:"classroom",session:session.id,lesson:undefined}}
+            className="text-sm font-semibold underline">Private class controls</Link>}
+          {session.roomId&&session.roomState==="live"&&<Link to="/classroom/$sessionId/presentation"
             params={{sessionId:session.roomId}}
-            className="text-sm font-semibold underline">Projector view</Link>}
+            className="text-sm font-semibold underline">Audience display</Link>}
           <span className="text-xs text-muted-foreground">Your Class Session</span>
         </div>}
       </li>)}
@@ -119,6 +130,19 @@ export function NativeClassSessionsPanel({
         A paired device is not proof of learner attendance or lesson completion.
       </p>
     </div>}
+    {showConsole&&canSchedule&&activeSession?.roomId&&
+      <NativeClassroomHostPanel key={activeSession.roomId}
+        roomId={activeSession.roomId}
+        canReviewAttendance={workspace.canViewRoster}
+        initialCode={opened?.roomId===activeSession.roomId?opened.pairingCode:null}
+        initialExpiry={opened?.roomId===activeSession.roomId?opened.expiresAt:null}
+        onClosed={async()=>{setOpened(null);await onChanged?.();}}
+      />}
+    {showConsole&&canSchedule&&!activeSession&&
+      <p role="status" className="mt-5 border border-border p-4 text-sm">
+        Open an authorized scheduled Session to use the private playback,
+        activity and attendance controls.
+      </p>}
     {workspace.sessionsTruncated&&<p className="mt-4 text-sm text-muted-foreground">
       Showing the first 100 Sessions. Additional results require pagination.
     </p>}
