@@ -57,13 +57,15 @@ export function NoncreditNetworkReportPanel(){
           <table className="w-full text-left text-sm">
             <thead><tr className="border-b border-border bg-muted/30">
               <th scope="col" className="p-3">Organization</th>
+              <th scope="col" className="p-3">Reporting unit at registration</th>
               <th scope="col" className="p-3">Basis</th>
               <th scope="col" className="p-3">Registrations</th>
               <th scope="col" className="p-3">Completed</th>
             </tr></thead>
             <tbody>{report.data.affiliations.map(row=>
-              <tr key={row.organizationId+":"+(row.reportingUnitId??"provider")} className="border-b border-border">
+              <tr key={[row.organizationId,row.networkMembershipId??"provider",row.reportingUnitId??"none",row.basis].join(":")} className="border-b border-border">
                 <th scope="row" className="p-3 font-medium">{row.organizationName}</th>
+                <td className="p-3">{row.reportingUnitName??"Provider Site"}</td>
                 <td className="p-3">{row.basis==="self_reported"?"Self-reported local":"Provider default"}</td>
                 <td className="p-3 tabular-nums">{row.registrations}</td>
                 <td className="p-3 tabular-nums">{row.completed}</td>
