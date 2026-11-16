@@ -2,40 +2,32 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
+import { buildSiteClassMeetings, displaySiteClassTime, siteWallWeek, type LocalMeeting } from "@/domain/class-session-local-time";
 import { scheduleNativeClassSessions, openNativeClassSession, revokeNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
 import { NativeClassroomHostPanel } from "@/components/learning/NativeClassroomHostPanel";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
 type ClassWorkspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
 
-function utcDisplay(value:string):string{
-  return value.replace("T"," ").slice(0,16)+" UTC";
+type SchedulingMode="weekly"|"single"|"custom";
+type CustomRow={id:string;localStart:string;minutes:number};
+function newCustomRow():CustomRow{
+  return {id:crypto.randomUUID(),localStart:"",minutes:60};
 }
-function buildFourWeekMeetings(firstLocal:string,durationMinutes:number,ids:string[]){
-  const start=new Date(firstLocal);
-  if(!Number.isFinite(start.getTime()) || !Number.isInteger(durationMinutes) ||
-     durationMinutes<15||durationMinutes>480||ids.length!==4){
-    throw new Error("Choose a valid future start time and a 15–480-minute duration.");
-  }
-  return ids.map((requestId,index)=>{
-    const day=new Date(start);
-    // Advance calendar weeks in the facilitator's local timezone, not by a
-    // fixed millisecond duration that may shift across DST.
-    day.setDate(day.getDate()+index*7);
-    const end=new Date(day.getTime()+durationMinutes*60_000);
-    return {requestId,startsAt:day.toISOString(),endsAt:end.toISOString()};
-  });
-}
-
 export function NativeClassSessionsPanel({
   workspace,canSchedule=false,showConsole=false,canRevoke=false,onChanged,
 }:{
   workspace:ClassWorkspace;canSchedule?:boolean;showConsole?:boolean;canRevoke?:boolean;
   onChanged?:()=>Promise<unknown>;
 }){
+  const [mode,setMode]=useState<SchedulingMode>("weekly");
   const [first,setFirst]=useState("");
   const [minutes,setMinutes]=useState(60);
+  const [customRows,setCustomRows]=useState<CustomRow[]>([newCustomRow()]);
   const [requestIds,setRequestIds]=useState<string[]>([]);
+  const [scheduled,setScheduled]=useState(false);
+  const [prepared,setPrepared]=useState({media:false,display:false,room:false});
+  const siteTimeZone=workspace.siteTimeZone;
   const [busy,setBusy]=useState(false);
   const [opened,setOpened]=useState<{roomId:string;pairingCode:string|null;expiresAt:string|null}|null>(null);
   const [notice,setNotice]=useState("");
@@ -46,23 +38,46 @@ export function NativeClassSessionsPanel({
     session.id===workspace.selectedSessionId &&
     session.isMySession && session.roomState==="live") ??
     workspace.sessions.find(session=>session.isMySession && session.roomState==="live");
-  async function createFour(event:FormEvent<HTMLFormElement>){
+  async function createMeetings(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
-    if(busy||!canSchedule||!workspace.siteId)return;
+    if(busy||scheduled||!canSchedule||!workspace.siteId)return;
     setError("");setNotice("");setBusy(true);
     try{
-      const ids=requestIds.length===4?requestIds:
-        Array.from({length:4},()=>crypto.randomUUID());
-      if(requestIds.length!==4)setRequestIds(ids);
-      const meetings=buildFourWeekMeetings(first,minutes,ids);
+      const wanted=mode==="weekly"?4:mode==="single"?1:customRows.length;
+      const ids=requestIds.length===wanted?requestIds:
+        Array.from({length:wanted},()=>crypto.randomUUID());
+      if(requestIds.length!==wanted)setRequestIds(ids);
+      const local:LocalMeeting[]=mode==="custom"?
+        customRows.map((row,index)=>({
+          requestId:ids[index]!,localStart:row.localStart,durationMinutes:row.minutes,
+        })):
+        ids.map((id,index)=>({
+          requestId:id,
+          localStart:mode==="weekly"?siteWallWeek(first,index):first,
+          durationMinutes:minutes,
+        }));
+      const meetings=buildSiteClassMeetings(local,siteTimeZone);
       const result=await scheduleNativeClassSessions({data:{
-        classId:workspace.classId,cadence:"weekly",meetings,
+        classId:workspace.classId,
+        cadence:mode==="weekly"?"weekly":"custom",meetings,
       }});
       await onChanged?.();
-      setNotice(result.created+" dated Class Sessions scheduled. No room playback or attendance has been activated.");
+      setScheduled(true);
+      setNotice(result.created+" Class Session"+(result.created===1?"":"s")+
+        " scheduled in "+siteTimeZone+". Scheduling does not record learner attendance.");
     }catch(e){
       setError(normalizeClientError(e,"Unable to schedule this Class.").message);
-    }finally{setBusy(false)}
+    }finally{setBusy(false);}
+  }
+  function resetSchedule(){
+    setRequestIds([]);
+    setScheduled(false);
+  }
+  function changeRow(id:string,update:Partial<Pick<CustomRow,"localStart"|"minutes">>){
+    resetSchedule();
+    setCustomRows(current=>current.map(row=>row.id===id?{
+      ...row,...update,id:crypto.randomUUID(),
+    }:row));
   }
   async function start(classSessionId:string){
     if(!canSchedule||busy)return;
@@ -98,15 +113,40 @@ export function NativeClassSessionsPanel({
       Dates come from the canonical delivery timetable. Scheduling does not
       enroll learners, verify attendance, or authorize projected video playback.
     </p>
+    {canSchedule&&<section className="mt-4 border border-border bg-muted/20 p-4"
+      aria-label="Prepare this classroom">
+      <h3 className="text-base font-semibold">Before Class · Ready to teach</h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Check your classroom setup before opening the room. These are local preparation
+        reminders, not stored attendance or compliance evidence.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+        {([
+          ["media","Approved lesson and captions checked"],
+          ["display","TV, audio and projected text checked"],
+          ["room","Participant joining instructions ready"],
+        ] as const).map(([key,label])=><label key={key}
+          className="flex min-h-11 items-start gap-2 border border-border p-3 text-sm">
+          <input type="checkbox" checked={prepared[key]}
+            onChange={e=>setPrepared(current=>({...current,[key]:e.target.checked}))}
+            className="mt-1"/>
+          {label}
+        </label>)}
+      </div>
+      {!Object.values(prepared).every(Boolean)&&<p className="mt-2 text-xs text-muted-foreground">
+        {Object.values(prepared).filter(Boolean).length} of 3 preparation checks acknowledged.
+        You can still open a classroom if you need to.
+      </p>}
+    </section>}
     {workspace.sessions.length?<ol className="mt-4 divide-y divide-border border-t border-border">
       {workspace.sessions.map((session,index)=><li key={session.id}
         className="grid gap-2 py-4 sm:grid-cols-[minmax(0,1fr)_auto]">
         <div>
           <p className="text-sm font-semibold">Session {index+1}</p>
-          <p className="mt-1 text-sm">{utcDisplay(session.startsAt)}
-            {" to "}{utcDisplay(session.endsAt)}</p>
+          <p className="mt-1 text-sm">{displaySiteClassTime(session.startsAt,siteTimeZone)}
+            {" to "}{displaySiteClassTime(session.endsAt,siteTimeZone)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Status: {session.roomState==="ended"?"Ended":
+            Status: {session.roomState==="ended"?"After Class · Ended":
               session.state==="scheduled"?"Scheduled":
               session.state==="started"?"Started":"Cancelled"}
           </p>
@@ -154,7 +194,7 @@ export function NativeClassSessionsPanel({
         Join code: {opened.pairingCode}
       </p>}
       {opened.expiresAt&&<p className="mt-1 text-xs text-muted-foreground">
-        One-time pairing expires: {utcDisplay(opened.expiresAt)}
+        One-time pairing expires: {displaySiteClassTime(opened.expiresAt,siteTimeZone)}
       </p>}
       <Link to="/classroom/$sessionId/presentation" params={{sessionId:opened.roomId}}
         hash={opened.pairingCode&&opened.expiresAt
@@ -181,32 +221,78 @@ export function NativeClassSessionsPanel({
     {workspace.sessionsTruncated&&<p className="mt-4 text-sm text-muted-foreground">
       Showing the first 100 Sessions. Additional results require pagination.
     </p>}
-    {canSchedule&&workspace.siteId&&<form onSubmit={e=>void createFour(e)}
+    {canSchedule&&workspace.siteId&&<form onSubmit={e=>void createMeetings(e)}
       className="mt-6 space-y-4 border-t border-border pt-5">
-      <h3 className="text-base font-semibold">Schedule a four-week series</h3>
+      <h3 className="text-base font-semibold">Schedule Class Sessions</h3>
       <p className="text-sm text-muted-foreground">
-        Four consecutive weekly meetings at this Class's approved hosting Site.
-        Only a currently assigned teacher or facilitator may schedule.
+        Enter times in the hosting Site's time zone:
+        <strong> {siteTimeZone}</strong>. Meetings retain local wall-clock time
+        across daylight-saving changes. Ambiguous or missing times are rejected.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <fieldset className="flex flex-wrap gap-3">
+        <legend className="mb-2 text-sm font-semibold">Schedule type</legend>
+        {([
+          ["weekly","Four weekly Sessions"],
+          ["single","One Session"],
+          ["custom","Custom dates (up to 12)"],
+        ] as const).map(([value,label])=><label key={value}
+          className="flex min-h-11 items-center gap-2 border border-border px-3 text-sm">
+          <input type="radio" name={"native-schedule-"+workspace.classId}
+            checked={mode===value} onChange={()=>{setMode(value);resetSchedule();}}/>
+          {label}
+        </label>)}
+      </fieldset>
+      {mode!=="custom"?<div className="grid gap-3 sm:grid-cols-2">
         <div><label htmlFor="native-series-start" className="block text-sm font-semibold">
-          First session (your local time)
+          {mode==="weekly"?"First Session":"Session"} start ({siteTimeZone})
         </label>
           <input id="native-series-start" type="datetime-local" required value={first}
-            onChange={e=>{setFirst(e.target.value);setRequestIds([]);}}
+            onChange={e=>{setFirst(e.target.value);resetSchedule();}}
             className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
         </div>
         <div><label htmlFor="native-series-duration" className="block text-sm font-semibold">
           Duration (minutes)
         </label>
           <input id="native-series-duration" type="number" required min={15} max={480}
-            value={minutes} onChange={e=>{setMinutes(Number(e.target.value));setRequestIds([]);}}
+            value={minutes} onChange={e=>{setMinutes(Number(e.target.value));resetSchedule();}}
             className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
         </div>
-      </div>
-      <Button type="submit" disabled={!first||busy}>
-        {busy?"Scheduling…":"Schedule four Sessions"}
+      </div>:<div className="space-y-3">
+        {customRows.map((row,index)=><div key={row.id}
+          className="grid items-end gap-3 border border-border p-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
+          <div>
+            <label className="text-sm font-semibold" htmlFor={"class-custom-"+row.id}>
+              Session {index+1} start ({siteTimeZone})
+            </label>
+            <input id={"class-custom-"+row.id} type="datetime-local" required
+              value={row.localStart} onChange={e=>changeRow(row.id,{localStart:e.target.value})}
+              className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+          </div>
+          <div>
+            <label className="text-sm font-semibold" htmlFor={"class-minutes-"+row.id}>
+              Minutes
+            </label>
+            <input id={"class-minutes-"+row.id} type="number" min={15} max={480} required
+              value={row.minutes} onChange={e=>changeRow(row.id,{minutes:Number(e.target.value)})}
+              className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+          </div>
+          <Button size="sm" variant="outline" type="button" disabled={customRows.length<=1||busy}
+            onClick={()=>{setCustomRows(rows=>rows.filter(item=>item.id!==row.id));resetSchedule();}}>
+            Remove
+          </Button>
+        </div>)}
+        <Button type="button" variant="outline" disabled={busy||customRows.length>=12}
+          onClick={()=>{setCustomRows(rows=>[...rows,newCustomRow()]);resetSchedule();}}>
+          Add another Session
+        </Button>
+      </div>}
+      <Button type="submit" disabled={scheduled||busy||
+        (mode!=="custom"&&!first)||(mode==="custom"&&customRows.some(row=>!row.localStart))}>
+        {busy?"Scheduling…":scheduled?"Sessions scheduled":"Schedule "+(mode==="weekly"?"four Sessions":mode==="single"?"one Session":"custom Sessions")}
       </Button>
+      {scheduled&&<p role="status" className="text-sm">
+        Saved. Change the date, duration or schedule type to create another booking.
+      </p>}
     </form>}
     {notice&&<p role="status" className="mt-4 text-sm">{notice}</p>}
     {error&&<p role="alert" className="mt-4 text-sm">{error}</p>}
