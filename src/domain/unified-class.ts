@@ -26,8 +26,8 @@ export const classDefinitionSchema = z.object({
 export type ClassDefinition = z.infer<typeof classDefinitionSchema>;
 
 const dateTime = z.string().datetime({ offset: true });
-// A Class Offering exists for assigned/private Classes too; its public listing
-// and its enrollment mechanism are independent settings.
+// Class Offering is OPTIONAL: visibility and enrollment methods are publication terms,
+// not the Class identity or required source for assigned enrollment.
 export const classOfferingTermsSchema = z.object({
   visibility: classVisibilitySchema,
   enrollmentMethods: z.array(classEnrollmentMethodSchema).min(1).max(4)
@@ -55,12 +55,17 @@ export type ClassOfferingTerms = z.infer<typeof classOfferingTermsSchema>;
 // learner or a promise of an award.
 export const classEnrollmentRequestSchema = z.object({
   classId: uuid,
-  classOfferingVersionId: uuid,
+  classOfferingVersionId: uuid.nullable(),
   learnerPersonId: uuid,
   enrollmentMethod: classEnrollmentMethodSchema,
   creditMode: classCreditModeSchema,
 }).strict();
 export type ClassEnrollmentRequest = z.infer<typeof classEnrollmentRequestSchema>;
+
+/** Direct school/organization assignment can be authorized without a Class Offering. */
+export function enrollmentNeedsOffering(method:z.infer<typeof classEnrollmentMethodSchema>):boolean{
+  return method==="self" || method==="invitation" || method==="approval";
+}
 
 export function validOfferingProductKind(
   kind: PublisherOfferingKind, courseCount: number, hasOtherRequiredComponents: boolean,
