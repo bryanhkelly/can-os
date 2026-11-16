@@ -1,0 +1,213 @@
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import {
+  getUnifiedClassCourseOptions, getMyUnifiedClassDrafts,
+} from "@/modules/classes/unified-class.functions";
+import { getNativeOfferingVersionImpact } from "@/modules/programs/publisher-version-impact.functions";
+import { localClassFields, publisherOwnedFields } from "@/domain/publisher-class-variation";
+
+/**
+ * One operator-facing administrative entry point. Published product authority
+ * remains with publisher editors and independent reviewers. This route is an
+ * authorized READ of local adoptions, versions and delivery readiness.
+ */
+export const Route=createFileRoute("/canonical/program-operations")({
+  component:ProgramOperations,
+});
+
+function ProgramOperations(){
+  const [searchInput,setSearchInput]=useState("");
+  const [search,setSearch]=useState("");
+  const [selectedKey,setSelectedKey]=useState("");
+  const catalog=useInfiniteQuery({
+    queryKey:["program-operations-catalog",search],
+    initialPageParam:0,
+    queryFn:({pageParam})=>getUnifiedClassCourseOptions({data:{search,cursor:pageParam}}),
+    getNextPageParam:page=>page.nextCursor??undefined,
+    retry:false,
+  });
+  const classes=useQuery({
+    queryKey:["native-class-operator-classes"],
+    queryFn:()=>getMyUnifiedClassDrafts(),retry:false,
+  });
+  const rows=catalog.data?.pages.flatMap(page=>page.items)??[];
+  const grouped=new Map<string,typeof rows>();
+  for(const row of rows){
+    const key=[row.deploymentId,row.adoptionId,row.offeringVersionId].join(":");
+    grouped.set(key,[...(grouped.get(key)??[]),row]);
+  }
+  const groups=[...grouped].map(([key,components])=>({
+    key,first:components[0]!,
+    components:components
+      .filter((row,index)=>components.findIndex(other=>other.courseVersionId===row.courseVersionId)===index)
+      .sort((a,b)=>(a.sequenceNo??Number.MAX_SAFE_INTEGER)-(b.sequenceNo??Number.MAX_SAFE_INTEGER)),
+  }));
+  const selected=groups.find(group=>group.key===selectedKey)??null;
+  const impact=useQuery({
+    queryKey:["program-operations-version-impact",selected?.first.offeringId],
+    enabled:!!selected,
+    queryFn:()=>getNativeOfferingVersionImpact({data:{offeringId:selected!.first.offeringId}}),
+    retry:false,
+  });
+  const localClasses=(classes.data??[]).filter(cls=>selected&&
+    cls.offeringVersionId===selected.first.offeringVersionId&&
+    cls.deploymentId===selected.first.deploymentId);
+  const classVersions=impact.data?.localClassImpact.filter(row=>
+    row.offeringVersionId===selected?.first.offeringVersionId)??[];
+  const classesAtVersion=classVersions.reduce((total,row)=>total+row.classCount,0);
+  const activeAtVersion=classVersions.filter(row=>row.state==="active")
+    .reduce((total,row)=>total+row.classCount,0);
+  return <WorkspaceShell width="wide" eyebrow="CAN OS · Publisher and Program Operations"
+    title="Program operations"
+    subtitle="Follow the approved publisher product from immutable Course versions to each authorized local Class. Independent operators do not need a network affiliation."
+    actions={<div className="flex flex-wrap gap-4 text-sm font-semibold">
+      <Link to="/canonical/classes" className="underline underline-offset-4">Manage local Classes</Link>
+      <Link to="/canonical/blueprints" className="underline underline-offset-4">Publisher Blueprints</Link>
+      <Link to="/canonical/lab/deployments" className="underline underline-offset-4">Deployments and adoption</Link>
+    </div>}>
+    <section className="mt-5 border border-border bg-card p-5">
+      <h2 className="font-serif text-2xl">Approved Products</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Your current operating Organization and authorized Sites determine what appears.
+        Published content belongs to its publisher. This page cannot approve publisher changes.
+      </p>
+      <form onSubmit={event=>{event.preventDefault();setSearch(searchInput.trim());setSelectedKey("");}}
+        className="mt-4 flex flex-wrap items-end gap-3">
+        <label className="min-w-[15rem] flex-1 text-sm font-semibold" htmlFor="program-search">
+          Program, Course or Deployment
+          <input id="program-search" value={searchInput} maxLength={100}
+            onChange={event=>setSearchInput(event.target.value)}
+            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+            placeholder="Search approved products"/>
+        </label>
+        <Button type="submit">Search</Button>
+        {search&&<Button type="button" variant="outline" onClick={()=>{
+          setSearch("");setSearchInput("");setSelectedKey("");
+        }}>Clear</Button>}
+      </form>
+      {catalog.isPending&&<p role="status" className="mt-4 text-sm">Checking approved Programs and Courses…</p>}
+      {catalog.isError&&<p role="alert" className="mt-4 text-sm">
+        This workspace is not available for the current operator or release environment.
+      </p>}
+      {catalog.isSuccess&&groups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
+        No matching published, adopted Courses are currently available within your authorized Sites.
+      </p>}
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {groups.map(group=><article key={group.key} className="border border-border p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            {group.first.offeringKind==="program"?"Program":
+              group.first.offeringKind==="course"?"Standalone Course":"Published Offering"}
+            {" · "}publisher version {group.first.offeringVersionNo}
+          </p>
+          <h3 className="mt-2 font-semibold">{group.first.offeringTitle}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {group.first.deploymentName} · {group.components.length} loaded Course component(s)
+          </p>
+          <ul className="mt-3 space-y-2">
+            {group.components.map(course=><li key={course.courseVersionId}
+              className="border-t border-border pt-2 text-sm">
+              <span className="font-semibold">{course.courseTitle} v{course.courseVersionNo}</span>
+              <span className="text-muted-foreground">
+                {" · "}{course.isRequired?"Required":"Optional"}
+                {" · "}{course.siteOptions.length} authorized Site(s)
+              </span>
+            </li>)}
+          </ul>
+          <Button type="button" variant="outline" className="mt-4"
+            onClick={()=>setSelectedKey(group.key)}>Review rollout</Button>
+        </article>)}
+      </div>
+      {catalog.hasNextPage&&<Button type="button" variant="outline" className="mt-4"
+        disabled={catalog.isFetchingNextPage} onClick={()=>void catalog.fetchNextPage()}>
+        {catalog.isFetchingNextPage?"Loading…":"Load more approved products"}
+      </Button>}
+    </section>
+    {selected&&<section className="mt-5 border border-border bg-card p-5"
+      aria-label="Selected Offering rollout and version impact">
+      <h2 className="font-serif text-2xl">{selected.first.offeringTitle}</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Local Deployment: {selected.first.deploymentName}. Adopted publisher Offering v{selected.first.offeringVersionNo}.
+        A new publisher release does not upgrade active Classes automatically.
+      </p>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        {[
+          ["Publisher","Published version"],
+          ["Operator","Adoption approved"],
+          ["Site","Delivery authorized"],
+          ["Local Class",activeAtVersion?"Active delivery":classesAtVersion?"Draft or inactive":"Not yet launched"],
+        ].map(([label,detail])=><div key={label} className="border border-border bg-muted/20 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+          <p className="mt-1 text-sm font-semibold">{detail}</p>
+        </div>)}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        These milestones are derived from current canonical records. They are not a replacement
+        for durable publisher approvals or an authoritative rollout event ledger.
+      </p>
+      {impact.isPending&&<p role="status" className="mt-4 text-sm">Checking publisher version impact…</p>}
+      {impact.isError&&<p role="alert" className="mt-4 text-sm">
+        Version impact cannot be verified under the current scope. No upgrade recommendation is available.
+      </p>}
+      {impact.data&&<div className="mt-4 border-t border-border pt-4">
+        <h3 className="text-lg font-semibold">Version impact</h3>
+        <p className="mt-2 text-sm">
+          Latest published publisher version: <strong>{impact.data.latestPublishedVersionNo??"Unknown"}</strong>.
+          {" "}Current Deployment adoption: <strong>v{selected.first.offeringVersionNo}</strong>.
+          {impact.data.latestPublishedVersionNo!==null&&
+            impact.data.latestPublishedVersionNo>selected.first.offeringVersionNo
+            ?" A newer version requires separate review and approved adoption.":" No newer published version was found."}
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Across the Sites currently authorized to this operator, {classesAtVersion} Class(es)
+          reference this pinned version; {activeAtVersion} are active.
+          The full Class count comes from the server, not this page's limited Class list.
+        </p>
+        {impact.data.publisherVersionsTruncated&&<p className="mt-2 text-xs text-muted-foreground">
+          More than 100 publisher versions exist. The version history shown here is limited.
+        </p>}
+        <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
+          <Link to="/canonical/lab/deployments" className="underline">Review approved adoption</Link>
+          <Link to="/canonical/classes" className="underline">Prepare or revise local Class</Link>
+        </div>
+      </div>}
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="border border-border p-4">
+          <h3 className="font-semibold">Publisher-controlled and immutable</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The receiving operator cannot replace these by editing a Class.
+          </p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+            {publisherOwnedFields.map(field=><li key={field}>{field}</li>)}
+          </ul>
+        </div>
+        <div className="border border-border p-4">
+          <h3 className="font-semibold">Locally configurable, subject to approval</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Local choices still require Site grants and any publisher Class policy.
+          </p>
+          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm">
+            {localClassFields.map(field=><li key={field}>{field}</li>)}
+          </ul>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Publisher variation approvals outside the published policy require a separately governed workflow.
+          </p>
+        </div>
+      </div>
+      <h3 className="mt-5 font-semibold">Local Class operations</h3>
+      {classes.isError&&<p role="alert" className="mt-2 text-sm">Class list unavailable.</p>}
+      {localClasses.length===0&&<p className="mt-2 text-sm text-muted-foreground">
+        No matching Class was found in the current bounded operator list. This does not establish zero Classes nationally.
+      </p>}
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {localClasses.map(cls=><Link key={cls.classId} to="/classes/$classId"
+          params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
+          className="block border border-border p-3 text-sm underline underline-offset-4">
+          <strong>{cls.title}</strong> · {cls.state} · {cls.deliveryMode.replaceAll("_"," ")}
+        </Link>)}
+      </div>
+    </section>}
+  </WorkspaceShell>;
+}
