@@ -35,7 +35,7 @@ function CourseActivityPublisher(){
   const [passing,setPassing]=useState(0.8);
   const [maxQuizAttempts,setMaxQuizAttempts]=useState(3);
   const [allLessons,setAllLessons]=useState(true);
-  const [feedbackRequired,setFeedbackRequired]=useState(true);
+  const [feedbackRequired,setFeedbackRequired]=useState(false);
   const [consentVersion,setConsentVersion]=useState("feedback-v1");
   const [consentText,setConsentText]=useState("");
   const [replace,setReplace]=useState(false);
@@ -135,7 +135,7 @@ function CourseActivityPublisher(){
             <label className="flex min-h-11 items-center gap-2">
               <input type="checkbox" checked={feedbackRequired}
                 onChange={e=>setFeedbackRequired(e.target.checked)}/>
-              Require feedback submission
+              Require identified feedback for completion (not recommended)
             </label>
           </fieldset>
         </div>
@@ -210,6 +210,8 @@ function CourseActivityPublisher(){
           Use simple ratings and short written responses. Do not request sensitive
           personal details in ordinary program feedback. Answers are kept in a
           restricted table, not in classroom displays or facilitator aggregates.
+          Feedback is optional by default so declining identified feedback does
+          not prevent completion.
         </p>
         <div className="mt-4 space-y-4">
           {feedback.map((question,index)=><div key={question.key}
