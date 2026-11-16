@@ -99,10 +99,12 @@ export function requiresClassSessionAgenda(input:{
 }):boolean{
   if(!input.featureEnabled||!input.mandatoryFrom)return false;
   const value=input.mandatoryFrom;
+  const parsed=Date.parse(value);
   if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value)||
-     !Number.isFinite(Date.parse(value)))
+     !Number.isFinite(parsed)||
+     new Date(parsed).toISOString()!==value.replace(/\.0+Z$/,"Z"))
     throw new Error("CAN_WS4_AGENDA_REQUIRED_FROM must be a valid UTC ISO timestamp");
   if(!Number.isFinite(input.sessionCreatedAt.getTime()))
     throw new Error("Class Session createdAt must be an actual timestamp");
-  return input.sessionCreatedAt.getTime()>=Date.parse(value);
+  return input.sessionCreatedAt.getTime()>=parsed;
 }
