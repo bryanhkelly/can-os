@@ -4,6 +4,34 @@ Status: **native replacement model on a feature branch; not applied to a live da
 Canonical v3.0.1 remains the governing source of publisher rights, site/operation authority,
 learning identity, progress, school records, registration and completion evidence.
 
+## November 15 integration checkpoint
+
+The feature branch has incorporated the latest `main` authorization and
+single-login changes with a genuine two-parent merge commit. The canonical
+Site Admin/Registrar role matrix retains purpose-specific `class.manage`
+only for Class operations; neither role receives `credential.issue` by
+default. Protected Class creation, activation, Offering terms, direct adult
+assignment and teaching-team mutations revalidate the current CAN/native
+staff grant inside their database transaction. Scheduling and opening native
+Class Sessions separately revalidate the active facilitator session in that
+same transaction.
+
+Native direct adult assignment requires an organization-scoped, verified
+canonical learner account with `site_id IS NULL`, matching the actual
+canonical learner-login contract. The hosting Class's specific Site,
+Deployment and operating rights remain independently checked. No Class
+Offering is required for assignment.
+
+Release limitations: source-level checks are not successful typecheck,
+test or signed-in browser evidence. GitHub Actions has produced a
+repository-wide synthetic `BuildFailed` `startup_failure` with zero jobs
+on both `main` and the feature branch. CI must start real jobs before a
+passing result can be claimed. The native tables are absent on `test01`;
+no migrations have been executed there or on production. One-account
+switching between a person's student and staff experiences still requires
+verified multiple-role integration across all instructional service calls;
+the current Class learner-player APIs require an active learner context.
+
 ## One consistent educational model
 
 - **Course**: reusable instructional content, versioned at publication.
