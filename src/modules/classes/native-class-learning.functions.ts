@@ -10,7 +10,7 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
-import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { resolveAuthorizedLearningPerson } from "@/modules/identity/authorized-learning-person.server";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -20,10 +20,9 @@ export const getNativeClassLearning=createServerFn({method:"GET"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const actor=await getCanonicalCommandContext(getRequest());
-    if(actor.role!=="learner" || !actor.actorPersonId)
-      throw new AuthorizationError("verified learner Person");
-    assertCapability(actor,"learning.participate");
+    const {actor}=await resolveAuthorizedLearningPerson(
+      getRequest(),"learning.participate",
+    );
     return db.transaction(async tx=>{
       const [enrollment]=await tx.select().from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
