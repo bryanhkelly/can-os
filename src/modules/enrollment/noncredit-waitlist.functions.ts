@@ -1,10 +1,10 @@
 import {createServerFn} from "@tanstack/react-start";
-import {setResponseHeader} from "@tanstack/react-start/server";
-import {and,eq,sql,inArray} from "drizzle-orm";
+import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
+import {and,desc,eq,lt,or,sql,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
-  accessAccountNoncreditPrincipals,
+  accessAccountNoncreditPrincipals,accessAccounts,
 } from "@/db/schema";
 import {
   auditEvents,domainEvents,noncreditEnrollmentWaitlist,
@@ -12,6 +12,8 @@ import {
   noncreditTrainingVersions,noncreditWaitlistEmailDeliveries,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
+import {getCommandContext} from "@/modules/identity/command-context.server";
+import {isDemoAccountEmail} from "@/domain/local-demo-access";
 import {noncreditEnrollCommand} from "@/domain/noncredit-self-enrollment";
 import {readEligibleSelfEnrollmentReleases} from "./noncredit-self-enrollment-catalog.server";
 
@@ -98,42 +100,70 @@ export const joinNoncreditWaitlist=createServerFn({method:"POST"})
     });
   });
 
-export const getMyNoncreditWaitlist=createServerFn({method:"GET"})
-  .handler(async()=>{
-    privateGuard();
-    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
-    const owner=await requireVerifiedAdultAccount();
-    const rows=await db.select({
-      waitlistId:noncreditEnrollmentWaitlist.id,
-      releaseId:noncreditEnrollmentWaitlist.releaseId,
-      status:noncreditEnrollmentWaitlist.status,
-      inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt,
-      joinedAt:noncreditEnrollmentWaitlist.joinedAt,
-      title:noncreditTrainingVersions.title,
-      releaseStatus:noncreditSelfEnrollmentReleases.status,
-    }).from(noncreditEnrollmentWaitlist)
-      .innerJoin(noncreditSelfEnrollmentReleases,eq(
-        noncreditSelfEnrollmentReleases.id,noncreditEnrollmentWaitlist.releaseId))
-      .innerJoin(noncreditTrainingVersions,eq(
-        noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
-      .where(and(
-        eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId),
-        eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId),
-        inArray(noncreditEnrollmentWaitlist.status,["waiting","invited"]),
-      )).limit(100);
-    const deliveries=rows.length?await db.select({
-      waitlistId:noncreditWaitlistEmailDeliveries.waitlistId,
-      invitationExpiresAt:noncreditWaitlistEmailDeliveries.invitationExpiresAt,
-      status:noncreditWaitlistEmailDeliveries.status,
-    }).from(noncreditWaitlistEmailDeliveries)
-      .where(inArray(noncreditWaitlistEmailDeliveries.waitlistId,
-        rows.map(row=>row.waitlistId))):[];
-    return rows.map(row=>({
+// Active invitation/waitlist opportunities use the original CAN account and
+// original Person, regardless of the navigation role currently selected.
+const waitlistCursor=z.object({
+  joinedAt:z.string().datetime({offset:true}),
+  waitlistId:z.string().uuid(),
+}).strict();
+async function readMyNoncreditWaitlistPage(
+  cursor:z.infer<typeof waitlistCursor>|null,
+){
+  privateGuard();
+  const actor=await getCommandContext(getRequest());
+  if(!actor.actorPersonId||actor.sessionAccountId)
+    throw new AuthorizationError("real verified CAN Person");
+  const [owner]=await db.select({
+    accountId:accessAccounts.id,personId:accessAccounts.personId,
+    email:accessAccounts.emailNormalized,
+    disabled:accessAccounts.disabled,
+    verifiedAt:accessAccounts.emailVerifiedAt,
+  }).from(accessAccounts)
+    .where(eq(accessAccounts.id,actor.accountId)).limit(1);
+  if(!owner||owner.disabled||!owner.verifiedAt||
+     owner.personId!==actor.actorPersonId||isDemoAccountEmail(owner.email))
+    throw new AuthorizationError("current verified account Person");
+  const rows=await db.select({
+    waitlistId:noncreditEnrollmentWaitlist.id,
+    releaseId:noncreditEnrollmentWaitlist.releaseId,
+    status:noncreditEnrollmentWaitlist.status,
+    inviteExpiresAt:noncreditEnrollmentWaitlist.inviteExpiresAt,
+    joinedAt:noncreditEnrollmentWaitlist.joinedAt,
+    joinedAtCursor:sql<string>`to_char(${noncreditEnrollmentWaitlist.joinedAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+    title:noncreditTrainingVersions.title,
+    releaseStatus:noncreditSelfEnrollmentReleases.status,
+  }).from(noncreditEnrollmentWaitlist)
+    .innerJoin(noncreditSelfEnrollmentReleases,eq(
+      noncreditSelfEnrollmentReleases.id,noncreditEnrollmentWaitlist.releaseId))
+    .innerJoin(noncreditTrainingVersions,eq(
+      noncreditTrainingVersions.id,noncreditSelfEnrollmentReleases.trainingVersionId))
+    .where(and(
+      eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId),
+      eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId),
+      inArray(noncreditEnrollmentWaitlist.status,["waiting","invited"]),
+      cursor?or(
+        sql`${noncreditEnrollmentWaitlist.joinedAt} < ${cursor.joinedAt}::timestamptz`,
+        and(sql`${noncreditEnrollmentWaitlist.joinedAt} = ${cursor.joinedAt}::timestamptz`,
+          lt(noncreditEnrollmentWaitlist.id,cursor.waitlistId)),
+      ):undefined,
+    )).orderBy(desc(noncreditEnrollmentWaitlist.joinedAt),
+      desc(noncreditEnrollmentWaitlist.id)).limit(51);
+  const page=rows.slice(0,50);
+  const last=page[page.length-1];
+  const deliveries=page.length?await db.select({
+    waitlistId:noncreditWaitlistEmailDeliveries.waitlistId,
+    invitationExpiresAt:noncreditWaitlistEmailDeliveries.invitationExpiresAt,
+    status:noncreditWaitlistEmailDeliveries.status,
+  }).from(noncreditWaitlistEmailDeliveries)
+    .where(inArray(noncreditWaitlistEmailDeliveries.waitlistId,
+      page.map(row=>row.waitlistId))):[];
+  return {
+    items:page.map(row=>({
       releaseId:row.releaseId,title:row.title,
       emailDeliveryStatus:row.status==="invited"&&row.inviteExpiresAt
         ? deliveries.find(item=>item.waitlistId===row.waitlistId&&
           item.invitationExpiresAt.getTime()===row.inviteExpiresAt!.getTime())?.status??"not_queued"
-        : null,
+        :null,
       status:row.status==="invited" && row.inviteExpiresAt &&
         row.inviteExpiresAt<=new Date()?"expired" as const:row.status,
       invitationActive:row.status==="invited"&&
@@ -141,7 +171,24 @@ export const getMyNoncreditWaitlist=createServerFn({method:"GET"})
         row.releaseStatus==="published",
       inviteExpiresAt:row.inviteExpiresAt?.toISOString()??null,
       joinedAt:row.joinedAt.toISOString(),
-    }));
+    })),
+    nextCursor:rows.length>50&&last
+      ?{joinedAt:last.joinedAtCursor,waitlistId:last.waitlistId}:null,
+  };
+}
+export const getMyNoncreditWaitlistPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    cursor:waitlistCursor.nullable().default(null),
+  }).strict().parse(raw))
+  .handler(async({data})=>readMyNoncreditWaitlistPage(data.cursor));
+
+/** Existing first-100 reader for the training management page. */
+export const getMyNoncreditWaitlist=createServerFn({method:"GET"})
+  .handler(async()=>{
+    const first=await readMyNoncreditWaitlistPage(null);
+    if(!first.nextCursor)return first.items;
+    const second=await readMyNoncreditWaitlistPage(first.nextCursor);
+    return [...first.items,...second.items];
   });
 
 export const cancelMyNoncreditWaitlist=createServerFn({method:"POST"})
