@@ -2,6 +2,7 @@ import { type EffectCallback, type ReactElement, type ReactNode, type SetStateAc
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SectionGradeFinalization } from "@/components/learning/SectionGradeFinalization";
+import { Button } from "@/components/ui/button";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 vi.mock("@tanstack/react-router",()=>({Link:({to,search,children}:{to:string;search?:Record<string,string>;children:ReactNode})=>
   <a href={to+"?"+new URLSearchParams(search)}>{children}</a>}));
@@ -79,7 +80,7 @@ function words(node: ReactNode): string {
   return isValidElement<ControlProps>(node) ? words(node.props.children) : "";
 }
 function findButton(label: string) {
-  return controls(render()).find((node) => node.type === "button" && words(node.props.children).includes(label));
+  return controls(render()).find((node) => node.type === Button && words(node.props.children).includes(label));
 }
 function findField(label: string) {
   return controls(render()).find((node) => node.props["aria-label"] === label);
@@ -219,10 +220,23 @@ describe("gradebook section grade finalization panel", () => {
     expect(state.correct).toHaveBeenCalledOnce();
   });
 
+  it("uses V6.1 shared controls and keeps each student correction individually labelled", async () => {
+    await loaded();
+    findButton("Correct grade")?.props.onClick?.();
+    const html=renderToStaticMarkup(render());
+    expect(html).toContain("Corrected percentage for Ada Lovelace");
+    expect(html).toContain("Corrected letter grade for Ada Lovelace");
+    expect(html).toContain("Correction reason for Ada Lovelace");
+    expect(html).toContain("Grading period to finalize");
+    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
+  });
+
   it("warns when the school year has no configured grade scale", async () => {
     state.read.mockResolvedValue({ ...model, gradeScaleConfigured: false });
     await loaded();
-    expect(renderToStaticMarkup(render())).toContain("no configured grade scale");
+    const html=renderToStaticMarkup(render());
+    expect(html).toContain("no configured grade scale");
+    expect(html).toContain("border-warning/50");
   });
 
   it("synchronously blocks a second finalization before React rerenders", async () => {
