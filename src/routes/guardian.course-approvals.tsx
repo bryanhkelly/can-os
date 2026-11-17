@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -107,22 +108,21 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
                 subject to final school approval and the published registration policy.</span>
             </label>
             <div className="mt-4 flex flex-wrap gap-3">
-              <button
+              <Button
                 type="button"
                 disabled={busy || acknowledged[item.id] !== coursePermissionContext(item)}
                 onClick={() => void decide(item, true)}
-                className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
               >
                 Approve class addition
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="outline"
                 disabled={busy}
                 onClick={() => void decide(item, false)}
-                className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
               >
                 Decline
-              </button>
+              </Button>
             </div>
           </article>
         ))}
