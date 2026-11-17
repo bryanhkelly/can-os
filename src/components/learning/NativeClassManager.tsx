@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { WorkspaceShell } from "@/components/workspace";
+import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -304,6 +305,17 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       </Link>
     </div>}>
     {navigation}
+    <div className="mt-5">
+      <NativeClassLaunchReadiness state={{
+        operatorSites:operatorSites.status,
+        authorizedSiteCount:operatorSites.data?.length??0,
+        adoptedCourses:options.status,
+        visibleAdoptedCourseCount:optionsData.length,
+        visibleDraftClasses:classes.status,
+        visibleDraftClassCount:classes.data?.length??0,
+        filtered:Boolean(search||preferredSiteId||preferredOfferingVersionId),
+      }}/>
+    </div>
     <section className="mt-5 border border-border bg-card p-5" aria-label="Approved Offering hierarchy">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
