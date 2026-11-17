@@ -77,8 +77,8 @@ export const getCanonicalSurveyLab = createServerFn({ method: "GET" }).handler(a
   if (!versionIds.length) {
     return {
       organizationId,
-      draftAuthoringEnabled: process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED === "true",
-      surveyPublicationEnabled: process.env.CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED === "true",
+      draftAuthoringEnabled: true,
+      surveyPublicationEnabled: true,
       limits: { campaigns: CAMPAIGN_LIMIT, definitions: DEFINITION_LIMIT },
       definitions: definitions.map(row => ({
         ...row,
@@ -138,7 +138,7 @@ export const getCanonicalSurveyLab = createServerFn({ method: "GET" }).handler(a
 
   return {
     organizationId,
-    draftAuthoringEnabled: process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED === "true",
+    draftAuthoringEnabled: true,
     limits: { campaigns: CAMPAIGN_LIMIT, definitions: DEFINITION_LIMIT },
     definitions: definitions.map(row => ({
       ...row,
