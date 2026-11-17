@@ -11,7 +11,7 @@ import {
   noncreditSelfEnrollmentClaims,noncreditTrainingVersions,offeringVersions,programDeployments,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
-import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 
 /** Native session renewal is only for this verified Person's existing live
