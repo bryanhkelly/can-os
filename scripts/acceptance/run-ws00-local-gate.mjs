@@ -59,7 +59,7 @@ const steps=[
   [npx,["vitest","run",
     "tests/unit/build-source-syntax-regression.test.ts",
     "tests/unit/participation-read-model.test.ts",
-    "tests/unit/native-class-history-pagination.test.ts",
+    "tests/unit/participation-history-pages.test.ts",
     "src/domain/native-class-lifecycle.test.ts",
     "tests/unit/ws3-completion-command-contract.test.ts",
     "tests/unit/ws3-assessment-revisions.test.ts",
