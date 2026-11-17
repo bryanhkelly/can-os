@@ -8,8 +8,9 @@ import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions,
   canonicalClassEnrollments, learnerCourseAttempts, canonicalDeliverySessions,
-  facilitatedClassroomPlans, facilitatedLearningSessions, auditEvents, domainEvents,
+  facilitatedClassroomPlans, facilitatedLearningSessions, 
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { assertNativeClassSessionSeries, canChangeUnopenedClassSession } from "@/domain/native-class-sessions";
 import { requireNativeClassSessionHost } from "./native-class-session-host.server";
@@ -100,7 +101,7 @@ export const scheduleNativeClassSessions=createServerFn({method:"POST"})
           requestId:meeting.requestId,
         }).returning({id:canonicalClassSessions.id});
         if(!created)throw new Error("Class Session reference was not recorded");
-        await tx.insert(auditEvents).values({
+        await writeCanonicalAudit(tx,{
           actorPersonId:host.actor.actorPersonId!,
           owningOrganizationId:host.organizationId,
           eventCode:"class.session.scheduled",
@@ -109,7 +110,7 @@ export const scheduleNativeClassSessions=createServerFn({method:"POST"})
             deliverySessionId:plan.deliverySessionId,
             startsAt:meeting.startsAt,endsAt:meeting.endsAt},
         });
-        await tx.insert(domainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           actorPersonId:host.actor.actorPersonId!,
           eventType:"ClassSessionScheduled",
           aggregateType:"class",aggregateId:instance.id,
@@ -249,13 +250,13 @@ export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
         replacementEndsAt:data.replacement?.endsAt??null,
         changedAt:now.toISOString(),
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:host.actor.actorPersonId!,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.session.schedule.changed",
         entityKind:"class_session",entityId:original.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:host.actor.actorPersonId!,
         eventType:"ClassSessionScheduleChanged",
         aggregateType:"class_session",aggregateId:original.id,payload,
@@ -370,7 +371,7 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         state:"started",facilitatedSessionId:room.facilitatedSessionId,
         updatedAt:now,
       }).where(eq(facilitatedClassroomPlans.id,plan.id));
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:host.actor.actorPersonId!,
         owningOrganizationId:host.organizationId,
         eventCode:"class.session.started",
@@ -378,7 +379,7 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         payload:{classId:instance.id,planId:plan.id,
           facilitatedSessionId:room.facilitatedSessionId},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:host.actor.actorPersonId!,
         eventType:"ClassSessionStarted",aggregateType:"class",
         aggregateId:instance.id,
@@ -453,7 +454,7 @@ export const revokeNativeClassSession=createServerFn({method:"POST"})
         .set({state:"ended",endedAt:now,
           pairingExpiresAt:now})
         .where(eq(facilitatedLearningSessions.id,room.id));
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.session.revoked",
@@ -461,7 +462,7 @@ export const revokeNativeClassSession=createServerFn({method:"POST"})
         payload:{classId:cls.id,facilitatedSessionId:room.id,
           reason:data.reason,endedAt:now.toISOString()},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId,
         eventType:"ClassSessionRevoked",
         aggregateType:"class",aggregateId:cls.id,
