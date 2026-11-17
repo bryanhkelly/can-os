@@ -1,10 +1,15 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   canNativeSelfTransferTo,
   nativeSelfTransferCreditModes,
+  NATIVE_SELF_TRANSFER_CREDIT_MODES,
 } from "./native-class-transfer-choices";
 
 describe("native adult self-transfer choices", () => {
+  it("has one ordered server-approved mode contract", () => {
+    expect(NATIVE_SELF_TRANSFER_CREDIT_MODES).toEqual(["audit", "not_applicable"]);
+  });
   it("exposes only server-supported audit and not-applicable credit modes", () => {
     expect(nativeSelfTransferCreditModes(["for_credit", "audit", "not_applicable"]))
       .toEqual(["audit", "not_applicable"]);
@@ -30,6 +35,15 @@ describe("native adult self-transfer choices", () => {
     expect(canNativeSelfTransferTo(sourceClassId, {
       ...candidate, allowedCreditModes: ["for_credit"],
     })).toBe(false);
+  });
+
+  it("keeps UI destination selection and the server validator on the same policy", () => {
+    const ui = readFileSync(new URL("../routes/class.tsx", import.meta.url), "utf8");
+    const server = readFileSync(new URL("../modules/classes/native-class-transfers.functions.ts", import.meta.url), "utf8");
+    expect(ui).toContain("canNativeSelfTransferTo(item.classId,row)");
+    expect(ui).toContain("allowedTransferModes.map(m=>");
+    expect(ui).not.toContain("target.allowedCreditModes.map(m=>");
+    expect(server).toContain("creditMode:z.enum(NATIVE_SELF_TRANSFER_CREDIT_MODES)");
   });
 
   it("preserves the offered order when selecting an eligible default", () => {
