@@ -1766,6 +1766,15 @@
       "roleJourney": "Verified Person discovers eligible native Classes, sees own invitations and enrollment history, no school role required",
       "readBoundary": "pending",
       "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/platform.tsx",
+      "route": "/platform",
+      "owner": "identity",
+      "verification": "pending",
+      "roleJourney": "Verified non-demo account with independently provisioned app_admin grant",
+      "readBoundary": "Platform aggregate counts only; exact current grant and verified session",
+      "writeBoundary": "No platform mutations exposed"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
