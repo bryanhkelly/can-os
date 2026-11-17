@@ -64,9 +64,14 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
   if(link){
     if(link.accessPersonId!==owner.personId)
       throw new AuthorizationError("CAN identity changed; manual reconciliation required");
-    if(adultReview&&(!adultReview.consumedAt||
-       adultReview.canonicalAccountId!==link.canonicalAccountId||
-       adultReview.canonicalPersonId!==link.canonicalPersonId))
+    // A newly approved but unconsumed review must not interrupt an
+    // existing noncredit learner. Class admission still requires activation
+    // of independently verified adulthood; noncredit retains its own policy.
+    if(adultReview&&(adultReview.consumedAt
+      ?adultReview.canonicalAccountId!==link.canonicalAccountId||
+       adultReview.canonicalPersonId!==link.canonicalPersonId
+      :adultReview.canonicalAccountId!==null||
+       adultReview.canonicalPersonId!==null))
       throw new AuthorizationError("conflicting reviewed adult identity cannot be reused");
     const [native]=await tx.select({
       id:canonicalAccounts.id,email:canonicalAccounts.emailNormalized,
@@ -75,7 +80,8 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
       .where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
     const [person]=await tx.select({id:canonicalPersons.id,birthDate:canonicalPersons.birthDate})
       .from(canonicalPersons).where(eq(canonicalPersons.id,link.canonicalPersonId)).limit(1);
-    if(adultReview&&person?.birthDate!==adultReview.verifiedBirthDate)
+    if(adultReview&&((adultReview.consumedAt||person?.birthDate)&&
+       person?.birthDate!==adultReview.verifiedBirthDate))
       throw new AuthorizationError("canonical adult date of birth differs from approved evidence");
     if(!native || !person || native.disabledAt || !native.verifiedAt ||
        native.email!==owner.email)
