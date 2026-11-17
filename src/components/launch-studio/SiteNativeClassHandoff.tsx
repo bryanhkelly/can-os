@@ -13,12 +13,11 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    queryFn:()=>getLaunchSiteClassScope({data:{siteId:publicSiteId}}),retry:false});
  const canonicalSiteId=scope.data?.kind==="ready"?publicSiteId:null;
  const classesRead=useQuery({queryKey:["launch-native-classes",canonicalSiteId],
-   queryFn:()=>getMyUnifiedClassDrafts(),enabled:Boolean(canonicalSiteId),retry:false});
+   queryFn:()=>getMyUnifiedClassDrafts({data:{siteId:canonicalSiteId!}}),enabled:Boolean(canonicalSiteId),retry:false});
  const adoptedCourses=useQuery({queryKey:["launch-class-course-adoptions",canonicalSiteId],
    queryFn:()=>getUnifiedClassCourseOptions({data:{siteId:canonicalSiteId!,search:"",cursor:0}}),
    enabled:Boolean(canonicalSiteId),retry:false});
- const classes=canonicalSiteId
-   ?(classesRead.data??[]).filter(item=>item.siteId===canonicalSiteId):[];
+ const classes=classesRead.data??[];
  return <section className="mt-6 border p-5" aria-label="Unified Classroom handoff">
   <p className="text-xs font-bold uppercase tracking-wide text-primary">Classes and delivery</p>
   <h3 className="mt-2 flex items-center gap-2 font-serif text-2xl"><Users className="size-5"/> Turn an approved Course into a Class</h3>
@@ -90,7 +89,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
         Review the governed Blueprint, Offering and Deployment adoption before creating a Class.
       </p>}
     {classes.length===0?<p className="mt-4 text-sm text-muted-foreground">
-     No native Classes are visible for this exact Site. This does not certify Site readiness.
+     No native Classes appear in the authorized Site result (up to 100). This does not certify Site readiness.
     </p>:<ul className="mt-4 grid gap-3 md:grid-cols-2">{classes.map(item=><li key={item.classId} className="border bg-card p-4">
      <p className="font-semibold">{item.title}</p>
      <p className="mt-1 text-xs text-muted-foreground">
