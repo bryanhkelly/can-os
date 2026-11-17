@@ -147,6 +147,8 @@ state stored in the DB. WS1 owns its exact read-model shape.
   and school/guardian authority; do not reinterpret it from noncredit or Class.
 - The WS2-native Class history reader offers 50-item, Person-scoped,
   descending `(enrolled_at, class_enrollment_id)` keyset pagination.
+  Cursor time is an exact PostgreSQL microsecond UTC representation, compared
+  as `timestamptz` in SQL instead of truncating through JavaScript Date.
   The native My Classes view can load older entries beyond its former
   first-100 cap. WS1 remains sole owner of the cross-domain My Activity
   presentation and must reconcile the shared learner route before integration.
