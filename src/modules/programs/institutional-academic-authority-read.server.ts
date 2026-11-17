@@ -18,12 +18,12 @@ type Reader = Pick<typeof db, "select">;
  */
 export async function listInstitutionallyAuthorizedAcademicProgramIds(
   tx: Reader,
-  actor: Pick<AccessContext, "scope">,
+  actor: Pick<AccessContext, "scope" | "role" | "grantSiteId">,
   programIds: readonly string[],
   requiredServices: readonly OperatingService[],
   at = new Date(),
 ): Promise<Set<string>> {
-  const unique = [...new Set(programIds)];
+  // This projection is exclusively for verified provider-wide teachers.\n  // Other roles must use their own resource authorization policy.\n  if (actor.role !== "teacher" || actor.grantSiteId !== null)\n    throw new AuthorizationError("provider-wide teaching context");\n  const unique = [...new Set(programIds)];
   const permitted = new Set<string>();
   if (!unique.length) return permitted;
   normalizeOperatingServices(requiredServices);
