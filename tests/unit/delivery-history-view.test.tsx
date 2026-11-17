@@ -24,6 +24,8 @@ describe("watch delivery history presentation", () => {
     expect(html).toContain("not verified");
     expect(html).toContain("Provider attempts:");
     expect(html).toContain("Provider accepted:");
+    expect(html).toContain("Jan 1, 2030, 12:01 PM UTC");
+    expect(html).toContain('dateTime="2030-01-01T12:01:00.000Z"');
     expect(html).toContain("notification=selected-notice&amp;deliveryCursor=older-page");
     expect(html).toContain("Latest deliveries");
     expect(html).toContain("Refresh delivery status");
@@ -35,6 +37,7 @@ describe("watch delivery history presentation", () => {
     expect(html).toContain("No watch delivery records");
     expect(html).toContain("not a log of all messages");
     expect(html).toContain("Refreshing...");
+    expect(html).toContain('aria-busy="true"');
     expect(html).toContain("disabled");
     expect(html).not.toContain("Older deliveries");
     expect(html).not.toContain("Available in CAN");
@@ -57,6 +60,7 @@ describe("watch delivery history presentation", () => {
       refreshing={false} onRefresh={vi.fn()} />);
     expect(html).toContain('role="alert"');
     expect(html).toContain("Delivery history is unavailable");
+    expect(html).toContain("border-danger/50");
     expect(html).toContain("notifications are still available");
     expect(html).toContain("Latest deliveries");
     expect(html).not.toContain("No watch delivery records");
