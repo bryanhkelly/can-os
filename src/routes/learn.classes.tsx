@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
@@ -7,6 +7,8 @@ import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativePublicClassCatalogPage, getMyNativeClassEnrollmentHistoryPage, enrollInNativeClass,
 } from "@/modules/classes/native-class-enrollment.functions";
+import { getMyNativeClassInvitations, declineNativeClassInvitation } from
+  "@/modules/classes/native-class-invitations.functions";
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 
@@ -93,6 +95,80 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
   </article>;
 }
+type NativeInvitation=Awaited<ReturnType<typeof getMyNativeClassInvitations>>[number];
+function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Promise<void>}){
+  const [adult,setAdult]=useState(false);
+  const [consent,setConsent]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  const pending=item.state==="pending";
+  const expires=new Date(item.expiresAt).toLocaleString();
+  async function accept(){
+    if(!pending||!adult||!consent||busy)return;
+    setBusy(true);setError("");setNotice("");
+    try{
+      await enrollInNativeClass({data:{
+        classOfferingVersionId:item.classOfferingVersionId,
+        invitationId:item.invitationId,
+        creditMode:item.creditMode,adultAttested:true,consentAccepted:true,
+      }});
+      setNotice("Invitation accepted. Your Class and learning record are ready.");
+      await onChanged();
+    }catch(e){
+      setError(normalizeClientError(e,"The invitation could not be accepted.").message);
+    }finally{setBusy(false);}
+  }
+  async function decline(){
+    if(!pending||busy)return;
+    setBusy(true);setError("");setNotice("");
+    try{
+      await declineNativeClassInvitation({data:{invitationId:item.invitationId}});
+      setNotice("Invitation declined. No Enrollment was created.");
+      await onChanged();
+    }catch(e){
+      setError(normalizeClientError(e,"Unable to decline this invitation.").message);
+    }finally{setBusy(false);}
+  }
+  return <article className="border border-border bg-card p-5">
+    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      Verified native Class invitation · {item.state}
+    </p>
+    <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
+    <p className="mt-2 text-sm text-muted-foreground">
+      {pending?"Accept before "+expires:"Invitation expired or already resolved."}
+      {" "}An invitation does not reserve a seat or establish enrollment.
+    </p>
+    {pending&&<>
+      <div className="mt-4 border border-border bg-muted/20 p-3">
+        <p className="text-sm font-semibold">Published participation and data-use terms</p>
+        <p className="mt-2 whitespace-pre-wrap text-sm leading-6">
+          {item.consentText??"Published consent unavailable. Acceptance will be denied."}
+        </p>
+      </div>
+      <label className="mt-4 flex items-start gap-3 text-sm">
+        <input type="checkbox" className="mt-1" checked={adult}
+          onChange={e=>setAdult(e.target.checked)}/>
+        I confirm I am at least 18 years old. My age is independently verified.
+      </label>
+      <label className="mt-3 flex items-start gap-3 text-sm">
+        <input type="checkbox" className="mt-1" checked={consent}
+          onChange={e=>setConsent(e.target.checked)}/>
+        I accept the current participation and data-use terms.
+      </label>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button disabled={!adult||!consent||busy||!item.consentText}
+          onClick={()=>void accept()}>{busy?"Processing…":"Accept invitation"}</Button>
+        <Button variant="outline" disabled={busy} onClick={()=>void decline()}>
+          Decline invitation
+        </Button>
+      </div>
+    </>}
+    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
+    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+  </article>;
+}
+
 type EnrolledClass=Awaited<ReturnType<typeof getMyNativeClassEnrollmentHistoryPage>>["items"][number];
 function EnrolledClassCard({item,onChanged}:{item:EnrolledClass;onChanged:()=>Promise<void>}){
   const [confirm,setConfirm]=useState(false);
@@ -161,6 +237,10 @@ function NativeLearnerClasses(){
     retry:false,
   });
   const catalogItems=catalog.data?.pages.flatMap(page=>page.items)??[];
+  const invitations=useQuery({
+    queryKey:["native-my-class-invitations"],
+    queryFn:()=>getMyNativeClassInvitations(),retry:false,
+  });
   const enrolled=useInfiniteQuery({
     queryKey:["native-my-class-enrollment-history"],
     initialPageParam:null as {enrolledAt:string;classEnrollmentId:string}|null,
@@ -175,6 +255,7 @@ function NativeLearnerClasses(){
     await Promise.all([
       client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId]}),
       client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]}),
+      client.invalidateQueries({queryKey:["native-my-class-invitations"]}),
       // WS1 projects this source independently. Enrollment and withdrawal must
       // invalidate the unified view without writing a second participation row.
       client.invalidateQueries({queryKey:["my-activity"]}),
@@ -184,9 +265,24 @@ function NativeLearnerClasses(){
     subtitle="One Class enrollment and one learning record, regardless of whether your Class is academic, independent or facilitated."
     actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}>
     <section className="mt-6">
+      <h2 className="font-serif text-2xl">My Class invitations</h2>
+      {invitations.isPending&&<p role="status" className="mt-3 text-sm">
+        Checking invitations for your verified Person…
+      </p>}
+      {invitations.isError&&<p role="alert" className="mt-3 text-sm">
+        Your native Class invitations could not be verified.
+      </p>}
+      {invitations.isSuccess&&invitations.data.length===0&&
+        <p className="mt-3 text-sm text-muted-foreground">No native Class invitations.</p>}
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {invitations.data?.map(item=><InvitationCard key={item.invitationId}
+          item={item} onChanged={refresh}/>)} 
+      </div>
+    </section>
+    <section className="mt-6">
       <h2 className="font-serif text-2xl">Enrolled Classes</h2>
       {enrolled.isPending&&<p role="status" className="mt-3 text-sm">Loading your Classes…</p>}
-      {enrolled.isError&&<p role="alert" className="mt-3 border border-border p-4 text-sm">Native Class records are not yet enabled for this session or environment.</p>}
+      {enrolled.isError&&<p role="alert" className="mt-3 border border-border p-4 text-sm">Native Class records are unavailable or access could not be verified.</p>}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {enrolledItems.map(item=><EnrolledClassCard
           key={item.classEnrollmentId} item={item} onChanged={refresh}/>)}
@@ -219,7 +315,7 @@ function NativeLearnerClasses(){
         Its enrollment terms and current authority are checked again here.
       </p>}
       {catalog.isPending&&<p role="status" className="mt-4 text-sm">Checking currently offered Classes…</p>}
-      {catalog.isError&&<p role="alert" className="mt-4 border border-border p-4 text-sm">Public Class discovery is not enabled or is unavailable.</p>}
+      {catalog.isError&&<p role="alert" className="mt-4 border border-border p-4 text-sm">Public Class discovery is unavailable. Please retry.</p>}
       {catalog.isSuccess&&catalogItems.length===0&&<p className="mt-4 text-sm text-muted-foreground">No public Class Offerings are currently accepting enrollment.</p>}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         {catalogItems.map(item=><OfferingCard key={item.classOfferingVersionId} item={item} onJoined={refresh}/>)}
