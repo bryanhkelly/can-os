@@ -164,8 +164,11 @@ export const getMyNativeClassApprovals=createServerFn({method:"GET"}).handler(as
   state:canonicalClassEnrollmentApprovalRequests.state,
   expiresAt:canonicalClassEnrollmentApprovalRequests.expiresAt,
   acceptedEnrollmentId:canonicalClassEnrollmentApprovalRequests.acceptedEnrollmentId,
+  consentText:canonicalClassOfferingVersions.consentText,
+  allowedCreditModes:canonicalClassOfferingVersions.allowedCreditModes,
  }).from(canonicalClassEnrollmentApprovalRequests)
   .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollmentApprovalRequests.classId))
+  .innerJoin(canonicalClassOfferingVersions,eq(canonicalClassOfferingVersions.id,canonicalClassEnrollmentApprovalRequests.classOfferingVersionId))
   .where(eq(canonicalClassEnrollmentApprovalRequests.applicantPersonId,actor.actorPersonId))
   .orderBy(desc(canonicalClassEnrollmentApprovalRequests.requestedAt)).limit(100);
  const now=new Date();
