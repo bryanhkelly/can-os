@@ -13,6 +13,8 @@ describe("shared workflow presentation", () => {
     expect(html).toContain("Site authorization");
     expect(html).toContain("Awaiting CAN authorization");
     expect(html).toContain("Onsite staffing");
+    expect(html).toContain("Needs attention");
+    expect(html).toContain('aria-label="Prerequisites results"');
   });
   it("shows an empty prerequisite state", () => {
     const html = renderToStaticMarkup(<WorkflowPrerequisites items={[]}/>);
