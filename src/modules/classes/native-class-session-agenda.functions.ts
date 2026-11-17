@@ -32,9 +32,6 @@ const publishInput = readInput.extend({
 }).strict();
 
 function requireAgendaFeature() {
-  if (process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED !== "true" ||
-      process.env.CAN_WS4_SESSION_AGENDAS_ENABLED !== "true")
-    throw new AuthorizationError("Class Session agenda release not activated");
 }
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
