@@ -136,6 +136,8 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         noncreditRegistrationId:learnerCourseAttempts.noncreditRegistrationId,
         sectionId:learnerCourseAttempts.sectionId,
         deploymentId:learnerCourseAttempts.deploymentId,
+        adoptionId:learnerCourseAttempts.adoptionId,
+        offeringVersionId:learnerCourseAttempts.offeringVersionId,
         courseVersionId:learnerCourseAttempts.courseVersionId,
       }).from(learnerCourseAttempts)
         .where(inArray(learnerCourseAttempts.classEnrollmentId,enrollmentIds))
@@ -147,6 +149,8 @@ export const getNativeClassReport=createServerFn({method:"GET"})
           ?enrollmentById.get(attempt.classEnrollmentId):null;
         if(!owner||attempt.enrollmentId||attempt.noncreditRegistrationId||
           attempt.sectionId||attempt.deploymentId!==cls.deploymentId||
+          attempt.adoptionId!==cls.adoptionId||
+          attempt.offeringVersionId!==cls.offeringVersionId||
           attempt.courseVersionId!==cls.courseVersionId)
           throw new Error("Course Attempt does not belong to this exact Class Enrollment");
         const current=attemptsByEnrollment.get(owner.id)??[];
