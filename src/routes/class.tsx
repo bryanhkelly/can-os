@@ -13,6 +13,7 @@ import {requestNativeClassApproval,getMyNativeClassApprovals} from "@/modules/cl
 import {transferMyNativeClassEnrollment} from "@/modules/classes/native-class-transfers.functions";
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
+import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
 
 export const Route=createFileRoute("/class")({
   validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string}=>({
@@ -359,6 +360,10 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
 }
 
 function NativeLearnerClasses(){
+  const [recovering,setRecovering]=useState(false);
+  const [recoveryNotice,setRecoveryNotice]=useState("");
+  const [recoveryError,setRecoveryError]=useState("");
+
   const client=useQueryClient();
   const requested=Route.useSearch();
   const [searchText,setSearchText]=useState(requested.search??"");
@@ -408,9 +413,38 @@ function NativeLearnerClasses(){
       client.invalidateQueries({queryKey:["my-activity"]}),
     ]);
   }
+  async function recoverExistingNativeLearning(){
+    if(recovering)return;
+    setRecovering(true);setRecoveryError("");setRecoveryNotice("");
+    try{
+      await resumeLinkedNativeClassLearner();
+      setRecoveryNotice("Your existing verified CAN learner identity is connected. You can continue without another login.");
+      await refresh();
+    }catch(error){
+      setRecoveryError(normalizeClientError(error,
+        "No approved adult learner identity is linked to this CAN account yet. A verified Person, current learner grant and independent identity review may be required before native Class enrollment."
+      ).message);
+    }finally{setRecovering(false);}
+  }
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Classes"
     subtitle="One Class enrollment and one learning record, regardless of whether your Class is academic, independent or facilitated."
     actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}>
+    {(enrolled.isError||approvals.isError||invitations.isError)&&
+      <section className="mt-5 border border-border bg-card p-5" aria-label="Verified CAN learner session recovery">
+        <h2 className="font-serif text-xl">Continue with your CAN account</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          If your CAN account was previously verified and linked to your native learning
+          Person, you can restore Class access using this login. This does not enroll
+          you in any Class or create a new identity. New learner identities and age
+          verification require the governed onboarding process.
+        </p>
+        <Button className="mt-3" type="button" variant="outline"
+          disabled={recovering} onClick={()=>void recoverExistingNativeLearning()}>
+          {recovering?"Checking linked identity…":"Restore verified Class access"}
+        </Button>
+        {recoveryNotice&&<p role="status" className="mt-3 text-sm">{recoveryNotice}</p>}
+        {recoveryError&&<p role="alert" className="mt-3 text-sm text-destructive">{recoveryError}</p>}
+      </section>}
     <section className="mt-6">
       <h2 className="font-serif text-2xl">My Class invitations</h2>
       {invitations.isPending&&<p role="status" className="mt-3 text-sm">
