@@ -1,4 +1,4 @@
-import { createFileRoute, linkOptions } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getMySchoolProfile } from "@/modules/operations/school-profile.functions";
 import { SchoolProfile, schoolRecordTabs, type SchoolRecordTab } from "@/components/operations/SchoolProfile";
@@ -27,5 +27,5 @@ function MySchoolPage() {
     <EmptyState title="No school connected" description="Your school profile will appear when your enrollment is linked to a school." />
   </WorkspaceShell>;
   return <SchoolProfile data={{ ...outcome.data, site }} tab={tab}
-    tabLink={value => linkOptions({ to: "/student/my-school", search: value === "overview" ? {} : { tab: value } })} />;
+    tabLink={value => ({ to: "/student/my-school", search: { tab: value === "overview" ? undefined : value } })} />;
 }
