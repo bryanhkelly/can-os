@@ -2,7 +2,7 @@
 /**
  * WS00 fallback when GitHub Actions cannot create jobs.
  * Local, exact-SHA source/build checks ONLY. Never applies migrations,
- * seeds databases, enables feature flags, or deploys.
+ * seeds databases, or deploys.
  */
 import {spawnSync} from "node:child_process";
 import {readFileSync} from "node:fs";
@@ -46,13 +46,7 @@ console.log("[WS00] Database migration, credentials, production and deployment a
 
 const npm=process.platform==="win32"?"npm.cmd":"npm";
 const npx=process.platform==="win32"?"npx.cmd":"npx";
-const env={...process.env,
-  CAN_UNIFIED_CLASS_COMMANDS_ENABLED:"false",
-  CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED:"false",
-  CAN_WS3_CLASS_POLICY_PUBLICATION_ENABLED:"false",
-  CAN_WS3_EVIDENCE_REVIEW_ENABLED:"false",
-  CAN_WS4_SESSION_AGENDAS_ENABLED:"false",
-};
+const env={...process.env};
 for(const key of ["DATABASE_URL","DATABASE_URL_UNPOOLED","DIRECT_URL","NEON_DATABASE_URL",
   "NEON_API_KEY","CLOUDFLARE_API_TOKEN","CF_API_TOKEN"]){delete env[key];}
 const steps=[
