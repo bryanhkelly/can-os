@@ -311,3 +311,56 @@ persistence outside the Class admission module. Neither migration was
 silently emulated by a weaker consent checkbox. The current QA Class and
 verified-review fixtures are absent; browser, typecheck/build and negative
 RLS authorization tests have not been demonstrated at the latest main SHA.
+
+## November 17: Community Center native Class acceptance checkpoint
+
+**Status: NOT EXECUTED / NOT ACCEPTED.** Current `main` contains the
+read-only `NativeClassLaunchReadiness` operator panel and a guarded,
+real-command browser acceptance test. Neither authoring a spec nor rendering
+a readiness panel is proof of successful Class creation.
+
+Read-only Neon inspections on November 17, 2026 showed:
+
+| Source | Published Course versions | Approved local adoptions | Native Classes | Class Enrollments | Class Sessions |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Primary `main` | 0 | Not verified | 0 | 0 | 0 |
+| Isolated `test01` | 2 | 2 | 0 | 0 | 0 |
+
+The primary database's synthetic Community Learning Center still has two
+Programs and three planned Activity Seasons. Those records are **not**
+`education_v30.classes` and may not be represented as open enrollment.
+
+The QA **operator creation** journey is guarded by
+`playwright.native-class-operator.config.ts` and
+`scripts/acceptance/check-native-class-operator-qa.mjs`. It requires an
+isolated Neon branch matched to `DATABASE_URL`/`TEST_DATABASE_URL`, a
+localhost-only application server, a verified native Site admin/registrar
+with a valid one-account session, and a real approved local Course adoption.
+After the approved fixture is provisioned, run:
+
+```bash
+APP_ENV=test NODE_ENV=test CAN_CLASS_OPERATOR_QA_RUN=1 \
+CAN_TEST_DB_WRITES_ENABLED=true \
+CAN_E2E_TEST_BRANCH_ID=<actual-branch-id> \
+CAN_CLASS_OPERATOR_QA_SITE_ID=<approved-canonical-site-uuid> \
+CAN_CLASS_OPERATOR_QA_SECRET=<opaque-qa-session-secret> \
+CAN_CLASS_OPERATOR_QA_BASE_URL=http://localhost:3199 \
+DATABASE_URL=<isolated-neon-url> TEST_DATABASE_URL=<same-isolated-neon-url> \
+npm run test:e2e:class-operator
+```
+
+The operator test selects an authorized published Course/Site/mode, invokes
+the real create command, reopens `/class?view=manage`, and confirms the
+created Class in a fresh server-backed read. It deliberately **does not**
+fabricate adoption, Site identity, Class Enrollment, Session attendance,
+consent, or a Course Attempt. The test persists a QA Class, so it must
+only run against a disposable or explicitly approved test branch.
+
+Next independent acceptance steps are authorized Class activation,
+publication and current-version consent, verified learner enrollment,
+recorded Course media uploaded through an approved native media pathway,
+teacher/facilitator Session opening, attendance, and source-backed
+reconciliation. The legacy `ClassVideoUploadForm` is scoped to a school
+`Section`; it must not be passed a native Class ID or treated as proof of
+native Class media upload.
+
