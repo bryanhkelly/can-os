@@ -70,7 +70,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const preferencesDirty=JSON.stringify({delivery,interestIds:chosen})!==JSON.stringify(savedPreferences);
   const siteFieldsDirty=!siteId&&Boolean(name||organizationId||city||state||timezone);
   const releaseNavigation=useLaunchUnsavedChanges(preferencesDirty||siteFieldsDirty,
-    "Leave Site setup? Unsaved Site details or program interests will be lost.");
+    "Leave Site setup? Unsaved Site details or program interests will be lost.",true);
   const [error,setError] = useState("");
   const [savingPreferences,setSavingPreferences] = useState(false);
   const [previewKey,setPreviewKey] = useState(0);
