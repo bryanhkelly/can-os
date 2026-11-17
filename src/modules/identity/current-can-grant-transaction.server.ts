@@ -13,6 +13,8 @@ export type CANGrantScope = {
   roles: readonly string[];
   organizationId: string | null;
   siteId: string | null;
+  /** Optional organization classification required by independently governed reviewers. */
+  organizationType?: string;
 };
 
 /**
@@ -36,6 +38,7 @@ export async function assertCurrentCANGrantForMutation(
   if (!actor.accountId || !actor.sessionId || !actor.grantId ||
       !actor.actorPersonId || !actor.role || actor.sessionAccountId ||
       !expected.roles.includes(actor.role) ||
+      (expected.organizationType && !expected.organizationId) ||
       (actor.scope.organizationIds?.length ?? 0) !== (expected.organizationId ? 1 : 0) ||
       (expected.organizationId &&
         actor.scope.organizationIds?.[0] !== expected.organizationId) ||
@@ -50,6 +53,18 @@ export async function assertCurrentCANGrantForMutation(
     throw new AuthorizationError("current CAN session");
   }
   const digest = hashAccessSecret(raw, pepper);
+  // Purpose-scoped reviewers must lock the actual institution classification.
+  // Other grants, including account-only roles, need no Organization join.
+  const organizationJoin = expected.organizationType
+    ? sql`JOIN public.organizations verified_org
+        ON verified_org.id=current_grant.organization_id`
+    : sql``;
+  const organizationCheck = expected.organizationType
+    ? sql`AND verified_org.type=${expected.organizationType}::text`
+    : sql``;
+  const lockTargets = expected.organizationType
+    ? sql`FOR SHARE OF session,account,current_grant,person,verified_org`
+    : sql`FOR SHARE OF session,account,current_grant,person`;
 
   const result = await tx.execute(sql`
     SELECT account.email_normalized AS email
@@ -60,6 +75,7 @@ export async function assertCurrentCANGrantForMutation(
       ON current_grant.id=session.active_grant_id
      AND current_grant.account_id=account.id
     JOIN public.people person ON person.id=account.person_id
+    ${organizationJoin}
     WHERE session.secret_hash=${digest}::text
       AND session.id=${actor.sessionId}::uuid
       AND account.id=${actor.accountId}::uuid
@@ -71,6 +87,7 @@ export async function assertCurrentCANGrantForMutation(
         IS NOT DISTINCT FROM ${expected.organizationId}::uuid
       AND current_grant.site_id
         IS NOT DISTINCT FROM ${expected.siteId}::uuid
+      ${organizationCheck}
       AND current_grant.active=true AND person.active=true
       AND account.disabled=false
       AND account.email_verified_at IS NOT NULL
@@ -79,7 +96,7 @@ export async function assertCurrentCANGrantForMutation(
       AND session.updated_at>clock_timestamp()-interval '30 minutes'
       AND (NOT session.shared_device OR
         session.last_activity_at>clock_timestamp()-interval '5 minutes')
-    FOR SHARE OF session,account,current_grant,person
+    ${lockTargets}
   `);
   if (result.rows.length !== 1 ||
       typeof result.rows[0]?.email !== "string" ||
