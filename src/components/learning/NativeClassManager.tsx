@@ -318,7 +318,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         visibleDraftClassCount:preferredSiteId
           ?(classes.data??[]).filter(cls=>cls.siteId===preferredSiteId).length
           :(classes.data?.length??0),
-        filtered:Boolean(search||preferredSiteId||preferredOfferingVersionId),
+        filtered:Boolean(search),
       }}/>
     </div>
     <section className="mt-5 border border-border bg-card p-5" aria-label="Approved Offering hierarchy">
