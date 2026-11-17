@@ -214,11 +214,30 @@ const governedRecordConsumers = {
   "routes/actions.$actionId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Action metadata"'],
   "routes/enrichment_.$seasonId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Program details"'],
   "routes/centers.demo.tsx": ["<RecordHeader", "<RecordLayout"],
+  "components/field-trips/FieldTripFacts.tsx": ["<RecordFacts", 'label="Field trip schedule and fee"'],
+  "routes/student.field-trips.tsx": ["<FieldTripFacts trip={item}/>"],
+  "routes/guardian.field-trips.tsx": ["<FieldTripFacts trip={item}/>"],
+  "components/church/ChurchApplicationConfirmation.tsx": ["<RecordFacts", 'label="Submitted church application details"'],
+  "components/enrollment/FirstSchoolDayHandoff.tsx": ["<RecordFacts", 'variant="tiles"',
+    'label="School-day verification evidence"', '"Not yet observable"'],
 };
 for (const [file, required] of Object.entries(governedRecordConsumers)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
   for (const fragment of required) if (!source.includes(fragment)) {
     console.error(`${file} must reuse V6.1 record composition: missing ${fragment}`);
+    process.exitCode = 1;
+  }
+}
+
+// Migrated feature-level RecordFacts compositions must retain right-angle geometry.
+for (const path of [
+  "components/field-trips/FieldTripFacts.tsx",
+  "components/church/ChurchApplicationConfirmation.tsx",
+  "components/enrollment/FirstSchoolDayHandoff.tsx",
+]) {
+  const source = readFileSync(join(srcRoot, path), "utf8");
+  if (radiusUtility.test(source)) {
+    console.error(`${path} must retain V6.1 square-corner record facts`);
     process.exitCode = 1;
   }
 }
