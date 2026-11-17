@@ -20,6 +20,7 @@ import {
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole, blueprintReadDatabaseRole } from "@/domain/blueprint-database-role";
+import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
 
 type ReviewInput = ReturnType<typeof decideBlueprintReviewInputSchema.parse>;
 
@@ -41,6 +42,7 @@ async function requireReviewVersion(
     configurationId: blueprintConfigurationVersions.configurationId,
     owningOrganizationId: blueprintConfigurations.owningOrganizationId,
     lifecycle: blueprintConfigurationVersions.lifecycle,
+    config: blueprintConfigurationVersions.config,
   }).from(blueprintConfigurationVersions)
     .innerJoin(blueprintConfigurations,
       eq(blueprintConfigurations.id, blueprintConfigurationVersions.configurationId))
@@ -139,6 +141,7 @@ export async function getBlueprintReviewHistory(
   return db.transaction(async tx => {
     await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
     const version = await requireReviewVersion(tx, context, configurationVersionId);
+    requireBlueprintSiteScope(context, version.config);
     const rows = await tx.select({
       id: configurationReviews.id,
       decision: configurationReviews.decision,
