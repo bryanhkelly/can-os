@@ -146,12 +146,12 @@ export async function authorizeCanonicalCourseAttempt(
     }
   }
   if (attempt.noncreditRegistrationId) {
-    [registration] = await tx.select().from(noncreditRegistrations)
+    registration = (await tx.select().from(noncreditRegistrations)
       .where(and(eq(noncreditRegistrations.id,attempt.noncreditRegistrationId),
-        eq(noncreditRegistrations.deploymentId,attempt.deploymentId))).limit(1);
+        eq(noncreditRegistrations.deploymentId,attempt.deploymentId))).limit(1))[0]??null;
     if (registration) {
-      [training] = await tx.select().from(noncreditTrainingVersions)
-        .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1);
+      training = (await tx.select().from(noncreditTrainingVersions)
+        .where(eq(noncreditTrainingVersions.id,registration.trainingVersionId)).limit(1))[0]??null;
     }
   }
   return resolveCanonicalCourseParticipation({
