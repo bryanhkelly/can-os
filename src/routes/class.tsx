@@ -31,6 +31,16 @@ const PublisherCourseActivityEditor=lazy(async()=>{
   const module=await import("@/components/learning/PublisherCourseActivityEditor");
   return {default:module.PublisherCourseActivityEditor};
 });
+/** Recorded-instructor production belongs to authorized Course presenters;
+ * both views share the existing private authoring and independent review services. */
+const ProviderInstructionHome=lazy(async()=>{
+  const module=await import("@/components/learning/ProviderInstructionHome");
+  return {default:module.ProviderInstructionHome};
+});
+const ProviderInstructionDraft=lazy(async()=>{
+  const module=await import("@/components/learning/ProviderInstructionDraft");
+  return {default:module.ProviderInstructionDraft};
+});
 
 const classUuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function selectedClassUuid(value:unknown):string|undefined{
@@ -38,14 +48,15 @@ function selectedClassUuid(value:unknown):string|undefined{
 }
 
 export const Route=createFileRoute("/class")({
-  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;courseVersionId?:string;view?:"manage"|"activities"}=>({
-    view:value.view==="manage"||value.view==="activities"?value.view:undefined,
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;courseVersionId?:string;trackVersionId?:string;view?:"manage"|"activities"|"content"}=>({
+    view:value.view==="manage"||value.view==="activities"||value.view==="content"?value.view:undefined,
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
     classId:selectedClassUuid(value.classId),
     siteId:selectedClassUuid(value.siteId),
     offeringVersionId:selectedClassUuid(value.offeringVersionId),
     courseVersionId:selectedClassUuid(value.courseVersionId),
+    trackVersionId:selectedClassUuid(value.trackVersionId),
   }),
   component:ClassHome,
 });
@@ -391,10 +402,19 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
 function ClassHome(){
   const selected=Route.useSearch();
   const mode=selected.view==="manage"?"manage":
-    selected.view==="activities"?"activities":"explore";
+    selected.view==="activities"?"activities":selected.view==="content"?"content":"explore";
   const navigation=<NativeClassHomeNavigation mode={mode}
     search={selected.search} classId={selected.classId}
     siteId={selected.siteId} offeringVersionId={selected.offeringVersionId}/>;
+  if(selected.view==="content")return <Suspense fallback={<WorkspaceShell
+    title="Recorded instruction" eyebrow="CAN OS" width="wide">
+    <p role="status">Opening authorized recorded-content tools…</p>
+  </WorkspaceShell>}>
+    {selected.trackVersionId
+      ?<ProviderInstructionDraft key={selected.trackVersionId}
+        trackVersionId={selected.trackVersionId} navigation={navigation}/>
+      :<ProviderInstructionHome navigation={navigation}/>}
+  </Suspense>;
   if(selected.view==="activities")return <Suspense fallback={<WorkspaceShell
     title="Course activities" eyebrow="CAN OS" width="wide">
     <p role="status">Opening authorized publisher tools…</p>
