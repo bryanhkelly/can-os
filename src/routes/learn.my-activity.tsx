@@ -260,9 +260,11 @@ function MyActivityPage() {
   const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial" && (item.source==="noncredit_waitlist"?Boolean(nextOpportunityCursor):Boolean(nextCursors[item.source as ParticipationSource]))) ?? [];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Activity"
     subtitle="Your learning, programs, and participation in one place. Each provider keeps authority over its own records."
-    actions={<Link to="/explore" className="text-sm font-semibold text-primary underline underline-offset-4">
-      Explore opportunities
-    </Link>}>
+    actions={<div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
+      <a href="#noncredit-management" className="text-primary underline underline-offset-4"
+        onClick={()=>{setManagingKey(null);setShowAllTraining(true);}}>Manage training</a>
+      <Link to="/explore" className="text-primary underline underline-offset-4">Explore opportunities</Link>
+    </div>}>
     <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Participation summary">
       {views.map(view => <button type="button" key={view.id}
         onClick={() => setBucket(view.id)} aria-pressed={bucket === view.id}
@@ -301,7 +303,7 @@ function MyActivityPage() {
     </div>}
     {activity.isError && <div role="alert" className="mt-5 border border-border bg-card p-6">
       <h2 className="font-semibold">My Activity is unavailable</h2>
-      <p className="mt-2 text-sm text-muted-foreground">Your current session or participation could not be verified. No records were displayed.</p>
+      <p className="mt-2 text-sm text-muted-foreground">The combined participation summary could not be loaded. Your registrations remain source-authoritative. Use Manage training to access your registrations and waiting lists.</p>
       <Button type="button" variant="outline" className="mt-4 rounded-none"
         onClick={() => void activity.refetch()}>Try again</Button>
     </div>}
