@@ -13,7 +13,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   const navigate=useNavigate();
   const {session}=useWorkspaceSession();
   const authorized=!!session?.authenticated;
-  const scopeKey=authorized?session.activeGrantId:"signed-out";
+  const scopeKey=session?.authenticated?session.activeGrantId:"signed-out";
   const client=useQueryClient();
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
   const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
