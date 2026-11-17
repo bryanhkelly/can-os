@@ -3,7 +3,7 @@
  * Question content is data, never COGIC-specific code. No survey answer
  * counts as an academic assessment or verified participation time.
  */
-export type SurveyChoice = { id: string };
+export type SurveyChoice = { id: string; label?: string };
 export type SurveyQuestion = {
   id: string;
   type: "single_choice" | "multiple_choice" | "rating" | "likert" | "nps" | "text" | "matrix";
