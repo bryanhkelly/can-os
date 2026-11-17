@@ -21,6 +21,12 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(command).not.toContain("tx.insert(canonicalClassAwards)");
     expect(command).not.toContain("learningAwardIssuances");
   });
+  it("allows an independently approved not-yet-completed learner to progress, not a terminal resurrection",()=>{
+    expect(command).toContain('current.resultCode!=="not_yet_completed"');
+    expect(sql).toContain("prior.result_code<>'not_yet_completed'");
+    expect(sql).toContain("e.attempt_state<>'active'");
+    expect(command).toContain("terminal Class history cannot be restarted");
+  });
   it("respects canonical source trigger transition ordering",()=>{
     expect(canonical).toContain("class_row.enrollment_state<>'active'");
     const attemptMark=command.indexOf("tx.update(learnerCourseAttempts)");
