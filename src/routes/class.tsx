@@ -10,6 +10,7 @@ import {
 import { getMyNativeClassInvitations, declineNativeClassInvitation } from
   "@/modules/classes/native-class-invitations.functions";
 import {requestNativeClassApproval,getMyNativeClassApprovals} from "@/modules/classes/native-class-approvals.functions";
+import {transferMyNativeClassEnrollment} from "@/modules/classes/native-class-transfers.functions";
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 
@@ -238,11 +239,33 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
 }
 
 type EnrolledClass=Awaited<ReturnType<typeof getMyNativeClassEnrollmentHistoryPage>>["items"][number];
-function EnrolledClassCard({item,onChanged}:{item:EnrolledClass;onChanged:()=>Promise<void>}){
+function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onChanged:()=>Promise<void>;destinations:Item[]}){
   const [confirm,setConfirm]=useState(false);
   const [busy,setBusy]=useState(false);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
+  const [transferVersion,setTransferVersion]=useState("");
+  const [transferCredit,setTransferCredit]=useState<"audit"|"not_applicable">("not_applicable");
+  const [transferAdult,setTransferAdult]=useState(false);
+  const [transferConsent,setTransferConsent]=useState(false);
+  const target=destinations.find(row=>row.classOfferingVersionId===transferVersion);
+  async function transfer(){
+    if(item.status!=="active"||!target||!transferAdult||!transferConsent||
+       !target.allowedCreditModes.includes(transferCredit)||busy)return;
+    setBusy(true);setNotice("");setError("");
+    try{
+      await transferMyNativeClassEnrollment({data:{
+        sourceClassEnrollmentId:item.classEnrollmentId,
+        targetClassOfferingVersionId:target.classOfferingVersionId,
+        creditMode:transferCredit,adultAttested:true,consentAccepted:true,
+        requestId:crypto.randomUUID(),
+      }});
+      setNotice("Transfer completed. Old Class history was preserved.");
+      setTransferVersion("");setTransferAdult(false);setTransferConsent(false);
+      await onChanged();
+    }catch(e){setError(normalizeClientError(e,"Class transfer was not completed.").message)}
+    finally{setBusy(false)}
+  }
   async function withdraw(){
     if(!confirm||busy)return;
     setBusy(true);setError("");setNotice("");
@@ -267,6 +290,53 @@ function EnrolledClassCard({item,onChanged}:{item:EnrolledClass;onChanged:()=>Pr
         className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
         Open Class
       </Link>}
+    {item.status==="active"&&destinations.some(row=>row.classId!==item.classId&&
+      row.enrollmentMethods.includes("self"))&&
+      <details className="mt-4 border border-border p-3">
+        <summary className="cursor-pointer text-sm font-semibold">Transfer to another Class</summary>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Transfers are only available to public Classes accepting adult self-enrollment.
+          The destination seat and current terms are checked again before moving you.
+        </p>
+        <label className="mt-3 block text-sm font-semibold" htmlFor={"transfer-"+item.classEnrollmentId}>
+          Destination Class
+        </label>
+        <select id={"transfer-"+item.classEnrollmentId} value={transferVersion}
+          onChange={e=>{setTransferVersion(e.target.value);setTransferConsent(false);}}
+          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          <option value="">Select a destination</option>
+          {destinations.filter(row=>row.classId!==item.classId&&
+            row.enrollmentMethods.includes("self")).map(row=>
+            <option key={row.classOfferingVersionId} value={row.classOfferingVersionId}>
+              {row.classTitle}
+            </option>)}
+        </select>
+        {target&&<>
+          <label className="mt-3 block text-sm font-semibold">Participation
+            <select value={transferCredit}
+              onChange={e=>setTransferCredit(e.target.value as typeof transferCredit)}
+              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              {target.allowedCreditModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
+            </select>
+          </label>
+          <p className="mt-3 whitespace-pre-wrap border border-border bg-muted/20 p-3 text-sm">
+            {target.consentText}
+          </p>
+          <label className="mt-3 flex gap-2 text-sm">
+            <input type="checkbox" checked={transferAdult}
+              onChange={e=>setTransferAdult(e.target.checked)}/>
+            I confirm I am at least 18.
+          </label>
+          <label className="mt-3 flex gap-2 text-sm">
+            <input type="checkbox" checked={transferConsent}
+              onChange={e=>setTransferConsent(e.target.checked)}/>
+            I accept the destination Class terms and understand my current Class access ends.
+          </label>
+          <Button size="sm" className="mt-3" disabled={busy||!transferAdult||!transferConsent||
+            !target.allowedCreditModes.includes(transferCredit)}
+            onClick={()=>void transfer()}>{busy?"Transferring…":"Confirm transfer"}</Button>
+        </>}
+      </details>}
     {current&&<div className="mt-4">
       {!confirm?<Button type="button" size="sm" variant="outline"
         onClick={()=>setConfirm(true)}>
@@ -369,7 +439,7 @@ function NativeLearnerClasses(){
       {enrolled.isError&&<p role="alert" className="mt-3 border border-border p-4 text-sm">Native Class records are unavailable or access could not be verified.</p>}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
         {enrolledItems.map(item=><EnrolledClassCard
-          key={item.classEnrollmentId} item={item} onChanged={refresh}/>)}
+          key={item.classEnrollmentId} item={item} onChanged={refresh} destinations={catalogItems}/>)}
       </div>
       {enrolled.isSuccess&&enrolledItems.length===0&&<p className="mt-4 text-sm text-muted-foreground">You have no native Class enrollments yet.</p>}
       {enrolled.hasNextPage&&<Button type="button" size="sm" variant="outline" className="mt-4"
