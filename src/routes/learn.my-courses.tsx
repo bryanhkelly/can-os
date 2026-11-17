@@ -49,7 +49,11 @@ function MyNoncreditCourses(){
         registrationId,confirm:true,
       }});
       setWithdrawConfirm(null);
-      await client.invalidateQueries({queryKey:["my-noncredit-self-enrollments"]});
+      await Promise.all([
+        client.invalidateQueries({queryKey:["my-noncredit-self-enrollments"]}),
+        // A withdrawal changes the canonical participation displayed by WS1.
+        client.invalidateQueries({queryKey:["my-activity"]}),
+      ]);
       setNotice(result.alreadyWithdrawn
         ?"This registration was already withdrawn."
         :"Registration withdrawn. Your learning history and original consent record were retained.");
