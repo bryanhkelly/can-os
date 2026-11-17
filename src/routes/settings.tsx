@@ -42,7 +42,7 @@ function SettingsHome() {
     subtitle="Return to the same authorized records whenever your school's information or your preferences change. No second onboarding record is created.">
     <EditDestination title="My CAN account" icon={<UserRound className="size-5"/>}
       description="Your account, verified schools and roles, and favorite published learning locations. These preferences never grant institutional access.">
-      <Link className={actionClass} to="/account/">Open My CAN <ArrowRight className="size-4"/></Link>
+      <Link className={actionClass} to="/account">Open My CAN <ArrowRight className="size-4"/></Link>
     </EditDestination>
     {schoolAdmin && <SchoolSettingsDestinations siteId={siteId}/>}
     <div className="mt-7 grid gap-4">
