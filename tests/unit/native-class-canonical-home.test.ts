@@ -77,6 +77,7 @@ describe("one native Class route and reusable manager",()=>{
   it("checks requested delivery mode before retaining a selected Site",()=>{
     const manager=read("src/components/learning/NativeClassManager.tsx");
     expect(manager).not.toContain("some(mode=>mode===mode)");
+    expect(manager).toContain("deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))");
     expect(manager).toContain("site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)");
     expect(manager).toContain("setCreatedClassId(result.classId)");
     expect(manager).toContain("Open newly created Class");
