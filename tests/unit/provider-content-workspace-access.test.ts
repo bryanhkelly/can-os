@@ -3,8 +3,8 @@ import { providerContentCapability, providerContentHome, requireProviderContentR
 
 describe("provider content workspace role boundary", () => {
   it("routes only verified instructional creators and independent reviewers to separate workspaces", () => {
-    expect(providerContentHome("academic_content_creator")).toBe("/canonical/content");
-    expect(providerContentHome("academic_content_reviewer")).toBe("/canonical/content-reviews");
+    expect(providerContentHome("academic_content_creator")).toBe("/class?view=content");
+    expect(providerContentHome("academic_content_reviewer")).toBe("/class?view=reviews");
     expect(providerContentCapability("academic_content_creator")).toBe("instructional_track.author");
     expect(providerContentCapability("academic_content_reviewer")).toBe("instructional_track.review");
     expect(requireProviderContentRole("academic_content_creator")).toBe("academic_content_creator");
