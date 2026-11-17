@@ -79,7 +79,7 @@ BEGIN
   END IF;
   IF NEW.purpose='completion_correction' THEN
     SELECT r.participant_person_id,t.provider_organization_id,a.delivery_site_id
-      INTO target_person,target_org,target_site
+      INTO STRICT target_person,target_org,target_site
     FROM education_v30.noncredit_registrations r
     JOIN education_v30.noncredit_completion_decisions prior
       ON prior.registration_id=r.id AND prior.id=NEW.expected_decision_id
@@ -89,7 +89,7 @@ BEGIN
     WHERE r.id=NEW.noncredit_registration_id;
   ELSIF NEW.purpose='award_revocation' THEN
     SELECT d.recipient_person_id,i.issuer_organization_id,a.delivery_site_id
-      INTO target_person,target_org,target_site
+      INTO STRICT target_person,target_org,target_site
     FROM education_v30.learning_award_issuances i
     JOIN education_v30.learner_achievement_decisions d ON d.id=i.achievement_decision_id
     JOIN education_v30.noncredit_completion_decisions completion
@@ -100,7 +100,7 @@ BEGIN
     WHERE i.id=NEW.award_issuance_id;
   ELSE
     SELECT e.learner_person_id,c.operating_organization_id,a.delivery_site_id
-      INTO target_person,target_org,target_site
+      INTO STRICT target_person,target_org,target_site
     FROM education_v30.class_enrollments e
     JOIN education_v30.classes c ON c.id=e.class_id
     JOIN education_v30.participation_attributions a

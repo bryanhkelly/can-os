@@ -20,6 +20,7 @@ describe("WS3 completion evidence source and credential-current contracts",()=>{
     expect(subjectSql).toContain("noncredit_completion_decisions prior");
     expect(subjectSql).toContain("WS3 reviewed evidence bindings are immutable");
     expect(subjectSql).toContain("ROW(target_person,target_org,target_site)");
+    expect(subjectSql.match(/INTO STRICT target_person,target_org,target_site/g)).toHaveLength(3);
     expect(subjectSql).toContain("FORCE ROW LEVEL SECURITY");
     expect(subjectSql).toContain("REVOKE ALL");
     expect(subjectSql).toContain("FOR ALL TO neondb_owner");
