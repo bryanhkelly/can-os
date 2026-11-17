@@ -55,7 +55,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   {!declineTarget&&<MutationFeedback state={mutation} pendingMessage="Saving offer response..."/>}
   <ActionDialog open={!!declineTarget} title="Decline school offer?"
     description={`Decline the offer for ${declineTarget?.studentName ?? "this student"} at ${declineTarget?.program ?? "this school"}? The school will be notified and you may need to contact admissions to reapply.`}
-    confirmLabel="Decline offer" destructive pending={mutation.pending} confirmDisabled={busy}
+    confirmLabel="Decline offer" destructive pending={mutation.pending} pendingLabel="Declining offer…" confirmDisabled={busy}
     onClose={()=>setDeclineTarget(null)}
     onConfirm={()=>{if(declineTarget)void respond(declineTarget.offerId,"decline");}}>
     <MutationFeedback state={mutation} pendingMessage="Saving offer response..."/>
