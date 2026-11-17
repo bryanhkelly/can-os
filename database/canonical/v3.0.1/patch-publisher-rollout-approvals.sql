@@ -186,7 +186,7 @@ BEGIN
    END IF;
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS publisher_rollout_identity_immutable_trg
  ON education_v30.publisher_rollout_plans;
 CREATE TRIGGER publisher_rollout_identity_immutable_trg
@@ -202,7 +202,7 @@ CREATE TRIGGER operator_rollout_identity_immutable_trg
 -- Guard the append-only link between an approved local rollout application
 -- and its *existing* canonical Class. The Class is never synthesized here.
 CREATE OR REPLACE FUNCTION education_v30.operator_rollout_class_link_guard()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
  IF TG_OP <> 'INSERT' THEN
    RAISE EXCEPTION 'Approved rollout Class provenance is immutable'
@@ -226,7 +226,7 @@ BEGIN
      USING ERRCODE='23514';
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS operator_rollout_class_link_guard_trg
  ON education_v30.operator_rollout_class_links;
 CREATE TRIGGER operator_rollout_class_link_guard_trg
@@ -238,7 +238,7 @@ CREATE TRIGGER operator_rollout_class_link_guard_trg
 -- independently verified person/session must STILL be checked by WS00's
 -- purpose-specific SQL role/procedure before issuing these inserts.
 CREATE OR REPLACE FUNCTION education_v30.publisher_rollout_review_independence()
-RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $$
 BEGIN
  IF TG_TABLE_NAME='publisher_rollout_decisions' THEN
    IF NOT EXISTS (
@@ -262,7 +262,7 @@ BEGIN
    END IF;
  END IF;
  RETURN NEW;
-END $;
+END $$;
 DROP TRIGGER IF EXISTS publisher_rollout_review_independence_trg
  ON education_v30.publisher_rollout_decisions;
 CREATE TRIGGER publisher_rollout_review_independence_trg
