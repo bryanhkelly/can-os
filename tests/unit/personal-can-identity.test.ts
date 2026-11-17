@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { personalCanSignupSchema, isAccountOnlyGrant, eligiblePersonalLanding } from "@/domain/personal-account-signup";
 import { myCanContactInput, accountProfileCanEdit } from "@/domain/can-account-profile";
@@ -24,6 +25,22 @@ describe("Personal CAN account boundaries", () => {
     expect(accountProfileCanEdit({demoAccountSwitching:true,actorPersonId:"a",
       activeGrantId:"grant",grants:[current]})).toBe(false);
   });
+  it("reuses the immutable Person even when every old role is revoked", () => {
+    const personal=readFileSync(
+      "src/modules/identity/personal-account-signup.server.ts","utf8");
+    const school=readFileSync(
+      "src/modules/identity/school-setup-signup.server.ts","utf8");
+    const signin=readFileSync(
+      "src/modules/identity/passwordless-access.server.ts","utf8");
+    expect(personal).toContain("eq(accountPersonGrants.active, true)");
+    expect(personal).toContain("if (!existing.consumedAt && existing.expiresAt > new Date()) return;");
+    expect(personal).toContain("let personId=account.personId");
+    expect(personal).toContain("if(!existing?.active)throw new Error");
+    expect(school).toContain("associated[0]?.personId??account.personId");
+    expect(school).toContain("account.personId!==existingPersonId");
+    expect(signin).toContain("boundAccount.personId!==chosenGrant?.personId");
+  });
+
   it("accepts bounded personal contact fields only", () => {
     expect(myCanContactInput.parse({preferredName:"Avery",phone:"+1 (415) 555-0100"}).phone)
       .toBe("+1 (415) 555-0100");
