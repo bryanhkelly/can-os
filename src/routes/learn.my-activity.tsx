@@ -210,7 +210,7 @@ function MyActivityPage() {
               onClick={() => {setBucket("current"); setKind("all");}}>Clear filters</button>
             <Link to="/explore" className="font-semibold text-primary underline">Explore opportunities</Link>
           </div>
-        </div>}
+        </div> : null}
       </section>
       {opportunities.length > 0 && <section className="mt-8" aria-label="Enrollment opportunities">
         <h2 className="font-serif text-2xl">Enrollment opportunities</h2>
