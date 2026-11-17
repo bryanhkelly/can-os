@@ -77,6 +77,7 @@
     "test:visual": "npm run build-storybook && chromatic",
     "lint": "eslint . && node scripts/check-design-system.mjs",
     "design:inventory": "node scripts/report-design-system-adoption.mjs",
+    "design:routes": "node scripts/audit-v61-routes.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
     "deploy:cloudflare": "node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
