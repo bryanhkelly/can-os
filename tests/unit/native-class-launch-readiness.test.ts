@@ -75,7 +75,7 @@ describe("native Class launch readiness is a source-backed presentation",()=>{
     expect(config).toContain('url.protocol!=="http:"');
     expect(preflight).toContain("verifyAdmissionsNeonBranch");
     expect(preflight).toContain('CAN_E2E_TEST_BRANCH_ID');
-    expect(preflight).not.toMatch(/\\bINSERT\\b|\\bUPDATE\\b|\\bDELETE\\b|\\bTRUNCATE\\b/i);
+    expect(preflight).not.toMatch(/\bINSERT\b|\bUPDATE\b|\bDELETE\b|\bTRUNCATE\b/i);
     expect(spec).toContain("withAuthenticatedPage");
     expect(spec).toContain("Create draft Class");
     expect(spec).toContain("await page.reload()");
