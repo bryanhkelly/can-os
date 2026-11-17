@@ -22,6 +22,8 @@ const required = [
     "tests/unit/ws3-evidence-review-and-class-current.test.ts",
     "tests/unit/ws3-class-policy-publication-contract.test.ts",
   ]],
+  ["npm",["run","test"]],
+  ["npm",["run","build"]],
 ];
 const results=[];
 for (const [command,args] of required){
