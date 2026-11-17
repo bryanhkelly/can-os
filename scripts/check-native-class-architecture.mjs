@@ -36,5 +36,23 @@ for (const path of nativeOwners) {
     }
   }
 }
+// Native Classes authenticate without projecting retiring school Sections.
+const canonicalContext = readFileSync(
+  resolve(root, "src/modules/identity/canonical-command-context.server.ts"), "utf8");
+const coreIdentity = readFileSync(
+  resolve(root, "src/modules/identity/command-context.server.ts"), "utf8");
+if (!canonicalContext.includes("getIdentityContext(request)") ||
+    canonicalContext.includes("getCommandContext(request)")) {
+  console.error("Native Class authentication must use Section-free CAN identity");
+  errors++;
+}
+const coreStart = coreIdentity.indexOf("export async function getIdentityContext(");
+const legacyStart = coreIdentity.indexOf("export async function getCommandContext(", coreStart);
+if (coreStart < 0 || legacyStart < 0 ||
+    /\\bsectionTeachers\\b|\\bsectionIds\\b|\\bsectionId\\b/.test(
+      coreIdentity.slice(coreStart, legacyStart))) {
+  console.error("Core identity must not project retiring school Section scope");
+  errors++;
+}
 if (errors > 0) process.exitCode = 1;
 else console.log(`Native Class architecture boundary verified: ${nativeOwners.length} owners`);
