@@ -76,18 +76,18 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
       const [created]=await tx.insert(noncreditCompletionDecisions).values({
         registrationId:registration.id,policyId:policy.id,
         assessmentResultId:data.assessmentResultId,outcome:"completed",
-        decisionSource:"provider",decidedByPersonId:actor.actorPersonId,supersedesId:latest?.id??null,
+        decisionSource:"provider",decidedByPersonId:actor.actorPersonId!,supersedesId:latest?.id??null,
       }).returning({id:noncreditCompletionDecisions.id});
       if(!created)throw new Error("Unable to save the noncredit completion decision");
       const payload={courseAttemptId:attempt.id,registrationId:registration.id,
         policyId:policy.id,assessmentResultId:data.assessmentResultId};
-      await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+      await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId!,
         owningOrganizationId:training.providerOrganizationId,
         eventCode:"learning.noncredit.completed",entityKind:"noncredit_completion_decision",
         entityId:created.id,payload});
       await tx.insert(domainEvents).values({eventType:"NoncreditTrainingCompleted",
         aggregateType:"noncredit_completion_decision",aggregateId:created.id,
-        actorPersonId:actor.actorPersonId,payload});
+        actorPersonId:actor.actorPersonId!,payload});
       return {decisionId:created.id,alreadyCompleted:false};
     });
   });
