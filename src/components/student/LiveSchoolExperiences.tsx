@@ -164,7 +164,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
    description={cancelTarget
     ?`Cancel ${cancelTarget.seriesTitle} with ${cancelTarget.teacherName} on ${format(cancelTarget.startsAt,cancelTarget.timezone)} (${cancelTarget.timezone})? The slot will open for another family.`
     :"Cancel this appointment? The slot will open for another family."}
-   confirmLabel="Cancel appointment" destructive pending={mutation.pending} confirmDisabled={busy}
+   confirmLabel="Cancel appointment" destructive pending={mutation.pending} pendingLabel="Cancelling appointment…" confirmDisabled={busy}
    onClose={()=>{setCancelTarget(null);setCancelSubmitting(false)}}
    onConfirm={()=>{
     if(!cancelTarget)return;
