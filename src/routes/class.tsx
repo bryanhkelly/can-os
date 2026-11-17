@@ -25,17 +25,19 @@ const NativeClassManager=lazy(async()=>{
   return {default:module.NativeClassManager};
 });
 
+const classUuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function selectedClassUuid(value:unknown):string|undefined{
+  return typeof value==="string"&&classUuidPattern.test(value)?value:undefined;
+}
+
 export const Route=createFileRoute("/class")({
-  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;view?:"manage"}=>({
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;view?:"manage"}=>({
     view:value.view==="manage"?"manage":undefined,
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
-    classId:typeof value.classId==="string"&&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.classId)
-      ?value.classId:undefined,
-    siteId:typeof value.siteId==="string"&&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.siteId)
-      ?value.siteId:undefined,
+    classId:selectedClassUuid(value.classId),
+    siteId:selectedClassUuid(value.siteId),
+    offeringVersionId:selectedClassUuid(value.offeringVersionId),
   }),
   component:ClassHome,
 });
@@ -395,7 +397,8 @@ function ClassHome(){
     </nav>
     {selected.view==="manage"
       ?<Suspense fallback={<p role="status" className="p-6 text-sm">Opening Class management…</p>}>
-        <NativeClassManager key={selected.siteId??"all"} preferredSiteId={selected.siteId}/>
+        <NativeClassManager key={`${selected.siteId??"all"}:${selected.offeringVersionId??"all"}`}
+          preferredSiteId={selected.siteId} preferredOfferingVersionId={selected.offeringVersionId}/>
       </Suspense>
       :<NativeLearnerClasses/>}
   </div>;
