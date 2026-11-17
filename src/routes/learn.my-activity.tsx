@@ -7,6 +7,7 @@ import {Button} from "@/components/ui/button";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
 import {getMyActivity,getMyActivitySourcePage,getMyActivityOpportunityPage} from "@/modules/learning/my-activity.functions";
 import {assembleParticipation} from "@/domain/participation-projections";
+import {activityEvidenceLinks} from "@/domain/activity-evidence-navigation";
 import {assertParticipationHistoryPage} from "@/domain/participation-history-pages";
 import {
   activityStatusLabel,resolveActivityFilters,
@@ -43,7 +44,8 @@ function displayDate(value: string | null): string | null {
     year: "numeric", month: "short", day: "numeric",
   }) : null;
 }
-function ActivityCard({item}: {item: ParticipationRecord}) {
+function ActivityCard({item,viewerRole}: {item: ParticipationRecord;viewerRole:string}) {
+  const recordLinks=activityEvidenceLinks(item,viewerRole);
   const next = displayDate(item.nextAt);
   const start = displayDate(item.startAt);
   const end = displayDate(item.endAt);
@@ -81,6 +83,13 @@ function ActivityCard({item}: {item: ParticipationRecord}) {
           {item.progress.label}: {item.progress.completed} of {item.progress.total}
         </p>}
         {item.outcome && <p className="mt-3 text-sm font-medium">{item.outcome.label}</p>}
+        {recordLinks.length>0 && <nav aria-label={"Official records for "+item.title}
+          className="mt-4 flex flex-wrap gap-x-4 gap-y-2">
+          {recordLinks.map(link=><a key={link.href} href={link.href}
+            className="text-xs font-semibold text-primary underline underline-offset-4">
+            {link.label}
+          </a>)}
+        </nav>}
       </div>
       {item.action && <a href={item.action.href}
         className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -304,7 +313,7 @@ function MyActivityPage() {
           <p className="text-sm text-muted-foreground">Showing {shown.length} {shown.length===1?"record":"records"}{canLoadOlder?" · More history available":""}{opportunities.length>0?` · ${opportunities.length} enrollment opportunities`:""}</p>
         </div>
         {shown.length ? <div className="mt-3 grid gap-3">
-          {shown.map(item => <ActivityCard key={item.key} item={item}/>)}
+          {shown.map(item => <ActivityCard key={item.key} item={item} viewerRole={activity.data?.viewerRole??""}/>)}
         </div> : opportunities.length === 0 ? <div className="mt-3 border border-border bg-card p-6">
           <h3 className="font-serif text-xl">Nothing to display in this view</h3>
           <p className="mt-2 text-sm text-muted-foreground">
