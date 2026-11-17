@@ -1,7 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
+import { workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import { Button } from "@/components/ui/button";
 import { getUnifiedClassCourseOptions } from "@/modules/classes/unified-class.functions";
 import { getNativeOfferingVersionImpact } from "@/modules/programs/publisher-version-impact.functions";
@@ -14,6 +15,11 @@ import { projectedRolloutStages } from "@/domain/program-rollout-lifecycle";
  * authorized READ of local adoptions, versions and delivery readiness.
  */
 export const Route=createFileRoute("/canonical/program-operations")({
+  loader:async({context})=>{
+    const result=await context.queryClient.fetchQuery(workspaceSessionQueryOptions());
+    if(!result.session?.authenticated)
+      throw redirect({to:"/access",search:{returnTo:"/canonical/program-operations"}});
+  },
   component:ProgramOperations,
 });
 
