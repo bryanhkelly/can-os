@@ -28,8 +28,6 @@ const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getInstructionalLearnerContext(getRequest());
     if(!actor.actorPersonId||actor.role!=="learner")
@@ -132,7 +130,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       // independent source binding and feature are deployed. Earlier generic
       // Class Outcomes are never promoted to verified completion.
       let classCompletionAuthorityVerified=false;
-      if(process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED==="true"){
+      {
         const governed=await tx.select({
           id:canonicalClassOutcomes.id,
           resultCode:canonicalClassOutcomes.resultCode,
