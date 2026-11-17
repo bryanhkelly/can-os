@@ -363,10 +363,10 @@ export const getNativeClassOperatorSites=createServerFn({method:"GET"})
     const operator=await requireClassOperator();
     if(!operator.siteIds.length)return [];
     const now=new Date();
-    return db.selectDistinct({
+    const rows=await db.selectDistinct({
       id:catalogSites.id,name:canonicalEnrollmentSites.name,
     }).from(catalogSites)
-      .innerJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,catalogSites.id))
+      .leftJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,catalogSites.id))
       .innerJoin(siteOrganizationRoles,and(
         eq(siteOrganizationRoles.siteId,catalogSites.id),
         eq(siteOrganizationRoles.organizationId,operator.organizationId),
@@ -396,6 +396,7 @@ export const getNativeClassOperatorSites=createServerFn({method:"GET"})
         inArray(catalogSites.id,operator.siteIds),
         eq(catalogSites.status,"active"),
       )).orderBy(asc(canonicalEnrollmentSites.name),asc(catalogSites.id));
+    return rows.map(site=>({id:site.id,name:site.name??"Authorized Site"}));
   });
 
 /** One bounded, stable page of publisher Offerings and their authorized Courses.
