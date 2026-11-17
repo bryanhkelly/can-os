@@ -4,7 +4,7 @@ import { and, desc, eq, gte, ilike, inArray, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { alias } from "drizzle-orm/pg-core";
 import { accessibleClasses } from "@/modules/learning/class-access.server";
-import type { Actor } from "@/modules/identity/actors.server";
+import { requireActor } from "@/modules/identity/actors.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { studentAcademicTimeline } from "@/domain/student-academic-timeline";
@@ -174,7 +174,7 @@ export const searchStudents = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const context = await requireStaffDirectoryContext();
     const teacherSectionIds = context.role === "teacher"
-      ? (await accessibleClasses(context as Actor)).map(section => section.id) : [];
+      ? (await accessibleClasses(await requireActor(["teacher"]))).map(section => section.id) : [];
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const profileIds = await visibleStudentProfileIds(db, s, {
       role: context.role,
@@ -252,7 +252,7 @@ export const getStudent360 = createServerFn({ method: "GET" })
       throw new AuthorizationError("student identifier");
     }
     const teacherSectionIds = context.role === "teacher"
-      ? (await accessibleClasses(context as Actor)).map(section => section.id) : [];
+      ? (await accessibleClasses(await requireActor(["teacher"]))).map(section => section.id) : [];
     const [{ db }, s] = await Promise.all([import("@/db/client"), import("@/db/schema")]);
     const [profile] = await db
       .select({
