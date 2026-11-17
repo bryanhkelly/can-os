@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { GradebookSectionSelector } from "@/components/learning/GradebookSectionSelector";
 import { EmptyState, WorkspaceNotice, PageNavigation } from "@/components/workspace";
 
@@ -39,6 +41,20 @@ describe("V6.1 universal action and surface contracts", () => {
     expect(html).toContain("Algebra (ALG)");
     expect(html).toContain('value="section-a" selected=""');
     expect(html).not.toMatch(/rounded-(?:lg|xl|2xl)/);
+  });
+
+  it("links required field labels, descriptions and validation to the same control", () => {
+    const html = renderToStaticMarkup(<Field label="Independent review reason"
+      description="Explain the current evidence." required error="A review reason is required.">
+      <Input aria-describedby="existing-help"/>
+    </Field>);
+    const id = html.match(/<label for="([^"]+)"/)?.[1];
+    expect(id).toBeTruthy();
+    expect(html).toContain(`id="${id}"`);
+    expect(html).toContain('required=""');
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain(`aria-describedby="existing-help ${id}-description ${id}-error"`);
+    expect(html).toContain('role="alert"');
   });
 
   it("keeps empty, error and pagination surfaces rectangular", () => {
