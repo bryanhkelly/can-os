@@ -53,8 +53,9 @@ export function assertOperationalClassEnrollmentMethods(
   methods: readonly string[],
 ): void {
   if (methods.length === 0 || new Set(methods).size !== methods.length ||
-      methods.some(method => method !== "self" && method !== "assignment")) {
-    throw new AuthorizationError("operational Class enrollment methods (self or verified adult assignment)");
+      methods.some(method => method !== "self" && method !== "assignment" &&
+        method !== "invitation")) {
+    throw new AuthorizationError("operational Class enrollment methods (self, verified adult invitation or assignment)");
   }
 }
 
