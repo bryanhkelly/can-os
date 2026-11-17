@@ -47,8 +47,16 @@ const tableQueries = {
     FROM public.sections s JOIN public.course_template_versions v ON v.id=s.course_template_version_id
     JOIN public.course_templates t ON t.id=v.course_template_id
     JOIN education_v30.courses c ON c.course_code=t.code AND c.publisher_organization_id=t.owning_organization_id
-    JOIN education_v30.course_versions cv ON cv.course_id=c.id AND cv.lifecycle='published'
+    JOIN education_v30.course_versions cv ON cv.course_id=c.id AND cv.lifecycle='published' AND cv.version_no=v.version
     WHERE v.status::text='published'`,
+  ambiguous_published_course_matches: `SELECT count(*)::bigint AS n FROM (
+    SELECT s.id FROM public.sections s
+    JOIN public.course_template_versions v ON v.id=s.course_template_version_id
+    JOIN public.course_templates t ON t.id=v.course_template_id
+    JOIN education_v30.courses c ON c.course_code=t.code AND c.publisher_organization_id=t.owning_organization_id
+    JOIN education_v30.course_versions cv ON cv.course_id=c.id AND cv.lifecycle='published' AND cv.version_no=v.version
+    WHERE v.status::text='published' GROUP BY s.id HAVING count(DISTINCT cv.id)>1
+  ) conflicting`,
   missing_published_course_matches: `SELECT count(DISTINCT s.id)::bigint AS n
     FROM public.sections s JOIN public.course_template_versions v ON v.id=s.course_template_version_id
     JOIN public.course_templates t ON t.id=v.course_template_id
@@ -129,9 +137,11 @@ try {
     counts.native_accounts !== counts.shared_account_ids ||
     counts.active_native_sessions !== 0;
   const unmatchedPublishedCourses = counts.missing_published_course_matches ?? null;
+  const ambiguousPublishedCourses = counts.ambiguous_published_course_matches ?? null;
   const result = {
     target: "test01", counts, missing, blockingLegacy, dualIdentity,
-    dependentRows, blockingDependents, identityDiverged, unmatchedPublishedCourses,
+    dependentRows, blockingDependents, identityDiverged,
+    unmatchedPublishedCourses, ambiguousPublishedCourses,
     sectionRetirementReady: blockingLegacy.length === 0 && blockingDependents.length === 0 && missing.length === 0,
     singleIdentityConsolidationReady: dualIdentity.length === 0 && !identityDiverged && missing.length === 0,
     note: "Aggregate preflight only. It does not prove record-level migration, retention, RLS, or functional parity.",
@@ -143,6 +153,8 @@ try {
     "BLOCKED: dependent Section foreign-key records require migration");
   assert.equal(unmatchedPublishedCourses, 0,
     "BLOCKED: legacy Courses lack publisher-owned published native equivalents");
+  assert.equal(ambiguousPublishedCourses, 0,
+    "BLOCKED: published Course version candidates are ambiguous");
   assert.equal(identityDiverged, false,
     "BLOCKED: native Person/account identity remains separate or native sessions remain");
   assert.equal(dualIdentity.length, 0,
