@@ -406,7 +406,7 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
     </div>
     {reschedule && <ActionDialog open title={`Reschedule ${reschedule.title}`} confirmLabel="Save session time"
       description={`Enter times in ${group.timezone}. Nonexistent or ambiguous daylight-saving times are not accepted.`}
-      pending={mutation.pending} confirmDisabled={busy || !availability.writesEnabled}
+      pending={mutation.pending} pendingLabel="Saving session time…" confirmDisabled={busy || !availability.writesEnabled}
       onClose={() => setReschedule(null)}
       onConfirm={() => void mutation.run(() => reviseCanonicalGroupSession({ data: {
         sessionId: reschedule.id, action: "reschedule",
@@ -473,7 +473,7 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
     </div>
     {report && <ActionDialog open title="Report study group post"
       description="Explain why this post needs facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly."
-      confirmLabel="Send report" pending={mutation.pending}
+      confirmLabel="Send report" pending={mutation.pending} pendingLabel="Sending report…"
       confirmDisabled={busy || !availability.contentEnabled || reportReason.trim().length < 5}
       onClose={() => setReport(null)}
       onConfirm={() => void mutation.run(() => reportCanonicalGroupPost({ data: {
