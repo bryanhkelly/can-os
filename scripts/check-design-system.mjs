@@ -135,3 +135,24 @@ for (const [file, required] of Object.entries(sharedPatternContracts)) {
     process.exitCode = 1;
   }
 }
+
+
+// Layer 2 shared workspace surfaces and migrated feature forms must remain
+// square and compose canonical controls, not rebuild browser widgets.
+const governedWorkspaceSurfaces = [
+  "workspace/workspace-panel.tsx",
+];
+for (const file of governedWorkspaceSurfaces) {
+  const source = readFileSync(join(root, file), "utf8");
+  if (radiusUtility.test(source)) {
+    console.error(`${file} must use V6.1 square-corner surfaces`);
+    process.exitCode = 1;
+  }
+}
+const governedCompletionReview = readFileSync(join(root, "learning/NoncreditCompletionReviewPanel.tsx"), "utf8");
+if (!governedCompletionReview.includes('from "@/components/ui/select"') ||
+    /<select\b/.test(governedCompletionReview) ||
+    radiusUtility.test(governedCompletionReview)) {
+  console.error("Noncredit completion review must use the shared Select and V6.1 geometry");
+  process.exitCode = 1;
+}
