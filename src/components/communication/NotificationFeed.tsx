@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ArrowUpRight, Bell, Check, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { StatusBadge } from "@/components/workspace";
+import { EmptyState, StatusBadge } from "@/components/workspace";
+import { RecordedTime } from "@/components/workflow";
 import type { CenterNotice } from "@/domain/notification-center";
 
 export function NotificationFeed({ notices, busy, onStatus, onReadAll, onNavigate }: {
@@ -45,7 +46,7 @@ export function NotificationFeed({ notices, busy, onStatus, onReadAll, onNavigat
             </StatusBadge>
           </div>
           <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed text-muted-foreground">{notice.body}</p>
-          <time dateTime={notice.date} className="mt-2 block text-xs text-muted-foreground">{new Date(notice.date).toLocaleString()}</time>
+          <RecordedTime value={notice.date} className="mt-2 block text-xs text-muted-foreground"/>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             {notice.href && <a href={notice.href} onClick={onNavigate}
               className="mr-2 inline-flex items-center gap-1 text-xs font-semibold text-primary underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -61,10 +62,10 @@ export function NotificationFeed({ notices, busy, onStatus, onReadAll, onNavigat
         </article>
       </li>)}
     </ul>
-    {!visible.length && <div role="status" className="grid justify-items-center gap-3 p-8 text-center">
-      <Bell aria-hidden="true" className="size-7 text-muted-foreground" />
-      <p className="text-sm font-semibold">{filter === "unread" ? "You're all caught up." : "No notifications yet."}</p>
-      <p className="text-xs text-muted-foreground">Updates for your signed-in account appear here.</p>
+    {!visible.length && <div role="status" className="p-4">
+      <EmptyState className="text-center"
+        title={filter === "unread" ? "You're all caught up." : "No notifications yet."}
+        description="Updates for your signed-in account appear here." />
     </div>}
   </section>;
 }
