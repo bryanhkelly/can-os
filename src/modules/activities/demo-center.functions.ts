@@ -64,6 +64,34 @@ export const getDemoCenter=createServerFn({method:"GET"}).handler(async()=>{
     return {id:lesson.id,title:lesson.title,
       lessonOrder:lesson.lessonOrder,estimatedMinutes:minutes};
   });
+  // Only the fixed, non-authoritative synthetic rollout. Missing or proposed
+  // records are never treated as verified launch approval or enrollment.
+  const [rollout]=course?await db.select({
+    operationStatus:native.educationOperations.status,
+    offeringLifecycle:native.offeringVersions.lifecycle,
+    deploymentStatus:native.programDeployments.status,
+    adoptionStatus:native.deploymentOfferingAdoptions.approvalStatus,
+  }).from(native.programDeployments)
+    .innerJoin(native.educationOperations,eq(
+      native.educationOperations.id,native.programDeployments.operationId))
+    .innerJoin(native.deploymentOfferingAdoptions,eq(
+      native.deploymentOfferingAdoptions.deploymentId,native.programDeployments.id))
+    .innerJoin(native.offeringVersions,and(
+      eq(native.offeringVersions.id,
+        native.deploymentOfferingAdoptions.offeringVersionId),
+      eq(native.offeringVersions.offeringId,native.programDeployments.offeringId)))
+    .innerJoin(native.educationOperationSites,and(
+      eq(native.educationOperationSites.operationId,
+        native.educationOperations.id),
+      eq(native.educationOperationSites.siteId,demoSiteId)))
+    .where(and(
+      eq(native.programDeployments.id,"ca270000-0000-4000-8000-000000000052"),
+      eq(native.deploymentOfferingAdoptions.id,
+        "ca270000-0000-4000-8000-000000000053"),
+      eq(native.offeringVersions.id,
+        "ca270000-0000-4000-8000-000000000051"),
+    )).limit(1):[];
   return {site:{id:site.id,name:site.name},plans,
-    nativeCourse:course??null,nativeCourseLessons:lessons};
+    nativeCourse:course??null,nativeCourseLessons:lessons,
+    nativeRollout:rollout??null};
 });
