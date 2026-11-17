@@ -1,9 +1,8 @@
 import { rolesAllow } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { applications,documents,journeyRequirements,journeys } from "@/db/schema";
-import {assertR2DemoEnabled,enrollmentDocumentStorageVerified} from "@/domain/r2-document-access";
+import {enrollmentDocumentStorageVerified} from "@/domain/r2-document-access";
 import { EventTypes } from "@/domain/event-types";
-import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { createServerFn } from "@tanstack/react-start";
@@ -21,11 +20,8 @@ async function uploadsEnabled(applicationId:string,mode:"upload"|"download"="upl
  const app=await authorizeEnrollmentApplication(context,applicationId);
  if(mode==="upload"&&["withdrawn","declined"].includes(app.stage))
   throw new Error("This application is closed to enrollment document changes");
- if(mode==="upload"&&await isDemoTenantOrganization(app.organizationId)){
-  assertR2DemoEnabled(process.env.CAN_R2_DEMO_UPLOADS_ENABLED);
- }else if(mode==="upload"&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED!=="true"){
-  throw new Error("Live enrollment document uploads are not enabled for this deployment");
- }
+ // R2 credentials, exact application scope, requirement, size and MIME
+ // restrictions are mandatory. No environment-wide rollout permission.
  return {...context,actorPersonId:context.actorPersonId,organizationId:app.organizationId};
 }
 async function requirementScope(applicationId:string,requirementId:string,allowClosed=false){
@@ -115,7 +111,7 @@ export const getEnrollmentDocumentDownload=createServerFn({method:"POST"})
   return {downloadUrl:signR2Object("GET",record.storageKey,undefined,60),expiresInSeconds:60};
  });
 
-/** Deployment switches only; never exposes R2 credentials. */
+/** Reports operational storage readiness; it never exposes R2 credentials. */
 export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET"}).handler(async()=>{
  const context=await getCommandContext(getRequest());
  if(!context.actorPersonId||!rolesAllow(["registrar","guardian"], context.role))
@@ -123,7 +119,7 @@ export const getEnrollmentDocumentUploadAvailability=createServerFn({method:"GET
  let configured=true;
  try{r2Config()}catch{configured=false}
  return {
-  live:configured&&process.env.CAN_R2_LIVE_UPLOADS_ENABLED==="true",
-  demo:configured&&process.env.CAN_R2_DEMO_UPLOADS_ENABLED==="true",
+  live:configured,
+  demo:configured,
  };
 });
