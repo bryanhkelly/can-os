@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { NativeClassManager } from "@/components/learning/NativeClassManager";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { WorkspaceShell, StatusBadge } from "@/components/workspace";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
@@ -18,6 +17,13 @@ import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
 import { enrollCurrentPersonInClass } from "@/modules/classes/native-class-entry.client";
+
+/** Load privileged Class management composition only when requested,
+ * keeping the public Class directory and enrollment entry lightweight. */
+const NativeClassManager=lazy(async()=>{
+  const module=await import("@/components/learning/NativeClassManager");
+  return {default:module.NativeClassManager};
+});
 
 export const Route=createFileRoute("/class")({
   validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;view?:"manage"}=>({
@@ -388,7 +394,9 @@ function ClassHome(){
       </Link>
     </nav>
     {selected.view==="manage"
-      ?<NativeClassManager key={selected.siteId??"all"} preferredSiteId={selected.siteId}/>
+      ?<Suspense fallback={<p role="status" className="p-6 text-sm">Opening Class management…</p>}>
+        <NativeClassManager key={selected.siteId??"all"} preferredSiteId={selected.siteId}/>
+      </Suspense>
       :<NativeLearnerClasses/>}
   </div>;
 }
