@@ -1,15 +1,16 @@
-/** Pure, testable contract for the Site-to-canonical enrollment DB reader.
- * A configured URL or a table existing is not proof of query authority.
- */
+/** Transitional cross-schema reader permission check.
+ * Both read paths use the SAME platform Site UUID; no identity bridge.
+ * Configured credentials never substitute for effective SQL permissions. */
 export type SiteNoncreditPreflight={
-  mappingReady:boolean;
+  sitesReady:boolean;
   releasesReady:boolean;
   publicSchema:boolean;
   nativeSchema:boolean;
-  mappingRead:boolean;
+  siteRead:boolean;
+  nativeSiteRead:boolean;
   releaseRead:boolean;
 };
 export function siteCatalogReaderAccessible(value:SiteNoncreditPreflight):boolean{
-  return value.mappingReady&&value.releasesReady&&value.publicSchema&&
-    value.nativeSchema&&value.mappingRead&&value.releaseRead;
+  return value.sitesReady&&value.releasesReady&&value.publicSchema&&
+    value.nativeSchema&&value.siteRead&&value.nativeSiteRead&&value.releaseRead;
 }
