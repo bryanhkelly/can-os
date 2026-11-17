@@ -501,6 +501,10 @@ const migratedV61RouteControls = {
   "routes/learn.my-activity.tsx": [
     "@/components/ui/button", "<StatusBadge",
   ],
+  "routes/learn.enroll.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/choice", "@/components/ui/label",
+  ],
   "routes/explore.index.tsx": [
     "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
     "@/components/ui/label", "<QueryState", "<EmptyState",
@@ -508,6 +512,10 @@ const migratedV61RouteControls = {
   "routes/student.settings.tsx": [
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/select",
     "@/components/ui/field", "<Field",
+  ],
+  "routes/guardian.students.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/label",
+    "<StatusBadge",
   ],
   "routes/platform.tsx": [
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
