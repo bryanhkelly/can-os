@@ -12,6 +12,7 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(source).toContain('actor.role!=="app_admin"');
    expect(source).toContain("actor.sessionAccountId");
    expect(source).toContain("actor.accountId===data.accessAccountId");
+   expect(source).toContain("account.personId===actor.actorPersonId");
    expect(source).toContain('eq(accountPersonGrants.role,"app_admin")');
    expect(source).toContain('eq(accountPersonGrants.active,true)');
    expect(source).toContain("actor.grantId");
@@ -37,5 +38,18 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(source).not.toContain("tx.insert(canonicalAccountGrants)");
    expect(activation).toContain('review.status!=="approved"');
    expect(activation).toContain("review.accessPersonId!==owner.personId");
+ });
+ it("revocation ends all original learner grants and native sessions without deleting history",()=>{
+   expect(source).toContain("export const revokeAdultClassLearnerReview");
+   expect(source).toContain("reason:z.string().trim().min(10).max(500)");
+   expect(source).toContain('eq(canonicalAccountGrants.roleCode,"learner")');
+   expect(source).toContain('eq(canonicalAccountGrants.accountId,review.canonicalAccountId)');
+   expect(source).toContain('eq(canonicalSessions.accountId,review.canonicalAccountId)');
+   expect(source).toContain('tx.update(canonicalAccountGrants).set({');
+   expect(source).toContain('tx.update(canonicalSessions).set({revokedAt:now})');
+   expect(source).toContain('tx.update(accessAdultLearningReviews).set({status:"revoked"})');
+   expect(source).toContain('action:"class.adult_identity.review_revoked"');
+   expect(source).not.toContain("tx.delete(canonicalPersons)");
+   expect(source).not.toContain("tx.delete(canonicalClassEnrollments)");
  });
 });
