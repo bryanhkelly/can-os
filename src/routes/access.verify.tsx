@@ -1,4 +1,5 @@
 import {createFileRoute} from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 import {createServerOnlyFn} from "@tanstack/react-start";
 import {useEffect,useState} from "react";
 import {InvalidAccessCredentialError,logAuthenticationUnavailable} from "@/domain/access-errors";
@@ -107,7 +108,7 @@ function VerifyAccess(){
   <form action={verifyAction} method="post" onSubmit={()=>{clearLearnerBrowserState();setWorking(true);}}>
   <input type="hidden" name="token" value={token??""}/>
   <input type="hidden" name="returnTo" value={search.returnTo??""}/>
-  <button type="submit" disabled={working||!ready||!token} className="rounded-lg bg-foreground px-5 py-3 text-background disabled:opacity-50">Sign in securely</button>
+  <Button type="submit" disabled={working||!ready||!token} loading={working} loadingLabel="Signing in securely…">Sign in securely</Button>
   </form>
  </main>;
 }
