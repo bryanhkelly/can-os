@@ -18,6 +18,23 @@ Status: **IN PROGRESS**. Native application routing cut over on November 17, 202
 
 No Section DDL or existing academic records were deleted during the native route change. This is intentionally **not** a declaration of completed Section retirement.
 
+## November 17 /class consolidation checkpoint
+
+- `/class` owns native discovery/enrollment and authorized management. The
+  shared manager lives in `src/components/learning/NativeClassManager.tsx`.
+  `/canonical/classes` redirects to `/class?view=manage` for bookmarks only.
+- `/class/:classId` owns native learner, teacher/facilitator, and manager
+  workspaces. Do not create separate teacher preview/classroom routes.
+- Historical `/classes` Section workflows remain only until current academic
+  placements, grade evidence, and dependent access are migrated and reconciled.
+  Do not delete them while native Class rows are absent.
+- Minors and guardians must receive separately verified native Class consent and
+  enrollment commands before moving existing Activity/Season registration
+  journeys. A synthetic planning Site is not an active native Class.
+- On November 17 the primary database had native Class schema but no actual
+  Class, Class Enrollment, or Class Session rows. Deployed acceptance remains
+  unverified.
+
 ## November 17 architecture isolation and retirement gates
 
 **Governing decision:** Sections and CAN-to-canonical Person/account translations are
