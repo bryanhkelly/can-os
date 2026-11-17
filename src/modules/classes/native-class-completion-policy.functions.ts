@@ -38,9 +38,6 @@ export const publishNativeClassCompletionPolicy=createServerFn({method:"POST"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
-       process.env.CAN_WS3_CLASS_POLICY_PUBLICATION_ENABLED!=="true")
-      throw new AuthorizationError("Class completion policy publication not activated");
     const request=getRequest(),actor=await getCanonicalCommandContext(request);
     if(!actor.actorPersonId || !["site_admin","registrar"].includes(actor.role??"") ||
        actor.scope.organizationIds?.length!==1 ||
