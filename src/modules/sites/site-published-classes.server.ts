@@ -11,20 +11,14 @@ const candidate=z.object({
   deliveryMode,nextStartsAt:z.coerce.date().nullable(),
 }).strict();
 
-/** Public Class Offering catalog under a separately approved Site link.
- * Never returns private, unlisted or draft Classes, rosters, room URLs,
- * facilitator identities or public enrollment promises. */
+/** Published Class offerings for the SAME platform Site UUID.
+ * The calling website projection already validates public Site publication;
+ * the query independently enforces native Class and Course release gates.
+ * No identity bridge or second Site record is consulted. */
 export async function readLinkedSitePublishedClasses(
   publicSiteId:string,executor:Reader=db,
 ):Promise<SitePublishedClassListing[]> {
   if(!uuid.safeParse(publicSiteId).success)return [];
-  const links=await executor.execute(sql`
-    SELECT canonical_site_id AS "canonicalSiteId"
-    FROM public.site_canonical_identity_links
-    WHERE public_site_id=${publicSiteId}::uuid AND status='approved'
-  `);
-  if(links.rows.length!==1)return [];
-  const canonicalSiteId=uuid.parse(links.rows[0]?.canonicalSiteId);
   const rows=await executor.execute(sql`
     SELECT DISTINCT c.id AS "classId",c.title AS "title",
       c.delivery_mode AS "deliveryMode",
@@ -40,8 +34,10 @@ export async function readLinkedSitePublishedClasses(
     INNER JOIN education_v30.class_offerings co ON co.class_id=c.id
     INNER JOIN education_v30.class_offering_versions cv
       ON cv.class_id=c.id AND cv.class_offering_id=co.id
+    INNER JOIN public.sites platform_site
+      ON platform_site.id=c.site_id
     INNER JOIN education_v30.sites s
-      ON s.id=c.site_id AND s.status='active'
+      ON s.id=platform_site.id AND s.status='active'
     INNER JOIN education_v30.program_deployments pd
       ON pd.id=c.deployment_id AND pd.status='active'
     INNER JOIN education_v30.education_operations op
@@ -65,7 +61,7 @@ export async function readLinkedSitePublishedClasses(
     INNER JOIN education_v30.course_versions course
       ON course.id=c.course_version_id AND course.lifecycle='published'
       AND course.published_at IS NOT NULL
-    WHERE c.site_id=${canonicalSiteId}::uuid
+    WHERE c.site_id=${publicSiteId}::uuid
       AND c.state='active'
       AND cv.state='published' AND cv.visibility='public'
       AND cv.published_at IS NOT NULL
