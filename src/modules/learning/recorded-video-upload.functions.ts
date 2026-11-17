@@ -18,14 +18,19 @@ import { writeAudit } from "@/platform/mutation";
 
 const uuid = z.string().uuid();
 const assetKeyPattern = /^learning\/instructional-track\/[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const beginInput = classVideoFileSchema.extend({
-  courseVersionId: uuid,
-  title: z.string().trim().min(3).max(200),
+const fileFields=z.object({
+  courseVersionId:uuid, title:z.string().trim().min(3).max(200),
+  fileName:z.string(),contentType:z.enum(["video/mp4","video/webm"]),size:z.number(),
 }).strict();
-const finishInput = beginInput.extend({
-  assetId: uuid, assetVersionId: uuid, key: z.string().regex(assetKeyPattern),
-  acknowledgedRights: z.literal(true),
-}).strict();
+function checkVideo(value:z.infer<typeof fileFields>,ctx:z.RefinementCtx){
+  const result=classVideoFileSchema.safeParse(value);
+  if(!result.success)for(const issue of result.error.issues)ctx.addIssue(issue);
+}
+const beginInput=fileFields.superRefine(checkVideo);
+const finishInput=fileFields.extend({
+  assetId:uuid,assetVersionId:uuid,key:z.string().regex(assetKeyPattern),
+  acknowledgedRights:z.literal(true),
+}).superRefine(checkVideo);
 
 function requireVideoUploads() {
   if (process.env.CAN_R2_CURRICULUM_UPLOADS_ENABLED !== "true")
@@ -114,7 +119,10 @@ export const finishRecordedVideoUpload = createServerFn({method:"POST"})
       if(prior){
         if(prior.assetId!==data.assetId || prior.key!==data.key ||
           prior.title!==data.title || prior.organizationId!==publisher.organizationId ||
-          prior.lifecycle!=="draft" || JSON.stringify(prior.terms)!==JSON.stringify(fileMetadata))
+          prior.lifecycle!=="draft" ||
+          !prior.terms || typeof prior.terms!=="object" || Array.isArray(prior.terms) ||
+          !Object.entries(fileMetadata).every(([key,value])=>
+            (prior.terms as Record<string,unknown>)[key]===value))
           throw new DomainError("CONFLICT","This video draft was already finalized with different details.");
         return {assetId:data.assetId,assetVersionId:data.assetVersionId,status:"draft" as const};
       }
