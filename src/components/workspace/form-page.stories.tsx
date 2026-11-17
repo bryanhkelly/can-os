@@ -5,6 +5,8 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FormActions, FormSection } from "./form-page";
+import { ActionFooter } from "./action-footer";
+import { Button } from "@/components/ui/button";
 
 function DedicatedForm({ pending = false, onSubmit }: { pending?: boolean; onSubmit: (name: string) => void }) {
   const [name, setName] = useState("");
@@ -84,5 +86,29 @@ export const SingleColumnEvidenceReview: Story = {
     await expect(document.getElementById(describedBy!)?.textContent).toContain("Verify the current record");
     await expect(region.querySelector(".grid-cols-1")).not.toBeNull();
     await expect(within(region).getByRole("textbox", {name:/Rationale/})).toBeRequired();
+  },
+};
+
+function InlineActionsExample() {
+  const [reviewed, setReviewed] = useState(false);
+  return <div className="max-w-xl border bg-card p-5">
+    <p role="status">{reviewed ? "Reviewed in preview" : "Review pending"}</p>
+    <p className="mt-2 text-xs text-muted-foreground">Presentation example only. No approval is recorded.</p>
+    <ActionFooter layout="inline">
+      <Button type="button" onClick={() => setReviewed(true)}>Mark reviewed in preview</Button>
+      <Button type="button" variant="outline" onClick={() => setReviewed(false)}>Reset preview</Button>
+    </ActionFooter>
+  </div>;
+}
+export const InlineRecordActions: Story = {
+  render: () => <InlineActionsExample/>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvasElement.querySelector('[data-action-footer="inline"]')).toBeInTheDocument();
+    await expect(canvasElement.querySelector('[data-form-actions]')).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", {name:"Mark reviewed in preview"}));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Reviewed in preview");
+    await userEvent.click(canvas.getByRole("button", {name:"Reset preview"}));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Review pending");
   },
 };
