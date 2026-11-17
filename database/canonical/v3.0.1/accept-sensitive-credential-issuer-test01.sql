@@ -62,13 +62,13 @@ END $deny$;
 INSERT INTO education_v30.canonical_sensitive_capability_approvals
  (canonical_grant_id,capability_code,requested_by_can_account_id,
   request_evidence_reference)
-SELECT grant.id,'credential.issue',
+SELECT native_grant.id,'credential.issue',
  'faab0000-0000-4000-8000-000000000001',
  'Test issuer authority request, deliberately synthetic and rolled back'
-FROM education_v30.canonical_account_grants grant
-WHERE grant.person_id='44440000-0000-4000-8000-000000000001'
- AND grant.site_id='22220000-0000-4000-8000-000000000001'
- AND grant.role_code='site_admin' AND grant.active AND grant.revoked_at IS NULL;
+FROM education_v30.canonical_account_grants native_grant
+WHERE native_grant.person_id='44440000-0000-4000-8000-000000000001'
+ AND native_grant.site_id='22220000-0000-4000-8000-000000000001'
+ AND native_grant.role_code='site_admin' AND native_grant.active AND native_grant.revoked_at IS NULL;
 
 DO $deny$
 BEGIN
