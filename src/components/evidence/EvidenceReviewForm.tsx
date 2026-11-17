@@ -1,6 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 
 export type EvidenceDecision = "approve" | "reject";
 
@@ -37,12 +39,12 @@ export function EvidenceReviewForm({
       setPending(false);
     }
   }
-  return <div className="mt-3 rounded border p-3 text-xs">
-    <label className="block">{label}
-      <textarea className="mt-1 block w-full rounded border bg-background p-2"
+  return <div className="mt-3 border p-3 text-xs">
+    <Field label={label}>
+      <Textarea
         value={reason} minLength={10} maxLength={2000} disabled={busy}
         onChange={event => setReason(event.target.value)} />
-    </label>
+    </Field>
     <div className="mt-2 flex flex-wrap gap-2">
       <Button type="button" variant="outline" size="sm"
         disabled={busy || reason.trim().length < 10 || reason.trim().length > 2000} onClick={() => void submit("approve")}>
