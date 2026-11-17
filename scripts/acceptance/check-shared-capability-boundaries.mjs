@@ -47,6 +47,9 @@ const governed = [
     "src/modules/classes/native-class-enrollment.functions.ts",
     "src/modules/enrollment/noncredit-self-enrollment.functions.ts",
     "src/modules/enrollment/noncredit-self-enrollment-withdraw.functions.ts",
+    "src/modules/enrollment/noncredit-self-enrollment-resume.functions.ts",
+    "src/modules/enrollment/noncredit-enrollment-publication.functions.ts",
+    "src/modules/classes/native-class-assignment.functions.ts",
   ].map(path => ({
     path,
     layer: "canonical-enrollment-adapter",
