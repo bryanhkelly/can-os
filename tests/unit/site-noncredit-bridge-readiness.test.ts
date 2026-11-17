@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   siteCatalogReaderAccessible,type SiteNoncreditPreflight,
-} from "@/domain/site-noncredit-bridge";
+} from "@/domain/site-noncredit-catalog-readiness";
 
 const complete:SiteNoncreditPreflight={
   sitesReady:true,releasesReady:true,publicSchema:true,nativeSchema:true,
