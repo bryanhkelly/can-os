@@ -16,7 +16,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
  * This is a temporary schema-compatibility guard, not a second Site identity.
  */
 export type LaunchSiteCatalogScope =
-  | {kind:"unlinked"|"blocked"}
+  | {kind:"not_provisioned"|"blocked"}
   | {kind:"ready";canonicalSiteId:string;actor:CommandContext};
 
 export async function resolveLaunchSiteCatalogContext(
@@ -31,7 +31,7 @@ export async function resolveLaunchSiteCatalogContext(
   // profile exists. No duplicate identity is ever allocated or approved.
   const [nativeSite]=await db.select({id:catalogSites.id,status:catalogSites.status})
     .from(catalogSites).where(eq(catalogSites.id,site.id)).limit(1);
-  if(!nativeSite||nativeSite.status==="closed")return {kind:"unlinked"};
+  if(!nativeSite||nativeSite.status==="closed")return {kind:"not_provisioned"};
 
   let actor:CommandContext;
   try {
