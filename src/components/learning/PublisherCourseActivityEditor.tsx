@@ -37,7 +37,9 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
     queryFn:()=>getPublisherCourseActivityOptions(),
     retry:false,
   });
-  // Deep links are suggestions only; the privileged Course options reader\n  // determines whether the current publisher may actually author this version.\n  const [courseVersionId,setCourseVersionId]=useState(preferredCourseVersionId??"");
+  // Deep links are suggestions only; the privileged Course options reader
+  // determines whether the current publisher may actually author this version.
+  const [courseVersionId,setCourseVersionId]=useState(preferredCourseVersionId??"");
   const [quiz,setQuiz]=useState<Quiz[]>(freshQuiz);
   const [feedback,setFeedback]=useState<Feedback[]>(freshFeedback);
   const [passing,setPassing]=useState(0.8);
