@@ -18,6 +18,18 @@ concurrency-serialized active-grant trigger. The corresponding Drizzle account
 model includes `personId`. This migration is NOT installed or authorized for
 production and does not itself update the v3 FK graph.
 
+**QA installation (2026-11-17):** The 13 SQL statements in
+`patch-can-one-person-grants.sql` were applied transactionally on the
+**test01** Neon branch only. A subsequent independent SQL query confirmed the
+account Person column, partial-unique Person index and both identity triggers
+exist, and found **zero active grant/Person anchor mismatches**. Synthetic
+rollback-only write behavior is represented by
+`scripts/acceptance/test-one-person-account-constraints.mjs`, but this
+script has not yet been executed. Application build, authorization suite and
+browser journeys are **not verified**. **Production has not been migrated.**
+Deploying the new `accessAccounts.personId` reader without applying the
+migration in the target environment will fail. Coordinate DB and app release.
+
 **Read-only test01 evidence (2026-11-17):** 68 `public.people`, 6
 `education_v30.persons`, zero shared UUIDs; 10 CAN accounts, 4 native accounts,
 zero shared account UUIDs; 141 public Person FK references and 219 canonical
