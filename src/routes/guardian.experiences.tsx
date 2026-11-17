@@ -1,4 +1,4 @@
-import { createFileRoute, linkOptions, Link } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { getMySchoolProfile } from "@/modules/operations/school-profile.functions";
 import { SchoolProfile, schoolRecordTabs, type SchoolRecordTab } from "@/components/operations/SchoolProfile";
@@ -46,5 +46,5 @@ function GuardianExperiencesPage() {
     </> : <EmptyState title="No school connected" description="The school calendar and conference bookings will appear when your family account is linked to an active school." />}
   </WorkspaceShell>;
   return <SchoolProfile data={{ ...outcome.data, site }} tab={tab}
-    tabLink={value => linkOptions({ to: "/guardian/experiences", search: value === "overview" ? { student } : { tab: value, student } })} />;
+    tabLink={value => ({ to: "/guardian/experiences", search: { student, tab: value === "overview" ? undefined : value } })} />;
 }
