@@ -230,6 +230,9 @@ const schoolFamilyAdapter = {
 
 /** Retain the original scheduled job contract and bounded concurrency. */
 export async function processSchoolFamilyOutboundDeliveries(now = new Date(), limit = 120) {
+  const bounded = Math.max(0, Math.trunc(limit));
+  const workers = Math.min(6, bounded);
+  if (!workers) return 0;
   // An expired SMS processing lease may mean the provider accepted the send
   // before the worker died. Never automatically re-send such SMS receipts.
   // Email retains its stable idempotency-key recovery behavior.
@@ -243,9 +246,6 @@ export async function processSchoolFamilyOutboundDeliveries(now = new Date(), li
     eq(delivery.status, "processing"),
     lte(delivery.leaseUntil, clock),
   ));
-  const bounded = Math.max(0, Math.trunc(limit));
-  const workers = Math.min(6, bounded);
-  if (!workers) return 0;
   const counts = await Promise.all(Array.from({ length: workers }, (_, i) =>
     dispatchOutboundMessages(schoolFamilyAdapter, {
       now, limit: Math.floor(bounded / workers) + (i < bounded % workers ? 1 : 0),
