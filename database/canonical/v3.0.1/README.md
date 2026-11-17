@@ -1,5 +1,11 @@
 # CAN OS canonical database v3.0.1
 
+> **Production note (2026-11-17):** The additive CAN staff crosswalk and
+> restricted reader patches have been applied to Neon `main`, but canonical
+> school Sites, Persons, accounts, approved mappings and Blueprint operational
+> acceptance are still absent. Do not interpret a schema migration as a
+> completed identity cutover. See `docs/runbooks/platform-admin-and-valor-blueprint-cutover.md`.
+
 **Canonical baseline decision: net-new only.** Organizations, Sites, Persons,
 identity/session principals, role grants and demo data are created directly
 in the canonical model. No legacy ID inference, wholesale historical-data
