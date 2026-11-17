@@ -13,7 +13,7 @@ describe("noncredit 48-hour invitation delivery",()=>{
       releaseClosesAt:new Date(until.getTime()+60_000),now,
     };
     expect(currentWaitlistEmailOpportunity(valid)).toBe(true);
-    expect(currentWaitlistEmailOpportunity({...valid,waitlistStatus:"accepted"})).toBe(false);
+    expect(currentWaitlistEmailOpportunity(opportunity)...valid,waitlistStatus:"accepted"})).toBe(false);
     expect(currentWaitlistEmailOpportunity({...valid,waitlistStatus:"cancelled"})).toBe(false);
     expect(currentWaitlistEmailOpportunity({...valid,invitationExpiresAt:null})).toBe(false);
     expect(currentWaitlistEmailOpportunity({...valid,deliveryInvitationExpiresAt:new Date(until.getTime()-1)})).toBe(false);
@@ -37,8 +37,11 @@ describe("noncredit 48-hour invitation delivery",()=>{
     expect(worker).toContain("readEligibleSelfEnrollmentReleases(db, record.releaseId)");
     expect(worker).toContain("record.releaseStatus");
     expect(worker).toContain("isDemoTenantOrganization(");
-    expect(worker).toContain("eq(accountPersonGrants.active, true)");
-    expect(worker).toContain('grant.role === "student"');
+    expect(worker).toContain("assertUnambiguousAdultAccount(record.accountId, record.personId)");
+    expect(read("src/modules/identity/unambiguous-adult-account.server.ts"))
+      .toContain("eq(accountPersonGrants.active, true)");
+    expect(read("src/modules/identity/unambiguous-adult-account.server.ts"))
+      .toContain('grant.role === "student"');
     expect(worker).toContain("sendNotificationEmail(message, key)");
     expect(worker).toContain('for("update", { skipLocked: true })');
     expect(worker).toContain("leaseUntil");
