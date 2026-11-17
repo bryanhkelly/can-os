@@ -366,12 +366,24 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
     const request=getRequest();
     const actor=await getCanonicalCommandContext(request);
     return db.transaction(async tx=>{
-      // Serializes with WS2 withdrawal/cancel and concurrent outcome reviews.
+      // WS00/WS2 lock discipline: Class -> exact Enrollment -> Course Attempt.
+      // The first read determines lock order only; it cannot authorize a write.
+      const [link]=await tx.select({classId:canonicalClassEnrollments.classId})
+        .from(canonicalClassEnrollments)
+        .where(eq(canonicalClassEnrollments.id,data.classEnrollmentId)).limit(1);
+      if(!link)throw new AuthorizationError("current Class enrollment");
+      const [lockedClass]=await tx.select({id:canonicalClasses.id})
+        .from(canonicalClasses)
+        .where(eq(canonicalClasses.id,link.classId))
+        .for("update").limit(1);
+      if(!lockedClass)throw new AuthorizationError("current Class");
       const [locked]=await tx.select({id:canonicalClassEnrollments.id})
         .from(canonicalClassEnrollments)
-        .where(eq(canonicalClassEnrollments.id,data.classEnrollmentId))
-        .for("update").limit(1);
-      if(!locked)throw new AuthorizationError("current Class enrollment");
+        .where(and(
+          eq(canonicalClassEnrollments.id,data.classEnrollmentId),
+          eq(canonicalClassEnrollments.classId,lockedClass.id),
+        )).for("update").limit(1);
+      if(!locked)throw new AuthorizationError("current exact Class enrollment");
       const authorized=await authorizeReview(tx,locked.id,actor);
       if(!authorized.policy || authorized.policy.id!==data.expectedPolicyVersionId)
         throw new AuthorizationError("original independently approved Class policy");
