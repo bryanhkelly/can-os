@@ -27,8 +27,6 @@ const cancelInput = z.object({
 }).strict();
 
 function requireEnabled():void {
-  if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-    throw new AuthorizationError("native Class lifecycle not activated");
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
 }
