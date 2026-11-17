@@ -65,6 +65,12 @@ Application acceptance, journey activation and enrollment activation now call `w
 
 Other command services still need incremental adoption, with regression testing before replacing any source-specific transaction or idempotency behavior.
 
+## Canonical mutation evidence adoption
+
+Native Class enrollment, noncredit self-enrollment and noncredit self-withdrawal now share `src/platform/canonical-mutation.server.ts`, which writes canonical `education_v30.audit_events` and `education_v30.domain_events` through each caller's existing transaction. This is **not** the same table contract as the legacy public-schema `src/platform/mutation.ts`; maintaining two schema-specific writers avoids unsafe table substitutions while reusing the mutation responsibility.
+
+The three adapted enrollment paths preserve their existing event types, eligibility rechecks, lock order, idempotency behavior and immutable source records. CI guards these paths against adding new direct canonical audit/event inserts. Additional canonical service consumers should migrate incrementally only after verifying their transaction and event contracts.
+
 ## Review standard
 
 Any new capability must identify its authoritative write owner, public interface, authorization model, audit/event behavior, source-to-display status mapping and contract tests. Any proposal for a duplicate capability must explain why an adapter cannot satisfy the requirement. Shared UI follows CAN OS design system v6.1.
