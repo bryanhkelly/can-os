@@ -35,6 +35,7 @@ const governed = [
       /^@\/components(?:\/|$)/,
     ],
     requiredImports: ["@/platform/mutation", "@/domain/command-context"],
+    forbiddenPatterns: [/\\bwriteAudit\\s*\\(\\s*tx\\s*,\\s*\\{/],
   },
   {
     path: "src/modules/communication/outbound-dispatcher.server.ts",
@@ -109,6 +110,11 @@ for (const rule of governed) {
   for (const dependency of dependencies) {
     if (rule.forbiddenImports.some(pattern => pattern.test(dependency))) {
       errors.push(`${rule.path} (${rule.layer}) must not import ${dependency}`);
+    }
+  }
+  for (const pattern of rule.forbiddenPatterns ?? []) {
+    if (pattern.test(source)) {
+      errors.push(`${rule.path} must use verified actor context in shared audit writers`);
     }
   }
   for (const required of rule.requiredImports ?? []) {
