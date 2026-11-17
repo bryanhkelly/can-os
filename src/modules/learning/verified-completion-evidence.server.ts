@@ -55,7 +55,7 @@ export async function assertSourceBoundCompletionEvidence(
     )).limit(2);
   const bound=bindings[0];
   const now=new Date();
-  if (bindings.length!==1 || !matchesApprovedEvidenceBinding(
+  if (!bound || bindings.length!==1 || !matchesApprovedEvidenceBinding(
       bound,target,input,now))
     throw new AuthorizationError("independently approved evidence for exact Person and source");
 
