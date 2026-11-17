@@ -9,7 +9,7 @@ export function PrerequisiteChecklist({ items, label }: {
   items: readonly PrerequisiteItem[]; label: string;
 }) {
   return <ul aria-label={label} className="mt-3 space-y-2">
-    {items.map(item => <li key={item.id} className="rounded border p-3 text-sm">
+    {items.map(item => <li key={item.id} className="border p-3 text-sm">
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-medium">{item.title}</span>
         <StatusBadge tone={item.satisfied ? "neutral" : "attention"}>
