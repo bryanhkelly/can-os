@@ -28,11 +28,17 @@ export async function handleResendDeliveryWebhook(request: Request): Promise<Res
   const receipt = notificationOutboundDeliveries;
   const occurredAt = new Date();
   const delivered = event.type === "email.delivered";
-  const changes = delivered ? {
+  const common = {
+    status: "accepted" as const,
+    acceptedAt: sql`coalesce(${receipt.acceptedAt}, ${occurredAt})`,
+    nextAttemptAt: null,
     providerMessageId: event.providerMessageId,
+  };
+  const changes = delivered ? {
+    ...common,
     providerDeliveredAt: sql`coalesce(${receipt.providerDeliveredAt}, ${occurredAt})`,
   } : {
-    providerMessageId: event.providerMessageId,
+    ...common,
     providerFailedAt: sql`coalesce(${receipt.providerFailedAt}, ${occurredAt})`,
     providerFailureKind: event.type,
   };
@@ -45,8 +51,10 @@ export async function handleResendDeliveryWebhook(request: Request): Promise<Res
       // already recorded a different Resend message identifier.
       or(isNull(receipt.providerMessageId),
         eq(receipt.providerMessageId, event.providerMessageId)),
-      // Suppressed or unsent receipts never get provider attribution.
-      or(eq(receipt.status, "processing"), eq(receipt.status, "accepted")),
+      // A signed delivery may race a failed HTTP response or delayed
+      // settlement. Once Resend reports an outcome, block automatic resend.
+      or(eq(receipt.status, "pending"), eq(receipt.status, "processing"),
+        eq(receipt.status, "accepted"), eq(receipt.status, "failed")),
     ));
   return new Response(null, { status: 200 });
 }
