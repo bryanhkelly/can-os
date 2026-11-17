@@ -13,7 +13,7 @@ import { classVideoFileSchema, videoUploadPolicy, hasVideoSignature } from "@/do
 import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertTrackProvider } from "./instructional-track-access.server";
-import { createPrivateUpload, resolveR2Config, verifyPrivateObject, hashPrivateObjectSha256 } from "@/platform/storage/r2";
+import { createPrivateUpload, resolveR2Config, verifyPrivateObject, hashPrivateObjectSha256, signPrivateObjectUrl } from "@/platform/storage/r2";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid = z.string().uuid();
@@ -174,4 +174,45 @@ export const getMyRecordedVideoDrafts = createServerFn({method:"GET"})
         )).orderBy(desc(contentAssets.createdAt)).limit(50);
       return rows.map(row=>({...row,reviewStatus:"private_draft" as const}));
     });
+  });
+
+/** Private creator preview. Signed R2 access is never returned for other
+ * creators' assets, unverified objects, published learner sources, or a
+ * Course outside the active evidence-backed creator appointment. */
+export const getOwnRecordedVideoPreview=createServerFn({method:"POST"})
+  .validator((value:unknown)=>z.object({
+    courseVersionId:uuid,assetVersionId:uuid,
+  }).strict().parse(value))
+  .handler(async({data})=>{
+    privateNoStore();
+    requireVideoUploads();
+    const actor=await getCommandContext(getRequest());
+    if(!actor.actorPersonId)throw new AuthorizationError("authenticated creator");
+    const record=await db.transaction(async tx=>{
+      const publisher=await requireCurrentPublisher(tx,actor,data.courseVersionId);
+      const [item]=await tx.select({
+        key:contentAssetVersions.storageReference,
+        sha256:contentAssetVersions.sha256,
+        terms:contentAssetVersions.licenseTerms,
+      }).from(contentAssetVersions)
+        .innerJoin(contentAssets,eq(contentAssets.id,contentAssetVersions.assetId))
+        .where(and(
+          eq(contentAssetVersions.id,data.assetVersionId),
+          eq(contentAssetVersions.lifecycle,"draft"),
+          eq(contentAssets.ownerOrganizationId,publisher.organizationId),
+          eq(contentAssets.kind,"video"),
+        )).limit(1);
+      const terms=item?.terms;
+      if(!item?.key||item.key!==instructionalTrackAssetStorageKey(data.assetVersionId)||
+        !item.sha256||!terms||typeof terms!=="object"||Array.isArray(terms)||
+        terms.uploadedByPersonId!==actor.actorPersonId||
+        terms.courseVersionId!==data.courseVersionId||
+        terms.source!=="creator_video_upload"||
+        !videoUploadPolicy.contentTypes.includes(String(terms.contentType)))
+        throw new AuthorizationError("your verified private instructional video");
+      return item.key;
+    });
+    return {downloadUrl:signPrivateObjectUrl({
+      method:"GET",key:record,keyPattern:assetKeyPattern,expiresSeconds:900,
+    })};
   });
