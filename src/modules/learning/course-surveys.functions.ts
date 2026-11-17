@@ -36,8 +36,6 @@ const privateResult=()=>setResponseHeader("Cache-Control","private, no-store");
 async function classSurveyCampaignIds(tx:Tx,context:CommandContext & {actorPersonId:string},
   access:CanonicalParticipationAccess):Promise<string[]|null>{
   if(access.source!=="class")return null;
-  if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-    throw new AuthorizationError("Class survey attribution not released");
   const [row]=await tx.select({classId:canonicalClasses.id})
     .from(learnerCourseAttempts)
     .innerJoin(canonicalClassEnrollments,and(
@@ -73,8 +71,7 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
   if(allowedClassCampaigns&&!allowedClassCampaigns.includes(data.campaignId))
     throw new AuthorizationError("survey campaign is not attributed to this Class");
-  if(access.source==="noncredit"&&
-      process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"){
+  if(access.source==="noncredit"){
     const [classScoped]=await tx.select({campaignId:canonicalClassSurveyCampaigns.campaignId})
       .from(canonicalClassSurveyCampaigns)
       .where(eq(canonicalClassSurveyCampaigns.campaignId,data.campaignId)).limit(1);
@@ -150,8 +147,7 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
       const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
       if(allowedClassCampaigns?.length===0)return [];
       const now=new Date();
-      const noncreditIsolation=access.source==="noncredit"&&
-        process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"?
+      const noncreditIsolation=access.source==="noncredit"?
         notExists(tx.select({id:canonicalClassSurveyCampaigns.campaignId})
           .from(canonicalClassSurveyCampaigns)
           .where(eq(canonicalClassSurveyCampaigns.campaignId,surveyCampaigns.id))):
