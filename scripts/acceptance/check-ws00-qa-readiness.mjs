@@ -63,6 +63,21 @@ async function run(){
   `;
   if(!reviewSchema?.exists||!reviewSchema.forced_rls)
     throw new Error("WS00 QA missing reviewed adult onboarding schema or FORCE RLS");
+  const [reviewGuards]=await sql`
+    SELECT
+      (SELECT count(*)::integer FROM pg_trigger t
+       WHERE t.tgrelid='public.access_adult_learning_reviews'::regclass
+         AND t.tgname='freeze_adult_learning_review' AND t.tgenabled='O') AS freeze_triggers,
+      (SELECT count(*)::integer FROM pg_constraint c
+       WHERE c.conrelid='public.access_adult_learning_reviews'::regclass
+         AND c.conname IN ('adult_learning_independent_reviewer',
+           'adult_learning_consumption_pair')) AS identity_constraints,
+      has_table_privilege('can_v30_canonical_auth_reader',
+        'public.access_adult_learning_reviews','SELECT') AS restricted_reader_can_select
+  `;
+  if(reviewGuards?.freeze_triggers!==1||reviewGuards.identity_constraints!==2||
+     reviewGuards.restricted_reader_can_select!==false)
+    throw new Error("WS00 QA reviewed adult evidence immutability or restricted role boundary failed");
   const [fresh]=await sql`
     SELECT a.id,review.access_person_id,review.status,
       review.consumed_at,review.canonical_account_id,
