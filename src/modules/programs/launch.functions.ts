@@ -564,7 +564,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
      eq(s.sites.slug,data.slug),
      sql`lower(${s.sites.name}) = ${data.name.trim().toLowerCase()}`,
     )))
-    .limit(1).for("update");
+    .for("update").limit(1);
    if(existing) {
     const savedPlanningLocation=schoolPlanningLocationSchema.safeParse(existing.metadata.schoolPlanningLocation);
     // Exact replay returns the original canonical Site and its website reservation;
