@@ -5,7 +5,7 @@ const source=(path:string)=>readFileSync(path,"utf8");
 const operatorRead=source("src/modules/learning/noncredit-completion-review.functions.ts");
 const operatorPanel=source("src/components/learning/NoncreditCompletionReviewPanel.tsx");
 const queuePanel=source("src/components/learning/NoncreditCompletionQueuePanel.tsx");
-const noncreditRoute=source("src/routes/canonical_.noncredit-completion.tsx");
+const noncreditRoute=source("src/routes/canonical_.noncredit-review-queue.tsx");
 const canonicalClassRead=source("src/modules/classes/native-class-canonical-evidence.functions.ts");
 const canonicalClassPanel=source("src/components/learning/NativeClassCanonicalEvidencePanel.tsx");
 const preflight=source("scripts/acceptance/check-ws3-completion-readiness.mjs");
@@ -20,7 +20,7 @@ describe("WS3 completion read and operator controls",()=>{
     expect(queuePanel).toContain("getNoncreditCompletionQueue");
     expect(queuePanel).toContain("NoncreditCompletionReviewPanel");
     expect(queuePanel).toContain("query.data.hasMore");
-    expect(noncreditRoute).toContain('createFileRoute("/canonical_/noncredit-completion")');
+    expect(noncreditRoute).toContain('createFileRoute("/canonical_/noncredit-review-queue")');
   });
 
   it("keeps operator history view behind a current grant, exact Site and disabled flag",()=>{

@@ -6,7 +6,7 @@ import { NoncreditCompletionQueuePanel } from "@/components/learning/NoncreditCo
  * the existing /canonical page without requiring unrelated router edits.
  * WS00 owns final production navigation and route retirement.
  */
-export const Route=createFileRoute("/canonical_/noncredit-completion")({
+export const Route=createFileRoute("/canonical_/noncredit-review-queue")({
   component:NoncreditCompletionWorkspace,
 });
 
