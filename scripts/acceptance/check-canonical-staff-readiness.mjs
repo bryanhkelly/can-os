@@ -5,8 +5,8 @@
  * granting identity links, and without printing identities or credentials.
  *
  * DATABASE_URL=<target database> npm run db:canonical:staff-readiness
- * This is a schema/operator readiness check, NOT proof that a particular
- * user has a verified mapping or that the restricted login can SET ROLE.
+ * Requires at least one exact, approved, non-demo staff Person/Site/role path.
+ * Still not proof a browser session authenticates or that the restricted login can SET ROLE.
  */
 import { Pool } from "@neondatabase/serverless";
 
@@ -36,26 +36,81 @@ try {
   } else {
     const [counts] = (await client.query(`
       SELECT
+        (SELECT count(*)::int FROM public.access_accounts a
+           JOIN public.account_person_grants g ON g.account_id = a.id
+          WHERE a.disabled = false AND a.email_verified_at IS NOT NULL
+            AND a.email_normalized NOT LIKE '%.demo'
+            AND a.person_id = g.person_id AND g.active = true
+            AND g.role IN ('site_admin','registrar')
+            AND g.organization_id IS NOT NULL AND g.site_id IS NOT NULL
+        ) AS verified_can_staff_grants,
         (SELECT count(*)::int FROM public.access_account_canonical_principals
           WHERE revoked_at IS NULL AND verified_at IS NOT NULL) AS verified_person_links,
         (SELECT count(*)::int FROM public.site_canonical_identity_links
-          WHERE status = 'approved' AND confirmed_at IS NOT NULL AND reviewed_at IS NOT NULL) AS approved_site_links,
+          WHERE status = 'approved' AND confirmed_at IS NOT NULL
+            AND reviewed_at IS NOT NULL
+            AND requested_by_person_id <> reviewed_by_person_id
+        ) AS approved_site_links,
         (SELECT count(*)::int FROM education_v30.canonical_account_grants
-          WHERE active = true AND revoked_at IS NULL AND role_code IN ('site_admin','registrar')) AS active_staff_grants,
+          WHERE active = true AND revoked_at IS NULL
+            AND role_code IN ('site_admin','registrar')) AS active_staff_grants,
         (SELECT count(*)::int FROM education_v30.site_organization_roles
-          WHERE role_code IN ('operator','host')
-            AND valid_from <= now() AND (valid_through IS NULL OR valid_through > now())) AS active_site_relationships
+          WHERE role_code IN ('operator','host') AND valid_from <= now()
+            AND (valid_through IS NULL OR valid_through > now())) AS active_site_relationships,
+        (SELECT count(*)::int
+           FROM public.access_accounts a
+           JOIN public.account_person_grants public_grant
+             ON public_grant.account_id = a.id
+            AND public_grant.active AND public_grant.role IN ('site_admin','registrar')
+            AND public_grant.site_id IS NOT NULL
+           JOIN public.sites public_site ON public_site.id = public_grant.site_id
+            AND public_site.organization_id = public_grant.organization_id
+           JOIN public.site_canonical_identity_links site_link
+             ON site_link.public_site_id = public_site.id
+            AND site_link.status = 'approved'
+            AND site_link.confirmed_at IS NOT NULL AND site_link.reviewed_at IS NOT NULL
+            AND site_link.requested_by_person_id <> site_link.reviewed_by_person_id
+           JOIN public.access_account_canonical_principals person_link
+             ON person_link.account_id = a.id
+            AND person_link.revoked_at IS NULL AND person_link.verified_at IS NOT NULL
+           JOIN education_v30.canonical_account_grants native_grant
+             ON native_grant.person_id = person_link.canonical_principal_id
+            AND native_grant.site_id = site_link.canonical_site_id
+            AND native_grant.role_code = public_grant.role
+            AND native_grant.active AND native_grant.revoked_at IS NULL
+           JOIN education_v30.canonical_accounts native_account
+             ON native_account.id = native_grant.account_id
+           JOIN education_v30.sites native_site
+             ON native_site.id = native_grant.site_id
+          WHERE a.disabled = false AND a.email_verified_at IS NOT NULL
+            AND a.person_id = public_grant.person_id
+            AND a.email_normalized NOT LIKE '%.demo'
+            AND native_account.disabled_at IS NULL
+            AND native_account.email_verified_at IS NOT NULL
+            AND native_site.status IN ('planning','active')
+            AND EXISTS (
+              SELECT 1 FROM education_v30.site_organization_roles rel
+              WHERE rel.site_id = native_grant.site_id
+                AND rel.organization_id = native_grant.organization_id
+                AND rel.role_code IN ('host','operator')
+                AND rel.valid_from <= now()
+                AND (rel.valid_through IS NULL OR rel.valid_through > now())
+            )
+        ) AS eligible_staff_paths
     `)).rows;
     await client.query("ROLLBACK");
-    const ready = Object.values(counts).every(value => Number(value) > 0);
+    // Independent positive counters are NOT sufficient: they may belong to
+    // different schools, people and grants. Require a complete joined path.
+    const ready = Number(counts.eligible_staff_paths) > 0;
     console.log(JSON.stringify({ infrastructure: "present", ...counts, acceptance_ready: ready }, null, 2));
     if (!ready) {
-      console.error("FAIL: no end-to-end canonical staff path is available. Do not auto-create or approve identity links.");
+      console.error("FAIL: no end-to-end, independently approved, non-demo CAN staff path exists.");
+      console.error("Do not auto-create or approve identity links. Provision via authorized review.");
       process.exitCode = 1;
     } else {
-      console.log("PASS: staff infrastructure and at least one relationship candidate exist.");
-      console.log("NEXT: separately verify exact account, Person, Site and grant using authorized reviewer actions,");
-      console.log("then run a real same-session Blueprint authoring test. Counts alone do not grant access.");
+      console.log("PASS: at least one matched CAN/canonical staff identity path exists.");
+      console.log("NEXT: verify restricted login permissions and complete same-session Blueprint browser acceptance.");
+      console.log("A joined path alone does not prove that a specific browser session can author.");
     }
   }
 } catch (error) {
