@@ -92,7 +92,7 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(handoff).toContain('result.preview?"Not yet observable":result.attendanceRecorded?"Recorded":"Not recorded"');
     expect(handoff).toContain("<WorkspaceNotice");
     expect(handoff).toContain("<Button");
-    expect(handoff).not.toMatch(/<(?:button|dl)\\b/);
+    expect(handoff).not.toMatch(/<(?:button|dl)\b/);
   });
 });
 
