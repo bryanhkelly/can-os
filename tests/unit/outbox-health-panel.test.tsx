@@ -67,7 +67,7 @@ async function loaded() {
 beforeEach(() => {
   vi.clearAllMocks(); state.slots = []; state.cursor = 0; state.effects = [];
   state.read.mockResolvedValue({ failed: 2, pending: 9, pendingUnhandled: 3, processing: 1,
-    schoolFamilyDelivery: {pending:6,processing:2,retryScheduled:3,failed:1,providerAccepted:12,suppressed:4} });
+    schoolFamilyDelivery: {pending:6,processing:2,retryScheduled:3,failed:1,providerAccepted:12,providerDelivered:7,providerFailed:2,complained:1,suppressed:4} });
 });
 
 describe("operations outbox health panel", () => {
@@ -88,7 +88,10 @@ describe("operations outbox health panel", () => {
     expect(html).toContain("School-family delivery recovery");
     expect(html).toContain("Retry scheduled");
     expect(html).toContain("Provider accepted");
-    expect(html).toContain("does not confirm inbox delivery");
+    expect(html).toContain("Mail server delivered");
+    expect(html).toContain("Provider failed");
+    expect(html).toContain("Spam complaints");
+    expect(html).toContain("does not confirm mail-server delivery");
     expect(state.read).toHaveBeenCalledOnce();
   });
 
