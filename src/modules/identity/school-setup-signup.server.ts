@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accountPersonGrants, memberships, organizations, people, roleAssignments, schoolSetupSignups, sites } from "@/db/schema";
+import { accessAccounts, accountPersonGrants, memberships, organizations, people, roleAssignments, schoolSetupSignups, sites } from "@/db/schema";
 import { DEFAULT_SITE_TIMEZONE } from "@/domain/site-timezone";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -43,11 +43,26 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
   if (associated.some(grant=>grant.role!=="account_holder") ||
       new Set(associated.map(grant=>grant.personId)).size>1)
     throw new Error("School founder identity needs verification before reuse");
-  const existingPersonId=associated[0]?.personId;
-  const [createdPerson] = existingPersonId ? [null] : await tx.insert(people).values({
-    legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
-  }).returning({ id: people.id });
-  const personId=existingPersonId??createdPerson?.id;
+  // Account Person ownership remains durable even when the last membership
+  // was revoked. Do not invent a second Person for an established founder.
+  const [account] = await tx.select({personId:accessAccounts.personId})
+    .from(accessAccounts).where(eq(accessAccounts.id,accountId))
+    .for("update").limit(1);
+  if(!account)throw new Error("Verified school founder account unavailable");
+  const existingPersonId=associated[0]?.personId??account.personId;
+  if(account.personId && existingPersonId!==account.personId)
+    throw new Error("School founder Person differs from account identity");
+  let personId=existingPersonId;
+  if(personId){
+    const [existing] = await tx.select({active:people.active}).from(people)
+      .where(eq(people.id,personId)).limit(1);
+    if(!existing?.active)throw new Error("School founder Person is not active");
+  }else{
+    const [createdPerson] = await tx.insert(people).values({
+      legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+    }).returning({id:people.id});
+    personId=createdPerson?.id;
+  }
   if (!personId) throw new Error("School administrator identity could not be created");
 
   const [grant] = await tx.insert(accountPersonGrants).values({
