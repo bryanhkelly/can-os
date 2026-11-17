@@ -123,8 +123,7 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
             </li>)}
           </ul>}
       </section>
-      {isValidDecision && current && current.state!=="unavailable" &&
-        current.state!=="not_decided" &&
+      {isValidDecision && current &&
       <form className="space-y-3 border-t border-border pt-4" onSubmit={event=>{
         event.preventDefault();
         if(correctionReady) correction.mutate(current.decisionId);
