@@ -23,6 +23,9 @@ const nativeOwners = [
   "src/components/learning/NativeClassManager.tsx",
   "src/components/learning/NativeClassHomeNavigation.tsx",
   "src/components/learning/PublisherCourseActivityEditor.tsx",
+  "src/components/learning/ProviderInstructionHome.tsx",
+  "src/components/learning/ProviderInstructionDraft.tsx",
+  "src/components/learning/ProviderInstructionReviews.tsx",
 ];
 const forbidden = [
   { term: /\bsectionTeachers\b|\bsectionIds\b|\bsectionId\b/, reason: "legacy Section ownership" },
@@ -74,6 +77,35 @@ if (!stagedActivities.includes('to="/class" search={{view:"activities"}}') ||
     !promotedActivities.includes("getPublisherCourseActivityOptions")) {
   console.error("Native Class architecture: publisher activities must be owned by /class");
   errors++;
+}
+
+// The canonical/ pages are deliberately staging redirects only. Keep
+// independently governed author and reviewer commands in reusable /class
+// components and their original server-side authority gates.
+for (const [stagingPath,searchHint,forbiddenCommand] of [
+  ["src/routes/canonical.content.tsx",'view:"content"',"createRecordedInstructionDraft"],
+  ["src/routes/canonical.content_.$trackVersionId.tsx",'trackVersionId',"saveRecordedInstructionDraft"],
+  ["src/routes/canonical.content-reviews.tsx",'view:"reviews"',"decideRecordedInstructionReview"],
+]) {
+  const staged=readFileSync(resolve(root,stagingPath),"utf8");
+  if(!staged.includes('Navigate to="/class"')||
+     !staged.includes(searchHint)||staged.includes(forbiddenCommand)) {
+    console.error("Native Class architecture: staged content route must only redirect: "+stagingPath);
+    errors++;
+  }
+}
+for (const [component,requiredCommand] of [
+  ["ProviderInstructionHome","createRecordedInstructionDraft"],
+  ["ProviderInstructionDraft","saveRecordedInstructionDraft"],
+  ["ProviderInstructionReviews","decideRecordedInstructionReview"],
+]) {
+  const source=readFileSync(resolve(root,
+    "src/components/learning/"+component+".tsx"),"utf8");
+  if(source.includes("createFileRoute")||!source.includes(requiredCommand)||
+     !productionClasses.includes(component)) {
+    console.error("Native Class architecture: missing promoted content component "+component);
+    errors++;
+  }
 }
 
 if (errors > 0) process.exitCode = 1;
