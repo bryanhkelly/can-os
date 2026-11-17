@@ -119,9 +119,9 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(bridge).not.toContain('from(accessAccountCanonicalPrincipals)');
     expect(bridge).not.toContain('from(canonicalAccountGrants)');
     expect(restricted).toContain("public.access_account_canonical_principals");
-    expect(restricted).toContain("public.site_canonical_identity_links");
-    expect(restricted).toContain("site_link.status = 'approved'");
-    expect(restricted).toContain("site_link.confirmed_at IS NOT NULL");
+    expect(restricted).not.toContain("public.site_canonical_identity_links");
+    expect(restricted).toContain("native_grant.site_id = source.can_site_id");
+    expect(restricted).toContain("native_site.id = source.can_site_id");
     expect(restricted).toContain("native_grant.revoked_at IS NULL");
     expect(restricted).toContain("native_account.disabled_at IS NULL");
     expect(restricted).toContain("operator_role.valid_through");
