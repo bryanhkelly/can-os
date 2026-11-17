@@ -131,6 +131,7 @@ export const routeNavigation = {
   "/guardian/course-approvals": page("/guardian/students", ["guardian"]),
   "/guardian/enrichment": page("/guardian/experiences", ["guardian"]),
   "/guardian/enrollment-changes": page("/home", ["guardian"]),
+  "/guardian/native-classes": page("/guardian/students", ["guardian"]),
   "/guardian/experiences": page("/guardian/experiences", ["guardian"]),
   "/guardian/field-trips": page("/guardian/experiences", ["guardian"]),
   "/guardian/group-permissions": page("/guardian/experiences", ["guardian"]),
