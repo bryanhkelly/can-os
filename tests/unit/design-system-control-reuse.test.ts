@@ -30,6 +30,8 @@ const files = [
   "src/components/operations/LocalSiteDelegationPanel.tsx",
   "src/components/operations/SiteStaffingFeedback.tsx",
   "src/components/operations/OutboxHealthPanel.tsx",
+  "src/components/operations/SchoolOpeningReviewPanel.tsx",
+  "src/components/learning/SectionGradeFinalization.tsx",
   "src/components/operations/LaunchOrientationTask.tsx",
   "src/components/operations/LaunchTeacherQualificationPolicy.tsx",
   "src/components/operations/LaunchTaskDestination.tsx",
