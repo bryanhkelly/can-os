@@ -25,7 +25,7 @@ function QueryState({ loading, error, isEmpty, empty, children, onRetry, retryin
   if (error) {
     return <WorkspaceNotice tone="danger" className="mt-8">
       <span>{error}</span>
-      {onRetry && <Button type="button" variant="ghost" size="sm" onClick={onRetry} disabled={retrying}
+      {onRetry && <Button type="button" variant="ghost" size="sm" onClick={onRetry} loading={retrying} disabled={retrying}
         className="ml-auto underline underline-offset-4">
         {retrying ? "Retrying…" : "Retry"}
       </Button>}
