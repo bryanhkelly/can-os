@@ -53,7 +53,8 @@ describe("WS3 independent evidence reviewer workflow",()=>{
     expect(classOperator).toContain("Record formal decision");
     expect(classOperator).toContain("getPendingCompletionEvidenceReviews");
     expect(classRoute).toContain("createFileRoute");
-    expect(classRoute).toContain("NativeClassCompletionOperatorPanel");
+    expect(read("src/routes/class_.$classId.tsx")).toContain("NativeClassCompletionOperatorPanel");
+    expect(classRoute).toContain('<Navigate to="/class/$classId"');
   });
   it("does not claim verified learner completion until current canonical function agrees",()=>{
     expect(learnerSource).not.toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
