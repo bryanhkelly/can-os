@@ -37,7 +37,7 @@ import { assertCurrentNativeClassLearnerForMutation } from "./native-class-learn
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
-const selfInput=z.object({
+export const nativeClassEnrollmentInput=z.object({
   classOfferingVersionId:uuid,
   creditMode:classCreditModeSchema,
   adultAttested:z.literal(true),
@@ -195,7 +195,7 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
  * Guardian/youth participation and approval require their own verified
  * authorization, consent, and decision commands. */
 export const enrollInNativeClass=createServerFn({method:"POST"})
-  .validator((raw:unknown)=>selfInput.parse(raw))
+  .validator((raw:unknown)=>nativeClassEnrollmentInput.parse(raw))
   .handler(async({data})=>{
     guard();const {learnerPersonId,actor,request}=await requireLearner();
     return db.transaction(async tx=>{
