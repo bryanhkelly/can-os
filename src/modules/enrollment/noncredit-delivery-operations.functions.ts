@@ -73,6 +73,9 @@ export const getNoncreditDeliveryAttempts=createServerFn({method:"GET"})
           acceptedAt:delivery.acceptedAt,
           nextAttemptAt:delivery.nextAttemptAt,
           attempts:delivery.attempts,
+          providerDeliveredAt:delivery.providerDeliveredAt,
+          providerFailedAt:delivery.providerFailedAt,
+          providerFailureKind:delivery.providerFailureKind,
         },now);
         return {
           id:delivery.id,createdAt:delivery.createdAt.toISOString(),
@@ -119,6 +122,9 @@ export const retryNoncreditDelivery=createServerFn({method:"POST"})
       acceptedAt:current.receipt.acceptedAt,
       nextAttemptAt:current.receipt.nextAttemptAt,
       attempts:current.receipt.attempts,
+      providerDeliveredAt:current.receipt.providerDeliveredAt,
+      providerFailedAt:current.receipt.providerFailedAt,
+      providerFailureKind:current.receipt.providerFailureKind,
     },now);
     if(!state.retryable)throw new AuthorizationError("active failed invitation eligible for retry");
     const [updated]=await tx.update(noncreditWaitlistEmailDeliveries).set({
@@ -129,6 +135,8 @@ export const retryNoncreditDelivery=createServerFn({method:"POST"})
       eq(noncreditWaitlistEmailDeliveries.id,current.receipt.id),
       eq(noncreditWaitlistEmailDeliveries.status,"failed"),
       isNull(noncreditWaitlistEmailDeliveries.acceptedAt),
+      isNull(noncreditWaitlistEmailDeliveries.providerDeliveredAt),
+      isNull(noncreditWaitlistEmailDeliveries.providerFailedAt),
     )).returning({id:noncreditWaitlistEmailDeliveries.id});
     if(!updated)throw new AuthorizationError("delivery already recovered or changed");
     await tx.insert(auditEvents).values({
