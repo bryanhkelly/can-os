@@ -46,18 +46,18 @@ describe("provider-independent authorization context",()=>{
    expect(roleCapabilities[role]).not.toContain("enrollment:manage");
   }
  });
- it("checks all underlying active grants, not only filtered workspace grants",()=>{
-  const server=readFileSync("src/modules/identity/command-context.server.ts","utf8");
-  expect(server).toContain("accountPersonId:accessAccounts.personId");
-  expect(server).toContain("session.accountPersonId!==activePerson");
-  expect(server).toContain("from(accountPersonGrants)");
-  expect(server).toContain("eq(accountPersonGrants.accountId,session.accountId)");
-  expect(server).toContain("eq(accountPersonGrants.active,true)");
-  expect(server).toContain("not(eq(accountPersonGrants.personId,activePerson))");
-  expect(server).toContain("if(conflicting.length)");
-  // A first-page or bounded lookup cannot prove the absence of a conflicting
-  // grant in the account's full active grant set.
-  expect(server).not.toContain("originalPersons.length===0");
+ it("checks raw active memberships via one shared Person identity policy",()=>{
+  const session=readFileSync("src/modules/identity/command-context.server.ts","utf8");
+  const invariant=readFileSync("src/modules/identity/unambiguous-adult-account.server.ts","utf8");
+  expect(session).toContain("accountPersonId:accessAccounts.personId");
+  expect(session).toContain("session.accountPersonId!==activePerson");
+  expect(session).toContain("assertRawAccountPerson(session.accountId, activePerson)");
+  expect(invariant).toContain("from(accountPersonGrants)");
+  expect(invariant).toContain("eq(accountPersonGrants.accountId, accountId)");
+  expect(invariant).toContain("eq(accountPersonGrants.active, true)");
+  expect(invariant).toContain("not(eq(accountPersonGrants.personId, personId))");
+  expect(invariant).toContain("if (conflicting.length)");
+  expect(invariant).not.toContain("originalPersons.length===0");
  });
  it("requires exactly one Person per real account across Site and role grants",()=>{
   const own=[grant,{...grant,id:"grant-2",role:"guardian",siteId:"site-2"}];
