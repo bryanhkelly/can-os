@@ -6,7 +6,7 @@ const read=(path:string)=>readFileSync(path,"utf8");
 describe("WS5 publisher composition export and Site launch boundaries",()=>{
   it("exports a complete canonical Offering composition rather than a truncated picker page",()=>{
     const fn=read("src/modules/programs/publisher-rollout.functions.ts");
-    const page=read("src/routes/canonical.classes.tsx");
+    const page=read("src/components/learning/NativeClassManager.tsx");
     expect(fn).toContain("getPublisherRolloutTemplate");
     expect(fn).toContain("canonicalOfferingCourses");
     expect(fn).toContain(".orderBy(asc(canonicalOfferingCourses.sequenceNo)");
@@ -34,7 +34,7 @@ describe("WS5 publisher composition export and Site launch boundaries",()=>{
   });
   it("keeps local Site modes and activation independent from portable instructions",()=>{
     const fn=read("src/modules/classes/unified-class.functions.ts");
-    const page=read("src/routes/canonical.classes.tsx");
+    const page=read("src/components/learning/NativeClassManager.tsx");
     expect(fn).toContain('siteByOperation=new Map');
     expect(fn).toContain('placementKeys.has(row.deploymentId+":"+id)');
     expect(page).toContain('site.allowedDeliveryModes.includes(deliveryMode)');
