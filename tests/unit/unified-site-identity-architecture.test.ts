@@ -38,6 +38,33 @@ describe("one public-schema Site and Organization model",()=>{
     expect(audit).not.toMatch(/sql\`\s*(?:INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|GRANT|TRUNCATE)\b/i);
   });
 
+  it("moves native support models directly to public without second identity tables",()=>{
+    const learning=read("src/db/canonical-v301/learning.ts");
+    const placements=read("src/db/canonical-v301/classroom-site-placements.ts");
+    const ddl=read("database/production/2026-11-17-consolidate-drizzle-native-support-tables.sql");
+    expect(learning).toContain('contentAssets = pgTable("content_assets"');
+    expect(learning).toContain('deploymentOrganizationRoles = pgTable("deployment_organization_roles"');
+    expect(placements).toContain('classroomEnrollmentSitePlacements = pgTable("enrollment_site_placements"');
+    expect(ddl).toContain("ALTER TABLE education_v30.content_assets SET SCHEMA public");
+    expect(ddl).toContain("ALTER TABLE education_v30.enrollment_site_placements SET SCHEMA public");
+    expect(ddl).not.toContain("CREATE TABLE");
+    expect(ddl).not.toContain("site_canonical_identity_links");
+  });
+
+  it("rebinds only reviewed operational foreign keys to the authoritative Site",()=>{
+    const ddl=read("database/production/2026-11-17-rebind-public-operational-site-fks.sql");
+    const gate=read("scripts/acceptance/check-main-site-schema-consolidation.mjs");
+    expect(ddl).toContain("FOREIGN KEY (site_id) REFERENCES public.sites(id)");
+    expect(ddl).toContain("public.institutional_approvals");
+    expect(ddl).toContain("public.operation_calendar_days");
+    expect(ddl).toContain("public.operation_safety_requirements");
+    expect(ddl).toContain("c.convalidated");
+    expect(gate).toContain("site_bridge_absent");
+    expect(gate).toContain("fullConsolidationComplete:summary.canonical_tables===0");
+    expect(gate).toContain('const MAIN="br-restless-sea-ar9ooo55"');
+    expect(gate).not.toMatch(/sql\`\s*(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b/i);
+  });
+
   it("documents schema consolidation and removal of duplicate identities",()=>{
     const adr=read("docs/architecture/adr-one-platform-site-identity.md");
     expect(adr).toContain("one public application schema");
