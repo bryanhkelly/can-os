@@ -361,3 +361,34 @@ export const withdrawMyGuardianNativeClassEnrollment=createServerFn({method:"POS
    return {alreadyWithdrawn:false};
   });
  });
+
+/** Guardian-visible Class history is always scoped to their originally
+ * approved minor enrollment AND a still-current verified relationship.
+ */
+export const getMyNativeGuardianClassEnrollments=createServerFn({method:"GET"})
+ .handler(async()=>{
+  guard();const now=new Date();
+  const guardian=await requireNativeGuardian(getRequest(),now);
+  return db.transaction(async tx=>{
+   const rows=await tx.select({
+    classEnrollmentId:canonicalClassEnrollments.id,
+    classId:canonicalClassEnrollments.classId,
+    learnerPersonId:canonicalClassEnrollments.learnerPersonId,
+    status:canonicalClassEnrollments.status,
+    title:canonicalClasses.title,
+   }).from(canonicalClassEnrollments)
+    .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
+    .where(and(
+      eq(canonicalClassEnrollments.enrolledByPersonId,guardian.personId),
+      eq(canonicalClassEnrollments.enrollmentMethod,"approval"),
+    )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(100);
+   const results=[];
+   for(const row of rows){
+    try{
+     await requireNativeGuardianChild(tx,guardian.personId,row.learnerPersonId,now);
+     results.push(row);
+    }catch(e){if(!(e instanceof AuthorizationError))throw e;}
+   }
+   return results;
+  });
+ });
