@@ -7,7 +7,7 @@ import {
   accessAccounts, accountPersonGrants, accessAccountNoncreditPrincipals,
   accessAccountCanonicalPrincipals, accessAdultLearningReviews, people,
 } from "@/db/schema";
-import { canonicalAccounts, canonicalEnrollmentOrganizations } from "@/db/canonical-v301";
+import { canonicalAccounts, canonicalEnrollmentOrganizations, canonicalAccountGrants, canonicalSessions } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -133,4 +133,83 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
      return {approved:true as const};
    });
    return result;
+ });
+
+/**
+ * Revoke an adult-review decision and every native learner credential created
+ * from it. The original review, evidence reference, Person and Class history
+ * remain intact; no enrollment or assessment source is deleted.
+ *
+ * This service is essential: changing review status without revoking sessions
+ * would leave a previously issued native-only cookie live.
+ */
+const revokeInput=z.object({
+  accessAccountId:z.string().uuid(),
+  reason:z.string().trim().min(10).max(500),
+}).strict();
+
+export const revokeAdultClassLearnerReview=createServerFn({method:"POST"})
+ .validator((raw:unknown)=>revokeInput.parse(raw))
+ .handler(async({data})=>{
+   setResponseHeader("Cache-Control","private, no-store");
+   const actor=await getCommandContext(getRequest());
+   assertCapability(actor,"platform.admin");
+   if(actor.role!=="app_admin"||!actor.accountId||!actor.actorPersonId||
+      actor.sessionAccountId||actor.grantSiteId||
+      (actor.scope.organizationIds?.length??0)!==0||
+      (actor.scope.siteIds?.length??0)!==0||
+      actor.accountId===data.accessAccountId)
+     throw new AuthorizationError("independent platform adult identity reviewer");
+   return db.transaction(async tx=>{
+     const [reviewer]=await tx.select({
+       email:accessAccounts.emailNormalized,verified:accessAccounts.emailVerifiedAt,
+       disabled:accessAccounts.disabled,personId:accessAccounts.personId,
+     }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
+     const [currentAdmin]=await tx.select({id:accountPersonGrants.id})
+       .from(accountPersonGrants).where(and(
+         eq(accountPersonGrants.id,actor.grantId),
+         eq(accountPersonGrants.accountId,actor.accountId),
+         eq(accountPersonGrants.personId,actor.actorPersonId),
+         eq(accountPersonGrants.role,"app_admin"),
+         eq(accountPersonGrants.active,true),
+         isNull(accountPersonGrants.organizationId),
+         isNull(accountPersonGrants.siteId),
+       )).limit(1);
+     if(!reviewer?.verified||reviewer.disabled||
+        reviewer.personId!==actor.actorPersonId||
+        isDemoAccountEmail(reviewer.email)||!currentAdmin)
+       throw new AuthorizationError("current verified independent reviewer");
+     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"native-identity:"+data.accessAccountId}))`);
+     const [review]=await tx.select().from(accessAdultLearningReviews)
+       .where(eq(accessAdultLearningReviews.accessAccountId,data.accessAccountId))
+       .for("update").limit(1);
+     if(!review)throw new AuthorizationError("review record unavailable");
+     if(review.status==="revoked")return {revoked:true as const,alreadyRevoked:true};
+     const now=new Date();
+     if(review.canonicalAccountId&&review.canonicalPersonId){
+       await tx.update(canonicalAccountGrants).set({
+         active:false,revokedAt:now,
+       }).where(and(
+         eq(canonicalAccountGrants.accountId,review.canonicalAccountId),
+         eq(canonicalAccountGrants.personId,review.canonicalPersonId),
+         eq(canonicalAccountGrants.roleCode,"learner"),
+         eq(canonicalAccountGrants.organizationId,review.organizationId),
+         eq(canonicalAccountGrants.active,true),
+         isNull(canonicalAccountGrants.revokedAt),
+       ));
+       await tx.update(canonicalSessions).set({revokedAt:now})
+         .where(and(
+           eq(canonicalSessions.accountId,review.canonicalAccountId),
+           isNull(canonicalSessions.revokedAt),
+         ));
+     }
+     await tx.update(accessAdultLearningReviews).set({status:"revoked"})
+       .where(eq(accessAdultLearningReviews.accessAccountId,data.accessAccountId));
+     await writeAudit(tx,actor,{
+       action:"class.adult_identity.review_revoked",
+       entityType:"access_account",entityId:data.accessAccountId,
+       after:{status:"revoked",reason:data.reason},
+     });
+     return {revoked:true as const,alreadyRevoked:false};
+   });
  });
