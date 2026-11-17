@@ -12,6 +12,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
+import { latestCanonicalAssessmentRevisions } from "@/domain/canonical-assessment-revisions";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -103,6 +104,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       const attemptIds=attempts.map(a=>a.id);
       const results=attemptIds.length?await tx.select({
         attemptId:assessmentExecutionResults.attemptId,
+        resultRevision:assessmentExecutionResults.resultRevision,
         resultStatus:assessmentExecutionResults.resultStatus,
         outcome:assessmentExecutionResults.outcome,
         supersedesId:assessmentExecutionResults.supersedesId,
@@ -111,8 +113,10 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
         .where(inArray(assessmentExecutionResults.attemptId,attemptIds))
         .orderBy(desc(assessmentExecutionResults.resultRevision)).limit(501):[];
       if(results.length>500)throw new AuthorizationError("Assessment results require pagination");
-      const superseded=new Set(results.flatMap(row=>row.supersedesId?[row.supersedesId]:[]));
-      const valid=results.filter(row=>!superseded.has(row.id)&&
+      const projected=latestCanonicalAssessmentRevisions(results);
+      if(projected.ambiguousAttemptIds.length)
+        throw new AuthorizationError("ambiguous canonical assessment revisions");
+      const valid=projected.current.filter(row=>
         row.resultStatus==="finalized"&&
         attempts.some(a=>a.id===row.attemptId&&a.state==="finalized"));
       const completionRecords=await tx.select({

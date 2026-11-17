@@ -22,6 +22,7 @@ const required = [
     "tests/unit/ws3-evidence-review-and-class-current.test.ts",
     "tests/unit/ws3-class-policy-publication-contract.test.ts",
     "tests/unit/ws3-operator-workflow-contract.test.ts",
+    "tests/unit/ws3-assessment-revisions.test.ts",
   ]],
   ["npm",["run","test"]],
   ["npm",["run","build"]],

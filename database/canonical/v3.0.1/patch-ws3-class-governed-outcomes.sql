@@ -33,7 +33,6 @@ SET search_path=education_v30,pg_catalog AS $ws3$
 DECLARE e record; p record; ev record; prior record;
         today date; total_lessons integer; completed_lessons integer;
         verified_sessions integer; assessment_passed boolean;
-        delivery_site uuid; attribution_count integer;
 BEGIN
   IF NEW.outcome_kind<>'completion' THEN RETURN NEW; END IF;
   -- Do not allow new completion-like evidence to bypass the governed source
@@ -72,19 +71,6 @@ BEGIN
      e.attempt_section IS NOT NULL OR
      e.learner_person_id=NEW.completion_decided_by_person_id THEN
     RAISE EXCEPTION 'Class outcome requires exact independent learner and Course Attempt'
-      USING ERRCODE='23514';
-  END IF;
-
-  -- Preserve the original per-learner Site authority even when a Class itself
-  -- has no Site (private/site-distributed Class). One immutable attribution
-  -- is required; account favorites and network affiliation are not substitutes.
-  SELECT count(*)::integer,min(a.delivery_site_id)
-    INTO attribution_count,delivery_site
-  FROM education_v30.participation_attributions a
-  WHERE a.class_enrollment_id=e.id;
-  IF attribution_count<>1 OR delivery_site IS NULL OR
-     (e.site_id IS NOT NULL AND e.site_id<>delivery_site) THEN
-    RAISE EXCEPTION 'Class completion requires one original learner delivery Site'
       USING ERRCODE='23514';
   END IF;
 
@@ -156,7 +142,7 @@ BEGIN
        SELECT 1 FROM education_v30.learning_completion_evidence_bindings binding
        JOIN education_v30.participation_attributions attr
          ON attr.class_enrollment_id=e.id
-         AND attr.delivery_site_id=delivery_site
+           AND (e.site_id IS NULL OR attr.delivery_site_id=e.site_id)
        WHERE binding.purpose='class_completion_decision'
          AND binding.class_enrollment_id=e.id
          AND binding.expected_class_outcome_id
@@ -220,12 +206,12 @@ BEGIN
           AND assertion.facilitator_person_id=cs.facilitator_person_id
           AND assertion.facilitator_person_id<>e.learner_person_id
           AND plan.state='started'
-          AND plan.site_id=delivery_site
+          AND plan.site_id=e.site_id
           AND plan.host_organization_id=e.operating_organization_id
           AND plan.course_version_id=e.class_course
           AND room.state='ended' AND room.ended_at IS NOT NULL
           AND room.ended_at<=clock_timestamp()
-          AND room.site_id=delivery_site
+          AND room.site_id=e.site_id
           AND room.host_organization_id=e.operating_organization_id
           AND room.course_version_id=e.class_course
           AND room.deployment_id=e.class_deployment
@@ -293,9 +279,6 @@ CREATE OR REPLACE FUNCTION education_v30.v301_ws3_class_completion_is_current(
   JOIN education_v30.class_enrollments e ON e.id=o.class_enrollment_id
   JOIN education_v30.learner_course_attempts a ON a.id=e.course_attempt_id
   JOIN education_v30.classes cls ON cls.id=e.class_id
-  JOIN education_v30.participation_attributions attr
-    ON attr.class_enrollment_id=e.id
-       AND (cls.site_id IS NULL OR cls.site_id=attr.delivery_site_id)
   JOIN education_v30.class_completion_policy_versions policy
     ON policy.id=o.completion_policy_version_id
      AND policy.class_id=cls.id
@@ -309,8 +292,6 @@ CREATE OR REPLACE FUNCTION education_v30.v301_ws3_class_completion_is_current(
     AND o.source_kind='ws3_governed' AND o.result_code='completed'
     AND e.status='completed' AND a.status='completed'
     AND a.class_enrollment_id=e.id
-    AND (SELECT count(*) FROM education_v30.participation_attributions one
-      WHERE one.class_enrollment_id=e.id)=1
     AND ev.verified_at IS NOT NULL AND ev.verified_at<=now()
     AND (ev.valid_from IS NULL OR ev.valid_from<=now()::date)
     AND (ev.valid_through IS NULL OR ev.valid_through>=now()::date)
@@ -345,11 +326,11 @@ CREATE OR REPLACE FUNCTION education_v30.v301_ws3_class_completion_is_current(
           AND cs.facilitator_person_id=plan.facilitator_person_id
           AND assertion.facilitator_person_id=cs.facilitator_person_id
           AND assertion.facilitator_person_id<>e.learner_person_id
-          AND plan.state='started' AND plan.site_id=attr.delivery_site_id
+          AND plan.state='started' AND plan.site_id=cls.site_id
           AND plan.host_organization_id=cls.operating_organization_id
           AND plan.course_version_id=cls.course_version_id
           AND room.state='ended' AND room.ended_at<=now()
-          AND room.site_id=attr.delivery_site_id
+          AND room.site_id=cls.site_id
           AND room.host_organization_id=cls.operating_organization_id
           AND room.course_version_id=cls.course_version_id
           AND room.deployment_id=cls.deployment_id

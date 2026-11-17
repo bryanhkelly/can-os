@@ -24,6 +24,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { validateClassAuthority } from "@/modules/classes/unified-class-authority.server";
 import { assertSourceBoundCompletionEvidence } from "@/modules/learning/verified-completion-evidence.server";
+import { latestCanonicalAssessmentRevisions } from "@/domain/canonical-assessment-revisions";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
@@ -179,8 +180,12 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
   if(attendanceRows.length>1000)
     throw new AuthorizationError("Class attendance evidence needs pagination");
   const latestRoom=new Map<string,(typeof attendanceRows)[number]>();
-  for (const row of attendanceRows)
+  for (const row of attendanceRows) {
+    // Match the SQL authority: only the actual Class Session's host can
+    // supersede that Session's earlier roll call.
+    if(row.assertionFacilitator!==row.classFacilitator)continue;
     if(!latestRoom.has(row.classSessionId))latestRoom.set(row.classSessionId,row);
+  }
   const sessions:VerifiedSessionEvidence[]=[];
   for (const row of latestRoom.values()) {
     if(row.roomState!=="ended" || !row.roomEndAt ||
@@ -232,17 +237,12 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
     .where(inArray(assessmentExecutionResults.attemptId,attempts.map(a=>a.id)))
     .limit(1001):[];
   if(results.length>1000)throw new AuthorizationError("assessment result paging required");
-  const byAttempt=new Map<string,typeof results>();
-  for(const result of results) {
-    const group=byAttempt.get(result.attemptId)??[];
-    group.push(result);byAttempt.set(result.attemptId,group);
-  }
+  const projected=latestCanonicalAssessmentRevisions(results);
+  if(projected.ambiguousAttemptIds.length)
+    throw new AuthorizationError("ambiguous canonical assessment result revisions");
   const latestResults:CanonicalAssessmentResult[]=[];
-  for(const [assessmentAttemptId,versions] of byAttempt) {
-    const replaced=new Set(versions.flatMap(v=>v.supersedesId?[v.supersedesId]:[]));
-    const heads=versions.filter(v=>!replaced.has(v.id));
-    if(heads.length!==1)continue;
-    const current=heads[0]!;
+  for(const current of projected.current) {
+    const assessmentAttemptId=current.attemptId;
     latestResults.push({
       id:current.id,courseAttemptId:attempt.id,
       courseVersionId:cls.courseVersionId,
