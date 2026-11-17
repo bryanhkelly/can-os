@@ -152,3 +152,33 @@ executed and must be run on an independently authorized test branch.
 `CAN_CREDENTIAL_ISSUANCE_ENABLED` must stay disabled until a dedicated
 runtime writer privilege plan, positive DB acceptance, award/credential
 end-to-end tests, artifact generation and revocation all pass.
+
+## November 17, 2026: test01 issuer security acceptance
+
+The credential issuance handler now explicitly denies requests unless
+`CAN_CREDENTIAL_ISSUANCE_ENABLED=true`. It rechecks independent issuer
+authorization and the exact immutable noncredit delivery Site before any
+`alreadyIssued` response or award write, and rejects self-issuance.
+
+On isolated Neon `test01`:
+
+- Applied the additive `patch-sensitive-credential-issuer-account-binding.sql`
+  function update. The installed function requires the issuer approval's CAN
+  account to match the authenticated CAN session's account.
+- Installed `provision-sensitive-issuer-approval-writer.sql`. The restricted
+  `can_v30_sensitive_approval_writer` role is NOLOGIN/NOBYPASSRLS, has
+  INSERT/UPDATE but no DELETE, and has three RLS policies.
+- Ran the synthetic `accept-sensitive-credential-issuer-test01.sql` as an
+  explicit rollback-only acceptance transaction. All 26 statements completed
+  successfully, including verified positive issuance authority and denial
+  for pending, expired, revoked, wrong capability, revoked session and
+  differently owned CAN account.
+- Verified no synthetic accounts or identity links persisted, no issuer
+  approvals remain, and no Site correspondence was provisioned.
+
+This is **database authorization acceptance**, not real certificate issuance
+or signed-in browser acceptance. Production issuer migrations and the
+restricted role have not been installed. Do not turn on issuance until
+the deployed application's runtime database roles, grant-scoped write RLS,
+build/typecheck/unit tests, browser journeys and award-artifact lifecycle have
+been verified on an isolated environment.
