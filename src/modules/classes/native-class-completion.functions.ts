@@ -24,6 +24,7 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { validateClassAuthority } from "@/modules/classes/unified-class-authority.server";
 import { assertSourceBoundCompletionEvidence } from "@/modules/learning/verified-completion-evidence.server";
+import { latestCanonicalAssessmentRevisions } from "@/domain/canonical-assessment-revisions";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
@@ -236,20 +237,12 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
     .where(inArray(assessmentExecutionResults.attemptId,attempts.map(a=>a.id)))
     .limit(1001):[];
   if(results.length>1000)throw new AuthorizationError("assessment result paging required");
-  const byAttempt=new Map<string,typeof results>();
-  for(const result of results) {
-    const group=byAttempt.get(result.attemptId)??[];
-    group.push(result);byAttempt.set(result.attemptId,group);
-  }
+  const projected=latestCanonicalAssessmentRevisions(results);
+  if(projected.ambiguousAttemptIds.length)
+    throw new AuthorizationError("ambiguous canonical assessment result revisions");
   const latestResults:CanonicalAssessmentResult[]=[];
-  for(const [assessmentAttemptId,versions] of byAttempt) {
-    // Match the SQL completion/credential validity authority: the greatest
-    // result_revision is current, even if a bad legacy record omitted a
-    // supersedes_id link. A tied latest revision is ambiguous and cannot pass.
-    const maxRevision=Math.max(...versions.map(v=>v.resultRevision));
-    const heads=versions.filter(v=>v.resultRevision===maxRevision);
-    if(heads.length!==1)continue;
-    const current=heads[0]!;
+  for(const current of projected.current) {
+    const assessmentAttemptId=current.attemptId;
     latestResults.push({
       id:current.id,courseAttemptId:attempt.id,
       courseVersionId:cls.courseVersionId,
