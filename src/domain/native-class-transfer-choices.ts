@@ -3,14 +3,15 @@
  * This must match native-class-transfers.functions.ts input.creditMode.
  * Credit-bearing moves require a separate academic/eligibility workflow.
  */
-export type NativeSelfTransferCreditMode = "audit" | "not_applicable";
+export const NATIVE_SELF_TRANSFER_CREDIT_MODES = ["audit", "not_applicable"] as const;
+export type NativeSelfTransferCreditMode = (typeof NATIVE_SELF_TRANSFER_CREDIT_MODES)[number];
 
 export function nativeSelfTransferCreditModes(
   offered: readonly string[],
 ): NativeSelfTransferCreditMode[] {
   return offered.filter(
     (value): value is NativeSelfTransferCreditMode =>
-      value === "audit" || value === "not_applicable",
+      NATIVE_SELF_TRANSFER_CREDIT_MODES.some(accepted => accepted === value),
   );
 }
 
