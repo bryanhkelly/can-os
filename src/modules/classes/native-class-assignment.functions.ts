@@ -4,12 +4,13 @@ import { and,count,desc,eq,isNotNull,isNull,lte,inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents,domainEvents,canonicalClasses,canonicalClassEnrollments,
+  canonicalClasses,canonicalClassEnrollments,
   canonicalClassEnrollmentRepeatAuthorizations,
   canonicalAccountGrants,canonicalAccounts,canonicalPersons,
   learnerCourseAttempts,participationAttributions,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 import { currentClassAuthority } from "./native-class-authority.server";
@@ -153,7 +154,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
             eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
             isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
           ));
-        await tx.insert(domainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           eventType:"ClassRepeatAuthorizationConsumed",
           aggregateType:"class_repeat_authorization",aggregateId:repeatAuthorization.id,
           actorPersonId:actor.actorPersonId!,
@@ -161,7 +162,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
             classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
         });
       }
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.enrollment.assigned",
@@ -170,7 +171,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
           creditMode:data.creditMode,courseAttemptId:attempt.id,
           classOfferingVersionId:null},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId!,
         eventType:"ClassEnrollmentAssigned",
         aggregateType:"class_enrollment",aggregateId:enrollment.id,
