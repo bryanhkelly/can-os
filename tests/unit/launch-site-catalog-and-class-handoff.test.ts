@@ -10,7 +10,9 @@ describe("Launch catalog, Class and persistence contracts",()=>{
     const handoff=source("src/components/launch-studio/SiteNativeClassHandoff.tsx");
     const publicClasses=source("src/modules/sites/site-published-classes.server.ts");
     expect(server).toContain("assertSiteSetupScope(publicActor,site");
-    expect(server).toContain("eq(catalogSites.id,site.id)");
+    expect(server).toContain("lifecycleStatus:sites.lifecycleStatus");
+    expect(server).toContain('if(!site.lifecycleStatus||site.lifecycleStatus==="closed")');
+    expect(server).not.toContain("catalogSites");
     expect(server).toContain("getCanonicalCommandContext(request)");
     expect(server).toContain("actor.scope.siteIds?.includes(site.id)");
     expect(server).not.toContain("site_canonical_identity_links");
