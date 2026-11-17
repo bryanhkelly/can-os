@@ -331,18 +331,10 @@ export const verifyCANStaffCanonicalPrincipal = createServerFn({ method: "POST" 
       }).from(sites).where(eq(sites.id, data.publicSiteId)).limit(1);
       if (!site) throw new AuthorizationError("existing school Site");
 
-      const links = await tx.execute(sql`
-        SELECT canonical_site_id AS "canonicalSiteId"
-        FROM public.site_canonical_identity_links
-        WHERE public_site_id = ${data.publicSiteId}::uuid AND status = 'approved'
-          AND confirmed_at IS NOT NULL AND reviewed_at IS NOT NULL
-        LIMIT 2
-      `);
-      if (links.rows.length !== 1 ||
-          typeof links.rows[0]?.canonicalSiteId !== "string") {
-        throw new AuthorizationError("independently approved school Site link");
-      }
-      const canonicalSiteId = String(links.rows[0].canonicalSiteId);
+      // One Site identity. The current public Site UUID must match the
+      // independently authorized native staff grant exactly. Never create
+      // an alias, guess by name or consult a Site correspondence table.
+      const canonicalSiteId = site.id;
       const [account] = await tx.select({
         id: accessAccounts.id, disabled: accessAccounts.disabled,
         verifiedAt: accessAccounts.emailVerifiedAt,
