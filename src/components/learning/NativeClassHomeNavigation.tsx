@@ -4,7 +4,7 @@ import { useActiveWorkspaceMember } from "@/components/shell/workspace-session-c
 import { canonicalRoleCapabilities } from "@/domain/canonical-access";
 
 type Props = {
-  mode: "explore" | "manage" | "activities" | "content";
+  mode: "explore" | "manage" | "activities" | "content" | "reviews";
   siteId?: string;
   search?: string;
   classId?: string;
@@ -22,6 +22,7 @@ export function NativeClassHomeNavigation({
   // Provider content is an organization-wide, evidence-backed appointment,
   // not a general Class/Site management capability.
   const canAuthorContent = (grant?.role as string|undefined)==="academic_content_creator";
+  const canReviewContent = (grant?.role as string|undefined)==="academic_content_reviewer";
   return <DetailNavigation label="Class workspace sections" variant="record">
     <Link to="/class" search={{siteId,search,classId,view:undefined}}
       aria-current={mode==="explore"?"page":undefined}>
@@ -41,6 +42,11 @@ export function NativeClassHomeNavigation({
       search={{view:"content"}}
       aria-current={mode==="content"?"page":undefined}>
       Recorded instruction
+    </Link>}
+    {(canReviewContent || mode==="reviews") && <Link to="/class"
+      search={{view:"reviews"}}
+      aria-current={mode==="reviews"?"page":undefined}>
+      Independent content reviews
     </Link>}
   </DetailNavigation>;
 }
