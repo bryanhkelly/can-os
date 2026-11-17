@@ -121,7 +121,7 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       </div>
       <label className="mt-4 flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1"
         checked={adult} onChange={e=>setAdult(e.target.checked)}/>
-        I confirm that I am at least 18 years old. Age is independently verified.
+        I confirm that I am at least 18. Class admission requires a separately verified adult learner identity.
       </label>
       <label className="mt-3 flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1"
         checked={consent} onChange={e=>setConsent(e.target.checked)}/>
@@ -241,7 +241,7 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
       <label className="mt-4 flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-1" checked={adult}
           onChange={e=>setAdult(e.target.checked)}/>
-        I confirm I am at least 18 years old. My age is independently verified.
+        I confirm that I am at least 18. Class admission requires a separately verified adult learner identity.
       </label>
       <label className="mt-3 flex items-start gap-3 text-sm">
         <input type="checkbox" className="mt-1" checked={consent}
