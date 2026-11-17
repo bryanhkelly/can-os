@@ -58,6 +58,8 @@ const governed = [
     "src/modules/enrollment/noncredit-cohort-operations.server.ts",
     "src/modules/classes/native-class-guardian-enrollment.functions.ts",
     "src/modules/classes/native-class-sessions.functions.ts",
+    "src/modules/classes/class-staff.functions.ts",
+    "src/modules/classes/unified-class.functions.ts",
   ].map(path => ({
     path,
     layer: "canonical-enrollment-adapter",
