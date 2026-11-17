@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { RecordFacts, WorkspaceNotice } from "@/components/workspace";
+import { RecordFacts } from "@/components/workspace/record-layout";
+import { WorkspaceNotice } from "@/components/workspace/notice";
 import { getFirstSchoolDayHandoff } from "@/modules/enrollment/first-school-day-handoff.functions";
 
 type Result = Awaited<ReturnType<typeof getFirstSchoolDayHandoff>>;
