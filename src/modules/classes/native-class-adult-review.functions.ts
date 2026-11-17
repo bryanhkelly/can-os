@@ -126,7 +126,7 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
        verifiedByPersonId:documents.verifiedByPersonId,
        expiresAt:documents.expiresAt,
        metadata:documents.metadata,
-     }).from(documents).where(eq(documents.id,evidenceId)).limit(1);
+     }).from(documents).where(eq(documents.id,evidenceId)).for("update").limit(1);
      // A browser checkbox or free-text case reference is not independent proof.
      // The referenced protected document must already have been verified by a
      // distinct Person, for this exact CAN Person and reviewed birth date.
@@ -141,6 +141,20 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
         evidence.metadata.verifiedBirthDate!==data.verifiedBirthDate||
         evidence.metadata.verificationOutcome!=="approved")
        throw new AuthorizationError("independently verified adult identity evidence");
+     const [verifierGrant]=await tx.select({id:accountPersonGrants.id})
+       .from(accountPersonGrants).innerJoin(accessAccounts,and(
+         eq(accessAccounts.id,accountPersonGrants.accountId),
+         eq(accessAccounts.disabled,false),
+       )).where(and(
+         eq(accountPersonGrants.personId,evidence.verifiedByPersonId!),
+         eq(accountPersonGrants.role,"app_admin"),
+         eq(accountPersonGrants.active,true),
+         isNull(accountPersonGrants.organizationId),
+         isNull(accountPersonGrants.siteId),
+         sql`${accessAccounts.emailVerifiedAt} IS NOT NULL`,
+       )).limit(1);
+     if(!verifierGrant)
+       throw new AuthorizationError("adult identity evidence requires independently authorized verification");
      const [org]=await tx.select({id:canonicalEnrollmentOrganizations.id})
        .from(canonicalEnrollmentOrganizations).where(and(
          eq(canonicalEnrollmentOrganizations.id,data.organizationId),
