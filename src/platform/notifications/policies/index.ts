@@ -4,6 +4,7 @@ import { assignmentMissingPolicy } from "./assignment-missing";
 import { classAnnouncementPublishedPolicy } from "./class-announcement-published";
 import { communicationMessageSentPolicy } from "./communication-message-sent";
 import { sectionScheduleChangedPolicy } from "./section-schedule-changed";
+import { sectionEnrollmentWithdrawnPolicy } from "./section-enrollment-withdrawn";
 
 /** Registry of all event-driven notification policies. Import for side effect. */
 registerNotificationPolicy(assignmentMissingPolicy);
@@ -11,9 +12,11 @@ registerNotificationPolicy(communicationMessageSentPolicy);
 registerNotificationPolicy(classAnnouncementPublishedPolicy);
 registerNotificationPolicy(admissionsStageChangedPolicy);
 registerNotificationPolicy(sectionScheduleChangedPolicy);
+registerNotificationPolicy(sectionEnrollmentWithdrawnPolicy);
 
 export { admissionsStageChangedPolicy };
 export { assignmentMissingPolicy };
 export { classAnnouncementPublishedPolicy };
 export { communicationMessageSentPolicy };
 export { sectionScheduleChangedPolicy };
+export { sectionEnrollmentWithdrawnPolicy };
