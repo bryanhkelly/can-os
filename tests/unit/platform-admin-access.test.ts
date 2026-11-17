@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import { resolveAccessContext, roleCapabilities } from "@/domain/access-context";
 import { assertCapability } from "@/domain/command-context";
 import { getWorkspaceHome, getWorkspaceLinks } from "@/components/shell/workspace-navigation.registry";
@@ -33,6 +34,28 @@ describe("platform App Admin role isolation", () => {
     expect(() => resolveAccessContext(principal, [{...grant, organizationId: "school-org"}])).toThrow();
     expect(() => resolveAccessContext(principal, [{...grant, siteId: "school-site"}])).toThrow();
     expect(() => resolveAccessContext(principal, [{...grant, active: false}])).toThrow();
+  });
+
+  it("requires verified non-demo identity for platform operations", () => {
+    const auth = readFileSync("src/modules/identity/platform-admin.functions.ts", "utf8");
+    expect(auth).toContain('assertCapability(actor, "platform.admin")');
+    expect(auth).toContain('actor.role !== "app_admin"');
+    expect(auth).toContain("isDemoAccountEmail(account.email)");
+    expect(auth).toContain("actor.sessionAccountId");
+    expect(auth).toContain('private, no-store');
+    expect(auth).not.toContain("INSERT INTO");
+    expect(auth).not.toContain("SELECT *");
+  });
+
+  it("restricts provisioning to an explicit independent operator command", () => {
+    const script = readFileSync("scripts/provision-platform-admin.mjs", "utf8");
+    expect(script).toContain('--execute');
+    expect(script).toContain("PLATFORM_ADMIN_TICKET");
+    expect(script).toContain("email === approverEmail");
+    expect(script).toContain("target.person_id === approver.person_id");
+    expect(script).toContain("ROLLBACK");
+    expect(script).toContain("domain_events");
+    expect(script).not.toContain("000000");
   });
 
   it("uses a dedicated platform workspace without school navigation", () => {
