@@ -81,7 +81,7 @@ This consolidation standardizes *how evidence is recorded*, not whether each bus
 
 Native Class approval decisions, repeat approvals, guardian-linked Class enrollment and session scheduling now use the canonical audit and domain-event writers. The same is true of noncredit cohort scheduling. Each command retains its own row locks, scope/consent decisions and source-of-truth records, with evidence appended in the same SQL transaction.
 
-The canonical writer migration now covers 14 explicitly governed canonical mutation adapters. Existing routes and products do not gain alternative enrollment authority; the refactor is code reuse over the existing `education_v30` schema. CI must still pass before treating this work as production-verified.
+The canonical writer migration now covers 16 explicitly governed canonical mutation adapters, including Class staff management and unified Class publishing. Existing routes and products do not gain alternative enrollment authority; the refactor is code reuse over the existing `education_v30` schema. CI must still pass before treating this work as production-verified.
 
 ## Review standard
 
