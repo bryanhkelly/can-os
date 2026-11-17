@@ -432,7 +432,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           <p className="mt-4 text-sm text-muted-foreground">
             Publish, close and revise terms through the authorized Class administration workflow.
           </p>
-          <Link to="/canonical/classes" className="mt-3 inline-block text-sm font-semibold underline">
+          <Link to="/class" search={{view:"manage"}} className="mt-3 inline-block text-sm font-semibold underline">
             Class Offering controls
           </Link>
         </>}
