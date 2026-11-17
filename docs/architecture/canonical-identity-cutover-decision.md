@@ -2,6 +2,30 @@
 
 **Decision:** One CAN login and one authoritative Person identity. There is no requirement to preserve native-v3 browser login, account-to-account bridges, or old identity endpoints during the cutover. This is an architecture decision, **not** evidence that the cutover is implemented or tested.
 
+## Authoritative identity choice
+
+**Chosen target:** `public.access_accounts` is the sole login account; its immutable
+`person_id` refers to **`public.people.id`**, the authoritative Person key.
+A Person can have many active roles and Site/Organization grants but may not be
+associated with two active CAN accounts. `education_v30.persons`,
+`education_v30.canonical_accounts`, native bearer sessions and account mapping
+tables must be retired as authoritative identity sources, not preserved through
+permanent adapters.
+
+**Database implementation staged on main:** `patch-can-one-person-grants.sql`
+adds the account Person anchor, one-account-per-Person unique index and
+concurrency-serialized active-grant trigger. The corresponding Drizzle account
+model includes `personId`. This migration is NOT installed or authorized for
+production and does not itself update the v3 FK graph.
+
+**Read-only test01 evidence (2026-11-17):** 68 `public.people`, 6
+`education_v30.persons`, zero shared UUIDs; 10 CAN accounts, 4 native accounts,
+zero shared account UUIDs; 141 public Person FK references and 219 canonical
+Person FK references. There were no active multi-Person CAN accounts. The
+`preflight-one-person-cutover.sql` check reported **BLOCKED**, not passed.
+No lookup by email can authorize a rekey. An explicit verified migration plan
+must preserve learner and academic history as it changes native references.
+
 ## Current code inspected
 
 - `src/modules/identity/command-context.server.ts`: verifies the CAN access session and active account-person grant.
