@@ -42,7 +42,7 @@ export const readCanonicalBlueprintHome = createServerFn({ method: "GET" })
       role: context.role,
       siteIds: context.scope.siteIds ?? [],
       organizationId: context.scope.organizationIds?.[0] ?? null,
-      referencesEnabled: process.env.CAN_CANONICAL_CATALOG_ENABLED === "true",
+      referencesEnabled: true,
     };
   });
 
