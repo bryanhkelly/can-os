@@ -72,12 +72,34 @@ describe("canonical discovery in Launch Studio academics", () => {
     expect(html).not.toContain("Launch academic wizard");
   });
 
+  it("keeps canonical Course discovery available when legacy Program reads fail", () => {
+    const html = renderToStaticMarkup(
+      <SchoolHubWorkflow module="academics" selection={{ siteId }}
+        data={{ ...base, launches: null } as never}/>,
+    );
+    expect(html).toContain("Published Offering discovery");
+    expect(html).toContain("Legacy Program records are unavailable");
+    expect(html).not.toContain("Launch academic wizard");
+  });
+
+  it("keeps Course discovery available when multiple legacy school Programs need selection", () => {
+    const html = renderToStaticMarkup(
+      <SchoolHubWorkflow module="academics" selection={{siteId}}
+        data={{...base,launches:[
+          {id:programId,name:"School year"},
+          {id:"00000000-0000-4000-8000-000000000003",name:"Summer school"},
+        ]} as never}/>,
+    );
+    expect(html).toContain("Published Offering discovery");
+    expect(html).toContain("Choose a school Program");
+  });
+
   it("does not expose an unprovisioned catalog in legacy School Hub", () => {
     const html = renderToStaticMarkup(
       <SchoolHubWorkflow module="academics" selection={{ siteId }}
         data={{ ...base, canonicalCatalogEnabled: false } as never}/>,
     );
-    expect(html).toContain("Published program discovery is not enabled");
+    expect(html).toContain("Program catalog requires verified Site access");
     expect(html).toContain("Launch academic wizard");
     expect(html).not.toContain("canonical-discovery");
   });
@@ -85,7 +107,7 @@ describe("canonical discovery in Launch Studio academics", () => {
   it("does not mount discovery or a configuration workflow for an unauthorized Site selection", () => {
     const html = renderToStaticMarkup(
       <SchoolHubWorkflow module="academics" selection={{ siteId }} data={{
-        ...base, selectionError: "Site unavailable", launches: [{ id: programId, name: "Program" }],
+        ...base, options:{...base.options,sites:[]}, selectionError: "Site unavailable", launches: [{ id: programId, name: "Program" }],
       } as never} />,
     );
     expect(html).toContain("Site unavailable");
