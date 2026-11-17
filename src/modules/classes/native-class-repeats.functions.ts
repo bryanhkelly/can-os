@@ -4,9 +4,10 @@ import {and,desc,eq,gt,inArray,isNotNull,isNull} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
-  auditEvents,domainEvents,canonicalClasses,canonicalClassEnrollments,
+  canonicalClasses,canonicalClassEnrollments,
   canonicalClassOutcomes,canonicalClassEnrollmentRepeatAuthorizations,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {assertCurrentCanonicalStaffForMutation} from
@@ -101,7 +102,7 @@ export const authorizeNativeClassRepeat=createServerFn({method:"POST"})
     approvedByPersonId:actor.actorPersonId,approvedAt:now,expiresAt,
    }).returning({id:canonicalClassEnrollmentRepeatAuthorizations.id});
    if(!saved)throw new Error("repeat authorization was not saved");
-   await tx.insert(auditEvents).values({
+   await writeCanonicalAudit(tx,{
     actorPersonId:actor.actorPersonId,owningOrganizationId:cls.operatingOrganizationId,
     eventCode:"class.repeat.authorized",entityKind:"class_repeat_authorization",
     entityId:saved.id,
@@ -109,7 +110,7 @@ export const authorizeNativeClassRepeat=createServerFn({method:"POST"})
      learnerPersonId:prior.learnerPersonId,evidenceVersionId:data.evidenceVersionId,
      reason:data.reason,seatReserved:false},
    });
-   await tx.insert(domainEvents).values({
+   await emitCanonicalDomainEvent(tx,{
     eventType:"ClassRepeatAuthorized",aggregateType:"class_repeat_authorization",
     aggregateId:saved.id,actorPersonId:actor.actorPersonId,
     payload:{classId:cls.id,priorEnrollmentId:prior.id,learnerPersonId:prior.learnerPersonId},
