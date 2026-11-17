@@ -12,14 +12,13 @@ import { listAdmissionsPrograms } from "@/modules/enrollment/admissions-program-
 import { getAdmissionOfferOptions, issueAdmissionOffer, activateOfferedEnrollment,withdrawIssuedAdmissionOffer } from "@/modules/enrollment/admissions-offer.functions";
 import { pipelineStages, type AdmissionsStage } from "@/domain/admissions-pipeline";
 import { selectActionableOffer, canIssueAnotherOffer } from "@/domain/admissions-offer-selection";
-import { WorkspaceShell, StatCard, EmptyState, DetailNavigation, SectionTab, StatusBadge, CreateAction, secondaryActionClassName } from "@/components/workspace";
+import { WorkspaceShell, StatCard, DirectoryTable, EmptyState, DetailNavigation, SectionTab, StatusBadge, CreateAction, secondaryActionClassName } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import {z} from "zod";
 import {optionalSearchUuid,siteProgramHref,siteProgramSelectionSchema} from "@/lib/route-search";
 import { PageNavigation } from "@/components/workspace/page-navigation";
 import { SiteProgramFields } from "@/components/workspace/site-program-fields";
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { plural } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
@@ -132,32 +131,24 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
        {summary.byStage.map(item=><SectionTab key={item.stage} current={selected.stage===item.stage} className="capitalize"
         link={{to:"/admissions",search:{siteId:selected.siteId,programId:selected.programId,stage:item.stage}}}>{item.stage} ({item.count})</SectionTab>)}
       </DetailNavigation>
-      {!selected.application&&<div className="rounded-xl border bg-card">
-       <ul aria-label="Applications" className="divide-y sm:hidden">{rows.map(row=>{
-        const href={siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id};
-        return <li key={row.id} className="space-y-2 p-4">
-         <div className="flex items-start justify-between gap-3">
-          <Link to="/admissions" search={href} className="font-semibold underline">{row.studentName??row.id}</Link>
-          <StatusBadge tone={row.enrollments.length>0?"success":row.outstandingRequirements>0?"attention":"neutral"}>{row.enrollments.length>0?"Enrolled":formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge>
-         </div>
-         <p className="text-sm text-muted-foreground">{row.program}</p>
-         <Link to="/admissions" search={href} className="inline-flex min-h-11 items-center text-sm font-semibold underline">{nextStep(row)}</Link>
-        </li>;
-       })}</ul>
-       <Table className="hidden text-left sm:table">
-        <caption className="sr-only">Authorized admissions pipeline and next steps</caption>
-        <TableHeader className="bg-muted/50"><TableRow><TableHead scope="col" className="p-4">Applicant</TableHead><TableHead scope="col" className="p-4">Program</TableHead><TableHead scope="col" className="p-4">Stage</TableHead><TableHead scope="col" className="p-4">Next step</TableHead></TableRow></TableHeader>
-        <TableBody className="divide-y">{rows.map(row=>{
-         const next=nextStep(row);
-         return <TableRow key={row.id} className="align-top hover:bg-muted/40">
-          <th scope="row" className="p-4 font-semibold"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{row.studentName??row.id}</Link><span className="mt-1 block text-xs font-normal text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span></th>
-          <TableCell className="p-4 align-top">{row.program}</TableCell><TableCell className="p-4 align-top"><StatusBadge tone={row.enrollments.length>0?"success":row.outstandingRequirements>0?"attention":"neutral"}>{row.enrollments.length>0?"Enrolled":formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}</StatusBadge></TableCell>
-          <TableCell className="p-4 align-top"><Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}} className="underline">{next}</Link></TableCell>
-         </TableRow>;
-        })}</TableBody>
-       </Table>
-       {!rows.length&&<p className="p-5 text-sm text-muted-foreground">No applications in this stage and scope.</p>}
-      </div>}
+      {!selected.application&&<DirectoryTable label="Admissions applications"
+        caption="Authorized admissions pipeline and next steps. Results are paginated by the server."
+        rows={rows} rowKey={row=>row.id}
+        empty={<p className="p-4 text-sm text-muted-foreground">No applications in this stage and scope.</p>}
+        columns={[
+          {id:"applicant",title:"Applicant",render:row=><>
+            <Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}}
+              className="font-semibold underline">{row.studentName??row.id}</Link>
+            <span className="mt-1 block text-xs text-muted-foreground">{row.submittedAt?`Submitted ${new Date(row.submittedAt).toLocaleDateString()}`:"Not submitted"}</span>
+          </>},
+          {id:"program",title:"Program",render:row=>row.program},
+          {id:"stage",title:"Stage",render:row=><StatusBadge tone={row.enrollments.length>0?"success":row.outstandingRequirements>0?"attention":"neutral"}>
+            {row.enrollments.length>0?"Enrolled":formatStatus(row.disposition==="waitlisted"?"waitlisted":row.stage)}
+          </StatusBadge>},
+          {id:"next",title:"Next step",render:row=><Link to="/admissions"
+            search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page>1?page:undefined,application:row.id}}
+            className="underline">{nextStep(row)}</Link>},
+        ]}/>}
       {!selected.application&&pageCount>1&&<PageNavigation label="Admissions pages" className="mt-4 justify-between" showUnavailable
        previous={page>1&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page-1}} className="rounded border px-3 py-2">Previous page</Link>}
        next={hasMore&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className="rounded border px-3 py-2">Next page</Link>}>
