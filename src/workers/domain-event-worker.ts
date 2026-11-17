@@ -296,6 +296,8 @@ for (const eventType of [
 registerDomainEventHandler(EventTypes.SectionScheduleChanged, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionEnrollmentWithdrawn, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionWaitlistSeatOffered, handleNotificationPolicyEvent);
+registerDomainEventHandler(EventTypes.SectionCreationRequestDeclined, handleNotificationPolicyEvent);
+registerDomainEventHandler(EventTypes.SectionCreationRequestFulfilled, handleNotificationPolicyEvent);
 
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;
