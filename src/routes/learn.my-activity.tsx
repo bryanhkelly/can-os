@@ -5,7 +5,7 @@ import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
-import {getMyActivity,getMyActivitySourcePage} from "@/modules/learning/my-activity.functions";
+import {getMyActivity,getMyActivitySourcePage,getMyActivityOpportunityPage} from "@/modules/learning/my-activity.functions";
 import {assembleParticipation} from "@/domain/participation-projections";
 import {assertParticipationHistoryPage} from "@/domain/participation-history-pages";
 import {
@@ -129,14 +129,20 @@ function MyActivityPage() {
   pageKeyRef.current=pageKey;
   const [extraPages,setExtraPages]=useState<{
     key:string;records:ParticipationRecord[];
+    opportunities:ParticipationOpportunity[];
     cursors:Partial<Record<ParticipationSource,string>>;
-  }>({key:"none",records:[],cursors:{}});
+    opportunityCursor:string|null;
+  }>({key:"none",records:[],opportunities:[],cursors:{},
+    opportunityCursor:null});
   const [loadingOlder,setLoadingOlder]=useState(false);
   const [olderError,setOlderError]=useState("");
   const extra=extraPages.key===pageKey?extraPages.records:[];
   const nextCursors=extraPages.key===pageKey
     ?extraPages.cursors:activity.data?.nextCursors??{};
-  const canLoadOlder=Object.values(nextCursors).some(value=>Boolean(value));
+  const nextOpportunityCursor=extraPages.key===pageKey
+    ?extraPages.opportunityCursor:activity.data?.nextOpportunityCursor??null;
+  const canLoadOlder=Object.values(nextCursors).some(value=>Boolean(value))||
+    Boolean(nextOpportunityCursor);
   const records=useMemo(
     ()=>assembleParticipation([...(activity.data?.records??[]),...extra]),
     [activity.data?.records,extra],
@@ -149,8 +155,15 @@ function MyActivityPage() {
       .filter((entry):entry is [ParticipationSource,string]=>Boolean(entry[1]));
     setLoadingOlder(true);setOlderError("");
     try{
-      const result=await Promise.allSettled(requests.map(async([source,cursor])=>
-        getMyActivitySourcePage({data:{source,cursor}})));
+      const [result,opportunityResult]=await Promise.all([
+        Promise.allSettled(requests.map(async([source,cursor])=>
+          getMyActivitySourcePage({data:{source,cursor}}))),
+        nextOpportunityCursor
+          ?Promise.allSettled([
+            getMyActivityOpportunityPage({data:{cursor:nextOpportunityCursor}}),
+          ])
+          :Promise.resolve([]),
+      ]);
       if(pageKeyRef.current!==key)return;
       const next={...nextCursors};
       const added:ParticipationRecord[]=[];
@@ -175,18 +188,50 @@ function MyActivityPage() {
         if(value.nextCursor)next[source]=value.nextCursor;
         else delete next[source];
       }
+      const extraOpportunityItems:ParticipationOpportunity[]=[];
+      let latestOpportunityCursor=nextOpportunityCursor;
+      if(opportunityResult.length){
+        const outcome=opportunityResult[0]!;
+        if(outcome.status==="rejected")failed=true;
+        else{
+          const page=outcome.value;
+          const seen=new Set([
+            ...activity.data.opportunities.map(row=>row.key),
+            ...(extraPages.key===key?extraPages.opportunities:[]).map(row=>row.key),
+          ]);
+          if(page.nextCursor===nextOpportunityCursor||
+             (page.nextCursor!==null&&page.items.length===0)||
+             page.items.some(item=>
+               item.key!=="noncredit_waitlist_release:"+item.releaseId||
+               seen.has(item.key))){
+            failed=true;
+          }else{
+            extraOpportunityItems.push(...page.items);
+            latestOpportunityCursor=page.nextCursor;
+          }
+        }
+      }
       setExtraPages(previous=>({
         key,records:assembleParticipation([
           ...(previous.key===key?previous.records:[]),...added,
-        ]),cursors:next,
+        ]),
+        opportunities:[
+          ...(previous.key===key?previous.opportunities:[]),
+          ...extraOpportunityItems,
+        ],
+        cursors:next,opportunityCursor:latestOpportunityCursor,
       }));
       if(failed)setOlderError(
         "Some history sources could not be verified. Retry to continue those sources.");
     }finally{setLoadingOlder(false);}
   }
-  const opportunities = bucket === "upcoming" && kind === "all" ? activity.data?.opportunities ?? [] : [];
+  const allOpportunities=[
+    ...(activity.data?.opportunities??[]),
+    ...(extraPages.key===pageKey?extraPages.opportunities:[]),
+  ];
+  const opportunities=bucket==="upcoming"&&kind==="all"?allOpportunities:[];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
-  const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial" && (item.source==="noncredit_waitlist" || Boolean(nextCursors[item.source as ParticipationSource]))) ?? [];
+  const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial" && (item.source==="noncredit_waitlist"?Boolean(nextOpportunityCursor):Boolean(nextCursors[item.source as ParticipationSource]))) ?? [];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Activity"
     subtitle="Your learning, programs, and participation in one place. Each provider keeps authority over its own records."
     actions={<Link to="/explore" className="text-sm font-semibold text-primary underline underline-offset-4">
@@ -279,7 +324,7 @@ function MyActivityPage() {
           {loadingOlder?"Loading older records…":"Load older activity"}
         </Button>
         <span className="text-xs text-muted-foreground">
-          Paged across verified sources; older history is not discarded.
+          Paged across verified participation and enrollment opportunities; older history is not discarded.
         </span>
       </div>}
       {olderError&&<p role="alert" className="mt-3 text-sm text-destructive">
