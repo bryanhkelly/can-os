@@ -96,14 +96,11 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
       const saved=await siteMutation.submit({data:{
         organizationId,name,slug:suggestedLaunchSlug(name)||"learning-site",timezone,
         stubOnly:false,planningLocation:{city,state},
+        launchPreferences:{delivery,interestIds:chosen},
       }});
       if(saved.status==="ignored")return;
+      // Site and initial planning preferences commit in one transaction.
       setSiteId(saved.value.siteId);
-      // Persist intended delivery at the first step. A visitor can leave
-      // before choosing any Programs and still resume that original choice.
-      await saveSiteLaunchPreferences({data:{
-        siteId:saved.value.siteId,preferences:{delivery,interestIds:chosen},
-      }});
       goTo("network",saved.value.siteId);
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to establish your Site. Nothing has been published."));}
   }
