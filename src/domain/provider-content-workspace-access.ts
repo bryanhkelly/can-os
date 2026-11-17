@@ -19,6 +19,6 @@ export function providerContentCapability(role: ProviderContentRole) {
 
 export function providerContentHome(role: ProviderContentRole) {
   return role === "academic_content_creator"
-    ? "/canonical/content" as const
-    : "/canonical/content-reviews" as const;
+    ? "/class?view=content" as const
+    : "/class?view=reviews" as const;
 }
