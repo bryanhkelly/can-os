@@ -25,7 +25,10 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
     expect(source).toContain('eq(canonicalAccountGrants.roleCode,"learner")');
     expect(source).toContain("isNull(canonicalAccountGrants.revokedAt)");
     expect(source).toContain("isNull(canonicalAccountGrants.siteId)");
-    expect(source).toContain("grants.length!==1");
+    expect(source).toContain("grants.length===0");
+    expect(source).toContain("grants.some(g=>g.personId!==link.canonicalPersonId)");
+    expect(source).toContain("review?grants.filter(g=>g.organizationId===review.organizationId)");
+    expect(source).toContain("home.length!==1");
     expect(source).not.toContain("tx.insert(canonicalAccounts)");
     expect(source).not.toContain("tx.insert(canonicalPersons)");
     expect(source).not.toContain("tx.insert(canonicalAccountGrants)");
@@ -78,7 +81,8 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
     expect(recovery).toContain("verifiedAdultOn(native.birthDate,now)");
     expect(recovery).toContain('new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED")');
     expect(recovery).toContain("links.length!==1");
-    expect(recovery).toContain("grants.length!==1");
+    expect(recovery).toContain("grants.length===0");
+    expect(recovery).toContain("home.length!==1");
     expect(recovery).not.toContain("tx.update(canonicalPersons)");
     expect(recovery).not.toContain("tx.insert(canonicalPersons)");
     expect(recovery).not.toContain("tx.insert(canonicalAccounts)");
