@@ -28,7 +28,7 @@ describe("native Class guardian and minor enrollment",()=>{
   const request=service.slice(service.indexOf("export const requestNativeGuardianClassApproval"),
     service.indexOf("export const getMyNativeGuardianClassApprovals"));
   expect(request).not.toContain("tx.insert(canonicalClassEnrollments)");
-  expect(request).toContain("class_enrollment");
+  expect(request).toContain("canonicalClassEnrollmentApprovalRequests");
   expect(service).toContain('approval.state!=="approved"');
   expect(service).toContain('approval.reviewedByPersonId===guardian.personId');
   expect(service).toContain('approval.reviewedByPersonId===approval.learnerPersonId');
