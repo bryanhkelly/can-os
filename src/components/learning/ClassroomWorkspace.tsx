@@ -9,7 +9,7 @@ export type ClassroomReturnTo = "academic" | "native" | "training";
 function ReturnToClasses({target}:{target:ClassroomReturnTo}){
   return target==="academic"?<Link to="/classes" className="underline">My classes</Link>:
     target==="native"?<Link to="/classes" search={{}} className="underline">My classes</Link>:
-    <Link to="/learn/my-courses" className="underline">My classes</Link>;
+    <Link to="/learn/my-activity" className="underline">My classes</Link>;
 }
 
 export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPosition, metadata, actions, rail, children, returnTo="academic" }: {
@@ -43,7 +43,7 @@ export function ClassroomWorkspace({ title, subtitle, lessonTitle, lessonPositio
         </Button>
         <Button variant="ghost" size="sm" asChild>{returnTo==="academic"?<Link to="/classes"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
         returnTo==="native"?<Link to="/classes" search={{}}><ArrowLeft aria-hidden="true"/>Exit classroom</Link>:
-        <Link to="/learn/my-courses"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>}</Button>
+        <Link to="/learn/my-activity"><ArrowLeft aria-hidden="true"/>Exit classroom</Link>}</Button>
       </div>
     </div>
     <div className="classroom-content">
