@@ -57,6 +57,14 @@ Avoid universal tables, new infrastructure services and unrelated migrations sol
 
 These are incremental boundaries, **not** proof that all product experiences have been migrated. New implementations should adopt the existing shared primitives instead of duplicating identity or outbound delivery logic.
 
+## Shared enrollment command adoption
+
+School application creation, acceptance, and legacy activation now use `assertProgramCommandAccess` for current capability + exact Program authorization. Application creation also rechecks Program scope inside its transaction. Admission state, seat reservations, guarded transfers and the distinct noncredit/native Class enrollment rules remain owned by their existing services.
+
+Application acceptance, journey activation and enrollment activation now call `writeAudit(tx, context, change)` so audit attribution derives from the trusted command context rather than hand-assembled actor rows. The architectural CI guard rejects a return to raw `writeAudit(tx, { ... })` in this enrollment service. These code-only changes require no database migration.
+
+Other command services still need incremental adoption, with regression testing before replacing any source-specific transaction or idempotency behavior.
+
 ## Review standard
 
 Any new capability must identify its authoritative write owner, public interface, authorization model, audit/event behavior, source-to-display status mapping and contract tests. Any proposal for a duplicate capability must explain why an adapter cannot satisfy the requirement. Shared UI follows CAN OS design system v6.1.
