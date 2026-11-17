@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalOfferingCourses, courseVersions, courses,
+  canonicalOfferingCourses, catalogSites, courseVersions, courses,
   deploymentOfferingAdoptions, educationOperationOrganizationRoles,
-  educationOperations, offeringVersions, offerings, programDeployments,
+  educationOperationSites, educationOperations, offeringVersions, offerings,
+  programDeployments, siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
 import { publishedOfferingKind, assertCompletePortableCourseComposition } from "@/domain/network-program-rollout";
@@ -29,6 +30,8 @@ const inputSchema=z.object({
 export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
   .validator((raw:unknown)=>inputSchema.parse(raw))
   .handler(async({data})=>{
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+      throw new AuthorizationError("unified Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
@@ -36,6 +39,8 @@ export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
     assertCapability(actor,"class.manage");
     if(actor.scope.organizationIds?.length!==1)
       throw new AuthorizationError("one verified operating Organization");
+    const siteIds=actor.scope.siteIds??[];
+    if(!siteIds.length)throw new AuthorizationError("verified current operator Site");
     const organizationId=actor.scope.organizationIds[0]!;
     const now=new Date();
     return db.transaction(async tx=>{
@@ -77,6 +82,26 @@ export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
           eq(offerings.status,"active"),
           eq(offeringVersions.lifecycle,"published"),
           isNotNull(offeringVersions.publishedAt),
+          exists(tx.select({id:educationOperationSites.id}).from(educationOperationSites)
+            .innerJoin(catalogSites,and(
+              eq(catalogSites.id,educationOperationSites.siteId),
+              eq(catalogSites.status,"active"),
+            ))
+            .innerJoin(siteOrganizationRoles,and(
+              eq(siteOrganizationRoles.siteId,catalogSites.id),
+              eq(siteOrganizationRoles.organizationId,organizationId),
+              inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+              lte(siteOrganizationRoles.validFrom,now),
+              or(isNull(siteOrganizationRoles.validThrough),
+                gt(siteOrganizationRoles.validThrough,now)),
+            ))
+            .where(and(
+              eq(educationOperationSites.operationId,programDeployments.operationId),
+              inArray(educationOperationSites.siteId,siteIds),
+              lte(educationOperationSites.validFrom,now),
+              or(isNull(educationOperationSites.validThrough),
+                gt(educationOperationSites.validThrough,now)),
+            ))),
         )).limit(1);
       if(!approved)throw new AuthorizationError("currently approved published Offering adoption");
       // Later publisher versions are never adopted implicitly. A local Class
