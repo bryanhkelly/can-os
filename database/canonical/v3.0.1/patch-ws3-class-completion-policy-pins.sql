@@ -61,8 +61,9 @@ BEGIN
  IF c.course_version_id IS DISTINCT FROM NEW.course_version_id
     OR c.course_lifecycle IS DISTINCT FROM 'published'
     OR c.course_published_at IS NULL OR
-    c.course_published_at>NEW.published_at
-    OR NEW.published_at>clock_timestamp() THEN
+    c.course_published_at>NEW.published_at OR
+    NEW.effective_at<NEW.published_at OR
+    NEW.published_at>clock_timestamp() THEN
    RAISE EXCEPTION 'Class completion policy must pin one published Course version'
      USING ERRCODE='23514';
  END IF;
@@ -75,6 +76,7 @@ BEGIN
     OR ev.verified_at IS NULL OR ev.verified_at>NEW.published_at
     OR ev.verified_by_person_id IS NULL
     OR ev.verified_by_person_id=NEW.authored_by_person_id
+    OR ev.verified_by_person_id=NEW.approved_by_person_id
     OR (ev.valid_from IS NOT NULL AND ev.valid_from>NEW.published_at::date)
     OR (ev.valid_through IS NOT NULL AND ev.valid_through<NEW.published_at::date) THEN
    RAISE EXCEPTION 'Independent current publisher-owned policy evidence required'
