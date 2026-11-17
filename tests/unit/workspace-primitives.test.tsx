@@ -31,7 +31,7 @@ describe("workspace design primitives", () => {
     const html = renderToStaticMarkup(<WorkspaceNotice tone="success">
       <p>Saved successfully</p><p>Refresh may still be pending</p>
     </WorkspaceNotice>);
-    expect(html).toMatch(/^<div\\b/);
+    expect(html).toMatch(/^<div\b/);
     expect(html).toContain("<div class=\"min-w-0 flex-1\"><p>Saved successfully</p>");
     expect(html).not.toContain("<span class=\"min-w-0 flex-1\"><p>");
     expect(html).toContain("<p>Refresh may still be pending</p>");
