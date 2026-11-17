@@ -16,6 +16,21 @@ describe("source-owned delivery recovery state",()=>{
   expect(waitlistDeliveryView({...base,currentInvitationExpiresAt:new Date("2026-11-20")},now).retryable).toBe(false);
   expect(waitlistDeliveryView({...base,invitationExpiresAt:new Date("2026-11-16")},now).state).toBe("expired");
  });
+ it("distinguishes provider delivery, bounce and complaint",()=>{
+  expect(waitlistDeliveryView({...base,status:"accepted",acceptedAt:now,
+    providerDeliveredAt:now},now)).toEqual({
+    state:"provider_delivered",label:"Delivered to mail server",retryable:false,
+  });
+  expect(waitlistDeliveryView({...base,providerFailedAt:now,
+    providerFailureKind:"email.bounced"},now)).toEqual({
+    state:"provider_failed",label:"Provider reported delivery failure",retryable:false,
+  });
+  expect(waitlistDeliveryView({...base,providerFailedAt:now,
+    providerFailureKind:"email.complained"},now)).toEqual({
+    state:"complained",label:"Recipient reported spam",retryable:false,
+  });
+  expect(waitlistDeliveryView({...base,providerFailedAt:now},now).retryable).toBe(false);
+ });
  it("distinguishes queued, in flight, scheduled retry and suppressed",()=>{
   expect(waitlistDeliveryView({...base,status:"pending"},now).state).toBe("pending");
   expect(waitlistDeliveryView({...base,status:"processing"},now).retryable).toBe(false);
