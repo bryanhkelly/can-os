@@ -77,13 +77,16 @@ describe("operations outbox health panel", () => {
     expect(html).toContain("Event outbox");
     expect(html).toContain("Pending");
     expect(html).toContain("Processing");
-    expect(html).toContain(">1</p>");
+    expect(html).toContain(">1</span>");
     expect(html).toContain("Unhandled");
     expect(html).toContain("Failed");
-    expect(html).toContain(">9</p>");
-    expect(html).toContain(">3</p>");
-    expect(html).toContain(">2</p>");
+    expect(html).toContain(">9</span>");
+    expect(html).toContain(">3</span>");
+    expect(html).toContain(">2</span>");
     expect(html).toContain("3 pending events have no registered");
+    expect(html).toContain("text-3xl");
+    expect(html).toContain("border-warning/50");
+    expect(html).not.toContain("rounded-lg");
     expect(html).toContain("School-family outbound delivery");
     expect(html).toContain("School-family delivery recovery");
     expect(html).toContain("Retry scheduled");
@@ -99,7 +102,7 @@ describe("operations outbox health panel", () => {
     state.read.mockResolvedValue({ failed: 0, pending: 4, pendingUnhandled: 0, processing: 0 });
     await loaded();
     const html = renderToStaticMarkup(render());
-    expect(html).toContain(">4</p>");
+    expect(html).toContain(">4</span>");
     expect(html).not.toContain("will not drain");
   });
 
@@ -112,7 +115,7 @@ describe("operations outbox health panel", () => {
       expect(html).not.toContain("private operator diagnostic");
       expect(html).toContain("role=\"alert\"");
     });
-    expect(renderToStaticMarkup(render())).not.toContain(">9</p>");
+    expect(renderToStaticMarkup(render())).not.toContain(">9</span>");
   });
 
   it("reloads on retry after a read failure", async () => {
@@ -121,7 +124,7 @@ describe("operations outbox health panel", () => {
     await vi.waitFor(() => expect(findRetry()).toBeDefined());
     state.read.mockResolvedValue({ failed: 0, pending: 1, pendingUnhandled: 0, processing: 0 });
     findRetry()?.props.onClick?.();
-    await vi.waitFor(() => expect(renderToStaticMarkup(render())).toContain(">1</p>"));
+    await vi.waitFor(() => expect(renderToStaticMarkup(render())).toContain(">1</span>"));
     expect(state.read).toHaveBeenCalledTimes(2);
   });
 });
