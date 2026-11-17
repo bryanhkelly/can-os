@@ -4,7 +4,8 @@ import { and, asc, desc, eq, exists, gt, inArray, isNotNull, isNull, lte, or, sq
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalClasses, canonicalClassOfferingVersions, catalogSites, deploymentOfferingAdoptions,
+  canonicalClasses, canonicalClassOfferingVersions, canonicalEnrollmentSites,
+  catalogSites, classroomDeploymentSites, deploymentOfferingAdoptions,
   educationOperationOrganizationRoles, educationOperationSites,
   educationOperations, offeringVersions, offerings, programDeployments,
   siteOrganizationRoles,
@@ -43,6 +44,8 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
         versionId:offeringVersions.id,
         versionNo:offeringVersions.versionNo,
         deploymentId:programDeployments.id,
+        operationId:programDeployments.operationId,
+        deploymentName:programDeployments.name,
       }).from(programDeployments)
         .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
         .innerJoin(deploymentOfferingAdoptions,and(
@@ -89,6 +92,50 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
             ))),
         ));
       if(!approved.length)throw new AuthorizationError("active Offering adoption and Site operation");
+      const deploymentIds=[...new Set(approved.map(row=>row.deploymentId))];
+      const operationIds=[...new Set(approved.map(row=>row.operationId))];
+      const eligibleSiteRows=await tx.select({
+        operationId:educationOperationSites.operationId,
+        siteId:catalogSites.id,
+        siteName:canonicalEnrollmentSites.name,
+      }).from(educationOperationSites)
+        .innerJoin(catalogSites,and(
+          eq(catalogSites.id,educationOperationSites.siteId),
+          eq(catalogSites.status,"active"),
+        ))
+        .leftJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,catalogSites.id))
+        .innerJoin(siteOrganizationRoles,and(
+          eq(siteOrganizationRoles.siteId,catalogSites.id),
+          eq(siteOrganizationRoles.organizationId,organizationId),
+          inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+          lte(siteOrganizationRoles.validFrom,now),
+          or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+        ))
+        .where(and(
+          inArray(educationOperationSites.operationId,operationIds),
+          inArray(educationOperationSites.siteId,siteIds),
+          lte(educationOperationSites.validFrom,now),
+          or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+        ));
+      const eligibleSites=[...new Map(eligibleSiteRows.map(site=>[
+        site.operationId+":"+site.siteId,site,
+      ])).values()];
+      const placementRows=await tx.select({
+        deploymentId:classroomDeploymentSites.deploymentId,
+        siteId:classroomDeploymentSites.siteId,
+      }).from(classroomDeploymentSites).where(and(
+        inArray(classroomDeploymentSites.deploymentId,deploymentIds),
+        inArray(classroomDeploymentSites.siteId,siteIds),
+      ));
+      const placementSet=new Set(placementRows.map(row=>row.deploymentId+":"+row.siteId));
+      const adoptionSites=approved.flatMap(row=>eligibleSites
+        .filter(site=>site.operationId===row.operationId)
+        .map(site=>({
+          adoptionId:row.id,deploymentId:row.deploymentId,
+          offeringVersionId:row.versionId,versionNo:row.versionNo,
+          siteId:site.siteId,siteName:site.siteName??"Authorized Site",
+          classroomPlacement:placementSet.has(row.deploymentId+":"+site.siteId),
+        })));
       const [offering]=await tx.select({title:offerings.title,status:offerings.status})
         .from(offerings).where(eq(offerings.id,data.offeringId)).limit(1);
       if(!offering||offering.status!=="active")
@@ -106,6 +153,35 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
           eq(offeringVersions.lifecycle,"published"),
           isNotNull(offeringVersions.publishedAt),
         )).orderBy(desc(offeringVersions.versionNo)).offset(100).limit(1);
+      // Counts and Class details use each Class's actual Deployment/Operation,
+      // not merely any Site ID that happens to be in the staff account grant.
+      const scopedClassFilter=and(
+        eq(offeringVersions.offeringId,data.offeringId),
+        eq(canonicalClasses.operatingOrganizationId,organizationId),
+        inArray(canonicalClasses.deploymentId,deploymentIds),
+        inArray(canonicalClasses.siteId,siteIds),
+        exists(tx.select({id:educationOperationSites.id})
+          .from(educationOperationSites)
+          .innerJoin(catalogSites,and(
+            eq(catalogSites.id,educationOperationSites.siteId),
+            eq(catalogSites.status,"active"),
+          ))
+          .innerJoin(siteOrganizationRoles,and(
+            eq(siteOrganizationRoles.siteId,catalogSites.id),
+            eq(siteOrganizationRoles.organizationId,organizationId),
+            inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+            lte(siteOrganizationRoles.validFrom,now),
+            or(isNull(siteOrganizationRoles.validThrough),
+              gt(siteOrganizationRoles.validThrough,now)),
+          ))
+          .where(and(
+            eq(educationOperationSites.operationId,programDeployments.operationId),
+            eq(educationOperationSites.siteId,canonicalClasses.siteId),
+            lte(educationOperationSites.validFrom,now),
+            or(isNull(educationOperationSites.validThrough),
+              gt(educationOperationSites.validThrough,now)),
+          ))),
+      );
       const impacts=await tx.select({
         offeringVersionId:canonicalClasses.offeringVersionId,
         siteId:canonicalClasses.siteId,
@@ -113,11 +189,8 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
         classCount:sql<number>`count(*)::integer`,
       }).from(canonicalClasses)
         .innerJoin(offeringVersions,eq(offeringVersions.id,canonicalClasses.offeringVersionId))
-        .where(and(
-          eq(offeringVersions.offeringId,data.offeringId),
-          eq(canonicalClasses.operatingOrganizationId,organizationId),
-          inArray(canonicalClasses.siteId,siteIds),
-        ))
+        .innerJoin(programDeployments,eq(programDeployments.id,canonicalClasses.deploymentId))
+        .where(scopedClassFilter)
         .groupBy(canonicalClasses.offeringVersionId,canonicalClasses.siteId,canonicalClasses.state);
       const publishedListings=await tx.select({
         offeringVersionId:canonicalClasses.offeringVersionId,
@@ -125,29 +198,45 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
         classCount:sql<number>`count(distinct ${canonicalClasses.id})::integer`,
       }).from(canonicalClasses)
         .innerJoin(offeringVersions,eq(offeringVersions.id,canonicalClasses.offeringVersionId))
+        .innerJoin(programDeployments,eq(programDeployments.id,canonicalClasses.deploymentId))
         .innerJoin(canonicalClassOfferingVersions,and(
           eq(canonicalClassOfferingVersions.classId,canonicalClasses.id),
           eq(canonicalClassOfferingVersions.state,"published"),
         ))
-        .where(and(
-          eq(offeringVersions.offeringId,data.offeringId),
-          eq(canonicalClasses.operatingOrganizationId,organizationId),
-          inArray(canonicalClasses.siteId,siteIds),
-        ))
+        .where(scopedClassFilter)
         .groupBy(canonicalClasses.offeringVersionId,canonicalClasses.siteId);
+      const classRows=await tx.select({
+        classId:canonicalClasses.id,
+        deploymentId:canonicalClasses.deploymentId,
+        offeringVersionId:canonicalClasses.offeringVersionId,
+        versionNo:offeringVersions.versionNo,
+        siteId:canonicalClasses.siteId,
+        title:canonicalClasses.title,
+        state:canonicalClasses.state,
+        deliveryMode:canonicalClasses.deliveryMode,
+      }).from(canonicalClasses)
+        .innerJoin(offeringVersions,eq(offeringVersions.id,canonicalClasses.offeringVersionId))
+        .innerJoin(programDeployments,eq(programDeployments.id,canonicalClasses.deploymentId))
+        .where(scopedClassFilter)
+        .orderBy(desc(canonicalClasses.createdAt),desc(canonicalClasses.id))
+        .limit(101);
       return {
         offeringId:data.offeringId,offeringTitle:offering.title,
         latestPublishedVersionNo:versions[0]?.versionNo??null,
         publisherVersionsTruncated:!!other,
         approvedAdoptions:approved.map(row=>({
           adoptionId:row.id,deploymentId:row.deploymentId,
+          deploymentName:row.deploymentName,
           offeringVersionId:row.versionId,versionNo:row.versionNo,
         })),
+        adoptionSites,
         publisherVersions:versions,
         // Counts are exact for the current operator's authorized Site IDs;
         // never describe them as all national/affiliate Classes.
         localClassImpact:impacts,
         publishedClassOfferings:publishedListings,
+        affectedClasses:classRows.slice(0,100),
+        moreAffectedClasses:classRows.length>100,
       };
     });
   });
