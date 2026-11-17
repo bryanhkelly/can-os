@@ -6,7 +6,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { getActionDetail } from "@/modules/actions/action-detail.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { PageFrame, RecordHeader, RecordLayout, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { PageFrame, RecordHeader, RecordLayout, RecordFacts, WorkspacePanel, StatusBadge } from "@/components/workspace";
 
 export const Route = createFileRoute("/actions/$actionId")({
   loader: ({ params }) => safeLoader(() => getActionDetail({ data: { actionId: params.actionId } }), {
@@ -28,11 +28,11 @@ function ActionDetailPage() {
       subtitle="Recorded work and follow-through. Changes remain in the owning workflow."
       status={<StatusBadge tone={statusTone}><span className="capitalize">{action.status.replaceAll("_", " ")}</span></StatusBadge>} />}
     main={<WorkspacePanel title="Action details">
-      <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
-        <div><dt className="text-xs text-muted-foreground">Type</dt><dd className="mt-1 capitalize">{action.type.replaceAll("_", " ")}</dd></div>
-        <div><dt className="text-xs text-muted-foreground">Priority</dt><dd className="mt-1 capitalize">{action.priority}</dd></div>
-        <div><dt className="text-xs text-muted-foreground">Due</dt><dd className="mt-1">{action.dueAt ? new Date(action.dueAt).toLocaleDateString() : "No due date"}</dd></div>
-      </dl>
+      <RecordFacts label="Action metadata" columns={3} className="mt-4" items={[
+        { label: "Type", value: <span className="capitalize">{action.type.replaceAll("_", " ")}</span> },
+        { label: "Priority", value: <span className="capitalize">{action.priority}</span> },
+        { label: "Due", value: action.dueAt ? new Date(action.dueAt).toLocaleDateString() : "No due date" },
+      ]}/>
       {action.description && <p className="mt-5 whitespace-pre-wrap text-sm">{action.description}</p>}
       {action.resolutionNote && <div className="mt-5 border-t pt-5"><h3 className="font-semibold">Resolution</h3><p className="mt-2 whitespace-pre-wrap text-sm">{action.resolutionNote}</p></div>}
       {action.resolvedAt && <p className="mt-3 text-sm text-muted-foreground">Resolved {new Date(action.resolvedAt).toLocaleDateString()}</p>}
