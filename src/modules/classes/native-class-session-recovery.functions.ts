@@ -95,13 +95,15 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
           canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
           canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
           organizationId:accessAdultLearningReviews.organizationId,
+          verifiedBirthDate:accessAdultLearningReviews.verifiedBirthDate,
         }).from(accessAdultLearningReviews).where(
           eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
         ).limit(1):[];
       if(review&&(review.status!=="approved"||!review.consumedAt||
          review.accessPersonId!==owner.personId||
          review.canonicalAccountId!==link.canonicalAccountId||
-         review.canonicalPersonId!==link.canonicalPersonId))
+         review.canonicalPersonId!==link.canonicalPersonId||
+         review.verifiedBirthDate!==native.birthDate))
         throw new AuthorizationError("revoked or conflicting adult identity review");
       const grants=await tx.select({
         id:canonicalAccountGrants.id,organizationId:canonicalAccountGrants.organizationId,
