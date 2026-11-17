@@ -5,11 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/choice";
 import { MutationFeedback } from "@/components/workspace";
+import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { classVideoFileSchema, videoUploadPolicy } from "@/domain/class-video";
 import { createPrivateUploadTask } from "@/platform/storage/private-upload";
 import {
   beginRecordedVideoUpload,finishRecordedVideoUpload,getMyRecordedVideoDrafts,
+  getOwnRecordedVideoPreview,
 } from "@/modules/learning/recorded-video-upload.functions";
 
 /** Native /class provider workflow. Unlike the legacy Section supplement, an
@@ -132,9 +134,16 @@ export function ProviderVideoUploadForm({
       {drafts.isSuccess&&!!drafts.data.length&&
         <ul className="mt-3 divide-y border border-border">
           {drafts.data.map(draft=><li key={draft.assetVersionId}
-            className="flex flex-wrap items-center justify-between gap-2 p-3 text-sm">
-            <span className="font-medium">{draft.title}</span>
-            <span className="text-muted-foreground">Private draft · Review required</span>
+            className="space-y-3 p-3 text-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="font-medium">{draft.title}</span>
+              <span className="text-muted-foreground">Private draft · Review required</span>
+            </div>
+            <ClassVideoPlayer title={draft.title+" · private creator preview"}
+              resourceId={draft.assetVersionId}
+              loadUrl={async()=>(await getOwnRecordedVideoPreview({data:{
+                courseVersionId,assetVersionId:draft.assetVersionId,
+              }})).downloadUrl}/>
           </li>)}
         </ul>}
     </div>}
