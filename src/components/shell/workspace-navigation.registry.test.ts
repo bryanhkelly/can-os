@@ -51,8 +51,8 @@ describe("generated workspace navigation", () => {
     expect(workspaceLinks.site_website_editor.some(item => item.path === "/site-website")).toBe(true);
     expect(getWorkspaceHome("academic_content_creator")).toBe("/canonical/content");
     expect(getWorkspaceHome("academic_content_reviewer")).toBe("/canonical/content-reviews");
-    expect(workspaceLinks.academic_content_creator[0].path).toBe("/canonical/content");
-    expect(workspaceLinks.academic_content_reviewer[0].path).toBe("/canonical/content-reviews");
+    expect(workspaceLinks.academic_content_creator[0]?.path).toBe("/canonical/content");
+    expect(workspaceLinks.academic_content_reviewer[0]?.path).toBe("/canonical/content-reviews");
     expect(roleCapabilities.academic_content_creator).not.toContain("student:read");
     expect(roleCapabilities.academic_content_reviewer).not.toContain("student:read");
     const workflows = routeNavigation["/operations/workflows"];
