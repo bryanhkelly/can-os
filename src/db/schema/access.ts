@@ -6,12 +6,18 @@ import { people } from "./identity";
 /** Provider-independent local account. Never treat browser persona as an account. */
 export const accessAccounts = pgTable("access_accounts", {
  id: id(),
+ // Immutable Person ownership; the same person may hold many scoped roles.
+ // Backfilled/created by patch-can-one-person-grants.sql.
+ personId: uuid("person_id").references(() => people.id, {onDelete:"restrict"}),
  emailNormalized: text("email_normalized").notNull(),
  emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
  disabled: boolean("disabled").notNull().default(false),
  createdAt: createdAt(),
  updatedAt: updatedAt(),
-}, t => [uniqueIndex("access_accounts_email_uq").on(t.emailNormalized)]);
+}, t => [
+ uniqueIndex("access_accounts_email_uq").on(t.emailNormalized),
+ uniqueIndex("access_accounts_person_id_uq").on(t.personId).where(sql`${t.personId} IS NOT NULL`),
+]);
 
 /** Verified account-to-person assignment; one login can represent multiple genuine memberships. */
 export const accountPersonGrants = pgTable("account_person_grants", {
