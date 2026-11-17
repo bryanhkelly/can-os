@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getMyNoncreditSelfEnrollments, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { openMyNoncreditCourse } from "@/modules/enrollment/noncredit-self-enrollment-resume.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
@@ -10,23 +11,26 @@ import {getMyNoncreditWaitlist,getMyNoncreditWaitlistByRelease,cancelMyNoncredit
 
 export function NoncreditEnrollmentManagement({registrationId,releaseId}:{registrationId?:string;releaseId?:string}={}){
   const navigate=useNavigate();
+  const {session}=useWorkspaceSession();
+  const authorized=!!session?.authenticated;
+  const scopeKey=authorized?session.activeGrantId:"signed-out";
   const client=useQueryClient();
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
   const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
   const [withdrawBusy,setWithdrawBusy]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
-  const query=useQuery({queryKey:["my-noncredit-self-enrollments",registrationId??"all"],
+  const query=useQuery({queryKey:["my-noncredit-self-enrollments",scopeKey,registrationId??"all"],
     queryFn:async()=>{
       if(!registrationId)return getMyNoncreditSelfEnrollments();
       const record=await getMyNoncreditRegistrationById({data:{registrationId}});
       return record?[record]:[];
-    },enabled:!releaseId,retry:false,staleTime:15_000});
+    },enabled:authorized&&!releaseId,retry:false,staleTime:15_000});
   const [busy,setBusy]=useState<string|null>(null);
-  const waiting=useQuery({queryKey:["my-noncredit-waitlist",releaseId??"all"],queryFn:async()=>{
+  const waiting=useQuery({queryKey:["my-noncredit-waitlist",scopeKey,releaseId??"all"],queryFn:async()=>{
     if(!releaseId)return getMyNoncreditWaitlist();
     const entry=await getMyNoncreditWaitlistByRelease({data:{releaseId}});
     return entry?[entry]:[];
-  },enabled:!registrationId,retry:false,staleTime:15_000});
+  },enabled:authorized&&!registrationId,retry:false,staleTime:15_000});
   const [error,setError]=useState("");
   async function open(courseAttemptId:string) {
     if(busy)return;
@@ -64,6 +68,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   }
   const visibleCourses=releaseId ? [] : query.data;
   const visibleWaitlist=registrationId ? [] : waiting.data;
+  if(!authorized)return <p role="status" className="border border-border p-4 text-sm">Sign in with your CAN account to manage training.</p>;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
     {!releaseId&&query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
