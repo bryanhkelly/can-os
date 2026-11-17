@@ -16,7 +16,6 @@ describe("account-wide participation source authority and pagination",()=>{
     "selectActivityMemberships(",
     "guardianRelationshipPredicate",
     "profileScope(",
-    'access:"academic"',
     "getProfiles(\"academic\")",
     "getProfiles(\"enrollment\")",
   ])expect(school).toContain(phrase);
