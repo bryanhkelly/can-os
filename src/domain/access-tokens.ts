@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { secureSessionCookieHeader } from "./session-cookies";
 
 /** Provider-independent token helpers. Raw secrets must never be stored or logged. */
 export function issueOpaqueSecret(): string {
@@ -38,7 +39,7 @@ export function accessSessionIsWithinIdleWindow(lastActivityAt: Date, now = new 
 export const accessSessionCookie = "__Host-can_os_session";
 export function sessionCookieHeader(secret: string, maxAgeSeconds=60*60*12): string {
  if(!/^[A-Za-z0-9_-]{40,}$/.test(secret)) throw new Error("Invalid session token");
- return `${accessSessionCookie}=${secret}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSeconds}`;
+ return secureSessionCookieHeader(accessSessionCookie, secret, maxAgeSeconds);
 }
 export function clearSessionCookieHeader(): string {
  return `${accessSessionCookie}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`;
