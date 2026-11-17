@@ -60,4 +60,16 @@ describe("DirectoryTable reusable workspace pattern", () => {
     expect(selected).toContain("1 record selected");
   });
 
+  it("supports accessible row-specific actions without losing authorization filtering", () => {
+    const html = renderToStaticMarkup(<DirectoryTable {...base}
+      rowActions={[{
+        id:"status",
+        label:row=>row.editable?"Deactivate":"Activate",
+        allowed:row=>row.editable,
+        onClick:()=>undefined,
+      }]}/>);
+    expect(html.match(/Deactivate/g)).toHaveLength(1);
+    expect(html).not.toContain(">Activate</button>");
+  });
+
 });
