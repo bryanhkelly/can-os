@@ -186,12 +186,27 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
     guard();const {learnerPersonId,actor,request}=await requireLearner();
     return db.transaction(async tx=>{
       const now=new Date();
-      const [version]=await tx.select().from(canonicalClassOfferingVersions)
-        .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId)).limit(1);
-      if(!version)throw new AuthorizationError("valid Class Offering version");
+      // Resolve the parent Class ID without locking the Offering. Publisher
+      // publication/closure also locks Class before Offering; using the same
+      // order avoids deadlocks. This first read is only a locator, NEVER the
+      // authoritative published terms for a seat-changing decision.
+      const [sourceVersion]=await tx.select({
+        classId:canonicalClassOfferingVersions.classId,
+      }).from(canonicalClassOfferingVersions)
+        .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId))
+        .limit(1);
+      if(!sourceVersion)throw new AuthorizationError("valid Class Offering version");
       const [instance]=await tx.select({id:canonicalClasses.id}).from(canonicalClasses)
-        .where(eq(canonicalClasses.id,version.classId)).for("update").limit(1);
+        .where(eq(canonicalClasses.id,sourceVersion.classId)).for("update").limit(1);
       if(!instance)throw new AuthorizationError("current Class");
+      // Re-read + lock published terms AFTER waiting for the Class lock.
+      // Otherwise an Offering closed by the publisher while this request
+      // waits could be admitted using its stale pre-lock publication state.
+      const [version]=await tx.select().from(canonicalClassOfferingVersions)
+        .where(and(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId),
+          eq(canonicalClassOfferingVersions.classId,instance.id)))
+        .for("update").limit(1);
+      if(!version)throw new AuthorizationError("current Class Offering version");
       const current=await currentClassAuthority(tx,instance.id,now);
       if(!current.siteId)throw new AuthorizationError("Class enrollment requires a Site");
       const [offering]=await tx.select({id:canonicalClassOfferings.id})
