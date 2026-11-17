@@ -41,17 +41,16 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
       "authorized.source!==\"class\"",
       'eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!)',
       'eq(classSessionAgendaRevisions.classSessionId,link.id)',
-      "CAN_WS4_SESSION_AGENDAS_ENABLED",
     ])expect(api).toContain(claim);
     expect(schedule).toContain("publish a Course-linked Class Session study plan before opening");
     expect(schedule).toContain("revokeNativeClassSession");
   });
-  it("hides disabled agenda UI and gives Site managers read-only access",()=>{
+  it("exposes authorized agendas without rollout switches and gives Site managers read-only access",()=>{
     const workspace=read("src/modules/classes/native-class-workspace.functions.ts");
     const panel=read("src/components/learning/NativeClassSessionsPanel.tsx");
     const agenda=read("src/modules/classes/native-class-session-agenda.functions.ts");
-    expect(workspace).toContain('sessionAgendasEnabled:process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"');
-    expect(workspace).toContain('process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true"');
+    expect(workspace).toContain("const sessionAgendasEnabled=true;");
+    expect(workspace).not.toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
     expect(panel).toContain("workspace.sessionAgendasEnabled&&");
     const host=read("src/components/learning/NativeClassroomHostPanel.tsx");
     expect(host).toContain("enabled:agendasEnabled");
@@ -70,7 +69,7 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
     expect(agenda).toContain('actor.capabilities.has("learning.room.facilitate")');
     expect(agenda).toContain("link.facilitatorPersonId===actor.actorPersonId");
   });
-  it("requires optimistic plan revision and gradual activation",()=>{
+  it("requires optimistic plan revision and mandatory agenda validation",()=>{
     const api=read("src/modules/classes/native-class-session-agenda.functions.ts");
     const agenda=read("src/components/learning/NativeClassSessionAgenda.tsx");
     const schedule=read("src/modules/classes/native-class-sessions.functions.ts");
@@ -79,7 +78,7 @@ describe("WS4 four-week, two-Site contract (synthetic unit model, NOT browser ac
     expect(agenda).toContain("expectedRevisionNo:data.revisionNo");
     expect(agenda).toContain("Reload latest plan");
     expect(schedule).toContain("requiresClassSessionAgenda({");
-    expect(schedule).toContain("CAN_WS4_AGENDA_REQUIRED_FROM");
+    expect(schedule).not.toContain("CAN_WS4_AGENDA_REQUIRED_FROM");
     expect(schedule).toContain("sessionCreatedAt:link.createdAt");
   });
   it("changes only unopened Sessions and links an audited replacement atomically",()=>{
