@@ -131,7 +131,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         credentialDefinitionVersionId: definition.versionId,
         recipientPersonId: registration.participantPersonId,
         noncreditCompletionDecisionId: completion.id,
-        decidedByPersonId: actor.actorPersonId,
+        decidedByPersonId: actor.actorPersonId!,
       }).returning({ id: learnerAchievementDecisions.id });
       if (!award) throw new Error("Unable to record achievement decision");
 
@@ -151,7 +151,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
           const [certificate] = await tx.insert(noncreditCompletionCertificates).values({
             decisionId: completion.id,
             issuerOrganizationId: definition.issuerOrganizationId,
-            issuedByPersonId: actor.actorPersonId,
+            issuedByPersonId: actor.actorPersonId!,
             certificateReference: credentialReference,
             status: "issued",
           }).returning({ id: noncreditCompletionCertificates.id });
@@ -164,7 +164,7 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         achievementDecisionId: award.id,
         issuerOrganizationId: definition.issuerOrganizationId,
         legacyNoncreditCertificateId: legacyCertificateId,
-        issuedByPersonId: actor.actorPersonId,
+        issuedByPersonId: actor.actorPersonId!,
         credentialReference,
       }).returning({ id: learningAwardIssuances.id });
       if (!issuance) throw new Error("Unable to record credential issuance");
@@ -175,12 +175,12 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         kind: definition.definitionKind,
       };
       await tx.insert(auditEvents).values({
-        actorPersonId: actor.actorPersonId, owningOrganizationId: definition.issuerOrganizationId,
+        actorPersonId: actor.actorPersonId!, owningOrganizationId: definition.issuerOrganizationId,
         eventCode: "learning.credential.issued", entityKind: "credential_issuance",
         entityId: issuance.id, payload,
       });
       await tx.insert(domainEvents).values({
-        actorPersonId: actor.actorPersonId,
+        actorPersonId: actor.actorPersonId!,
         eventType: "CredentialIssued", aggregateType: "credential_issuance",
         aggregateId: issuance.id, payload,
       });
