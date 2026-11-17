@@ -40,7 +40,8 @@ describe("WS3 full operator approval, correction and revocation workflow",()=>{
     expect(revocation).toContain("assertSourceBoundCompletionEvidence");
   });
   it("Class workflow separately publishes, reviews and records original source outcome",()=>{
-    expect(nativeRoute).toContain("NativeClassCompletionOperatorPanel");
+    expect(source("src/routes/class_.$classId.tsx")).toContain("NativeClassCompletionOperatorPanel");
+    expect(nativeRoute).toContain('<Navigate to="/class/$classId"');
     expect(classUi).toContain("Publish reviewed policy");
     expect(classUi).toContain("Request independent approval");
     expect(classUi).toContain("Record formal decision");
