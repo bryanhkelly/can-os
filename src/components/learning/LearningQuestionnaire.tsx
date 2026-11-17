@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { validateCourseSurveyAnswers, type SurveyAnswerInput, type SurveyQuestion } from "@/domain/course-survey";
 
-export type LearningQuestion = SurveyQuestion & {
+export type LearningQuestion = Omit<SurveyQuestion,"options"> & {
   prompt: string;
   options: readonly {id:string;label:string}[];
 };
