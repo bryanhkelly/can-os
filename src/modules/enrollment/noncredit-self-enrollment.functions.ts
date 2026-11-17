@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
+import { appendResponseHeader, getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { z } from "zod";
@@ -319,7 +319,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
       const cookie=await issueNativeLearnerSession(tx,native.accountId,grantId,now);
       return {registrationId,courseAttemptId:attemptId,alreadyEnrolled,cookie};
     });
-    setResponseHeader("Set-Cookie",outcome.cookie);
+    appendResponseHeader("Set-Cookie",outcome.cookie);
     return {registrationId:outcome.registrationId,
       courseAttemptId:outcome.courseAttemptId,
       alreadyEnrolled:outcome.alreadyEnrolled};
