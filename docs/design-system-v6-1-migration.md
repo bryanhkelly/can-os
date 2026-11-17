@@ -243,6 +243,20 @@ record lifecycles and audit commands remain unchanged by presentation migration.
   one-column form layout. The shared-component checker enforces these
   composition contracts, not route-specific business rules.
 
+### Component-first adoption increment: inline record actions
+
+- `ActionFooter` now offers three presentation layouts: `form`,
+  `dialog` and `inline`. The inline layout retains consistent button
+  spacing and responsive wrapping without creating an HTML form or setting
+  business rules.
+- School-opening authorization, final-grade correction and Site director
+  delegation compose the inline action footer instead of independent flex
+  action rows. Each maintains its existing authorization and server mutation
+  contract.
+- Unit tests, Storybook and source-level checker rules cover this layout and
+  its current consumers. In-flight duplicate confirmation prevention remains
+  in `ActionDialog`, while inline mutation idempotency remains feature-owned.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
