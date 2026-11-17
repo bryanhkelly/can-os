@@ -1,6 +1,7 @@
 # CAN OS unified Class and Class Offering architecture
 
-Status: **native replacement model on a feature branch; not applied to a live database**.
+Status: **native Class model integrated on `main`; production acceptance still unverified**.
+On November 17, 2026, read-only inspection confirmed that the primary Neon database contains\n`education_v30.classes`, `class_offerings`, `class_enrollments`, and `class_sessions`,\nbut each of these four tables had zero records. This is schema evidence, not\nproof of deploy, valid operating grants, or an end-to-end learner journey.
 Canonical v3.0.1 remains the governing source of publisher rights, site/operation authority,
 learning identity, progress, school records, registration and completion evidence.
 
@@ -87,7 +88,7 @@ legacy Section or noncredit-registration services, and there are no importers, b
 dual writes, source adapters or fallback endpoints. Existing live data and workflows remain
 unmodified on main until a separately approved replacement deployment.
 
-## Branch implementation (source committed, runtime inactive)
+## Integrated implementation (production journey not yet accepted)
 
 - Contracts: src/domain/unified-class.ts and src/domain/native-class-enrollment.ts.
 - Tables/Drizzle mapping: src/db/canonical-v301/classes.ts; direct Course Attempt
@@ -113,7 +114,7 @@ unmodified on main until a separately approved replacement deployment.
   services now authorize the native Class Enrollment / Course Attempt source.
   Native credit/assessment issuance remains disabled. Class-specific scheduled
   room pairing and projector services have branch implementations but are unverified.
-- Global Class creation and Class Offering publishing: /canonical/classes.
+- Global Class creation and Class Offering publishing: `/class?view=manage` via\n  `src/components/learning/NativeClassManager.tsx`; the old `/canonical/classes`\n  route performs only a compatibility redirect.
 - Native catalog/self-enrollment entry: /class (canonical native directory).
 - Shared Class workspace for learner, teacher/facilitator, and manager:
   /class/:classId (role-gated view and tab query modifiers).
@@ -519,7 +520,7 @@ revoked and invalid identities fail closed. Existing Class/Session services
 remain the source of truth; no parallel Class, content, registration or approval
 store is introduced.
 
-A Site-scoped link enters `/canonical/classes?siteId=<canonical UUID>`.
+A Site-scoped link enters `/class?view=manage&siteId=<canonical UUID>`.
 The composer filters its already-authorized adoption and Course options for
 that exact Site and prefills facilitated delivery; the Class creation command
 still rechecks native Site and adoption authority transactionally. The Class
