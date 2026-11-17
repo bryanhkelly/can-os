@@ -1,3 +1,5 @@
+import { AuthorizationError } from "./command-context";
+
 /** Read a single cookie without treating name prefixes as matches. */
 export function readCookie(request: Request, name: string): string | undefined {
   const header = request.headers.get("cookie");
@@ -8,7 +10,7 @@ export function readCookie(request: Request, name: string): string | undefined {
     if (separator < 0) continue;
     if (part.slice(0, separator).trim() === name) {
       // Duplicate session names are ambiguous, never choose one silently.
-      if (found !== undefined) return undefined;
+      if (found !== undefined) throw new AuthorizationError("unambiguous session cookie");
       found = part.slice(separator + 1).trim();
     }
   }
