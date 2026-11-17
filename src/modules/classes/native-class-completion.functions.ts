@@ -352,8 +352,14 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
       }
       if(current===null && data.outcome==="voided")
         throw new AuthorizationError("nothing to void");
-      if(current!==null && data.outcome==="completed")
-        throw new AuthorizationError("completed terminal Class history cannot be restarted");
+      // A previously reviewed "not yet completed" decision may progress to
+      // completed once the originally pinned requirements are satisfied.
+      // An already completed or voided terminal record cannot be resurrected.
+      if(current && data.outcome==="completed" &&
+         (current.resultCode!=="not_yet_completed" ||
+          authorized.enrollment.status!=="active" ||
+          authorized.attempt.status!=="active"))
+        throw new AuthorizationError("terminal Class history cannot be restarted");
       if(current===null && (authorized.enrollment.status!=="active" ||
           authorized.cls.state!=="active"))
         throw new AuthorizationError("current active Class participant");
