@@ -32,7 +32,7 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  const now=new Date();
  const [session]=await db.select({
   id:accessSessions.id,accountId:accessSessions.accountId,activeGrantId:accessSessions.activeGrantId,
-  email:accessAccounts.emailNormalized,
+  email:accessAccounts.emailNormalized,accountPersonId:accessAccounts.personId,
   sharedDevice:accessSessions.sharedDevice,lastActivityAt:accessSessions.lastActivityAt,
  }).from(accessSessions)
   .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
@@ -51,7 +51,11 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   // establish the one-Person account invariant. Check the underlying active
   // grants instead, before selecting a persona or expanding Site authority.
   const activePerson=grants.find(grant=>grant.id===session.activeGrantId)?.personId;
-  if(!activePerson)return rejectSession(request,"membership_unavailable");
+  // The account Person anchor is authoritative and immutable. A valid
+  // membership cannot silently point at someone else after a role switch.
+  if(!activePerson || !session.accountPersonId ||
+     session.accountPersonId!==activePerson)
+   return rejectSession(request,"membership_unavailable");
   const conflicting=await db.select({id:accountPersonGrants.id})
    .from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.accountId,session.accountId),
