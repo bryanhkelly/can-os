@@ -9,7 +9,7 @@ import { FileSelectionField, UploadedFileNotice } from "@/components/evidence/Fi
 import { QueryState } from "./query-state";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 
 const meta = { title: "Foundations/Reusable workflow controls",
@@ -43,7 +43,7 @@ export const ScopeSelection: Story = {
   },
 };
 
-function DialogExample({ pending = false }: { pending?: boolean }) {
+function DialogExample({ pending = false, pendingLabel }: { pending?: boolean; pendingLabel?: string }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [count, setCount] = useState(0);
@@ -51,9 +51,9 @@ function DialogExample({ pending = false }: { pending?: boolean }) {
     <Button onClick={() => setOpen(true)}>Review decision</Button>
     <p>Confirmed: {count}</p>
     <ActionDialog open={open} title="Review decision" description="Provide a reason before confirming."
-      confirmLabel="Confirm decision" pending={pending} onClose={() => setOpen(false)}
+      confirmLabel="Confirm decision" pending={pending} pendingLabel={pendingLabel} onClose={() => setOpen(false)}
       onConfirm={() => { setCount(value => value + 1); setOpen(false); }}>
-      <Label>Reason<Textarea required minLength={5} value={reason} onChange={event => setReason(event.target.value)} /></Label>
+      <Field label="Reason" required><Textarea required minLength={5} value={reason} onChange={event => setReason(event.target.value)} /></Field>
     </ActionDialog>
   </>;
 }
@@ -82,12 +82,16 @@ export const ReasonDialog: Story = {
   },
 };
 export const PendingDialog: Story = {
-  render: () => <DialogExample pending />,
+  render: () => <DialogExample pending pendingLabel="Recording decision…" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: "Review decision" }));
     const dialog = canvas.getByRole("dialog");
     await expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeDisabled();
+    const confirm = within(dialog).getByRole("button", { name: "Recording decision…" });
+    await expect(confirm).toBeDisabled();
+    await expect(confirm).toHaveAttribute("aria-busy", "true");
+    await expect(dialog.querySelector("[data-dialog-actions]")).toBeInTheDocument();
     await expect(within(dialog).getByLabelText("Reason")).toBeDisabled();
     fireEvent(dialog, new Event("cancel", { cancelable: true }));
     await expect(dialog).toBeVisible();
