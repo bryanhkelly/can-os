@@ -2,14 +2,18 @@
  * Sending mail about it requires all fields to describe the SAME active
  * invitation. The email provider's receipt is not proof of enrollment.
  */
-export function currentWaitlistEmailOpportunity(input:{
+export type WaitlistEmailOpportunity = {
   waitlistStatus:string;
   invitationExpiresAt:Date|null;
   deliveryInvitationExpiresAt:Date;
   releaseStatus:string;
   releaseClosesAt:Date;
   now:Date;
-}):boolean{
+};
+
+export function currentWaitlistEmailOpportunity<T extends WaitlistEmailOpportunity>(
+  input: T,
+): input is T & { invitationExpiresAt: Date } {
   const expiration=input.invitationExpiresAt;
   return input.waitlistStatus==="invited" &&
     expiration!==null &&
