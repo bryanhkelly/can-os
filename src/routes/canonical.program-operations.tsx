@@ -55,12 +55,14 @@ function ProgramOperations(){
   });
   const impactData=impact.data;
   const classVersions=impactData?.localClassImpact.filter(row=>
-    row.offeringVersionId===selected?.first.offeringVersionId)??[];
+    row.offeringVersionId===selected?.first.offeringVersionId &&
+    row.deploymentId===selected?.first.deploymentId)??[];
   const classesAtVersion=classVersions.reduce((total,row)=>total+row.classCount,0);
   const activeAtVersion=classVersions.filter(row=>row.state==="active")
     .reduce((total,row)=>total+row.classCount,0);
   const publishedAtVersion=(impactData?.publishedClassOfferings??[])
-    .filter(row=>row.offeringVersionId===selected?.first.offeringVersionId)
+    .filter(row=>row.offeringVersionId===selected?.first.offeringVersionId &&
+      row.deploymentId===selected?.first.deploymentId)
     .reduce((total,row)=>total+row.classCount,0);
   const rolloutStages=projectedRolloutStages({
     publisherPublished:!!selected,
@@ -168,7 +170,7 @@ function ProgramOperations(){
             ?" A newer version requires separate review and approved adoption.":" No newer published version was found."}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Across the Sites currently authorized to this operator, {classesAtVersion} Class(es)
+          Within this Deployment and its currently authorized Sites, {classesAtVersion} Class(es)
           reference this pinned version; {activeAtVersion} are active.
           {publishedAtVersion} Class(es) have a published optional registration Offering.
           The full Class counts come from the server, not this page's limited Class list.
