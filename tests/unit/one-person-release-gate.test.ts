@@ -58,6 +58,7 @@ describe("canonical CAN Person production cutover gate",()=>{
   expect(gate).toContain("has_person_anchor");
   expect(gate).toContain("single_person_grant_triggers");
   expect(gate).toContain("mismatched_active_grants");
+  expect(gate).toContain("unanchored_historical_accounts");
   expect(gate).not.toContain("INSERT INTO");
   expect(gate).not.toContain("ALTER TABLE");
   const parity=read("scripts/acceptance/check-production-drizzle-parity.mjs");
