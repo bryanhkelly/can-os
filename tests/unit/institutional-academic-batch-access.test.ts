@@ -31,7 +31,7 @@ describe("institutional batch projection is not a general Program grant", () => 
   it("denies unrelated Programs even when no church agreement is needed", async () => {
     const { db, calls } = reader([[program], [{id:"institution-a",type:"school"}]]);
     const ids = await listInstitutionallyAuthorizedAcademicProgramIds(
-      db as never, { scope: { organizationIds: ["another-institution"] } },
+      db as never, { role: "teacher", grantSiteId: null, scope: { organizationIds: ["another-institution"] } },
       [program.id], required,
     );
     expect([...ids]).toEqual([]);
@@ -41,7 +41,7 @@ describe("institutional batch projection is not a general Program grant", () => 
   it("permits only the matching institution for an ordinary Program", async () => {
     const { db } = reader([[program], [{id:"institution-a",type:"school"}]]);
     const ids = await listInstitutionallyAuthorizedAcademicProgramIds(
-      db as never, { scope: { organizationIds: ["institution-a"] } },
+      db as never, { role: "teacher", grantSiteId: null, scope: { organizationIds: ["institution-a"] } },
       [program.id], required,
     );
     expect([...ids]).toEqual(["program-a"]);
@@ -59,6 +59,18 @@ describe("institutional batch projection is not a general Program grant", () => 
     );
     expect([...ids]).toEqual([]);
     expect(calls.count).toBe(3);
+  });
+
+  it("rejects a site-scoped teacher or non-teacher caller", async () => {
+    const { db } = reader([]);
+    await expect(listInstitutionallyAuthorizedAcademicProgramIds(
+      db as never, { role: "site_admin", grantSiteId: null,
+        scope: { organizationIds: ["institution-a"] } }, [program.id], required,
+    )).rejects.toThrow();
+    await expect(listInstitutionallyAuthorizedAcademicProgramIds(
+      db as never, { role: "teacher", grantSiteId: "site-a",
+        scope: { organizationIds: ["institution-a"] } }, [program.id], required,
+    )).rejects.toThrow();
   });
 
   it("cannot grant Programs when the request is empty", async () => {
