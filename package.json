@@ -74,6 +74,7 @@
     "test:storybook": "vitest run --config vitest.storybook.config.ts",
     "test:visual": "npm run build-storybook && chromatic",
     "lint": "eslint . && node scripts/check-design-system.mjs",
+    "design:inventory": "node scripts/report-design-system-adoption.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
     "deploy:cloudflare": "node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
