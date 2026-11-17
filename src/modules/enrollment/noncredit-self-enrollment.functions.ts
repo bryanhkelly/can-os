@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { z } from "zod";
@@ -20,6 +20,8 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
+import { getCommandContext } from "@/modules/identity/command-context.server";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -377,8 +379,21 @@ async function readMyNoncreditHistoryPage(
   cursor:z.infer<typeof personalNoncreditCursor>|null,
 ){
     setResponseHeader("Cache-Control","private, no-store");
-    const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
-    const owner=await requireVerifiedAdultAccount();
+    // Read-only personal history follows the original explicitly bound CAN
+    // Person, irrespective of which authorized role is selected now. New
+    // enrollment still requires the independently verified adult write path.
+    const actor=await getCommandContext(getRequest());
+    if(!actor.actorPersonId||actor.sessionAccountId)
+      throw new AuthorizationError("real CAN account Person");
+    const [owner]=await db.select({
+      accountId:accessAccounts.id,personId:accessAccounts.personId,
+      email:accessAccounts.emailNormalized,
+      disabled:accessAccounts.disabled,
+      verifiedAt:accessAccounts.emailVerifiedAt,
+    }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
+    if(!owner||owner.disabled||!owner.verifiedAt||
+       owner.personId!==actor.actorPersonId||isDemoAccountEmail(owner.email))
+      throw new AuthorizationError("verified CAN participation identity");
     const [link]=await db.select().from(accessAccountNoncreditPrincipals)
       .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId)).limit(1);
     if(!link || link.accessPersonId!==owner.personId)return {items:[],nextCursor:null};
