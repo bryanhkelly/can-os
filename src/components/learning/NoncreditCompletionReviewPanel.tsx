@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getNoncreditCompletionReview } from "@/modules/learning/noncredit-completion-review.functions";
 import { correctNoncreditCompletion } from "@/modules/learning/noncredit-completion-corrections.functions";
@@ -135,12 +136,12 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
         </p>
         <label className="block space-y-1 text-sm font-medium">
           Correction decision
-          <select className="w-full border border-input bg-background p-2 text-sm"
+          <Select
             value={outcome} onChange={event=>
               setOutcome(event.target.value as "not_yet_completed"|"voided")}>
             <option value="not_yet_completed">Not yet completed</option>
             <option value="voided">Void prior decision</option>
-          </select>
+          </Select>
         </label>
         <label className="block space-y-1 text-sm font-medium">
           Verified evidence version ID
