@@ -63,7 +63,8 @@ describe("native Class launch readiness is a source-backed presentation",()=>{
     expect(manager).toContain("adoptedCourses:options.status");
     expect(manager).toContain("visibleDraftClasses:classes.status");
     expect(component).toContain("projectClassLaunchReadiness(state)");
-    expect(component).toContain("Deployment and adoption inspection (staging)");
+    expect(component).toContain('to="/class" search={{view:"content"}}');
+    expect(component).toContain("Program Operations and adoption inspection (staging)");
     expect(component).not.toContain("createUnifiedClassDraft");
   });
   it("guards the mutating QA browser journey with isolated-branch checks",()=>{
