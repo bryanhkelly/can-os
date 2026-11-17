@@ -159,9 +159,15 @@ export const activateUnifiedClass=createServerFn({method:"POST"})
 
 /** Private provider-scoped draft inspection. No public catalog exposure. */
 export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
-  .handler(async()=>{
+  .validator((raw:unknown)=>z.object({
+    siteId:z.string().uuid().optional(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
     requireClassFeature();
     const operator=await requireClassOperator();
+    // A caller-supplied filter may narrow a verified Site grant, never widen it.
+    if(data.siteId&&!operator.siteIds.includes(data.siteId))
+      throw new AuthorizationError("current Site scope for Class discovery");
     return db.selectDistinctOn([canonicalClasses.id],{
       classId:canonicalClasses.id,title:canonicalClasses.title,
       capacity:canonicalClasses.capacity,
@@ -183,13 +189,15 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
       ))
       .where(and(
         eq(canonicalClasses.operatingOrganizationId,operator.organizationId),
+        data.siteId?eq(canonicalClasses.siteId,data.siteId):undefined,
         or(
           operator.siteIds.length?inArray(canonicalClasses.siteId,operator.siteIds):undefined,
-          and(isNull(canonicalClasses.siteId),eq(canonicalClasses.createdByPersonId,operator.actor.actorPersonId!)),
+          data.siteId?undefined:and(
+            isNull(canonicalClasses.siteId),
+            eq(canonicalClasses.createdByPersonId,operator.actor.actorPersonId!)),
         ),
       )).orderBy(asc(canonicalClasses.id),desc(canonicalClassOfferingVersions.versionNo)).limit(100);
   });
-
 
 const manageOfferingInput = z.object({
   classId: z.string().uuid(),
