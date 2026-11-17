@@ -24,7 +24,7 @@ export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(
   if (!organizationIds.length || !programIds.length) {
     return { ...counts, schoolFamilyDelivery: {
       pending:0, processing:0, retryScheduled:0, failed:0,
-      providerAccepted:0, suppressed:0,
+      providerAccepted:0, providerDelivered:0, providerFailed:0, complained:0, suppressed:0,
     }};
   }
   const d=notificationOutboundDeliveries;
@@ -35,7 +35,10 @@ export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(
     processing:sql<number>`count(*) filter (where ${d.status} = 'processing')::int`,
     retryScheduled:sql<number>`count(*) filter (where ${d.status} = 'failed' and ${d.nextAttemptAt} is not null)::int`,
     failed:sql<number>`count(*) filter (where ${d.status} = 'failed' and ${d.nextAttemptAt} is null)::int`,
-    providerAccepted:sql<number>`count(*) filter (where ${d.status} = 'accepted')::int`,
+    providerAccepted:sql<number>`count(*) filter (where ${d.status} = 'accepted' and ${d.providerDeliveredAt} is null and ${d.providerFailedAt} is null)::int`,
+    providerDelivered:sql<number>`count(*) filter (where ${d.providerDeliveredAt} is not null and ${d.providerFailedAt} is null)::int`,
+    providerFailed:sql<number>`count(*) filter (where ${d.providerFailedAt} is not null and ${d.providerFailureKind} <> 'email.complained')::int`,
+    complained:sql<number>`count(*) filter (where ${d.providerFailureKind} = 'email.complained')::int`,
     suppressed:sql<number>`count(*) filter (where ${d.status} = 'suppressed')::int`,
   }).from(d)
     .innerJoin(notifications,eq(notifications.id,d.notificationId))
@@ -53,6 +56,9 @@ export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(
     retryScheduled:Number(row?.retryScheduled??0),
     failed:Number(row?.failed??0),
     providerAccepted:Number(row?.providerAccepted??0),
+    providerDelivered:Number(row?.providerDelivered??0),
+    providerFailed:Number(row?.providerFailed??0),
+    complained:Number(row?.complained??0),
     suppressed:Number(row?.suppressed??0),
   }};
 });
