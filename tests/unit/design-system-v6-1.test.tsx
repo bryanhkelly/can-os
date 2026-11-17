@@ -56,6 +56,19 @@ describe("V6.1 reusable design system", () => {
     expect(launch).toContain("planning-only");
   });
 
+  it("composes native enrolled-Class lifecycle controls from shared primitives", () => {
+    const route = readFileSync(new URL("../../src/routes/class.tsx", import.meta.url), "utf8");
+    const start = route.indexOf("function EnrolledClassCard(");
+    const end = route.indexOf("function NativeLearnerClasses", start);
+    const component = route.slice(start, end);
+    expect(component).toContain("<StatusBadge");
+    expect(component).toContain("<Select");
+    expect(component).toContain("<Checkbox");
+    expect(component).not.toMatch(/<(?:select|input)\b/);
+    expect(component).toContain("withdrawMyNativeClassEnrollment");
+    expect(component).toContain("transferMyNativeClassEnrollment");
+  });
+
   it("loads the same V6.1 fonts in the app and Storybook", () => {
     const root = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
     const preview = readFileSync(new URL("../../.storybook/preview-head.html", import.meta.url), "utf8");
