@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
-import { EntityCard, RecordHeader, RecordLayout } from "./record-layout";
+import { EntityCard, RecordHeader, RecordLayout, RecordFacts } from "./record-layout";
 import { DashboardPanel } from "./dashboard-layout";
 import { StatusBadge } from "./workspace-panel";
 import { Button } from "@/components/ui/button";
@@ -40,9 +40,9 @@ export const ApplicantRecord: Story = { render: () => <div className="bg-backgro
     navigation={<><a href="#overview" aria-current="page" className="border-b-2 border-primary px-3 py-2 text-sm font-semibold text-primary">Overview</a>
       <a href="#documents" className="px-3 py-2 text-sm text-muted-foreground">Documents</a>
       <a href="#history" className="px-3 py-2 text-sm text-muted-foreground">History</a></>}
-    main={<DashboardPanel title="Application information" id="overview"><p className="text-sm text-muted-foreground">Keep the applicant and authorized next action visible on arrival; no unrelated create form above this record.</p></DashboardPanel>}
-    rail={<DashboardPanel title="Next action"><p className="text-xs text-muted-foreground">Guardian evidence requires authorized registrar review.</p></DashboardPanel>}
-    activity={<><h2 className="text-sm font-semibold">Activity</h2><p className="mt-2 text-xs text-muted-foreground">Submission and review history from canonical events.</p></>}
+    main={<DashboardPanel title="Application information" id="overview"><p className="mb-4 text-sm text-muted-foreground">Keep the applicant and authorized next action visible on arrival; no unrelated create form above this record.</p><RecordFacts label="Application facts" columns={3} items={[{label:"School",value:"Valor Academy"},{label:"Grade",value:"9"},{label:"Application state",value:"Review required"}]}/></DashboardPanel>}
+    railLabel="Application review context" rail={<DashboardPanel title="Next action"><p className="text-xs text-muted-foreground">Guardian evidence requires authorized registrar review.</p></DashboardPanel>}
+    activityLabel="Application history" activity={<><h2 className="text-sm font-semibold">Activity</h2><p className="mt-2 text-xs text-muted-foreground">Submission and review history from canonical events.</p></>}
   />
 </div>,
   play: async ({ canvas }) => {
@@ -51,7 +51,36 @@ export const ApplicantRecord: Story = { render: () => <div className="bg-backgro
     const portrait = canvas.getByRole("img", { name: "Avery Kelly: no profile photo" });
     await expect(heading.getBoundingClientRect().left).toBe(eyebrow.getBoundingClientRect().left);
     await expect(heading).toHaveFocus();
+    await expect(canvas.getByRole("group", { name: "Record actions" })).toContainElement(canvas.getByRole("button", { name: "Review evidence" }));
+    await expect(canvas.getByLabelText("Application facts")).toBeVisible();
+    await expect(canvas.getByRole("complementary", { name: "Application review context" })).toBeVisible();
     await expect(portrait).toHaveStyle({ borderRadius: "0px" });
     await expect(portrait.getBoundingClientRect().width).toBe(portrait.getBoundingClientRect().height);
+  },
+};
+
+export const CompactRecordFacts: Story = {
+  render: () => <div className="grid max-w-4xl gap-6 bg-background p-5 sm:grid-cols-2 sm:p-8">
+    <div className="border bg-card p-5">
+      <h2 className="mb-4 font-semibold">Program record</h2>
+      <RecordFacts label="Program metadata" items={[
+        {label:"Site",value:"Westside Learning Center"},
+        {label:"Program",value:"After-school digital skills"},
+        {label:"Dates",value:"January through March"},
+        {label:"Availability",value:<StatusBadge tone="attention">Pending authorization</StatusBadge>},
+      ]}/>
+    </div>
+    <div className="border bg-card p-5">
+      <h2 className="mb-4 font-semibold">Action record</h2>
+      <RecordFacts label="Action metadata" columns={3} items={[
+        {label:"Type",value:"Evidence review"},
+        {label:"Priority",value:"High"},
+        {label:"Due",value:"Not scheduled"},
+      ]}/>
+    </div>
+  </div>,
+  play: async ({ canvas }) => {
+    await expect(canvas.getByLabelText("Program metadata")).toBeVisible();
+    await expect(canvas.getByLabelText("Action metadata")).toHaveClass("sm:grid-cols-3");
   },
 };
