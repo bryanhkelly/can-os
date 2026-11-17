@@ -24,7 +24,8 @@ describe("WS3 completion read and operator controls",()=>{
     expect(operatorPanel).toContain("reason.trim()");
   });
   it("never marks Class outcomes as policy-verified without the missing authority",()=>{
-    expect(canonicalClassRead).toContain("classCompletionAuthorityVerified:false");
+    expect(canonicalClassRead).toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
+    expect(canonicalClassRead).toContain("classCompletionAuthorityVerified=validity.rows[0]?.valid===true");
     expect(canonicalClassPanel).toContain('?"Verified":"Not verified"');
     expect(canonicalClassPanel).toContain("independent policy-backed decision is not yet verified");
     expect(operatorPanel).not.toContain("canonicalClassAwards");
