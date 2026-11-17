@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, StatusBadge } from "@/components/workspace";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
 import { normalizeClientError } from "@/lib/client-error";
@@ -108,7 +108,10 @@ function ReviewEditor({ item }: { item: Item }) {
   return <article className="border bg-card p-5">
     <h2 className="font-semibold">{item.name}</h2>
     <p className="mt-1 text-sm text-muted-foreground">
-      {item.blueprintTitle} · Revision {item.revision} · Latest decision: {item.latestDecision.replaceAll("_", " ")}
+      {item.blueprintTitle} · Revision {item.revision} · Latest decision:{" "}
+      <StatusBadge tone={item.latestDecision === "approved" ? "success" : item.latestDecision === "rejected" ? "danger" : item.latestDecision === "conditional" ? "attention" : "neutral"}>
+        {item.latestDecision.replaceAll("_", " ")}
+      </StatusBadge>
     </p>
     <p className="mt-2 text-sm">
       {item.selectedComponents.length} selected component{item.selectedComponents.length === 1 ? "" : "s"}
