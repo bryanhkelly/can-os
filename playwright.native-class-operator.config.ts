@@ -9,6 +9,7 @@ if(process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test"||
    process.env.CAN_TEST_DB_WRITES_ENABLED!=="true"||
    !process.env.TEST_DATABASE_URL||
    process.env.DATABASE_URL!==process.env.TEST_DATABASE_URL||
+   !process.env.CAN_APPLICATION_DB_HOST||
    !process.env.CAN_E2E_TEST_BRANCH_ID||
    !process.env.CAN_CLASS_OPERATOR_QA_SITE_ID||
    !process.env.CAN_CLASS_OPERATOR_QA_SECRET||
