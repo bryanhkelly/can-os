@@ -73,6 +73,7 @@ try {
            JOIN public.access_account_canonical_principals person_link
              ON person_link.account_id = a.id
             AND person_link.revoked_at IS NULL AND person_link.verified_at IS NOT NULL
+            AND person_link.verified_by_account_id <> a.id
            JOIN education_v30.canonical_account_grants native_grant
              ON native_grant.person_id = person_link.canonical_principal_id
             AND native_grant.site_id = site_link.canonical_site_id
@@ -82,12 +83,34 @@ try {
              ON native_account.id = native_grant.account_id
            JOIN education_v30.sites native_site
              ON native_site.id = native_grant.site_id
+           JOIN education_v30.organizations native_org
+             ON native_org.id = native_grant.organization_id
+           JOIN public.people can_person
+             ON can_person.id = public_grant.person_id
           WHERE a.disabled = false AND a.email_verified_at IS NOT NULL
             AND a.person_id = public_grant.person_id
             AND a.email_normalized NOT LIKE '%.demo'
             AND native_account.disabled_at IS NULL
             AND native_account.email_verified_at IS NOT NULL
+            AND native_org.status = 'active'
+            AND can_person.active = true
             AND native_site.status IN ('planning','active')
+            AND NOT EXISTS (
+              SELECT 1 FROM public.account_person_grants other_grant
+              WHERE other_grant.account_id = a.id AND other_grant.active = true
+                AND other_grant.person_id <> public_grant.person_id
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM public.access_account_canonical_principals other_link
+              WHERE other_link.canonical_principal_id = person_link.canonical_principal_id
+                AND other_link.account_id <> a.id AND other_link.revoked_at IS NULL
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM public.access_account_canonical_principals other_link
+              WHERE other_link.account_id = a.id
+                AND other_link.canonical_principal_id <> person_link.canonical_principal_id
+                AND other_link.revoked_at IS NULL
+            )
             AND EXISTS (
               SELECT 1 FROM education_v30.site_organization_roles rel
               WHERE rel.site_id = native_grant.site_id
@@ -99,7 +122,7 @@ try {
         ) AS eligible_staff_paths
     `)).rows;
     await client.query("ROLLBACK");
-    // Independent positive counters are NOT sufficient: they may belong to
+    // Mirrors the restricted staff-session reader's identity and scope gates.\n    // An active browser session and role SET permission must still be tested.\n    // Independent positive counters are NOT sufficient: they may belong to
     // different schools, people and grants. Require a complete joined path.
     const ready = Number(counts.eligible_staff_paths) > 0;
     console.log(JSON.stringify({ infrastructure: "present", ...counts, acceptance_ready: ready }, null, 2));
