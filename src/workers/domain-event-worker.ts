@@ -461,14 +461,18 @@ export type OutboxHealth = {
 };
 
 /** Operational view of the outbox for monitoring surfaces and alerts. */
-export async function getOutboxHealth(): Promise<OutboxHealth> {
+export async function getOutboxHealth(siteIds?: readonly string[]): Promise<OutboxHealth> {
   const handledTypes = [...registry.keys()];
+  // Scoped operators see only events explicitly attributed to their Sites.
+  const sitePredicate = siteIds
+    ? inArray(sql<string>`${domainEvents.payload}->>'siteId'`, [...siteIds])
+    : undefined;
 
   const countWhere = async (where: SQL | undefined): Promise<number> => {
     const [row] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(domainEvents)
-      .where(where);
+      .where(and(sitePredicate, where));
     return Number(row?.count ?? 0);
   };
 
