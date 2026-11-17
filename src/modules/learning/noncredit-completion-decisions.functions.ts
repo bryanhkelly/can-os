@@ -9,6 +9,7 @@ import { auditEvents, domainEvents, learnerCourseAttempts, noncreditRegistration
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
+import { assertNoncreditCompletionSiteScope } from "@/modules/learning/verified-completion-site.server";
 
 const schema=z.object({
   courseAttemptId:z.string().uuid(),
@@ -43,8 +44,10 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
         .for("update").limit(1);
       if(!registration||!["registered","active"].includes(registration.status)||
          registration.adoptionId!==attempt.adoptionId||
-         registration.offeringVersionId!==attempt.offeringVersionId)
-        throw new AuthorizationError("current noncredit registration");
+         registration.offeringVersionId!==attempt.offeringVersionId||
+         registration.participantPersonId===actor.actorPersonId)
+        throw new AuthorizationError("current independent noncredit registration");
+      await assertNoncreditCompletionSiteScope(tx,actor,registration);
       const [training]=await tx.select().from(noncreditTrainingVersions)
         .where(and(eq(noncreditTrainingVersions.id,registration.trainingVersionId),
           eq(noncreditTrainingVersions.offeringVersionId,attempt.offeringVersionId))).limit(1);
@@ -57,8 +60,10 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
             eq(noncreditCompletionPolicies.id,registration.completionPolicyId),
             eq(noncreditCompletionPolicies.trainingVersionId,training.id),
           )).limit(1):[];
-      if(!policy||policy.id!==data.expectedPolicyId||policy.effectiveAt>new Date())
-        throw new AuthorizationError("current noncredit completion policy");
+      if(!policy||policy.id!==data.expectedPolicyId||
+         registration.completionPolicyId!==policy.id||
+         policy.effectiveAt>new Date())
+        throw new AuthorizationError("participant-pinned noncredit completion policy");
       if(policy.skillsAssessmentRequired&&!data.assessmentResultId)
         throw new AuthorizationError("finalized assessment result");
       const decisions=await tx.select().from(noncreditCompletionDecisions)
