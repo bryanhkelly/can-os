@@ -4,10 +4,11 @@ import {and,desc,eq,inArray,isNotNull,isNull,lte} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
-  auditEvents,domainEvents,canonicalClasses,canonicalClassOfferingVersions,
+  canonicalClasses,canonicalClassOfferingVersions,
   canonicalClassEnrollments,canonicalPersons,canonicalAccountGrants,canonicalAccounts,
   canonicalClassEnrollmentInvitations,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertNativeClassOperatorExitScope} from "@/domain/native-class-lifecycle";
 import {verifiedAdultOn} from "@/domain/native-class-enrollment";
@@ -117,14 +118,14 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
         lte(canonicalClassEnrollmentInvitations.expiresAt,now),
       )).returning({id:canonicalClassEnrollmentInvitations.id});
     for(const item of expired){
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.invitation.expired",entityKind:"class_invitation",
         entityId:item.id,payload:{classId:cls.id,siteId:cls.siteId,
           recipientPersonId:data.learnerPersonId,reason:"expired_before_reissue"},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId,eventType:"ClassInvitationExpired",
         aggregateType:"class_invitation",aggregateId:item.id,
         payload:{classId:cls.id,siteId:cls.siteId,
@@ -149,13 +150,13 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
     const payload={classId:cls.id,classOfferingVersionId:version.id,
       invitationId:saved.id,learnerPersonId:data.learnerPersonId,
       siteId:cls.siteId,expiresAt:expiresAt.toISOString(),seatReserved:false};
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:actor.actorPersonId,
       owningOrganizationId:cls.operatingOrganizationId,
       eventCode:"class.invitation.issued",entityKind:"class_invitation",
       entityId:saved.id,payload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       actorPersonId:actor.actorPersonId,eventType:"ClassInvitationIssued",
       aggregateType:"class_invitation",aggregateId:saved.id,payload,
     });
@@ -223,7 +224,7 @@ export const declineNativeClassInvitation=createServerFn({method:"POST"})
     await tx.update(canonicalClassEnrollmentInvitations)
       .set({state,respondedAt:now})
       .where(eq(canonicalClassEnrollmentInvitations.id,invitation.id));
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:actor.actorPersonId,owningOrganizationId:invitation.operatingOrganizationId,
       eventCode:"class.invitation."+state,entityKind:"class_invitation",entityId:invitation.id,
       payload:{classId:cls.id,siteId:invitation.siteId,reason:"learner_response"},
