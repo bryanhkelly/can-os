@@ -35,7 +35,7 @@ for (const token of [
   "exists(tx.select({id:educationOperationOrganizationRoles.id})",
   "exists(tx.select({id:educationOperationSites.id})",
   "inArray(educationOperationSites.siteId,permittedSites)",
-  "placementKeys.has(row.deploymentId+\" :\"".replace(" \":\"", "\":\""), // exact scoped placement
+  'placementKeys.has(row.deploymentId+":"+id)', // exact scoped placement
 ]) must(readModel, token, "Class operator read model");
 mustNot(readModel, "for(const siteId of operator.siteIds)", "bounded Course discovery");
 for(const token of [
