@@ -120,6 +120,14 @@ describe("version-bound school-opening review",()=>{
     expect(html).toContain("border-success/50");
     expect(html).not.toContain("Approve independently reviewed opening");
   });
+  it("guards the action handler if a disabled approval is invoked programmatically",async()=>{
+    await loaded();
+    expect(findButton("Approve independently")?.props.disabled).toBe(true);
+    findButton("Approve independently")?.props.onClick?.();
+    await Promise.resolve();
+    expect(state.decide).not.toHaveBeenCalled();
+  });
+
   it("does not expose decision buttons before a review has loaded",()=>{
     state.read.mockReturnValue(new Promise(()=>{}));mount();
     expect(findButton("Approve independently")).toBeUndefined();
