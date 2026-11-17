@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
+import { LoaderCircle } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
@@ -27,13 +28,21 @@ const buttonVariants = cva(
 
 export interface ButtonProps extends React.ComponentProps<"button">, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  /** Native button pending state. Disables repeat submissions and announces busy. */
+  loading?: boolean;
+  loadingLabel?: string;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, type, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, type, loading = false, loadingLabel, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : "button";
     return <Comp ref={ref} type={asChild ? undefined : type ?? "button"}
-      className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+      disabled={asChild ? undefined : disabled || loading}
+      aria-busy={loading || undefined}
+      className={cn(buttonVariants({ variant, size }), className)} {...props}>
+      {!asChild && loading && <LoaderCircle aria-hidden="true" className="animate-spin" />}
+      {loading && loadingLabel && !asChild ? loadingLabel : children}
+    </Comp>;
   },
 );
 Button.displayName = "Button";
