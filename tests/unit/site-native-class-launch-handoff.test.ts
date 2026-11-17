@@ -24,9 +24,11 @@ describe("Site-first native-Class handoff",()=>{
  });
  it("preselects only native Site-authorized Course options",()=>{
   const route=source("src/components/learning/NativeClassManager.tsx");
-  expect(source("src/routes/class.tsx")).toContain("siteId:typeof value.siteId");
+  expect(source("src/routes/class.tsx")).toContain("siteId:selectedClassUuid(value.siteId)");
   expect(route).toContain('row.siteOptions.some(site=>site.id===preferredSiteId)');
   expect(route).toContain("createUnifiedClassDraft({data:");
-  expect(source("src/routes/class.tsx")).toContain("<NativeClassManager key={selected.siteId");
+  expect(route).toContain("selectAuthorizedClassSite(row.siteOptions,preferredSiteId,mode)");
+  expect(route).toContain("authorizedSiteCount:preferredSiteId");
+  expect(source("src/routes/class.tsx")).toContain("preferredSiteId={selected.siteId}");
  });
 });
