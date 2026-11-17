@@ -8,6 +8,7 @@ import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
   canonicalClassOfferingVersions, canonicalClassEnrollments, canonicalPersons,
   canonicalClassOutcomes, canonicalClassAwards,
+  canonicalClassEnrollmentInvitations,
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
@@ -32,6 +33,7 @@ const selfInput=z.object({
   creditMode:classCreditModeSchema,
   adultAttested:z.literal(true),
   consentAccepted:z.literal(true),
+  invitationId:uuid.optional(),
   networkMembershipId:z.string().uuid().optional(),
 }).strict();
 function guard(){
@@ -217,14 +219,39 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       if(!offering)throw new AuthorizationError("Class Offering belongs to this Class");
       const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
         .from(canonicalPersons).where(eq(canonicalPersons.id,learnerPersonId)).limit(1);
-      assertNativeSelfEnrollmentEligible({
-        classState:current.classState,offeringState:version.state,
-        terms:{visibility:version.visibility,enrollmentMethods:version.enrollmentMethods,
-          opensAt:version.opensAt,closesAt:version.closesAt},
-        adultVerified:verifiedAdultOn(person?.birthDate,now),
-        adultAttested:data.adultAttested,consentAccepted:data.consentAccepted,
-        consentVersion:version.consentVersion,consentText:version.consentText,
-      },now);
+      const [invitation]=data.invitationId
+        ?await tx.select().from(canonicalClassEnrollmentInvitations)
+          .where(eq(canonicalClassEnrollmentInvitations.id,data.invitationId))
+          .for("update").limit(1):[];
+      if(data.invitationId){
+        // The Class is locked before the invitation so that an issuer, a
+        // learner and a last-seat registrar cannot deadlock or reuse terms.
+        if(!invitation||invitation.state!=="pending"||
+          invitation.expiresAt<=now||
+          invitation.learnerPersonId!==learnerPersonId||
+          invitation.classId!==instance.id||
+          invitation.classOfferingVersionId!==version.id||
+          invitation.operatingOrganizationId!==current.operatingOrganizationId||
+          invitation.siteId!==current.siteId||
+          invitation.creditMode!==data.creditMode||
+          !version.enrollmentMethods.includes("invitation")||
+          version.state!=="published"||
+          current.classState!=="active"||
+          (version.opensAt&&version.opensAt>now)||
+          (version.closesAt&&version.closesAt<=now)||
+          !verifiedAdultOn(person?.birthDate,now)||
+          !version.consentVersion||!version.consentText)
+          throw new AuthorizationError("current exact-Person adult Class invitation");
+      }else{
+        assertNativeSelfEnrollmentEligible({
+          classState:current.classState,offeringState:version.state,
+          terms:{visibility:version.visibility,enrollmentMethods:version.enrollmentMethods,
+            opensAt:version.opensAt,closesAt:version.closesAt},
+          adultVerified:verifiedAdultOn(person?.birthDate,now),
+          adultAttested:data.adultAttested,consentAccepted:data.consentAccepted,
+          consentVersion:version.consentVersion,consentText:version.consentText,
+        },now);
+      }
       const previous=await tx.select({
         id:canonicalClassEnrollments.id,status:canonicalClassEnrollments.status,
         creditMode:canonicalClassEnrollments.creditMode,
@@ -270,7 +297,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       const [enrollment]=await tx.insert(canonicalClassEnrollments).values({
         classId:instance.id,classOfferingVersionId:version.id,
         learnerPersonId,enrolledByPersonId:learnerPersonId,
-        enrollmentMethod:"self",creditMode:data.creditMode,status:"active",
+        enrollmentMethod:invitation?"invitation":"self",creditMode:data.creditMode,status:"active",
         consentVersion:version.consentVersion,consentSha256,consentedAt:now,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Class Enrollment insert failed");
@@ -309,11 +336,27 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       if(!attempt)throw new Error("Course Attempt insert failed");
       await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
         .where(eq(canonicalClassEnrollments.id,enrollment.id));
+      if(invitation){
+        await tx.update(canonicalClassEnrollmentInvitations).set({
+          state:"accepted",respondedAt:now,acceptedEnrollmentId:enrollment.id,
+        }).where(and(
+          eq(canonicalClassEnrollmentInvitations.id,invitation.id),
+          eq(canonicalClassEnrollmentInvitations.state,"pending"),
+        ));
+        await tx.insert(domainEvents).values({
+          eventType:"ClassInvitationAccepted",aggregateType:"class_invitation",
+          aggregateId:invitation.id,actorPersonId:learnerPersonId,
+          payload:{classId:instance.id,classEnrollmentId:enrollment.id,
+            classOfferingVersionId:version.id,siteId:current.siteId,
+            acceptedAt:now.toISOString()},
+        });
+      }
       await tx.insert(auditEvents).values({
         actorPersonId:learnerPersonId,owningOrganizationId:current.operatingOrganizationId,
         eventCode:"class.enrollment.created",entityKind:"class_enrollment",entityId:enrollment.id,
         payload:{classId:instance.id,classOfferingVersionId:version.id,
-          courseAttemptId:attempt.id,method:"self",creditMode:data.creditMode,
+          courseAttemptId:attempt.id,method:invitation?"invitation":"self",creditMode:data.creditMode,
+          invitationId:invitation?.id??null,
           consentVersion:version.consentVersion,consentSha256},
       });
       await tx.insert(domainEvents).values({
