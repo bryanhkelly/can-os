@@ -697,6 +697,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/guardian.native-classes.tsx",
+      "route": "/guardian/native-classes",
+      "owner": "enrollment",
+      "verification": "pending",
+      "roleJourney": "Verified CAN guardian to canonical Person bridge, staff-reviewed minor Class approval and guardian consent",
+      "writeBoundary": "Server-verified guardian authority, exact published Class, independent staff decision, one locked Enrollment and Course Attempt",
+      "readBoundary": "Only currently verified canonical guardian relationships and their own approved family participation"
+    },
+    {
       "file": "src/routes/guardian.experiences.tsx",
       "route": "/guardian/experiences",
       "owner": "student-experience",
