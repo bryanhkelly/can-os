@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+import { requireLocalHttpUrl } from "./tests/e2e/config/guards";
 
 /** Separate, explicitly opt-in, read-only authenticated two-Site QA.
  * Never points at production and never creates Class/Session/enrollment rows.
@@ -7,9 +8,7 @@ import { defineConfig } from "@playwright/test";
 const baseURL=process.env.CAN_WS4_QA_BASE_URL;
 if(process.env.CAN_WS4_QA_RUN!=="1"||!baseURL)
   throw new Error("WS4 QA requires CAN_WS4_QA_RUN=1 and local CAN_WS4_QA_BASE_URL");
-const url=new URL(baseURL);
-if(url.protocol!=="http:"||!["localhost","127.0.0.1","[::1]"].includes(url.hostname))
-  throw new Error("WS4 QA must target a locally hosted, isolated test environment");
+const url = requireLocalHttpUrl(baseURL, "WS4 QA");
 const ids=[process.env.CAN_WS4_QA_CLASS_A,process.env.CAN_WS4_QA_CLASS_B];
 if(ids.some(id=>!id||!/^[a-f0-9-]{36}$/i.test(id))||ids[0]===ids[1])
   throw new Error("WS4 QA requires two distinct synthetic Class UUIDs");
