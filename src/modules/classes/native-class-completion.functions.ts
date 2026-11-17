@@ -324,9 +324,6 @@ export const getNativeClassCompletionReview=createServerFn({method:"GET"})
   .validator((raw:unknown)=>inspectInput.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
-       process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED!=="true")
-      throw new AuthorizationError("Class completion not activated");
     const actor=await getCanonicalCommandContext(getRequest());
     return db.transaction(async tx=>{
       const authorized=await authorizeReview(tx,data.classEnrollmentId,actor);
@@ -360,9 +357,6 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
   .validator((raw:unknown)=>decideInput.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
-       process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED!=="true")
-      throw new AuthorizationError("Class completion writes not activated");
     const request=getRequest();
     const actor=await getCanonicalCommandContext(request);
     return db.transaction(async tx=>{
@@ -505,9 +499,6 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
   .validator((raw:unknown)=>queueInput.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
-       process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED!=="true")
-      throw new AuthorizationError("Class completion review queue not activated");
     const request=getRequest();
     const actor=await getCanonicalCommandContext(request);
     if(!actor.actorPersonId || !["site_admin","registrar"].includes(actor.role??"") ||
