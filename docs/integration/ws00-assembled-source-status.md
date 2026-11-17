@@ -105,3 +105,15 @@ Read-only V8 runtime evaluation of the retrieved pure TypeScript projection afte
 A later GitHub Actions integration run [44004753007](https://github.com/bryanhkelly/can-os/actions/runs/44004753007) also reported `startup_failure` with empty name and synthetic `BuildFailed` path; no jobs began. Issue [#317](https://github.com/bryanhkelly/can-os/issues/317) remains the CI P0 dependency. `npm run verify:ws00` is available on a clean checked-out integration branch as a **locally executable fallback**; WS00 could not execute it in the current environment.
 
 **NO-GO for main and production** pending an actual exact-SHA build, restricted database acceptance, migration approval and two-Site/guardian authenticated testing.
+
+
+## WS00 continued integration: guarded completions and My Activity history
+
+- WS3's subsequent append-only `class_outcomes` guard and rollback-only, isolated SQL fixture tests were merged at `8eb7221edc55f0808e2052afac7fc7cdc24ef336`. A governed formal Class completion can no longer be silently changed or deleted by that proposed migration. The SQL is still **staged and unapplied**, so this does not claim persistent database protection.
+- Found a WS1/WS2 cross-stream issue: My Activity called the old `getMyNativeClassEnrollments` source, which returned only the first 100 Class Enrollment records. This lost older history despite WS2 having a Person-scoped, immutable, microsecond-cursor history API.
+- WS00 now calls `getMyNativeClassEnrollmentHistoryPage` through `readBoundedNativeClassHistory`, revalidating the original canonical learner scope for every page. It fetches at most ten pages of 50 records, denies duplicates and stalled cursors and continues reporting its source coverage as **partial**.
+- If more than 500 Class enrollments exist, the My Activity source emits a bounded-history notice, and its 6.1 UI links to `/learn/classes`, which supports continued historical pagination. This is not a blanket claim of lifetime history completeness across school Sections and noncredit sources.
+- Added `tests/unit/native-class-history-pagination.test.ts` and included it in `ws00-integration-gate.yml` and `npm run verify:ws00`. Its tested scenarios include 120 historic rows, duplicate IDs, stagnant cursors, empty continuing pages, bounded truncation and oversized pages. A scratch copy of the pure helper was separately compiled using `tsc --strict`, and seven isolated Node assertions passed; the full GitHub repository, Vitest and authenticated browser suites are still **unexecuted**.
+- A source-level check of the new WS1/WS2 integration and its UI/guard/tests passed 9 of 9 inspected assertions. This is narrower than an application build.
+
+**Latest observed status:** all six feature branch heads were included and integration was **0 commits behind** `main`. However, the GitHub Actions run [44010158564](https://github.com/bryanhkelly/can-os/actions/runs/44010158564) still produced `startup_failure` before any job. PR #307 stays **DRAFT / NO-GO**; issue [#317](https://github.com/bryanhkelly/can-os/issues/317) tracks CI restoration. No changes to main, test01 or production were made in this continuation.
