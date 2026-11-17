@@ -29,8 +29,6 @@ const pendingInput=z.object({classId:z.string().uuid()}).strict();
 export const getNativeClassPendingKnowledgeReviews=createServerFn({method:"GET"})
   .validator((raw:unknown)=>pendingInput.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
@@ -100,8 +98,6 @@ export const getNativeClassPendingKnowledgeReviews=createServerFn({method:"GET"}
 export const finalizeNativeClassKnowledgeCheck=createServerFn({method:"POST"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
