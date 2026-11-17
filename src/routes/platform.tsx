@@ -2,9 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { normalizeClientError } from "@/lib/client-error";
 import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@/modules/classes/native-class-adult-review.functions";
-import { DirectoryTable, WorkspaceShell } from "@/components/workspace";
+import { DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
 
@@ -37,11 +40,7 @@ function PlatformAdministration() {
         ["Organizations", summary.organizations],
         ["Sites", summary.sites],
         ["Active App Admin grants", summary.activePlatformAdmins],
-      ] as const).map(([label, value]) => <section key={label}
-        className="border border-border bg-card p-5">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-3 text-3xl font-semibold tabular-nums">{value}</p>
-      </section>)}
+      ] as const).map(([label, value]) => <StatCard key={label} label={label} value={value}/>)}
     </div>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Site operations readiness</h2>
@@ -154,27 +153,27 @@ function AdultLearnerReviewSection({ready,cases}:{
         </div>}
       </div>
       <form className="mt-5 grid gap-4" onSubmit={e=>void approve(e)}>
-        <label className="grid gap-1 text-sm font-medium">CAN account ID
+        <Field label="CAN account ID" required>
           <Input required value={accountId} onChange={e=>setAccountId(e.target.value)}
             placeholder="Verified account UUID"/>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Canonical learner home Organization ID
+        </Field>
+        <Field label="Canonical learner home Organization ID" required>
           <Input required value={organizationId} onChange={e=>setOrganizationId(e.target.value)}
             placeholder="Active organization UUID"/>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Independently verified date of birth
+        </Field>
+        <Field label="Independently verified date of birth" required>
           <Input required type="date" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/>
-        </label>
-        <label className="grid gap-1 text-sm font-medium">Secure evidence reference
+        </Field>
+        <Field label="Secure evidence reference" required>
           <Input required value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)}
             placeholder="document:xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx"/>
-        </label>
-        <label className="flex items-start gap-3 text-sm leading-6">
-          <input type="checkbox" required checked={evidenceChecked}
+        </Field>
+        <Label className="flex items-start gap-3 text-sm leading-6">
+          <Checkbox required checked={evidenceChecked}
             onChange={e=>setEvidenceChecked(e.target.checked)} className="mt-1"/>
           I independently checked identity and adult eligibility, and the secure evidence
           reference identifies an independently approved, restricted document for this exact CAN Person.
-        </label>
+        </Label>
         <Button type="submit" disabled={!evidenceChecked||busy}>
           {busy?"Recording review…":"Approve adult learner identity"}
         </Button>
@@ -185,16 +184,16 @@ function AdultLearnerReviewSection({ready,cases}:{
           Uses the CAN account ID above. Revocation ends dependent native learner credentials
           but preserves Class records and the original review evidence.
         </p>
-        <label className="mt-3 grid gap-1 text-sm font-medium">Reason for revocation
+        <Field label="Reason for revocation" className="mt-3">
           <Input value={reason} onChange={e=>setReason(e.target.value)} maxLength={500}
             placeholder="Required audit reason, at least 10 characters"/>
-        </label>
+        </Field>
         <Button className="mt-3" type="button" variant="outline"
           disabled={busy||!accountId||reason.trim().length<10}
           onClick={()=>void revoke()}>Revoke reviewed identity</Button>
       </div>
-      {message&&<p role="status" className="mt-4 text-sm">{message}</p>}
-      {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
+      {message&&<WorkspaceNotice tone="success" className="mt-4">{message}</WorkspaceNotice>}
+      {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     </>}
   </section>;
 }
