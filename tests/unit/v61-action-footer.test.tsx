@@ -25,12 +25,15 @@ describe("V6.1 shared action layout", () => {
     expect(html).toContain('href="/terms"');
     expect(html.indexOf("Create term")).toBeLessThan(html.indexOf("Cancel"));
     expect(html).not.toContain("<form");
+    expect(html).not.toContain('aria-disabled="true"');
   });
 
   it("locks pending form submission and uses the supplied pending label", () => {
     const html = renderToStaticMarkup(<FormActions submitLabel="Publish program"
       pendingLabel="Publishing…" pending cancel={<a href="/programs">Cancel</a>}/>);
     expect(html).toContain("Publishing…");
+    expect(html).toContain('aria-disabled="true"');
+    expect(html).toContain('tabindex="-1"');
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('disabled=""');
     expect(html).not.toContain(">Publish program</button>");
