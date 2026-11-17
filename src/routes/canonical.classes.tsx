@@ -6,7 +6,8 @@ import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  getUnifiedClassCourseOptions, getMyUnifiedClassDrafts, createUnifiedClassDraft,
+  getUnifiedClassCourseOptions, getNativeClassOperatorSites,
+  getMyUnifiedClassDrafts, createUnifiedClassDraft,
   publishUnifiedClassOffering, closeUnifiedClassOffering,
   activateUnifiedClass, createNextUnifiedClassOfferingVersion,
 } from "@/modules/classes/unified-class.functions";
@@ -58,6 +59,9 @@ function NativeClasses(){
     retry:false,
   });
   const optionsData=options.data?.pages.flatMap(page=>page.items)??[];
+  const operatorSites=useQuery({
+    queryKey:["native-class-operator-sites"],queryFn:()=>getNativeClassOperatorSites(),retry:false,
+  });
   const classes=useQuery({queryKey:["native-class-operator-classes"],
     queryFn:()=>getMyUnifiedClassDrafts(),retry:false});
   const [choice,setChoice]=useState("");
@@ -108,9 +112,7 @@ function NativeClasses(){
     (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
   const rolloutReadiness=recipePlan
     ?assessLocalRollout(recipePlan,exactRolloutData,rolloutSiteId||null):[];
-  const rolloutSiteOptions=Array.from(new Map(
-    combinedOptions.flatMap(row=>row.siteOptions.map(site=>[site.id,site] as const))
-  ).values()).sort((a,b)=>a.name.localeCompare(b.name));
+  const rolloutSiteOptions=operatorSites.data??[];
   // Offering versions remain canonical publisher products. Each authorized
   // adoption may support many Course components and local Classes; no extra
   // Program records are synthesized for standalone Courses.
@@ -431,7 +433,9 @@ function NativeClasses(){
           {recipePlan&&<div className="mt-4 space-y-2" aria-label="Local rollout checklist">
             <p className="text-sm font-semibold">{recipePlan.offeringTitle} · rollout v{recipePlan.revision}</p>
             <label className="block text-sm font-semibold" htmlFor="publisher-rollout-site">Receiving Site</label>
+            {operatorSites.isError&&<p role="alert" className="text-xs">Authorized Site directory unavailable. Do not prepare a Class.</p>}
             <select id="publisher-rollout-site" value={rolloutSiteId}
+              disabled={operatorSites.isPending||operatorSites.isError}
               onChange={event=>{setRolloutSiteId(event.target.value);setChoice("");setSiteId("");}}
               className="min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Select an authorized physical or virtual Site</option>
