@@ -2,6 +2,7 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QueryState } from "@/components/workspace";
 import { getOutboxHealthSummary } from "@/modules/operations/outbox-health.functions";
+import { SchoolFamilyDeliveryRecoveryPanel } from "./SchoolFamilyDeliveryRecoveryPanel";
 
 type Health = Awaited<ReturnType<typeof getOutboxHealthSummary>>;
 
@@ -77,6 +78,7 @@ export function OutboxHealthPanel() {
             </div>)}
         </div>
       </div>}
+      {health && <SchoolFamilyDeliveryRecoveryPanel />}
       {health && health.pendingUnhandled > 0 && <p role="status" className="mt-4 rounded-lg border border-dashed p-3 text-sm">
         {health.pendingUnhandled} pending event{health.pendingUnhandled === 1 ? "" : "s"} have no registered
         consumer and will not drain until a handler is registered.
