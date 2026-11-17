@@ -53,6 +53,17 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(ui).toContain("disabled={!adult||!consent||busy||full}");
   });
 
+  it("exposes complete per-Person Class history through stable keyset pagination",()=>{
+    expect(self).toContain("export const getMyNativeClassEnrollmentHistoryPage=");
+    expect(self).toContain("myClassHistoryInput.parse(raw)");
+    expect(self).toContain("lt(canonicalClassEnrollments.enrolledAt,");
+    expect(self).toContain("lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)");
+    expect(self).toContain("eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId)");
+    expect(self).toContain("desc(canonicalClassEnrollments.id)).limit(51)");
+    expect(self).toContain("const items=rows.slice(0,50)");
+    expect(self).toContain("classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId");
+  });
+
   it("preserves Course Attempt authority when a Class ends",()=>{
     expect(exit).toContain("assertNativeClassAttemptForExit(");
     expect(exit).toContain("assertNativeClassExitReason(");
