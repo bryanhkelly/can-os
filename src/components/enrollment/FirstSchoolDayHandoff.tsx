@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+import { RecordFacts, WorkspaceNotice } from "@/components/workspace";
 import { getFirstSchoolDayHandoff } from "@/modules/enrollment/first-school-day-handoff.functions";
 
 type Result = Awaited<ReturnType<typeof getFirstSchoolDayHandoff>>;
@@ -28,29 +30,27 @@ function FirstSchoolDayForApplication({applicationId,programId}:{
     return ()=>{live=false;};
   },[applicationId,refresh]);
 
-  return <section aria-label="Verified first-day handoff" className="mt-4 rounded-lg border p-3 text-sm">
+  return <section aria-label="Verified first-day handoff" className="mt-4 border p-3 text-sm">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h4 className="font-semibold">Verify the student's next supervised school day</h4>
-      <button type="button" className="rounded border px-2 py-1 text-xs"
+      <Button type="button" variant="outline" size="sm" loading={loading}
         disabled={loading} onClick={()=>setRefresh(value=>value+1)}>
         {loading?"Checking…":"Recheck"}
-      </button>
+      </Button>
     </div>
     {loading&&<p role="status" className="mt-2">Checking the live school-local calendar, this student's expected roster and independently reviewed supervision plan…</p>}
-    {error&&<p role="alert" className="mt-2">{error}</p>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-2">{error}</WorkspaceNotice>}
     {result&&<>
       <p className="mt-2 text-xs text-muted-foreground">{result.preview ? "First verified scheduled instructional day" : "Site-local date"}: {result.date} {result.preview ? "(future plan, not verified attendance)" : "(today)"}</p>
       {result.programName&&<p className="mt-1 text-xs">Program: {result.programName} · Section: {result.sectionTitle??"Not assigned"}</p>}
       <p role="status" className="mt-2">{result.message}</p>
       {result.preview&&<p className="mt-2 text-xs">Student placement and scheduling are verified for this date. Planned staffing is a separate review; no future physical presence, attendance, custody or school opening is being attested. Recheck after timetable or staffing changes.</p>}
-      <dl className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <div className="rounded border p-2"><dt className="text-xs">Expected onsite</dt>
-          <dd className="font-semibold">{result.studentExpected?"Yes":"Not confirmed"}</dd></div>
-        <div className="rounded border p-2"><dt className="text-xs">Reviewed staffing plan</dt>
-          <dd className="font-semibold">{result.supervisionPlanned?"Ready":"Not confirmed"}</dd></div>
-        <div className="rounded border p-2"><dt className="text-xs">Observed attendance</dt>
-          <dd className="font-semibold">{result.preview?"Not yet observable":result.attendanceRecorded?"Recorded":"Not recorded"}</dd></div>
-      </dl>
+      <RecordFacts label="School-day verification evidence" columns={3} variant="tiles" className="mt-2 gap-2" items={[
+        { id: "expected", label: "Expected onsite", value: result.studentExpected?"Yes":"Not confirmed" },
+        { id: "staffing", label: "Reviewed staffing plan", value: result.supervisionPlanned?"Ready":"Not confirmed" },
+        { id: "attendance", label: "Observed attendance",
+          value: result.preview?"Not yet observable":result.attendanceRecorded?"Recorded":"Not recorded" },
+      ]}/>
       {result.outstandingGaps.length>0&&<p className="mt-2 text-xs">
         Blockers: {result.outstandingGaps.map(gap=>gap.replaceAll("_"," ")).join("; ")}
       </p>}
