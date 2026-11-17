@@ -2,7 +2,7 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { PrerequisiteChecklist } from "@/components/workspace/prerequisite-checklist";
 import { EvidenceDetails } from "@/components/evidence/EvidenceDetails";
 import {useCallback,useEffect,useRef,useState} from "react";
-import { MutationFeedback, QueryState, StatusBadge } from "@/components/workspace";
+import { ActionFooter, MutationFeedback, QueryState, StatusBadge } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -103,7 +103,7 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
         <Input value={reason} disabled={busy||loading} minLength={10} maxLength={500}
           onChange={e=>setReason(e.target.value)}/>
       </Field>
-      <div className="mt-2 flex gap-2">
+      <ActionFooter layout="inline" className="mt-2">
         {opening.canDecide&&opening.status==="draft"&&<Button type="button"
           disabled={busy||loading||reason.trim().length<10||!opening.approvalReady}
           onClick={()=>void decide("approve")}>
@@ -117,7 +117,7 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
         {opening.status==="suspended"&&<p className="text-xs">
           Suspended. A new reviewed draft version is required to reopen.
         </p>}
-      </div>
+      </ActionFooter>
     </>}
     </QueryState>
   </section>;
