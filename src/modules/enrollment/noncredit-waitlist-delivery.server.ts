@@ -12,6 +12,8 @@ import {
 import {
   sendNotificationEmail, type NotificationEmailMessage,
 } from "@/modules/communication/notification-email.server";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
+import { AuthorizationError } from "@/domain/command-context";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
@@ -115,16 +117,12 @@ const waitlistAdapter = {
       )).limit(1);
     if (!recipient?.email)
       return { kind: "suppress", reason: "verified_account_person_unavailable" };
-    const grants = await db.select({
-      personId: accountPersonGrants.personId,
-      role: accountPersonGrants.role,
-    }).from(accountPersonGrants).where(and(
-      eq(accountPersonGrants.accountId, record.accountId),
-      eq(accountPersonGrants.active, true),
-    )).limit(101);
-    if (!grants.length || grants.length > 100 ||
-      grants.some(grant => grant.personId !== record.personId || grant.role === "student"))
+    try {
+      await assertUnambiguousAdultAccount(record.accountId, record.personId);
+    } catch (error) {
+      if (!(error instanceof AuthorizationError)) throw error;
       return { kind: "suppress", reason: "adult_person_identity_reconciliation_required" };
+    }
 
     // Only a fixed, HTTPS public origin may appear in outbound email.
     const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
