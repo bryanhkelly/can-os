@@ -350,7 +350,7 @@ function MyActivityPage() {
           {opportunities.map(item => <OpportunityCard key={item.key} item={item}/>)}
         </div>
       </section>}
-      <section className="mt-8 border-t border-border pt-6" aria-label="Noncredit enrollment management">
+      <section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
          <NoncreditEnrollmentManagement/>
        </section>
        <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
