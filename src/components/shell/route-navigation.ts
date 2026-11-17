@@ -202,7 +202,7 @@ export const routeNavigation = {
   "/staff/students": page("/staff/students", staff),
   "/canonical/assessment-publications": hidden("Independent assessment publication workspace", []),
   "/canonical/assessment-reviews": hidden("Independent assessment review workspace", []),
-  "/canonical/classes": hidden("Provider-owned native Class operations", []),
+  "/canonical/classes": hidden("Retired provider Class management location; opens canonical /class", []),
   "/canonical/classes/completion": hidden("Governed Class completion review", []),
   "/canonical/completion-evidence-reviews": hidden("Independent completion evidence review", []),
   "/canonical/course-activities": hidden("Approved Course activity authoring", []),
