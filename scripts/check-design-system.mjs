@@ -543,8 +543,8 @@ for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   // are correct and must not be prohibited inside the primitives themselves.
   // Hidden POST fields in passwordless authentication are deliberately native:
   // the styled Input primitive must never make a hidden credential visible.
-  const visibleSource = source.replace(/<input\\s+type=["']hidden["'][^>]*\\/>/g, "");
-  if (/<(?:button|input|select|textarea|label)\\b/.test(visibleSource) ||
+  const visibleSource = source.replace(/<input\s+type=["']hidden["'][^>]*\/>/g, "");
+  if (/<(?:button|input|select|textarea|label)\b/.test(visibleSource) ||
       radiusUtility.test(source)) {
     console.error(`${file} reintroduced a native visible control or legacy rounded geometry`);
     process.exitCode = 1;
