@@ -56,6 +56,33 @@ describe("canonical Blueprint Studio Site selection", () => {
     expect(html).not.toContain("Blueprint editor");
   });
 
+  it("opens the only authorized Site directly without a UUID selection screen", () => {
+    const previous = state.outcome.data.siteIds;
+    state.outcome.data.siteIds = [first];
+    state.search = {};
+    try {
+      const html = render();
+      expect(html).toContain(`data-site-id="${first}"`);
+      expect(html).not.toContain("Choose an authorized Site");
+      expect(html).not.toContain("Choose a different Site");
+    } finally {
+      state.outcome.data.siteIds = previous;
+    }
+  });
+
+  it("does not fall back to its sole authorized Site when an unauthorized UUID is explicit", () => {
+    const previous = state.outcome.data.siteIds;
+    state.outcome.data.siteIds = [first];
+    state.search = { siteId: second };
+    try {
+      const html = render();
+      expect(html).toContain("not authorized");
+      expect(html).not.toContain("Blueprint editor");
+    } finally {
+      state.outcome.data.siteIds = previous;
+    }
+  });
+
   it("mounts only the explicitly selected authorized Site", () => {
     state.search = { siteId: second };
     const html = render();
