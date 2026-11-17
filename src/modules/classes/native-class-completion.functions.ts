@@ -329,7 +329,7 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
       if(!authorized.policy || authorized.policy.id!==data.expectedPolicyVersionId)
         throw new AuthorizationError("original independently approved Class policy");
       const current=await currentGovernedOutcome(tx,data.classEnrollmentId);
-      if(current?.id!==(data.expectedPriorOutcomeId??null)){
+      if((current?.id??null)!==(data.expectedPriorOutcomeId??null)){
         if(current && current.supersedesOutcomeId===data.expectedPriorOutcomeId &&
            current.resultCode===data.outcome &&
            current.completionEvidenceVersionId===data.evidenceVersionId &&
