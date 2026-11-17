@@ -29,21 +29,24 @@ describe("noncredit 48-hour invitation delivery",()=>{
     expect(api).toContain("notificationQueued:true");
     expect(api).not.toContain("sendNotificationEmail(");
   });
-  it("rechecks live eligibility and verified adult identity before provider delivery",()=>{
+  it("rechecks live eligibility and verified adult identity through its source adapter",()=>{
     const worker=read("src/modules/enrollment/noncredit-waitlist-delivery.server.ts");
+    const dispatcher=read("src/modules/communication/outbound-dispatcher.server.ts");
     expect(worker).toContain("currentWaitlistEmailOpportunity({");
     expect(worker).toContain("record.delivery.invitationExpiresAt");
-    expect(worker).toContain("readEligibleSelfEnrollmentReleases(db,record.releaseId)");
+    expect(worker).toContain("readEligibleSelfEnrollmentReleases(db, record.releaseId)");
     expect(worker).toContain("record.releaseStatus");
     expect(worker).toContain("isDemoTenantOrganization(");
-    expect(worker).toContain("accountPersonGrants.active,true");
-    expect(worker).toContain('grant.role==="student"');
-    expect(worker).toContain("sendNotificationEmail({");
-    expect(worker).toContain("},claimed.id)");
-    expect(worker).toContain('for("update",{skipLocked:true})');
+    expect(worker).toContain("eq(accountPersonGrants.active, true)");
+    expect(worker).toContain('grant.role === "student"');
+    expect(worker).toContain("sendNotificationEmail(message, key)");
+    expect(worker).toContain('for("update", { skipLocked: true })');
     expect(worker).toContain("leaseUntil");
     expect(worker).toContain("nextAttemptAt");
-    expect(worker).toContain("accepted");
+    expect(worker).toContain("dispatchOutboundMessages(waitlistAdapter");
+    expect(dispatcher).toContain("adapter.renew(active");
+    expect(dispatcher).toContain("adapter.send(prepared.message, active.id)");
+    expect(dispatcher).toContain("adapter.settle(active");
   });
   it("does not make provider acceptance equal enrollment or learner receipt",()=>{
     const worker=read("src/modules/enrollment/noncredit-waitlist-delivery.server.ts");
