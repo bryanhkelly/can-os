@@ -50,6 +50,7 @@ Avoid universal tables, new infrastructure services and unrelated migrations sol
 ## Implemented shared foundations (main)
 
 - `src/platform/mutation.ts`: canonical audit, domain-event, and in-app notification writers.
+- `src/domain/command-context.ts`: `assertExplicitProgramScope` requires a present, current Program grant for enrollment mutations. This is deliberately stricter than legacy optional-scope read helpers; school applications and their retries use it.
 - `src/modules/identity/unambiguous-adult-account.server.ts`: raw active-grant adult identity check, called by noncredit self-enrollment. Filtered session grants are not identity evidence.
 - `src/modules/communication/outbound-dispatcher.server.ts`: transport retry, leasing, fencing, and dispatch orchestration. Noncredit waitlist and school-family alerts are feature-specific adapters that independently recheck eligibility.
 - `scripts/acceptance/check-shared-capability-boundaries.mjs`: initial dependency ownership guard, now covering eight existing owners/adapters, run by CI.
