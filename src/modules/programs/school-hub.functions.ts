@@ -31,7 +31,7 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   // An unauthorized or stale Site selector returns the authorized picker.
   if(!site || (actor.grantSiteId && actor.grantSiteId!==site.id))
     return {canonicalCatalogEnabled,catalogState,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
-  if(!data.module || data.module==="academics"){
+  if(data.module==="academics"){
     try {
       const {resolveLaunchSiteCatalogContext}=await import("./launch-site-catalog.server");
       const resolved=await resolveLaunchSiteCatalogContext(getRequest(),site.id);
