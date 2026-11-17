@@ -28,7 +28,7 @@ schoolYearMatchesFamilyProgram,
 import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configuration-lock";
 import {
 assertCapability,
-assertProgramScope,
+assertExplicitProgramScope,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
@@ -41,12 +41,6 @@ import { requireChurchHostedOperatingServices } from "@/modules/programs/program
 import { requireCurrentSchoolJurisdictionForEnrollment } from "@/modules/programs/school-jurisdiction-opening-gate.server";
 import { emitEvent,writeAudit } from "@/platform/mutation";
 import { and,desc,eq,inArray,isNotNull,isNull,or,sql } from "drizzle-orm";
-
-/** Enrollment commands must never interpret an absent program grant as global access. */
-function requireEnrollmentProgramScope(context:CommandContext,programId:string):void {
-  if (!context.scope.programIds?.includes(programId)) throw new AuthorizationError(`program scope: ${programId}`);
-  assertProgramScope(context,programId);
-}
 
 export async function startFamilyApplication(
   context: CommandContext,
@@ -212,7 +206,7 @@ export async function startFamilyApplication(
       .where(eq(programs.id, input.programId))
       .limit(1);
     if (!program) throw new Error("Program not found");
-    requireEnrollmentProgramScope(context, input.programId);
+    assertExplicitProgramScope(context, input.programId);
     if(originTransfer){
       if(!program.siteId||originTransfer.siteId===program.siteId)
         throw new Error("Transfer admission must be for a different school Site from the origin");
@@ -613,7 +607,7 @@ export async function acceptApplication(
       .limit(1);
 
     if (!current) throw new Error("Application not found");
-    requireEnrollmentProgramScope(context, current.programId);
+    assertExplicitProgramScope(context, current.programId);
     // Admission acceptance under CAN's school-of-record authority requires
     // live, independently verified church/CAN services; an inquiry does not.
     await requireChurchHostedOperatingServices(tx,current.programId,[
@@ -681,7 +675,7 @@ export async function activateEnrollmentFromApplication(
       .limit(1);
 
     if (!application) throw new Error("Application not found");
-    requireEnrollmentProgramScope(context, application.programId);
+    assertExplicitProgramScope(context, application.programId);
     const hostedAgreement=await requireChurchHostedOperatingServices(tx,application.programId,[
       "admissions","school_of_record",
     ]);
