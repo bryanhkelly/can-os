@@ -195,3 +195,31 @@ if (!completionReview.includes('from "@/components/workflow"') ||
   console.error("Completion review must use shared StatusTimeline for decision and issuance history");
   process.exitCode = 1;
 }
+
+// Govern migrated approval and notification history surfaces.
+// Native checkbox and textarea elements are prohibited at the feature layer;
+// primitives preserve their underlying native accessibility semantics.
+const migratedApplicationSurfaces = {
+  "routes/canonical.assessment-reviews.tsx": [
+    'from "@/components/ui/select"', 'from "@/components/ui/textarea"',
+    'from "@/components/ui/choice"', 'from "@/components/ui/button"',
+  ],
+  "components/communication/DeliveryHistory.tsx": [
+    'from "@/components/workflow"', "<StatusTimeline",
+    'from "@/components/ui/button"',
+  ],
+};
+for (const [file, required] of Object.entries(migratedApplicationSurfaces)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of required) {
+    if (!source.includes(fragment)) {
+      console.error(`${file} must reuse governed application primitives/patterns: missing ${fragment}`);
+      process.exitCode = 1;
+    }
+  }
+  if (/<(?:select|textarea|button|input)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(`${file} must compose canonical controls and square V6.1 surfaces`);
+    process.exitCode = 1;
+  }
+}
