@@ -294,6 +294,7 @@ for (const eventType of [
 // Schedule changes must fan out to scoped recipients through the notification
 // policy; do not let the generic audit-only pass-through swallow them.
 registerDomainEventHandler(EventTypes.SectionScheduleChanged, handleNotificationPolicyEvent);
+registerDomainEventHandler(EventTypes.SectionEnrollmentWithdrawn, handleNotificationPolicyEvent);
 
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;
