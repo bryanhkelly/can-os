@@ -30,8 +30,7 @@ test("one verified CAN account completes native Class enroll, learn, Activity an
     // Must be a real authoritative enrollment + canonical Course Attempt.
     // The current implementation requires a preexisting native cookie and
     // is expected to FAIL here until P0 #320 is implemented securely.
-    await expect(page.getByRole("status")).toContainText(
-      "Enrollment confirmed. Your Course Attempt is ready.");
+    await expect(page.getByText("Enrollment confirmed. Your Course Attempt is ready.")).toBeVisible();
     await expect(page.getByRole("link",{name:"Open Class"})).toBeVisible();
 
     await page.goto("/learn/my-activity");
@@ -41,7 +40,7 @@ test("one verified CAN account completes native Class enroll, learn, Activity an
     await page.goto("/learn/classes");
     await page.getByRole("button",{name:"Withdraw from Class"}).click();
     await page.getByRole("button",{name:"Confirm withdrawal"}).click();
-    await expect(page.getByRole("status")).toContainText("Participation withdrawn");
+    await expect(page.getByText("Participation withdrawn. Your learning history is preserved.")).toBeVisible();
 
     await page.goto("/learn/my-activity");
     await page.getByRole("button",{name:/History/}).click();
