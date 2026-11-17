@@ -15,6 +15,8 @@ describe("native Class adult approval source contract",()=>{
   expect(command).toContain('terms.enrollmentMethods.includes("approval")');
   expect(command).toContain("assertCurrentNativeClassLearnerForMutation");
   expect(command).toContain("seatReserved:false");
+  expect(command).toContain("class.approval.expired");
+  expect(command).toContain("ClassApprovalExpired");
  });
  it("requires an independent exact-Site staff decision",()=>{
   expect(command).toContain("assertNativeClassOperatorExitScope(actor,cls)");
@@ -48,5 +50,6 @@ describe("native Class adult approval source contract",()=>{
   expect(learner).toContain("I accept the current Class participation");
   expect(manager).toContain("getNativeClassApprovalQueue");
   expect(manager).toContain("decideNativeClassApproval");
+  expect(manager).toContain("reviewReason.trim()");
  });
 });
