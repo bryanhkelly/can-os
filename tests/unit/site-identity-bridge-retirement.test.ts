@@ -23,7 +23,8 @@ describe("one Site UUID; retired identity bridge",()=>{
   ];
   for(const file of files)
     expect(read(file),file).not.toContain("site_canonical_identity_links");
-  expect(read(files[0])).toContain("eq(catalogSites.id,site.id)");
+  expect(read(files[0])).toContain("lifecycleStatus:sites.lifecycleStatus");
+  expect(read(files[0])).not.toContain("catalogSites");
   expect(read(files[3])).toContain("native.id=s.id");
   expect(read(files[4])).toContain("eq(accountPersonGrants.siteId,grant.siteId)");
   expect(read(files[5])).toContain("const canonicalSiteId = site.id;");
