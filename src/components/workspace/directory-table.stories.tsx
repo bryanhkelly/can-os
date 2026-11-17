@@ -4,6 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { LayoutGrid, List } from "lucide-react";
 import { DirectoryPage, DirectoryTable, type DirectorySort } from "./directory-table";
+import { FilterBar } from "./filter-bar";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "./empty-state";
@@ -92,3 +93,27 @@ function PageExample() {
 export const DirectoryComposition: Story = { render: () => <PageExample/> };
 export const NoRecords: Story = { render: () => <EmptyState kind="records" actions={<Button variant="outline">Create first record</Button>}/> };
 export const NoMatches: Story = { render: () => <EmptyState kind="matches" actions={<Button variant="outline">Clear filters</Button>}/> };
+
+function FilterBarExample() {
+  const [query, setQuery] = useState("");
+  const [view, setView] = useState("list");
+  return <div className="bg-background p-6">
+    <FilterBar label="Class roster" query={query} onQueryChange={setQuery}
+      searchLabel="Search participants" searchPlaceholder="Name or email"
+      view={view} onViewChange={setView}
+      views={[{ value: "list", label: "List view", icon: <List/> },
+        { value: "grid", label: "Grid view", icon: <LayoutGrid/> }]}/>
+    <output aria-live="polite">{query || "No query"} / {view}</output>
+  </div>;
+}
+export const ReusableFilterBar: Story = {
+  render: () => <FilterBarExample/>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByRole("searchbox", { name: "Search participants" }), "Jordan");
+    await expect(canvas.getByText("Jordan / list")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Grid view" }));
+    await expect(canvas.getByRole("button", { name: "Grid view" })).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.getByText("Jordan / grid")).toBeVisible();
+  },
+};
