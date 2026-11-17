@@ -7,6 +7,7 @@ import {
 } from "@/modules/activities/extended-learning-evidence.functions";
 import type { ExtendedSeasonApprovalCategory } from "@/domain/extended-learning-approval";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 
 type Model = Awaited<ReturnType<typeof readExtendedEvidenceFn>>;
 type Item = Model["categories"][number];
@@ -19,6 +20,16 @@ type UploadInput = {
 export function ExtendedSeasonEvidencePanel({ seasonId, onChange }: {
   seasonId: string; onChange?: () => Promise<void> | void;
 }) {
+  const { session } = useWorkspaceSession();
+  if (session?.authenticated && session.demoAccountSwitching) {
+    return <section className="mt-3 rounded-lg border bg-card p-4" aria-label="Extended-learning operational approvals">
+      <h3 className="text-sm font-semibold">Independent operating approval</h3>
+      <p role="status" className="mt-1 text-xs text-muted-foreground">
+        Shared demo accounts cannot access restricted operating evidence.
+        A verified registrar for this site and program can submit the documents for review by a separate authorized CAN network officer.
+      </p>
+    </section>;
+  }
   return <ExtendedSeasonEvidenceWorkspace key={seasonId} seasonId={seasonId} onChange={onChange} />;
 }
 
