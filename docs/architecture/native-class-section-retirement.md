@@ -98,3 +98,42 @@ authority and evidence lineage before any production cutover. The script
 `db:test01:retirement-readiness` now discovers dependent FK tables
 automatically. Counts are a snapshot, not proof that current production
 has the same records.
+
+## Cutover candidate reporting (additional test01 verification)
+
+The source-to-native Course selection must be evidence based rather than a
+new permanent translation service. The read-only, test01-pinned candidate
+inventory is `npm run db:test01:class-cutover-candidates` with
+`CAN_CLASS_CUTOVER_CANDIDATES=1` and
+`CAN_CLASS_CUTOVER_QA_DATABASE_URL` set to the isolated test01 connection.
+
+It reports one entry per legacy class without learner names or email addresses,
+including source Course version, Site, Program and **aggregate** enrollment,
+assessment, submission, scheduling, grade and lesson-progress counts.
+It looks for published native Course versions with the same publisher, Course
+code and version number. Such a match is only a **candidate**: an independent
+curriculum/content, rights, assessment and grading equivalence review is still
+required before mapping anything. Zero or multiple candidates block migration;
+the script never writes to a database and cannot authorize a cutover.
+
+A subsequent direct read-only check on test01 established:
+- All 11 old classes are active, belong to one Site and one Program; all 129
+  legacy Section enrollments are active
+- All 11 source Course versions are published
+- **Zero** exact publisher+Course-code candidates among the native Courses
+  (and thus zero exact published version candidates)
+- Additional retained academic evidence includes 996 scheduled occurrences,
+  4 Section grade records and 4 lesson-progress records, beyond the 506
+  submissions and 60 assessments previously counted
+
+**Required next source data:** approved native Course publications for the
+actual eleven source Course versions, independently reconciled learner
+Person identities, explicit Deployments/adoptions, accurate dated Class
+Sessions, grade/assessment conversion rules, and record-level audit
+reconciliation. No one-to-one conversion is inferred from a matching title,
+email address, Site membership or numerical version alone.
+
+The read-only retirement preflight now fails on missing/ambiguous native Course
+version candidates and on divergent native Person/account IDs, even if the
+legacy identity-link tables happen to be empty. This closes the misleading
+"no links means one identity" loophole.
