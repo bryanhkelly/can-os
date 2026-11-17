@@ -541,6 +541,9 @@ export const createLaunchSite = createServerFn({method:"POST"})
   timezone:siteTimezoneSchema,
   address:physicalSiteAddressSchema.optional(),
   stubOnly:z.boolean().optional(),
+  // One platform Site identity: classify at creation, never allocate a
+  // secondary education_v30 Site or infer its identity from a name.
+  siteKind:z.enum(["physical","virtual","mobile"]).optional(),
   planningLocation:schoolPlanningLocationSchema.optional(),
   launchPreferences:siteLaunchPreferencesSchema.optional(),
  }).strict().refine(value=>!value.stubOnly||Boolean(value.planningLocation), "A school stub requires city and state").parse(v))
@@ -558,7 +561,8 @@ export const createLaunchSite = createServerFn({method:"POST"})
    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"site-create:" + data.organizationId + ":" + data.name.trim().toLowerCase()}))`);
    // The unique index only covers slug; a renamed slug would otherwise fork the campus.
    const [existing]=await tx.select({id:s.sites.id,name:s.sites.name,slug:s.sites.slug,
-     timezone:s.sites.timezone,address:s.sites.address,metadata:s.sites.metadata})
+     timezone:s.sites.timezone,address:s.sites.address,
+     siteKind:s.sites.siteKind,metadata:s.sites.metadata})
     .from(s.sites)
     .where(and(eq(s.sites.organizationId,data.organizationId),or(
      eq(s.sites.slug,data.slug),
@@ -571,6 +575,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
     // a changed name, timezone or location must be edited, not silently adopted.
     if(existing.slug===data.slug && existing.name.trim().toLowerCase()===data.name.trim().toLowerCase() &&
       existing.timezone===data.timezone &&
+      (!data.siteKind || existing.siteKind===data.siteKind) &&
       (data.address ? samePhysicalSiteAddress(existing.address,data.address) : existing.address===null) &&
       (!data.planningLocation || (savedPlanningLocation.success &&
        savedPlanningLocation.data.city === data.planningLocation.city && savedPlanningLocation.data.state === data.planningLocation.state))) {
@@ -596,7 +601,8 @@ export const createLaunchSite = createServerFn({method:"POST"})
    }
    const createdAt=new Date();
    const [site]=await tx.insert(s.sites).values({organizationId:data.organizationId,name:data.name,
-     slug:data.slug,timezone:data.timezone,address:data.address,updatedAt:createdAt,
+     slug:data.slug,timezone:data.timezone,address:data.address,
+     siteKind:data.siteKind,lifecycleStatus:"planning",updatedAt:createdAt,
      metadata:{siteIdentityRevision:createdAt.toISOString(),
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),
       ...(data.launchPreferences?{launchPreferences:data.launchPreferences}:{}),
@@ -606,12 +612,14 @@ export const createLaunchSite = createServerFn({method:"POST"})
    await emitEvent(tx,{
     eventType:EventTypes.SiteCreated,aggregateType:"site",aggregateId:site.id,
     actorPersonId:actor.actorPersonId,organizationId:data.organizationId,
-    siteId:site.id,payload:{name:data.name,timezone:data.timezone,addressProvided:Boolean(data.address),stubOnly:Boolean(data.stubOnly)},
+    siteId:site.id,payload:{name:data.name,timezone:data.timezone,
+     siteKind:data.siteKind??null,addressProvided:Boolean(data.address),stubOnly:Boolean(data.stubOnly)},
    });
    await writeAudit(tx,actor,{
     action:"site.create",entityType:"site",entityId:site.id,
     scope:{organizationId:data.organizationId,siteId:site.id},
-    after:{name:data.name,timezone:data.timezone,address:data.address??null,
+    after:{name:data.name,timezone:data.timezone,siteKind:data.siteKind??null,
+      lifecycleStatus:"planning",address:data.address??null,
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),stubOnly:Boolean(data.stubOnly)}});
    // Stub creation has no website reservation dependency. The legacy location
    // flow still reserves a private draft, without publishing or issuing grants.
