@@ -26,7 +26,7 @@ export const canonicalAccountGrants = educationV30.table("canonical_account_gran
   revokedAt: timestamp("revoked_at", { withTimezone: true }),
 }, t => [
   index("canonical_account_grants_account_idx").on(t.accountId)
-    .where(and(t.active, isNull(t.revokedAt))),
+    .where(sql`${t.active} AND ${t.revokedAt} IS NULL`),
 ]);
 
 /** Independently approved time-bounded staff capability, not a role grant. */
