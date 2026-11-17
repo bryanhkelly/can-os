@@ -87,7 +87,8 @@
     "test:network:unit": "vitest run tests/unit/network-attribution.test.ts tests/unit/noncredit-self-enrollment.test.ts",
     "db:network:test01:verify": "node scripts/acceptance/check-network-attribution-schema.mjs",
     "check:route-identifiers": "node scripts/acceptance/check-route-identifier-collisions.mjs",
-    "test:route-identifiers": "node --test scripts/acceptance/check-route-identifier-collisions.test.mjs"
+    "test:route-identifiers": "node --test scripts/acceptance/check-route-identifier-collisions.test.mjs",
+    "db:canonical:one-person-cutover-preflight": "node scripts/acceptance/check-one-person-cutover.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
