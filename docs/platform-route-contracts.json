@@ -1745,9 +1745,9 @@
       "route": "/canonical/course-activities",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
+      "roleJourney": "Staged publisher Course activity editor now redirects bookmarked URLs to /class?view=activities",
+      "readBoundary": "Redirect only; promoted publisher editor rechecks current organization, owner and Course publisher scope on each read",
+      "writeBoundary": "No writes at /canonical; assessment and survey authoring uses existing purpose-bound commands and independent review"
     },
     {
       "file": "src/routes/canonical.issuer-access.tsx",
@@ -1772,9 +1772,9 @@
       "route": "/class",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "One canonical /class entry for public native Class discovery, enrollment history, invitations, and authorized operator Class management",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
+      "roleJourney": "Single native /class entry for discovery, enrollment, authorized Class management and publisher-owned Course activity drafting",
+      "readBoundary": "Public offerings are independently eligibility-filtered; privileged management and publisher queries recheck exact role and current organization/Site permissions",
+      "writeBoundary": "Server-side Class, publisher assessment and survey commands authorize each action independently; URL choice never grants rights"
     },
     {
       "file": "src/routes/platform.tsx",
