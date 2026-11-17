@@ -6,7 +6,7 @@ const read=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
 const activation=read("src/modules/classes/native-class-reviewed-onboarding.functions.ts");
 const migration=read("database/canonical/v3.0.1/patch-reviewed-adult-class-onboarding.sql");
 const route=read("src/routes/class.tsx");
-const entry=read("src/modules/classes/native-class-entry.functions.ts");
+const entry=read("src/modules/classes/native-class-entry.client.ts");
 
 describe("reviewed adult Class activation: one sign-in, never self-verification",()=>{
   it("consumes only independent pre-existing approved evidence for exact CAN Person",()=>{
@@ -74,7 +74,7 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(entry).toContain('activateReviewedNativeClassLearner()');
     expect(route).toContain('enrollCurrentPersonInClass');
     const activationOffset=entry.indexOf('await activateReviewedNativeClassLearner()');
-    expect(entry.indexOf('return enrollInNativeClass({data});',activationOffset))
+    expect(entry.indexOf('return enrollInNativeClass(input);',activationOffset))
       .toBeGreaterThan(activationOffset);
   });
 });
