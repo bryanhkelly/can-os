@@ -77,16 +77,27 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         throw new AuthorizationError("current independently linked native Person");
       if(!verifiedAdultOn(native.birthDate,now))
         throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
-      const [review]=await tx.select({
-        status:accessAdultLearningReviews.status,
-        consumedAt:accessAdultLearningReviews.consumedAt,
-        accessPersonId:accessAdultLearningReviews.accessPersonId,
-        canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
-        canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
-        organizationId:accessAdultLearningReviews.organizationId,
-      }).from(accessAdultLearningReviews).where(
-        eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
-      ).limit(1);
+      // Legacy approved links remain usable before the additive migration;
+      // a present but non-FORCE-RLS evidence ledger is never trusted.
+      const reviewedSchema=await tx.execute(sql`
+        SELECT to_regclass('public.access_adult_learning_reviews') IS NOT NULL AS present,
+          EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+            WHERE n.nspname='public' AND c.relname='access_adult_learning_reviews'
+              AND c.relrowsecurity AND c.relforcerowsecurity) AS forced
+      `);
+      if(reviewedSchema.rows[0]?.present===true&&reviewedSchema.rows[0]?.forced!==true)
+        throw new AuthorizationError("reviewed adult identity ledger security unavailable");
+      const [review]=reviewedSchema.rows[0]?.present===true
+        ?await tx.select({
+          status:accessAdultLearningReviews.status,
+          consumedAt:accessAdultLearningReviews.consumedAt,
+          accessPersonId:accessAdultLearningReviews.accessPersonId,
+          canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
+          canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
+          organizationId:accessAdultLearningReviews.organizationId,
+        }).from(accessAdultLearningReviews).where(
+          eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
+        ).limit(1):[];
       if(review&&(review.status!=="approved"||!review.consumedAt||
          review.accessPersonId!==owner.personId||
          review.canonicalAccountId!==link.canonicalAccountId||
