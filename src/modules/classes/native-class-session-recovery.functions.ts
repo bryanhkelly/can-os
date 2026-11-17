@@ -3,7 +3,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
-  accessAccounts, accountPersonGrants, accessAccountNoncreditPrincipals,
+  accessAccounts, accessAccountNoncreditPrincipals,
   accessAccountCanonicalPrincipals, accessAdultLearningReviews,
 } from "@/db/schema";
 import {
@@ -14,6 +14,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import {
   requireVerifiedAdultAccount, issueNativeLearnerSession,
 } from "@/modules/enrollment/noncredit-self-enrollment-identity.server";
@@ -39,17 +40,10 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         email:accessAccounts.emailNormalized,verified:accessAccounts.emailVerifiedAt,
         disabled:accessAccounts.disabled,personId:accessAccounts.personId,
       }).from(accessAccounts).where(eq(accessAccounts.id,owner.accountId)).limit(1);
-      const memberships=await tx.select({
-        personId:accountPersonGrants.personId,role:accountPersonGrants.role,
-      }).from(accountPersonGrants).where(and(
-        eq(accountPersonGrants.accountId,owner.accountId),
-        eq(accountPersonGrants.active,true),
-      )).limit(101);
       if(!can?.verified||can.disabled||can.email!==owner.email||
-         can.personId!==owner.personId||memberships.length===0||
-         memberships.length>100||memberships.some(
-           grant=>grant.personId!==owner.personId||grant.role==="student",
-         ))throw new AuthorizationError("current single-person verified CAN account");
+         can.personId!==owner.personId)
+        throw new AuthorizationError("current verified CAN adult Person");
+      await assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx);
 
       const links=await tx.select().from(accessAccountNoncreditPrincipals).where(
         eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId),
