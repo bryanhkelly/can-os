@@ -287,3 +287,18 @@ describe("single My Activity training workspace", () => {
     expect(commands).toContain('enabled:!registrationId');
   });
 });
+
+describe("Site and network workspace composition", () => {
+  it("renders a single Site directory component without redirecting a one-Site operator", () => {
+    const siteRoute=readFileSync(join(routesDir,"sites.index.tsx"),"utf8");
+    const network=readFileSync(join(repoRoot,"src/components/home/NetworkHome.tsx"),"utf8");
+    const shared=readFileSync(join(repoRoot,"src/components/operations/ScopedSiteDirectory.tsx"),"utf8");
+    expect(siteRoute).toContain("<ScopedSiteDirectory");
+    expect(network).toContain("<ScopedSiteDirectory");
+    expect(siteRoute).not.toContain("throw redirect(");
+    expect(siteRoute).toContain("profileLinks");
+    expect(network).not.toContain("profileLinks");
+    expect(shared).toContain("profileLinks=false");
+    expect(shared).toContain("sites.map(");
+  });
+});
