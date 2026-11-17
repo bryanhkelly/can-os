@@ -4,7 +4,10 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import {
   listGuardianFieldTripPermissions, signGuardianFieldTripPermission,
   declineGuardianFieldTripPermission,
@@ -71,40 +74,39 @@ function TripPermissions({ items }: { items: Trip[] }) {
       eyebrow="Family"
       title="Field trip permissions"
       subtitle="Review published school permission language and respond to invitations for your children. Permission and fees are separate steps."
-      actions={<Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}
+      actions={<Link to="/home" className=" border px-3 py-2 text-sm">Family home</Link>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
       {trip && <Link to="/guardian/field-trips" className="mt-5 inline-block text-sm font-semibold underline">View all field trips</Link>}
-      {trip && visibleItems.length === 0 && <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This field trip invitation is no longer available in your authorized family workspace. You can view other trips or contact the school.</p>}
+      {trip && visibleItems.length === 0 && <WorkspaceNotice tone="danger" className="mt-5">This field trip invitation is no longer available in your authorized family workspace. You can view other trips or contact the school.</WorkspaceNotice>}
       <div className="mt-7 space-y-4">
-        {visibleItems.map(item => <article key={item.participantId} className="rounded-xl border bg-card p-5">
+        {visibleItems.map(item => <article key={item.participantId} className=" border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.studentName}</p>
           <h2 className="mt-2 text-xl font-semibold">{item.title}</h2>
           <p className="mt-2 text-sm">{item.destination}</p>
           <FieldTripFacts trip={item}/>
           {item.status === "permission_complete"
-            ? <div className="mt-4 space-y-3 rounded-lg border p-3 text-sm">
+            ? <div className="mt-4 space-y-3  border p-3 text-sm">
                 <p>Permission recorded.</p>
-                {item.canDecline&&<button type="button" disabled={!!busy}
-                  className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50"
-                  onClick={()=>void decline(item.participantId,item.studentName)}>Withdraw permission before boarding</button>}
+                {item.canDecline&&<Button type="button" variant="outline" size="sm" disabled={!!busy}
+                  onClick={()=>void decline(item.participantId,item.studentName)}>Withdraw permission before boarding</Button>}
                 {!item.canDecline&&<p className="text-xs text-muted-foreground">Contact the school immediately if your plans change.</p>}
               </div>
             : item.status === "declined"
-              ? <p className="mt-4 rounded-lg border p-3 text-sm">Permission declined. The school was notified; this child is not authorized to board.</p>
+              ? <p className="mt-4  border p-3 text-sm">Permission declined. The school was notified; this child is not authorized to board.</p>
             : item.permissionText
               ? <div className="mt-5">
                   <p className="text-xs uppercase tracking-wide text-muted-foreground">
                     School permission statement · Version {item.permissionVersion}
                   </p>
-                  <div className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 text-sm">
+                  <div className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap  border bg-muted/30 p-4 text-sm">
                     {item.permissionText}
                   </div>
                   {!item.canSign
                     ? <p className="mt-3 text-sm text-amber-700">The permission window is closed. Contact your school.</p>
                     : <>
-                        <label className="mt-4 flex items-start gap-3 text-sm">
-                          <input type="checkbox" className="mt-1"
+                        <Label className="mt-4 flex items-start gap-3 text-sm">
+                          <Checkbox className="mt-1"
                             checked={!!item.permissionVersion && !!item.permissionText &&
                               acknowledged[item.participantId] === JSON.stringify([item.permissionVersion, item.permissionText])}
                             onChange={event => setAcknowledged(previous => ({
@@ -113,14 +115,14 @@ function TripPermissions({ items }: { items: Trip[] }) {
                             }))} />
                           <span>I am authorized to provide permission for {item.studentName},
                             and I have read and agree to the school's statement above.</span>
-                        </label>
-                        <button type="button" disabled={!!busy || !item.permissionVersion || !item.permissionText ||
+                        </Label>
+                        <Button type="button" disabled={!!busy || !item.permissionVersion || !item.permissionText ||
                             acknowledged[item.participantId] !== JSON.stringify([item.permissionVersion, item.permissionText])}
-                          className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50"
-                          onClick={() => void sign(item)}>Sign permission</button>
-                        {item.canDecline&&<button type="button" disabled={!!busy}
-                          className="ml-3 mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
-                          onClick={()=>void decline(item.participantId,item.studentName)}>Decline participation</button>}
+                          className="mt-4"
+                          onClick={() => void sign(item)}>Sign permission</Button>
+                        {item.canDecline&&<Button type="button" variant="outline" disabled={!!busy}
+                          className="ml-3 mt-4"
+                          onClick={()=>void decline(item.participantId,item.studentName)}>Decline participation</Button>}
                       </>}
                 </div>
               : <p className="mt-4 text-sm text-amber-700">
@@ -131,9 +133,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
             must be handled through the school's existing finance process.
           </p>}
         </article>)}
-        {!trip && items.length === 0 && <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
-          No field trip invitations are currently associated with your enrolled children.
-        </p>}
+        {!trip && items.length === 0 && <EmptyState title="No field trip invitations" description="No field trip invitations are currently associated with your enrolled children."/>}
       </div>
     </WorkspaceShell>
   );
