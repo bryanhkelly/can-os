@@ -82,8 +82,8 @@ describe("WS3 governed native Class completion contract",()=>{
   it("takes WS00 Class-first lock order to avoid WS2 withdrawal deadlocks",()=>{
     const start=command.indexOf("export const decideNativeClassCompletion");
     const code=command.slice(start);
-    const cls=code.indexOf(".from(canonicalClasses)");
-    const en=code.indexOf(".from(canonicalClassEnrollments)");
+    const cls=code.indexOf("const [lockedClass]");
+    const en=code.indexOf("const [locked]");
     expect(cls).toBeGreaterThan(-1);
     expect(en).toBeGreaterThan(cls);
   });
