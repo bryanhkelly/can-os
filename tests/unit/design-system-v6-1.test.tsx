@@ -116,6 +116,20 @@ describe("V6.1 reusable design system", () => {
     expect(html).not.toMatch(/\brounded(?:-[\w-]+)?\b/);
   });
 
+  it("renders concise record evidence as square labeled tiles", () => {
+    const html = renderToStaticMarkup(<RecordFacts columns={3} variant="tiles"
+      label="Supervision facts" items={[
+        { id: "expected", label: "Expected onsite", value: "Not confirmed" },
+        { id: "staffing", label: "Reviewed staffing plan", value: "Ready" },
+        { id: "attendance", label: "Observed attendance", value: "Not yet observable" },
+      ]}/>);
+    expect(html).toContain('aria-label="Supervision facts"');
+    expect(html).toContain("sm:grid-cols-3");
+    expect((html.match(/border border-border bg-card p-3/g) ?? []).length).toBe(3);
+    expect(html).toContain("Not yet observable");
+    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
+  });
+
   it("supports a single-column record fact list and an empty safe result", () => {
     const html = renderToStaticMarkup(<RecordFacts columns={1}
       items={[{label:"Opening state", value:"Draft"}]}/>);
