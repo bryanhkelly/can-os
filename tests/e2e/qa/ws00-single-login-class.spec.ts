@@ -22,14 +22,14 @@ test("one verified CAN account completes native Class enroll, learn, Activity an
     await expect(page.getByRole("heading",{name:"My Classes"})).toBeVisible();
     const enroll=page.getByRole("button",{name:"Enroll in Class"});
     await expect(enroll).toBeDisabled();
-    await page.getByLabel(/I confirm that I am at least 18 years old/i).check();
+    await page.getByLabel(/I confirm that I am at least 18/i).check();
     await page.getByLabel(/I have read and accept these participation/i).check();
     await expect(enroll).toBeEnabled();
     await enroll.click();
 
     // Must be a real authoritative enrollment + canonical Course Attempt.
-    // The current implementation requires a preexisting native cookie and
-    // is expected to FAIL here until P0 #320 is implemented securely.
+    // Reviewed-first-time onboarding may now create a native session from
+    // separately approved evidence. Never seed or forge a native cookie here.
     await expect(page.getByText("Enrollment confirmed. Your Course Attempt is ready.")).toBeVisible();
     await expect(page.getByRole("link",{name:"Open Class"})).toBeVisible();
 
