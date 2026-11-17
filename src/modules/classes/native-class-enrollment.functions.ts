@@ -4,10 +4,13 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { accessAccounts,accessAccountNoncreditPrincipals } from "@/db/schema";
+import {getCommandContext} from "@/modules/identity/command-context.server";
 import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
   canonicalClassOfferingVersions, canonicalClassEnrollments, canonicalPersons,
   canonicalClassOutcomes, canonicalClassAwards,
+  canonicalAccounts, canonicalAccountGrants,
   canonicalClassEnrollmentInvitations,
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
@@ -401,18 +404,17 @@ const myClassHistoryInput=z.object({
   }).strict().nullable().default(null),
 }).strict();
 
-export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"})
-  .validator((raw:unknown)=>myClassHistoryInput.parse(raw))
-  .handler(async({data})=>{
-    guard();
-    const {learnerPersonId}=await requireLearner();
+type NativeClassHistoryCursor=NonNullable<z.infer<typeof myClassHistoryInput>["cursor"]>;
+async function readNativeClassHistoryPage(
+  learnerPersonId:string,cursor:NativeClassHistoryCursor|null,
+){
     // Date objects truncate PostgreSQL microseconds to milliseconds. Using
     // them for a keyset cursor can skip same-millisecond history rows.
     // Cast the validated ISO cursor directly in PostgreSQL instead.
-    const older=data.cursor?or(
-      sql`${canonicalClassEnrollments.enrolledAt} < ${data.cursor.enrolledAt}::timestamptz`,
-      and(sql`${canonicalClassEnrollments.enrolledAt} = ${data.cursor.enrolledAt}::timestamptz`,
-        lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)),
+    const older=cursor?or(
+      sql`${canonicalClassEnrollments.enrolledAt} < ${cursor.enrolledAt}::timestamptz`,
+      and(sql`${canonicalClassEnrollments.enrolledAt} = ${cursor.enrolledAt}::timestamptz`,
+        lt(canonicalClassEnrollments.id,cursor.classEnrollmentId)),
     ):undefined;
     const rows=await db.select({
       classEnrollmentId:canonicalClassEnrollments.id,
@@ -485,4 +487,70 @@ export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"}
       enrolledAt:last.enrolledAtCursor,
       classEnrollmentId:last.classEnrollmentId,
     }:null};
+}
+
+/** Native-session consumers retain their restricted canonical learner grant. */
+export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>myClassHistoryInput.parse(raw))
+  .handler(async({data})=>{
+    guard();
+    const {learnerPersonId}=await requireLearner();
+    return readNativeClassHistoryPage(learnerPersonId,data.cursor);
+  });
+
+/**
+ * Read-only CAN account bridge for My Activity. This never issues a native
+ * learner cookie, creates a canonical Person, or grants playback/enrollment.
+ * It permits source-owned history only after a live CAN session, exact
+ * explicit CAN→canonical Account+Person bridge, verified native account,
+ * and a current native learner grant for that same Person.
+ */
+export const getMyNativeClassHistoryForCanAccountPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>myClassHistoryInput.parse(raw))
+  .handler(async({data})=>{
+    guard();
+    const actor=await getCommandContext(getRequest());
+    if(!actor.actorPersonId||actor.sessionAccountId)
+      throw new AuthorizationError("real verified CAN account Person");
+    const [account]=await db.select({
+      personId:accessAccounts.personId,
+      email:accessAccounts.emailNormalized,
+      disabled:accessAccounts.disabled,
+      verifiedAt:accessAccounts.emailVerifiedAt,
+    }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
+    if(!account||account.disabled||!account.verifiedAt||
+       account.personId!==actor.actorPersonId)
+      throw new AuthorizationError("current verified CAN Person");
+    const links=await db.select({
+      canPersonId:accessAccountNoncreditPrincipals.accessPersonId,
+      canonicalAccountId:accessAccountNoncreditPrincipals.canonicalAccountId,
+      canonicalPersonId:accessAccountNoncreditPrincipals.canonicalPersonId,
+    }).from(accessAccountNoncreditPrincipals)
+      .where(and(
+        eq(accessAccountNoncreditPrincipals.accessAccountId,actor.accountId),
+        eq(accessAccountNoncreditPrincipals.accessPersonId,actor.actorPersonId),
+      )).limit(2);
+    if(links.length===0)return {items:[],nextCursor:null};
+    if(links.length!==1||links[0]!.canPersonId!==actor.actorPersonId)
+      throw new AuthorizationError("unique verified canonical bridge");
+    const link=links[0]!;
+    const [verified]=await db.select({id:canonicalAccounts.id})
+      .from(canonicalAccounts).where(and(
+        eq(canonicalAccounts.id,link.canonicalAccountId),
+        eq(canonicalAccounts.emailNormalized,account.email),
+        isNull(canonicalAccounts.disabledAt),
+        isNotNull(canonicalAccounts.emailVerifiedAt),
+      )).limit(1);
+    if(!verified)throw new AuthorizationError("current native account bridge");
+    const [grant]=await db.select({id:canonicalAccountGrants.id})
+      .from(canonicalAccountGrants).where(and(
+        eq(canonicalAccountGrants.accountId,link.canonicalAccountId),
+        eq(canonicalAccountGrants.personId,link.canonicalPersonId),
+        eq(canonicalAccountGrants.roleCode,"learner"),
+        eq(canonicalAccountGrants.active,true),
+        isNull(canonicalAccountGrants.revokedAt),
+        isNull(canonicalAccountGrants.siteId),
+      )).limit(1);
+    if(!grant)throw new AuthorizationError("current native learner identity");
+    return readNativeClassHistoryPage(link.canonicalPersonId,data.cursor);
   });
