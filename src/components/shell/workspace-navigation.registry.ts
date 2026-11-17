@@ -13,6 +13,7 @@ const destinationContextKeys: Record<string, readonly string[]> = {
   "/operations/insights": ["siteId", "programId"],
   "/settings": ["siteId"],
   "/admin": ["siteId"],
+  "/canonical/blueprints": [],
   "/site-website": ["siteId", "programId"],
   "/staff/attendance": ["programId"],
   "/operations/curriculum": ["programId"],
@@ -84,6 +85,7 @@ export interface WorkspaceNavigationItem {
 
 export const workspaceHome = {
   account_holder: "/account/",
+  app_admin: "/canonical",
   academic_content_creator: "/canonical/content",
   academic_content_reviewer: "/canonical/content-reviews",
   site_website_editor: "/home",
@@ -122,6 +124,7 @@ const schoolAdministrationLinks = [
   { title: "Students", path: "/staff/students", icon: "users" },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },
   { title: "Curriculum", path: "/operations/curriculum", icon: "book" },
+  { title: "Blueprint Studio", path: "/canonical/blueprints", icon: "book" },
   { title: "Program operations", path: "/canonical/program-operations", icon: "book" },
   { title: "Reports", path: "/reports/", icon: "clipboard" },
   { title: "Teachers", path: "/operations/teacher-marketplace", icon: "users" },
@@ -137,6 +140,7 @@ const siteAdminProfileLink = {
  */
 const roleLinks = {
   account_holder: [{ title: "Classes", path: "/class", icon: "book" }, { title: "My Activity", path: "/learn/my-activity", icon: "book" }],
+  app_admin: [],
   academic_content_creator: [],
   academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
