@@ -66,7 +66,7 @@
     "lint": "eslint . && node scripts/check-design-system.mjs",
     "lint:fix": "eslint . --fix",
     "build:cloudflare": "vite build --config vite.cloudflare.config.ts",
-    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
+    "deploy:cloudflare": "node scripts/acceptance/check-one-person-deploy-schema.mjs && npm run build:cloudflare && wrangler deploy",
     "test:classroom:unit": "vitest run tests/unit/facilitated-learning.test.ts tests/unit/canonical-learning-activity.test.ts tests/unit/classroom-priority-fixes.test.ts tests/unit/canonical-learning-release-contract.test.ts tests/unit/canonical-learning-release-readiness.test.ts tests/unit/classroom-phase2-integration.test.ts tests/unit/classroom-release3.test.ts tests/unit/classroom-release-enrollment-handoff.test.ts tests/unit/site-noncredit-bridge-readiness.test.ts tests/unit/noncredit-waitlist-delivery-contract.test.ts",
     "test:classroom:unconfigured": "playwright test --config playwright.authenticated-routes.config.ts --grep 'classroom join fails closed|learner and guardian cannot use facilitator|companion without a verified'",
     "db:canonical:noncredit-self-enrollment": "node scripts/acceptance/check-noncredit-self-enrollment.mjs",
@@ -89,7 +89,8 @@
     "check:route-identifiers": "node scripts/acceptance/check-route-identifier-collisions.mjs",
     "test:route-identifiers": "node --test scripts/acceptance/check-route-identifier-collisions.test.mjs",
     "db:canonical:one-person-cutover-preflight": "node scripts/acceptance/check-one-person-cutover.mjs",
-    "test:identity:account-constraints": "node scripts/acceptance/test-one-person-account-constraints.mjs"
+    "test:identity:account-constraints": "node scripts/acceptance/test-one-person-account-constraints.mjs",
+    "verify:deploy:identity-schema": "node scripts/acceptance/check-one-person-deploy-schema.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
