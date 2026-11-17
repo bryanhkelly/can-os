@@ -3,6 +3,9 @@ import { ArrowDown, ArrowUp, Copy, LayoutGrid, Plus, Save, Trash2 } from "lucide
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/choice";
+import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { Select } from "@/components/ui/select";
 import {
   defaultSiteContentChannelConfig, siteContentChannelConfigSchema,
@@ -31,6 +34,11 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
   const initial=initialConfig??defaultSiteContentChannelConfig;
   const [revision,setRevision]=useState(initial.revision);
   const [blocks,setBlocks]=useState<SiteContentBlock[]>(initial.blocks.map(b=>({...b})));
+  const [savedSnapshot,setSavedSnapshot]=useState(JSON.stringify({
+    revision:initial.revision,blocks:initial.blocks,
+  }));
+  useLaunchUnsavedChanges(JSON.stringify({revision,blocks})!==savedSnapshot,
+    "Leave Site content setup? Unsaved block edits will be lost.");
   const [addChannel,setAddChannel]=useState<SiteContentChannelId| "">("");
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
@@ -81,6 +89,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
       }});
       setRevision(next.revision);
       setBlocks(next.blocks.map(block=>({...block})));
+      setSavedSnapshot(JSON.stringify({revision:next.revision,blocks:next.blocks}));
       setSaved(true);
       setPublished(false);
       onSaved();
@@ -180,13 +189,12 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
             </Field>
           </div>
           <Field label="Section description" className="mt-4">
-            <textarea value={block.description} maxLength={320} rows={3}
-              onChange={e=>editBlock(block.id,{description:e.target.value})}
-              className="w-full border border-input bg-card p-3 text-sm text-foreground focus-visible:outline-2 focus-visible:outline-primary"/>
+            <Textarea value={block.description} maxLength={320} rows={3}
+              onChange={e=>editBlock(block.id,{description:e.target.value})}/>
           </Field>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
             <label className="inline-flex min-h-11 items-center gap-3 text-sm">
-              <input type="checkbox" checked={block.enabled} className="size-4"
+              <Checkbox checked={block.enabled}
                 onChange={e=>editBlock(block.id,{enabled:e.target.checked})}/>
               Show this block when source records are available
             </label>
