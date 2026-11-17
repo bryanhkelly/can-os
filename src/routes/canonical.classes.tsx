@@ -24,7 +24,8 @@ type Method=ClassOfferingTerms["enrollmentMethods"][number];
 type CreditMode=ClassOfferingTerms["allowedCreditModes"][number];
 const methodOptions: {value:Method;label:string}[]=[
   {value:"self",label:"Self-enrollment"},{value:"assignment",label:"Assignment"},
-  // Invitation and approval become selectable only after WS2 verified commands.
+  {value:"invitation",label:"Invitation (verified adults)"},
+  // Approval requires an independently authorized review workflow.
 ];
 const creditOptions: {value:CreditMode;label:string}[]=[
   {value:"not_applicable",label:"No academic credit"},
