@@ -36,7 +36,7 @@ export async function assertCurrentCANGrantForMutation(
   if (!actor.accountId || !actor.sessionId || !actor.grantId ||
       !actor.actorPersonId || !actor.role || actor.sessionAccountId ||
       !expected.roles.includes(actor.role) ||
-      actor.scope.organizationIds?.length !== (expected.organizationId ? 1 : 0) ||
+      (actor.scope.organizationIds?.length ?? 0) !== (expected.organizationId ? 1 : 0) ||
       (expected.organizationId &&
         actor.scope.organizationIds?.[0] !== expected.organizationId) ||
       actor.grantSiteId !== expected.siteId ||
