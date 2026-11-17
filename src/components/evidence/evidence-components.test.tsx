@@ -46,6 +46,10 @@ describe("shared evidence presentation", () => {
     expect(html).toContain("disabled");
     expect(html).toContain("Review rationale");
     expect(html).toContain('minLength="10"');
+    const labelId = html.match(/<label for="([^"]+)"/)?.[1];
+    expect(labelId).toBeTruthy();
+    expect(html).toContain(`id="${labelId}"`);
+    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
   });
 
   it("renders disabled upload controls when deployment disables private uploads", () => {
