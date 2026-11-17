@@ -25,6 +25,12 @@ export type OutboundPreparation<Message> =
   | { kind: "fail"; reason: string }
   | { kind: "ready"; message: Message };
 
+export type OutboundSendResult = boolean | {
+  accepted: boolean;
+  /** Provider-assigned message ID; contains no recipient contact data. */
+  providerMessageId?: string;
+};
+
 export type OutboundAdapter<Message> = {
   claim(now: Date, seenIds: readonly string[], leaseMs: number): Promise<OutboundClaim | null>;
   prepare(claim: OutboundClaim, now: Date): Promise<OutboundPreparation<Message>>;
@@ -33,7 +39,7 @@ export type OutboundAdapter<Message> = {
   /** Return the claimed receipt to pending without consuming an attempt. */
   defer?(claim: OutboundClaim, until: Date, now: Date): Promise<boolean>;
   /** Transport must reuse claim.id as its idempotency key. */
-  send(message: Message, idempotencyKey: string): Promise<boolean>;
+  send(message: Message, idempotencyKey: string): Promise<OutboundSendResult>;
   /**
    * Every write is fenced by the claim's renewed lease and processing state.
    * Return false when ownership has changed; do not count unowned results.
@@ -46,6 +52,7 @@ export type OutboundAdapter<Message> = {
       attempts: number;
       nextAttemptAt: Date | null;
       reason: string | null;
+      providerMessageId?: string;
     },
   ): Promise<boolean>;
   /** A crash during preparation/transport also consumes one attempt. */
@@ -109,13 +116,16 @@ export async function dispatchOutboundMessages<Message>(
       const renewed = await adapter.renew(active, clock(), leaseMs);
       if (!renewed) continue;
       active = renewed;
-      const providerAccepted = await adapter.send(prepared.message, active.id);
+      const providerResult = await adapter.send(prepared.message, active.id);
+      const providerAccepted = typeof providerResult === "boolean" ? providerResult : providerResult.accepted;
+      const providerMessageId = typeof providerResult === "boolean" ? undefined : providerResult.providerMessageId;
       const attempts = active.attempts + 1;
       const at = clock();
       const kind = providerAccepted ? "accepted" : "failed";
       if (await adapter.settle(active, {
         kind, now: at, attempts,
         reason: providerAccepted ? null : "provider_not_accepted",
+        ...(providerAccepted && providerMessageId ? { providerMessageId } : {}),
         nextAttemptAt: providerAccepted || attempts >= maxAttempts
           ? null : new Date(at.getTime() + retryDelayMs(attempts)),
       })) totals[kind]++;
