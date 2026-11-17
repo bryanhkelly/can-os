@@ -66,4 +66,21 @@ describe("native Class launch readiness is a source-backed presentation",()=>{
     expect(component).toContain("Deployment and adoption inspection (staging)");
     expect(component).not.toContain("createUnifiedClassDraft");
   });
+  it("guards the mutating QA browser journey with isolated-branch checks",()=>{
+    const config=readFileSync("playwright.native-class-operator.config.ts","utf8");
+    const preflight=readFileSync("scripts/acceptance/check-native-class-operator-qa.mjs","utf8");
+    const spec=readFileSync("tests/e2e/qa/native-class-operator.spec.ts","utf8");
+    expect(config).toContain('CAN_TEST_DB_WRITES_ENABLED!=="true"');
+    expect(config).toContain("CAN_APPLICATION_DB_HOST");
+    expect(config).toContain('url.protocol!=="http:"');
+    expect(preflight).toContain("verifyAdmissionsNeonBranch");
+    expect(preflight).toContain('CAN_E2E_TEST_BRANCH_ID');
+    expect(preflight).not.toMatch(/\\bINSERT\\b|\\bUPDATE\\b|\\bDELETE\\b|\\bTRUNCATE\\b/i);
+    expect(spec).toContain("withAuthenticatedPage");
+    expect(spec).toContain("Create draft Class");
+    expect(spec).toContain("await page.reload()");
+    expect(spec).toContain("persistedTitle");
+    expect(spec).not.toContain("sql.query");
+  });
+
 });
