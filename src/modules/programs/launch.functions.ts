@@ -222,6 +222,7 @@ export const listLaunches = createServerFn({ method: "GET" })
         name: s.programs.name,
         slug: s.programs.slug,
         type: s.programs.type,
+        gradeRange: s.programs.gradeRange,
         status: s.programs.status,
         organizationId: s.programs.organizationId,
         academicProviderOrganizationId: s.programs.academicProviderOrganizationId,
