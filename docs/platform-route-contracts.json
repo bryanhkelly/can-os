@@ -359,27 +359,27 @@
       "route": "/canonical/content",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Verified organization-scoped instructional creator sees only Courses with current evidence-backed appointments, then creates private recorded-track drafts and resumes owned versions",
-      "readBoundary": "Exact active legacy provider grant plus course-specific professional role appointment, current capability evidence, verified membership; excludes student and other organizations",
-      "writeBoundary": "Draft creation delegated to existing audited provider-owned instructional track command; no student record or publication powers"
+      "roleJourney": "Staged creator URL redirects to /class?view=content; provider content home retains existing exact-appointment checks",
+      "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
+      "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
     },
     {
       "file": "src/routes/canonical.content_.$trackVersionId.tsx",
       "route": "/canonical/content_/$trackVersionId",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Author edits their own unsubmitted track's exact published Course lessons and approved content asset bindings, saves a revision and submits the manifest for independent review",
-      "readBoundary": "Own author draft, current grant, course-scoped capability and appointment revalidated; approved organization asset inventory only; no learner data",
-      "writeBoundary": "Existing save and submit commands revalidate exact revision, publication assets, rights, lesson coverage and audit; submitted manifest freezes editing"
+      "roleJourney": "Staged content edit URL redirects to /class?view=content&trackVersionId=:id; current Course/asset checks remain with original services",
+      "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
+      "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
     },
     {
       "file": "src/routes/canonical.content-reviews.tsx",
       "route": "/canonical/content-reviews",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Independent reviewer sees only submitted manifests under current course-specific appointments, records category decisions and publishes only fully approved tracks",
-      "readBoundary": "Current reviewer organization grant, independently verified course appointment, exclude own author and presenter tracks, no access to learner records",
-      "writeBoundary": "Existing audited review and publish commands require current exact manifest and independent reviews covering academic, rights, accessibility, coverage and safeguarding"
+      "roleJourney": "Staged review URL redirects to /class?view=reviews; independent reviewers retain their existing authority boundary",
+      "readBoundary": "Redirect only; promoted component reads current authorized provider appointment via the existing source service",
+      "writeBoundary": "No writes in the staging route; original author/reviewer commands remain separately authorized, audited and independently reviewed"
     },
     {
       "file": "src/routes/canonical.lab.credentials.tsx",
@@ -1772,9 +1772,9 @@
       "route": "/class",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Single native /class entry for discovery, enrollment, authorized Class management and publisher-owned Course activity drafting",
-      "readBoundary": "Public offerings are independently eligibility-filtered; privileged management and publisher queries recheck exact role and current organization/Site permissions",
-      "writeBoundary": "Server-side Class, publisher assessment and survey commands authorize each action independently; URL choice never grants rights"
+      "roleJourney": "One production /class experience for discovery, enrollment, Class management, publisher activities, recorded instruction draft production, and independent content review",
+      "readBoundary": "Each view uses its original authorized source reader and exact current role, organization, Course and independent provider appointment checks",
+      "writeBoundary": "Each create, edit, submit, review and publish command retains existing server-side author/reviewer separation, idempotency and audit"
     },
     {
       "file": "src/routes/platform.tsx",
