@@ -21,6 +21,19 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     }
   });
 
+  it("re-reads locked Offering terms after Class lock to block stale publication",()=>{
+    const locator=self.indexOf("const [sourceVersion]=await tx.select({");
+    const classLock=self.indexOf('eq(canonicalClasses.id,sourceVersion.classId)).for("update")');
+    const lockedTerms=self.indexOf("const [version]=await tx.select().from(canonicalClassOfferingVersions)");
+    const currentTerms=self.indexOf("assertNativeSelfEnrollmentEligible({");
+    expect(locator).toBeGreaterThan(0);
+    expect(classLock).toBeGreaterThan(locator);
+    expect(lockedTerms).toBeGreaterThan(classLock);
+    expect(self.slice(lockedTerms,currentTerms)).toContain('.for("update").limit(1)');
+    expect(currentTerms).toBeGreaterThan(lockedTerms);
+    expect(self).not.toContain('eq(canonicalClasses.id,version.classId)).for("update")');
+  });
+
   it("takes the canonical Class lock before open-seat admission",()=>{
     for(const source of [self,assigned]){
       const lock=source.indexOf('for("update")');
