@@ -38,10 +38,19 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
  if(module==="academics") {
   const catalogDiscovery = data.canonicalCatalogEnabled
     ? <ProgramDiscoveryPanel key={siteId} siteId={siteId}/>
-    : <p role="status" className="mt-6 border bg-muted p-4 text-sm">
-        Published program discovery is not enabled for this school yet.
-        You can continue preparing academics without it.
-      </p>;
+    : <section role="status" className="mt-6 border border-border bg-card p-4 text-sm">
+        <p className="font-semibold">Program catalog requires verified Site access</p>
+        <p className="mt-2 text-muted-foreground">
+          {data.catalogState==="unavailable"?"Catalog authorization could not be checked right now."
+            :data.catalogState==="blocked"?"Your CAN account does not have a current approved canonical staff grant for this Site."
+            :"This Site has not completed independent canonical identity approval."}
+          {" "}You can continue private planning without receiving enrollment or publishing authority.
+        </p>
+        <Link to="/site-identity" search={{mode:"request",siteId}}
+          className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary underline">
+          Review Site identity and approval
+        </Link>
+      </section>;
   if(current)return <>{catalogDiscovery}{data.academic ? <LaunchAcademicSetupWorkspace key={current.id} hubMode data={data.academic}/> : <p role="alert" className="mt-6 border p-5">Academic records could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry academic records</Button></p>}</>;
   if(data.draftFailed)return <><p role="alert" className="mt-6 border p-5">Your saved academic setup could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry saved draft</Button></p></>;
     const wizardData:LaunchWizardData={options:{...data.options,canCreateSite:false,sites:data.options.sites.filter(item=>item.id===siteId),organizations:data.options.organizations.filter(org=>org.id===site?.organizationId)},launches:{launches:data.launches},preparationPrograms:[],familyInvitations:null,admissionsCounts:null,enrollmentCounts:null,extendedPlanning:null,jurisdictionGuidance:{},jurisdictionResearch:data.jurisdictionResearch??{},jurisdictionResearchUnavailable:data.jurisdictionResearchUnavailable,authError:"",draft:data.draft,draftContext:`${siteId}:`};
