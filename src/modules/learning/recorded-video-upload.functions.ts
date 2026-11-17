@@ -13,7 +13,7 @@ import { classVideoFileSchema, videoUploadPolicy, hasVideoSignature } from "@/do
 import { instructionalTrackAssetStorageKey } from "@/domain/instructional-tracks";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertTrackProvider } from "./instructional-track-access.server";
-import { createPrivateUpload, resolveR2Config, verifyPrivateObject } from "@/platform/storage/r2";
+import { createPrivateUpload, resolveR2Config, verifyPrivateObject, hashPrivateObjectSha256 } from "@/platform/storage/r2";
 import { writeAudit } from "@/platform/mutation";
 
 const uuid = z.string().uuid();
@@ -103,6 +103,9 @@ export const finishRecordedVideoUpload = createServerFn({method:"POST"})
       key:data.key,keyPattern:assetKeyPattern,expectedSize:data.size,
       expectedContentType:data.contentType,verifySignature:hasVideoSignature,
     });
+    const sha256=await hashPrivateObjectSha256({
+      key:data.key,keyPattern:assetKeyPattern,expectedSize:data.size,
+    });
     return db.transaction(async tx=>{
       const publisher=await requireCurrentPublisher(tx,actor,data.courseVersionId);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${data.assetVersionId}))`);
@@ -110,6 +113,7 @@ export const finishRecordedVideoUpload = createServerFn({method:"POST"})
         id:contentAssetVersions.id,assetId:contentAssetVersions.assetId,
         key:contentAssetVersions.storageReference,
         lifecycle:contentAssetVersions.lifecycle,
+        sha256:contentAssetVersions.sha256,
         title:contentAssets.title,
         organizationId:contentAssets.ownerOrganizationId,
         terms:contentAssetVersions.licenseTerms,
@@ -119,7 +123,7 @@ export const finishRecordedVideoUpload = createServerFn({method:"POST"})
       if(prior){
         if(prior.assetId!==data.assetId || prior.key!==data.key ||
           prior.title!==data.title || prior.organizationId!==publisher.organizationId ||
-          prior.lifecycle!=="draft" ||
+          prior.lifecycle!=="draft" || prior.sha256!==sha256 ||
           !prior.terms || typeof prior.terms!=="object" || Array.isArray(prior.terms) ||
           !Object.entries(fileMetadata).every(([key,value])=>
             (prior.terms as Record<string,unknown>)[key]===value))
@@ -132,7 +136,7 @@ export const finishRecordedVideoUpload = createServerFn({method:"POST"})
       });
       await tx.insert(contentAssetVersions).values({
         id:data.assetVersionId,assetId:data.assetId,versionNo:1,
-        storageReference:data.key,licenseTerms:fileMetadata,
+        storageReference:data.key,licenseTerms:fileMetadata,sha256,
         lifecycle:"draft",publishedAt:null,
       });
       await writeAudit(tx,actor,{
