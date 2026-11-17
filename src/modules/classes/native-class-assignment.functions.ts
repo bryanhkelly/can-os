@@ -120,7 +120,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         classId:cls.id,classOfferingVersionId:null,
         learnerPersonId:person.id,enrollmentMethod:"assignment",
         creditMode:data.creditMode,status:"active",
-        enrolledByPersonId:actor.actorPersonId,
+        enrolledByPersonId:actor.actorPersonId!,
         consentVersion:null,consentSha256:null,consentedAt:null,
       }).returning({id:canonicalClassEnrollments.id});
       if(!enrollment)throw new Error("Cannot save assigned Class Enrollment");
@@ -145,7 +145,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
         .set({courseAttemptId:attempt.id})
         .where(eq(canonicalClassEnrollments.id,enrollment.id));
       await tx.insert(auditEvents).values({
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.enrollment.assigned",
         entityKind:"class_enrollment",entityId:enrollment.id,
@@ -154,7 +154,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
           classOfferingVersionId:null},
       });
       await tx.insert(domainEvents).values({
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         eventType:"ClassEnrollmentAssigned",
         aggregateType:"class_enrollment",aggregateId:enrollment.id,
         payload:{classId:cls.id,courseAttemptId:attempt.id,method:"assignment"},
