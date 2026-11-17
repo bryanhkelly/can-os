@@ -4,6 +4,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, BookOpen, Check, ExternalLink, MapPin, Settings, ShieldCheck, Star, Users } from "lucide-react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { useWorkspaceSession, workspaceSessionQueryOptions } from "@/components/shell/WorkspaceSession";
 import { switchVerifiedMembership } from "@/lib/workspace-membership-switch";
 import { getMyCanAccount, setMyCanFavoriteSite } from "@/modules/identity/my-can-account.functions";
@@ -144,10 +148,10 @@ function MyCanAccount() {
             {!account.favoritesReady && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
               Saved locations are not yet available in this database. Your school access remains unchanged.
             </p>}
-            <label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a location</label>
-            <input id="place-search" type="search" value={search}
+            <Label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a location</Label
+            <Input id="place-search" type="search" value={search}
               onChange={event => setSearch(event.target.value)} placeholder="Search site, organization or city"
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
+              className="mt-2 min-h-11"/>
           </header>
           <div className="divide-y divide-border">
             {visiblePlaces.map(place => <article key={place.id} className="px-5 py-4">
@@ -256,16 +260,16 @@ function AccountContactEditor({ profile, editable }: {
       Your verified email and official institutional records are managed separately.
       Sharing with a new school still requires its own application or invitation.
     </p>
-    <label className="block text-xs font-semibold" htmlFor="my-can-preferred-name">Preferred name</label>
-    <input id="my-can-preferred-name" value={preferredName} maxLength={80}
+    <Label className="block text-xs font-semibold" htmlFor="my-can-preferred-name">Preferred name</Label
+    <Input id="my-can-preferred-name" value={preferredName} maxLength={80}
       disabled={!editable || saving} onChange={event => setPreferredName(event.target.value)}
       autoComplete="nickname"
-      className="min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
-    <label className="block text-xs font-semibold" htmlFor="my-can-phone">Contact phone</label>
-    <input id="my-can-phone" value={phone} maxLength={30} type="tel"
+      className="min-h-11"/>
+    <Label className="block text-xs font-semibold" htmlFor="my-can-phone">Contact phone</Label
+    <Input id="my-can-phone" value={phone} maxLength={30} type="tel"
       disabled={!editable || saving} onChange={event => setPhone(event.target.value)}
       autoComplete="tel"
-      className="min-h-11 w-full border border-border bg-background px-3 text-sm focus-visible:outline-2 focus-visible:outline-primary"/>
+      className="min-h-11"/>
     <Button type="submit" size="sm" disabled={!editable || saving}>
       {saving ? "Saving…" : "Save contact preferences"}
     </Button>
@@ -323,24 +327,24 @@ function SiteContactSharing({ siteId, siteName, current, available, grantAllowed
       <Button variant="outline" size="sm" type="button" disabled={!available || saving}
         onClick={() => void decide("revoke")}>Stop sharing</Button>
     </div> : <>
-      <button type="button" className="text-xs font-semibold text-primary underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-primary"
+      <Button type="button" variant="ghost" size="sm" className="text-xs font-semibold text-primary underline underline-offset-4"
         disabled={!available || !grantAllowed || saving} aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}>
         Share my contact with this location
-      </button>
+      </Button>
       {expanded && <div className="mt-3 max-w-lg space-y-3 border border-border bg-muted/20 p-4">
         <p className="text-sm leading-6">Allow {siteName} to see your CAN name and verified email address
           for the purpose you select. This does not enroll you in anything or grant a staff role.</p>
-        <label htmlFor={"share-purpose-"+siteId} className="block text-xs font-semibold">Purpose</label>
-        <select id={"share-purpose-"+siteId} value={purpose}
+        <Label htmlFor={"share-purpose-"+siteId} className="block text-xs font-semibold">Purpose</Label
+        <Select id={"share-purpose-"+siteId} value={purpose}
           onChange={event => setPurpose(event.target.value as SiteConsentView["purpose"])}
-          className="min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="min-h-11">
           {consentPurposes.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
-        </select>
-        <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" checked={sharePhone} onChange={event => setSharePhone(event.target.checked)}/>
+        </Select>
+        <Label className="flex items-start gap-2 text-sm">
+          <Checkbox checked={sharePhone} onChange={event => setSharePhone(event.target.checked)}/>
           Include my contact phone
-        </label>
+        </Label
         <p className="text-xs leading-5 text-muted-foreground">You can revoke future access at any time.
           Revoking does not erase information already lawfully received or retained by an organization.</p>
         <Button type="button" size="sm" disabled={saving || !available}
