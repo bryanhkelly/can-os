@@ -56,7 +56,7 @@ export const getNativeClassRosterPage=createServerFn({method:"GET"})
       if(!cls||!organizationId||actor.scope.organizationIds?.length!==1||
          cls.operatingOrganizationId!==organizationId||
          (cls.siteId?!actor.scope.siteIds?.includes(cls.siteId):
-           cls.createdByPersonId!==actor.actorPersonId))
+           cls.createdByPersonId!==actor.actorPersonId!))
         throw new AuthorizationError("your operating Class");
       await validateClassAuthority(tx,{
         actor,organizationId,siteIds:actor.scope.siteIds??[],
@@ -114,7 +114,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getCanonicalCommandContext(getRequest());
-    if(!actor.actorPersonId)throw new AuthorizationError("verified Class member");
+    if(!actor.actorPersonId!)throw new AuthorizationError("verified Class member");
     return db.transaction(async tx=>{
       const [instance]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId)).limit(1);
@@ -144,7 +144,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           status:canonicalClassEnrollments.status,
         }).from(canonicalClassEnrollments).where(and(
           eq(canonicalClassEnrollments.classId,instance.id),
-          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
+          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!),
           inArray(canonicalClassEnrollments.status,["active","completed"]),
         )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(2);
         if(active.length>1)throw new AuthorizationError("ambiguous current Class enrollment");
@@ -171,14 +171,14 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
           attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
         }).from(canonicalClassStaffAssignments).where(and(
           eq(canonicalClassStaffAssignments.classId,instance.id),
-          eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
+          eq(canonicalClassStaffAssignments.personId,actor.actorPersonId!),
           eq(canonicalClassStaffAssignments.state,"approved"),
           lte(canonicalClassStaffAssignments.beginsAt,now),
           or(isNull(canonicalClassStaffAssignments.endsAt),
             gt(canonicalClassStaffAssignments.endsAt,now)),
         )).limit(2);
         if(assignments.length){
-          await assertCurrentNativeTeachingGrant(tx,actor.actorPersonId,instance.operatingOrganizationId,instance.siteId);
+          await assertCurrentNativeTeachingGrant(tx,actor.actorPersonId!,instance.operatingOrganizationId,instance.siteId);
           // Revoke or expire underlying publisher, deployment, adoption or Site
           // authority and teaching access disappears immediately.
           await currentClassAuthority(tx,instance.id,now);
@@ -193,7 +193,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
          actor.scope.organizationIds?.includes(instance.operatingOrganizationId) &&
          (instance.siteId
            ? actor.scope.siteIds?.includes(instance.siteId)
-           : instance.createdByPersonId===actor.actorPersonId)){
+           : instance.createdByPersonId===actor.actorPersonId!)){
         await validateClassAuthority(tx,{
           actor,organizationId:instance.operatingOrganizationId,
           siteIds:actor.scope.siteIds??[],
@@ -415,7 +415,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         state:row.state,
         startsAt:row.startsAt.toISOString(),
         endsAt:row.endsAt.toISOString(),
-        isMySession:row.facilitatorPersonId===actor.actorPersonId,
+        isMySession:row.facilitatorPersonId===actor.actorPersonId!,
         agendaRequired:requiresClassSessionAgenda({
           featureEnabled:sessionAgendasEnabled,
           mandatoryFrom:process.env.CAN_WS4_AGENDA_REQUIRED_FROM,
