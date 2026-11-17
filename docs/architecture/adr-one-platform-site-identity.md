@@ -57,6 +57,10 @@ The `education_v30.sites` table now has 40 inbound FK constraints; `public.sites
 14. Rebound four reviewed, empty `public` operational tables' Site foreign keys from `education_v30.sites(id)` to the authoritative `public.sites(id)`, preserving constraint names and validation. SQL: `database/production/2026-11-17-rebind-public-operational-site-fks.sql`. Exact Site UUIDs were already the same; no mapping or backfill was introduced.
 15. Added `verify:site:main-consolidation` to assert directly on Neon main that moved tables remain in `public`, four reviewed Site constraints target `public.sites`, and the Site identity bridge remains absent. This check does not certify the remaining 430 native tables, browser flows or release readiness.
 
+16. Rebound **26 Organization FKs across 23 empty public operational tables** from `education_v30.organizations(id)` to `public.organizations(id)`. Preserved their names and validation; isolated the active adult-learning identity-review FK for later authorization migration. SQL: `database/production/2026-11-17-rebind-public-operational-organization-fks.sql`.
+17. Rebound **7 operational Person FKs** from `education_v30.persons(id)` to `public.people(id)`. The three Person/account correspondence and review tables were not touched. Read-only source inspection verified that the native Person and Account tables are empty on main, while the platform retains 142 People and 15 login Accounts. SQL: `database/production/2026-11-17-rebind-public-operational-person-fks.sql`.
+18. Extended main-only `verify:site:main-consolidation` to check 4 direct Site FKs, 26 direct Organization FKs, 7 direct Person FKs, 10 representative relocated table locations, and the retired Site bridge. This is a **milestone gate**, not full typecheck, migration rollback acceptance or browser release.
+
 ## Production cutover (dependency order; not yet executed)
 
 1. Inventory every schema object and real record, including colliding names, 430 remaining canonical tables, 245 routines, 7 sensitive tables, sequences, views, non-FK UUIDs, triggers, migrations, role grants, RLS policies, published URLs and identity-related consumers.
