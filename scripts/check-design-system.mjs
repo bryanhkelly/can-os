@@ -158,10 +158,11 @@ if (!governedCompletionReview.includes('from "@/components/ui/select"') ||
 }
 
 
-// Shared roster presentation applies to Section, Site Admin and native Class
-// workflows. Only row layout is centralized; feature authority stays server-owned.
+// Tabular rosters use DirectoryTable; compact row lists use RosterList.
+// Both remain presentation-only. Source authorization and enrollment stay server-owned.
 const rosterConsumers = {
-  "learning/ClassRosterPanel.tsx": ["RosterList", 'from "@/components/workspace"'],
+  // A tabular roster uses DirectoryTable; compact classroom lists use RosterList.
+  "learning/ClassRosterPanel.tsx": ["DirectoryTable", 'from "@/components/workspace"'],
   "routes/classes.tsx": ["RosterList", 'from "@/components/workspace"'],
   "routes/class_.$classId.tsx": ["RosterList", 'from "@/components/workspace"'],
 };
