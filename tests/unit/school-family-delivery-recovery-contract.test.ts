@@ -19,7 +19,7 @@ describe("scoped school-family operator recovery",()=>{
 
   it("only requeues failed terminal receipts, retaining the original idempotency key",()=>{
     const file=read("src/modules/communication/school-family-delivery-operations.functions.ts");
-    expect(file).toContain('if(r.status!=="failed"||r.nextAttemptAt||r.acceptedAt||r.leaseUntil)');
+    expect(file).toContain('if(r.status!=="failed"||r.nextAttemptAt||r.acceptedAt||r.leaseUntil||');
     expect(file).toContain('eq(s.notificationOutboundDeliveries.status,"failed")');
     expect(file).toContain("isNull(s.notificationOutboundDeliveries.acceptedAt)");
     expect(file).toContain('status:"pending",attempts:0,nextAttemptAt:now');
