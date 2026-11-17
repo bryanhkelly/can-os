@@ -1,6 +1,7 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest, setResponseHeader} from "@tanstack/react-start/server";
-import {AuthorizationError} from "@/domain/command-context";
+import {
+  projectSchoolPrograms, projectAcceptedCalendarEvents,AuthorizationError} from "@/domain/command-context";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {
   PARTICIPATION_READ_MODEL_VERSION, assertParticipationReadModel,
@@ -16,6 +17,7 @@ import {getMyNativeClassEnrollmentHistoryPage} from "@/modules/classes/native-cl
 import {readBoundedNativeClassHistory} from "@/domain/native-class-history-pagination";
 import {getMyNoncreditSelfEnrollments} from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import {getMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
+import {getMyProgramEventParticipation} from "./personal-program-event.functions";
 import {getEnrichmentFamily} from "@/modules/activities/enrichment-family.functions";
 
 /**
@@ -87,6 +89,15 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
         return projectFamilyEnrichment(result.registrations, result.children, now);
       });
     }
+    if(session.role==="student"||session.role==="guardian"){
+      // One source-verified read serves Program and accepted-Event projections.
+      // Neither a calendar invite nor a Program catalog entry is enrollment.
+      const programEvents=getMyProgramEventParticipation();
+      register("school_program",async()=>
+        projectSchoolPrograms((await programEvents).programs,now));
+      register("calendar_event",async()=>
+        projectAcceptedCalendarEvents((await programEvents).events,now));
+    }
     // Personal adult training is bound to the verified access account; it does
     // not inherit permissions from Site staff roles or a dependent's record.
     if (session.role === "guardian" || session.role === "account_holder") {
@@ -117,7 +128,8 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
     }
     await Promise.all(work);
     const allSources: ActivitySource[] = [
-      "school_section", "native_class", "noncredit_course",
+      "school_section", "school_program", "calendar_event",
+      "native_class", "noncredit_course",
       "family_enrichment", "noncredit_waitlist",
     ];
     for (const source of allSources) {
