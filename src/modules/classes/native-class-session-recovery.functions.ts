@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -139,6 +139,6 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
       return {cookie:issued};
     });
     // Never issue a cookie if any identity or audit check rolls back.
-    setResponseHeader("Set-Cookie",cookie);
+    appendResponseHeader("Set-Cookie",cookie);
     return {ready:true as const};
   });
