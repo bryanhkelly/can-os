@@ -9,11 +9,9 @@ import { accessSessionCookie } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { getCommandContext } from "./command-context.server";
 import { resolveCanonicalSiteStaffFromCan } from "./canonical-can-staff-bridge.server";
-import { Pool, type PoolClient } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import {
-  canonicalAuthReaderDatabaseRole,
   canonicalSessionCookie,
   canonicalSessionRowSchema,
   type CanonicalSessionRow,
@@ -77,30 +75,15 @@ async function runCanonicalReaderProbe(): Promise<boolean> {
   const url = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
   if (!canonicalRestrictedAuthUrlValid(url, process.env.DATABASE_URL) ||
       (process.env.CAN_CANONICAL_ACCESS_TOKEN_PEPPER?.length ?? 0) < 32) return false;
-  let pool: Pool | undefined;
-  let client: PoolClient | undefined;
   try {
-    pool = new Pool({ connectionString: url, max: 1, connectionTimeoutMillis: 3000 });
-    client = await pool.connect();
-    await client.query("BEGIN READ ONLY");
-    await client.query(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`);
-    const result = await client.query(
-      "SELECT account_id FROM education_v30.v301_canonical_session_context($1::text)",
-      [randomBytes(32).toString("hex")],
+    // Uses the same restricted DB role and reader as real authentication.
+    // A cryptographically random digest must not identify a real session.
+    const records = await readRestrictedCanonicalSession(
+      "native", randomBytes(32).toString("hex"),
     );
-    await client.query("ROLLBACK");
-    // The random digest must match no session. Success proves the restricted
-    // projection is callable, not that a privileged DB role can SELECT tables.
-    return result.rows.length === 0;
-  } catch (error) {
-    logCanonicalReaderFailure("probe", error);
-    if (client) {
-      try { await client.query("ROLLBACK"); } catch { /* fail closed */ }
-    }
+    return records.length === 0;
+  } catch {
     return false;
-  } finally {
-    client?.release();
-    if (pool) await pool.end().catch(() => { /* probe still fails closed */ });
   }
 }
 
