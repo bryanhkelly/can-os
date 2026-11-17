@@ -1,5 +1,6 @@
 import {useEffect,useState} from "react";
 import {Button} from "@/components/ui/button";
+import {DirectoryTable} from "@/components/workspace";
 import {EvidenceDocumentSummary} from "@/components/evidence";
 import {
   listCANSchoolJurisdictionReviewQueue,
@@ -98,14 +99,20 @@ export function CANSchoolJurisdictionReviewDesk(){
       This workspace cannot approve school opening, public claims, government funding or accreditation.
     </p>
     {loading&&<p role="status">Loading authorized reviews…</p>}
-    {!loading&&<div className="mt-3 space-y-2">
-      {items.length===0&&<p className="text-sm">No pending school jurisdiction reviews in this CAN institutional scope.</p>}
-      {items.map(item=><Button key={item.id} type="button" variant="outline"
-        onClick={()=>{setSelected(item);setNote("");setMessage("");setError("");}}
-        className="h-auto w-full justify-start whitespace-normal text-left">
-        {item.siteName} · {item.programName} · {item.type==="school_jurisdiction_requirement"?"Requirement evidence":"Legal scope"} · {item.status.replaceAll("_"," ")}
-      </Button>)}
-      {truncated&&<p className="text-xs text-muted-foreground">More review Actions exist; filter the canonical Actions workspace.</p>}
+    {!loading&&<div className="mt-3">
+      <DirectoryTable label="School jurisdiction reviews"
+        caption="Authorized independent legal scope and requirement evidence review requests."
+        rows={items} rowKey={item=>item.id}
+        empty={<p className="p-4 text-sm text-muted-foreground">No pending school jurisdiction reviews in this CAN institutional scope.</p>}
+        columns={[
+          {id:"site",title:"Site",render:item=>item.siteName},
+          {id:"program",title:"Program",render:item=>item.programName},
+          {id:"type",title:"Review type",render:item=>item.type==="school_jurisdiction_requirement"?"Requirement evidence":"Legal scope"},
+          {id:"status",title:"Status",render:item=>item.status.replaceAll("_"," ")},
+        ]}
+        rowActions={[{id:"review",label:"Review",allowed:()=>true,
+          onClick:item=>{setSelected(item);setNote("");setMessage("");setError("");}}]}/>
+      {truncated&&<p className="mt-2 text-xs text-muted-foreground">More review Actions exist; filter the canonical Actions workspace.</p>}
     </div>}
     {selected&&<div className="mt-4 space-y-3 rounded-lg border p-4">
       <p className="font-medium">{selected.programName} — {selected.siteName}</p>
