@@ -91,6 +91,16 @@ SET search_path=pg_catalog,pg_temp
 AS $one_person$
 DECLARE anchored uuid;
 BEGIN
+  -- Historical role grants are evidence. Once issued, their owning account
+  -- and Person cannot be rewritten even after revocation. Changes in
+  -- authorization are expressed only by updating active/state.
+  IF TG_OP='UPDATE' AND (
+    NEW.account_id IS DISTINCT FROM OLD.account_id OR
+    NEW.person_id IS DISTINCT FROM OLD.person_id
+  ) THEN
+    RAISE EXCEPTION 'Existing CAN role grant identity cannot be reassigned'
+      USING ERRCODE='23514';
+  END IF;
   IF NEW.active THEN
     -- Updating the account row, not merely selecting it FOR UPDATE, is
     -- important: under REPEATABLE READ competing attempts will serialize or
