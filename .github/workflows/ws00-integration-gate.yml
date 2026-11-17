@@ -50,7 +50,8 @@ jobs:
             tests/unit/ws3-completion-command-contract.test.ts \
             tests/unit/native-class-session-agenda.test.ts \
             tests/unit/ws5-publisher-rollout-migration-contract.test.ts \
-            tests/unit/participation-reporting-two-site-pilot.test.ts
+            tests/unit/participation-reporting-two-site-pilot.test.ts \
+            tests/unit/participation-reporting.test.ts
       - name: Native Class and Site regression suites
         run: |
           npm run test:classes:unit
