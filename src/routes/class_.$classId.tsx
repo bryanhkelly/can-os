@@ -313,6 +313,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
     queryFn:()=>getNativeClassApprovalQueue({data:{classId:workspace.classId}}),
     enabled:workspace.tab==="roster",retry:false,
   });
+  const [reviewReason,setReviewReason]=useState("");
   const [learnerPersonId,setLearnerPersonId]=useState("");
   const [learnerCreditMode,setLearnerCreditMode]=useState<"audit"|"not_applicable">("not_applicable");
   const [staffPersonId,setStaffPersonId]=useState("");
@@ -341,8 +342,8 @@ function ManagingClass({workspace}:{workspace:Workspace}){
     if(pending)return;
     setPending(true);setError("");setNotice("");
     try{
-      await decideNativeClassApproval({data:{approvalRequestId,decision,reason:
-        decision==="approved"?"Verified adult eligibility reviewed by Class staff":"Class eligibility denied"}});
+      await decideNativeClassApproval({data:{approvalRequestId,decision,reason:reviewReason.trim()}});
+      setReviewReason("");
       await client.invalidateQueries({queryKey:["native-class-approval-queue",workspace.classId]});
       setNotice(decision==="approved"?
         "Approved. Learner must independently accept current terms and claim an available seat.":
@@ -421,6 +422,13 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </p>
             {approvals.isError&&<p role="alert" className="mt-2 text-sm">Approval queue unavailable.</p>}
             {approvals.data?.length===0&&<p className="mt-2 text-sm">No pending requests.</p>}
+            <label className="mt-3 block text-sm font-semibold" htmlFor="class-approval-reason">
+              Decision rationale
+            </label>
+            <textarea id="class-approval-reason" value={reviewReason}
+              maxLength={1000} onChange={event=>setReviewReason(event.target.value)}
+              placeholder="Record the independent eligibility review and reason for approving or rejecting"
+              className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
             <ul className="mt-3 space-y-2">
               {approvals.data?.map(item=><li key={item.approvalRequestId}
                 className="border border-border p-3 text-sm">
@@ -428,9 +436,9 @@ function ManagingClass({workspace}:{workspace:Workspace}){
                 <p>Requested: {new Date(item.requestedAt).toLocaleString()}</p>
                 <p>Expires: {new Date(item.expiresAt).toLocaleString()}</p>
                 <div className="mt-3 flex gap-2">
-                  <Button disabled={pending}
+                  <Button disabled={pending||reviewReason.trim().length<3}
                     onClick={()=>void decideApproval(item.approvalRequestId,"approved")}>Approve</Button>
-                  <Button variant="outline" disabled={pending}
+                  <Button variant="outline" disabled={pending||reviewReason.trim().length<3}
                     onClick={()=>void decideApproval(item.approvalRequestId,"rejected")}>Reject</Button>
                 </div>
               </li>)}
