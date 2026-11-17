@@ -187,8 +187,10 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
   });
 
 /** Transactionally creates one Class Enrollment and one canonical Course Attempt.
- * This entry point is adult self-enrollment only. Guardian, assignment, approval
- * and invitation require their own verified authorization commands. */
+ * This entry point accepts verified adult self-enrollment and independently
+ * authorized adult invitations. Assignment is a separate staff command.
+ * Guardian/youth participation and approval require their own verified
+ * authorization, consent, and decision commands. */
 export const enrollInNativeClass=createServerFn({method:"POST"})
   .validator((raw:unknown)=>selfInput.parse(raw))
   .handler(async({data})=>{
