@@ -105,6 +105,10 @@ describe("daily operations attention", () => {
     });
     expect(items.find(item => item.id === "documents:program-1")?.nextStep)
       .toBe("Review enrollment requirements");
+    expect(items.find(item => item.id === "academic:program-1")).toMatchObject({
+      nextStep: "Review program grading summary",
+      href: "/home?programId=program-1&siteId=site-1#academic-activity-program-1",
+    });
   });
 
   it("does not give site leaders broad aggregates or another person's assigned private Action", () => {

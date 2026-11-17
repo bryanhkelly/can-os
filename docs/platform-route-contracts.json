@@ -328,6 +328,15 @@
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
+      "file": "src/routes/canonical.classes.tsx",
+      "route": "/canonical/classes",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Site Admin or Registrar opens native Class management from Program operations or Reports and selects Class evidence for a Class in scope",
+      "readBoundary": "Native Class services validate current operator, provider and Site scope; report reads independently reauthorize the exact Class",
+      "writeBoundary": "Existing native Class and Class Offering commands reauthorize the current operator and canonical Site"
+    },
+    {
       "file": "src/routes/canonical.classes_.completion.tsx",
       "route": "/canonical/classes/completion",
       "owner": "learning",
@@ -1703,6 +1712,60 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.assessment-publications.tsx",
+      "route": "/canonical/assessment-publications",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.assessment-reviews.tsx",
+      "route": "/canonical/assessment-reviews",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.course-activities.tsx",
+      "route": "/canonical/course-activities",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.issuer-access.tsx",
+      "route": "/canonical/issuer-access",
+      "owner": "credentials",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/classes_.$classId.tsx",
+      "route": "/classes_/$classId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/learn.classes.tsx",
+      "route": "/learn/classes",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"

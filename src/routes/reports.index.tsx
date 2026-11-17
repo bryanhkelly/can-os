@@ -17,11 +17,11 @@ function ReportingHome(){
       <section className="border border-border bg-card p-5">
         <h2 className="font-serif text-xl">Class evidence</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Open an authorized native Class and select Reports to review its dated
+          Choose Class evidence from the native Class directory to review its dated
           sessions, registrations, host-attested attendance, assessments and recorded awards.
         </p>
-        <Link to="/classes" search={{}} className="mt-4 inline-block text-sm font-semibold text-primary underline">
-          Browse my authorized Classes
+        <Link to="/canonical/classes" className="mt-4 inline-block text-sm font-semibold text-primary underline">
+          Browse native Classes
         </Link>
       </section>
       <section className="border border-border bg-card p-5">

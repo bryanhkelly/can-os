@@ -12,6 +12,7 @@ const destinationContextKeys: Record<string, readonly string[]> = {
   "/operations/interest-events": ["siteId", "programId"],
   "/operations/insights": ["siteId", "programId"],
   "/settings": ["siteId"],
+  "/admin": ["siteId"],
   "/site-website": ["siteId", "programId"],
   "/staff/attendance": ["programId"],
   "/operations/curriculum": ["programId"],
@@ -122,7 +123,7 @@ const schoolAdministrationLinks = [
   { title: "Program operations", path: "/canonical/program-operations", icon: "book" },
   { title: "Reports", path: "/reports/", icon: "clipboard" },
   { title: "Teachers", path: "/operations/teacher-marketplace", icon: "users" },
-  { title: "Administration", path: "/admin", icon: "users" },
+  { title: "Staff & access", path: "/admin", icon: "users" },
 ] satisfies readonly WorkspaceNavigationItem[];
 
 const siteAdminProfileLink = {
@@ -136,7 +137,7 @@ const roleLinks = {
   account_holder: [{ title: "My Activity", path: "/learn/my-activity", icon: "book" }],
   academic_content_creator: [],
   academic_content_reviewer: [],
-  site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
+  site_admin: [...schoolAdministrationLinks, { title: "Classes", path: "/classes", icon: "book" }, siteAdminProfileLink],
   site_website_editor: [{ title: "Website", path: "/site-website", icon: "globe" }],
   room_facilitator: [
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },

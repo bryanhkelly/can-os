@@ -226,7 +226,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
         <p className="mt-2 text-sm text-muted-foreground">Use the existing action workspace and live program details to review emerging concerns. No inferred warning counts.</p>
       </div>
       <div className="rounded-2xl border bg-muted/30 p-5">
-        <h3 className="text-sm font-semibold">Healthy</h3>
+        <h3 className="text-sm font-semibold">Active sections</h3>
         <p className="mt-2 text-sm text-muted-foreground">{commandCenterData.summary.sections} active sections in scope. Individual readiness is not inferred from this count.</p>
       </div>
     </div>
@@ -241,9 +241,9 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     <h2 className="font-serif text-2xl">Live school operations</h2>
     <div className="mt-3 flex flex-wrap gap-4 text-sm">
     <span>{commandCenterData.summary.sections} active sections</span>
-    <span>{commandCenterData.summary.unstaffed} unstaffed</span>
+    <span>{commandCenterData.summary.unstaffed} without verified instructional staffing</span>
     <span>{commandCenterData.summary.underCapacity} capacity gaps</span>
-    <span>{commandCenterData.summary.waitlisted} waiting students</span>
+    <span>{commandCenterData.summary.waitlisted} open section waitlist entries</span>
     </div>
     <div className="mt-4 space-y-2">
     {commandCenterData.issues.map(issue=><div key={issue.kind+issue.sectionId} className="rounded border p-3 text-sm">
@@ -251,7 +251,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
        <Link className="mt-2 inline-block underline" to="/launch/school/$programId"
         params={{programId:issue.programId}} search={{siteId:undefined,programId:undefined}}>Review lifecycle →</Link>
      </div>)}
-    {!commandCenterData.issues.length&&<p className="text-sm">No staffing or capacity exceptions detected.</p>}
+    {!commandCenterData.issues.length&&<p className="text-sm">No instructional staffing, capacity or section waitlist exceptions detected.</p>}
     </div>
    </section>}
   {dashboardData&&<section className="mt-7 space-y-4" aria-label="Guided school launch and operations">
@@ -290,6 +290,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
     </div>
     <div className="mt-5 space-y-4">
     {dashboardData.programs.map(program=><article key={program.id} className="rounded-xl border p-4">
+      <div id={`academic-activity-${program.id}`} className="scroll-mt-6" />
       <div className="flex flex-wrap items-center justify-between gap-2">
        <h3 className="font-semibold">{program.name} <span className="text-xs font-normal text-muted-foreground">· {program.status.replaceAll("_"," ")} · {program.type.replaceAll("_"," ")}</span></h3>
        <Link className="text-sm underline" to="/launch/school/$programId" params={{programId:program.id}} search={{siteId:undefined,programId:undefined}}>Review program →</Link>

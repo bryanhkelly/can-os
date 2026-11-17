@@ -16,17 +16,18 @@ export const Route = createFileRoute("/launch/site")({
   loaderDeps: ({ search }) => ({ siteId: search.siteId }),
   loader: ({ deps }) => safeLoader(async () => {
     const options = await listLaunchOptions();
-    if (!deps.siteId) return { options, selectedSiteId: "", preferences: null, selectionError: null, sitePrograms: null, programsState: "empty" as const, contentChannels: defaultSiteContentChannelConfig };
-    if (!options.sites.some(item => item.id === deps.siteId))
-      return { options, selectedSiteId: deps.siteId, preferences: null, sitePrograms: null, programsState: "unauthorized" as const, contentChannels: defaultSiteContentChannelConfig,
+    const siteId = deps.siteId ?? (!options.canCreateSite && options.sites.length === 1 ? options.sites[0].id : undefined);
+    if (!siteId) return { options, selectedSiteId: "", preferences: null, selectionError: null, sitePrograms: null, programsState: "empty" as const, contentChannels: defaultSiteContentChannelConfig };
+    if (!options.sites.some(item => item.id === siteId))
+      return { options, selectedSiteId: siteId, preferences: null, sitePrograms: null, programsState: "unauthorized" as const, contentChannels: defaultSiteContentChannelConfig,
         selectionError: "This Site is not available to your active account or role. Choose an authorized Site explicitly." };
-    const preferences = await readSiteLaunchPreferences({ data: { siteId: deps.siteId } });
-    const contentChannels = await getSiteContentChannels({data:{siteId:deps.siteId}});
+    const preferences = await readSiteLaunchPreferences({ data: { siteId } });
+    const contentChannels = await getSiteContentChannels({data:{siteId}});
     // The private website remains available even when a program reader fails.
     const recordRead = await supplementaryRead(
       () => listLaunches({data:{includeActive:true}}), data=>data.launches.length===0);
-    return { options, selectedSiteId: deps.siteId, preferences, contentChannels, selectionError: null,
-      sitePrograms: recordRead.data?.launches.filter(record=>record.siteId===deps.siteId)??null,
+    return { options, selectedSiteId: siteId, preferences, contentChannels, selectionError: null,
+      sitePrograms: recordRead.data?.launches.filter(record=>record.siteId===siteId)??null,
       programsState: recordRead.state };
   })(),
   component: SiteLaunchPage,
