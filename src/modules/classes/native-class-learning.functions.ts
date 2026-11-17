@@ -19,8 +19,6 @@ const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 export const getNativeClassLearning=createServerFn({method:"GET"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class learning release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(actor.role!=="learner" || !actor.actorPersonId)
