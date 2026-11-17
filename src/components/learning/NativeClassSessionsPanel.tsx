@@ -305,7 +305,7 @@ export function NativeClassSessionsPanel({
             search={{view:"teach",tab:"classroom",session:session.id,lesson:undefined}}
             className="text-sm font-semibold underline">Resume authorized live controls</Link>}
           {session.roomId&&session.roomState==="live"&&<Link to="/classroom/$sessionId/presentation"
-            params={{sessionId:session.roomId}}
+            params={{sessionId:session.roomId}} search={{layout:"presentation"}}
             className="text-sm font-semibold underline">Audience display</Link>}
           <span className="text-xs text-muted-foreground">Your Class Session</span>
         </div>}
@@ -323,7 +323,7 @@ export function NativeClassSessionsPanel({
       {opened.expiresAt&&<p className="mt-1 text-xs text-muted-foreground">
         One-time pairing expires: {displaySiteClassTime(opened.expiresAt,siteTimeZone)}
       </p>}
-      <Link to="/classroom/$sessionId/presentation" params={{sessionId:opened.roomId}}
+      <Link to="/classroom/$sessionId/presentation" params={{sessionId:opened.roomId}} search={{layout:"presentation"}}
         hash={opened.pairingCode&&opened.expiresAt
           ?"pair="+encodeURIComponent(opened.pairingCode)+"&expires="+encodeURIComponent(opened.expiresAt)
           :undefined}
