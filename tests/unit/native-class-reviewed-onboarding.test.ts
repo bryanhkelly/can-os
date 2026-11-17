@@ -55,6 +55,16 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(migration).toContain('OLD.status=\'revoked\'');
     expect(migration).toContain('Only trusted database operations');
   });
+  it("can run the single-login QA gate without the separate four-session pilot fixtures",()=>{
+    const preflight=read("scripts/acceptance/check-ws00-qa-readiness.mjs");
+    const config=read("playwright.ws00-single-login.config.ts");
+    expect(config).toContain('CAN_WS00_QA_SCOPE:"single_login_class"');
+    expect(preflight).toContain('env.CAN_WS00_QA_SCOPE==="single_login_class"');
+    expect(preflight).toContain("const ids=singleLoginOnly");
+    expect(preflight).toContain('if(!singleLoginOnly){');
+    expect(preflight).toContain("CAN_WS00_QA_FRESH_LEARNER_CAN_ACCOUNT_ID");
+    expect(preflight).toContain("reviewSchema");
+  });
   it("enrolls only after missing-cookie recovery and approved activation",()=>{
     expect(route).toContain('CANONICAL_LEARNER_SESSION_REQUIRED');
     expect(route).toContain('CANONICAL_LEARNER_ONBOARDING_REQUIRED');
