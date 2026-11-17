@@ -44,12 +44,12 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
         <p className="mt-2 text-muted-foreground">
           {data.catalogState==="unavailable"?"Catalog authorization could not be checked right now."
             :data.catalogState==="blocked"?"Your CAN account does not have a current approved canonical staff grant for this Site."
-            :"This Site has not completed independent canonical identity approval."}
+             :"Native Course operations have not yet been provisioned for this Site ID."}
           {" "}You can continue private planning without receiving enrollment or publishing authority.
         </p>
-        <Link to="/site-identity" search={{mode:"request",siteId}}
+        <Link to="/class" search={{view:"manage",siteId}}
           className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary underline">
-          Review Site identity and approval
+          Open Class management
         </Link>
       </section>) : null;
 
