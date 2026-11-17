@@ -106,6 +106,27 @@ async function run(){
   if(rows.length!==ids.length||rows.some(row=>
        !row.site_id||!row.course_version_id||row.state!=="active"))
     throw new Error("WS00 QA requires active, Site-bound, Course-version-pinned Classes");
+  // A Class row alone is not a usable enrollment fixture. The same exact
+  // published Offering and participation terms must be present as the
+  // learner-facing catalog and the native enrollment command expect.
+  const [oneHourOffering]=await sql`
+    SELECT v.id::text AS offering_version_id,
+      v.class_id::text AS class_id
+    FROM education_v30.class_offering_versions v
+    JOIN education_v30.class_offerings o
+      ON o.id=v.class_offering_id AND o.class_id=v.class_id
+    JOIN education_v30.classes c ON c.id=v.class_id
+    WHERE c.id=${ids[0]}::uuid AND c.state='active'
+      AND v.state='published' AND v.visibility='public'
+      AND 'self'=ANY(v.enrollment_methods)
+      AND 'not_applicable'=ANY(v.allowed_credit_modes)
+      AND v.consent_version IS NOT NULL
+      AND length(btrim(v.consent_text))>=25
+      AND (v.opens_at IS NULL OR v.opens_at<=now())
+      AND (v.closes_at IS NULL OR v.closes_at>now())
+  `;
+  if(!oneHourOffering)
+    throw new Error("WS00 QA needs a published, eligible and consented one-hour Class Offering, not merely an active Class row");
   if(!singleLoginOnly){
     const siteA=rows.find(row=>row.id===ids[1])?.site_id;
     const siteB=rows.find(row=>row.id===ids[2])?.site_id;
