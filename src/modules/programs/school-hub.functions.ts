@@ -20,9 +20,8 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   const actor=await getCommandContext(getRequest());assertCapability(actor,"program.read");
   if(!hasRegistrarAuthority(actor.role))throw new AuthorizationError("school launch workspace");
   const options=await listLaunchOptions();
-  // This flag is an availability signal, not an authorization grant.
-  // Catalog reads still require current Site scope and restricted DB roles.
-  const canonicalCatalogEnabled=process.env.CAN_CANONICAL_CATALOG_ENABLED==="true";
+  // Catalog authority remains bounded by Site scope and restricted DB roles.
+  const canonicalCatalogEnabled=true;
   if(!data.siteId)return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
   if(!z.string().uuid().safeParse(data.siteId).success)
     return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,
