@@ -15,6 +15,11 @@ export function CanonicalBlueprintLoadError({
       connect the school Site and your canonical staff identity before protected
       canonical records can be accessed. Signing in again cannot grant missing permissions.
     </p>
+    <p className="mt-3 text-sm text-muted-foreground">
+      Shared demonstration accounts using an @*.demo address cannot be used for
+      protected canonical authoring or administrative decisions. Use an independently
+      verified staff account with a current canonical Site and Person grant.
+    </p>
     <p className="mt-4 text-sm">
       If you administer this Site, <Link to="/site-identity" className="font-semibold text-primary underline underline-offset-4">open Site identity verification</Link>
       {" "}to review the required association and independent approval. The verification workflow does not automatically grant access.
