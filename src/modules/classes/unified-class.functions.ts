@@ -403,7 +403,8 @@ export const getNativeClassOperatorSites=createServerFn({method:"GET"})
         inArray(catalogSites.id,operator.siteIds),
         eq(catalogSites.status,"active"),
       )).orderBy(asc(canonicalEnrollmentSites.name),asc(catalogSites.id));
-    return rows.map(site=>({id:site.id,name:site.name??"Authorized Site"}));
+    const visibleSites: Array<{id:string;name:string|null}>=rows;
+    return visibleSites.map(site=>({id:site.id,name:site.name??"Authorized Site"}));
   });
 
 /** One bounded, stable page of publisher Offerings and their authorized Courses.
