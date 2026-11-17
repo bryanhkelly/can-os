@@ -56,7 +56,7 @@ export function ClassroomFacilitatorConsole({
         </p>
       </div>
       <Button asChild variant="outline" size="sm">
-        <Link to="/classroom/$sessionId/presentation" params={{ sessionId: facilitatedSessionId }}>
+        <Link to="/classroom/$sessionId/presentation" params={{ sessionId: facilitatedSessionId }} search={{layout:"presentation"}}>
           Open presentation screen
         </Link>
       </Button>
