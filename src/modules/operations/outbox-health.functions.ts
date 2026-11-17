@@ -19,8 +19,9 @@ export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(
   setResponseHeader("Cache-Control", "private, no-store");
   const { getOutboxHealth } = await import("@/workers/domain-event-worker");
   const organizationIds=actor.scope.organizationIds??[];
+  const programIds=actor.scope.programIds??[];
   const counts=await getOutboxHealth(actor.scope.siteIds);
-  if (!organizationIds.length) {
+  if (!organizationIds.length || !programIds.length) {
     return { ...counts, schoolFamilyDelivery: {
       pending:0, processing:0, retryScheduled:0, failed:0,
       providerAccepted:0, suppressed:0,
@@ -44,6 +45,7 @@ export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(
       eq(actions.type,"school_family_bulletin"),
       inArray(actions.siteId,actor.scope.siteIds),
       inArray(actions.organizationId,organizationIds),
+      inArray(actions.programId,programIds),
     ));
   return { ...counts, schoolFamilyDelivery:{
     pending:Number(row?.pending??0),
