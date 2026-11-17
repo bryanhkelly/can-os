@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { RosterList } from "@/components/workspace/roster-list";
 import { WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace/workspace-panel";
 import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
-import { RecordHeader, RecordLayout, EntityCard } from "@/components/workspace/record-layout";
+import { RecordHeader, RecordLayout, RecordFacts, EntityCard } from "@/components/workspace/record-layout";
 import { WorkflowWorkspace, WorkflowProgress } from "@/components/workflow/workflow-workspace";
 import { UserFlowMap } from "@/components/workflow/user-flow-map";
 import { MasterDetailWorkspace, MasterDetailListItem } from "@/components/workspace/master-detail-workspace";
@@ -98,6 +98,57 @@ describe("V6.1 reusable design system", () => {
     expect(html.indexOf("Avery Kelly")).toBeLessThan(html.indexOf("Guardian verification"));
     expect(html).toContain("Needs review");
     expect(html).toContain('aria-label="Related record context"');
+  });
+
+  it("renders authorized record facts as a semantic, labeled, responsive definition list", () => {
+    const html = renderToStaticMarkup(<RecordFacts label="Application facts" columns={3}
+      items={[
+        { id: "site", label: "Site", value: "Valor Academy" },
+        { id: "program", label: "Program", value: <strong>Summer enrichment</strong> },
+        { id: "status", label: "Status", value: "Awaiting review" },
+      ]}/>);
+    expect(html).toContain('<dl aria-label="Application facts"');
+    expect(html).toContain("sm:grid-cols-3");
+    expect((html.match(/<dt\b/g) ?? []).length).toBe(3);
+    expect((html.match(/<dd\b/g) ?? []).length).toBe(3);
+    expect(html).toContain("<strong>Summer enrichment</strong>");
+    expect(html.indexOf("Site")).toBeLessThan(html.indexOf("Awaiting review"));
+    expect(html).not.toMatch(/\brounded(?:-[\w-]+)?\b/);
+  });
+
+  it("supports a single-column record fact list and an empty safe result", () => {
+    const html = renderToStaticMarkup(<RecordFacts columns={1}
+      items={[{label:"Opening state", value:"Draft"}]}/>);
+    expect(html).toContain("<dl");
+    expect(html).not.toContain("sm:grid-cols-2");
+    expect(html).not.toContain("sm:grid-cols-3");
+    expect(renderToStaticMarkup(<RecordFacts items={[]}/>)).toBe("");
+  });
+
+  it("names the available record actions and scope-specific rail/activity", () => {
+    const html = renderToStaticMarkup(<RecordLayout
+      header={<RecordHeader title="Site details" status={<span>Draft</span>}
+        actions={<button type="button">Review site</button>}/>}
+      main={<p>Current site data</p>}
+      rail={<p>Next step</p>} railLabel="Site compliance context"
+      activity={<p>Reviewed yesterday</p>} activityLabel="Site review history"/>);
+    expect(html).toContain('role="group" aria-label="Record actions"');
+    expect(html).toContain('aria-label="Site compliance context"');
+    expect(html).toContain('aria-label="Site review history"');
+    expect(html).toContain("Review site");
+    expect(html).toContain("Reviewed yesterday");
+  });
+
+  it("supports semantic rich metadata in a linked entity card without nested spans", () => {
+    const html = renderToStaticMarkup(<EntityCard title="Community learning center"
+      href="/sites/center-1"
+      meta={<><p>Summer programs</p><p>Enrollment pending approval</p></>}>
+      This is a record link, not an enrollment confirmation.
+    </EntityCard>);
+    expect(html).toContain('href="/sites/center-1"');
+    expect(html).toContain("<p>Summer programs</p>");
+    expect(html).toContain("<p>Enrollment pending approval</p>");
+    expect(html).not.toContain('<span class="min-w-0 text-muted-foreground"><p>');
   });
 
   it("keeps directory cards as actual links with accessible record labels", () => {
