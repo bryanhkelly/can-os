@@ -186,8 +186,10 @@ const sharedPatternContracts = {
   "workspace/filter-bar.tsx": ['from "@/components/ui/input"', 'from "@/components/ui/button"', 'from "@/components/ui/field"'],
   "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
   "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions'],
-  "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}'],
-  "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}'],
+  "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
+    'aria-describedby={description ? descriptionId : undefined}', 'columns === 1'],
+  "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
+    'submitted.current', 'wasPending.current && !pending'],
 
 };
 for (const [file, required] of Object.entries(sharedPatternContracts)) {
