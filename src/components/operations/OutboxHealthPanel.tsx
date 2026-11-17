@@ -55,6 +55,28 @@ export function OutboxHealthPanel() {
           <p className="mt-2 text-2xl font-semibold">{value}</p>
         </div>)}
       </div>}
+      {health?.schoolFamilyDelivery && <div className="mt-6 border-t pt-4">
+        <h3 className="font-semibold">School-family outbound delivery</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Counts for your authorized Sites and Organizations only. Provider accepted
+          does not confirm inbox delivery, reading, or a guardian taking action.
+          Failed excludes deliveries already scheduled for automatic retry.
+        </p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          {([
+            ["Queued", health.schoolFamilyDelivery.pending],
+            ["Processing", health.schoolFamilyDelivery.processing],
+            ["Retry scheduled", health.schoolFamilyDelivery.retryScheduled],
+            ["Failed", health.schoolFamilyDelivery.failed],
+            ["Provider accepted", health.schoolFamilyDelivery.providerAccepted],
+            ["Suppressed", health.schoolFamilyDelivery.suppressed],
+          ] as Array<[string, number]>).map(([label, value]) =>
+            <div key={label} className="border p-3">
+              <p className="text-xs text-muted-foreground">{label}</p>
+              <p className="mt-2 text-2xl font-semibold">{value}</p>
+            </div>)}
+        </div>
+      </div>}
       {health && health.pendingUnhandled > 0 && <p role="status" className="mt-4 rounded-lg border border-dashed p-3 text-sm">
         {health.pendingUnhandled} pending event{health.pendingUnhandled === 1 ? "" : "s"} have no registered
         consumer and will not drain until a handler is registered.
