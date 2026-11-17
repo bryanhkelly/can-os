@@ -107,14 +107,14 @@ export const publishNoncreditCompletionPolicy=createServerFn({method:"POST"})
         minimumAssessmentFraction:data.minimumAssessmentFraction===null
           ?null:data.minimumAssessmentFraction.toFixed(5),
         completionMode:data.completionMode,
-        effectiveAt:new Date(),approvedByPersonId:actor.actorPersonId,
+        effectiveAt:new Date(),approvedByPersonId:actor.actorPersonId!,
         publishedAt:new Date(),
       }).returning();
       if(!policy)throw new Error("Completion policy could not be published");
       const payload={trainingVersionId:training.id,policyId:policy.id,
         policyVersion:policy.policyVersion,completionMode:policy.completionMode};
       await tx.insert(auditEvents).values({
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         owningOrganizationId:training.providerOrganizationId,
         eventCode:"noncredit.completion_policy.published",
         entityKind:"noncredit_completion_policy",entityId:policy.id,payload,
@@ -122,7 +122,7 @@ export const publishNoncreditCompletionPolicy=createServerFn({method:"POST"})
       await tx.insert(domainEvents).values({
         eventType:"NoncreditCompletionPolicyPublished",
         aggregateType:"noncredit_completion_policy",aggregateId:policy.id,
-        actorPersonId:actor.actorPersonId,payload,
+        actorPersonId:actor.actorPersonId!,payload,
       });
       return {policyId:policy.id,policyVersion:policy.policyVersion,
         completionMode:policy.completionMode,
