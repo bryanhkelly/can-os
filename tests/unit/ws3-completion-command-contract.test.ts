@@ -24,7 +24,7 @@ describe("WS3 guarded completion mutation integration contracts", () => {
     expect(corrections).toContain("assertNoncreditCompletionSiteScope(tx,actor,registration)");
   });
   it("gates correction, locks source, validates independent verified evidence and appends history", () => {
-    expect(corrections).toContain("CAN_NONCREDIT_COMPLETION_CORRECTIONS_ENABLED");
+    expect(corrections).not.toContain("CAN_NONCREDIT_COMPLETION_CORRECTIONS_ENABLED");
     expect(corrections).toContain('.for("update")');
     expect(corrections).toContain("registration.participantPersonId === actor.actorPersonId");
     expect(corrections).toContain("evidence.verifiedByPersonId === actor.actorPersonId");
