@@ -13,7 +13,7 @@ export function PageNavigation({ label, previous, next, children, showUnavailabl
   className?: string;
 }) {
   return <nav aria-label={label} className={cn("flex flex-wrap items-center gap-3 text-sm", className)}>
-    {previous || (showUnavailable && <span aria-disabled="true" className="rounded border px-3 py-2 opacity-50">{previousLabel}</span>)}
+    {previous || (showUnavailable && <span aria-disabled="true" className="border px-3 py-2 opacity-50">{previousLabel}</span>)}
     {children}
     {next || (showUnavailable && <span aria-disabled="true" className="rounded border px-3 py-2 opacity-50">{nextLabel}</span>)}
   </nav>;
