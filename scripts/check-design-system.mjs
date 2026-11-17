@@ -213,6 +213,7 @@ for (const [file, required] of Object.entries(sharedPatternContracts)) {
 const governedRecordConsumers = {
   "routes/actions.$actionId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Action metadata"'],
   "routes/enrichment_.$seasonId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Program details"'],
+  "routes/centers.demo.tsx": ["<RecordHeader", "<RecordLayout"],
 };
 for (const [file, required] of Object.entries(governedRecordConsumers)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
