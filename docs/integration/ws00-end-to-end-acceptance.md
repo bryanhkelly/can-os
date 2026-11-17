@@ -235,5 +235,47 @@ ineligible for automatic conversion. Cover both fresh and previously
 noncredit-linked adults in the QA acceptance, including repeat requests,
 revocation, simultaneous Class/noncredit requests, and prior grants.
 
-**This preexisting-link upgrade is not implemented or tested.** The browser
-and data-path P0 must not be marked working until both cohorts are verified.
+**The preexisting-link upgrade is now implemented in source, not runtime-accepted.**
+Independent App Admin review permits only exact existing CAN-to-canonical
+noncredit links; activation locks and reuses the native Person, sets only a
+previously null verified birth date, and reuses or provisions the one authorized
+home-Organization learner grant. Conflicting identity or date evidence fails
+closed. Signed-in QA acceptance for both cohorts remains outstanding.
+
+
+### Identity consolidation implementation update
+
+Main now uses the shared raw account-Person invariant in Class review, activation
+and session recovery, and the same native learner authorization capability for
+Class enrollment and Class learning. The Class page delegates all three
+admission modes to `native-class-entry.client.ts`. This is deliberately a
+reusable *client application flow*, not a nested server RPC: TanStack Start
+does not make a newly set response cookie visible to subsequent handlers in
+the same HTTP request. Recovery/activation is one request; enrollment retry
+is a separate request after the browser receives the HttpOnly cookie. The
+original `native-class-entry.functions.ts` was retired.
+
+The review command now requires an existing private R2 document for the
+exact CAN Person with restricted sensitivity, an independently verified date
+matching the approval, a current authorized App Admin document verifier,
+verified object metadata and no evidence revocation. It does not accept an
+arbitrary URL/opaque reference as evidence. The QA readiness script rechecks
+the same evidence provenance and validates review immutability and denial of
+raw review-table SELECT to the canonical auth-reader role.
+
+The existing `/platform` workspace now exposes redacted review lifecycle
+states (approved pending activation, active, revoked), with no DOB or private
+document contents. A repeated revocation rechecks and revokes dependent
+native grants/sessions and leaves historical participation records untouched.
+
+**Remaining explicit release gates:** A securely controlled upload and
+independent evidence-verification producer for the documented R2 identity
+document category is not yet established; currently neither test01 nor main
+has any adult identity documents or reviewed approvals. A separate browser
+credential still exists for canonical sessions, despite a single interactive
+CAN login. Removing it across classroom playback and session persistence
+requires a deliberately staged cross-module migration, not a claim of
+completion from the admission-only refactor. Actual signed-in Class publisher,
+QA fixtures, E2E browser, build/typecheck, and restricted-role negative tests
+remain unverified. Production roll-out of new review UX should not be
+considered accepted from database migration alone.
