@@ -3,8 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QueryState } from "./query-state";
-import { Field } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { FilterBar } from "./filter-bar";
 import { WorkspaceShell, type WorkspaceShellProps } from "./workspace-shell";
 
 export function DirectoryPage({ query, onQueryChange, searchLabel = "Search", searchPlaceholder, filters, views, view, onViewChange, children, ...shell }: Omit<WorkspaceShellProps, "children"> & {
@@ -19,16 +18,10 @@ export function DirectoryPage({ query, onQueryChange, searchLabel = "Search", se
   children: ReactNode;
 }) {
   return <WorkspaceShell {...shell}>
-    <div role="search" aria-label={`${typeof shell.title === "string" ? shell.title : "Directory"} search`} className="mt-6 flex min-w-0 flex-wrap items-end gap-4">
-      <Field label={searchLabel} className="min-w-0 flex-1 sm:max-w-sm">
-        <Input type="search" value={query} onChange={event => onQueryChange(event.target.value)} placeholder={searchPlaceholder}/>
-      </Field>
-      {filters}
-      {views && onViewChange && <div role="group" aria-label="Directory view" className="flex shrink-0 gap-1">
-        {views.map(option => <Button key={option.value} type="button" size="icon" variant={view === option.value ? "secondary" : "ghost"}
-          aria-pressed={view === option.value} aria-label={option.label} title={option.label} onClick={() => onViewChange(option.value)}>{option.icon}</Button>)}
-      </div>}
-    </div>
+    <FilterBar label={typeof shell.title === "string" ? shell.title : "Directory"}
+      query={query} onQueryChange={onQueryChange} searchLabel={searchLabel}
+      searchPlaceholder={searchPlaceholder} filters={filters} views={views}
+      view={view} onViewChange={onViewChange}/>
     {children}
   </WorkspaceShell>;
 }
@@ -57,7 +50,7 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
   pagination?: ReactNode;
 }) {
   return <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={rows.length === 0} empty={empty}>
-    <div className="mt-6 min-w-0 rounded-xl border bg-card">
+    <div className="mt-6 min-w-0 border bg-card">
       <Table aria-label={label} scrollLabel={`${label} scroll area`}>
         <TableCaption className="px-4 pb-4 text-left">{caption}</TableCaption>
         <TableHeader><TableRow>{columns.map(column => {
