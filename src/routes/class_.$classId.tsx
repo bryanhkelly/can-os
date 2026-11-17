@@ -17,6 +17,7 @@ import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClas
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
+import { issueNativeClassInvitation } from "@/modules/classes/native-class-invitations.functions";
 import { provisionNativeClassKnowledgeCheckAccess } from "@/modules/classes/native-class-assessment-provision.functions";
 import {
   assignNativeClassStaff, endNativeClassStaffAssignment,
@@ -330,6 +331,21 @@ function ManagingClass({workspace}:{workspace:Workspace}){
     }catch(e){setError(normalizeClientError(e,"Could not assign Class learner.").message)}
     finally{setPending(false)}
   }
+  async function inviteLearner(){
+    if(!learnerPersonId||pending||!workspace.offering||
+       !workspace.offering.enrollmentMethods.includes("invitation"))return;
+    setPending(true);setError("");setNotice("");
+    try{
+      const result=await issueNativeClassInvitation({data:{
+        classOfferingVersionId:workspace.offering.id,
+        learnerPersonId,creditMode:learnerCreditMode,requestId:crypto.randomUUID(),
+      }});
+      await refresh();setLearnerPersonId("");
+      setNotice(result.duplicate?"This invitation was already issued.":
+        "Invitation created for the verified learner. They must sign in, accept consent, and claim an available seat within 48 hours. No seat is reserved.");
+    }catch(e){setError(normalizeClientError(e,"Could not invite Class learner.").message)}
+    finally{setPending(false)}
+  }
   async function assign(){
     if(!staffPersonId||pending)return;
     setPending(true);setError("");setNotice("");
@@ -409,6 +425,16 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </select>
             <Button className="mt-4" disabled={!learnerPersonId||pending}
               onClick={()=>void assignLearner()}>Assign to Class</Button>
+            {workspace.offering?.state==="published"&&
+              workspace.offering.enrollmentMethods.includes("invitation")&&
+              <Button className="mt-4 ml-2" variant="outline"
+                disabled={!learnerPersonId||pending}
+                onClick={()=>void inviteLearner()}>Invite to Class</Button>}
+            {workspace.offering?.state==="published"&&
+              workspace.offering.enrollmentMethods.includes("invitation")&&
+              <p className="mt-2 text-xs text-muted-foreground">
+                An invitation is not an enrollment or a seat reservation. The recipient accepts current published terms from their own Class account.
+              </p>}
           </div>
         </>}
         {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
