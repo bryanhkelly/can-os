@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState, type ReactNode } from "react";
-import { WorkspaceShell, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, StatusBadge, MutationFeedback } from "@/components/workspace";
 import { NativeClassHomeNavigation } from "@/components/learning/NativeClassHomeNavigation";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   getNativePublicClassCatalogPage, getMyNativeClassEnrollmentHistoryPage,
 } from "@/modules/classes/native-class-enrollment.functions";
@@ -288,9 +289,8 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
 type EnrolledClass=Awaited<ReturnType<typeof getMyNativeClassEnrollmentHistoryPage>>["items"][number];
 function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onChanged:()=>Promise<void>;destinations:Item[]}){
   const [confirm,setConfirm]=useState(false);
-  const [busy,setBusy]=useState(false);
-  const [notice,setNotice]=useState("");
-  const [error,setError]=useState("");
+  const mutation=useMutationFeedback(onChanged);
+  const busy=mutation.pending||mutation.refreshFailed;
   const [transferVersion,setTransferVersion]=useState("");
   const [transferCredit,setTransferCredit]=useState<NativeSelfTransferCreditMode|"">("");
   const [transferAdult,setTransferAdult]=useState(false);
@@ -301,30 +301,36 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
   async function transfer(){
     if(item.status!=="active"||!target||!transferAdult||!transferConsent||
        !transferCredit||!allowedTransferModes.includes(transferCredit)||busy)return;
-    setBusy(true);setNotice("");setError("");
-    try{
-      await transferMyNativeClassEnrollment({data:{
+    const outcome=await mutation.run(
+      ()=>transferMyNativeClassEnrollment({data:{
         sourceClassEnrollmentId:item.classEnrollmentId,
         targetClassOfferingVersionId:target.classOfferingVersionId,
         creditMode:transferCredit,adultAttested:true,consentAccepted:true,
         requestId:crypto.randomUUID(),
-      }});
-      setNotice("Transfer completed. Old Class history was preserved.");
-      setTransferVersion("");setTransferCredit("");setTransferAdult(false);setTransferConsent(false);
-      await onChanged();
-    }catch(e){setError(normalizeClientError(e,"Class transfer was not completed.").message)}
-    finally{setBusy(false)}
+      }}),
+      {
+        successMessage:"Transfer completed. Old Class history was preserved.",
+        commandErrorMessage:"Class transfer was not completed.",
+        refreshErrorMessage:"The transfer was saved, but the Class list could not refresh. Retry refresh before submitting another change.",
+      },
+    );
+    if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+      setTransferVersion("");setTransferCredit("");
+      setTransferAdult(false);setTransferConsent(false);
+    }
   }
   async function withdraw(){
     if(!confirm||busy)return;
-    setBusy(true);setError("");setNotice("");
-    try{
-      await withdrawMyNativeClassEnrollment({data:{classEnrollmentId:item.classEnrollmentId}});
-      setNotice("Participation withdrawn. Your learning history is preserved.");
+    const outcome=await mutation.run(
+      ()=>withdrawMyNativeClassEnrollment({data:{classEnrollmentId:item.classEnrollmentId}}),
+      {
+        successMessage:"Participation withdrawn. Your learning history is preserved.",
+        commandErrorMessage:"Unable to withdraw from Class.",
+        refreshErrorMessage:"Withdrawal was saved, but the Class list could not refresh. Retry refresh before submitting another change.",
+      },
+    );
+    if(outcome.status==="saved"||outcome.status==="refresh-failed")
       setConfirm(false);
-      await onChanged();
-    }catch(e){setError(normalizeClientError(e,"Unable to withdraw from Class.").message);}
-    finally{setBusy(false);}
   }
   const current=item.status==="active"||item.status==="pending";
   return <article className="border border-border bg-card p-5">
@@ -406,8 +412,8 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
         </div>
       </div>}
     </div>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
+      pendingMessage="Saving Class change…" className="mt-3"/>
   </article>;
 }
 
