@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { db } from "@/db/client";
+import { db, getRequestScopedResource } from "@/db/client";
 import { accessAccounts, accessAccountNoncreditPrincipals } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
@@ -46,6 +46,8 @@ export function getCanonicalSessionRow(request: Request): Promise<CanonicalSessi
   return pending;
 }
 
+let nodeCanonicalAuthPool: Pool | undefined;
+
 async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
   const digest = canonicalSessionDigestFromRequest(request);
   // Dedicated restricted login: never switch roles from the app's broad
@@ -53,7 +55,12 @@ async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessi
   const connectionString = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
   if (!canonicalRestrictedAuthUrlValid(connectionString, process.env.DATABASE_URL))
     throw new AuthorizationError("dedicated restricted canonical session reader configuration");
-  const pool = new Pool({ connectionString, max: 1 });
+  // Workers: scoped pool closed with the request. Node: reuse one restricted
+  // pool across requests; never reuse an individual WebSocket client in Workers.
+  const pool = getRequestScopedResource("canonical-auth-pool", () => {
+    const instance = new Pool({ connectionString, max: 1 });
+    return { pool: instance, close: () => instance.end() };
+  })?.pool ?? (nodeCanonicalAuthPool ??= new Pool({ connectionString, max: 4 }));
   let client: PoolClient | undefined;
   let records: Array<Record<string, unknown>> = [];
   try {
@@ -76,7 +83,6 @@ async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessi
     throw new AuthorizationError("canonical session reader unavailable");
   } finally {
     client?.release();
-    await pool.end();
   }
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
