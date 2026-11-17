@@ -5,6 +5,7 @@ import { accessAccounts, accessAccountNoncreditPrincipals } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 import { accessSessionCookie } from "@/domain/access-tokens";
+import { readCookie } from "@/domain/session-cookies";
 import { getCommandContext } from "./command-context.server";
 import { resolveCanonicalSiteStaffFromCan } from "./canonical-can-staff-bridge.server";
 import { Pool, type PoolClient } from "@neondatabase/serverless";
@@ -23,10 +24,7 @@ import {
  * Organization is read from public-schema identity records.
  */
 export function canonicalSessionDigestFromRequest(request: Request): string {
-  const cookie = request.headers.get("cookie") ?? "";
-  const raw = cookie.split(";").map(item => item.trim())
-    .find(item => item.startsWith(canonicalSessionCookie + "="))
-    ?.slice(canonicalSessionCookie.length + 1);
+  const raw = readCookie(request, canonicalSessionCookie);
   if (!raw || !/^[A-Za-z0-9_-]{40,}$/.test(raw)) {
     throw new AuthorizationError("authenticated session");
   }
@@ -38,7 +36,17 @@ export function canonicalSessionDigestFromRequest(request: Request): string {
     .update(pepper).update(":").update(raw).digest("hex");
 }
 
-export async function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
+const canonicalSessionReads = new WeakMap<Request, Promise<CanonicalSessionRow>>();
+
+export function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
+  const existing = canonicalSessionReads.get(request);
+  if (existing) return existing;
+  const pending = readCanonicalSessionRow(request);
+  canonicalSessionReads.set(request, pending);
+  return pending;
+}
+
+async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
   const digest = canonicalSessionDigestFromRequest(request);
   // Dedicated restricted login: never switch roles from the app's broad
   // DATABASE_URL connection. This connection has no raw identity-table reads.
@@ -60,7 +68,8 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
     );
     records = result.rows;
     await client.query("COMMIT");
-  } catch {
+  } catch (error) {
+    logCanonicalReaderFailure("session_read", error);
     if (client) {
       try { await client.query("ROLLBACK"); } catch { /* Preserve original denial. */ }
     }
@@ -82,6 +91,13 @@ export async function getCanonicalSessionRow(request: Request): Promise<Canonica
  * A brief cache avoids opening a new connection for every page visit.
  * No credentials, SQL errors or account information enter the response.
  */
+function logCanonicalReaderFailure(phase: "session_read" | "probe", error: unknown): void {
+  // Fixed category only. Do not log exception text, database URLs, or SQL.
+  const category = error instanceof Error && error.name === "AbortError"
+    ? "timeout" : "connection_or_query";
+  console.warn("Canonical restricted reader unavailable", { phase, category });
+}
+
 let readerProbeCache: { until: number; ready: boolean } = { until: 0, ready: false };
 let pendingReaderProbe: Promise<boolean> | null = null;
 
@@ -104,7 +120,8 @@ async function runCanonicalReaderProbe(): Promise<boolean> {
     // The random digest must match no session. Success proves the restricted
     // projection is callable, not that a privileged DB role can SELECT tables.
     return result.rows.length === 0;
-  } catch {
+  } catch (error) {
+    logCanonicalReaderFailure("probe", error);
     if (client) {
       try { await client.query("ROLLBACK"); } catch { /* fail closed */ }
     }
@@ -123,7 +140,7 @@ export async function probeCanonicalAuthReader(): Promise<boolean> {
   if (readerProbeCache.until > now) return readerProbeCache.ready;
   if (!pendingReaderProbe) {
     pendingReaderProbe = runCanonicalReaderProbe().then(ready => {
-      readerProbeCache = { ready, until: Date.now() + (ready ? 60_000 : 15_000) };
+      readerProbeCache = { ready, until: Date.now() + (ready ? 60_000 : 2_000) };
       return ready;
     }).finally(() => { pendingReaderProbe = null; });
   }
@@ -141,10 +158,8 @@ export async function probeCanonicalAuthReader(): Promise<boolean> {
  * CAN session must never fall back to a native cookie or silently switch roles.
  */
 export async function getCanonicalCommandContext(request: Request): Promise<CommandContext> {
-  const cookies = (request.headers.get("cookie") ?? "").split(";")
-    .map(item => item.trim());
-  const hasCan = cookies.some(item => item.startsWith(accessSessionCookie + "="));
-  const hasNative = cookies.some(item => item.startsWith(canonicalSessionCookie + "="));
+  const hasCan = readCookie(request, accessSessionCookie) !== undefined;
+  const hasNative = readCookie(request, canonicalSessionCookie) !== undefined;
   if (hasCan) {
     const actor = await getCommandContext(request);
     if (actor.role === "site_admin" || actor.role === "registrar") {
