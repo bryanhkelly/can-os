@@ -39,8 +39,6 @@ function iso(value:Date){return value.toISOString();}
 export const getNativeClassReport=createServerFn({method:"GET"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class reporting not activated");
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const from=new Date(data.from+"T00:00:00.000Z");
