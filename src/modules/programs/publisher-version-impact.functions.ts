@@ -117,7 +117,8 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
           lte(educationOperationSites.validFrom,now),
           or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
         ));
-      const eligibleSites=[...new Map(eligibleSiteRows.map(site=>[
+      const typedEligibleSites: Array<{operationId:string;siteId:string;siteName:string|null}>=eligibleSiteRows;
+      const eligibleSites=[...new Map(typedEligibleSites.map(site=>[
         site.operationId+":"+site.siteId,site,
       ] as const)).values()];
       const placementRows=await tx.select({
