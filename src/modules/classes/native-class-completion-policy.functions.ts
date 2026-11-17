@@ -106,7 +106,7 @@ export const publishNativeClassCompletionPolicy=createServerFn({method:"POST"})
         requirePassingAssessment:data.requirePassingAssessment,
         effectiveAt,publishedAt:now,
         authoredByPersonId:cls.createdByPersonId,
-        approvedByPersonId:actor.actorPersonId,
+        approvedByPersonId:actor.actorPersonId!,
         approvedPolicyEvidenceVersionId:data.policyEvidenceVersionId,
       }).returning({id:classCompletionPolicyVersions.id,
         versionNo:classCompletionPolicyVersions.versionNo});
@@ -119,14 +119,14 @@ export const publishNativeClassCompletionPolicy=createServerFn({method:"POST"})
         appliesTo:"future_enrollments",
       };
       await tx.insert(auditEvents).values({
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"learning.class.completion_policy_published",
         entityKind:"class_completion_policy_version",
         entityId:created.id,payload,
       });
       await tx.insert(domainEvents).values({
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         eventType:"ClassCompletionPolicyPublished",
         aggregateType:"class_completion_policy_version",
         aggregateId:created.id,payload,
