@@ -106,6 +106,31 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
         throw new AuthorizationError("conflicting invitation request replay");
       return {invitationId:retry.id,expiresAt:retry.expiresAt.toISOString(),duplicate:true};
     }
+    // Expiry is enforced on every acceptance and lazily materialized when
+    // issuing a replacement. No background job or environment flag is needed.
+    const expired=await tx.update(canonicalClassEnrollmentInvitations)
+      .set({state:"expired",respondedAt:now})
+      .where(and(
+        eq(canonicalClassEnrollmentInvitations.classId,cls.id),
+        eq(canonicalClassEnrollmentInvitations.learnerPersonId,data.learnerPersonId),
+        eq(canonicalClassEnrollmentInvitations.state,"pending"),
+        lte(canonicalClassEnrollmentInvitations.expiresAt,now),
+      )).returning({id:canonicalClassEnrollmentInvitations.id});
+    for(const item of expired){
+      await tx.insert(auditEvents).values({
+        actorPersonId:actor.actorPersonId,
+        owningOrganizationId:cls.operatingOrganizationId,
+        eventCode:"class.invitation.expired",entityKind:"class_invitation",
+        entityId:item.id,payload:{classId:cls.id,siteId:cls.siteId,
+          recipientPersonId:data.learnerPersonId,reason:"expired_before_reissue"},
+      });
+      await tx.insert(domainEvents).values({
+        actorPersonId:actor.actorPersonId,eventType:"ClassInvitationExpired",
+        aggregateType:"class_invitation",aggregateId:item.id,
+        payload:{classId:cls.id,siteId:cls.siteId,
+          recipientPersonId:data.learnerPersonId},
+      });
+    }
     const [pending]=await tx.select({id:canonicalClassEnrollmentInvitations.id})
       .from(canonicalClassEnrollmentInvitations)
       .where(and(eq(canonicalClassEnrollmentInvitations.classId,cls.id),
