@@ -47,18 +47,19 @@ describe("WS2 native Class enrollment lifecycle", () => {
       }
     }
   });
-  it("rejects non-operational publisher methods", () => {
+  it("permits independently authorized invitation and rejects unimplemented approval methods", () => {
     expect(() => assertOperationalClassEnrollmentMethods(["self","assignment"])).not.toThrow();
+    expect(() => assertOperationalClassEnrollmentMethods(["invitation"])).not.toThrow();
+    expect(() => assertOperationalClassEnrollmentMethods(["assignment","invitation"])).not.toThrow();
     for (const methods of [
-      [],["invitation"],["approval"],["self","approval"],
-      ["assignment","invitation"],["self","self"],
+      [],["approval"],["self","approval"],["self","self"],
     ]) expect(() => assertOperationalClassEnrollmentMethods(methods)).toThrow();
   });
   it("rejects unverified for-credit claims and invalid credit methods",()=>{
     for(const terms of [
       {enrollmentMethods:["self"],allowedCreditModes:["for_credit"]},
       {enrollmentMethods:["assignment"],allowedCreditModes:["for_credit"]},
-      {enrollmentMethods:["self","invitation"],allowedCreditModes:["audit"]},
+      {enrollmentMethods:["self","approval"],allowedCreditModes:["audit"]},
       {enrollmentMethods:["self"],allowedCreditModes:[]},
       {enrollmentMethods:["self"],allowedCreditModes:["audit","audit"]},
       {enrollmentMethods:["self"],allowedCreditModes:["something_else"]},
