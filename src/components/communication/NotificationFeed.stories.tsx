@@ -24,6 +24,8 @@ export const ActivityFeed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("2 unread updates")).toBeVisible();
+    await expect(canvas.getByText(/4:30 PM UTC/)).toBeVisible();
+    await expect(canvasElement.querySelectorAll("time")).toHaveLength(3);
     await userEvent.click(canvas.getByRole("button", { name: "Unread" }));
     await expect(canvas.queryByText("School calendar updated")).not.toBeInTheDocument();
     await userEvent.click(canvas.getAllByRole("button", { name: "Mark as read" })[0]!);
