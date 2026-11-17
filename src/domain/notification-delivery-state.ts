@@ -11,11 +11,22 @@ export type WaitlistDeliverySnapshot = {
  acceptedAt:Date|null;
  nextAttemptAt:Date|null;
  attempts:number;
+ providerDeliveredAt?:Date|null;
+ providerFailedAt?:Date|null;
+ providerFailureKind?:string|null;
 };
 export function waitlistDeliveryView(row:WaitlistDeliverySnapshot,now:Date):{
- state:"pending"|"provider_accepted"|"retry_scheduled"|"failed"|"expired"|"suppressed";
+ state:"pending"|"provider_accepted"|"provider_delivered"|"provider_failed"|"complained"|"retry_scheduled"|"failed"|"expired"|"suppressed";
  label:string;retryable:boolean;
 }{
+ if(row.providerFailedAt){
+   return row.providerFailureKind==="email.complained"
+     ? {state:"complained",label:"Recipient reported spam",retryable:false}
+     : {state:"provider_failed",label:"Provider reported delivery failure",retryable:false};
+ }
+ if(row.providerDeliveredAt){
+   return {state:"provider_delivered",label:"Delivered to mail server",retryable:false};
+ }
  if(row.status==="accepted"||row.acceptedAt){
    return {state:"provider_accepted",label:"Provider accepted (delivery unconfirmed)",retryable:false};
  }
