@@ -6,8 +6,8 @@
     "dev": "node scripts/dev.mjs",
     "build": "vite build",
     "assets:prepare": "node scripts/prepare-template-images.mjs",
-    "prebuild": "npm run check:build-source-syntax && npm run assets:prepare",
-    "prebuild:cloudflare": "npm run check:build-source-syntax && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
+    "prebuild": "npm run check:build-source-syntax && npm run check:route-identifiers && npm run assets:prepare",
+    "prebuild:cloudflare": "npm run check:build-source-syntax && npm run check:route-identifiers && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
     "postbuild": "npm run typecheck",
     "postbuild:cloudflare": "npm run typecheck",
     "prebuild-storybook": "npm run assets:prepare",
@@ -85,7 +85,9 @@
     "db:canonical:objective-draft:preflight": "node scripts/acceptance/check-canonical-objective-draft-preflight.mjs",
     "db:canonical:objective-approval:preflight": "node scripts/acceptance/check-canonical-objective-approval-preflight.mjs",
     "test:network:unit": "vitest run tests/unit/network-attribution.test.ts tests/unit/noncredit-self-enrollment.test.ts",
-    "db:network:test01:verify": "node scripts/acceptance/check-network-attribution-schema.mjs"
+    "db:network:test01:verify": "node scripts/acceptance/check-network-attribution-schema.mjs",
+    "check:route-identifiers": "node scripts/acceptance/check-route-identifier-collisions.mjs",
+    "test:route-identifiers": "node --test scripts/acceptance/check-route-identifier-collisions.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
