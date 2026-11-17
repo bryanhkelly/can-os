@@ -19,7 +19,7 @@ export type NotificationEmailMessage = {
   actionUrl?: string;
   siteId?: string;
   /** Server-owned receipt tags for authenticated provider callbacks. */
-  providerReceipt?: { source: "school_family"; receiptId: string };
+  providerReceipt?: { source: "school_family" | "noncredit_waitlist"; receiptId: string };
   attachments?: { filename: string; content: string; contentType: string }[];
 };
 
