@@ -297,13 +297,10 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
     subtitle="Create a Class from an adopted Course. Class Offerings are optional: school and private assignment do not require a public or private registration listing."
     actions={<div className="flex flex-wrap items-center gap-4 text-sm font-semibold">
       <Link to="/canonical/program-operations" className="underline underline-offset-4">
-        Program operations
+        Program setup (staging)
       </Link>
       <Link to="/canonical/course-activities" className="underline underline-offset-4">
-        Course activities
-      </Link>
-      <Link to="/canonical" className="underline underline-offset-4">
-        Canonical workspace
+        Publisher activity tools (staging)
       </Link>
     </div>}>
     {navigation}
