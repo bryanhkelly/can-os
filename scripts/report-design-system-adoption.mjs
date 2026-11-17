@@ -12,7 +12,7 @@ const canonicalTags = new Set([
   "DirectoryTable", "QueryState", "WorkspaceNotice", "StatusBadge",
   "ActionDialog", "FormSection", "FormActions", "EmptyState",
   "RecordHeader", "RecordLayout", "RecordFacts", "EntityCard",
-  "FieldTripFacts", "ActionFooter", "StatCard", "WorkspacePanel",
+  "FieldTripFacts", "RecordedTime", "DeliveryReceiptFacts", "ActionFooter", "StatCard", "WorkspacePanel",
   "StatusTimeline", "EvidencePicker",
 ]);
 const files = [];
