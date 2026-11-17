@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest,setResponseHeader } from "@tanstack/react-start/server";
-import { and,count,eq,isNotNull,isNull,lte,inArray } from "drizzle-orm";
+import { and,count,desc,eq,isNotNull,isNull,lte,inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -103,7 +103,7 @@ export const assignAdultToNativeClass=createServerFn({method:"POST"})
           eq(canonicalClassEnrollments.classId,cls.id),
           eq(canonicalClassEnrollments.learnerPersonId,person.id),
           eq(canonicalClassEnrollments.status,"completed"),
-        )).limit(1);
+        )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(1);
       const repeatAuthorization=completed
         ?await requireNativeRepeatAuthorization(tx,cls.id,person.id,completed.id,new Date())
         :null;
