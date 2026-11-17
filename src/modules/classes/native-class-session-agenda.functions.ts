@@ -147,7 +147,7 @@ export const getNativeClassSessionAgenda=createServerFn({method:"GET"})
           throw new AuthorizationError("one verified Class enrollment and Course Attempt");
         const member=members[0];
         const authorized=await authorizeCanonicalCourseAttempt(
-          tx,actor,member.courseAttemptId,true,
+          tx,actor,member.courseAttemptId!,true,
         );
         if(authorized.source!=="class"||authorized.sectionId!==null||
           authorized.courseVersionId!==link.courseVersionId)
