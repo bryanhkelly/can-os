@@ -38,6 +38,32 @@ Person FK references. There were no active multi-Person CAN accounts. The
 No lookup by email can authorize a rekey. An explicit verified migration plan
 must preserve learner and academic history as it changes native references.
 
+## Historical ownership correction (2026-11-17)
+
+A second data audit found that an account can have **only revoked
+memberships** yet still have a known Person. Migration
+`0085_historical_person_ownership.sql` backfills an unanchored account only
+when **all historical grants identify exactly one Person** and that Person
+does not already belong to another anchored account. It never reactivates a
+grant, infers ownership from email, reassigns a Person, or edits enrollment
+history. Conflicts fail closed for an explicit identity reconciliation.
+
+On `test01`, four accounts with solely inactive historical grants were
+anchored by this additive migration. Postflight: **zero unanchored historical
+accounts**, **zero mismatched active grants**, ten anchored accounts and the
+immutable-identity trigger present. A separate rollback-only synthetic
+transaction passed account uniqueness, multiple same-Person roles, and
+Person/account reassignment denials; it left zero synthetic account or grant
+rows. The Node acceptance script remains unexecuted, and browser/build checks
+remain unverified.
+
+A production read-only audit found historical Person/account relationships
+that are not one-to-one. They must remain historical evidence, not be
+automatically merged or interpreted as authorization. Production schema
+is still **unmigrated**. The normal Cloudflare deployment gate now also
+requires no historically unanchored account; release proceeds only when
+the exact production schema is ready.
+
 ## Current code inspected
 
 - `src/modules/identity/command-context.server.ts`: verifies the CAN access session and active account-person grant.
