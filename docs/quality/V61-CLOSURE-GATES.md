@@ -42,6 +42,18 @@ Classify each discovered issue as:
 
 A local gate result of `engineering-gate-passed` establishes only that its recorded commands passed at that commit. It does **not** establish authenticated browser acceptance, persisted database behavior, production status, or green hosted CI. If dependency installation or browser provisioning fails, classify the cause from its log rather than silently skipping the gate.
 
+## Bounded Cycle 1 defect ledger (November 17, 2026)
+
+This is a source-review snapshot, **not** a passing application build or production acceptance report. Only confirmed findings and explicit environmental blockers belong here; do not invent a failure percentage or imply that unrun suites passed.
+
+| ID | Classification | Evidence / status | Remaining gate |
+| --- | --- | --- | --- |
+| CLASS-TRANSFER-001 | P1, integration bug | In `/class`, transfer choices previously included `for_credit` even though the server transfer validator accepted only `audit` and `not_applicable`. The UI also initialized the selected mode independently of the destination. Corrected by a shared transfer-mode contract, destination filtering, reset behavior and focused unit/source-contract tests committed to `main`. Eight source-level consistency assertions passed against `main` at `d9f42525754d9d07fc05ce88b0fe2b4e4e4f1c35`. | Execute the focused Vitest suite and authenticated transfer/declined-transfer browser journeys; verify persisted source and destination records. |
+| ENV-CI-BILLING | Environment blocked, not a confirmed code defect | GitHub Actions and Netlify are blocked by an outstanding balance, per operator report. Previous step-free workflow failures cannot establish code failure. | Hosted CI remains a separate post-billing gate. |
+| ENV-LOCAL-EXECUTION | Environment blocked, not a confirmed code defect | The current isolated tool runtime cannot resolve `github.com` to clone the complete repository. Local application typecheck, lint, builds, Storybook and browser acceptance have therefore **not** been executed from the checkout. | Run `node scripts/verify-v61-local.mjs` on a clean, credential-free `main` checkout, preserve its SHA-keyed logs, then classify actual failures. |
+
+All other proposed component migration work remains out of scope unless an independently reproducible defect emerges. An isolated policy-function smoke check is not the same as a successful Vitest run against the full repository.
+
 ## Cycle 2: high-value integration defects only
 
 Review actual behavior and affected V6.1 presentation contracts in these areas:
