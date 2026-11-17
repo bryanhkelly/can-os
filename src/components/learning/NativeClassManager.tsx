@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useState, type FormEvent, type ReactNode } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
+import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -308,11 +309,15 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
     <div className="mt-5">
       <NativeClassLaunchReadiness state={{
         operatorSites:operatorSites.status,
-        authorizedSiteCount:operatorSites.data?.length??0,
+        authorizedSiteCount:preferredSiteId
+          ?(operatorSites.data??[]).filter(site=>site.id===preferredSiteId).length
+          :(operatorSites.data?.length??0),
         adoptedCourses:options.status,
         visibleAdoptedCourseCount:optionsData.length,
         visibleDraftClasses:classes.status,
-        visibleDraftClassCount:classes.data?.length??0,
+        visibleDraftClassCount:preferredSiteId
+          ?(classes.data??[]).filter(cls=>cls.siteId===preferredSiteId).length
+          :(classes.data?.length??0),
         filtered:Boolean(search||preferredSiteId||preferredOfferingVersionId),
       }}/>
     </div>
@@ -386,8 +391,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                   const mode=row.localClassPolicy.allowedDeliveryModes.some(mode=>mode===deliveryMode)
                     ?deliveryMode:row.localClassPolicy.allowedDeliveryModes[0]!;
                   setDeliveryMode(mode);
-                  setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId&&
-                    site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))?preferredSiteId:"");
+                  setSiteId(selectAuthorizedClassSite(row.siteOptions,preferredSiteId,mode));
                   setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
                 }}>Configure Class</Button>
             </li>)}
@@ -513,8 +517,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                   setDeliveryMode(selectedOption.localClassPolicy.allowedDeliveryModes[0]!);
                   setSiteId("");
                 }else{
-                  setSiteId(selectedOption.siteOptions.some(site=>site.id===preferredSiteId&&
-                    site.allowedDeliveryModes.some(mode=>mode===deliveryMode))?preferredSiteId??"":"");
+                  setSiteId(selectAuthorizedClassSite(selectedOption.siteOptions,preferredSiteId,deliveryMode));
                 }
               }else setSiteId("");
             }}
@@ -573,7 +576,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                 const mode=e.target.value as typeof deliveryMode;
                 setDeliveryMode(mode);
                 if(!selected?.siteOptions.some(site=>site.id===siteId&&
-                    site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)))setSiteId("");
+                    site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)))
+                  setSiteId(selectAuthorizedClassSite(selected?.siteOptions??[],preferredSiteId,mode));
               }}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))
