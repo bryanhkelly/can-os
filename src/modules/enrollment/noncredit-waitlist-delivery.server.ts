@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, isNull, lte, notInArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
+import { OUTBOUND_LEASE_MS, OUTBOUND_MAX_ATTEMPTS, outboundRetryDelayMs } from "@/domain/outbound-retry-policy";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import {
   noncreditEnrollmentWaitlist,noncreditSelfEnrollmentReleases,
@@ -10,9 +11,9 @@ import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
 
-const LEASE_MS=120_000;
-const MAX_ATTEMPTS=5;
-const nextRetry=(attempt:number)=>Math.min(60_000*2**Math.max(0,attempt-1),3_600_000);
+const LEASE_MS=OUTBOUND_LEASE_MS;
+const MAX_ATTEMPTS=OUTBOUND_MAX_ATTEMPTS;
+const nextRetry=outboundRetryDelayMs;
 const nowAfter=(start:Date)=>new Date(start.getTime()+Math.max(0,Date.now()-start.getTime()));
 
 /**
