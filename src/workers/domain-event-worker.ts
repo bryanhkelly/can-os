@@ -291,6 +291,10 @@ for (const eventType of [
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
 }
 
+// Schedule changes must fan out to scoped recipients through the notification
+// policy; do not let the generic audit-only pass-through swallow them.
+registerDomainEventHandler(EventTypes.SectionScheduleChanged, handleNotificationPolicyEvent);
+
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;
 /** Lease on a claimed event. A crashed worker's claims become reclaimable after this. */
