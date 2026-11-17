@@ -477,6 +477,12 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
         operatingOrganizationId:cls.operatingOrganizationId,
         siteId:cls.siteId,title:cls.title,deliveryMode:cls.deliveryMode,
       });
+      const [latestPublishedPolicy]=await tx.select({
+        versionNo:classCompletionPolicyVersions.versionNo,
+        policyId:classCompletionPolicyVersions.id,
+      }).from(classCompletionPolicyVersions)
+        .where(eq(classCompletionPolicyVersions.classId,cls.id))
+        .orderBy(desc(classCompletionPolicyVersions.versionNo)).limit(1);
       const rows=await tx.select({
         id:canonicalClassEnrollments.id,
         enrolledAt:canonicalClassEnrollments.enrolledAt,
@@ -515,6 +521,7 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
       }
       return {
         classId:cls.id,classTitle:cls.title,
+        latestCompletionPolicyVersion:latestPublishedPolicy?.versionNo??null,
         page:data.page,hasMore:rows.length>10,
         participants:summaries,
         note:"Current Enrollment status and independently verified completion decisions are distinct. Historical award and credit issuance are governed separately.",
