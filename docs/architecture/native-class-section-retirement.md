@@ -68,3 +68,33 @@ new primary authorization scheme.
 **Status:** build gates and read-only preflight are source commits. No
 record-level migration, production deletion, full test pass or browser
 acceptance has been established by these commits.
+
+## Verified test01 inventory, November 17, 2026 (read-only)
+
+A direct Neon SQL inspection of `br-bitter-feather-ar0u63x7` found:
+- 11 public school Sections, 13 teacher rows, 129 Section enrollments,
+  60 assessments, and 506 submissions
+- 11 distinct legacy Course template versions used by those Sections;
+  only 2 native Course versions and 0 native Classes/Class Enrollments
+- 21 distinct enrolled school student profiles
+- 68 public CAN People and 6 native canonical Persons, with 0 equal
+  Person IDs across the two stores
+- 10 public CAN Accounts and 4 native canonical Accounts, with 0 equal
+  Account IDs across those two stores
+- 4 native account grants, 0 native sessions
+- 0 reviewed noncredit or staff identity-link rows
+
+Schema introspection returned **23 foreign-key relationships** to
+`public.sections`, including attendance, actions, grading, lesson progress,
+messages/support, calendar/scheduling, and staffing relationships. A
+Course-version join, Person-ID equality or email-based merge is therefore
+**not a verified migration**.
+
+**Decision:** no automatic legacy table drop, UUID coercion, shadow
+enrollment, synthetic native Person linkage or second-login workaround.
+A reviewed academic/identity reconciliation must establish the proper
+Course publisher, Class Deployment, published version, learner/guardian
+authority and evidence lineage before any production cutover. The script
+`db:test01:retirement-readiness` now discovers dependent FK tables
+automatically. Counts are a snapshot, not proof that current production
+has the same records.
