@@ -95,6 +95,16 @@ try{
       AND conname='ws2_approval_acceptance_only_after_review'
   `);
   const adultApprovalMigrationReady=approvalContract.rows.length===1;
+  const consentContract=await query(`
+    SELECT pg_get_constraintdef(oid) AS definition
+    FROM pg_constraint
+    WHERE conrelid=to_regclass('education_v30.class_enrollments')
+      AND conname='canonical_class_enrollment_consent_ck'
+  `);
+  const nativeConsentMethodsReady=consentContract.rows.length===1&&
+    consentContract.rows[0].definition.includes("invitation")&&
+    consentContract.rows[0].definition.includes("approval");
+
   if(requireIntents){
     assert.equal(missingIntents.length,0,
       "Native enrollment-intent migrations are missing: "+missingIntents.join(", "));
@@ -104,6 +114,8 @@ try{
     }
     assert(adultApprovalMigrationReady,
       "Adult approval lifecycle migration is absent or not applied");
+    assert(nativeConsentMethodsReady,
+      "Native invitation and approval consent constraints are not deployed");
   }
   const facts=await query(`
     SELECT
@@ -135,7 +147,7 @@ try{
     projectId,branchId,readOnly:true,identityChecked:true,
     structuralGuards:guards.length,
     missingEnrollmentIntentTables:missingIntents,
-    adultApprovalMigrationReady,
+    adultApprovalMigrationReady,nativeConsentMethodsReady,
     fixtureCounts:summary,
     twoSiteFourSession:requireJourney?"fixture-shape-present-only":"NOT_TESTED",
     commandAuthorization:"NOT_TESTED",
