@@ -44,18 +44,18 @@ function PlatformAdministration() {
       </section>)}
     </div>
     <section className="mt-6 border border-border bg-card p-5">
-      <h2 className="font-serif text-xl">Site identity readiness</h2>
+      <h2 className="font-serif text-xl">Site operations readiness</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        An approved correspondence and a canonical Site record are prerequisites
-        for further staff identity verification. This view does not approve them.
+        Each Site has one platform identity. This view shows whether legacy native Class operations
+        have been provisioned at the exact same Site ID; it does not approve permissions.
       </p>
-      <DirectoryTable label="Site identity readiness" caption="Sites visible to the authorized platform administrator."
+      <DirectoryTable label="Site identity readiness" caption="Site identities and native operating provision status."
         rows={summary.siteReadiness} rowKey={site=>site.siteId}
         empty={<p className="p-4 text-sm text-muted-foreground">No Sites are registered in the school directory.</p>}
         columns={[
           {id:"site",title:"Site",render:site=>site.siteName},
-          {id:"identity",title:"Identity review",render:site=>site.linkStatus.replaceAll("_"," ")},
-          {id:"canonical",title:"Canonical Site",render:site=>site.canonicalSiteExists?"Present":"Not established"},
+          {id:"provisioning",title:"Class operations",render:site=>site.nativeSiteProvisioned?"Provisioned":"Not provisioned"},
+          {id:"lifecycle",title:"Native lifecycle",render:site=>site.nativeLifecycle.replaceAll("_"," ")},
         ]}/>
       {summary.sites > summary.siteReadiness.length &&
         <p className="mt-3 text-xs text-muted-foreground">
@@ -66,8 +66,8 @@ function PlatformAdministration() {
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        This verified platform role does not bypass Site-to-canonical identity review,
-        grant Blueprint approval, or expose individual learner records.
+        This verified platform role does not grant Site-specific Class authority,
+        Blueprint approval, or access to individual learner records.
         Privileged platform mutations require separate audited server commands.
       </p>
     </section>
