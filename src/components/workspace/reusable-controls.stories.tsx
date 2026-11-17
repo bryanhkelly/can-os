@@ -147,6 +147,7 @@ export const SavedButRefreshFailed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("alert")).toHaveTextContent("The command succeeded.");
+    await expect(canvas.getByRole("alert")).toHaveClass("border-warning/50");
     await expect(canvas.queryByText("No change was completed.")).not.toBeInTheDocument();
     await expect(canvas.getByRole("link", { name: "Open saved record" })).toBeInTheDocument();
   },
