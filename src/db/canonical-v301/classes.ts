@@ -87,6 +87,11 @@ export const canonicalClassOutcomes = educationV30.table("class_outcomes", {
   outcomeKind:text("outcome_kind").$type<"grade"|"competency"|"completion"|"assessment">().notNull(),
   resultCode:text("result_code").notNull(),
   sourceKind:text("source_kind").notNull(),sourceId:uuid("source_id").notNull(),
+  completionPolicyVersionId:uuid("completion_policy_version_id"),
+  completionEvidenceVersionId:uuid("completion_evidence_version_id"),
+  completionDecidedByPersonId:uuid("completion_decided_by_person_id"),
+  supersedesOutcomeId:uuid("supersedes_outcome_id"),
+  completionReason:text("completion_reason"),
   recordedAt:timestamp("recorded_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[uniqueIndex("canonical_class_outcome_source_uq").on(t.classEnrollmentId,t.outcomeKind,t.sourceKind,t.sourceId)]);
 
