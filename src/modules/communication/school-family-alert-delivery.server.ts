@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNotNull, isNull, lte, notInArray, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, lte, notInArray, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
@@ -37,6 +37,16 @@ const schoolFamilyAdapter = {
       const [row] = await tx.select({
         id: delivery.id, attempts: delivery.attempts,
       }).from(delivery).where(and(
+        // Only claim this feature's receipts. A correlated EXISTS avoids
+        // locking a shared school bulletin Action during SKIP LOCKED claims.
+        sql`exists (
+          select 1 from notifications source_notification
+          join actions source_action on source_action.id = source_notification.resource_id
+          where source_notification.id = ${delivery.notificationId}
+            and source_notification.type = 'school_family_alert'
+            and source_notification.resource_type = 'action'
+            and source_action.type = 'school_family_bulletin'
+        )`,
         ...(seenIds.length ? [notInArray(delivery.id, [...seenIds])] : []),
         or(
           and(eq(delivery.status, "pending"),
