@@ -17,6 +17,15 @@ describe("workspace design primitives", () => {
     expect(error).not.toContain("<button");
   });
 
+  it("supports block content in accessible notices without nested paragraphs", () => {
+    const html = renderToStaticMarkup(<WorkspaceNotice tone="success">
+      <p>Saved successfully</p><p>Refresh may still be pending</p>
+    </WorkspaceNotice>);
+    expect(html).toMatch(/^<div\\b/);
+    expect(html).toContain("<p>Saved successfully</p>");
+    expect(html).toContain("<p>Refresh may still be pending</p>");
+  });
+
   it.each([
     ["neutral", "bg-muted"],
     ["info", "border-info/40"],
