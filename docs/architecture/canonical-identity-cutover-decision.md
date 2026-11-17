@@ -162,3 +162,48 @@ The current deployed application may still rely on transitional readers.
 Do not drop tables or enable a new path independently of its authorization
 and test migration. Do not represent the P0 as closed until both the source
 code and production database have passed the integrated acceptance.
+
+## Implementation continuation: exact Person FK ownership and reusable CAN grant checks
+
+GitHub `main` now contains an **unapplied** migration at
+`database/production/2026-11-17-stage-unified-person-fk-rebind.sql`.
+Direct Neon main catalog inspection established **239 validated, one-column
+foreign keys across 209 referencing tables**. Three referencing tables are
+still the `public` Person/account correspondence or adult-review schema;
+the other references remain native. There are zero native Person records and
+zero native accounts on main. The staged SQL preserves each FK name and
+referential action, rejects unexpected graph or source records, and requires
+an explicitly approved, independently verified runtime release before it can
+execute. **No FK rebinding has been applied to production.**
+
+The read-only inventory script is callable as:
+
+```sh
+CAN_MAIN_PERSON_FK_INVENTORY=1 DATABASE_URL="<Neon main URL>" \
+  npm run verify:person:main-fk-inventory -- --details
+```
+
+A reusable `assertCurrentCANGrantForMutation` now authenticates and locks
+the **same CAN session, immutable public Person, exact active grant,
+Organization and Site** within the business mutation transaction. It also
+supports locking the required Organization classification for institutional
+reviewers. This verifier does **not** itself award staff roles or replace
+independent official approvals. The credential issuer's independent reviewer
+write path now calls it instead of duplicating hand-written reviewer
+session SQL. The existing reviewer role and separate approved issuer grant
+remain mandatory.
+
+Before executing the FK migration, migrate the native Person Drizzle
+mappings, SQL functions/readers, staff and learner session resolvers,
+guardian authority, DOB evidence access, issuance and assessment revalidation,
+RLS and FK-connected writes to `public.people`. The authoritative
+`public.people` table does not contain a birth-date field; verified
+age/eligibility must come from separately reviewed protected evidence,
+never an inferred or publicly exposed Person property. Preserve existing
+`access_adult_learning_reviews` consent and evidence history when retiring
+its canonical Person/account columns.
+
+This is a **staged implementation checkpoint**, not P0 closure. Current
+runtime still has native-session and cross-account authorization consumers.
+The staged SQL must not run before those consumers and end-to-end journeys
+are updated and accepted.
