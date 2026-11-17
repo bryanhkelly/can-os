@@ -30,10 +30,6 @@ export default defineConfig({
     env:{
       ...process.env,
       APP_ENV:"test",NODE_ENV:"test",
-      CAN_UNIFIED_CLASS_COMMANDS_ENABLED:"true",
-      CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED:"true",
-      CAN_WS3_EVIDENCE_REVIEW_ENABLED:"true",
-      CAN_WS4_SESSION_AGENDAS_ENABLED:"true",
     },
   },
 });
