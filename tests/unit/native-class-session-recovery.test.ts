@@ -49,20 +49,21 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
 
 describe("native Class enrollment with one interactive CAN sign-in",()=>{
   const uiPath="src/routes/class.tsx";
-  it("tries direct enrollment before a linked CAN learner session recovery",()=>{
+  it("uses normal native enrollment first, then restores the same CAN login only if necessary",()=>{
     const ui=read(uiPath);
-    const first=ui.indexOf("result=await submit();");
+    const start=ui.indexOf("async function enrollWithLinkedCanRecovery");
+    const first=ui.indexOf("return await enrollInNativeClass(data);",start);
     const recovery=ui.indexOf("await resumeLinkedNativeClassLearner();",first);
-    const retry=ui.indexOf("result=await submit();",recovery);
-    expect(first).toBeGreaterThan(-1);
+    const retry=ui.indexOf("return enrollInNativeClass(data);",recovery);
+    expect(start).toBeGreaterThan(-1);
+    expect(first).toBeGreaterThan(start);
     expect(recovery).toBeGreaterThan(first);
     expect(retry).toBeGreaterThan(recovery);
-    // Normal native learners must never be forced through a CAN-only bridge.
-    expect(ui.slice(first,recovery)).not.toContain("await resumeLinkedNativeClassLearner()");
   });
-  it("does not replace the original enrollment error with a recovery error",()=>{
+  it("keeps all native Class admission modes on one guarded enrollment path",()=>{
     const ui=read(uiPath);
-    expect(ui).toContain("catch(originalError)");
+    const occurrences=ui.match(/await enrollWithLinkedCanRecovery\\(\\{data:\\{/g)??[];
+    expect(occurrences).toHaveLength(3); // self, approved, invitation
     expect(ui).toContain("catch { throw originalError; }");
   });
   it("does not claim a first-time identity can be forged from an email match",()=>{
