@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   evidenceDocuments, evidenceDocumentVersions,
@@ -36,7 +36,17 @@ export async function assertSourceBoundCompletionEvidence(
       eq(learningCompletionEvidenceBindings.approvedCorrectionOutcome,
         target.approvedCorrectionOutcome),
     )
-    :eq(learningCompletionEvidenceBindings.awardIssuanceId,target.issuanceId);
+    :target.purpose==="award_revocation"
+      ?eq(learningCompletionEvidenceBindings.awardIssuanceId,target.issuanceId)
+      :and(
+        eq(learningCompletionEvidenceBindings.classEnrollmentId,target.classEnrollmentId),
+        target.expectedClassOutcomeId
+          ?eq(learningCompletionEvidenceBindings.expectedClassOutcomeId,
+            target.expectedClassOutcomeId)
+          :isNull(learningCompletionEvidenceBindings.expectedClassOutcomeId),
+        eq(learningCompletionEvidenceBindings.approvedClassOutcome,
+          target.approvedClassOutcome),
+      );
   const bindings=await tx.select().from(learningCompletionEvidenceBindings)
     .where(and(
       eq(learningCompletionEvidenceBindings.purpose,target.purpose),
