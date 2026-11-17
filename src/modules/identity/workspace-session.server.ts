@@ -3,14 +3,14 @@ import { db } from "@/db/client";
 import { accessAccounts, sites, programs, people } from "@/db/schema";
 import { parseStudentDisplayPreferences } from "@/domain/student-display-preferences";
 import { AuthorizationError } from "@/domain/command-context";
-import { getCommandContext } from "./command-context.server";
+import { getIdentityContext } from "./command-context.server";
 import { readSessionGrants } from "./session-grants.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 
 export async function readWorkspaceSession(request: Request) {
   let context;
   try {
-    context = await getCommandContext(request);
+    context = await getIdentityContext(request);
   } catch (error) {
     if (error instanceof AuthorizationError) return { authenticated: false as const };
     throw error;
