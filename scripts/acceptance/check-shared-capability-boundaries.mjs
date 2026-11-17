@@ -34,7 +34,7 @@ const governed = [
       /^@\/routes(?:\/|$)/,
       /^@\/components(?:\/|$)/,
     ],
-    requiredImports: ["@/platform/mutation"],
+    requiredImports: ["@/platform/mutation", "@/domain/command-context"],
   },
   {
     path: "src/modules/communication/outbound-dispatcher.server.ts",
