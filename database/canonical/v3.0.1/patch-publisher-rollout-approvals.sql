@@ -65,7 +65,8 @@ CREATE TABLE IF NOT EXISTS education_v30.operator_rollout_applications (
    UNIQUE(plan_id,deployment_id,adoption_id,site_id,revision),
  CONSTRAINT operator_rollout_submission_ck CHECK(
    (state='draft' AND submitted_at IS NULL)
-   OR (state<>'draft' AND submitted_at IS NOT NULL)
+   OR state='withdrawn'
+   OR (state NOT IN ('draft','withdrawn') AND submitted_at IS NOT NULL)
  )
 );
 CREATE INDEX IF NOT EXISTS operator_rollout_site_status_idx
