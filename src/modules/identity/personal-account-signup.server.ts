@@ -83,22 +83,36 @@ export async function provisionVerifiedPersonalCanAccount(tx: Tx, accountId: str
       .where(eq(accessAccountSignups.accountId, accountId));
     return null;
   }
-  const [person] = await tx.insert(people).values({
-    legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
-    metadata: {
-      origin: "verified_email_personal_signup",
-      nameEvidence: "self_declared",
-      legalNameVerified: false,
-    },
-  }).returning({ id: people.id });
-  if (!person) throw new Error("Personal profile could not be initialized");
+  // A previously authorized account remains the SAME Person even after
+  // every role is revoked. Revocation cannot produce a second human identity.
+  const [account] = await tx.select({personId:accessAccounts.personId})
+    .from(accessAccounts).where(eq(accessAccounts.id,accountId))
+    .for("update").limit(1);
+  if (!account) throw new Error("Verified CAN account unavailable");
+  let personId=account.personId;
+  if(personId){
+    const [existing] = await tx.select({active:people.active}).from(people)
+      .where(eq(people.id,personId)).limit(1);
+    if(!existing?.active)throw new Error("CAN account Person is not active");
+  }else{
+    const [created] = await tx.insert(people).values({
+      legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
+      metadata: {
+        origin: "verified_email_personal_signup",
+        nameEvidence: "self_declared",
+        legalNameVerified: false,
+      },
+    }).returning({id:people.id});
+    if(!created)throw new Error("Personal profile could not be initialized");
+    personId=created.id;
+  }
   const [grant] = await tx.insert(accountPersonGrants).values({
-    accountId, personId: person.id, role: "account_holder",
+    accountId, personId, role: "account_holder",
     organizationId: null, siteId: null, active: true,
   }).returning({ id: accountPersonGrants.id });
   if (!grant) throw new Error("Personal CAN access could not be initialized");
   await writeAudit(tx, {
-    actorPersonId: person.id,
+    actorPersonId: personId,
     action: "identity.personal_account.created",
     resourceType: "access_account",
     resourceId: accountId,
