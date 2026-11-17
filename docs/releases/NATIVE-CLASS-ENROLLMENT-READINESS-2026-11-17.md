@@ -17,40 +17,63 @@ transaction, browser and authenticated test01 verification succeed.
   learner acceptance are implemented as distinct commands and UI.
 - Approval decisions do not create Enrollments or Course Attempts. Consent and
   capacity are re-evaluated when the learner accepts. Reviewers must enter a reason.
-- Publication rejects invitation/approval when their required intent schema or
-  approval lifecycle constraint is missing.
-- The canonical base intent SQL must be followed by the additive adult approval
-  lifecycle SQL; the latter separates reviewer decision from learner admission.
+- Publication rejects invitation/approval when their required intent schema,
+  independently reviewed approval lifecycle, or canonical consent-method constraint is missing.
+- CAN guardian sessions with independently verified canonical Person bridges can
+  request approval for a current verified minor, accept new consent after
+  exact-Site staff review, or withdraw guardian-created participation.
+- Adult self-transfer between distinct published public Classes is transactional,
+  with deterministic dual-Class locking, preserved source history, fresh target
+  consent/capacity, new Enrollment/Attempt and audit evidence.
+- Independent completion-outcome-based repeat authorizations are bound to exact
+  prior completed Enrollments, expire after 30 days, and are consumed atomically
+  by adult or guardian-authorized admissions.
+- Migration order: `patch-native-class-enrollment-authority-ws2.sql`,
+  `patch-native-class-adult-approval-lifecycle.sql`, then
+  `patch-native-class-consent-methods.sql` for consent-bearing `self`,
+  `invitation` and `approval` admissions.
 - A read-only QA script can enforce schema presence via
   `--require-enrollment-intents` without mutating data.
 
-## Confirmed test01 database blocker
+## Confirmed test01 migration status
 
-Project `sweet-hall-62441909`, branch `br-bitter-feather-ar0u63x7`
-(`test01`) was read-only inspected on 2026-11-17:
-`class_enrollment_invitations`, `class_enrollment_approval_requests`,
-`class_enrollment_transfer_requests`, and
-`class_enrollment_repeat_authorizations` were all absent.
-There were zero Class fixtures. No migration, seed or acceptance write was run.
+On 2026-11-17, Neon project `sweet-hall-62441909`, nonproduction
+branch `br-bitter-feather-ar0u63x7` (`test01`) received the
+four enrollment intent tables and the two follow-up constraints
+for independently reviewed adult approval and consent-bearing Class methods.
 
-## Still required for full enrollment feature completeness
+Verified on that branch:
+- Four intent tables with `ENABLE ROW LEVEL SECURITY` and `FORCE ROW LEVEL SECURITY`
+- Four key uniqueness indexes, including one pending invitation/approval/transfer
+  and repeat-outcome authorization identity
+- Revised approved-request acceptance checks and independent reviewer constraints
+- Revised `class_enrollments` consent check: `self`, `invitation`, and
+  `approval` must have verified consent; assignment remains no-consent
+- No production database schema or records were modified
 
-1. **Guardian/youth native Class placement:** Map the verified existing
-   guardian/student Person identity to canonical Persons without assuming
-   matching IDs across schemas. Preserve guardian-consent and school authority,
-   age gates, child protection and eligibility, with separate authorization.
-2. **Cross-Class transfers:** Destination eligibility and consent, stable dual-Class
-   locking, source Course Attempt closure, destination Course Attempt creation,
-   audit and rollback must occur in one authorized transaction.
-3. **Completed repeat:** Independent completion-outcome authorization, proof
-   binding, expiry and one-time consumption; never resurrect a closed Enrollment.
-4. **Delivery notifications:** Verified recipient bridge, outbox consumer,
-   deduplication and retries for invitations, approvals and enrollment transitions.
-5. **QA and release:** Apply reviewed migrations to an isolated approved database
-   branch only. Confirm forced RLS, least-privilege grants, schema parity, roles,
-   negative guardian impersonation tests, retries, contention and one-hour plus
-   four-session pilot journeys. Run build/typecheck/unit/integration/browser
-   checks and prove zero unintended production writes.
+These are structural checks, not authenticated positive/negative authorization
+or runtime testing. **The branch still has zero native Class fixtures**,
+so no end-to-end enrollments or Class Course Attempts have been proven.
+
+## Remaining before shipping
+
+1. **Authenticated QA journeys:** Seed only isolated synthetic, verified
+   learner/guardian/staff/Classes/Sites. Prove all four methods, reviewer
+   independence, invitation expiry, guardian revocation, last-seat contention,
+   cancellation and fresh Course Attempt identities.
+2. **CI and build:** Run typecheck, lint, Cloudflare build, native Class unit
+   tests, route ownership and end-to-end browser tests against the exact
+   `main` SHA. They have **not been executed or verified green** in this run.
+3. **Notifications:** Canonical event stream is written, but outbound invitation,
+   approval and transfer delivery/recipient mapping still lacks a confirmed
+   canonical-to-CAN notification adapter and retry/dedup consumer.
+4. **Additional operational variants:** Atomic adult self-transfer is implemented.
+   Guardian-managed and staff-directed cross-Class transfers require separate
+   scoped authorization; the family flow currently supports applying to a new
+   Class and separately withdrawing the old one. Completed guardian repeats
+   require independent repeat authorization.
+5. **Database rollout:** Production application-role grants and migrations
+   remain unapproved and unapplied. Do not assume test01 is production.
 
 ## QA invocation
 
