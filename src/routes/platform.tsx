@@ -39,6 +39,36 @@ function PlatformAdministration() {
       </section>)}
     </div>
     <section className="mt-6 border border-border bg-card p-5">
+      <h2 className="font-serif text-xl">Site identity readiness</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        An approved correspondence and a canonical Site record are prerequisites
+        for further staff identity verification. This view does not approve them.
+      </p>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full border-collapse text-left text-sm">
+          <thead><tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+            <th scope="col" className="py-3 pr-4">Site</th>
+            <th scope="col" className="py-3 pr-4">Identity review</th>
+            <th scope="col" className="py-3">Canonical Site</th>
+          </tr></thead>
+          <tbody>
+            {summary.siteReadiness.map(site => <tr key={site.siteId} className="border-b border-border">
+              <td className="py-3 pr-4 font-medium">{site.siteName}</td>
+              <td className="py-3 pr-4">{site.linkStatus.replaceAll("_", " ")}</td>
+              <td className="py-3">{site.canonicalSiteExists ? "Present" : "Not established"}</td>
+            </tr>)}
+          </tbody>
+        </table>
+        {summary.siteReadiness.length === 0 && <p className="py-5 text-sm text-muted-foreground">
+          No Sites are registered in the school directory.
+        </p>}
+      </div>
+      {summary.sites > summary.siteReadiness.length &&
+        <p className="mt-3 text-xs text-muted-foreground">
+          Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
+        </p>}
+    </section>
+    <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         This verified platform role does not bypass Site-to-canonical identity review,
