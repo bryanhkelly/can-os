@@ -140,6 +140,7 @@ export function FamilyHomeView({children,needs,loading,error,needsWarning,gradeF
   shortcuts={<>
   <DashboardShortcut title="Students" description="Released grades and schoolwork" icon={<BookOpen className="size-5" />}><Link to="/guardian/students" search={{student:selectedChild?.studentPersonId}} /></DashboardShortcut>
    <DashboardShortcut title="Applications & offers" description="Review enrollment next steps" icon={<ClipboardList className="size-5" />}><Link to="/guardian/admission-offers" search={{student:activeStudent}} /></DashboardShortcut>
+   <DashboardShortcut title="Community Classes" description="Class applications and guardian consent" icon={<BookOpen className="size-5" />}><Link to="/guardian/native-classes" /></DashboardShortcut>
    <DashboardShortcut title="Calendar" description="Your family's authorized schedule" icon={<CalendarDays className="size-5" />}><Link to="/calendar" /></DashboardShortcut>
    <DashboardShortcut title="Family inbox" description="Conversations with your school" icon={<MessageCircle className="size-5" />}><Link to="/messages" /></DashboardShortcut>
   </>}
