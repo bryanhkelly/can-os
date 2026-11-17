@@ -50,13 +50,14 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   // unaccepted sandbox invitations). That filtered set is NOT adequate to
   // establish the one-Person account invariant. Check the underlying active
   // grants instead, before selecting a persona or expanding Site authority.
-  const originalPersons=await db.select({personId:accountPersonGrants.personId})
+  const activePerson=grants.find(grant=>grant.id===session.activeGrantId)?.personId;
+  if(!activePerson)return rejectSession(request,"membership_unavailable");
+  const conflicting=await db.select({id:accountPersonGrants.id})
    .from(accountPersonGrants)
    .where(and(eq(accountPersonGrants.accountId,session.accountId),
-     eq(accountPersonGrants.active,true))).limit(2);
-  const activePerson=grants.find(grant=>grant.id===session.activeGrantId)?.personId;
-  if(!activePerson || originalPersons.length===0 ||
-     originalPersons.some(row=>row.personId!==activePerson))
+     eq(accountPersonGrants.active,true),
+     not(eq(accountPersonGrants.personId,activePerson)))).limit(1);
+  if(conflicting.length)
    return rejectSession(request,"membership_unavailable");
   try{assertSingleAccountPerson(session.accountId,grants);}
   catch{return rejectSession(request,"membership_unavailable");}
