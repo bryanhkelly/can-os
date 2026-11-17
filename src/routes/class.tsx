@@ -43,8 +43,11 @@ const creditName:Record<CreditMode,string>={
 async function enrollWithLinkedCanRecovery(data:Parameters<typeof enrollInNativeClass>[0]) {
   try { return await enrollInNativeClass(data); }
   catch(originalError){
-    try { await resumeLinkedNativeClassLearner(); }
-    catch { throw originalError; }
+    // Seat, consent, identity mismatch, revoked permission and infrastructure
+    // failures are not session-recovery signals. Never retry those mutations.
+    if(normalizeClientError(originalError).code!=="CANONICAL_LEARNER_SESSION_REQUIRED")
+      throw originalError;
+    await resumeLinkedNativeClassLearner();
     return enrollInNativeClass(data);
   }
 }
