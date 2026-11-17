@@ -1,3 +1,4 @@
+import { DirectoryTable } from "@/components/workspace";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -95,27 +96,16 @@ function NoncreditLabContent({ attempts, trainings }: {
     </div>
     <section className="mt-6" aria-label="Provider training versions">
       <h2 className="font-serif text-2xl">Training versions</h2>
-      <div className="mt-3 overflow-x-auto border border-border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b bg-muted/40 text-xs text-muted-foreground">
-            <tr><th scope="col" className="p-3 font-semibold">Training</th>
-              <th scope="col" className="p-3 font-semibold">Publication</th>
-              <th scope="col" className="p-3 font-semibold">Instruction</th>
-              <th scope="col" className="p-3 font-semibold">Knowledge check</th></tr>
-          </thead>
-          <tbody>
-            {trainings.map(training => <tr key={training.id} className="border-b last:border-b-0">
-              <th scope="row" className="p-3 font-medium">{training.title}
-                <p className="mt-1 break-all font-mono text-xs font-normal text-muted-foreground">{training.id}</p></th>
-              <td className="p-3">{training.state}</td>
-              <td className="p-3">{training.requiredMinutes} min</td>
-              <td className="p-3">{training.assessmentVersionId ? "Linked" : "Not linked"}</td>
-            </tr>)}
-            {trainings.length === 0 && <tr><td colSpan={4} className="p-5 text-muted-foreground">
-              No provider-owned training versions in the current scope.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DirectoryTable label="Training versions" caption="Provider-owned training versions in the authorized scope."
+        rows={trainings} rowKey={training=>training.id}
+        empty={<p className="p-4 text-sm text-muted-foreground">No provider-owned training versions in the current scope.</p>}
+        columns={[
+          {id:"training",title:"Training",render:training=><>{training.title}
+            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{training.id}</p></>},
+          {id:"publication",title:"Publication",render:training=>training.state},
+          {id:"instruction",title:"Instruction",render:training=>`${training.requiredMinutes} min`},
+          {id:"assessment",title:"Knowledge check",render:training=>training.assessmentVersionId?"Linked":"Not linked"},
+        ]}/>
     </section>
 
     <section className="mt-7" aria-label="Noncredit course participation">

@@ -1,3 +1,4 @@
+import { DirectoryTable } from "@/components/workspace";
 import {createFileRoute,useRouter} from "@tanstack/react-router";
 import {useState} from "react";
 import {WorkspaceShell} from "@/components/workspace";
@@ -74,23 +75,20 @@ function DevicesContent({data}:{data:Workspace}){
   <section className="mt-8" aria-label="Site inventory">
    <h2 className="font-serif text-xl font-semibold">Registered equipment</h2>
    <p className="mt-2 text-sm text-muted-foreground">Showing the 100 most recent records. A browser login is not proof of possession of any equipment listed here.</p>
-   <div className="mt-4 overflow-x-auto border border-border bg-card">
-    <table className="min-w-full text-left text-sm">
-     <thead><tr className="border-b border-border bg-muted/30">
-      {["Label","Category","Ownership","Managed","Status"].map(s=><th key={s} className="p-3 font-medium">{s}</th>)}
-     </tr></thead>
-     <tbody>{data.devices.map(device=><tr key={device.id} className="border-b border-border">
-      <td className="p-3">{device.label}</td><td className="p-3">{device.deviceCategory}</td>
-      <td className="p-3">{device.ownership}</td><td className="p-3">{device.managed?"Yes":"No"}</td>
-      <td className="p-3">{data.writeAllowed?<select disabled={working} value={device.status}
-       className="border border-border bg-background px-2 py-1"
-       onChange={e=>void run(()=>changeSiteDeviceStatus({data:{id:device.id,status:e.target.value as typeof device.status}}))}>
-       {["active","repair","retired","lost"].map(s=><option key={s} value={s}>{s}</option>)}
-      </select>:device.status}</td>
-     </tr>)}</tbody>
-    </table>
-    {data.devices.length===0&&<p className="p-5 text-sm text-muted-foreground">No devices registered for this Site yet.</p>}
-   </div>
+   <DirectoryTable label="Registered equipment" caption="Up to 100 most recent authorized Site records; not proof of device possession."
+     rows={data.devices} rowKey={device=>device.id}
+     empty={<p className="p-4 text-sm text-muted-foreground">No devices registered for this Site yet.</p>}
+     columns={[
+       {id:"label",title:"Label",render:device=>device.label},
+       {id:"category",title:"Category",render:device=>device.deviceCategory},
+       {id:"ownership",title:"Ownership",render:device=>device.ownership},
+       {id:"managed",title:"Managed",render:device=>device.managed?"Yes":"No"},
+       {id:"status",title:"Status",render:device=>data.writeAllowed?<select disabled={working} value={device.status}
+         className="border border-border bg-background px-2 py-1"
+         onChange={e=>void run(()=>changeSiteDeviceStatus({data:{id:device.id,status:e.target.value as typeof device.status}}))}>
+         {["active","repair","retired","lost"].map(s=><option key={s} value={s}>{s}</option>)}
+       </select>:device.status},
+     ]}/>
   </section>
  </WorkspaceShell>;
 }
