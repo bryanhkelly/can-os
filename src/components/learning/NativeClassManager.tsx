@@ -54,8 +54,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const operatorSites=useQuery({
     queryKey:["native-class-operator-sites"],queryFn:()=>getNativeClassOperatorSites(),retry:false,
   });
-  const classes=useQuery({queryKey:["native-class-operator-classes"],
-    queryFn:()=>getMyUnifiedClassDrafts(),retry:false});
+  const classes=useQuery({queryKey:["native-class-operator-classes",preferredSiteId??null],
+    queryFn:()=>getMyUnifiedClassDrafts({data:{siteId:preferredSiteId}}),retry:false});
   const [choice,setChoice]=useState("");
   const [recipeText,setRecipeText]=useState("");
   const [recipeCourseId,setRecipeCourseId]=useState<string|null>(null);
