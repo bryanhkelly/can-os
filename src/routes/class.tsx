@@ -505,13 +505,13 @@ function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
   const enrolledItems=enrolled.data?.pages.flatMap(page=>page.items)??[];
   async function refresh(){
     await Promise.all([
-      client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId,siteId,deliveryMode]}),
-      client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]}),
-      client.invalidateQueries({queryKey:["native-my-class-invitations"]}),
-      client.invalidateQueries({queryKey:["native-my-class-approvals"]}),
+      client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId,siteId,deliveryMode]},{throwOnError:true}),
+      client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]},{throwOnError:true}),
+      client.invalidateQueries({queryKey:["native-my-class-invitations"]},{throwOnError:true}),
+      client.invalidateQueries({queryKey:["native-my-class-approvals"]},{throwOnError:true}),
       // WS1 projects this source independently. Enrollment and withdrawal must
       // invalidate the unified view without writing a second participation row.
-      client.invalidateQueries({queryKey:["my-activity"]}),
+      client.invalidateQueries({queryKey:["my-activity"]},{throwOnError:true}),
     ]);
   }
   async function recoverExistingNativeLearning(){
