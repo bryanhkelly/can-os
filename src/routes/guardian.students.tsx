@@ -5,6 +5,8 @@ import { getGuardianAssignments, getGuardianStudents } from "@/modules/learning/
 import { guardianAssignmentSummary, guardianWorkNeedsAction } from "@/domain/guardian-academics";
 import { WorkspaceShell, WorkspacePanel, StatusBadge, StatCard, DirectoryTable } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { LayoutGrid, List } from "lucide-react";
 import { SubmissionAnnotations } from "@/components/learning/SubmissionAnnotations";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
@@ -74,36 +76,36 @@ function GuardianAcademicsPage() {
   subtitle="Review your children's class assignments, instructions and released teacher feedback."
   breadcrumbs={<><Link to="/home" search={{student:selected||student}} className="underline">Family home</Link><span>/</span><span>Academics</span></>}
   actions={<div className="flex flex-wrap gap-2">
-   <Link to="/classes" className="rounded-lg border px-4 py-2 text-sm">Family classes</Link>
-   <Link to="/guardian/report-cards" search={{student:selected||undefined}} className="rounded-lg border px-4 py-2 text-sm">Report cards</Link>
+   <Link to="/classes" className=" border px-4 py-2 text-sm">Family classes</Link>
+   <Link to="/guardian/report-cards" search={{student:selected||undefined}} className=" border px-4 py-2 text-sm">Report cards</Link>
   </div>}>
-   {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
+   {students.length > 0 && <Label className="mt-8 block max-w-sm text-sm font-semibold">
     Student
-    <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
+    <Select className="mt-2 min-h-11" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
      <option value="" disabled>Choose an authorized student</option>
      {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
-    </select>
-   </label>}
+    </Select>
+   </Label>}
    {(loading || loadingStudents) && <p className="mt-8 text-sm" role="status">Loading academic progress…</p>}
-   {error && <div className="mt-8 rounded-lg border p-4 text-sm" role="alert">
+   {error && <div className="mt-8  border p-4 text-sm" role="alert">
     <p>{error}</p>
-    <button type="button" className="mt-3 rounded-lg border px-4 py-2 font-semibold"
-     onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry loading academic progress</button>
+    <Button variant="outline" type="button" className="mt-3"
+     onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry loading academic progress</Button>
    </div>}
-   {student&&!selected&&!loadingStudents&&!error&&<p role="alert" className="mt-8 rounded-lg border p-4 text-sm">This student is unavailable in your current family workspace. Choose an authorized student above.</p>}
-   {!loading && !loadingStudents && !error && students.length === 0 && <div className="mt-8 rounded-xl border bg-card p-5">
+   {student&&!selected&&!loadingStudents&&!error&&<p role="alert" className="mt-8  border p-4 text-sm">This student is unavailable in your current family workspace. Choose an authorized student above.</p>}
+   {!loading && !loadingStudents && !error && students.length === 0 && <div className="mt-8  border bg-card p-5">
     <p className="font-semibold">No enrolled children are showing in academics yet.</p>
     <p className="mt-2 text-sm text-muted-foreground">
      Your family home lists current admissions and enrollment steps by child and stage. Open your child's item there to continue a form. If your child is already enrolled but missing from academics, contact the school.
     </p>
     <div className="mt-4 flex flex-wrap gap-3 text-sm">
-     <Link to="/home" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Family home and enrollment steps</Link>
-     <Link to="/messages" className="inline-flex min-h-11 items-center rounded-lg border px-4 py-2 font-semibold">Message the school</Link>
+     <Link to="/home" className="inline-flex min-h-11 items-center  border px-4 py-2 font-semibold">Family home and enrollment steps</Link>
+     <Link to="/messages" className="inline-flex min-h-11 items-center  border px-4 py-2 font-semibold">Message the school</Link>
     </div>
    </div>}
    {!loading && !loadingStudents && !error && !!selected && students.length > 0 && assignments.length === 0 && <p className="mt-8 text-sm">No published assignments found.</p>}
    {(section||assessment)&&<Link to="/guardian/students" search={{student:selected||student}} className="mt-4 inline-block text-sm underline">All assignments for this child</Link>}
-   {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5 rounded-xl border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}
+   {!loading&&!loadingStudents&&!error&&selected&&(section||assessment)&&!visible.length&&<p role="alert" className="mt-5  border p-4">This assignment or class is unavailable in this child's authorized academic view.</p>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && <div className="mt-8 grid gap-3 sm:grid-cols-3" aria-label="Assignment summary">
     <StatCard label="Unfinished work" value={summary.needsAction}/>
     <StatCard label="Overdue" value={summary.overdue}/>
@@ -126,13 +128,13 @@ function GuardianAcademicsPage() {
      { id: "grade", title: "Grade", render: item => item.score !== null ? `${item.score} / ${item.pointsPossible}` : "—" },
     ]}/>}
    {!loading && !loadingStudents && !error && assignments.length > 0 && (!assessment && view === "cards" || assessment) && <div className="mt-8 grid gap-4">
-    {visible.map(item => <section key={item.assessmentId} className="rounded-xl border bg-card p-5">
+    {visible.map(item => <section key={item.assessmentId} className=" border bg-card p-5">
      <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:item.sectionId,student:selected}} className="underline">{item.course}</Link></p><h2 className="mt-1 text-lg font-semibold"><Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}} className="underline">{item.title}</Link></h2></div>
       <StatusBadge tone={item.timeliness==="missing"?"attention":"neutral"}>{item.status.replaceAll("_"," ")}{item.timeliness==="missing"?" · missing":item.timeliness==="late"?" · late":""}</StatusBadge>
      </div>
      <p className="mt-3 text-sm text-muted-foreground">Due: {item.dueAt ? new Date(item.dueAt).toLocaleDateString() : "Not set"}</p>
-     {item.revisionLimitReached && <div className="mt-3 rounded-lg border p-3 text-sm" role="status">
+     {item.revisionLimitReached && <div className="mt-3  border p-3 text-sm" role="status">
       <p className="font-semibold">No revision attempts remain for this assignment.</p>
       <p className="mt-1">The teacher's returned feedback is still available, but the student cannot submit another attempt under the current limit. Review the feedback and ask the school about next steps.</p>
       {!assessment && <Link to="/guardian/students" search={{student:selected,section:item.sectionId,assessment:item.assessmentId}}
@@ -140,14 +142,14 @@ function GuardianAcademicsPage() {
      </div>}
      {!item.revisionLimitReached && guardianWorkNeedsAction(item.status) &&
       (item.workAvailabilityReason==="closed"||item.workAvailabilityReason==="unpublished_or_closed") &&
-      <p className="mt-3 rounded-lg border p-3 text-sm" role="status">
+      <p className="mt-3  border p-3 text-sm" role="status">
        This assignment is no longer accepting student submissions. Review the unfinished work with your school.
       </p>}
      {guardianWorkNeedsAction(item.status) && item.workAvailabilityReason==="unreleased" &&
       <p className="mt-3 text-sm text-muted-foreground">This assignment has not opened for student work yet.</p>}
      {item.score !== null && <p className="mt-2 text-sm font-semibold">Grade: {item.score} / {item.pointsPossible}</p>}
-     {item.feedback && <p className="mt-3 rounded-lg bg-muted p-3 text-sm">Teacher feedback: {item.feedback}</p>}
-     {item.revisionFeedback && <p className="mt-3 rounded-lg border p-3 text-sm">
+     {item.feedback && <p className="mt-3  bg-muted p-3 text-sm">Teacher feedback: {item.feedback}</p>}
+     {item.revisionFeedback && <p className="mt-3  border p-3 text-sm">
       Previously released teacher feedback for this revision: {item.revisionFeedback}
      </p>}
      {assessment&&<>
