@@ -14,7 +14,7 @@ import {
   noncreditSelfEnrollmentReleases, noncreditSelfEnrollmentClaims,
   participationAttributions,networkMemberships,
   noncreditEnrollmentWaitlist,
-  noncreditCompletionPolicies, noncreditTrainingVersions,
+  noncreditCompletionPolicies, noncreditCompletionDecisions, noncreditTrainingVersions,
   auditEvents as canonicalAuditEvents, domainEvents as canonicalDomainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -422,8 +422,31 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
         inArray(facilitatedClassroomPlans.enrollmentReleaseId,releaseIds),
         inArray(facilitatedClassroomPlans.state,["scheduled","started"]),
       )).orderBy(canonicalDeliverySessions.startsAt).limit(1001):[];
+    // Only the source-owned, latest non-superseded formal decisions are
+    // displayed. Progress, elapsed time, registration, and assessment alone
+    // are never promoted into an official completion.
+    const registrationIds=[...new Set(registrations.map(row=>row.registrationId))];
+    const decisions=registrationIds.length?await db.select({
+      id:noncreditCompletionDecisions.id,
+      registrationId:noncreditCompletionDecisions.registrationId,
+      outcome:noncreditCompletionDecisions.outcome,
+      supersedesId:noncreditCompletionDecisions.supersedesId,
+    }).from(noncreditCompletionDecisions).where(
+      inArray(noncreditCompletionDecisions.registrationId,registrationIds),
+    ).orderBy(desc(noncreditCompletionDecisions.decidedAt),desc(noncreditCompletionDecisions.id))
+      .limit(1000):[];
+    const superseded=new Set(decisions.flatMap(item=>
+      item.supersedesId?[item.supersedesId]:[]));
+    const current=new Map<string,(typeof decisions)[number]>();
+    for(const item of decisions)
+      if(!superseded.has(item.id)&&!current.has(item.registrationId))
+        current.set(item.registrationId,item);
     return registrations.map(r=>({
-      ...r,upcomingSessions:plans.filter(p=>p.releaseId===r.releaseId &&
+      ...r,officialOutcome:current.has(r.registrationId)?{
+        referenceId:current.get(r.registrationId)!.id,
+        label:"Completion decision: "+current.get(r.registrationId)!.outcome.replaceAll("_"," "),
+      }:null,
+      upcomingSessions:plans.filter(p=>p.releaseId===r.releaseId &&
         p.endsAt.getTime()>Date.now()).slice(0,20).map(p=>({
           startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
         })),
