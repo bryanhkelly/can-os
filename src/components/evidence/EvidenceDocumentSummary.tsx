@@ -13,7 +13,7 @@ export interface EvidenceDocumentSummaryProps {
 export function EvidenceDocumentSummary({
   fileName, version, expiresAt, submittedAt, onGetDownloadUrl, downloadLabel,
 }: EvidenceDocumentSummaryProps) {
-  return <div className="mt-3 rounded border p-3 text-xs">
+  return <div className="mt-3 border p-3 text-xs">
     <p><strong>{version == null ? "Current document" : `Current v${version}`}:</strong> {fileName ?? "Private evidence"}</p>
     <p className="mt-1">
       {submittedAt && <>Submitted {new Date(submittedAt).toLocaleString()} · </>}
