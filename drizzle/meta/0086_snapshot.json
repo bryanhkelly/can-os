@@ -19396,7 +19396,6 @@
           "isUnique": true,
           "concurrently": false,
           "method": "btree",
-          "where": "(\"provider_message_id\" IS NOT NULL)",
           "with": {}
         }
       },
