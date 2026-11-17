@@ -1,4 +1,9 @@
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import {useState} from "react";
 import {useQuery} from "@tanstack/react-query";
 import {getEnrollmentDocumentDownload} from "@/modules/enrollment/r2-document-upload.functions";
@@ -81,22 +86,22 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
  }
  return <WorkspaceShell width="standard" eyebrow="Enrollment" title="Family enrollment readiness" subtitle="Review each household journey and its supporting private documents. Uploads are available only where the deployment has enabled the relevant R2 workflow.">
   {selection.application&&<Link to="/admissions/families" search={{siteId:selection.siteId,programId:selection.programId}} className="mt-4 inline-block text-sm underline">View all household readiness</Link>}
-  {selection.application&&!visibleApps.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current family readiness view.</p>}
-  {error&&<p role="alert" className="mt-4 rounded-xl border border-red-400 p-3">{error}</p>}
+  {selection.application&&!visibleApps.length&&<WorkspaceNotice tone="danger" className="mt-4">This application is unavailable in the current family readiness view.</WorkspaceNotice>}
+  {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
   <MutationFeedback state={mutation} pendingMessage="Saving family readiness..." className="mt-4"/>
   <QueryState loading={availability.isPending?"Checking document upload availability...":undefined}
    error={availability.isError?mutationErrorMessage(availability.error,"Unable to load document upload availability"):undefined}
    onRetry={()=>void availability.refetch()} retrying={availability.isFetching}/>
-  <div className="mt-6 rounded-xl border p-5"><p className="text-sm">Households represented</p><p className="font-serif text-3xl">{families.length}</p></div>
-  <div className="mt-6 space-y-4">{families.map((id,i)=><section key={id} className="rounded-xl border p-5">
+  <div className="mt-6"><StatCard label="Households represented" value={families.length}/></div>
+  <div className="mt-6 space-y-4">{families.map((id,i)=><section key={id} className=" border p-5">
    <h2 className="font-serif text-xl">Household {i+1}</h2>
-   <div className="mt-3 space-y-3">{visibleApps.filter(a=>a.householdId===id).map(a=><article key={a.id} className="rounded-lg border p-3">
+   <div className="mt-3 space-y-3">{visibleApps.filter(a=>a.householdId===id).map(a=><article key={a.id} className=" border p-3">
     <FamilyReadinessOverviewCard application={a}/>
     <Link to="/admissions" search={{siteId:selection.siteId,programId:selection.programId,application:a.id}} className="mt-2 inline-block text-xs font-semibold underline">Review offers and enrollment →</Link>
     {a.activeSchoolYears.length>0&&<p className="mt-2 text-xs text-muted-foreground">The admissions checklist is now a historical record. Active enrollment requirements are managed separately.</p>}
     {!((a.isFixture?uploadModes.demo:uploadModes.live))&&<p className="mt-3 text-xs text-muted-foreground">Document uploads are not enabled for this application. Existing verified documents may still be reviewed.</p>}
     <div className="mt-3 space-y-3">{a.requirements.map(r=>{
-     if(r.form)return <article key={r.id} className="space-y-3 rounded-lg border p-3">
+     if(r.form)return <article key={r.id} className="space-y-3  border p-3">
       <h3 className="font-semibold">{r.title}{r.blocking?" · Required":""}</h3>
       <fieldset disabled={busy!==null}><RegistrarEnrollmentFormReview key={r.form.submission?.id??r.form.revision} applicationId={a.id} requirementId={r.id}
        record={r.form} closed={["active","complete","cancelled"].includes(a.journeyStatus??"")}
@@ -104,19 +109,19 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
      </article>;
      const latestDocumentReview=[...r.evidence].reverse().find(e=>e.kind==="document_review");
      const documentReviewPending=Boolean(latestDocumentReview&&latestDocumentReview.status!=="accepted");
-     return <div key={r.id} className="rounded-lg border p-3"><label className="flex items-center gap-3 text-sm">
-      <input type="checkbox" checked={r.status==="complete"} disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")||
+     return <div key={r.id} className=" border p-3"><Label className="flex items-center gap-3 text-sm">
+      <Checkbox checked={r.status==="complete"} disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")||
        (r.status!=="complete"&&documentReviewPending)} onChange={e=>update(a.id,r.id,e.target.checked)}/>
       <span>{r.title}{r.blocking?" · Required":""}</span>
       <span className="text-xs text-muted-foreground">({r.status.replaceAll("_"," ")})</span>
-    </label>{r.status!=="complete"&&documentReviewPending&&<p className="mt-1 text-xs">Accept the current document using document review; the checklist cannot bypass review.</p>}<div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
-    {<div className="mt-2 flex items-center gap-2"><label className="text-xs" htmlFor={"document-"+r.id}>Document being reviewed</label><select id={"document-"+r.id} className="min-w-0 flex-1 rounded border bg-background p-1 text-xs" value={reviewFiles[familyRequirementKey(a.id,r.id)]??""} onChange={e=>setReviewFiles(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.value}))}><option value="">No document selected</option>{r.documents.filter(d=>d.isCurrent).map(d=><option key={d.id} value={d.id}>{d.fileName} · {d.reviewStatus}</option>)}</select></div>}
-    {<div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><button key={status} type="button" className="rounded border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")||(status==="accepted"&&!reviewFiles[familyRequirementKey(a.id,r.id)])} onClick={()=>review(a.id,r.id,status)}>{status}</button>)}</div>}
-    {<div className="mt-2 space-y-2">{r.documents.map(d=><div key={d.id} className="flex items-center justify-between gap-3 rounded border p-2 text-xs"><span className="truncate">{d.fileName} · v{d.version} · {new Date(d.uploadedAt).toLocaleDateString()} · {d.isCurrent?"Current":"Superseded"} · {d.reviewStatus}</span><EvidenceDocumentLink label="View private file" disabled={busy!==null} onGetDownloadUrl={async()=>(await getEnrollmentDocumentDownload({data:{applicationId:a.id,requirementId:r.id,documentId:d.id}})).downloadUrl}/></div>)}{!r.documents.length&&<p className="text-xs text-muted-foreground">No R2 document registered for this requirement.</p>}</div>}
-    {(a.isFixture?uploadModes.demo:uploadModes.live)&&<div className="mt-2 flex flex-wrap items-center gap-2"><input aria-label={"Select enrollment document for "+r.title} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="max-w-full text-xs" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>setFiles(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.files?.[0]??null}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||!files[familyRequirementKey(a.id,r.id)]} onClick={()=>upload(a.id,r.id)}>Upload to private R2</button></div>}
+    </Label>{r.status!=="complete"&&documentReviewPending&&<p className="mt-1 text-xs">Accept the current document using document review; the checklist cannot bypass review.</p>}<div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="registrar_note"&&typeof e.text==="string").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Review note: {String(e.text)}</p>)}</div><div className="mt-2 space-y-1">{r.evidence.filter(e=>e.kind==="document_review").map((e,i)=><p key={i} className="text-xs text-muted-foreground">Document review: {e.status}{e.text?" · "+e.text:""}{e.reviewedAt?" · "+new Date(e.reviewedAt).toLocaleDateString():""}</p>)}</div>
+    {<div className="mt-2 flex items-center gap-2"><Label className="text-xs" htmlFor={"document-"+r.id}>Document being reviewed</Label><Select id={"document-"+r.id} className="min-w-0 flex-1 text-xs" value={reviewFiles[familyRequirementKey(a.id,r.id)]??""} onChange={e=>setReviewFiles(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.value}))}><option value="">No document selected</option>{r.documents.filter(d=>d.isCurrent).map(d=><option key={d.id} value={d.id}>{d.fileName} · {d.reviewStatus}</option>)}</Select></div>}
+    {<div className="mt-2 flex flex-wrap gap-2">{(["requested","received","accepted","rejected"] as const).map(status=><Button variant="outline" size="sm" key={status} type="button" className=" border px-2 py-1 text-xs capitalize disabled:opacity-50" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")||(status==="accepted"&&!reviewFiles[familyRequirementKey(a.id,r.id)])} onClick={()=>review(a.id,r.id,status)}>{status}</Button>)}</div>}
+    {<div className="mt-2 space-y-2">{r.documents.map(d=><div key={d.id} className="flex items-center justify-between gap-3  border p-2 text-xs"><span className="truncate">{d.fileName} · v{d.version} · {new Date(d.uploadedAt).toLocaleDateString()} · {d.isCurrent?"Current":"Superseded"} · {d.reviewStatus}</span><EvidenceDocumentLink label="View private file" disabled={busy!==null} onGetDownloadUrl={async()=>(await getEnrollmentDocumentDownload({data:{applicationId:a.id,requirementId:r.id,documentId:d.id}})).downloadUrl}/></div>)}{!r.documents.length&&<p className="text-xs text-muted-foreground">No R2 document registered for this requirement.</p>}</div>}
+    {(a.isFixture?uploadModes.demo:uploadModes.live)&&<div className="mt-2 flex flex-wrap items-center gap-2"><Input aria-label={"Select enrollment document for "+r.title} type="file" accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg" className="max-w-full text-xs" disabled={busy!==null||["active","complete","cancelled"].includes(a.journeyStatus??"")} onChange={e=>setFiles(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.files?.[0]??null}))}/><Button variant="outline" size="sm" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||!files[familyRequirementKey(a.id,r.id)]} onClick={()=>upload(a.id,r.id)}>Upload to private R2</Button></div>}
     {(a.isFixture?uploadModes.demo:uploadModes.live)&&<p className="mt-1 text-xs text-muted-foreground">Restricted private R2 document workflow. PDF, JPG or PNG, maximum 10 MB. Uploaded files require registrar review.</p>}
     <p className="mt-2 text-xs">Document request and rejection reasons are visible to the family. Save note records an internal registrar note only.</p>
-    <div className="mt-2 flex gap-2"><input aria-label={"Review note or family-visible document instructions for "+r.title} className="min-w-0 flex-1 rounded border bg-background px-2 py-1 text-sm" value={notes[familyRequirementKey(a.id,r.id)]??""} maxLength={500} placeholder="Internal note or family-visible document instructions" onChange={e=>setNotes(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.value}))}/><button type="button" className="rounded border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[familyRequirementKey(a.id,r.id)]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</button></div></div>;
+    <div className="mt-2 flex gap-2"><Input aria-label={"Review note or family-visible document instructions for "+r.title} className="min-w-0 flex-1" value={notes[familyRequirementKey(a.id,r.id)]??""} maxLength={500} placeholder="Internal note or family-visible document instructions" onChange={e=>setNotes(previous=>({...previous,[familyRequirementKey(a.id,r.id)]:e.target.value}))}/><Button variant="outline" size="sm" type="button" className=" border px-3 py-1 text-xs disabled:opacity-50" disabled={busy!==null||(notes[familyRequirementKey(a.id,r.id)]??"").trim().length<5} onClick={()=>addNote(a.id,r.id)}>Save note</Button></div></div>;
     })}</div>
     {!a.requirements.length&&<p className="mt-2 text-sm text-muted-foreground">No requirements configured for this application.</p>}
    </article>)}</div>
@@ -124,7 +129,7 @@ function FamiliesView({page}:{page:Awaited<ReturnType<typeof loadFamilyReadiness
   <PageNavigation label="Family readiness pages" className="mt-5 gap-4"
    previous={!selection.application&&(selection.page??1)>1&&<Link to="/admissions/families" search={{...selection,page:(selection.page??1)-1}} className="underline">Previous families</Link>}
    next={!selection.application&&page.hasMore&&<Link to="/admissions/families" search={{...selection,page:page.nextPage??(selection.page??1)+1}} className="underline">Next families</Link>}/>
-  {!families.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No family enrollment cases found in your authorized programs.</p>}
+  {!families.length&&<EmptyState title="No family enrollment cases" description="No family enrollment cases found in your authorized programs."/>}
   </div>
  </WorkspaceShell>;
 }
