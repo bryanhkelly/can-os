@@ -1,4 +1,6 @@
 import type { ChangeEvent } from "react";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 
 export interface GradebookSectionOption {
   id: string;
@@ -28,11 +30,8 @@ export function GradebookSectionSelector<T extends GradebookSectionOption>({
   };
 
   return (
-    <label className="block text-sm font-medium">
-      <span>{label}</span>
-      <select
-        aria-label={label}
-        className="mt-2 w-full rounded-lg border bg-background p-3"
+    <Field label={label}>
+      <Select
         value={selectedId}
         disabled={disabled || sections.length === 0}
         onChange={handleChange}
@@ -43,7 +42,7 @@ export function GradebookSectionSelector<T extends GradebookSectionOption>({
             {section.title} ({section.code})
           </option>
         ))}
-      </select>
-    </label>
+      </Select>
+    </Field>
   );
 }
