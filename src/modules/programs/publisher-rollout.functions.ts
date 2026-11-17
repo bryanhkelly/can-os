@@ -30,8 +30,6 @@ const inputSchema=z.object({
 export const getPublisherRolloutTemplate=createServerFn({method:"GET"})
   .validator((raw:unknown)=>inputSchema.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("unified Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
