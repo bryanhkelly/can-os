@@ -843,6 +843,12 @@ export async function listInstitutionallyAuthorizedAcademicProgramIds(
     .innerJoin(host, eq(host.id, sql`coalesce(${programs.hostOrganizationId}, ${programs.organizationId})`))
     .where(inArray(programs.id, unique));
 
+  const institutionIds = [...new Set(rows.map(row => row.institutionOrganizationId))];
+  const institutionRows = institutionIds.length
+    ? await tx.select({ id: organizations.id, type: organizations.type })
+      .from(organizations).where(inArray(organizations.id, institutionIds))
+    : [];
+  const institutionTypes = new Map(institutionRows.map(row => [row.id, row.type]));
   const churchPrograms = new Map<string, OperatingProgramIdentity>();
   for (const row of rows) {
     const hostId = row.hostOrganizationId ?? row.organizationId;
@@ -856,7 +862,7 @@ export async function listInstitutionallyAuthorizedAcademicProgramIds(
       siteId: row.siteId, siteOrganizationId: row.siteOrganizationId,
       hostOrganizationId: hostId, hostOrganizationType: row.hostType,
       institutionOrganizationId: row.institutionOrganizationId,
-      institutionOrganizationType: "can_network",
+      institutionOrganizationType: institutionTypes.get(row.institutionOrganizationId) ?? "",
       creditIssuingOrganizationId: row.creditIssuingOrganizationId,
     });
   }
