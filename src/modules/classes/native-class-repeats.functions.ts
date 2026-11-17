@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,eq,gt,inArray,isNull} from "drizzle-orm";
+import {and,desc,eq,gt,inArray,isNotNull,isNull} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
@@ -141,3 +141,44 @@ export async function requireNativeRepeatAuthorization(
   throw new AuthorizationError("independently authorized unconsumed completed Class repeat");
  return authorization;
 }
+
+/** Current exact-Site manager's completed Class candidates. These are
+ * not student-wide history or permission to issue a repeat by themselves.
+ */
+export const listNativeClassRepeatCandidates=createServerFn({method:"GET"})
+ .validator((v:unknown)=>z.object({classId:uuid}).strict().parse(v))
+ .handler(async({data})=>{
+  noCache();
+  const request=getRequest();
+  const actor=await getCanonicalCommandContext(request);
+  if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
+   throw new AuthorizationError("current repeat reviewer");
+  assertCapability(actor,"class.manage");
+  return db.transaction(async tx=>{
+   const [cls]=await tx.select().from(canonicalClasses)
+    .where(eq(canonicalClasses.id,data.classId)).limit(1);
+   if(!cls)throw new AuthorizationError("existing exact-Site Class");
+   assertNativeClassOperatorExitScope(actor,cls);
+   await assertCurrentCanonicalStaffForMutation(tx,request,actor);
+   const rows=await tx.select({
+    priorEnrollmentId:canonicalClassEnrollments.id,
+    learnerPersonId:canonicalClassEnrollments.learnerPersonId,
+    completionOutcomeId:canonicalClassOutcomes.id,
+    evidenceVersionId:canonicalClassOutcomes.completionEvidenceVersionId,
+    completedAt:canonicalClassOutcomes.recordedAt,
+    decidedByPersonId:canonicalClassOutcomes.completionDecidedByPersonId,
+   }).from(canonicalClassEnrollments)
+    .innerJoin(canonicalClassOutcomes,
+      eq(canonicalClassOutcomes.classEnrollmentId,canonicalClassEnrollments.id))
+    .where(and(
+      eq(canonicalClassEnrollments.classId,cls.id),
+      eq(canonicalClassEnrollments.status,"completed"),
+      eq(canonicalClassOutcomes.outcomeKind,"completion"),
+      eq(canonicalClassOutcomes.resultCode,"completed"),
+      isNotNull(canonicalClassOutcomes.completionEvidenceVersionId),
+      isNotNull(canonicalClassOutcomes.completionPolicyVersionId),
+      isNotNull(canonicalClassOutcomes.completionDecidedByPersonId),
+    )).orderBy(desc(canonicalClassOutcomes.recordedAt)).limit(100);
+   return rows.filter(row=>row.decidedByPersonId!==actor.actorPersonId);
+  });
+ });
