@@ -64,6 +64,19 @@ check("WS3 completion takes parent Class lock before Enrollment",()=>{
   required(decide.includes("assertSourceBoundCompletionEvidence"),
     "Governed completion must retain independent source evidence binding");
 });
+check("WS3 rejects ambiguous assessment revisions and preserves current authorization",()=>{
+  const revisions=read("src/domain/canonical-assessment-revisions.ts");
+  const completion=read("src/modules/classes/native-class-completion.functions.ts");
+  const reader=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
+  required(revisions.includes("if(ambiguous.has(attemptId))continue;"),
+    "WS3 current-grade projection must fail closed when an attempt has invalid revisions");
+  required(completion.includes("latestCanonicalAssessmentRevisions") &&
+           completion.includes("projected.ambiguousAttemptIds.length"),
+    "WS3 completion cannot use an older passing grade when a newer correction is ambiguous");
+  required(reader.includes("latestCanonicalAssessmentRevisions") &&
+           reader.includes("projected.ambiguousAttemptIds.length"),
+    "WS3 learner evidence must not expose a provisional/voided grade as current");
+});
 check("WS4 keeps canonical Session identity and immutable change evidence",()=>{
   const s=read("src/modules/classes/native-class-sessions.functions.ts");
   required(s.includes("ClassSessionScheduleChanged"),
