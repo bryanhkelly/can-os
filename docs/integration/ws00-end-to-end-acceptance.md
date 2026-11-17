@@ -127,16 +127,24 @@ session in one serializable-identity transaction, before retrying the original
 Class enrollment command. No Class seat is reserved or Enrollment/Attempt written
 by activation itself. No browser-provided DOB, Person or Organization is accepted.
 
-**Review creation is NOT implemented as a public UI or automatic approval.**
-A trusted reviewer/operations process must independently validate age, identity,
-reviewer authority, exact CAN Account and Person IDs, and a currently active
-canonical home Organization; retain the source evidence in a controlled store;
-then enter an approved row with an opaque evidence reference using a separately
-authorized, auditable operator path. An email match, self-declared signup age,
-learner click, test fixture or Site favorite is not sufficient evidence. The
-current review ledger deliberately exposes no learner/reviewer write endpoint.
-Do not apply this migration on production until that governance, the operator
-write path, restricted-role RLS tests and rollback/reconciliation are approved.
+**Review creation is not automatic and has no public learner UI.**
+`approveAdultClassLearnerReview` is an internal App-Admin-only mutation requiring
+a separately provisioned verified App Admin, a real active exact Person, distinct
+reviewer/account, an independently checked birth date, an opaque reference to
+evidence in controlled storage, and an active canonical learner home Organization.
+It rechecks the current platform grant inside the transaction, never enrolls or
+creates a learner, and writes a CAN audit row without the date of birth.
+`revokeAdultClassLearnerReview` invalidates the decision and transactionally
+revokes the resulting native learner grants and active sessions, preserving
+Class history and evidence. The original reviewed evidence is immutable.
+
+The independent evidence collection and verification policy, actual controlled
+evidence storage integration, App Admin review UI, operator signoff, and tested
+DB permissions still require acceptance. A matching email, self-declared age,
+learner click, Site favorite or synthetic QA fixture cannot substitute for
+independent identity verification. Do not apply this migration to production
+until reviewer governance, actual QA role/RLS tests, revocation, rollback and
+reconciliation are approved.
 
 **Required QA acceptance:** start with a truly new verified CAN account and no
 native cookie or existing canonical account; arrange an independently approved
@@ -151,6 +159,6 @@ account; other Site staff/reviewer cookie; revoked learner grant; missing
 restricted reader. All must fail closed. Existing previously bound learners
 must continue to work without provisioning again.
 
-**Status:** code committed to `main`; migration and signed-in QA tests not run.
+**Status:** review/activation/revocation code committed to `main`; migration, independent evidence integration, and signed-in QA tests not run.
 Issue #320 remains P0 / NO-GO until the independent review path and the above
 QA assertions are completed with exact SHA and database branch evidence.
