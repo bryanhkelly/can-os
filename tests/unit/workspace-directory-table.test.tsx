@@ -30,6 +30,7 @@ describe("DirectoryTable reusable workspace pattern", () => {
     const html = renderToStaticMarkup(<DirectoryTable {...base}
       selectedKeys={new Set(["one"])} onSelectionChange={() => undefined} />);
     expect(html).toContain('aria-label="Select page"');
+    expect(html).toContain('aria-pressed="mixed"');
     expect(html).toContain('aria-label="Deselect row one"');
     expect(html).toContain('aria-label="Select row two"');
   });
