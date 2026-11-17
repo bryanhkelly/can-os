@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarDays, Users } from "lucide-react";
 import { getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
-import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions } from "@/modules/classes/unified-class.functions";
+import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions, getNativeClassOperatorSites } from "@/modules/classes/unified-class.functions";
+import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 
 /** One Site UUID across Launch Studio and Class. This scope read checks the
@@ -17,6 +18,11 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
  const adoptedCourses=useQuery({queryKey:["launch-class-course-adoptions",canonicalSiteId],
    queryFn:()=>getUnifiedClassCourseOptions({data:{siteId:canonicalSiteId!,search:"",cursor:0}}),
    enabled:Boolean(canonicalSiteId),retry:false});
+ const operatorSites=useQuery({
+   queryKey:["native-class-operator-sites"],
+   queryFn:()=>getNativeClassOperatorSites(),
+   enabled:Boolean(canonicalSiteId),retry:false,
+ });
  const classes=classesRead.data??[];
  return <section className="mt-6 border p-5" aria-label="Unified Classroom handoff">
   <p className="text-xs font-bold uppercase tracking-wide text-primary">Classes and delivery</p>
@@ -57,21 +63,16 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    </p>}
    {classesRead.isSuccess&&<>
     <ProgramDiscoveryPanel siteId={publicSiteId}/>
-    <div className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Class activation progression">
-      <div className="border border-border p-3 text-xs"><strong className="block text-sm">1. Approved Courses</strong>
-        <p className="mt-2">{adoptedCourses.isError?"Unable to verify local Course adoption"
-          :adoptedCourses.isPending?"Checking adopted Courses"
-          :adoptedCourses.data.items.length>0?"Authorized Course options available":"No eligible adopted Courses are visible"}</p>
-      </div>
-      <div className="border border-border p-3 text-xs"><strong className="block text-sm">2. Classes</strong>
-        <p className="mt-2">{classes.length} visible at this Site. {classes.some(item=>item.state==="active")
-          ?"An active Class exists.":"Activate a draft Class after Course adoption."}</p>
-      </div>
-      <div className="border border-border p-3 text-xs"><strong className="block text-sm">3. Registration and Sessions</strong>
-        <p className="mt-2">{classes.some(item=>item.offeringState==="published")
-          ?"A Class Offering is published; Sessions have separate scheduling."
-          :"Publishing a Class Offering is optional. Facilitation and Session scheduling have separate permissions."}</p>
-      </div>
+    <div className="mt-4">
+      <NativeClassLaunchReadiness state={{
+        operatorSites:operatorSites.status,
+        authorizedSiteCount:(operatorSites.data??[]).filter(site=>site.id===canonicalSiteId).length,
+        adoptedCourses:adoptedCourses.status,
+        visibleAdoptedCourseCount:adoptedCourses.data?.items.length??0,
+        visibleDraftClasses:classesRead.status,
+        visibleDraftClassCount:classes.length,
+        filtered:false,
+      }}/>
     </div>
     <div className="mt-4 flex flex-wrap gap-3">
      <Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
