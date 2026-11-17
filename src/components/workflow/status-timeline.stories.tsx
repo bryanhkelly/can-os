@@ -24,7 +24,7 @@ export const RecordedDecisions: Story = {
     await expect(canvas.getByRole("list", { name: "Authorized decision history" })).toBeVisible();
     await expect(canvas.getByText("Correction approved")).toBeVisible();
     await expect(canvas.getByText("Needs correction")).toBeVisible();
-    await expect(canvas.getAllByRole("time")).toHaveLength(2);
+    await expect(canvasElement.querySelectorAll("time")).toHaveLength(2);
   },
 };
 
