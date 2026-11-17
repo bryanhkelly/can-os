@@ -6,6 +6,7 @@ const sql=read("database/canonical/v3.0.1/patch-ws3-class-governed-outcomes.sql"
 const bindingSql=read("database/canonical/v3.0.1/patch-ws3-source-bound-evidence.sql");
 const command=read("src/modules/classes/native-class-completion.functions.ts");
 const canonical=read("database/canonical/v3.0.1/patch-unified-class-course-attempts.sql");
+const evidenceReview=read("src/modules/learning/completion-evidence-review.functions.ts");
 
 describe("WS3 governed native Class completion contract",()=>{
   it("reuses original Class outcomes and complete Enrollment and Attempt, never issues awards",()=>{
@@ -68,6 +69,13 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(sql).toContain("room.site_id=attr.delivery_site_id");
     expect(sql).not.toContain("plan.site_id=e.site_id");
     expect(sql).not.toContain("room.site_id=cls.site_id");
+    expect(bindingSql).toContain("c.site_id IS NULL OR a.delivery_site_id=c.site_id");
+    expect(evidenceReview).toContain(
+      "cls.site_id IS NULL OR attribution.delivery_site_id=cls.site_id");
+    expect(bindingSql).not.toContain("a.delivery_site_id=c.site_id\n    WHERE");
+    expect(evidenceReview).not.toContain(
+      "AND attribution.delivery_site_id=cls.site_id");
+
   });
   it("requires Class-linked ended room host assertions, never playback, pairing or agendas",()=>{
     expect(command).toContain("canonicalClassSessions.classroomPlanId");
