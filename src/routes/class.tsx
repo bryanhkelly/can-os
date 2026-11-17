@@ -7,7 +7,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  getNativePublicClassCatalogPage, getMyNativeClassEnrollmentHistoryPage, enrollInNativeClass,
+  getNativePublicClassCatalogPage, getMyNativeClassEnrollmentHistoryPage,
 } from "@/modules/classes/native-class-enrollment.functions";
 import { getMyNativeClassInvitations, declineNativeClassInvitation } from
   "@/modules/classes/native-class-invitations.functions";
@@ -16,7 +16,7 @@ import {transferMyNativeClassEnrollment} from "@/modules/classes/native-class-tr
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
-import { activateReviewedNativeClassLearner } from "@/modules/classes/native-class-reviewed-onboarding.functions";
+import { enrollCurrentPersonInClass } from "@/modules/classes/native-class-entry.functions";
 
 export const Route=createFileRoute("/class")({
   validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string}=>({
@@ -37,30 +37,6 @@ const creditName:Record<CreditMode,string>={
   for_credit:"For credit (eligibility required)",
   audit:"Audit, no academic credit",not_applicable:"No academic credit",
 };
-
-/** A native learner can use the native session directly. A previously linked
- * verified CAN learner can recover with the *same* interactive login without
- * a staff-cookie fallback. All admission modes share the same retry boundary.
- * Session recovery never creates a learner, grants a role or reserves a seat.
- */
-async function enrollWithLinkedCanRecovery(data:Parameters<typeof enrollInNativeClass>[0]) {
-  try { return await enrollInNativeClass(data); }
-  catch(originalError){
-    // Seat, consent, identity mismatch, revoked permission and infrastructure
-    // failures are not session-recovery signals. Never retry those mutations.
-    if(normalizeClientError(originalError).code!=="CANONICAL_LEARNER_SESSION_REQUIRED")
-      throw originalError;
-    try { await resumeLinkedNativeClassLearner(); }
-    catch(recoveryError){
-      if(normalizeClientError(recoveryError).code!=="CANONICAL_LEARNER_ONBOARDING_REQUIRED")
-        throw recoveryError;
-      // Only previously and independently approved evidence can create the
-      // first native Person and one home-Organization learner grant.
-      await activateReviewedNativeClassLearner();
-    }
-    return enrollInNativeClass(data);
-  }
-}
 
 function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
   const [mode,setMode]=useState<CreditMode>((item.allowedCreditModes[0]??"not_applicable") as CreditMode);
@@ -94,7 +70,7 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       // The server independently validates the CAN account, native Person,
       // adulthood and current learner grant before issuing the cookie.
       // Never silently create or impersonate a native account here.
-      const result=await enrollWithLinkedCanRecovery({data:{
+      const result=await enrollCurrentPersonInClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
       }});
@@ -164,7 +140,7 @@ function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>P
     if(!eligible||!adult||!consent||busy)return;
     setBusy(true);setNotice("");setError("");
     try{
-      await enrollWithLinkedCanRecovery({data:{
+      await enrollCurrentPersonInClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         approvalRequestId:item.approvalRequestId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
@@ -210,7 +186,7 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
     if(!pending||!adult||!consent||busy)return;
     setBusy(true);setError("");setNotice("");
     try{
-      await enrollWithLinkedCanRecovery({data:{
+      await enrollCurrentPersonInClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         invitationId:item.invitationId,
         creditMode:item.creditMode,adultAttested:true,consentAccepted:true,
