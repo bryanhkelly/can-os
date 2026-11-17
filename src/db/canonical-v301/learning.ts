@@ -6,6 +6,7 @@ import {
   jsonb,
   numeric,
   primaryKey,
+  pgTable,
   text,
   timestamp,
   uniqueIndex,
@@ -156,7 +157,7 @@ export const courseLessons = educationV30.table(
   ],
 );
 
-export const contentAssets = educationV30.table("content_assets", {
+export const contentAssets = pgTable("content_assets", {
   id: id(),
   ownerOrganizationId: uuid("owner_organization_id").notNull(),
   title: text("title").notNull(),
@@ -283,7 +284,7 @@ export const trackDistributionAuthorizations = educationV30.table(
   },
 );
 
-export const deploymentOrganizationRoles = educationV30.table("deployment_organization_roles", {
+export const deploymentOrganizationRoles = pgTable("deployment_organization_roles", {
   id: id(),
   deploymentId: uuid("deployment_id").notNull(),
   organizationId: uuid("organization_id").notNull(),
