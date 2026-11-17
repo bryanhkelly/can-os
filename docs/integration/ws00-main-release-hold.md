@@ -56,3 +56,40 @@ The following are **not yet certified passing** on the exact integrated SHA:
 - Netlify's `[context.production]` skip must be removed only after a separately authorized production release. This cannot prevent independent Cloudflare pipelines or manually triggered Netlify deploys.
 
 **Release remains HOLD / NO-GO, while development may proceed on main.**
+
+
+## Native Class schedule and CAN learner recovery hardening (2026-11-17)
+
+The following source fixes are committed directly on main:
+
+- Native Class Session plans cannot be rescheduled or cancelled through the
+  generic facilitated-room calendar. Native Sessions must use their specific
+  `changeNativeClassSessionSchedule` command so Class Session replacement,
+  cancellation history, staff authority and audits stay coherent. The generic
+  calendar now labels and links native Sessions to their Class workspace,
+  without rendering its generic mutation controls.
+- A retry of an existing Class Enrollment revalidates the active canonical
+  learner session inside the transaction. Independently approved admission
+  now passes the explicit `approval` method to the shared seat guard rather
+  than treating it as `self`.
+- `resumeLinkedNativeClassLearner` allows an adult CAN-only session to recover
+  a short-lived native learner cookie without a second interactive sign-in
+  **only when** the original CAN Person, existing independently linked native
+  Person, birth-date adult check, verified native account, and one current
+  learner home-Organization grant all agree. No identity is created and no
+  Class Enrollment or seat is altered. A restricted reader is mandatory.
+  The `/class` workspace offers this recovery for existing linked accounts.
+
+Focused Vitest regression contracts were added to `test:classes:unit`.
+Source-level assertions were checked against GitHub main; **TypeScript, Vitest,
+Cloudflare bundling and authenticated browser execution remain unverified**.
+
+**Remaining P0:** a truly new verified CAN account with no existing native
+Person/learner grant still cannot create the first native Class enrollment from
+one login. A separately reviewed native adult Person/age/learner grant
+onboarding decision is required; do not make an email match, shared demo
+identity or arbitrary self-reported adult birth date sufficient. The native
+Class approval and Site/Organization production schema still requires
+authorized migration and positive acceptance fixtures.
+
+**Release hold remains in force.**
