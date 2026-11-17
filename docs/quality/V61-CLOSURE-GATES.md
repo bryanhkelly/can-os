@@ -16,12 +16,17 @@ From a clean `main` checkout with Node 22 or newer, run:
 
 ```bash
 node scripts/verify-v61-local.mjs --list
+node scripts/verify-v61-local.mjs --preflight
 node scripts/verify-v61-local.mjs
 ```
 
 The runner checks its clean `main` commit SHA before installing locked dependencies and invoking the existing V6.1 design checker, diagnostic adoption inventory, Cloudflare **build only**, application build/route generation, typecheck, lint, focused V6.1 regressions, full unit suite, Storybook build and Storybook browser tests. No deployment or database connection is authorized.
 
 Results are written to `results.json` with individual logs in a newly created OS temporary directory. Record the actual SHA, commands, exits and logs in the V6.1 acceptance record. **No checked result may be inferred from the existence of this script.**
+
+The local runner rejects non-`main` or dirty checkouts and refuses common ignored `.env` / `.dev.vars` files containing database credential keys. It captures source integrity before and after every command; a moved HEAD, changed branch, or modified tracked source invalidates the whole attempt rather than mixing SHAs. The `--preflight` option verifies these prerequisites without installing dependencies. This reduces accidental database use but is **not** a network isolation sandbox: operators must keep credentials and production resources unavailable to test code.
+
+If Storybook's Chromium executable or system dependencies are absent, report an **environment prerequisite**, not a product failure, and install the browser dependencies only in the independent local environment. If GitHub `main` advances after the checkout or during test execution, refresh `main` and rerun rather than mixing evidence across commits.
 
 The diagnostic adoption inventory is not a completion percentage, nor does every remaining native element constitute a defect.
 
