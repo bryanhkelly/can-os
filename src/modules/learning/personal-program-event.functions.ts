@@ -91,6 +91,7 @@ export const getMyProgramEventParticipation=createServerFn({method:"GET"})
     return {
       programs:programRows.map(row=>({
         ...row,subjectName:profileNameById.get(row.studentProfileId)??null,
+        subjectKind:actor.role==="guardian"?"dependent" as const:"self" as const,
       })),
       events:eventRows.map(({metadata,...row})=>({
         ...row,cancelled:metadata.cancelled===true,
