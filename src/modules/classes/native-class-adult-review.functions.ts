@@ -193,7 +193,6 @@ export const revokeAdultClassLearnerReview=createServerFn({method:"POST"})
          eq(canonicalAccountGrants.accountId,review.canonicalAccountId),
          eq(canonicalAccountGrants.personId,review.canonicalPersonId),
          eq(canonicalAccountGrants.roleCode,"learner"),
-         eq(canonicalAccountGrants.organizationId,review.organizationId),
          eq(canonicalAccountGrants.active,true),
          isNull(canonicalAccountGrants.revokedAt),
        ));
