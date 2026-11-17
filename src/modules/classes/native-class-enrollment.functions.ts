@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
   canonicalClassOfferingVersions, canonicalClassEnrollments, canonicalPersons,
+  canonicalClassOutcomes, canonicalClassAwards,
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
@@ -391,8 +392,53 @@ export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"}
       .orderBy(desc(canonicalClassEnrollments.enrolledAt),
         desc(canonicalClassEnrollments.id)).limit(51);
     const items=rows.slice(0,50);
+    // Preserve original source-bound completion decisions in history, including
+    // after a withdrawal. A plain enrollment state is not a credential.
+    const enrollmentIds=items.map(item=>item.classEnrollmentId);
+    const decisions=enrollmentIds.length?await db.select({
+      id:canonicalClassOutcomes.id,
+      classEnrollmentId:canonicalClassOutcomes.classEnrollmentId,
+      resultCode:canonicalClassOutcomes.resultCode,
+      recordedAt:canonicalClassOutcomes.recordedAt,
+      supersedesOutcomeId:canonicalClassOutcomes.supersedesOutcomeId,
+    }).from(canonicalClassOutcomes).where(and(
+      inArray(canonicalClassOutcomes.classEnrollmentId,enrollmentIds),
+      eq(canonicalClassOutcomes.outcomeKind,"completion"),
+      isNotNull(canonicalClassOutcomes.completionPolicyVersionId),
+      isNotNull(canonicalClassOutcomes.completionEvidenceVersionId),
+      isNotNull(canonicalClassOutcomes.completionDecidedByPersonId),
+    )).orderBy(desc(canonicalClassOutcomes.recordedAt),desc(canonicalClassOutcomes.id))
+      .limit(1000):[];
+    const superseded=new Set(decisions.flatMap(row=>
+      row.supersedesOutcomeId?[row.supersedesOutcomeId]:[]));
+    const current=new Map<string,(typeof decisions)[number]>();
+    for(const decision of decisions)
+      if(!superseded.has(decision.id)&&!current.has(decision.classEnrollmentId))
+        current.set(decision.classEnrollmentId,decision);
+    const currentIds=[...current.values()].map(row=>row.id);
+    const awards=currentIds.length?await db.select({
+      classOutcomeId:canonicalClassAwards.classOutcomeId,
+      awardKind:canonicalClassAwards.awardKind,
+      issuedAt:canonicalClassAwards.issuedAt,
+    }).from(canonicalClassAwards).where(and(
+      inArray(canonicalClassAwards.classOutcomeId,currentIds),
+      isNull(canonicalClassAwards.revokedAt),
+    )).orderBy(desc(canonicalClassAwards.issuedAt)).limit(1000):[];
+    const awardByOutcome=new Map<string,(typeof awards)[number]>();
+    for(const award of awards)if(!awardByOutcome.has(award.classOutcomeId))
+      awardByOutcome.set(award.classOutcomeId,award);
+    const historic=items.map(item=>{
+      const decision=current.get(item.classEnrollmentId);
+      const award=decision?awardByOutcome.get(decision.id):undefined;
+      return {...item,officialOutcome:decision?{
+        referenceId:decision.id,
+        label:award
+          ?award.awardKind.replaceAll("_"," ")+" issued"
+          :"Completion decision: "+decision.resultCode.replaceAll("_"," "),
+      }:null};
+    });
     const last=items[items.length-1];
-    return {items,nextCursor:rows.length>50&&last?{
+    return {items:historic,nextCursor:rows.length>50&&last?{
       enrolledAt:last.enrolledAtCursor,
       classEnrollmentId:last.classEnrollmentId,
     }:null};
