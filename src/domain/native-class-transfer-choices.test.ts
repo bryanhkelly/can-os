@@ -46,6 +46,25 @@ describe("native adult self-transfer choices", () => {
     expect(server).toContain("creditMode:z.enum(NATIVE_SELF_TRANSFER_CREDIT_MODES)");
   });
 
+  it("keeps saved Class transfers separate from failed view refreshes", () => {
+    const ui = readFileSync(new URL("../routes/class.tsx", import.meta.url), "utf8");
+    const card = ui.slice(
+      ui.indexOf("function EnrolledClassCard("),
+      ui.indexOf("/** One canonical Class entry."),
+    );
+    expect(card).toContain("useMutationFeedback(onChanged)");
+    expect(card).toContain("const busy=mutation.pending||mutation.refreshFailed");
+    expect(card).toContain("MutationFeedback state=");
+    expect(card).toContain("refreshErrorMessage:");
+    expect(card).toContain('outcome.status==="saved"||outcome.status==="refresh-failed"');
+    expect(card).not.toContain("await onChanged()");
+    const refresh = ui.slice(
+      ui.indexOf("  async function refresh(){", ui.indexOf("function NativeLearnerClasses(")),
+      ui.indexOf("  async function recoverExistingNativeLearning(){"),
+    );
+    expect(refresh.match(/throwOnError:true/g)).toHaveLength(5);
+  });
+
   it("preserves the offered order when selecting an eligible default", () => {
     expect(nativeSelfTransferCreditModes(["not_applicable", "audit"])[0])
       .toBe("not_applicable");
