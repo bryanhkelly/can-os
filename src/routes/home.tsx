@@ -89,8 +89,8 @@ export const Route = createFileRoute("/home")({
       return { kind: "unavailable", message: error ?? "Unable to load your workspace session. Please try again." } as const;
     }
     if (session.role === "account_holder") throw redirect({to:"/account"});
-    if (session.role === "academic_content_creator") throw redirect({to:"/canonical/content"});
-    if (session.role === "academic_content_reviewer") throw redirect({to:"/canonical/content-reviews"});
+    if (session.role === "academic_content_creator") throw redirect({to:"/class",search:{view:"content"}});
+    if (session.role === "academic_content_reviewer") throw redirect({to:"/class",search:{view:"reviews"}});
     if (session.role === "can_credential_reviewer") throw redirect({to:"/canonical/issuer-access"});
     return loadHomeDashboard(session.role, deps);
   },
