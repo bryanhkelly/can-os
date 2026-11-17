@@ -31,7 +31,7 @@ describe("portable Course -> Site Class launch setup",()=>{
     expect(()=>parseNetworkClassLaunchRecipe("x".repeat(4001))).toThrow();
   });
   it("routes every receiving Site through current adoption and authorization, not bulk enrollment",()=>{
-    const page=readFileSync("src/routes/canonical.classes.tsx","utf8");
+    const page=readFileSync("src/components/learning/NativeClassManager.tsx","utf8");
     expect(page).toContain("getUnifiedClassCourseOptions");
     expect(page).toContain("setRecipeCourseId");
     expect(page).toContain("createUnifiedClassDraft");
