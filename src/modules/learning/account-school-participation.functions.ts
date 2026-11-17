@@ -89,15 +89,15 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
       );
     };
     const getProfiles=async(access:"academic"|"enrollment")=>{
-      const profiles=new Map<string,{name:string|null;kind:"self"|"dependent"}>();
+      const profiles=new Map<string,{name:string|null;kind:"self"|"dependent";personId:string}>();
       if(student.length){
         const ownProfile=await db.select({id:s.studentProfiles.id})
           .from(s.studentProfiles).where(eq(s.studentProfiles.personId,actor.actorPersonId!));
-        ownProfile.forEach(row=>profiles.set(row.id,{name:null,kind:"self"}));
+        ownProfile.forEach(row=>profiles.set(row.id,{name:null,kind:"self",personId:actor.actorPersonId!}));
       }
       if(guardians.length){
         const children=await db.select({
-          id:s.studentProfiles.id,
+          id:s.studentProfiles.id,personId:s.studentProfiles.personId,
           firstName:s.people.legalFirstName,lastName:s.people.legalLastName,
         }).from(s.guardianRelationships)
           .innerJoin(s.studentProfiles,
@@ -109,6 +109,7 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         for(const row of children)if(!profiles.has(row.id))
           profiles.set(row.id,{
             kind:"dependent",name:[row.firstName,row.lastName].filter(Boolean).join(" ")||null,
+            personId:row.personId,
           });
       }
       return profiles;
@@ -175,6 +176,7 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
       return finish(rows,items=>projectSchoolSections(items.map(row=>({
         id:row.sectionId,title:row.title,code:row.code,
         enrollmentId:row.enrollmentId,enrollmentStatus:row.enrollmentStatus,
+        studentPersonId:profiles.get(row.studentProfileId)!.personId,
         organizationId:row.organizationId,organizationName:row.organizationName,
         siteId:row.siteId,siteName:row.siteName,
         startsAt:row.startsAt,endsAt:row.endsAt,
