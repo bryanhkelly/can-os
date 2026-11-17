@@ -33,8 +33,6 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
   .validator((raw: unknown) => schema.parse(raw))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    if (process.env.CAN_NONCREDIT_COMPLETION_CORRECTIONS_ENABLED !== "true")
-      throw new AuthorizationError("noncredit completion corrections not activated");
     const request = getRequest();
     const actor = await getCanonicalCommandContext(request);
     if (!actor.actorPersonId || !["registrar", "site_admin"].includes(actor.role ?? ""))
