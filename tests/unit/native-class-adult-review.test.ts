@@ -33,6 +33,9 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(source).toContain('evidence.metadata.verifiedBirthDate!==data.verifiedBirthDate');
    expect(source).toContain('evidence.category!=="adult_identity_verification"');
    expect(source).toContain('!evidence.verifiedByPersonId');
+   expect(source).toContain('const [verifierGrant]=await tx.select');
+   expect(source).toContain('eq(accountPersonGrants.role,"app_admin")');
+   expect(source).toContain('documents).where(eq(documents.id,evidenceId)).for("update")');
  });
  it("never turns an adult review into an enrollment or a native session",()=>{
    expect(source).toContain("tx.insert(accessAdultLearningReviews)");
@@ -69,5 +72,8 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(ui).toContain("Secure evidence reference");
    expect(service).toContain("access_adult_learning_reviews");
    expect(service).toContain("c.relforcerowsecurity");
+   expect(service).toContain("reviewCases:reviewCases.map");
+   expect(service).not.toContain("verifiedBirthDate:accessAdultLearningReviews.verifiedBirthDate");
+   expect(ui).toContain("Recent identity review decisions");
  });
 });
