@@ -108,7 +108,7 @@ const [check] = await query`
    to_regclass('education_v30.site_device_policies') IS NOT NULL AS device_policies,
    to_regclass('education_v30.site_device_registrations') IS NOT NULL AS device_registrations,
    to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS noncredit_releases,
-   to_regclass('public.site_canonical_identity_links') IS NOT NULL AS site_identity_links,
+   to_regclass('public.site_canonical_identity_links') IS NULL AS site_identity_bridge_retired,
    EXISTS (SELECT 1 FROM pg_indexes
      WHERE schemaname='education_v30' AND indexname='noncredit_self_enroll_provider_idx') AS provider_index,
    EXISTS (SELECT 1 FROM pg_policies
