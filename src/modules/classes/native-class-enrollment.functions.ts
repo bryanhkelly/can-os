@@ -185,7 +185,6 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
   .handler(async({data})=>{
     guard();const {learnerPersonId,actor,request}=await requireLearner();
     return db.transaction(async tx=>{
-      const now=new Date();
       // Resolve the parent Class ID without locking the Offering. Publisher
       // publication/closure also locks Class before Offering; using the same
       // order avoids deadlocks. This first read is only a locator, NEVER the
@@ -207,6 +206,9 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           eq(canonicalClassOfferingVersions.classId,instance.id)))
         .for("update").limit(1);
       if(!version)throw new AuthorizationError("current Class Offering version");
+      // Evaluate temporal eligibility at the actual admission decision time,
+      // not before waiting on another transaction's Class/Offering locks.
+      const now=new Date();
       const current=await currentClassAuthority(tx,instance.id,now);
       if(!current.siteId)throw new AuthorizationError("Class enrollment requires a Site");
       const [offering]=await tx.select({id:canonicalClassOfferings.id})
