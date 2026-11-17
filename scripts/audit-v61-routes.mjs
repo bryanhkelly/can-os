@@ -26,6 +26,8 @@ const sourceGuarded = new Set([
   "learn.enroll.tsx",
   "student.settings.tsx",
   "guardian.students.tsx",
+  "guardian.attendance.tsx",
+  "guardian.enrichment.tsx",
   "platform.tsx",
 ]);
 
