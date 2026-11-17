@@ -11,6 +11,7 @@ import {
   canonicalClassOfferingVersions, canonicalClassEnrollments, canonicalPersons,
   canonicalClassOutcomes, canonicalClassAwards,
   canonicalAccounts, canonicalAccountGrants,
+  canonicalEnrollmentSites,
   canonicalClassEnrollmentInvitations,
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
@@ -428,11 +429,14 @@ async function readNativeClassHistoryPage(
       // Exact UTC microsecond cursor is kept separate from display Date.
       enrolledAtCursor:sql<string>`to_char(${canonicalClassEnrollments.enrolledAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
       siteId:canonicalClasses.siteId,
+      siteName:canonicalEnrollmentSites.name,
       enrollmentMethod:canonicalClassEnrollments.enrollmentMethod,
       classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId,
     }).from(canonicalClassEnrollments)
       .innerJoin(canonicalClasses,
         eq(canonicalClasses.id,canonicalClassEnrollments.classId))
+      .leftJoin(canonicalEnrollmentSites,
+        eq(canonicalEnrollmentSites.id,canonicalClasses.siteId))
       .where(and(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),older))
       .orderBy(desc(canonicalClassEnrollments.enrolledAt),
         desc(canonicalClassEnrollments.id)).limit(51);
