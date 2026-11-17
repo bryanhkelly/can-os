@@ -12,6 +12,7 @@ import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { writeAudit } from "@/platform/mutation";
 
 /**
@@ -80,15 +81,7 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
      const [person]=await tx.select({active:people.active})
        .from(people).where(eq(people.id,account.personId)).limit(1);
      if(!person?.active)throw new AuthorizationError("current real applicant Person");
-     const grants=await tx.select({
-       personId:accountPersonGrants.personId,role:accountPersonGrants.role,
-     }).from(accountPersonGrants).where(and(
-       eq(accountPersonGrants.accountId,account.id),
-       eq(accountPersonGrants.active,true),
-     )).limit(101);
-     if(grants.length===0||grants.length>100||
-        grants.some(g=>g.personId!==account.personId||g.role==="student"))
-       throw new AuthorizationError("one eligible adult CAN Person");
+     await assertUnambiguousAdultAccount(account.id,account.personId,tx);
      const [operator]=await tx.select({id:accessAccountCanonicalPrincipals.id})
        .from(accessAccountCanonicalPrincipals).where(and(
          eq(accessAccountCanonicalPrincipals.accountId,account.id),
