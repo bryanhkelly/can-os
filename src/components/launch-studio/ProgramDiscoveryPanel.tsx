@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from "react";
+import { Link } from "@tanstack/react-router";
 import type { AvailableOffering } from "@/domain/program-discovery";
 import { normalizeClientError } from "@/lib/client-error";
-import { discoverPrograms } from "@/modules/programs/program-discovery.functions";
+import { discoverLaunchSitePrograms } from "@/modules/programs/program-discovery.functions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 
@@ -19,6 +20,7 @@ function readableStatus(value: string): string {
 export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
   const [deliveryContext, setDeliveryContext] = useState<DeliveryContext>("onsite");
   const [offerings, setOfferings] = useState<AvailableOffering[] | null>(null);
+  const [canonicalSiteId,setCanonicalSiteId]=useState<string|null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,14 +29,16 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
     setLoading(true);
     setError(null);
     setOfferings(null);
+    setCanonicalSiteId(null);
     try {
-      const result = await discoverPrograms({
+      const result = await discoverLaunchSitePrograms({
         data: {
-          subject: { kind: "site", siteId },
+          publicSiteId:siteId,
           deliveryContext,
         },
       });
-      setOfferings(result);
+      setOfferings(result.items);
+      setCanonicalSiteId(result.canonicalSiteId);
     } catch (caught) {
       setError(normalizeClientError(caught, "Program discovery could not be completed. Try again.").message);
     } finally {
@@ -45,7 +49,7 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
   return <section className="mt-6 border bg-card p-6" aria-labelledby="program-discovery-title">
     <h2 id="program-discovery-title" className="font-serif text-2xl">Explore available programs</h2>
     <p className="mt-2 text-sm leading-6 text-muted-foreground">
-      Review published programs that may fit this school and delivery model.
+      Review published Programs and Courses for this Site and delivery model.
       Discovery is advisory; it does not qualify or approve a program.
     </p>
     <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={handleSubmit}>
@@ -89,6 +93,14 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
               </div>,
             )}
           </div>
+          {canonicalSiteId&&<Link to="/class" search={{view:"manage",siteId:canonicalSiteId,
+              offeringVersionId:offering.offeringVersionId}}
+            className="mt-4 inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-semibold text-primary">
+            Check authorized Course adoption and configure Class
+          </Link>}
+          <p className="mt-2 text-xs text-muted-foreground">
+            A published Offering does not itself grant Course adoption, Class creation or enrollment.
+          </p>
         </article>,
       )}
     </div>}
