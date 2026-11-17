@@ -33,6 +33,13 @@ describe("WS3 canonical assessment final-revision selection",()=>{
       row("result-1",0),
     ])).toMatchObject({current:[],ambiguousAttemptIds:["attempt-A"]});
   });
+  it("does not emit a current grade when any revision for that attempt is malformed",()=>{
+    const projected=latestCanonicalAssessmentRevisions([
+      row("valid",2),row("malformed",0),
+    ]);
+    expect(projected.ambiguousAttemptIds).toEqual(["attempt-A"]);
+    expect(projected.current).toEqual([]);
+  });
   it("keeps separate Course assessment attempts distinct",()=>{
     const projection=latestCanonicalAssessmentRevisions([
       row("r1",1),row("r2",3,{attemptId:"attempt-B"}),
