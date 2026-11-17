@@ -49,7 +49,7 @@ if (!canonicalContext.includes("getIdentityContext(request)") ||
 const coreStart = coreIdentity.indexOf("export async function getIdentityContext(");
 const legacyStart = coreIdentity.indexOf("export async function getCommandContext(", coreStart);
 if (coreStart < 0 || legacyStart < 0 ||
-    /\\bsectionTeachers\\b|\\bsectionIds\\b|\\bsectionId\\b/.test(
+    /\bsectionTeachers\b|\bsectionIds\b|\bsectionId\b/.test(
       coreIdentity.slice(coreStart, legacyStart))) {
   console.error("Core identity must not project retiring school Section scope");
   errors++;
