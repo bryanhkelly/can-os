@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -36,6 +37,8 @@ export const organizations = pgTable(
     type: organizationType("type").notNull(),
     name: text("name").notNull(),
     legalName: text("legal_name"),
+    lifecycleStatus: text("lifecycle_status").$type<"prospective" | "active" | "inactive" | "closed">(),
+    externalReference: text("external_reference"),
     slug: text("slug").notNull(),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
@@ -45,6 +48,7 @@ export const organizations = pgTable(
     uniqueIndex("organization_slug_uq").on(table.slug),
     index("organization_parent_idx").on(table.parentOrganizationId),
     index("organization_type_idx").on(table.type),
+    uniqueIndex("organizations_shared_external_reference_uq").on(table.externalReference),
   ],
 );
 
@@ -59,6 +63,11 @@ export const sites = pgTable(
     slug: text("slug").notNull(),
     address: jsonb("address").$type<Record<string, unknown>>(),
     timezone: text("timezone").default("America/Los_Angeles").notNull(),
+    siteKind: text("site_kind").$type<"physical" | "virtual" | "mobile">(),
+    capacity: integer("capacity"),
+    lifecycleStatus: text("lifecycle_status").$type<"planning" | "active" | "closed">(),
+    referenceCode: text("reference_code"),
+    geographicAreaId: uuid("geographic_area_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}).notNull(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -66,6 +75,7 @@ export const sites = pgTable(
   (table) => [
     uniqueIndex("site_org_slug_uq").on(table.organizationId, table.slug),
     index("site_org_idx").on(table.organizationId),
+    uniqueIndex("sites_shared_reference_code_uq").on(table.referenceCode),
   ],
 );
 
