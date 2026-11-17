@@ -63,10 +63,10 @@ export const getMyProgramEventParticipation=createServerFn({method:"GET"})
         )).orderBy(asc(s.enrollments.createdAt)).limit(200)
       :[];
 
-    // Accepted Person-participation is stronger than a public calendar listing.
-    // An accepted invitation never proves physical attendance or completion.
-    const eventRows=allowedProgramIds.length
-      ?await db.select({
+    // Exact accepted Person-participation is source authority for the viewer,
+    // including Account Holders and network-wide invitations without a Program.
+    // An accepted invitation never proves attendance or completion.
+    const eventRows=await db.select({
         participantId:s.calendarEventParticipants.id,
         eventId:s.calendarEvents.id,
         title:s.calendarEvents.title,
@@ -83,10 +83,8 @@ export const getMyProgramEventParticipation=createServerFn({method:"GET"})
           eq(s.calendarEventParticipants.participantType,"person"),
           eq(s.calendarEventParticipants.participantId,actor.actorPersonId),
           eq(s.calendarEventParticipants.responseStatus,"accepted"),
-          inArray(s.calendarEvents.programId,allowedProgramIds),
           ne(s.calendarEvents.type,"personal"),
-        )).orderBy(asc(s.calendarEvents.startsAt)).limit(200)
-      :[];
+        )).orderBy(asc(s.calendarEvents.startsAt)).limit(200);
 
     return {
       programs:programRows.map(row=>({
