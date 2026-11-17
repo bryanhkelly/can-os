@@ -1,4 +1,4 @@
-import { createFileRoute, linkOptions } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { getSchoolProfile } from "@/modules/operations/school-profile.functions";
 import { getSchoolExperiences } from "@/modules/student-experience/school-experiences.functions";
 import { listMySites } from "@/modules/operations/site-directory.functions";
@@ -30,5 +30,5 @@ function SchoolProfilePage() {
   const { tab = "overview" } = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure eyebrow="School profile" title="School profile" outcome={outcome} />;
   return <SchoolProfile data={outcome.data} tab={tab}
-    tabLink={value => linkOptions({ to: "/sites/$siteId/profile", params: { siteId }, search: value === "overview" ? {} : { tab: value } })} />;
+    tabLink={value => ({ to: "/sites/$siteId/profile", params: { siteId }, search: { tab: value === "overview" ? undefined : value } })} />;
 }
