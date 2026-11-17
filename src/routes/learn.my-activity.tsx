@@ -1,6 +1,6 @@
 import {createFileRoute, Link, redirect} from "@tanstack/react-router";
 import {useQuery} from "@tanstack/react-query";
-import {useMemo,useRef,useState} from "react";
+import {useEffect,useMemo,useRef,useState} from "react";
 import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw, Users} from "lucide-react";
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
@@ -45,12 +45,14 @@ function displayDate(value: string | null): string | null {
     year: "numeric", month: "short", day: "numeric",
   }) : null;
 }
-function ActivityCard({item,viewerRole}: {item: ParticipationRecord;viewerRole:string}) {
+function ActivityCard({item,viewerRole,managing,onManage}: {item: ParticipationRecord;viewerRole:string;managing:boolean;onManage:()=>void}) {
   const recordLinks=activityEvidenceLinks(item,viewerRole);
   const next = displayDate(item.nextAt);
   const start = displayDate(item.startAt);
   const end = displayDate(item.endAt);
   const isDependent = item.subject.kind === "dependent";
+  const canManageTraining=item.source==="noncredit_course" && !isDependent && !!item.refs.registrationId &&
+    (item.status==="active"||item.status==="scheduled");
   return <article className="border border-border bg-card p-4 sm:p-5" data-participation-key={item.key}>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0 flex-1">
@@ -92,14 +94,18 @@ function ActivityCard({item,viewerRole}: {item: ParticipationRecord;viewerRole:s
           </a>)}
         </nav>}
       </div>
-      {item.action && <a href={item.action.href}
+      {canManageTraining ? <button type="button" onClick={onManage} aria-expanded={managing}
+        className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        {managing?"Close registration controls":"Manage registration"}
+      </button> : item.action && <a href={item.action.href}
         className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
       </a>}
     </div>
+    {canManageTraining&&managing&&<div className="mt-5 border-t border-border pt-4"><NoncreditEnrollmentManagement registrationId={item.refs.registrationId}/></div>}
   </article>;
 }
-function OpportunityCard({item}: {item: ParticipationOpportunity}) {
+function OpportunityCard({item,managing,onManage}: {item: ParticipationOpportunity;managing:boolean;onManage:()=>void}) {
   const expires = displayDate(item.expiresAt);
   return <article className="border border-border bg-card p-4 sm:p-5" data-opportunity-key={item.key}>
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -115,17 +121,27 @@ function OpportunityCard({item}: {item: ParticipationOpportunity}) {
         </p>
         {item.state === "invited" && expires && <p className="mt-2 text-sm text-muted-foreground">Offer expires: {expires}</p>}
       </div>
-      {item.action && <a href={item.action.href}
-        className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
-      </a>}
+      <div className="flex flex-wrap gap-2">
+        {item.state==="invited"&&item.action&&<a href={item.action.href}
+          className="inline-flex min-h-10 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary">
+          {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
+        </a>}
+        {(item.state==="waiting"||item.state==="invited")&&<button type="button" onClick={onManage} aria-expanded={managing}
+          className="inline-flex min-h-10 items-center border border-border px-3 py-2 text-sm font-semibold text-primary">
+          {managing?"Close waitlist controls":"Manage waiting list"}
+        </button>}
+      </div>
     </div>
+    {managing&&<div className="mt-5 border-t border-border pt-4"><NoncreditEnrollmentManagement releaseId={item.releaseId}/></div>}
   </article>;
 }
 function MyActivityPage() {
   const {session} = useWorkspaceSession();
   const [bucket, setBucket] = useState<ParticipationBucket>("current");
   const [kind, setKind] = useState<ParticipationKind | "all">("all");
+  const [managingKey,setManagingKey]=useState<string|null>(null);
+  const [showAllTraining,setShowAllTraining]=useState(false);
+  useEffect(()=>{if(window.location.hash==="#noncredit-management")setShowAllTraining(true);},[]);
   const activity = useQuery({
     queryKey: ["my-activity", session?.authenticated ? session.activeGrantId : null,
       session?.authenticated ? session.role : null],
@@ -314,7 +330,8 @@ function MyActivityPage() {
           <p className="text-sm text-muted-foreground">Showing {shown.length} {shown.length===1?"record":"records"}{canLoadOlder?" · More history available":""}{opportunities.length>0?` · ${opportunities.length} enrollment opportunities`:""}</p>
         </div>
         {shown.length ? <div className="mt-3 grid gap-3">
-          {shown.map(item => <ActivityCard key={item.key} item={item} viewerRole={activity.data?.viewerRole??""}/>)}
+          {shown.map(item => <ActivityCard key={item.key} item={item} viewerRole={activity.data?.viewerRole??""}
+             managing={managingKey===item.key} onManage={()=>{setShowAllTraining(false);setManagingKey(current=>current===item.key?null:item.key);}}/>)}
         </div> : opportunities.length === 0 ? <div className="mt-3 border border-border bg-card p-6">
           <h3 className="font-serif text-xl">Nothing to display in this view</h3>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -347,11 +364,17 @@ function MyActivityPage() {
           These are not enrollments, attendance, or completed learning.
         </p>
         <div className="mt-3 grid gap-3">
-          {opportunities.map(item => <OpportunityCard key={item.key} item={item}/>)}
+          {opportunities.map(item => <OpportunityCard key={item.key} item={item}
+             managing={managingKey===item.key} onManage={()=>{setShowAllTraining(false);setManagingKey(current=>current===item.key?null:item.key);}}/>)}
         </div>
       </section>}
       <section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
-         <NoncreditEnrollmentManagement/>
+         <button type="button" aria-expanded={showAllTraining}
+           className="min-h-11 text-sm font-semibold text-primary underline underline-offset-4"
+           onClick={()=>{setManagingKey(null);setShowAllTraining(value=>!value);}}>
+           {showAllTraining?"Hide all training controls":"Manage all training registrations and waiting lists"}
+         </button>
+         {showAllTraining&&<NoncreditEnrollmentManagement/>}
        </section>
        <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
         <h2 className="font-semibold text-foreground">One CAN account, independently authorized access</h2>
