@@ -64,3 +64,31 @@ Project `can-os`, branch `test01` (nondefault). Queries were read-only; no schem
 - WS6 formal Class completion metrics remain intentionally unknown until WS3 governed decisions and revocations are independently verified; network-wide metrics also require consent/grants and disclosure controls.
 
 **Recommendation:** keep PR #307 in draft. It is source-integrated and structurally reconciled, but is **not merge-ready to main**.
+
+
+## WS00 follow-up: WS6 retake evidence, execution fallback and CI dispatch
+
+On the next integration pass, WS3's remaining two documentation/contract-test edits were reconciled. Five other feature branches had no unintegrated commits when checked; a feature author can continue pushing later, so recheck exact SHAs before promotion.
+
+### P0/P1 verified cross-stream reporting correction
+
+WS2 explicitly allows historical retake Course Attempts to reference the **same original native Class Enrollment**. The earlier WS6 report reader selected only the single pointer `class_enrollments.course_attempt_id`, which could silently omit actual attendance and assessment results from other exact-source Course Attempts. The integrated WS6 reader now:
+
+- Selects **all** canonical `learner_course_attempts` for the exact authorized `class_enrollment_id` set in the report's existing read-only repeatable-read transaction.
+- Verifies source Enrollment, Section/noncredit exclusivity, Deployment and Course version for every returned attempt, and checks that the selected current pointer belongs to the same Enrollment.
+- Passes the full historical attempt ID set to the report's pure aggregation while preserving **one** Registration/Enrollment metric per Enrollment and distinct Person counts across those attempts.
+- Refuses a duplicated historical attempt ID, an attempted cross-Enrollment reuse, or a selected pointer not present among exact owned attempts.
+- Retains private report scope, source limits and the deliberately unavailable formal completion metric. No new activity or grading ledger was introduced.
+
+Added test cases to `tests/unit/participation-reporting.test.ts`. The original TypeScript aggregation logic was separately evaluated in V8 **after erasing type annotations** against four focused fixtures: one retake's valid presence/assessment with one registration, incorrect selected pointer, duplicate retake, and an attempt shared across Enrollments. **4/4 passed**. This is NOT a successful TypeScript compiler, Vitest, SQL integration or signed-in browser result. Direct read-only `test01` SQL confirms `learner_course_attempts.class_enrollment_id` exists and a partial unique index `native_course_attempt_class_seq_uq` begins with that column. No database rows or schema were modified.
+
+The cross-workstream static guard was tightened to insist on complete Class Enrollment attempt query/mapping. Actual retrieved integrated source passed **9/9 static contract checks** after this change, executed in a read-only in-memory adapter.
+
+### Reproducible build path while GitHub Actions cannot dispatch
+
+- Created [P0 GitHub Actions issue #317](https://github.com/bryanhkelly/can-os/issues/317). Runs have empty workflow names, a synthetic `BuildFailed` path, `startup_failure` and **0 jobs**. This is a GitHub Actions pre-job problem, NOT a compiler result.
+- Possible causes include account/org billing restrictions, disabled Actions, or a broken/deleted synthetic workflow registry. **No actual billing or GitHub backend root cause has been verified.** The issue lists run IDs, settings/API checks and a GitHub Support escalation path.
+- Added `npm run verify:ws00`, backed by `scripts/acceptance/run-ws00-local-gate.mjs`. It requires a clean checkout of `integration/programs-courses-classes`, prints its SHA, disables new feature flags for its subprocesses, clears common DB/deployment environment variables, and sequentially runs `npm ci`, documentation/static guards, Cloudflare/app builds, TypeScript, ESLint/design system, focused and full unit regressions. **This script was syntax-checked but cannot be executed in the current runtime because the private repository cannot be cloned and npm dependencies are not mounted.** `npm ci` still requires package network/cache access on the machine running the local gate.
+- Success of the local source/build gate would still **not** authorize a database migration, changes to main, enabling feature flags or production deployment. Signed-in, isolated SQL, RLS and last-seat/concurrency acceptance remain mandatory.
+
+**Status remains DRAFT / NO-GO**, without altering main or production.
