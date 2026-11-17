@@ -18,7 +18,7 @@ function DemoCenterPage() {
   const result=Route.useLoaderData();
   if (!result.ok) return <LoaderFailure eyebrow="Community learning" title="Center" outcome={result}/>;
   if (!result.data) return <PageFrame width="wide"><p role="status">Center not found.</p></PageFrame>;
-  const {site,plans}=result.data;
+  const {site,plans,nativeCourse}=result.data;
   return <PageFrame width="wide">
     <RecordHeader eyebrow="Community Learning Center · Synthetic demonstration"
       title={site.name} subtitle="After-school and summer program planning"/>
@@ -35,10 +35,7 @@ function DemoCenterPage() {
           className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
           Connect this Site to Class operations
         </Link>
-        <Link to="/operations/curriculum" search={{}}
-          className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
-          Create and publish Course content
-        </Link>
+
         <Link to="/class" search={{}} className="mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
           Explore available Classes
         </Link>
@@ -55,7 +52,29 @@ function DemoCenterPage() {
         teaching Session or safety approval is implied by these records.
         A native Class requires a published Course and approved adoption.
       </WorkspaceNotice>
-      <SiteNativeClassHandoff publicSiteId={site.id}/>
+      <WorkspacePanel title="Native Course and first lesson"
+        description="Source-backed educational content, separate from Activity plans and Class enrollment.">
+        {!nativeCourse?<p role="status" className="text-sm">
+          The education Course draft is not available in the database.
+        </p>:<div className="space-y-3 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <strong className="text-base">{nativeCourse.title}</strong>
+            <StatusBadge tone="neutral">Course version: {nativeCourse.lifecycle}</StatusBadge>
+          </div>
+          <p className="text-muted-foreground">Course code: {nativeCourse.courseCode}</p>
+          <p><strong>First lesson:</strong> {nativeCourse.lessonTitle??"Not created"}</p>
+          <p className="text-muted-foreground">
+            This Course exists in the native education schema. Its version must
+            complete independent publication and be adopted by this Site
+            before a Class can be created or enrollment opened.
+          </p>
+          <Link to="/class" search={{view:"content"}}
+            className="inline-flex min-h-11 items-center border border-border px-4 py-3 font-semibold">
+            Open instructional content workspace (authorized creator)
+          </Link>
+        </div>}
+      </WorkspacePanel>
+            <SiteNativeClassHandoff publicSiteId={site.id}/>
       <div className="grid gap-4 md:grid-cols-2">
         {plans.map(plan=><WorkspacePanel key={plan.seasonId}
           title={plan.activityName} description={plan.programName}>
