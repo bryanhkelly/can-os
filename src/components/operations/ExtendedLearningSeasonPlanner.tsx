@@ -22,7 +22,7 @@ import { ExtendedSeasonEvidencePanel } from "./ExtendedSeasonEvidencePanel";
 
 type Planning = Awaited<ReturnType<typeof listExtendedSeasonPlanning>>;
 
-/** This workspace plans seasons only. It cannot publish or register children. */
+/** Plans seasons and publishes registration after the server verifies opening evidence. */
 export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   planning: Planning;
   siteId?: string;
@@ -35,7 +35,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
   const [startsOn, setStartsOn] = useState("");
   const [endsOn, setEndsOn] = useState("");
   const [capacity, setCapacity] = useState(24);
-  const mutation = useMutationFeedback(() => router.invalidate());
+  const mutation = useMutationFeedback(() => router.invalidate({ sync: true }));
   const busy = mutation.pending || mutation.refreshFailed;
   const [error, setError] = useState("");
   const [readinessOwners, setReadinessOwners] = useState<Record<string,string>>({});
@@ -82,7 +82,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
         startsOn, endsOn, capacity,
       } });
     }, {
-      successMessage: "Draft season saved. Registration is not open.",
+      successMessage: "Draft season saved. Review its opening requirements under Recorded seasons.",
       commandErrorMessage: "Unable to save draft season",
       refreshErrorMessage: "The draft season was saved, but current planning records could not be loaded. Retry the refresh before creating another season.",
     });
@@ -217,7 +217,7 @@ export function ExtendedLearningSeasonPlanner({ planning, siteId }: {
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving season changes…"/>
       <form noValidate onSubmit={createDraft} className="mt-4 grid gap-3 sm:grid-cols-2">
         <Field label="Extended-learning program" className="text-xs sm:col-span-2" required
-          error={draftAttempted&&!selected?"Choose an active noncredit program.":undefined}>
+          error={draftAttempted&&!selected?"Choose an eligible noncredit program.":undefined}>
           <Select value={programId} onChange={e => setProgramId(e.target.value)}>
             <option value="">Select a noncredit summer or after-school program</option>
             {selectable.map(p => <option key={p.id} value={p.id}>{p.name} · {programTypeLabels[p.type]}</option>)}
