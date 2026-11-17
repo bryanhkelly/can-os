@@ -142,7 +142,8 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         .leftJoin(s.sites,eq(s.sites.id,s.sections.siteId))
         .where(and(
           eq(s.enrollments.kind,"section"),
-          eq(s.enrollments.programId,s.programs.id),
+          // The Section owns the Program linkage. Historical Enrollment rows
+          // may predate the redundant enrollment.program_id backfill.
           inArray(s.enrollments.studentProfileId,[...profiles.keys()]),
           schoolScope,
           before(s.enrollments.createdAt,s.enrollments.id,data.cursor),
