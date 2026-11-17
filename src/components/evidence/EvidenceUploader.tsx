@@ -1,5 +1,7 @@
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { submitEvidenceUpload } from "./evidence-upload";
 import type { PrivateUpload } from "@/platform/storage/private-upload";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
@@ -23,6 +25,7 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
   adapter, makeInput, onUploaded, disabled = false, label = "Evidence expires on",
   submitLabel = "Submit for review",
 }: EvidenceUploaderProps<T>) {
+  const expiryId = useId();
   const [file, setFile] = useState<File | null>(null);
   const [expiry, setExpiry] = useState("");
   const [pending, setPending] = useState<{ key: string; input: T } | null>(null);
@@ -45,15 +48,16 @@ export function EvidenceUploader<T extends { fileName: string; mimeType: Evidenc
       setError(mutationErrorMessage(cause,"Evidence upload was not recorded"));
     } finally { inFlight.current = false; setBusy(false); }
   }
-  return <div className="mt-3 rounded border p-3 text-xs">
+  return <div className="mt-3 border border-border p-3 text-sm">
     <div className="grid gap-2 sm:grid-cols-2">
       <FileSelectionField label="PDF, JPEG or PNG" accept="application/pdf,image/jpeg,image/png"
         file={file} disabled={disabled||busy} onChange={selected=>{setFile(selected);setPending(null);}}/>
-      <label>{label}
-        <input type="date" value={expiry} disabled={disabled || busy}
-          className="mt-1 block w-full rounded border bg-background p-2"
+      <div>
+        <Label htmlFor={expiryId}>{label}</Label>
+        <Input id={expiryId} type="date" value={expiry} disabled={disabled || busy}
+          className="mt-1"
           onChange={event => { setExpiry(event.target.value); setPending(null); }}/>
-      </label>
+      </div>
     </div>
     <Button type="button" variant="outline" size="sm" className="mt-2"
       disabled={disabled || busy || (!pending && (!file || !expiry))}
