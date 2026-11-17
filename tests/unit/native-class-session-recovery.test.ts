@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { DomainError } from "../../src/domain/errors";
+import { normalizeClientError } from "../../src/lib/client-error";
 
 const read=(p:string)=>readFileSync(resolve(process.cwd(),p),"utf8");
 describe("existing CAN-only adult canonical learner session recovery",()=>{
@@ -79,5 +81,16 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
     expect(recovery).not.toContain("tx.update(canonicalPersons)");
     expect(recovery).not.toContain("tx.insert(canonicalPersons)");
     expect(recovery).not.toContain("tx.insert(canonicalAccounts)");
+  });
+});
+
+
+describe("native learner session recovery error contract",()=>{
+  it("distinguishes missing native cookie from forbidden permission",()=>{
+    const missing=normalizeClientError(new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED"));
+    expect(missing.code).toBe("CANONICAL_LEARNER_SESSION_REQUIRED");
+    expect(missing.kind).toBe("authentication");
+    expect(normalizeClientError(new DomainError("FORBIDDEN")).code).toBe("FORBIDDEN");
+    expect(normalizeClientError(new DomainError("UNAVAILABLE")).code).toBe("UNAVAILABLE");
   });
 });
