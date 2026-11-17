@@ -47,6 +47,15 @@ In particular, school Enrollment and noncredit Class Enrollment are separate aut
 
 Avoid universal tables, new infrastructure services and unrelated migrations solely for architectural symmetry.
 
+## Implemented shared foundations (main)
+
+- `src/platform/mutation.ts`: canonical audit, domain-event, and in-app notification writers.
+- `src/modules/identity/unambiguous-adult-account.server.ts`: raw active-grant adult identity check, called by noncredit self-enrollment. Filtered session grants are not identity evidence.
+- `src/modules/communication/outbound-dispatcher.server.ts`: transport retry, leasing, fencing, and dispatch orchestration. Noncredit waitlist and school-family alerts are feature-specific adapters that independently recheck eligibility.
+- `scripts/acceptance/check-shared-capability-boundaries.mjs`: initial dependency ownership guard, now covering eight existing owners/adapters, run by CI.
+
+These are incremental boundaries, **not** proof that all product experiences have been migrated. New implementations should adopt the existing shared primitives instead of duplicating identity or outbound delivery logic.
+
 ## Review standard
 
 Any new capability must identify its authoritative write owner, public interface, authorization model, audit/event behavior, source-to-display status mapping and contract tests. Any proposal for a duplicate capability must explain why an adapter cannot satisfy the requirement. Shared UI follows CAN OS design system v6.1.
