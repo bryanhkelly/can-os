@@ -56,6 +56,8 @@ const governed = [
     "src/modules/classes/native-class-approvals.functions.ts",
     "src/modules/classes/native-class-repeats.functions.ts",
     "src/modules/enrollment/noncredit-cohort-operations.server.ts",
+    "src/modules/classes/native-class-guardian-enrollment.functions.ts",
+    "src/modules/classes/native-class-sessions.functions.ts",
   ].map(path => ({
     path,
     layer: "canonical-enrollment-adapter",
