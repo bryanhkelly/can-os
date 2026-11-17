@@ -1,4 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useState, type FormEvent } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { normalizeClientError } from "@/lib/client-error";
+import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@/modules/classes/native-class-adult-review.functions";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
@@ -68,6 +73,7 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -77,4 +83,103 @@ function PlatformAdministration() {
       </p>
     </section>
   </WorkspaceShell>;
+}
+
+/**
+ * Controlled App Admin review. Only a reviewer who has independently
+ * examined identity and age evidence can approve. The backend never trusts
+ * these fields without a current non-demo platform grant and exact-person
+ * checks. No person is enrolled or granted Site rights by this form.
+ */
+function AdultLearnerReviewSection({ready}:{ready:boolean}){
+  const [accountId,setAccountId]=useState("");
+  const [organizationId,setOrganizationId]=useState("");
+  const [birthDate,setBirthDate]=useState("");
+  const [evidenceReference,setEvidenceReference]=useState("");
+  const [evidenceChecked,setEvidenceChecked]=useState(false);
+  const [reason,setReason]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState("");
+  const [error,setError]=useState("");
+  async function approve(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(!ready||!evidenceChecked||busy)return;
+    setBusy(true);setError("");setMessage("");
+    try{
+      await approveAdultClassLearnerReview({data:{
+        accessAccountId:accountId,organizationId,
+        verifiedBirthDate:birthDate,evidenceReference,
+        evidenceIndependentlyChecked:true,
+      }});
+      setMessage("Adult identity review approved. The learner may continue with their existing CAN sign-in.");
+      setEvidenceChecked(false);setBirthDate("");setEvidenceReference("");
+    }catch(e){setError(normalizeClientError(e,"Identity review was not approved.").message);}
+    finally{setBusy(false);}
+  }
+  async function revoke(){
+    if(!ready||busy||!reason.trim())return;
+    setBusy(true);setError("");setMessage("");
+    try{
+      const result=await revokeAdultClassLearnerReview({data:{accessAccountId:accountId,reason}});
+      setMessage(result.alreadyRevoked?"This review was already revoked.":
+        "Review revoked. Native learner sessions and grants issued from this review were invalidated.");
+      setReason("");
+    }catch(e){setError(normalizeClientError(e,"Identity review could not be revoked.").message);}
+    finally{setBusy(false);}
+  }
+  return <section className="mt-6 border border-border bg-card p-5" aria-label="Adult learner identity review">
+    <h2 className="font-serif text-xl">Adult learner identity review</h2>
+    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+      Independently verify the adult's identity and date of birth using evidence retained in
+      an approved secure system. This decision establishes eligibility for one CAN login,
+      not Class enrollment, Site membership, or staff access.
+    </p>
+    {!ready?<p role="status" className="mt-4 border border-border p-3 text-sm">
+      Reviewer workflow unavailable. The reviewed-adult evidence migration and
+      forced row-level security must be verified before identity decisions can be recorded.
+    </p>:<>
+      <form className="mt-5 grid gap-4" onSubmit={e=>void approve(e)}>
+        <label className="grid gap-1 text-sm font-medium">CAN account ID
+          <Input required value={accountId} onChange={e=>setAccountId(e.target.value)}
+            placeholder="Verified account UUID"/>
+        </label>
+        <label className="grid gap-1 text-sm font-medium">Canonical learner home Organization ID
+          <Input required value={organizationId} onChange={e=>setOrganizationId(e.target.value)}
+            placeholder="Active organization UUID"/>
+        </label>
+        <label className="grid gap-1 text-sm font-medium">Independently verified date of birth
+          <Input required type="date" value={birthDate} onChange={e=>setBirthDate(e.target.value)}/>
+        </label>
+        <label className="grid gap-1 text-sm font-medium">Secure evidence reference
+          <Input required value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)}
+            placeholder="secure-case:opaque_reference_id"/>
+        </label>
+        <label className="flex items-start gap-3 text-sm leading-6">
+          <input type="checkbox" required checked={evidenceChecked}
+            onChange={e=>setEvidenceChecked(e.target.checked)} className="mt-1"/>
+          I independently checked identity and adult eligibility, and the secure evidence
+          reference identifies retained, authorized evidence for this exact CAN account.
+        </label>
+        <Button type="submit" disabled={!evidenceChecked||busy}>
+          {busy?"Recording review…":"Approve adult learner identity"}
+        </Button>
+      </form>
+      <div className="mt-6 border-t border-border pt-5">
+        <h3 className="text-sm font-semibold">Revoke an existing adult review</h3>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Uses the CAN account ID above. Revocation ends dependent native learner credentials
+          but preserves Class records and the original review evidence.
+        </p>
+        <label className="mt-3 grid gap-1 text-sm font-medium">Reason for revocation
+          <Input value={reason} onChange={e=>setReason(e.target.value)} maxLength={500}
+            placeholder="Required audit reason, at least 10 characters"/>
+        </label>
+        <Button className="mt-3" type="button" variant="outline"
+          disabled={busy||!accountId||reason.trim().length<10}
+          onClick={()=>void revoke()}>Revoke reviewed identity</Button>
+      </div>
+      {message&&<p role="status" className="mt-4 text-sm">{message}</p>}
+      {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
+    </>}
+  </section>;
 }
