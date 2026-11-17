@@ -1,7 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { QueryState, WorkspaceNotice } from "@/components/workspace";
+import { QueryState } from "@/components/workspace";
+import { SiteStaffingFeedback } from "./SiteStaffingFeedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -75,7 +76,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
     }
   }
 
-  return <section aria-label="Local school responsibilities" className="mt-7  border bg-card p-5">
+  return <section aria-label="Local school responsibilities" className="mt-7 border bg-card p-5">
     <h2 className="font-serif text-2xl">Delegate local Site responsibilities</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       The church retains local leadership. Appoint its named Site director here.
@@ -84,15 +85,8 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
       or authority over other churches.
       An approved CAN onsite-supervision service agreement is required where applicable.
     </p>
-    {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
-    {notice && !mutation.data?.refreshWarning &&
-      <WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
-    {mutation.data?.refreshWarning && <WorkspaceNotice tone="attention" className="mt-3">
-      {notice && <p>{notice}</p>}
-      <p className={notice ? "mt-1" : undefined}>{mutation.data.refreshWarning}</p>
-      <Button type="button" variant="outline" size="sm" className="mt-2"
-        onClick={retry} loading={busy} disabled={busy}>Refresh staffing</Button>
-    </WorkspaceNotice>}
+    <SiteStaffingFeedback error={error} notice={notice}
+      refreshWarning={mutation.data?.refreshWarning} onRetry={retry} busy={busy}/>
     <QueryState loading={query.isPending ? "Loading Site staff assignments…" : undefined}
       error={query.isError ? mutationErrorMessage(query.error, "Unable to load Site staff assignments.") : undefined}
       onRetry={retry} retrying={busy}>
@@ -109,7 +103,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
             Date.parse(current.effectiveThrough) > Date.now();
           const candidates = data.candidates.filter(person =>
             person.role === localResponsibilityRoles[item.key]);
-          return <div key={item.key} className=" border p-4">
+          return <div key={item.key} className="border p-4">
             <h3 className="font-semibold">{item.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">{item.explanation}</p>
             <p className="mt-3 text-sm" role="status">
