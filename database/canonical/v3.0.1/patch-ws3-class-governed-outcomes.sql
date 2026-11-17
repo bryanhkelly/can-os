@@ -275,6 +275,11 @@ CREATE OR REPLACE FUNCTION education_v30.v301_ws3_class_completion_is_current(
   SELECT 1 FROM education_v30.class_outcomes o
   JOIN education_v30.class_enrollments e ON e.id=o.class_enrollment_id
   JOIN education_v30.learner_course_attempts a ON a.id=e.course_attempt_id
+  JOIN education_v30.classes cls ON cls.id=e.class_id
+  JOIN education_v30.class_completion_policy_versions policy
+    ON policy.id=o.completion_policy_version_id
+     AND policy.class_id=cls.id
+     AND policy.course_version_id=cls.course_version_id
   JOIN education_v30.class_enrollment_completion_pins pin
     ON pin.class_enrollment_id=e.id
      AND pin.completion_policy_version_id=o.completion_policy_version_id
@@ -287,6 +292,77 @@ CREATE OR REPLACE FUNCTION education_v30.v301_ws3_class_completion_is_current(
     AND ev.verified_at IS NOT NULL AND ev.verified_at<=now()
     AND (ev.valid_from IS NULL OR ev.valid_from<=now()::date)
     AND (ev.valid_through IS NULL OR ev.valid_through>=now()::date)
+    -- A later corrected absence, rescinded lesson or voided regrade must
+    -- invalidate effective completion until a fresh independent decision,
+    -- even if historical Class Enrollment remains terminal completed.
+    AND (NOT policy.require_all_lessons OR (
+      EXISTS(SELECT 1 FROM education_v30.course_lessons lesson
+        WHERE lesson.course_version_id=cls.course_version_id)
+      AND NOT EXISTS(
+        SELECT 1 FROM education_v30.course_lessons lesson
+        LEFT JOIN education_v30.learner_lesson_progress progress
+          ON progress.lesson_id=lesson.id AND progress.course_attempt_id=a.id
+             AND progress.course_version_id=cls.course_version_id
+        WHERE lesson.course_version_id=cls.course_version_id
+          AND (progress.id IS NULL OR progress.status NOT IN ('completed','waived'))
+      )
+    ))
+    AND (policy.required_verified_sessions=0 OR (
+      SELECT count(*) FROM (
+        SELECT DISTINCT ON (cs.id) cs.id,assertion.status
+        FROM education_v30.class_sessions cs
+        JOIN education_v30.facilitated_classroom_plans plan
+          ON plan.id=cs.classroom_plan_id
+        JOIN education_v30.facilitated_learning_sessions room
+          ON room.id=plan.facilitated_session_id
+        JOIN education_v30.facilitated_room_attendance_assertions assertion
+          ON assertion.facilitated_session_id=room.id
+             AND assertion.course_attempt_id=a.id
+        WHERE cs.class_id=cls.id
+          AND cs.delivery_session_id=plan.delivery_session_id
+          AND cs.facilitator_person_id=plan.facilitator_person_id
+          AND assertion.facilitator_person_id=cs.facilitator_person_id
+          AND assertion.facilitator_person_id<>e.learner_person_id
+          AND plan.state='started' AND plan.site_id=cls.site_id
+          AND plan.host_organization_id=cls.operating_organization_id
+          AND plan.course_version_id=cls.course_version_id
+          AND room.state='ended' AND room.ended_at<=now()
+          AND room.site_id=cls.site_id
+          AND room.host_organization_id=cls.operating_organization_id
+          AND room.course_version_id=cls.course_version_id
+          AND room.deployment_id=cls.deployment_id
+          AND assertion.asserted_at<=now()
+        ORDER BY cs.id,assertion.asserted_at DESC,assertion.id DESC
+      ) latest WHERE latest.status='present'
+    ) >= policy.required_verified_sessions)
+    AND (NOT policy.require_passing_assessment OR EXISTS(
+      SELECT 1
+      FROM education_v30.assessment_attempt_results r
+      JOIN education_v30.assessment_attempts at
+        ON at.id=r.attempt_id AND at.state='finalized'
+      JOIN education_v30.assessment_access_grants grant_row
+        ON grant_row.id=at.access_grant_id
+           AND grant_row.learner_id=at.learner_id
+           AND grant_row.administration_id=at.administration_id
+      JOIN education_v30.assessment_administrations administration
+        ON administration.id=at.administration_id
+      JOIN education_v30.learner_profiles learner
+        ON learner.id=grant_row.learner_id
+      WHERE grant_row.course_attempt_id=a.id
+        AND grant_row.access_status='approved'
+        AND learner.person_id=e.learner_person_id
+        AND administration.course_version_id=cls.course_version_id
+        AND administration.deployment_id=cls.deployment_id
+        AND administration.administering_organization_id=cls.operating_organization_id
+        AND r.result_status='finalized' AND r.outcome='pass'
+        AND r.reviewed_by_person_id IS NOT NULL
+        AND r.reviewed_by_person_id<>e.learner_person_id
+        AND NOT EXISTS(
+          SELECT 1 FROM education_v30.assessment_attempt_results newer
+          WHERE newer.attempt_id=r.attempt_id
+            AND newer.result_revision>r.result_revision
+        )
+    ))
     AND NOT EXISTS(
       SELECT 1 FROM education_v30.class_outcomes newer
       WHERE newer.supersedes_outcome_id=o.id
