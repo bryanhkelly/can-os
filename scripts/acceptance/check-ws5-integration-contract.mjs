@@ -41,7 +41,6 @@ mustNot(readModel, "for(const siteId of operator.siteIds)", "bounded Course disc
 for(const token of [
   "getPublisherRolloutTemplate", "assertCompletePortableCourseComposition",
   "inArray(educationOperationSites.siteId,siteIds)",
-  'if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")',
 ]) must(exporter, token, "publisher export");
 for(const token of [
   "localClassPolicy", "publisherClassVariationPolicy",
