@@ -172,7 +172,7 @@ function InsightsPage() {
    </QueryState>
    {dismissTarget&&<ActionDialog open title={`Dismiss "${dismissTarget.title}"`} confirmLabel="Dismiss insight"
      description="Explain why this insight is being dismissed (5-500 characters)."
-     pending={mutation.pending} confirmDisabled={busy||dismissReason.trim().length<5}
+     pending={mutation.pending} pendingLabel="Dismissing insight…" confirmDisabled={busy||dismissReason.trim().length<5}
      onClose={()=>setDismissTarget(null)} onConfirm={()=>void dismiss(dismissTarget)}>
      <Field label="Dismissal reason" required>
        <Textarea required minLength={5} maxLength={500} value={dismissReason}
