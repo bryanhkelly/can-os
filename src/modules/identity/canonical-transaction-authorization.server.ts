@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
+import { readCookie } from "@/domain/session-cookies";
 import {
   canonicalSessionRowSchema, projectCanonicalCommandContext,
 } from "@/domain/canonical-access";
@@ -33,10 +34,7 @@ export async function assertCurrentCanonicalStaffForMutation(
     throw new AuthorizationError("exact active canonical staff context");
   }
 
-  const rawCanSession = (request.headers.get("cookie") ?? "")
-    .split(";").map(cookie => cookie.trim())
-    .find(cookie => cookie.startsWith(accessSessionCookie + "="))
-    ?.slice(accessSessionCookie.length + 1);
+  const rawCanSession = readCookie(request, accessSessionCookie);
 
   let rows: unknown[];
   if (rawCanSession !== undefined) {
