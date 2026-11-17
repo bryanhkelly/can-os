@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useState } from "react";
 import { WorkspaceShell, StatusBadge } from "@/components/workspace";
+import { NativeClassHomeNavigation } from "@/components/learning/NativeClassHomeNavigation";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
@@ -382,28 +383,22 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
  * All commands remain independently scoped and authorized server-side. */
 function ClassHome(){
   const selected=Route.useSearch();
-  return <div className="min-w-0">
-    <nav aria-label="Class workspace mode" className="flex flex-wrap gap-2 px-4 pt-4 sm:px-6">
-      <Link to="/class" search={{search:selected.search,classId:selected.classId,siteId:selected.siteId,view:undefined}}
-        aria-current={!selected.view?"page":undefined}
-        className={"min-h-11 border px-4 py-3 text-sm font-semibold "+(!selected.view?"border-primary bg-muted":"border-border")}>
-        Explore and enroll
-      </Link>
-      <Link to="/class" search={{siteId:selected.siteId,view:"manage"}}
-        aria-current={selected.view==="manage"?"page":undefined}
-        className={"min-h-11 border px-4 py-3 text-sm font-semibold "+(selected.view==="manage"?"border-primary bg-muted":"border-border")}>
-        Manage Classes (authorized staff)
-      </Link>
-    </nav>
-    {selected.view==="manage"
-      ?<Suspense fallback={<p role="status" className="p-6 text-sm">Opening Class management…</p>}>
-        <NativeClassManager key={`${selected.siteId??"all"}:${selected.offeringVersionId??"all"}`}
-          preferredSiteId={selected.siteId} preferredOfferingVersionId={selected.offeringVersionId}/>
-      </Suspense>
-      :<NativeLearnerClasses/>}
-  </div>;
+  const navigation=<NativeClassHomeNavigation
+    mode={selected.view==="manage"?"manage":"explore"}
+    search={selected.search} classId={selected.classId}
+    siteId={selected.siteId} offeringVersionId={selected.offeringVersionId}/>;
+  return selected.view==="manage"
+    ?<Suspense fallback={<WorkspaceShell title="Classes" eyebrow="CAN OS"
+      width="wide"><p role="status">Opening Class management…</p></WorkspaceShell>}>
+      <NativeClassManager key={`${selected.siteId??"all"}:${selected.offeringVersionId??"all"}`}
+        preferredSiteId={selected.siteId}
+        preferredOfferingVersionId={selected.offeringVersionId}
+        navigation={navigation}/>
+    </Suspense>
+    :<NativeLearnerClasses navigation={navigation}/>;
 }
-function NativeLearnerClasses(){
+
+function NativeLearnerClasses({navigation}:{navigation:React.ReactNode}){
   const [recovering,setRecovering]=useState(false);
   const [recoveryNotice,setRecoveryNotice]=useState("");
   const [recoveryError,setRecoveryError]=useState("");
@@ -473,6 +468,7 @@ function NativeLearnerClasses(){
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Classes"
     subtitle="One Class enrollment and one learning record, regardless of whether your Class is academic, independent or facilitated."
     actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}>
+    {navigation}
     {(enrolled.isError||approvals.isError||invitations.isError)&&
       <section className="mt-5 border border-border bg-card p-5" aria-label="Verified CAN learner session recovery">
         <h2 className="font-serif text-xl">Continue with your CAN account</h2>
