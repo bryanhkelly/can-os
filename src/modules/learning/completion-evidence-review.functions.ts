@@ -268,8 +268,12 @@ export const requestCompletionEvidenceReview=createServerFn({method:"POST"})
 /** Review is original-Site scoped; a network reviewer without a current
  * independently verified exact-Site grant cannot approve a learner.
  */
+const pendingQueueInput=z.object({
+  page:z.number().int().min(0).max(100).default(0),
+}).strict();
 export const getPendingCompletionEvidenceReviews=createServerFn({method:"GET"})
-  .handler(async()=>{
+  .validator((raw:unknown)=>pendingQueueInput.parse(raw))
+  .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
     if(process.env.CAN_WS3_EVIDENCE_REVIEW_ENABLED!=="true")
       throw new AuthorizationError("evidence review flow not enabled");
@@ -290,7 +294,7 @@ export const getPendingCompletionEvidenceReviews=createServerFn({method:"GET"})
         await assertCurrentCredentialIssuer(tx,request,actor);
         allowedPurposes.push("award_revocation");
       } catch { /* no independently approved issuer authority */ }
-      if(!allowedPurposes.length)return {pending:[]};
+      if(!allowedPurposes.length)return {pending:[],hasMore:false,page:data.page};
       const rows=await tx.select().from(learningCompletionEvidenceReviewRequests)
         .where(and(
           inArray(learningCompletionEvidenceReviewRequests.purpose,allowedPurposes),
@@ -299,11 +303,11 @@ export const getPendingCompletionEvidenceReviews=createServerFn({method:"GET"})
           eq(learningCompletionEvidenceReviewRequests.deliverySiteId,
             actor.scope.siteIds![0]!),
           eq(learningCompletionEvidenceReviewRequests.status,"pending"),
-        )).orderBy(asc(learningCompletionEvidenceReviewRequests.createdAt))
-        .limit(51);
-      if(rows.length>50)
-        throw new AuthorizationError("review queue requires pagination");
-      return {pending:rows.filter(row=>row.submittedByPersonId!==actor.actorPersonId)
+        )).orderBy(asc(learningCompletionEvidenceReviewRequests.createdAt),
+          asc(learningCompletionEvidenceReviewRequests.id))
+        .limit(51).offset(data.page*50);
+      return {page:data.page,hasMore:rows.length>50,
+        pending:rows.slice(0,50).filter(row=>row.submittedByPersonId!==actor.actorPersonId)
         .map(row=>({
           requestId:row.id,purpose:row.purpose,
           sourceId:row.noncreditRegistrationId??row.awardIssuanceId??
