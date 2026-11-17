@@ -57,6 +57,28 @@ const governed = [
     ],
   })),
   {
+    path: "src/platform/execute-command.ts",
+    layer: "platform",
+    forbiddenImports: [
+      /^@\/modules(?:\/|$)/,
+      /^@\/routes(?:\/|$)/,
+      /^@\/components(?:\/|$)/,
+    ],
+    requiredImports: ["@/domain/command-context"],
+  },
+  {
+    path: "src/modules/actions/resolve-action.ts",
+    layer: "capability",
+    forbiddenImports: [/^@\/routes(?:\/|$)/, /^@\/components(?:\/|$)/],
+    requiredImports: ["@/platform/execute-command", "@/platform/mutation"],
+  },
+  {
+    path: "src/modules/operations/site-rooms.server.ts",
+    layer: "capability",
+    forbiddenImports: [/^@\/routes(?:\/|$)/, /^@\/components(?:\/|$)/],
+    requiredImports: ["@/platform/execute-command", "@/platform/mutation"],
+  },
+  {
     path: "src/modules/communication/outbound-dispatcher.server.ts",
     layer: "capability",
     forbiddenImports: [
