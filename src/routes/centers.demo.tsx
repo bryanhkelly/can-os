@@ -18,7 +18,9 @@ function DemoCenterPage() {
   const result=Route.useLoaderData();
   if (!result.ok) return <LoaderFailure eyebrow="Community learning" title="Center" outcome={result}/>;
   if (!result.data) return <PageFrame width="wide"><p role="status">Center not found.</p></PageFrame>;
-  const {site,plans,nativeCourse}=result.data;
+  const {site,plans,nativeCourse,nativeCourseLessons}=result.data;
+  const totalPlannedMinutes=nativeCourseLessons.reduce(
+    (sum,lesson)=>sum+(lesson.estimatedMinutes??0),0);
   return <PageFrame width="wide">
     <RecordLayout header={<RecordHeader eyebrow="Community Learning Center · Synthetic demonstration"
       title={site.name} subtitle="After-school and summer program planning"/>}
@@ -49,7 +51,7 @@ function DemoCenterPage() {
         teaching Session or safety approval is implied by these records.
         A native Class requires a published Course and approved adoption.
       </WorkspaceNotice>
-      <WorkspacePanel title="Native Course and first lesson"
+      <WorkspacePanel title="Native Course and lesson sequence"
         description="Source-backed educational content, separate from Activity plans and Class enrollment.">
         {!nativeCourse?<p role="status" className="text-sm">
           The education Course draft is not available in the database.
@@ -60,9 +62,25 @@ function DemoCenterPage() {
           </div>
           <RecordFacts variant="tiles" columns={3} label="Native Course details" items={[
             {label:"Course code",value:nativeCourse.courseCode},
-            {label:"First lesson",value:nativeCourse.lessonTitle??"Not created"},
+            {label:"Planned lessons",value:nativeCourseLessons.length},
+            {label:"Planned instruction",value:totalPlannedMinutes+" minutes"},
             {label:"Release status",value:nativeCourse.lifecycle==="published"?"Published":"Not published"},
           ]}/>
+          <ol aria-label="Draft Course lesson sequence"
+            className="divide-y divide-border border border-border">
+            {nativeCourseLessons.map(lesson=><li key={lesson.id}
+              className="flex flex-wrap items-start justify-between gap-3 p-3">
+              <span><span className="mr-2 text-xs font-semibold text-muted-foreground">
+                {lesson.lessonOrder}.
+              </span>{lesson.title}</span>
+              <span className="text-xs text-muted-foreground">
+                {lesson.estimatedMinutes==null?"Duration not set":lesson.estimatedMinutes+" min"}
+              </span>
+            </li>)}
+          </ol>
+          <p className="text-xs text-muted-foreground">
+            These are unpublished lesson outlines, not scheduled Class Sessions.
+          </p>
           <p className="text-muted-foreground">
             This Course exists in the native education schema. Its version must
             complete independent publication and be adopted by this Site
