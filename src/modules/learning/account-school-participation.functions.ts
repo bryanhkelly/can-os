@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,isNotNull,lt,or,sql,type SQL} from "drizzle-orm";
+import {and,desc,eq,inArray,isNotNull,or,sql,type SQL,type SQLWrapper} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import * as s from "@/db/schema";
@@ -30,21 +30,17 @@ const input= z.object({
 }).strict();
 const pageSize=40;
 const extended=["summer_enrichment","summer_program","after_school_enrichment"] as const;
-const cursorText=(column:typeof s.enrollments.createdAt|typeof s.calendarEventParticipants.createdAt|
-  typeof s.activityRegistrations.createdAt)=>
+const cursorText=(column:SQLWrapper)=>
   sql<string>`to_char(${column} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`;
-const before=(createdAt:typeof s.enrollments.createdAt|typeof s.calendarEventParticipants.createdAt|
-  typeof s.activityRegistrations.createdAt,
-  sourceId:typeof s.enrollments.id|typeof s.calendarEventParticipants.id|typeof s.activityRegistrations.id,
-  cursor:AccountSchoolHistoryCursor|null)=>{
+const before=(createdAt:SQLWrapper,sourceId:SQLWrapper,
+  cursor:AccountSchoolHistoryCursor|null):SQL|undefined=>{
   if(!cursor)return undefined;
   return or(
     sql`${createdAt} < ${cursor.createdAt}::timestamptz`,
-    and(sql`${createdAt} = ${cursor.createdAt}::timestamptz`,
-      lt(sourceId,cursor.id)),
+    sql`${createdAt} = ${cursor.createdAt}::timestamptz AND
+      ${sourceId} < ${cursor.id}::uuid`,
   );
 };
-
 export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
   .validator((raw:unknown)=>input.parse(raw))
   .handler(async({data}):Promise<{
@@ -72,18 +68,17 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     // authorizes that subject. A guardian grant must never broaden the
     // account owner's student profile, or vice versa.
     const scoped=(kind:"student"|"guardian",
-      org:typeof s.programs.organizationId|typeof s.sites.organizationId|typeof s.calendarEvents.organizationId,
-      site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId|typeof s.calendarEvents.siteId):SQL|undefined=>{
+      org:SQLWrapper,site:SQLWrapper):SQL|undefined=>{
       const permitted=(kind==="student"?student:guardians).map(g=>
-        g.organizationId?
-          and(eq(org,g.organizationId),g.siteId?eq(site,g.siteId):undefined):undefined)
-        .filter((condition):condition is SQL=>Boolean(condition));
+        g.organizationId?and(
+          sql`${org} = ${g.organizationId}::uuid`,
+          g.siteId?sql`${site} = ${g.siteId}::uuid`:undefined,
+        ):undefined).filter((condition):condition is SQL=>Boolean(condition));
       return permitted.length?or(...permitted):undefined;
     };
     const profileScope=(profiles:Map<string,{name:string|null;kind:"self"|"dependent"}>,
       profileColumn:typeof s.enrollments.studentProfileId|typeof s.activityRegistrations.studentProfileId,
-      org:typeof s.programs.organizationId|typeof s.sites.organizationId,
-      site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId):SQL|undefined=>{
+      org:SQLWrapper,site:SQLWrapper):SQL|undefined=>{
       const selfIds=[...profiles].filter(([,p])=>p.kind==="self").map(([id])=>id);
       const childIds=[...profiles].filter(([,p])=>p.kind==="dependent").map(([id])=>id);
       return or(
