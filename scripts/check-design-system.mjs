@@ -483,3 +483,50 @@ if (nativeCardStart < 0 || !nativeCard.includes("<StatusBadge") ||
   console.error("Native enrolled-Class lifecycle must compose V6.1 status and form primitives");
   process.exitCode = 1;
 }
+
+
+// Pages verified for V6.1 source-level control adoption are added here one by
+// one. This is a regression gate for their JSX only, not a claim that every
+// feature component, role, responsive layout or production flow was accepted.
+// Each route keeps its existing readers, authorization and mutation ownership.
+const migratedV61RouteControls = {
+  "routes/account.index.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/choice", "@/components/ui/label",
+  ],
+  "routes/account.sessions.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/label",
+    "<WorkspaceNotice", "<EmptyState",
+  ],
+  "routes/learn.my-activity.tsx": [
+    "@/components/ui/button", "<StatusBadge",
+  ],
+  "routes/explore.index.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/label", "<QueryState", "<EmptyState",
+  ],
+  "routes/student.settings.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/select",
+    "@/components/ui/field", "<Field",
+  ],
+  "routes/platform.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
+    "<StatCard", "<WorkspaceNotice",
+  ],
+};
+for (const [file, required] of Object.entries(migratedV61RouteControls)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of required) {
+    if (!source.includes(fragment)) {
+      console.error(`${file} lost a required V6.1 shared primitive or pattern: ${fragment}`);
+      process.exitCode = 1;
+    }
+  }
+  // This only scans component consumers. The underlying shared native elements
+  // are correct and must not be prohibited inside the primitives themselves.
+  if (/<(?:button|input|select|textarea|label)\\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(`${file} reintroduced a native control or legacy rounded geometry`);
+    process.exitCode = 1;
+  }
+}
