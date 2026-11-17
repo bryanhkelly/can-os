@@ -105,7 +105,8 @@
     "test:identity:account-constraints": "node scripts/acceptance/test-one-person-account-constraints.mjs",
     "verify:deploy:identity-schema": "node scripts/acceptance/check-one-person-deploy-schema.mjs",
     "db:canonical:main-schema": "node scripts/acceptance/check-main-extended-schema.mjs",
-    "db:canonical:drift-audit": "node scripts/acceptance/check-main-qa-db-drift.mjs"
+    "db:canonical:drift-audit": "node scripts/acceptance/check-main-qa-db-drift.mjs",
+    "verify:site-identity:preflight": "node scripts/acceptance/check-unified-site-identity.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
