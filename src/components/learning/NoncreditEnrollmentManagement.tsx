@@ -54,8 +54,8 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       setWithdrawBusy(null);
     }
   }
-  const visibleCourses=registrationId ? query.data?.filter(course=>course.registrationId===registrationId) : query.data;
-  const visibleWaitlist=releaseId ? waiting.data?.filter(item=>item.releaseId===releaseId) : waiting.data;
+  const visibleCourses=releaseId ? [] : registrationId ? query.data?.filter(course=>course.registrationId===registrationId) : query.data;
+  const visibleWaitlist=registrationId ? [] : releaseId ? waiting.data?.filter(item=>item.releaseId===releaseId) : waiting.data;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
     {query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
