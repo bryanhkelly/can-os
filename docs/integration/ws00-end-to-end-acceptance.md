@@ -342,6 +342,7 @@ After the approved fixture is provisioned, run:
 APP_ENV=test NODE_ENV=test CAN_CLASS_OPERATOR_QA_RUN=1 \
 CAN_TEST_DB_WRITES_ENABLED=true \
 CAN_E2E_TEST_BRANCH_ID=<actual-branch-id> \
+CAN_APPLICATION_DB_HOST=<known-production-hostname> \
 CAN_CLASS_OPERATOR_QA_SITE_ID=<approved-canonical-site-uuid> \
 CAN_CLASS_OPERATOR_QA_SECRET=<opaque-qa-session-secret> \
 CAN_CLASS_OPERATOR_QA_BASE_URL=http://localhost:3199 \
