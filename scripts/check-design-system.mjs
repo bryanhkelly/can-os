@@ -87,14 +87,14 @@ for (const file of ["ui/button.tsx", "ui/choice.tsx", "ui/input.tsx", "ui/select
 const governedFeatureControls = {
   "evidence/EvidenceUploader.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/input', '@/components/ui/label'],
-    forbidden: [/<input\\b/, /<button\\b/, /<select\\b/, /<textarea\\b/],
+    forbidden: [/<input\b/, /<button\b/, /<select\b/, /<textarea\b/],
   },
   "evidence/FileSelectionField.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/input', '@/components/ui/label'],
-    forbidden: [/<input\\b/, /<button\\b/, /<select\\b/, /<textarea\\b/],
+    forbidden: [/<input\b/, /<button\b/, /<select\b/, /<textarea\b/],
   },
 };
-const radiusUtility = /(?:^|[\\s"'\\x60])(?:[\\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\\[[^\\]]+\\]))?(?=[\\s"'\\x60])/;
+const radiusUtility = /(?:^|[\s"'\x60])(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=[\s"'\x60])/;
 for (const [file, contract] of Object.entries(governedFeatureControls)) {
   const source = readFileSync(join(root, file), "utf8");
   for (const imported of contract.imports) {
