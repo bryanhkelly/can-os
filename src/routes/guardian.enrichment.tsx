@@ -10,6 +10,9 @@ import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import {
   addEnrichmentChild, getEnrichmentFamily, listEnrichmentCatalog, registerEnrichmentChild,
 } from "@/modules/activities/enrichment-family.functions";
@@ -104,16 +107,16 @@ function EnrichmentFamilyView({ data, seasonId }: {
   return <WorkspaceShell eyebrow="Family"
     title="Summer and enrichment programs"
     subtitle="Explore available programs and register your children, whether or not they attend CAN Academy."
-    actions={<Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
+    actions={<Link to="/home" >Family home</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving family registration..."/>
-    {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    {error && <p role="alert" className="mt-5  border border-red-500 p-3 text-sm">{error}</p>}
+    <section className="mt-6  border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-semibold">Your family</h2>
-        <button type="button" onClick={() => setChildFormOpen(!childFormOpen)}
-          className="rounded-lg border px-3 py-2 text-sm">
+        <Button variant="outline" type="button" onClick={() => setChildFormOpen(!childFormOpen)}
+          >
           {childFormOpen ? "Cancel" : "Add a child for enrichment"}
-        </button>
+        </Button>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">
         Children listed here do not need an active CAN school enrollment. Select an existing child
@@ -123,13 +126,13 @@ function EnrichmentFamilyView({ data, seasonId }: {
         {data.family.children.length ? data.family.children.map(c =>
           [c.name, c.lastName].join(" ")).join(", ") : "No children connected yet."}
       </p>
-      {data.family.households.length > 1 && <label className="mt-3 block text-sm">
+      {data.family.households.length > 1 && <Label className="mt-3 block text-sm">
         Household for registration
-        <select value={householdId} onChange={e => setHouseholdId(e.target.value)}
-          className="mt-1 w-full rounded-lg border bg-background p-2">
+        <Select value={householdId} onChange={e => setHouseholdId(e.target.value)}
+          className="mt-1 min-h-11">
           {data.family.households.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
-        </select>
-      </label>}
+        </Select>
+      </Label>}
       {childFormOpen && <form noValidate onSubmit={addChild} className="mt-4 grid gap-3 sm:grid-cols-3">
         <Field label="First name" className="text-sm" required error={childAttempted&&!firstName.trim()?"Enter the child's first name.":undefined}>
           <Input value={firstName} maxLength={80} onChange={e => setFirstName(e.target.value)}/>
@@ -152,7 +155,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
         : <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {data.family.registrations.map(registration => {
             const child = data.family.children.find(c => c.studentProfileId === registration.studentProfileId);
-            return <li key={registration.id} className="rounded-xl border bg-card p-4">
+            return <li key={registration.id} className=" border bg-card p-4">
               <p className="font-semibold">{registration.offeringName}</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {child?.name} {child?.lastName} · {registration.seasonName}
@@ -171,7 +174,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
     <section className="mt-8 space-y-4" aria-label="Available enrichment programs">
       <h2 className="text-xl font-semibold">Open registration</h2>
       {seasonId && <Link to="/guardian/enrichment" className="text-sm font-semibold underline">Browse all enrichment programs</Link>}
-      {offerings.length === 0 && <p className="rounded-lg border p-5 text-sm text-muted-foreground">
+      {offerings.length === 0 && <p className=" border p-5 text-sm text-muted-foreground">
         {seasonId ? "This season is no longer available for registration." : "No programs are currently published for registration. Check back as sites release their summer and after-school schedules."}
       </p>}
       {offerings.map(offer => {
@@ -185,7 +188,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
         const quotedPrice = selectedPackages.reduce((sum,item)=>sum+item.priceCents,0);
         const requestedWaitlist = selectedPackages.some(option=>option.seatsRemaining === 0);
         const unavailableSelection = selectedPackages.some(option=>!option.available);
-        return <article key={offer.seasonId} className="rounded-xl border bg-card p-5">
+        return <article key={offer.seasonId} className=" border bg-card p-5">
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{offer.siteName} · {offer.programName}</p>
           <h3 className="mt-1 text-xl font-semibold">{offer.name}</h3>
           <p className="mt-1 text-sm">{offer.seasonName} · {offer.startsOn} to {offer.endsOn}</p>
@@ -199,26 +202,26 @@ function EnrichmentFamilyView({ data, seasonId }: {
               offer.seatsRemaining === null ? "Capacity not specified" :
               `${offer.seatsRemaining} seats remaining`}</span>
           </div>}
-          <label className="mt-4 block text-sm">Register child
-            <select value={selected}
+          <Label className="mt-4 block text-sm">Register child
+            <Select value={selected}
               onChange={e => setStudentSelections(prev => ({
                 ...prev, [offer.seasonId]: e.target.value,
-              }))} className="mt-1 w-full rounded-lg border bg-background p-2">
+              }))} className="mt-1 min-h-11">
               {data.family.children.length === 0 && <option value="">Add a child above first</option>}
               {data.family.children.map(c => <option key={c.studentProfileId}
                 value={c.studentProfileId}>{c.name} {c.lastName}</option>)}
-            </select>
-          </label>
+            </Select>
+          </Label>
           {prior ? <p className="mt-3 text-sm font-semibold">
             Existing registration: {prior.status.replaceAll("_", " ")}
           </p> : <>
-            {!!offer.packages.length && <fieldset className="mt-4 rounded-lg border p-3">
+            {!!offer.packages.length && <fieldset className="mt-4  border p-3">
               <legend className="px-2 text-sm font-semibold">Choose enrollment weeks or days</legend>
               <div className="grid gap-2">
-                {offer.packages.map(option=><label key={option.id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+                {offer.packages.map(option=><Label key={option.id}
+                  className="flex flex-wrap items-center justify-between gap-3  border p-3 text-sm">
                   <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={chosenIds.includes(option.id)}
+                    <Checkbox checked={chosenIds.includes(option.id)}
                       disabled={!option.available}
                       onChange={event=>setPackageSelections(current=>{
                         const ids=current[offer.seasonId] ?? [];
@@ -235,7 +238,7 @@ function EnrichmentFamilyView({ data, seasonId }: {
                       option.seatsRemaining === null ? "Capacity not specified" :
                       `${option.seatsRemaining} seats`}
                   </span>
-                </label>)}
+                </Label>)}
               </div>
               <p className="mt-2 text-sm font-semibold">
                 Selected total: {usd(quotedPrice)}
@@ -245,28 +248,28 @@ function EnrichmentFamilyView({ data, seasonId }: {
                 These packages have overlapping days. Choose non-overlapping options.
               </p>}
             </fieldset>}
-            <div className="mt-4 rounded-lg border p-3 text-sm">
+            <div className="mt-4  border p-3 text-sm">
               <p className="mb-2 font-semibold">Participation consent · version {offer.permissionVersion}</p>
               <p className="whitespace-pre-wrap">{offer.permissionText}</p>
             </div>
-            <label className="mt-3 flex items-start gap-2 text-sm">
-              <input type="checkbox" className="mt-1"
+            <Label className="mt-3 flex items-start gap-2 text-sm">
+              <Checkbox className="mt-1"
                 checked={acknowledged[offer.seasonId] === enrichmentConsentContext(selected, householdId, offer.permissionVersion)}
                 onChange={e => setAcknowledged(prev => ({
                   ...prev, [offer.seasonId]: e.target.checked
                     ? enrichmentConsentContext(selected, householdId, offer.permissionVersion) : "",
                 }))}/>
               I have read and agree to this participation permission for the selected child.
-            </label>
-            <button type="button" onClick={() => register(offer.seasonId, offer.permissionVersion)}
+            </Label>
+            <Button variant="outline" type="button" onClick={() => register(offer.seasonId, offer.permissionVersion)}
               disabled={busy || !selected || !householdId || !offer.registrationOpen ||
                 acknowledged[offer.seasonId] !== enrichmentConsentContext(selected, householdId, offer.permissionVersion) || packageConflict || unavailableSelection ||
                 (offer.packages.length > 0 && !chosenIds.length)}
-              className="mt-4 rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
+              className="mt-4">
               {!offer.registrationOpen ? "Registration unavailable" :
                 (offer.packages.length === 0 ? offer.seatsRemaining === 0 : requestedWaitlist)
                   ? "Join waitlist" : "Submit registration"}
-            </button>
+            </Button>
             <p className="mt-2 text-xs text-muted-foreground">
               Submitting a registration is not a payment or a final eligibility decision.
               Any applicable activity fee is recorded as a household obligation.
