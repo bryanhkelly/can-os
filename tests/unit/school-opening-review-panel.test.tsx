@@ -108,6 +108,7 @@ describe("version-bound school-opening review",()=>{
     expect(html).toContain("Provide at least 10 characters");
     expect(html).toContain('required=""');
     expect(html).toContain("Configuration v1");
+    expect(html).toContain('data-action-footer="inline"');
     expect(html).toContain("bg-muted");
     expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
   });
