@@ -43,5 +43,27 @@ export const getDemoCenter=createServerFn({method:"GET"}).handler(async()=>{
     ))
     .orderBy(desc(native.courseVersions.versionNo),asc(native.courseLessons.lessonOrder))
     .limit(1);
-  return {site:{id:site.id,name:site.name},plans,nativeCourse:course??null};
+  // Complete outline for the latest version only. A lesson plan is NOT a
+  // scheduled native Class Session or evidence of attendance. Keep the preview
+  // bounded to the known synthetic Course and never expose other publishers.
+  const nativeCourseLessons=course?await db.select({
+    id:native.courseLessons.id,
+    title:native.courseLessons.title,
+    lessonOrder:native.courseLessons.lessonOrder,
+    content:native.courseLessons.content,
+  }).from(native.courseLessons)
+    .where(eq(native.courseLessons.courseVersionId,course.versionId))
+    .orderBy(asc(native.courseLessons.lessonOrder))
+    .limit(24):[];
+  const lessons=nativeCourseLessons.map(lesson=>{
+    const minutes=lesson.content && typeof lesson.content==="object" &&
+      !Array.isArray(lesson.content) &&
+      typeof lesson.content.estimatedMinutes==="number" &&
+      Number.isFinite(lesson.content.estimatedMinutes)
+        ?lesson.content.estimatedMinutes:null;
+    return {id:lesson.id,title:lesson.title,
+      lessonOrder:lesson.lessonOrder,estimatedMinutes:minutes};
+  });
+  return {site:{id:site.id,name:site.name},plans,
+    nativeCourse:course??null,nativeCourseLessons:lessons};
 });
