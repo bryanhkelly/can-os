@@ -158,7 +158,7 @@ export const confirmCanonicalSiteIdentityLink=createServerFn({method:"POST"})
         actorPersonId:actor.actorPersonId!,owningOrganizationId:orgId,
         eventCode:"site.identity.native_confirmed",
         entityKind:"site",entityId:String(link.canonicalSiteId),
-        payload:{publicSiteId:data.publicSiteId,siteId:link.canonicalSiteId,
+        payload:{publicSiteId:data.publicSiteId,siteId:String(link.canonicalSiteId),
           result:"confirmed_for_independent_review"},
       });
       return {status:"confirmed" as const};
