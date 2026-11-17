@@ -359,8 +359,6 @@ function MyActivityPage() {
         <p className="mt-2">Load older activity to continue through source-owned history. Source outages and missing academic outcomes are shown as incomplete, never treated as evidence of no participation. This dashboard is not an official transcript.</p>
         <p className="mt-3">
           <Link to="/account" className="font-semibold text-primary underline">Manage authorized workspaces</Link>
-          {" · "}
-          
         </p>
       </section>
     </>}
