@@ -87,6 +87,15 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(cls).toBeGreaterThan(-1);
     expect(en).toBeGreaterThan(cls);
   });
+  it("keeps governed Class completion decisions append-only, preserving unrelated outcomes",()=>{
+    expect(sql).toContain("IF TG_OP='DELETE' THEN");
+    expect(sql).toContain("ELSIF TG_OP='UPDATE' THEN");
+    expect(sql).toContain("Governed Class completion decisions are append-only");
+    expect(sql).toContain("Governed Class completion decisions are immutable");
+    expect(sql).toContain("BEFORE INSERT OR UPDATE OR DELETE ON education_v30.class_outcomes");
+    expect(sql).toContain("RETURN OLD;");
+    expect(sql).toContain("RETURN NEW;");
+  });
   it("does not claim release ready with the migrations disabled",()=>{
     expect(sql).toContain("DO NOT APPLY IN PRODUCTION");
     expect(bindingSql).toContain("FORCE ROW LEVEL SECURITY");

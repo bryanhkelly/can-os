@@ -81,7 +81,7 @@ try{
       executed++;
     }
   }
-  const check=await client.query(\`
+  const check=await client.query(`
     SELECT
       (SELECT count(*) FROM pg_trigger
         WHERE NOT tgisinternal AND tgname IN (
@@ -103,19 +103,68 @@ try{
       (education_v30.v301_ws3_class_completion_is_current(
         '00000000-0000-4000-8000-000000000000'::uuid) IS FALSE)
         AS "unknownSourceNotCompleted"
-  \`);
+  `);
   const row=check.rows[0];
   if(Number(row.guardTriggers)!==6 ||
      Number(row.protectedTables)!==4 ||
      row.unknownSourceNotCompleted!==true)
     throw new Error("WS3 migration guards or Class validity are incomplete");
+  // Exercise the actual PostgreSQL trigger on a disposable, temporary
+  // minimal fixture, not on any real Class Enrollment or learner outcome.
+  // Three privileged historical mutations must be denied while an unrelated
+  // assessment history update keeps the original Class schema behavior.
+  await client.query(`
+    CREATE TEMP TABLE ws3_guard_fixture(
+      id integer PRIMARY KEY, outcome_kind text NOT NULL,
+      source_kind text NOT NULL, result_code text NOT NULL
+    ) ON COMMIT DROP
+  `);
+  await client.query(`
+    INSERT INTO ws3_guard_fixture VALUES
+      (1,'completion','ws3_governed','completed'),
+      (2,'assessment','external','original')
+  `);
+  await client.query(`
+    CREATE TRIGGER ws3_guard_fixture_trg BEFORE UPDATE OR DELETE
+      ON ws3_guard_fixture FOR EACH ROW
+      EXECUTE FUNCTION education_v30.ws3_guard_class_completion_decision()
+  `);
+  await client.query(`
+    DO $ws3_fixture$ DECLARE denied integer:=0;
+    BEGIN
+      BEGIN
+        UPDATE ws3_guard_fixture SET result_code='tampered' WHERE id=1;
+      EXCEPTION WHEN check_violation THEN denied:=denied+1; END;
+      BEGIN
+        DELETE FROM ws3_guard_fixture WHERE id=1;
+      EXCEPTION WHEN check_violation THEN denied:=denied+1; END;
+      BEGIN
+        UPDATE ws3_guard_fixture SET outcome_kind='completion',
+          source_kind='ws3_governed' WHERE id=2;
+      EXCEPTION WHEN check_violation THEN denied:=denied+1; END;
+      IF denied<>3 THEN
+        RAISE EXCEPTION 'Expected 3 rejected Class completion mutations, observed %',
+          denied;
+      END IF;
+      UPDATE ws3_guard_fixture SET result_code='revised' WHERE id=2;
+    END $ws3_fixture$
+  `);
+  const {rows:historyGuard}=await client.query(`
+    SELECT
+      (SELECT result_code='completed' FROM ws3_guard_fixture WHERE id=1)
+      AND
+      (SELECT result_code='revised' FROM ws3_guard_fixture WHERE id=2)
+      AS "historyImmutable"
+  `);
+  if(historyGuard[0]?.historyImmutable!==true)
+    throw new Error("Governed Class history was mutable or non-WS3 outcomes were blocked");
   await client.query("ROLLBACK TO SAVEPOINT ws3_migration_dry_run");
-  const undone=await client.query(\`
+  const undone=await client.query(`
     SELECT to_regclass('education_v30.class_completion_policy_versions') IS NULL
        AND to_regclass('education_v30.learning_completion_evidence_bindings') IS NULL
        AND to_regclass('education_v30.learning_completion_evidence_review_requests') IS NULL
        AS "rolledBack"
-  \`);
+  `);
   if(undone.rows[0]?.rolledBack!==true)
     throw new Error("Proposed WS3 schema was not rolled back");
   passed=true;
@@ -124,7 +173,8 @@ try{
     passed:true,executedStatements:executed,
     guardTriggers:Number(row.guardTriggers),
     protectedTables:Number(row.protectedTables),
-    unknownSourceNotCompleted:true,changesPersisted:false,
+    unknownSourceNotCompleted:true,appendOnlyGuardDenied:3,
+    unrelatedAssessmentUpdateAllowed:true,changesPersisted:false,
     caveat:"Does not replace restricted staff/learner acceptance, build or integration tests.",
   },null,2));
 }finally{

@@ -34,6 +34,25 @@ DECLARE e record; p record; ev record; prior record;
         today date; total_lessons integer; completed_lessons integer;
         verified_sessions integer; assessment_passed boolean;
 BEGIN
+  -- Existing completion decisions are append-only evidence. Never allow a
+  -- corrected outcome to rewrite/delete its predecessor, or let UPDATE turn
+  -- an older ungoverned record into a formally verified WS3 source.
+  -- Historical non-WS3 grade/competency/assessment rows retain their
+  -- pre-existing update/delete rules.
+  IF TG_OP='DELETE' THEN
+    IF OLD.outcome_kind='completion' AND OLD.source_kind='ws3_governed' THEN
+      RAISE EXCEPTION 'Governed Class completion decisions are append-only'
+        USING ERRCODE='23514';
+    END IF;
+    RETURN OLD;
+  ELSIF TG_OP='UPDATE' THEN
+    IF (OLD.outcome_kind='completion' AND OLD.source_kind='ws3_governed')
+       OR (NEW.outcome_kind='completion' AND NEW.source_kind='ws3_governed') THEN
+      RAISE EXCEPTION 'Governed Class completion decisions are immutable'
+        USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+  END IF;
   IF NEW.outcome_kind<>'completion' THEN RETURN NEW; END IF;
   -- Do not allow new completion-like evidence to bypass the governed source
   -- once this migration is installed. Existing historical rows are unchanged.
@@ -266,7 +285,7 @@ END $ws3$;
 DROP TRIGGER IF EXISTS ws3_class_completion_decision_insert_guard
  ON education_v30.class_outcomes;
 CREATE TRIGGER ws3_class_completion_decision_insert_guard
- BEFORE INSERT ON education_v30.class_outcomes
+ BEFORE INSERT OR UPDATE OR DELETE ON education_v30.class_outcomes
  FOR EACH ROW EXECUTE FUNCTION education_v30.ws3_guard_class_completion_decision();
 
 -- A formal verified completion requires completed Class and Course Attempt.

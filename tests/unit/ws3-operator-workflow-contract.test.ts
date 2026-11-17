@@ -51,6 +51,10 @@ describe("WS3 full operator approval, correction and revocation workflow",()=>{
     expect(qa).toContain('CAN_WS3_QA_BRANCH!=="test01"');
     expect(qa).toContain("ROLLBACK TO SAVEPOINT ws3_migration_dry_run");
     expect(qa).toContain('client.query("ROLLBACK")');
+    expect(qa).toContain("historyImmutable");
+    expect(qa).toContain("EXCEPTION WHEN check_violation");
+    expect(qa).toContain("Governed Class history was mutable");
+    expect(qa).not.toContain(String.fromCharCode(92,96));
     expect(qa).not.toContain('client.query("COMMIT")');
   });
 });
