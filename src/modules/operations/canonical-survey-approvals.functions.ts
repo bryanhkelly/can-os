@@ -18,10 +18,6 @@ const noStore = () => setResponseHeader("Cache-Control", "private, no-store");
 type Purpose = "survey_reviewer" | "survey_publisher";
 
 async function requireSurveyAuthority(purpose: Purpose) {
-  const flag=purpose==="survey_reviewer"
-    ? process.env.CAN_CANONICAL_SURVEY_REVIEW_ENABLED
-    : process.env.CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED;
-  if(flag!=="true")throw new AuthorizationError("survey approval capability disabled");
   const actor=await getCanonicalCommandContext(getRequest());
   const staff=actor.role==="site_admin"||actor.role==="registrar";
   if(!actor.actorPersonId || (purpose==="survey_reviewer"
