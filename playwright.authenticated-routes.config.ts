@@ -26,7 +26,7 @@ execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  testMatch: "authenticated-routes.spec.ts",
+  testMatch: ["authenticated-routes.spec.ts", "my-activity.spec.ts"],
   timeout: 90_000,
   expect: { timeout: 20_000 },
   workers: 1,
