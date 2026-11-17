@@ -39,7 +39,8 @@ export async function requestPersonalCanAccount(input: unknown,
     }
     if (!account || account.disabled) return;
     const [grant] = await tx.select({ id: accountPersonGrants.id }).from(accountPersonGrants)
-      .where(eq(accountPersonGrants.accountId, account.id)).limit(1);
+      .where(and(eq(accountPersonGrants.accountId, account.id),
+        eq(accountPersonGrants.active, true))).limit(1);
     const [schoolSignup] = await tx.select({ id: schoolSetupSignups.id }).from(schoolSetupSignups)
       .where(and(eq(schoolSetupSignups.accountId, account.id),
         isNull(schoolSetupSignups.consumedAt), gt(schoolSetupSignups.expiresAt, new Date()))).limit(1);
@@ -51,7 +52,10 @@ export async function requestPersonalCanAccount(input: unknown,
     const expiresAt = new Date(Date.now() + SIGNUP_LIFETIME_MS);
     if (existing) {
       // Don't let repeated unverified requests rewrite another signup's name.
-      if (existing.consumedAt || existing.expiresAt > new Date()) return;
+      // A consumed prior signup is historical evidence, not an eternal ban
+      // on creating an account-only membership after roles were revoked.
+      // Never replace a still-pending verified-email signup.
+      if (!existing.consumedAt && existing.expiresAt > new Date()) return;
       await tx.update(accessAccountSignups).set({
         firstName: data.firstName, lastName: data.lastName, expiresAt, consumedAt: null,
       }).where(eq(accessAccountSignups.accountId, account.id));
