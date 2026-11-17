@@ -36,6 +36,25 @@ try {
   } else {
     const [counts] = (await client.query(`
       SELECT
+        (SELECT count(*)::int FROM public.account_person_grants g
+           JOIN public.access_accounts a ON a.id = g.account_id
+           JOIN public.people p ON p.id = g.person_id
+          WHERE g.role = 'app_admin' AND g.active = true
+            AND g.organization_id IS NULL AND g.site_id IS NULL
+            AND a.person_id = p.id AND p.active = true
+            AND a.disabled = false AND a.email_verified_at IS NOT NULL
+            AND a.email_normalized NOT LIKE '%.demo'
+        ) AS eligible_app_admin_grants,
+        (SELECT count(*)::int FROM public.account_person_grants g
+           JOIN public.access_accounts a ON a.id = g.account_id
+           JOIN public.people p ON p.id = g.person_id
+           JOIN public.organizations o ON o.id = g.organization_id
+          WHERE g.role = 'can_network_steward' AND g.active = true
+            AND g.site_id IS NULL AND o.type = 'can_network'
+            AND a.person_id = p.id AND p.active = true
+            AND a.disabled = false AND a.email_verified_at IS NOT NULL
+            AND a.email_normalized NOT LIKE '%.demo'
+        ) AS eligible_institutional_approver_grants,
         (SELECT count(*)::int FROM public.access_accounts a
            JOIN public.account_person_grants g ON g.account_id = a.id
           WHERE a.disabled = false AND a.email_verified_at IS NOT NULL
@@ -125,7 +144,19 @@ try {
     // Mirrors the restricted staff-session reader's identity and scope gates.\n    // An active browser session and role SET permission must still be tested.\n    // Independent positive counters are NOT sufficient: they may belong to
     // different schools, people and grants. Require a complete joined path.
     const ready = Number(counts.eligible_staff_paths) > 0;
-    console.log(JSON.stringify({ infrastructure: "present", ...counts, acceptance_ready: ready }, null, 2));
+    const firstAdminProvisioningBlocked = Number(counts.eligible_app_admin_grants) === 0
+      && Number(counts.eligible_institutional_approver_grants) === 0;
+    console.log(JSON.stringify({
+      infrastructure: "present", ...counts,
+      staff_path_ready: ready,
+      first_admin_provisioning_blocked: firstAdminProvisioningBlocked,
+      browser_acceptance: "not-verified",
+    }, null, 2));
+    if (firstAdminProvisioningBlocked) {
+      console.error("BLOCKED: no independently authorized App Admin or CAN institutional approver exists.");
+      console.error("An initial institutional reviewer needs a separately governed, audited appointment.");
+      console.error("Do not bypass approval, use shared demo credentials, or seed a privileged grant.");
+    }
     if (!ready) {
       console.error("FAIL: no end-to-end, independently approved, non-demo CAN staff path exists.");
       console.error("Do not auto-create or approve identity links. Provision via authorized review.");
