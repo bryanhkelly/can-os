@@ -67,11 +67,21 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       // The server independently validates the CAN account, native Person,
       // adulthood and current learner grant before issuing the cookie.
       // Never silently create or impersonate a native account here.
-      await resumeLinkedNativeClassLearner();
-      const result=await enrollInNativeClass({data:{
+      const submit=()=>enrollInNativeClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
       }});
+      // Preserve independently authenticated native-only learners. A CAN
+      // learner with a missing/expired native session can recover using the
+      // same interactive sign-in; the recovery endpoint independently checks
+      // exact account/Person linkage, adulthood and a live learner grant.
+      let result:Awaited<ReturnType<typeof enrollInNativeClass>>;
+      try { result=await submit(); }
+      catch(originalError){
+        try { await resumeLinkedNativeClassLearner(); }
+        catch { throw originalError; }
+        result=await submit();
+      }
       setMessage(result.alreadyEnrolled?"You are already enrolled.":"Enrollment confirmed. Your Course Attempt is ready.");
       await onJoined();
     }catch(e){setError(normalizeClientError(e,"Class enrollment was not completed.").message)}
