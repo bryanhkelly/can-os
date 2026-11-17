@@ -30,6 +30,8 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
   const pending = useIsMutating({ mutationKey: siteStaffingKeys.program(programId) });
   const fetching = useIsFetching({ queryKey: siteStaffingKeys.program(programId) });
   const busy = pending > 0 || fetching > 0;
+  // A successful write with a failed refresh must not be repeated.
+  const writesBlocked = busy || Boolean(mutation.data?.refreshWarning);
   function retry() {
     if (client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
     mutation.reset();
@@ -46,7 +48,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
     : "";
 
   async function change(input: SectionFacilitatorInput) {
-    if (!data || query.isError ||
+    if (!data || query.isError || mutation.data?.refreshWarning ||
         client.isFetching({ queryKey: siteStaffingKeys.program(programId) }) ||
         client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
     try {
@@ -94,7 +96,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
               {current.filter(effective).map(a =>
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 text-sm">
                   <span>{a.name} · through {new Date(a.effectiveThrough!).toLocaleDateString()}</span>
-                  <Button type="button" variant="outline" size="sm" disabled={busy}
+                  <Button type="button" variant="outline" size="sm" disabled={writesBlocked}
                     onClick={() => void change({
                       sectionId:section.id, personId:a.personId,
                       action:"revoke", expectedAssignmentId:a.id,
@@ -108,7 +110,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
             </ul>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Field label="Verified local facilitator">
-                <Select disabled={busy} value={personId}
+                <Select disabled={writesBlocked} value={personId}
                   onChange={e => setSelected(old => ({ ...old, [key]: e.target.value }))}>
                   <option value="">Choose a person</option>
                   {data.staff.map(person =>
@@ -117,10 +119,10 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
                     </option>)}
                 </Select>
               </Field>
-              <AppointmentExpiryField label="Appointment ends" disabled={busy} value={through}
+              <AppointmentExpiryField label="Appointment ends" disabled={writesBlocked} value={through}
                 onChange={value => setExpires(old => ({ ...old, [key]: value }))}/>
             </div>
-            <Button type="button" variant="outline" disabled={busy || !personId || !through}
+            <Button type="button" variant="outline" disabled={writesBlocked || !personId || !through}
               onClick={() => void change({
                 sectionId:section.id, personId, action:"appoint",
                 expectedAssignmentId: existing?.id ?? null,
