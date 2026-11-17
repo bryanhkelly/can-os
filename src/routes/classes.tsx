@@ -94,7 +94,7 @@ function ClassesPage() {
     const { directory, roster } = outcome.data;
     return <WorkspaceShell width="wide" eyebrow="School operations" title="Classes"
       subtitle="All active classes in your authorized school Site. Rosters show only active Section and Program enrollments.">
-      <Link to="/canonical/classes" className="mt-4 inline-block text-sm font-semibold underline">
+      <Link to="/class" search={{view:"manage"}} className="mt-4 inline-block text-sm font-semibold underline">
         Manage native Classes and offerings
       </Link>
       {roster && <WorkspacePanel title={roster.section.title}
