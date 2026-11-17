@@ -2,6 +2,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
+import { z } from "zod";
 import { enrichmentConsentContext } from "@/domain/enrichment-consent";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -14,6 +15,7 @@ import {
 } from "@/modules/activities/enrichment-family.functions";
 
 export const Route = createFileRoute("/guardian/enrichment")({
+  validateSearch: search => z.object({ seasonId: z.string().uuid().optional() }).parse(search),
   loader: safeLoader(async () => {
     const [catalog, family] = await Promise.all([listEnrichmentCatalog(), getEnrichmentFamily()]);
     return { catalog, family };
@@ -27,16 +29,19 @@ const usd = (amount: number) => new Intl.NumberFormat("en-US", {
 
 function FamilyEnrichment() {
   const result = Route.useLoaderData();
+  const { seasonId } = Route.useSearch();
   if (!result.ok) return <LoaderFailure eyebrow="Family"
     title="Summer and enrichment programs" outcome={result} />;
-  return <EnrichmentFamilyView data={result.data} />;
+  return <EnrichmentFamilyView data={result.data} seasonId={seasonId} />;
 }
 
-function EnrichmentFamilyView({ data }: {
+function EnrichmentFamilyView({ data, seasonId }: {
+  seasonId?: string;
   data: { catalog: Awaited<ReturnType<typeof listEnrichmentCatalog>>;
     family: Awaited<ReturnType<typeof getEnrichmentFamily>> };
 }) {
   const router = useRouter();
+  const offerings = seasonId ? data.catalog.filter(offer => offer.seasonId === seasonId) : data.catalog;
   const [householdId, setHouseholdId] = useState(data.family.households[0]?.id ?? "");
   const [studentSelections, setStudentSelections] = useState<Record<string,string>>({});
   const [acknowledged, setAcknowledged] = useState<Record<string, string>>({});
@@ -165,10 +170,11 @@ function EnrichmentFamilyView({ data }: {
     </section>
     <section className="mt-8 space-y-4" aria-label="Available enrichment programs">
       <h2 className="text-xl font-semibold">Open registration</h2>
-      {data.catalog.length === 0 && <p className="rounded-lg border p-5 text-sm text-muted-foreground">
-        No programs are currently published for registration. Check back as sites release their summer and after-school schedules.
+      {seasonId && <Link to="/guardian/enrichment" className="text-sm font-semibold underline">Browse all enrichment programs</Link>}
+      {offerings.length === 0 && <p className="rounded-lg border p-5 text-sm text-muted-foreground">
+        {seasonId ? "This season is no longer available for registration." : "No programs are currently published for registration. Check back as sites release their summer and after-school schedules."}
       </p>}
-      {data.catalog.map(offer => {
+      {offerings.map(offer => {
         const selected = studentSelections[offer.seasonId] ?? data.family.children[0]?.studentProfileId ?? "";
         const prior = data.family.registrations.find(r =>
           r.seasonId === offer.seasonId && r.studentProfileId === selected);
@@ -257,7 +263,9 @@ function EnrichmentFamilyView({ data }: {
                 acknowledged[offer.seasonId] !== enrichmentConsentContext(selected, householdId, offer.permissionVersion) || packageConflict || unavailableSelection ||
                 (offer.packages.length > 0 && !chosenIds.length)}
               className="mt-4 rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
-              {offer.registrationOpen ? "Submit registration" : "Registration window is closed"}
+              {!offer.registrationOpen ? "Registration unavailable" :
+                (offer.packages.length === 0 ? offer.seatsRemaining === 0 : requestedWaitlist)
+                  ? "Join waitlist" : "Submit registration"}
             </button>
             <p className="mt-2 text-xs text-muted-foreground">
               Submitting a registration is not a payment or a final eligibility decision.

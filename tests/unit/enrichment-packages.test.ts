@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readEnrichmentPackages, selectEnrichmentPackages,
+import { canSubmitEnrichmentRegistration, readEnrichmentPackages, selectEnrichmentPackages,
   sessionOccupancy, selectedSessionWaitlisted, verifyEnrichmentPackages } from "@/domain/enrichment-packages";
 
 const a="00000000-0000-4000-8000-000000000001";
@@ -14,6 +14,13 @@ const pkgs=[
  {id:full,title:"Full camp",priceCents:23000,sessionIds:[a,b,c]},
 ];
 describe("enrichment per-session packages",()=>{
+ it("keeps submission open for full seasons or packages with bookable sessions",()=>{
+   expect(canSubmitEnrichmentRegistration(true, true, [])).toBe(true);
+   expect(canSubmitEnrichmentRegistration(true, true, [{available:true}])).toBe(true);
+   expect(canSubmitEnrichmentRegistration(true, true, [{available:false}])).toBe(false);
+   expect(canSubmitEnrichmentRegistration(true, false, [])).toBe(false);
+   expect(canSubmitEnrichmentRegistration(false, true, [{available:true}])).toBe(false);
+ });
  it("validates real events and exact unique ids",()=>{
    expect(verifyEnrichmentPackages(pkgs,[a,b,c])).toEqual(pkgs);
    expect(()=>verifyEnrichmentPackages([{...pkgs[0],sessionIds:[a,a]}],[a])).toThrow(/unique/);

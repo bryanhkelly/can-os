@@ -14,6 +14,16 @@ export const enrichmentPackageSchema = z.object({
 
 export type EnrichmentPackage = z.infer<typeof enrichmentPackageSchema>;
 
+/** A full session can accept waitlist entries while its registration window is open. */
+export function canSubmitEnrichmentRegistration(
+  registrationWindowOpen: boolean,
+  hasUpcomingSessions: boolean,
+  packages: readonly { available: boolean }[],
+): boolean {
+  return registrationWindowOpen && hasUpcomingSessions &&
+    (packages.length === 0 || packages.some(pack => pack.available));
+}
+
 export function verifyEnrichmentPackages(
   supplied: unknown,
   availableSessionIds: readonly string[],

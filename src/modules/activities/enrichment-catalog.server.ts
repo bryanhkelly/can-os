@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { readEnrichmentPublication } from "@/domain/enrichment-publication";
-import { readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
+import { canSubmitEnrichmentRegistration, readEnrichmentPackages, sessionOccupancy } from "@/domain/enrichment-packages";
 import { isExtendedLearningType } from "@/domain/program-offerings";
 import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
 import { readExtendedSeasonApprovals } from "./extended-season-approvals.server";
@@ -126,9 +126,6 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     const seatsRemaining = seatsFor(sessions);
     const registrationWindowOpen = (!row.registrationOpensAt || now >= row.registrationOpensAt) &&
       (!row.registrationClosesAt || now <= row.registrationClosesAt);
-    const hasBookableCapacity = packages.length
-      ? packageAvailability.some(item => item.available && (item.seatsRemaining ?? 0) > 0)
-      : seatsRemaining !== null && seatsRemaining > 0;
     return {
     seasonId: row.seasonId, name: row.name, seasonName: row.seasonName,
     programName: row.programName, programType: row.programType,
@@ -140,7 +137,7 @@ export async function readEnrichmentCatalog(siteId?: string, executor: Pick<type
     meetingTimezone: firstSession.get(row.seasonId)?.timezone ?? null,
     permissionVersion: row.permission.permissionVersion,
     permissionText: row.permission.permissionText,
-    registrationOpen: registrationWindowOpen && sessions.length > 0 && hasBookableCapacity,
+    registrationOpen: canSubmitEnrichmentRegistration(registrationWindowOpen, sessions.length > 0, packageAvailability),
   };
   });
 }
