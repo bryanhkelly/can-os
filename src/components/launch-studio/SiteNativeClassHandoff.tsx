@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Users } from "lucide-react";
 import { getSiteIdentityLinkStatus } from "@/modules/sites/site-identity-links.functions";
 import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions } from "@/modules/classes/unified-class.functions";
 import { resolveSiteClassLink } from "@/domain/site-class-launch-handoff";
+import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 
 /** Site-first to native-Class handoff: a public Site ID is never used as a
  * canonical Site ID or an authorization credential. Native reads independently
@@ -48,6 +49,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
     No Class absence or release readiness is assumed.
    </p>}
    {classesRead.isSuccess&&<>
+    <ProgramDiscoveryPanel siteId={publicSiteId}/>
     <div className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Class activation progression">
       <div className="border border-border p-3 text-xs"><strong className="block text-sm">1. Approved Courses</strong>
         <p className="mt-2">{adoptedCourses.isError?"Unable to verify local Course adoption"
