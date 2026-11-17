@@ -47,12 +47,13 @@ function ProgramOperations(){
     queryFn:()=>getNativeOfferingVersionImpact({data:{offeringId:selected!.first.offeringId}}),
     retry:false,
   });
-  const classVersions=impact.data?.localClassImpact.filter(row=>
+  const impactData=impact.data;
+  const classVersions=impactData?.localClassImpact.filter(row=>
     row.offeringVersionId===selected?.first.offeringVersionId)??[];
   const classesAtVersion=classVersions.reduce((total,row)=>total+row.classCount,0);
   const activeAtVersion=classVersions.filter(row=>row.state==="active")
     .reduce((total,row)=>total+row.classCount,0);
-  const publishedAtVersion=(impact.data?.publishedClassOfferings??[])
+  const publishedAtVersion=(impactData?.publishedClassOfferings??[])
     .filter(row=>row.offeringVersionId===selected?.first.offeringVersionId)
     .reduce((total,row)=>total+row.classCount,0);
   const rolloutStages=projectedRolloutStages({
@@ -135,7 +136,7 @@ function ProgramOperations(){
         Local Deployment: {selected.first.deploymentName}. Adopted publisher Offering v{selected.first.offeringVersionNo}.
         A new publisher release does not upgrade active Classes automatically.
       </p>
-      {impact.data&&<div className="mt-4 grid gap-3 md:grid-cols-3">
+      {impactData&&<div className="mt-4 grid gap-3 md:grid-cols-3">
         {rolloutStages.map(stage=><div key={stage.key} className="border border-border bg-muted/20 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {stage.complete?"Verified stage":"Not yet verified"}
@@ -151,13 +152,13 @@ function ProgramOperations(){
       {impact.isError&&<p role="alert" className="mt-4 text-sm">
         Version impact cannot be verified under the current scope. No upgrade recommendation is available.
       </p>}
-      {impact.data&&<div className="mt-4 border-t border-border pt-4">
+      {impactData&&<div className="mt-4 border-t border-border pt-4">
         <h3 className="text-lg font-semibold">Version impact</h3>
         <p className="mt-2 text-sm">
-          Latest published publisher version: <strong>{impact.data.latestPublishedVersionNo??"Unknown"}</strong>.
+          Latest published publisher version: <strong>{impactData.latestPublishedVersionNo??"Unknown"}</strong>.
           {" "}Current Deployment adoption: <strong>v{selected.first.offeringVersionNo}</strong>.
-          {impact.data.latestPublishedVersionNo!==null&&
-            impact.data.latestPublishedVersionNo>selected.first.offeringVersionNo
+          {impactData.latestPublishedVersionNo!==null&&
+            impactData.latestPublishedVersionNo>selected.first.offeringVersionNo
             ?" A newer version requires separate review and approved adoption.":" No newer published version was found."}
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -166,24 +167,24 @@ function ProgramOperations(){
           {publishedAtVersion} Class(es) have a published optional registration Offering.
           The full Class counts come from the server, not this page's limited Class list.
         </p>
-        {impact.data.publisherVersionsTruncated&&<p className="mt-2 text-xs text-muted-foreground">
+        {impactData.publisherVersionsTruncated&&<p className="mt-2 text-xs text-muted-foreground">
           More than 100 publisher versions exist. The version history shown here is limited.
         </p>}
         <h4 className="mt-4 text-sm font-semibold">Approved local adoption by Site</h4>
         <div className="mt-2 space-y-2">
-          {impact.data.approvedAdoptions.map(adoption=><div key={adoption.adoptionId}
+          {impactData.approvedAdoptions.map(adoption=><div key={adoption.adoptionId}
             className="border border-border p-3 text-sm">
             <p className="font-semibold">
               {adoption.deploymentName} · publisher version {adoption.versionNo}
-              {impact.data.latestPublishedVersionNo!==null&&
-                adoption.versionNo<impact.data.latestPublishedVersionNo
+              {impactData.latestPublishedVersionNo!==null&&
+                adoption.versionNo<impactData.latestPublishedVersionNo
                 ?" · Newer publisher version available":""}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               Approved adoption does not by itself grant access to another Organization or Site.
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {impact.data.adoptionSites.filter(site=>site.adoptionId===adoption.adoptionId)
+              {impactData.adoptionSites.filter(site=>site.adoptionId===adoption.adoptionId)
                 .map(site=><span key={site.siteId}
                   className="border border-border bg-muted/20 px-2 py-1 text-xs">
                   {site.siteName} · {site.classroomPlacement?"Classroom placement":"Self-paced Site only"}
@@ -225,11 +226,11 @@ function ProgramOperations(){
         operating Organization. Each Class remains pinned to its original Offering and
         Course versions until a separately approved local change.
       </p>
-      {!impact.data&&<p role="status" className="mt-2 text-sm">Verifying affected Class identities…</p>}
-      {impact.data&&impact.data.affectedClasses.length===0&&
+      {!impactData&&<p role="status" className="mt-2 text-sm">Verifying affected Class identities…</p>}
+      {impactData&&impactData.affectedClasses.length===0&&
         <p className="mt-2 text-sm text-muted-foreground">No currently authorized local Classes found for this Offering.</p>}
-      {impact.data&&<div className="mt-3 grid gap-2 md:grid-cols-2">
-        {impact.data.affectedClasses.map(cls=><Link key={cls.classId} to="/classes/$classId"
+      {impactData&&<div className="mt-3 grid gap-2 md:grid-cols-2">
+        {impactData.affectedClasses.map(cls=><Link key={cls.classId} to="/classes/$classId"
           params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
           className="block border border-border p-3 text-sm underline underline-offset-4">
           <strong>{cls.title}</strong>
@@ -237,15 +238,15 @@ function ProgramOperations(){
             Publisher v{cls.versionNo} · {cls.state} · {cls.deliveryMode.replaceAll("_"," ")}
           </span>
           <span className="block mt-1 text-xs text-muted-foreground">
-            {impact.data.adoptionSites.find(site=>site.siteId===cls.siteId&&
+            {impactData.adoptionSites.find(site=>site.siteId===cls.siteId&&
               site.deploymentId===cls.deploymentId)?.siteName??"Authorized Site"}
-            {impact.data.latestPublishedVersionNo!==null&&
-              cls.versionNo<impact.data.latestPublishedVersionNo
+            {impactData.latestPublishedVersionNo!==null&&
+              cls.versionNo<impactData.latestPublishedVersionNo
               ?" · Review newer publisher version":""}
           </span>
         </Link>)}
       </div>}
-      {impact.data?.moreAffectedClasses&&<p className="mt-2 text-xs text-muted-foreground">
+      {impactData?.moreAffectedClasses&&<p className="mt-2 text-xs text-muted-foreground">
         Only the first 100 affected Classes are shown. Counts above include all authorized
         Classes. Use the Class workspace for focused lookup before any migration decision.
       </p>}
