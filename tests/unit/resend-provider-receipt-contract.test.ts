@@ -13,6 +13,9 @@ describe("Resend provider receipt reconciliation contracts",()=>{
     expect(school).toContain('providerReceipt: { source: "school_family", receiptId: key }');
     expect(school).toContain("providerMessageId: result.providerMessageId");
     expect(school).toContain("sendNotificationEmailWithReceipt");
+    const waitlist=read("src/modules/enrollment/noncredit-waitlist-delivery.server.ts");
+    expect(waitlist).toContain('providerReceipt: { source: "noncredit_waitlist", receiptId: key }');
+    expect(waitlist).toContain("sendNotificationEmailWithReceipt");
   });
 
   it("validates signatures before parsing the raw payload and never sends",()=>{
@@ -21,10 +24,11 @@ describe("Resend provider receipt reconciliation contracts",()=>{
     expect(route).toContain('createFileRoute("/api/webhooks/resend")');
     expect(callback.indexOf("verifyResendWebhookSignature(body"))
       .toBeLessThan(callback.indexOf("JSON.parse(body)"));
-    expect(callback).toContain("eq(receipt.id, event.receiptId)");
-    expect(callback).toContain('eq(receipt.channel, "email")');
-    expect(callback).toContain("eq(receipt.providerMessageId, event.providerMessageId)");
-    expect(callback).toContain('status: "accepted" as const');
+    expect(callback).toContain("eq(r.id, event.receiptId)");
+    expect(callback).toContain("noncreditWaitlistEmailDeliveries");
+    expect(callback).toContain('eq(r.channel, "email")');
+    expect(callback).toContain("eq(r.providerMessageId, event.providerMessageId)");
+    expect(callback).toContain('status: "accepted"');
     expect(callback).toContain("nextAttemptAt: null");
     expect(callback).not.toContain("sendNotificationEmail(");
     expect(callback).not.toContain("sendOptedInSms(");
@@ -46,5 +50,8 @@ describe("Resend provider receipt reconciliation contracts",()=>{
     expect(journal.entries.some(e=>e.tag==="0086_notification_provider_receipts")).toBe(true);
     expect(snapshot.tables["public.notification_outbound_deliveries"].columns)
       .toHaveProperty("provider_message_id");
+    const canonical=read("database/canonical/v3.0.1/patch-noncredit-waitlist-provider-receipts.sql");
+    expect(canonical).toContain("provider_message_id text");
+    expect(canonical).toContain("FORCE ROW LEVEL SECURITY");
   });
 });
