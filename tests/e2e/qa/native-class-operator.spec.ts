@@ -45,6 +45,7 @@ test("verified operator creates and reloads one real native Class through /class
     const name=page.locator("#native-class-title");
     const title="QA Native Class "+Date.now();
     if(await name.isEnabled())await name.fill(title);
+    const persistedTitle=await name.inputValue();
     const create=page.getByRole("button",{name:"Create draft Class"});
     await expect(create).toBeEnabled();
     await create.click();
@@ -60,6 +61,7 @@ test("verified operator creates and reloads one real native Class through /class
     await expect(page.getByRole("heading",{name:"Class management"})).toBeVisible();
     await expect(page.locator('a[href*="'+id+'"]').first()).toBeVisible({timeout:30000});
     await page.goto("/class/"+id+"?view=manage&tab=overview");
+    await expect(page.getByRole("heading",{name:persistedTitle,exact:true})).toBeVisible({timeout:30000});
     await expect(page.getByRole("heading",{name:"Class unavailable"})).toHaveCount(0);
   },baseURL);
 });
