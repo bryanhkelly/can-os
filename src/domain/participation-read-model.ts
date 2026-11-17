@@ -7,8 +7,8 @@
 export const PARTICIPATION_READ_MODEL_VERSION = "1.1.0" as const;
 
 export type ParticipationSource =
-  | "school_section" | "native_class" | "noncredit_course"
-  | "family_enrichment";
+  | "school_section" | "school_program" | "calendar_event"
+  | "native_class" | "noncredit_course" | "family_enrichment";
 export type ParticipationOpportunitySource = "noncredit_waitlist";
 export type ActivitySource = ParticipationSource | ParticipationOpportunitySource;
 export type SourceCoverage = "complete" | "partial" | "unknown" | "not_applicable";
@@ -26,6 +26,9 @@ export interface ParticipationSourceReferences {
   classEnrollmentId?: string;
   courseAttemptId?: string;
   registrationId?: string;
+  programId?: string;
+  calendarEventId?: string;
+  calendarEventParticipantId?: string;
   releaseId?: string;
   seasonId?: string;
   studentProfileId?: string;
@@ -168,7 +171,9 @@ export function assertParticipationReadModel(model: ParticipationReadModel): voi
     if (!record.sourceId || record.key !== record.source + ":" + record.sourceId)
       throw new Error("Invalid participation source identity");
     const authoritative = record.source === "native_class" ? record.refs.classEnrollmentId
-      : record.source === "school_section" ? record.refs.enrollmentId
+      : record.source === "school_section" || record.source === "school_program"
+        ? record.refs.enrollmentId
+      : record.source === "calendar_event" ? record.refs.calendarEventParticipantId
       : record.refs.registrationId;
     if (authoritative !== record.sourceId)
       throw new Error("Participation identity must be authoritative enrollment or registration");
