@@ -170,9 +170,12 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
       eq(accessAdultLearningReviews.accessAccountId,actor.accountId),
     ).limit(1);
     if(adultReview && (adultReview.status!=="approved"||
-       !adultReview.consumedAt||adultReview.personId!==actor.actorPersonId||
-       adultReview.canonicalAccountId!==native.account_id||
-       adultReview.canonicalPersonId!==native.person_id))
+       adultReview.personId!==actor.actorPersonId||
+       (adultReview.consumedAt
+         ? adultReview.canonicalAccountId!==native.account_id||
+           adultReview.canonicalPersonId!==native.person_id
+         : adultReview.canonicalAccountId!==null||
+           adultReview.canonicalPersonId!==null)))
       throw new AuthorizationError("current reviewed learner identity");
     return projectCanonicalCommandContext(native);
   }
