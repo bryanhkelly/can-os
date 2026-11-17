@@ -9,7 +9,7 @@ export type DiscussionSettings={locked:boolean;graded:boolean;requiresInitialPos
 export const defaultDiscussionSettings:DiscussionSettings={locked:false,graded:false,requiresInitialPostBeforeReplies:false};
 
 /** Keep a deep-linked thread inside its authorized Section and optional lesson. */
-export function selectTeacherDiscussionThreads<T extends {id:string;sectionId:string;curriculumLessonId:string|null}>(
+export function selectTeacherDiscussionThreads<T extends {id:string;sectionId:string|null;curriculumLessonId:string|null}>(
  threads:readonly T[],selection:{section?:string;lesson?:string;thread?:string},
 ):T[]{
  return threads.filter(item=>(!selection.section||item.sectionId===selection.section)&&
