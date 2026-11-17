@@ -232,6 +232,19 @@ if (radiusUtility.test(rosterPattern)) {
   process.exitCode = 1;
 }
 
+// Canonical status presentation is reused by workflow prerequisites and evidence versions.
+const statusConsumers = {
+  "workflow/WorkflowPrerequisites.tsx": "PrerequisiteChecklist",
+  "evidence/EvidenceHistory.tsx": "EvidenceStatus",
+};
+for (const [path, component] of Object.entries(statusConsumers)) {
+  const source = readFileSync(join(root, path), "utf8");
+  if (!source.includes(`<${component}`)) {
+    console.error(`${path} must reuse canonical status component ${component}`);
+    process.exitCode = 1;
+  }
+}
+
 // Shared workflow history must render through the V6.1 pattern while retaining
 // the domain's existing decisions, credentials and server authorization.
 const statusTimeline = readFileSync(join(root, "workflow/status-timeline.tsx"), "utf8");
