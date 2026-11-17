@@ -15,12 +15,18 @@ export interface StatusTimelineEntry {
 }
 
 export function StatusTimeline({ entries, label = "Status history",
-  emptyMessage = "No recorded history.", className }: {
+  emptyMessage = "No recorded history.", timeZone = "UTC", className }: {
   entries: readonly StatusTimelineEntry[];
   label?: string;
   emptyMessage?: string;
+  /** Display time zone; defaults to explicit UTC for deterministic SSR and hydration. */
+  timeZone?: string;
   className?: string;
 }) {
+  const dateFormatter = new Intl.DateTimeFormat("en-US", {
+    year: "numeric", month: "short", day: "numeric", hour: "numeric",
+    minute: "2-digit", timeZone, timeZoneName: "short",
+  });
   if (!entries.length) return <p role="status"
     className={cn("text-sm text-muted-foreground", className)}>{emptyMessage}</p>;
   return <ol aria-label={label} className={cn("divide-y divide-border border border-border", className)}>
@@ -28,7 +34,8 @@ export function StatusTimeline({ entries, label = "Status history",
       <div className="min-w-0">
         <p className="font-semibold text-foreground">{entry.title}</p>
         <time dateTime={entry.occurredAt} className="mt-1 block text-xs tabular-nums text-muted-foreground">
-          {new Date(entry.occurredAt).toLocaleString()}
+          {Number.isNaN(new Date(entry.occurredAt).getTime())
+            ? "Recorded time unavailable" : dateFormatter.format(new Date(entry.occurredAt))}
         </time>
         {entry.description && <div className="mt-1 text-xs text-muted-foreground">{entry.description}</div>}
       </div>
