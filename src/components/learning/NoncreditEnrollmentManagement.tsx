@@ -16,9 +16,9 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   const [withdrawBusy,setWithdrawBusy]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
   const query=useQuery({queryKey:["my-noncredit-self-enrollments"],
-    queryFn:()=>getMyNoncreditSelfEnrollments(),retry:false,staleTime:15_000});
+    queryFn:()=>getMyNoncreditSelfEnrollments(),enabled:!releaseId,retry:false,staleTime:15_000});
   const [busy,setBusy]=useState<string|null>(null);
-  const waiting=useQuery({queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),retry:false,staleTime:15_000});
+  const waiting=useQuery({queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),enabled:!registrationId,retry:false,staleTime:15_000});
   const [error,setError]=useState("");
   async function open(courseAttemptId:string) {
     if(busy)return;
@@ -58,18 +58,20 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   const visibleWaitlist=registrationId ? [] : releaseId ? waiting.data?.filter(item=>item.releaseId===releaseId) : waiting.data;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
-    {query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
-    {query.isError && <p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
+    {!releaseId&&query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
+    {!releaseId&&query.isError && <p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
       Your course records are temporarily unavailable. <button type="button" onClick={()=>void query.refetch()} className="font-semibold text-primary underline">Try again</button>
     </p>}
     {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-4 border border-border bg-card p-4 text-sm">{notice}</p>}
+    {waiting.isError&&releaseId&&<p role="alert" className="text-sm">Your waiting-list status is temporarily unavailable. <button type="button" className="font-semibold underline" onClick={()=>void waiting.refetch()}>Try again</button></p>}
+    {waiting.isPending&&releaseId&&<p role="status" className="text-sm">Loading waiting-list controls…</p>}
     {waiting.isSuccess&&Boolean(visibleWaitlist?.length)&&<section className="mt-6 border border-border bg-card p-5" aria-label="My training waiting lists">
-      <h2 className="font-serif text-2xl">Waiting lists and reserved invitations</h2>
+      {!releaseId&&<h2 className="font-serif text-2xl">Waiting lists and reserved invitations</h2>}
       <p className="mt-2 text-sm text-muted-foreground">A waiting place is not enrollment. Reserved invitations expire and require you to confirm your registration personally.</p>
       <div className="mt-3 divide-y divide-border">
         {visibleWaitlist?.map(item=><article key={item.releaseId} className="py-4">
-          <h3 className="font-semibold text-sm">{item.title}</h3>
+          {!releaseId&&<h3 className="font-semibold text-sm">{item.title}</h3>}
           <p className="mt-2 text-sm">{item.invitationActive?"A seat is reserved for you":item.status==="expired"?"Invitation expired":"Waiting for an available place"}</p>
           {item.invitationActive&&<p className="mt-1 text-xs text-muted-foreground">Claim before {item.inviteExpiresAt?new Date(item.inviteExpiresAt).toLocaleString():"the invitation expires"}</p>}
           <div className="mt-3 flex flex-wrap gap-3">
@@ -99,13 +101,13 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       </div>
     </section>}
     {visibleCourses && <div className="mt-6 space-y-3">
-      {visibleCourses.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className="border border-border bg-card p-5">
+      {visibleCourses.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className={registrationId?"p-2":"border border-border bg-card p-5"}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {course.registrationStatus} · {course.attemptStatus}
             </p>
-            <h2 className="mt-2 font-serif text-2xl">{course.trainingTitle}</h2>
+            {!registrationId&&<h2 className="mt-2 font-serif text-2xl">{course.trainingTitle}</h2>}
             <p className="mt-2 text-xs text-muted-foreground">
               {course.deliveryMode==="facilitated"
                 ? "Facilitated at "+(course.siteName??"an approved learning center")
