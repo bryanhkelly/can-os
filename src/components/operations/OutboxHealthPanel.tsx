@@ -7,10 +7,10 @@ import { SchoolFamilyDeliveryRecoveryPanel } from "./SchoolFamilyDeliveryRecover
 type Health = Awaited<ReturnType<typeof getOutboxHealthSummary>>;
 
 /**
- * Read-only outbox telemetry for operators: pending backlog, events whose type
- * no worker claims (unhandled), and terminal failures (each escalated to an
- * ops Action). The server function is the only authorization gate; this panel
- * renders the server's verdict and never decides eligibility itself.
+ * Outbox telemetry and source-owned recovery for authorized operators. The
+ * health query is read-only; the nested delivery recovery module performs
+ * independently authorized and audited queue mutations. Neither component
+ * decides its own eligibility or claims provider acceptance as delivery.
  */
 export function OutboxHealthPanel() {
   const [health, setHealth] = useState<Health | null>(null);
