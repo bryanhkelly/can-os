@@ -178,8 +178,8 @@ export const getCanonicalCapabilityLab = createServerFn({ method: "GET" }).handl
 
   return {
     organizationId,
-    draftAuthoringEnabled: process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED === "true",
-    surveyPublicationEnabled: process.env.CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED === "true",
+    draftAuthoringEnabled: true,
+    surveyPublicationEnabled: true,
     role: actor.role,
     trainings,
     attempts,
