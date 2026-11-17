@@ -281,6 +281,29 @@ record lifecycles and audit commands remain unchanged by presentation migration.
   audit records and persistence are unchanged. Remaining legacy record facts
   should be migrated only where the semantics match this family.
 
+### Component-first adoption increment: record facts across audiences
+
+- `RecordFacts` now has `plain` (default) and `tiles` presentation variants.
+  Tiles use V6.1 square surfaces for concise, read-only verification evidence,
+  not analytics metrics. Labels, values and status meanings remain feature-owned.
+- A single `FieldTripFacts` feature composition renders departure, return,
+  deadline and fee for both authorized student and guardian projections. Consent,
+  boarding permission and participant identity remain in the existing,
+  separate audience-specific workflows and server contracts.
+- The church request receipt uses single-column `RecordFacts` while preserving
+  its explicit nonapproval language and follow-up information.
+- The first supervised school-day handoff uses `RecordFacts variant="tiles"`
+  for expected onsite, *planned* staffing and *observed* attendance. Future
+  attendance is still presented as **Not yet observable**, not as a physical
+  check-in or custody handoff. Its recheck uses the canonical pending Button.
+- Component tests cover published/unknown trip fees and deadlines, and contracts
+  keep the observed-versus-planned first-day boundary. Storybook demonstrates
+  the shared trip display and record-evidence tiles. The source checker guards
+  migrated components and V6.1 geometry without banning specialized legacy forms.
+- No authorization, consent, billing, attendance event or persistence behavior
+  was moved into the presentation layer. Build, lint and authenticated acceptance
+  still must pass for the exact `main` SHA before release.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
