@@ -178,6 +178,8 @@ function MyActivityPage() {
       {partialSources.length > 0 && <div role="note" className="mt-5 border border-border bg-card p-4 text-sm">
         <p className="font-semibold">Available records, not a complete lifetime history</p>
         <p className="mt-1 text-muted-foreground">The following sources have limited or current-workspace-only coverage: {partialSources.map(item => item.source.replaceAll("_", " ")).join(", ")}. This view does not certify missing records as nonexistent.</p>
+        {partialSources.filter(item => item.message).map(item =>
+          <p key={item.source} className="mt-2 text-muted-foreground">{item.message}</p>)}
       </div>}
       {unavailable.length > 0 && <div role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
         <p className="font-semibold">Some sources could not be verified.</p>
