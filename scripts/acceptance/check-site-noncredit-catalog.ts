@@ -13,7 +13,7 @@ import {
   inspectSiteNoncreditReadiness,probeSiteNoncreditCatalogReader,
   readLinkedSiteNoncreditReleases,
 } from "../../src/modules/sites/site-noncredit-releases.server";
-import {siteCatalogReaderAccessible} from "../../src/domain/site-noncredit-bridge";
+import {siteCatalogReaderAccessible} from "../../src/domain/site-noncredit-catalog-readiness";
 
 async function main(){
   assert.equal(process.env.CAN_SITE_CATALOG_VALIDATION,"1",
