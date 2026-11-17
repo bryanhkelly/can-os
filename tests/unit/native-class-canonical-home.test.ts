@@ -141,6 +141,18 @@ describe("one native Class route and reusable manager",()=>{
     expect(reader).toContain("nativeCourseLessons=course?await db.select");
     expect(reader).toContain("course.versionId");
     expect(reader).toContain(".limit(24)");
+    expect(center).toContain('title="Course rollout and local adoption"');
+    expect(center).toContain("nativeRollout.adoptionStatus");
+    expect(center).toContain("A proposed adoption is not approval.");
+    expect(reader).toContain("nativeRollout:rollout??null");
+    expect(reader).toContain("native.deploymentOfferingAdoptions");
+    expect(reader).toContain("native.educationOperationSites");
+    const rolloutSeed=read("database/seeds/2026-11-clc-native-course-rollout-planning.sql");
+    expect(rolloutSeed).toContain("'learning_center','planning'");
+    expect(rolloutSeed).toContain("'draft',NULL");
+    expect(rolloutSeed).toContain("'proposed',NULL,NULL");
+    expect(rolloutSeed).not.toContain("INSERT INTO education_v30.classes");
+    expect(rolloutSeed).not.toContain("INSERT INTO education_v30.professional_role_assignments");
     const fourSessions=read("database/seeds/2026-11-clc-ai-digital-skills-four-session-draft.sql");
     expect(fourSessions).toContain("Verify Before You Trust");
     expect(fourSessions).toContain("Protect Your Digital Identity");
