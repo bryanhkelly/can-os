@@ -212,3 +212,28 @@ separation, not a bypass of published authority, CAN/native authorization,
 restricted reader, reviewed adulthood, row-level security, participation
 history or withdrawal. With zero Classes on test01, the isolated P0 test still
 cannot pass until one authorized, published QA one-hour Class is provisioned.
+
+
+### Additional one-account integration gap identified
+
+A CAN adult may have completed noncredit self-enrollment before requesting a native
+Class. That enrollment creates a genuine CAN-to-canonical Person link but
+intentionally leaves the native Person's birth date null. The existing
+`resumeLinkedNativeClassLearner` correctly rejects the unverified date.
+However, `approveAdultClassLearnerReview` and
+`activateReviewedNativeClassLearner` currently reject any preexisting
+CAN-to-canonical link, even when it is the exact previously authenticated,
+consented one. Such learners are stuck despite having one real account.
+
+Do not solve this by creating a second Person, copying a self-attested date,
+trusting an email match, or reactivating a revoked grant. An authorized,
+independently reviewed upgrade must reuse the exact linked canonical Person,
+confirm its unchanged account association, verify new age evidence, preserve
+prior Course Attempts and Class history, and issue only the minimum current
+learner session. Existing documented staff/operator identities remain
+ineligible for automatic conversion. Cover both fresh and previously
+noncredit-linked adults in the QA acceptance, including repeat requests,
+revocation, simultaneous Class/noncredit requests, and prior grants.
+
+**This preexisting-link upgrade is not implemented or tested.** The browser
+and data-path P0 must not be marked working until both cohorts are verified.
