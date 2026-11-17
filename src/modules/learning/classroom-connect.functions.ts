@@ -88,11 +88,11 @@ export const getClassroomConnectCourseChoices = createServerFn({ method: "GET" }
         if (choices.has(candidate.courseAttemptId)) continue;
         try {
           await authorizeCanonicalCourseAttempt(tx, actor, candidate.courseAttemptId);
-          if("classId" in candidate){
+          if("classTitle" in candidate && "siteName" in candidate && "classId" in candidate){
             choices.set(candidate.courseAttemptId,{
               courseAttemptId:candidate.courseAttemptId,
               courseTitle:`${candidate.classTitle} · ${candidate.siteName??"Online"} · ${candidate.courseTitle}`,
-              classId:candidate.classId,
+              classId:candidate.classId as string,
             });
           }else{
             choices.set(candidate.courseAttemptId,{
