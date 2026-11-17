@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { StatusTimeline } from "@/components/workflow";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -95,17 +96,13 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
       </div>
       <section aria-label="Decision history" className="space-y-2">
         <h3 className="font-serif text-xl">Decision history</h3>
-        {query.data.history.length===0
-          ?<p className="text-sm text-muted-foreground">No formal decision yet.</p>
-          :<ol className="divide-y divide-border border border-border">
-            {query.data.history.map(row=><li key={row.id} className="p-3 text-sm">
-              <p className="font-semibold">{row.outcome.replaceAll("_"," ")}</p>
-              <p className="text-xs text-muted-foreground">
-                {new Date(row.decidedAt).toLocaleString()}
-                {row.supersedesId?" · Superseding correction":""}
-              </p>
-            </li>)}
-          </ol>}
+        <StatusTimeline label="Completion decision history" emptyMessage="No formal decision yet."
+          entries={query.data.history.map(row=>({
+            id:row.id,
+            title:row.outcome.replaceAll("_"," "),
+            occurredAt:row.decidedAt,
+            description:row.supersedesId?"Superseding correction":undefined,
+          }))}/>
       </section>
       <section aria-label="Award current validity" className="space-y-2">
         <h3 className="font-serif text-xl">Issued achievements</h3>
