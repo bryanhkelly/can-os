@@ -3,7 +3,7 @@ import {db} from "@/db/client";
 import {accessAccounts,accessAccountCanonicalPrincipals} from "@/db/schema";
 import {canonicalPersons,guardianAuthorities,learnerProfiles} from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
-import {getCommandContext} from "@/modules/identity/command-context.server";
+import {getIdentityContext} from "@/modules/identity/command-context.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -12,7 +12,7 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
  * assumed to be interchangeable.
  */
 export async function requireNativeGuardian(request:Request,now:Date){
- const actor=await getCommandContext(request);
+ const actor=await getIdentityContext(request);
  if(actor.role!=="guardian"||!actor.actorPersonId||
     !actor.accountId||actor.sessionAccountId)
   throw new AuthorizationError("verified CAN guardian");
