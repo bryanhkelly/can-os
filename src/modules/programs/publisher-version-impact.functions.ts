@@ -183,6 +183,7 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
           ))),
       );
       const impacts=await tx.select({
+        deploymentId:canonicalClasses.deploymentId,
         offeringVersionId:canonicalClasses.offeringVersionId,
         siteId:canonicalClasses.siteId,
         state:canonicalClasses.state,
@@ -191,8 +192,10 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
         .innerJoin(offeringVersions,eq(offeringVersions.id,canonicalClasses.offeringVersionId))
         .innerJoin(programDeployments,eq(programDeployments.id,canonicalClasses.deploymentId))
         .where(scopedClassFilter)
-        .groupBy(canonicalClasses.offeringVersionId,canonicalClasses.siteId,canonicalClasses.state);
+        .groupBy(canonicalClasses.deploymentId,canonicalClasses.offeringVersionId,
+          canonicalClasses.siteId,canonicalClasses.state);
       const publishedListings=await tx.select({
+        deploymentId:canonicalClasses.deploymentId,
         offeringVersionId:canonicalClasses.offeringVersionId,
         siteId:canonicalClasses.siteId,
         classCount:sql<number>`count(distinct ${canonicalClasses.id})::integer`,
@@ -204,7 +207,8 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
           eq(canonicalClassOfferingVersions.state,"published"),
         ))
         .where(scopedClassFilter)
-        .groupBy(canonicalClasses.offeringVersionId,canonicalClasses.siteId);
+        .groupBy(canonicalClasses.deploymentId,canonicalClasses.offeringVersionId,
+          canonicalClasses.siteId);
       const classRows=await tx.select({
         classId:canonicalClasses.id,
         deploymentId:canonicalClasses.deploymentId,
