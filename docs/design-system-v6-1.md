@@ -155,6 +155,16 @@ receipt as an enrollment or completion decision. Storybook documents
 populated/empty workflow histories; no new persistence or lifecycle
 service was introduced.
 
+**Blueprint and Section lifecycle status (November 2026):** Independent
+Blueprint review queues, Launch Studio review readouts, and Section lifecycle
+operations now use the shared `StatusBadge` and square-corner panels.
+Blueprint configuration approval is not operating authorization. The Blueprint
+review reader currently exposes a latest decision, not the complete historical
+event stream; do not render a fabricated `StatusTimeline` until an authorized,
+paginated source history is available. School Section enrollment transitions
+remain owned by the Section lifecycle service and retain their independent
+reason, transfer, capacity and audit checks.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
