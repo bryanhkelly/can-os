@@ -8,6 +8,8 @@ import {
 import { getGuardianStudents } from "@/modules/learning/guardian-academic-queries.functions";
 import { ReportCardView, TranscriptView } from "@/components/report-card";
 import { EmptyState, QueryState, WorkspaceShell } from "@/components/workspace";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/guardian/report-cards")({
   validateSearch:(search:Record<string,unknown>):{student?:string}=>({
@@ -84,13 +86,13 @@ function GuardianReportCardsPage() {
 
   return <WorkspaceShell eyebrow="Report card" title="Report card"
     subtitle="Finalized grades by grading period, plus the durable transcript record, for students connected to your account.">
-      {students.length > 0 && <label className="mt-8 block max-w-sm text-sm font-semibold">
+      {students.length > 0 && <Label className="mt-8 block max-w-sm text-sm font-semibold">
         Student
-        <select className="mt-2 w-full rounded-lg border bg-background p-3" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
+        <Select className="mt-2 min-h-11" value={selected} onChange={event => void navigate({search:{student:event.target.value}})}>
           <option value="" disabled>Choose an authorized student</option>
      {students.map(student => <option key={student.studentPersonId} value={student.studentPersonId}>{student.firstName} {student.lastName}</option>)}
-        </select>
-      </label>}
+        </Select>
+      </Label>}
       <QueryState loading={(loading || loadingStudents) && "Loading report card…"}
         error={error || unavailable}
         onRetry={error ? ()=>{setError("");setRetryKey(current=>current+1);} : undefined}
