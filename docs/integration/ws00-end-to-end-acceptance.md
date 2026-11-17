@@ -110,3 +110,47 @@ sessions and a disposable isolated QA database. A skipped test is **not a pass**
 These added checks have been committed but **have not passed in a running QA
 environment**. They do not replace one-hour/four-Session delivery, independently
 reviewed governed outcomes, two-Site reporting, or concurrent seat acceptance.
+
+
+## Reviewed-first-time CAN adult Class onboarding (Issue #320)
+
+Source implementation: `src/modules/classes/native-class-reviewed-onboarding.functions.ts`.
+QA-only schema candidate: `database/canonical/v3.0.1/patch-reviewed-adult-class-onboarding.sql`.
+
+When `/class` receives an authenticated CAN-only adult with no native cookie,
+Class self-enrollment/invitation/approval attempts the existing native learner
+recovery. If no existing verified bound Person/grant is available, it may consume
+**only** an independently approved, exact-account/exact-Person adult review.
+Activation creates the canonical account, Person (with reviewed birth date),
+CAN-to-canonical link, organization-scoped learner grant, audit event and native
+session in one serializable-identity transaction, before retrying the original
+Class enrollment command. No Class seat is reserved or Enrollment/Attempt written
+by activation itself. No browser-provided DOB, Person or Organization is accepted.
+
+**Review creation is NOT implemented as a public UI or automatic approval.**
+A trusted reviewer/operations process must independently validate age, identity,
+reviewer authority, exact CAN Account and Person IDs, and a currently active
+canonical home Organization; retain the source evidence in a controlled store;
+then enter an approved row with an opaque evidence reference using a separately
+authorized, auditable operator path. An email match, self-declared signup age,
+learner click, test fixture or Site favorite is not sufficient evidence. The
+current review ledger deliberately exposes no learner/reviewer write endpoint.
+Do not apply this migration on production until that governance, the operator
+write path, restricted-role RLS tests and rollback/reconciliation are approved.
+
+**Required QA acceptance:** start with a truly new verified CAN account and no
+native cookie or existing canonical account; arrange an independently approved
+review under disposable QA controls; then enroll in the published one-hour
+Class, open its content, see the original Class Enrollment in My Activity,
+withdraw and retain one original historical enrollment. Repeat the same request
+concurrently; ensure exactly one Person, one link, one learner grant, one consumed
+review and no duplicate Class seat. Negative fixtures: unreviewed; revoked;
+self-reviewed; underage; stale review; mismatched CAN Person; disabled reviewer;
+existing same-email canonical account; existing operator link; disabled CAN
+account; other Site staff/reviewer cookie; revoked learner grant; missing
+restricted reader. All must fail closed. Existing previously bound learners
+must continue to work without provisioning again.
+
+**Status:** code committed to `main`; migration and signed-in QA tests not run.
+Issue #320 remains P0 / NO-GO until the independent review path and the above
+QA assertions are completed with exact SHA and database branch evidence.
