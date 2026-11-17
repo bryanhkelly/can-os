@@ -55,8 +55,10 @@ describe("platform App Admin role isolation", () => {
     expect(script).toContain("target.person_id === approver.person_id");
     expect(script).toContain("ROLLBACK");
     expect(script).toContain("domain_events");
-    expect(script).toContain("role = 'can_network_steward'");
-    expect(script).toContain("role = 'app_admin'");
+    expect(script).toContain("g.role = 'can_network_steward'");
+    expect(script).toContain("o.type = 'can_network'");
+    expect(script).toContain("LEFT JOIN public.organizations");
+    expect(script).toContain("g.role = 'app_admin'");
     expect(script).toContain("pg_advisory_xact_lock");
     expect(script).toContain("authority.rows[0]");
     expect(script).not.toContain("000000");
