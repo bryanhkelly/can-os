@@ -33,6 +33,6 @@ export async function assertCurrentNativeClassLearnerForMutation(
     throw new AuthorizationError("current canonical learner session");
   assertNativeClassLearnerSessionForExit(
     session.rows[0] as Record<string,unknown>,
-    actor.actorPersonId,actor.scope.organizationIds[0],
+    actor.actorPersonId,actor.scope.organizationIds?.[0]??"",
   );
 }
