@@ -127,6 +127,14 @@ CAN OS V6.1 uses three layers of **one** design system, not three competing libr
 | 2. Application patterns | `src/components/workspace/`, `src/components/workflow/`, shared form and directory composition | DirectoryTable, FilterBar, PageHeader, FormSection, FormActions, WorkflowProgress, RecordHeader, StatusBadge | Own responsive composition, empty/error/loading states and reusable interactions. Remain domain-neutral; do not query databases or implement permissions. |
 | 3. Feature components | Feature-specific folders and modules | EvidenceUploader, class roster, enrollment forms, blueprint workflows | Own domain-specific fields, presentation and commands; compose Layers 1 and 2. Authorization and business transitions remain server-owned. |
 
+**Roster composition:** `RosterList` in `src/components/workspace/` owns row spacing,
+accessible list labeling, secondary information, action slots and empty state
+for school Section, Site Admin and native Class rosters. The feature supplies
+only rows already authorized by its owning reader. It does not fetch or redact
+people, change enrollment, merge lifecycle models, or override course/credit
+assessment authority. Native roster pagination and actions remain native;
+Section/academic gradebook actions remain Section-owned.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
