@@ -73,7 +73,7 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
-    <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady}/>
+    <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -91,7 +91,12 @@ function PlatformAdministration() {
  * these fields without a current non-demo platform grant and exact-person
  * checks. No person is enrolled or granted Site rights by this form.
  */
-function AdultLearnerReviewSection({ready}:{ready:boolean}){
+function AdultLearnerReviewSection({ready,cases}:{
+  ready:boolean;
+  cases:Array<{
+    accessAccountId:string;status:string;reviewedAt:string;activated:boolean;
+  }>;
+}){
   const [accountId,setAccountId]=useState("");
   const [organizationId,setOrganizationId]=useState("");
   const [birthDate,setBirthDate]=useState("");
@@ -138,6 +143,27 @@ function AdultLearnerReviewSection({ready}:{ready:boolean}){
       Reviewer workflow unavailable. The reviewed-adult evidence migration and
       forced row-level security must be verified before identity decisions can be recorded.
     </p>:<>
+      <div className="mt-5 border border-border p-4">
+        <h3 className="text-sm font-semibold">Recent identity review decisions</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Account identifiers and lifecycle status only. Verified birth dates,
+          document references and private identity evidence are not displayed.
+        </p>
+        {cases.length===0?<p className="mt-3 text-sm text-muted-foreground">
+          No adult identity decisions have been recorded.
+        </p>:<div className="mt-3 max-h-72 overflow-y-auto divide-y divide-border">
+          {cases.map(item=><div className="flex flex-wrap items-center justify-between gap-3 py-3" key={item.accessAccountId}>
+            <div>
+              <p className="font-mono text-xs break-all">{item.accessAccountId}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {item.status.replaceAll("_"," ")} · Reviewed {new Date(item.reviewedAt).toLocaleDateString()}
+              </p>
+            </div>
+            <Button type="button" variant="outline" size="sm"
+              onClick={()=>setAccountId(item.accessAccountId)}>Select account</Button>
+          </div>)}
+        </div>}
+      </div>
       <form className="mt-5 grid gap-4" onSubmit={e=>void approve(e)}>
         <label className="grid gap-1 text-sm font-medium">CAN account ID
           <Input required value={accountId} onChange={e=>setAccountId(e.target.value)}
