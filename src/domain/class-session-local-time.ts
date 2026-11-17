@@ -40,8 +40,8 @@ export function localClassTimeToInstant(local:string,timeZone:string):Date{
   validateSiteTimeZone(timeZone);
   if(!localPattern.test(local))throw new Error("Select a complete local date and time.");
   const [datePart,timePart]=local.split("T");
-  const [year,month,day]=datePart!.split("-").map(Number);
-  const [hour,minute]=timePart!.split(":").map(Number);
+  const [year=NaN,month=NaN,day=NaN]=datePart!.split("-").map(Number);
+  const [hour=NaN,minute=NaN]=timePart!.split(":").map(Number);
   const wallMillis=Date.UTC(year,month-1,day,hour,minute,0);
   if(!Number.isFinite(wallMillis)||new Date(wallMillis).toISOString().slice(0,16)!==local)
     throw new Error("Select a real calendar date and time.");
