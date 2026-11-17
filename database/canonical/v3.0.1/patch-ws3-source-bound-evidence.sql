@@ -9,13 +9,16 @@ SET LOCAL search_path TO education_v30,pg_catalog;
 -- This is a governance reference, NOT a new completion or credential ledger.
 CREATE TABLE IF NOT EXISTS education_v30.learning_completion_evidence_bindings (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  purpose text NOT NULL CHECK (purpose IN ('completion_correction','award_revocation')),
+  purpose text NOT NULL CHECK (purpose IN ('completion_correction','award_revocation','class_completion_decision')),
   evidence_version_id uuid NOT NULL REFERENCES education_v30.evidence_document_versions(id),
   noncredit_registration_id uuid REFERENCES education_v30.noncredit_registrations(id),
   expected_decision_id uuid REFERENCES education_v30.noncredit_completion_decisions(id),
   approved_correction_outcome text CHECK(approved_correction_outcome IN ('not_yet_completed','voided')),
   review_reason text NOT NULL CHECK (length(btrim(review_reason)) BETWEEN 10 AND 1000),
   award_issuance_id uuid REFERENCES education_v30.learning_award_issuances(id),
+  class_enrollment_id uuid REFERENCES education_v30.class_enrollments(id),
+  expected_class_outcome_id uuid REFERENCES education_v30.class_outcomes(id),
+  approved_class_outcome text CHECK(approved_class_outcome IN ('completed','not_yet_completed','voided')),
   participant_person_id uuid NOT NULL REFERENCES education_v30.persons(id),
   provider_organization_id uuid NOT NULL REFERENCES education_v30.organizations(id),
   delivery_site_id uuid NOT NULL REFERENCES education_v30.sites(id),
@@ -26,11 +29,18 @@ CREATE TABLE IF NOT EXISTS education_v30.learning_completion_evidence_bindings (
   CONSTRAINT ws3_evidence_exact_subject CHECK (
     (purpose='completion_correction' AND noncredit_registration_id IS NOT NULL AND
      expected_decision_id IS NOT NULL AND approved_correction_outcome IS NOT NULL AND
-     award_issuance_id IS NULL)
+     award_issuance_id IS NULL AND class_enrollment_id IS NULL AND
+     expected_class_outcome_id IS NULL AND approved_class_outcome IS NULL)
     OR
     (purpose='award_revocation' AND award_issuance_id IS NOT NULL AND
      noncredit_registration_id IS NULL AND expected_decision_id IS NULL AND
-     approved_correction_outcome IS NULL)
+     approved_correction_outcome IS NULL AND class_enrollment_id IS NULL AND
+     expected_class_outcome_id IS NULL AND approved_class_outcome IS NULL)
+    OR
+    (purpose='class_completion_decision' AND class_enrollment_id IS NOT NULL AND
+     approved_class_outcome IS NOT NULL AND noncredit_registration_id IS NULL AND
+     expected_decision_id IS NULL AND approved_correction_outcome IS NULL AND
+     award_issuance_id IS NULL)
   ),
   CONSTRAINT ws3_evidence_independent_review CHECK (
     submitted_by_person_id<>approved_by_person_id
@@ -46,6 +56,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS ws3_evidence_award_version_uq
  ON education_v30.learning_completion_evidence_bindings
  (award_issuance_id,evidence_version_id,purpose)
  WHERE award_issuance_id IS NOT NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ws3_evidence_class_enrollment_version_uq
+ ON education_v30.learning_completion_evidence_bindings
+ (class_enrollment_id,expected_class_outcome_id,evidence_version_id,purpose)
+ WHERE class_enrollment_id IS NOT NULL;
 
 -- Cross-check the immutable target, Person and original Site attribution.
 -- A network membership, reporting Site or general provider-owned document is
@@ -72,7 +87,7 @@ BEGIN
     JOIN education_v30.participation_attributions a
       ON a.noncredit_registration_id=r.id
     WHERE r.id=NEW.noncredit_registration_id;
-  ELSE
+  ELSIF NEW.purpose='award_revocation' THEN
     SELECT d.recipient_person_id,i.issuer_organization_id,a.delivery_site_id
       INTO target_person,target_org,target_site
     FROM education_v30.learning_award_issuances i
@@ -83,6 +98,21 @@ BEGIN
     JOIN education_v30.participation_attributions a
       ON a.noncredit_registration_id=r.id
     WHERE i.id=NEW.award_issuance_id;
+  ELSE
+    SELECT e.learner_person_id,c.operating_organization_id,a.delivery_site_id
+      INTO target_person,target_org,target_site
+    FROM education_v30.class_enrollments e
+    JOIN education_v30.classes c ON c.id=e.class_id
+    JOIN education_v30.participation_attributions a
+      ON a.class_enrollment_id=e.id
+    WHERE e.id=NEW.class_enrollment_id
+      AND (NEW.expected_class_outcome_id IS NULL OR EXISTS(
+        SELECT 1 FROM education_v30.class_outcomes prior
+        WHERE prior.id=NEW.expected_class_outcome_id
+          AND prior.class_enrollment_id=e.id
+          AND prior.outcome_kind='completion'
+          AND prior.source_kind='ws3_governed'
+      ));
   END IF;
   IF target_person IS NULL OR target_org IS NULL OR target_site IS NULL OR
      ROW(target_person,target_org,target_site) IS DISTINCT FROM
