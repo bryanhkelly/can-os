@@ -32,11 +32,7 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
   {status?.state==="Blocked" || status?.state==="Unavailable" ? <p role="status" className="mt-5 text-sm">{status.detail}</p> : <Button asChild className="mt-5"><Link to={navigation.websitePath} search={{siteId,returnToHub:navigation.context==="launch",returnToSettings:navigation.context==="settings"}}>Open Website &amp; Brand Studio →</Link></Button>}
  </section>;
  if(module==="team")return <section className="mt-6"><nav className="mb-4 flex flex-wrap gap-4" aria-label="School team views">{(["access","invite","people"] as const).map(mode=><Link key={mode} to={navigation.modulePath} params={{module:"team"}} search={{siteId,teamMode:mode}} className="inline-flex min-h-11 items-center border bg-card px-4 text-sm text-primary">{mode==="access"?"Members & permissions":mode==="invite"?"Invite team member":"People directory"}</Link>)}</nav><ScopedAdminConsole onChanged={()=>router.invalidate()} key={selection.teamMode??"access"} hubMode mode={selection.teamMode??"access"} selection={{siteId}}/></section>;
- if(!data.launches)return <p role="status" className="mt-6 border p-5">Program records are unavailable. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry records</Button></p>;
- const current=data.launches.find(program=>program.id===data.selectedProgramId);
- if(data.selectionError || (data.launches.length && !current))return <section className="mt-6 border bg-card p-6"><h2 className="font-serif text-2xl">Choose a Program</h2><p className="mt-2 text-sm">Select the offering to configure or review. Each belongs to this school.</p>{data.selectionError&&<p role="alert" className="mt-3 text-sm">{data.selectionError}</p>}<div className="mt-4 grid gap-3">{data.launches.map(program=><Link key={program.id} to={navigation.modulePath} params={{module}} search={{siteId,programId:program.id}} className="border p-4 text-primary">{program.name} →</Link>)}</div>{data.selectionError&&<Link to={navigation.modulePath} params={{module}} search={{siteId}} className="mt-4 inline-flex min-h-11 items-center text-primary">Clear Program selection →</Link>}</section>;
- if(module==="academics") {
-  const catalogDiscovery = data.canonicalCatalogEnabled
+ const catalogDiscovery=module==="academics" ? (data.canonicalCatalogEnabled
     ? <ProgramDiscoveryPanel key={siteId} siteId={siteId}/>
     : <section role="status" className="mt-6 border border-border bg-card p-4 text-sm">
         <p className="font-semibold">Program catalog requires verified Site access</p>
@@ -50,7 +46,32 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
           className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary underline">
           Review Site identity and approval
         </Link>
-      </section>;
+      </section>) : null;
+
+ // Canonical Course discovery is independent of legacy school Program reads.
+ // An unavailable or multi-Program school must not hide the native Class entry.
+ if(!data.launches)return <>{catalogDiscovery}
+   <p role="status" className="mt-6 border p-5">Legacy Program records are unavailable.
+     <Button variant="outline" onClick={()=>void router.invalidate()}>Retry records</Button>
+   </p></>;
+ const current=data.launches.find(program=>program.id===data.selectedProgramId);
+ if(data.selectionError || (data.launches.length && !current))return <>{catalogDiscovery}
+   <section className="mt-6 border border-border bg-card p-6">
+     <h2 className="font-serif text-2xl">Choose a school Program</h2>
+     <p className="mt-2 text-sm text-muted-foreground">These are saved academic preparation records. Adopted Courses and Classes use the independent catalog above.</p>
+     {data.selectionError&&<p role="alert" className="mt-3 text-sm">{data.selectionError}</p>}
+     <div className="mt-4 grid gap-3">{data.launches.map(program=>
+       <Link key={program.id} to={navigation.modulePath} params={{module}}
+         search={{siteId,programId:program.id}} className="border border-border p-4 text-primary">
+         {program.name} →
+       </Link>)}</div>
+     {data.selectionError&&<Link to={navigation.modulePath} params={{module}}
+       search={{siteId}} className="mt-4 inline-flex min-h-11 items-center text-primary">
+       Clear Program selection →
+     </Link>}
+   </section>
+ </>;
+ if(module==="academics") {
   if(current)return <>{catalogDiscovery}{data.academic ? <LaunchAcademicSetupWorkspace key={current.id} hubMode data={data.academic}/> : <p role="alert" className="mt-6 border p-5">Academic records could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry academic records</Button></p>}</>;
   if(data.draftFailed)return <><p role="alert" className="mt-6 border p-5">Your saved academic setup could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry saved draft</Button></p></>;
     const wizardData:LaunchWizardData={options:{...data.options,canCreateSite:false,sites:data.options.sites.filter(item=>item.id===siteId),organizations:data.options.organizations.filter(org=>org.id===site?.organizationId)},launches:{launches:data.launches},preparationPrograms:[],familyInvitations:null,admissionsCounts:null,enrollmentCounts:null,extendedPlanning:null,jurisdictionGuidance:{},jurisdictionResearch:data.jurisdictionResearch??{},jurisdictionResearchUnavailable:data.jurisdictionResearchUnavailable,authError:"",draft:data.draft,draftContext:`${siteId}:`};
