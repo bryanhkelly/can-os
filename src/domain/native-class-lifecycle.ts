@@ -54,8 +54,8 @@ export function assertOperationalClassEnrollmentMethods(
 ): void {
   if (methods.length === 0 || new Set(methods).size !== methods.length ||
       methods.some(method => method !== "self" && method !== "assignment" &&
-        method !== "invitation")) {
-    throw new AuthorizationError("operational Class enrollment methods (self, verified adult invitation or assignment)");
+        method !== "invitation" && method !== "approval")) {
+    throw new AuthorizationError("operational Class enrollment methods (self, verified adult invitation, approval or assignment)");
   }
 }
 
@@ -173,7 +173,7 @@ export function assertVerifiedAdultNativeClassExit(
  * Call under the Class's FOR UPDATE lock after the open-enrollment lookup.
  */
 export function assertNativeClassSeatAvailable(args:{
-  method:"self"|"invitation"|"assignment";
+  method:"self"|"invitation"|"approval"|"assignment";
   activeOrPending:number;
   classCapacity:number|null;
   offeringCapacity?:number|null;
