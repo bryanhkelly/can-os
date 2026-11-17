@@ -150,6 +150,8 @@ export async function accessibleClasses(actor: Actor) {
         ) : scope)).orderBy(s.sections.title);
     const available=[];
     const independentByProgram=new Map<string,boolean>();
+    const verifiedCrossSitePrograms=new Set<string>();
+    const deniedCrossSitePrograms=new Set<string>();
     // A previously signed-in CAN teacher must not retain a stale church
     // class directory entry after the underlying academic agreement expires
     // or is withdrawn. A Section assignment alone is never a contract.
@@ -169,16 +171,24 @@ export async function accessibleClasses(actor: Actor) {
         // sufficient, never a cross-school grant.
       }else if(!delegated.includes(row.id))continue;
       if(independent || !hostLocal){
-        try{
-          await requireCurrentTeacherProgramDelegation(db,{
-            personId:actor.actorPersonId,programId:row.programId,siteId:row.siteId,
-          });
-          await requireInstitutionalAcademicProgramAuthority(db,actor,row.programId,[
-            "academic_instruction","curriculum",
-          ]);
-        }catch(error){
-          if(!(error instanceof AuthorizationError))throw error;
-          continue;
+        // Directory-only cache: authorization is checked again by authorizeClass
+        // and inside protected mutations. Never cache across requests.
+        const key=row.programId+":"+(row.siteId??"");
+        if(deniedCrossSitePrograms.has(key))continue;
+        if(!verifiedCrossSitePrograms.has(key)){
+          try{
+            await requireCurrentTeacherProgramDelegation(db,{
+              personId:actor.actorPersonId,programId:row.programId,siteId:row.siteId,
+            });
+            await requireInstitutionalAcademicProgramAuthority(db,actor,row.programId,[
+              "academic_instruction","curriculum",
+            ]);
+            verifiedCrossSitePrograms.add(key);
+          }catch(error){
+            if(!(error instanceof AuthorizationError))throw error;
+            deniedCrossSitePrograms.add(key);
+            continue;
+          }
         }
       }
       try {
