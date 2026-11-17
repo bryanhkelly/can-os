@@ -48,6 +48,8 @@ describe("provider-independent authorization context",()=>{
  });
  it("checks all underlying active grants, not only filtered workspace grants",()=>{
   const server=readFileSync("src/modules/identity/command-context.server.ts","utf8");
+  expect(server).toContain("accountPersonId:accessAccounts.personId");
+  expect(server).toContain("session.accountPersonId!==activePerson");
   expect(server).toContain("from(accountPersonGrants)");
   expect(server).toContain("eq(accountPersonGrants.accountId,session.accountId)");
   expect(server).toContain("eq(accountPersonGrants.active,true)");
