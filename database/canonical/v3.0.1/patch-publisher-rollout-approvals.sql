@@ -154,6 +154,82 @@ CREATE TRIGGER operator_rollout_identity_immutable_trg
  BEFORE UPDATE OR DELETE ON education_v30.operator_rollout_applications
  FOR EACH ROW EXECUTE FUNCTION education_v30.publisher_rollout_identity_immutable();
 
+
+-- Guard the append-only link between an approved local rollout application
+-- and its *existing* canonical Class. The Class is never synthesized here.
+CREATE OR REPLACE FUNCTION education_v30.operator_rollout_class_link_guard()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+BEGIN
+ IF TG_OP <> 'INSERT' THEN
+   RAISE EXCEPTION 'Approved rollout Class provenance is immutable'
+     USING ERRCODE='23514';
+ END IF;
+ IF NOT EXISTS (
+   SELECT 1 FROM education_v30.operator_rollout_applications a
+   JOIN education_v30.classes c ON c.id=NEW.class_id
+   JOIN education_v30.offering_courses oc
+     ON oc.offering_version_id=a.offering_version_id
+     AND oc.course_version_id=NEW.course_version_id
+   WHERE a.id=NEW.application_id AND a.state IN ('approved','activated')
+     AND c.deployment_id=a.deployment_id
+     AND c.adoption_id=a.adoption_id
+     AND c.offering_version_id=a.offering_version_id
+     AND c.course_version_id=NEW.course_version_id
+     AND c.operating_organization_id=a.operating_organization_id
+     AND c.site_id=a.site_id
+ ) THEN
+   RAISE EXCEPTION 'Rollout Class must match approved Site, Organization, Deployment and Course version'
+     USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS operator_rollout_class_link_guard_trg
+ ON education_v30.operator_rollout_class_links;
+CREATE TRIGGER operator_rollout_class_link_guard_trg
+ BEFORE INSERT OR UPDATE OR DELETE ON education_v30.operator_rollout_class_links
+ FOR EACH ROW EXECUTE FUNCTION education_v30.operator_rollout_class_link_guard();
+
+-- At the DB boundary reviewers cannot approve their own work. A native
+-- dedicated reviewer role, current publisher organization scope, and
+-- independently verified person/session must STILL be checked by WS00's
+-- purpose-specific SQL role/procedure before issuing these inserts.
+CREATE OR REPLACE FUNCTION education_v30.publisher_rollout_review_independence()
+RETURNS trigger LANGUAGE plpgsql SET search_path=education_v30,pg_catalog AS $
+BEGIN
+ IF TG_TABLE_NAME='publisher_rollout_decisions' THEN
+   IF NOT EXISTS (
+     SELECT 1 FROM education_v30.publisher_rollout_plans p
+     WHERE p.id=NEW.plan_id AND p.state='submitted'
+       AND p.authored_by_person_id<>NEW.reviewer_person_id
+   ) THEN
+     RAISE EXCEPTION 'Independent publisher plan reviewer required for a submitted revision'
+       USING ERRCODE='23514';
+   END IF;
+ ELSE
+   IF NOT EXISTS (
+     SELECT 1 FROM education_v30.operator_rollout_applications a
+     JOIN education_v30.publisher_rollout_plans p ON p.id=a.plan_id
+     WHERE a.id=NEW.application_id AND a.state='submitted'
+       AND p.state='approved'
+       AND a.prepared_by_person_id<>NEW.reviewer_person_id
+   ) THEN
+     RAISE EXCEPTION 'Independent publisher reviewer and approved plan required'
+       USING ERRCODE='23514';
+   END IF;
+ END IF;
+ RETURN NEW;
+END $;
+DROP TRIGGER IF EXISTS publisher_rollout_review_independence_trg
+ ON education_v30.publisher_rollout_decisions;
+CREATE TRIGGER publisher_rollout_review_independence_trg
+ BEFORE INSERT ON education_v30.publisher_rollout_decisions
+ FOR EACH ROW EXECUTE FUNCTION education_v30.publisher_rollout_review_independence();
+DROP TRIGGER IF EXISTS operator_rollout_review_independence_trg
+ ON education_v30.operator_rollout_decisions;
+CREATE TRIGGER operator_rollout_review_independence_trg
+ BEFORE INSERT ON education_v30.operator_rollout_decisions
+ FOR EACH ROW EXECUTE FUNCTION education_v30.publisher_rollout_review_independence();
+
 -- No general application or public grants. All commands are disabled until
 -- WS00 provisions dedicated purpose-specific restricted DB roles, trusted
 -- session binding, independent reviewer authorization and RLS acceptance.
