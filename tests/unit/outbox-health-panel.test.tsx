@@ -63,7 +63,8 @@ async function loaded() {
 
 beforeEach(() => {
   vi.clearAllMocks(); state.slots = []; state.cursor = 0; state.effects = [];
-  state.read.mockResolvedValue({ failed: 2, pending: 9, pendingUnhandled: 3, processing: 1 });
+  state.read.mockResolvedValue({ failed: 2, pending: 9, pendingUnhandled: 3, processing: 1,
+    schoolFamilyDelivery: {pending:6,processing:2,retryScheduled:3,failed:1,providerAccepted:12,suppressed:4} });
 });
 
 describe("operations outbox health panel", () => {
@@ -80,6 +81,10 @@ describe("operations outbox health panel", () => {
     expect(html).toContain(">3</p>");
     expect(html).toContain(">2</p>");
     expect(html).toContain("3 pending events have no registered");
+    expect(html).toContain("School-family outbound delivery");
+    expect(html).toContain("Retry scheduled");
+    expect(html).toContain("Provider accepted");
+    expect(html).toContain("does not confirm inbox delivery");
     expect(state.read).toHaveBeenCalledOnce();
   });
 
