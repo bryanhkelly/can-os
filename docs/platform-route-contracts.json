@@ -332,9 +332,9 @@
       "route": "/canonical/classes",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Site Admin or Registrar opens native Class management from Program operations or Reports and selects Class evidence for a Class in scope",
-      "readBoundary": "Native Class services validate current operator, provider and Site scope; report reads independently reauthorize the exact Class",
-      "writeBoundary": "Existing native Class and Class Offering commands reauthorize the current operator and canonical Site"
+      "roleJourney": "Legacy bookmarked provider Class management location redirects to /class?view=manage; no local management UI",
+      "readBoundary": "Redirect only; the native /class manager separately checks current operator and Site scope",
+      "writeBoundary": "None on this route; all mutations require separately authorized native Class commands"
     },
     {
       "file": "src/routes/canonical.classes_.completion.tsx",
@@ -1772,7 +1772,7 @@
       "route": "/class",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Verified Person discovers eligible native Classes, sees own invitations and enrollment history, no school role required",
+      "roleJourney": "One canonical /class entry for public native Class discovery, enrollment history, invitations, and authorized operator Class management",
       "readBoundary": "pending",
       "writeBoundary": "pending"
     },
@@ -1784,6 +1784,15 @@
       "roleJourney": "Verified non-demo account with independently provisioned app_admin grant",
       "readBoundary": "Platform aggregate counts only; exact current grant and verified session",
       "writeBoundary": "No platform mutations exposed"
+    },
+    {
+      "file": "src/routes/centers.demo.tsx",
+      "route": "/centers/demo",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Synthetic community-center planning preview links to /class for authorized teaching, management, and enrollment",
+      "readBoundary": "Fixed synthetic Site only; draft planning rows do not grant registration or reveal learner data",
+      "writeBoundary": "No writes, no Class construction, and no approval attestations"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
