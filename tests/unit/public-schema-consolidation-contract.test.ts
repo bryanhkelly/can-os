@@ -5,6 +5,7 @@ const files=[
  "database/production/2026-11-17-consolidate-feedback-categories.sql",
  "database/production/2026-11-17-consolidate-static-reference-tables.sql",
  "database/production/2026-11-17-consolidate-36-empty-legacy-tables.sql",
+ "database/production/2026-11-17-consolidate-8-empty-operational-tables.sql",
 ];
 describe("public-schema production consolidation safety",()=>{
  it("migrations move objects in place, never replicate identities or lose rows",()=>{
@@ -20,7 +21,7 @@ describe("public-schema production consolidation safety",()=>{
     names.push(match[1]);
   }
   expect(new Set(names).size).toBe(names.length);
-  expect(names).toHaveLength(43);
+  expect(names).toHaveLength(51);
  });
  it("read-only verifier extracts the same exact migration table names",()=>{
   const check=read("scripts/acceptance/check-public-schema-consolidation.mjs");
