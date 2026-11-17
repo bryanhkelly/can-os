@@ -11,7 +11,9 @@ const canonicalTags = new Set([
   "Button", "Field", "Input", "Select", "Textarea", "Checkbox", "Radio",
   "DirectoryTable", "QueryState", "WorkspaceNotice", "StatusBadge",
   "ActionDialog", "FormSection", "FormActions", "EmptyState",
-  "RecordLayout", "StatusTimeline", "EvidencePicker",
+  "RecordHeader", "RecordLayout", "RecordFacts", "EntityCard",
+  "FieldTripFacts", "ActionFooter", "StatCard", "WorkspacePanel",
+  "StatusTimeline", "EvidencePicker",
 ]);
 const files = [];
 function walk(directory) {
