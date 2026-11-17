@@ -259,7 +259,7 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
                 none:"None for this onboarding check",
               }[grant.onboarding.nextAction])},
             ]}
-            rowActions={[{id:"toggle-access",label:"Change access",
+            rowActions={[{id:"toggle-access",label:({grant})=>grant.active?"Deactivate":"Activate",
               allowed:({grant})=>grant.onboarding.status!=="invited",
               onClick:({grant})=>void toggleGrant(grant.grantId,grant.active)}]}/>
         </section>}
