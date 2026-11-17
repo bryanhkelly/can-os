@@ -15,8 +15,7 @@ permanent adapters.
 **Database implementation staged on main:** `patch-can-one-person-grants.sql`
 adds the account Person anchor, one-account-per-Person unique index and
 concurrency-serialized active-grant trigger. The corresponding Drizzle account
-model includes `personId`. This migration is NOT installed or authorized for
-production and does not itself update the v3 FK graph.
+model includes `personId`. The account-Person anchor and its integrity triggers are now installed on Neon main; this does not itself update the v3 FK graph.
 
 **QA installation (2026-11-17):** The 13 SQL statements in
 `patch-can-one-person-grants.sql` were applied transactionally on the
@@ -26,7 +25,7 @@ exist, and found **zero active grant/Person anchor mismatches**. Synthetic
 rollback-only write behavior is represented by
 `scripts/acceptance/test-one-person-account-constraints.mjs`, but this
 script has not yet been executed. Application build, authorization suite and
-browser journeys are **not verified**. **Production has not been migrated.**
+browser journeys are **not verified**. **The native Person/Account cutover has not been migrated.**
 Deploying the new `accessAccounts.personId` reader without applying the
 migration in the target environment will fail. Coordinate DB and app release.
 
@@ -59,8 +58,8 @@ remain unverified.
 
 A production read-only audit found historical Person/account relationships
 that are not one-to-one. They must remain historical evidence, not be
-automatically merged or interpreted as authorization. Production schema
-is still **unmigrated**. The normal Cloudflare deployment gate now also
+automatically merged or interpreted as authorization. Native Person and account dependencies on production
+remain **unmigrated**. The normal Cloudflare deployment gate now also
 requires no historically unanchored account; release proceeds only when
 the exact production schema is ready.
 
@@ -95,3 +94,71 @@ the exact production schema is ready.
 - Verify source build, restricted DB migrations and RLS, one-hour and two-Site four-session pilot, and rollback/recovery before enabling production. Do not activate flags or migrate production in advance.
 
 **Release gate:** Until both schema and application paths are migrated and verified together, main cannot be represented as having completed the identity cutover. Partial removal of the old session path is unsafe because existing guarded workflows still invoke it.
+
+## P0 main production checkpoint (2026-11-17)
+
+The read-only Neon **main** inspection supersedes earlier test01 counts for
+production readiness. GitHub `main` now includes
+`scripts/acceptance/check-main-person-cutover.mjs`. Run only against the
+verified `can-os` Neon **main** branch:
+
+```sh
+CAN_MAIN_PERSON_CUTOVER_CHECK=1 DATABASE_URL="<production main neondb URL>" \
+  npm run verify:person:main-cutover
+```
+
+| Direct main observation | Count |
+| --- | ---: |
+| Platform People | 142 |
+| Native Person rows | 0 |
+| CAN accounts anchored to `public.people` | 15 / 15 |
+| Active account/Person grant mismatches | 0 |
+| Historical accounts with grants for multiple Persons | 1 |
+| Native Person inbound FKs | 239 |
+| Platform Person inbound FKs | 150 |
+| Native accounts / active native sessions | 0 / 0 |
+| Staff / learner correspondence rows | 0 / 0 |
+| Remaining transitional correspondence tables | 2 |
+
+The production immutable account trigger, active-grant Person trigger and
+one-account-per-Person unique index exist. This is an **account ownership
+milestone, not the native identity cutover**. The new verifier emits
+`BLOCKED` while the FK graph, historical conflict or transitional tables
+remain. Add `--strict` to use its report as a failing acceptance gate.
+It never creates Persons, copies history or changes grants.
+
+### P0 sequencing and non-negotiable security gates
+
+1. Inventory every native Person FK, function, role policy, trigger, and
+   runtime reader/writer. Rebind only after its actual data ownership and
+   references are reviewed. There are no native Person rows to automatically
+   match or copy, but 239 FKs cannot be discarded without rewiring.
+2. Preserve `public.people.id` and immutable CAN account ownership.
+   Retain the one conflicting historical account's evidence for explicit
+   reconciliation; do not resolve it by email, mutate the Person on an old
+   grant, or reactivate revoked access.
+3. Replace native staff-grant authorization with **explicit, current,
+   exact-Site CAN grants and independently reviewed, evidence-backed
+   authorization**. An identity anchor is never a staff appointment.
+   Reviewer and subject must be distinct; authors cannot self-approve.
+4. Move Class learner, guardian, enrollment, attendance, completion,
+   credential and historical readers/writers to the single Person key.
+   Preserve current consents, revocation checks, role scope, RLS, audit
+   history and independent official decisions. A dependent's access is
+   never inherited from a guardian login.
+5. In one coordinated code/database acceptance release, retire the two
+   empty account-to-canonical correspondence tables, native sessions,
+   native account/Person ownership and their *live* consumers. **Do not
+   introduce replacement crosswalks, shadow Person IDs, fallback cookies
+   or provisional grants.**
+6. Validate exact Site operator/reviewer separation, staff grant
+   issuance/revocation, cross-Site denials, one-hour adult training,
+   four-session learner cohorts, guardian consent, historical participation,
+   direct SQL/RLS denials and browser journeys. Record the production
+   commit and database state; neither this report nor zero native rows
+   certifies completion.
+
+The current deployed application may still rely on transitional readers.
+Do not drop tables or enable a new path independently of its authorization
+and test migration. Do not represent the P0 as closed until both the source
+code and production database have passed the integrated acceptance.
