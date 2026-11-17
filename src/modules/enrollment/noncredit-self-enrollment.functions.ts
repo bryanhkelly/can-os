@@ -20,6 +20,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
@@ -163,16 +164,9 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
         verified:accessAccounts.emailVerifiedAt,disabled:accessAccounts.disabled,
         email:accessAccounts.emailNormalized,
       }).from(accessAccounts).where(eq(accessAccounts.id,owner.accountId)).limit(1);
-      const linkedPeople=await tx.select({
-        personId:accountPersonGrants.personId,role:accountPersonGrants.role,
-      }).from(accountPersonGrants).where(and(
-        eq(accountPersonGrants.accountId,owner.accountId),
-        eq(accountPersonGrants.active,true),
-      )).limit(100);
-      if(!active?.verified||active.disabled||active.email!==owner.email||
-         linkedPeople.length===0||linkedPeople.some(row=>
-           row.personId!==owner.personId||row.role==="student"))
+      if(!active?.verified||active.disabled||active.email!==owner.email)
         throw new AuthorizationError("current verified adult account");
+      await assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx);
       const releases=await readEligibleSelfEnrollmentReleases(tx,data.releaseId);
       const release=releases[0];
       if(!release || release.consentVersion!==data.consentVersion ||
