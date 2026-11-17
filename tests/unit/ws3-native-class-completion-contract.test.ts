@@ -63,7 +63,7 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(command).toContain("assessmentExecutionResults");
     expect(command).toContain("assessmentExecutionAttempts");
     expect(command).toContain("assessmentFormAdministrations");
-    expect(command).toContain("results.filter");
+    expect(command).toContain("versions.filter");
     expect(command).toContain("replaced.has(v.id)");
     expect(command).toContain('heads.length!==1');
   });
