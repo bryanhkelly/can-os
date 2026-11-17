@@ -24,12 +24,15 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(source).toContain("verifiedAdultOn(data.verifiedBirthDate,now)");
    expect(source).toContain('reviewer.personId!==actor.actorPersonId');
    expect(source).toContain('account.personId');
-   expect(source).toContain('g.role==="student"');
+   expect(source).toContain('assertUnambiguousAdultAccount(account.id,account.personId,tx)');
    expect(source).toContain('eq(canonicalEnrollmentOrganizations.status,"active")');
    expect(source).toContain('if(operator||Boolean(native)!==Boolean(link)');
    expect(source).toContain('link.accessPersonId!==account.personId');
    expect(source).toContain('existingPerson.birthDate!==data.verifiedBirthDate');
    expect(source).toContain('if(prior)');
+   expect(source).toContain('evidence.metadata.verifiedBirthDate!==data.verifiedBirthDate');
+   expect(source).toContain('evidence.category!=="adult_identity_verification"');
+   expect(source).toContain('!evidence.verifiedByPersonId');
  });
  it("never turns an adult review into an enrollment or a native session",()=>{
    expect(source).toContain("tx.insert(accessAdultLearningReviews)");
