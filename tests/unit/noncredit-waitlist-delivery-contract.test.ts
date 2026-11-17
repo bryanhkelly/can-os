@@ -42,7 +42,8 @@ describe("noncredit 48-hour invitation delivery",()=>{
       .toContain("eq(accountPersonGrants.active, true)");
     expect(read("src/modules/identity/unambiguous-adult-account.server.ts"))
       .toContain('grant.role === "student"');
-    expect(worker).toContain("sendNotificationEmail(message, key)");
+    expect(worker).toContain("sendNotificationEmailWithReceipt({");
+    expect(worker).toContain('providerReceipt: { source: "noncredit_waitlist", receiptId: key }');
     expect(worker).toContain('for("update", { skipLocked: true })');
     expect(worker).toContain("leaseUntil");
     expect(worker).toContain("nextAttemptAt");
