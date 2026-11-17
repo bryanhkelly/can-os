@@ -109,7 +109,8 @@
     "verify:site:noncredit-catalog": "tsx scripts/acceptance/check-site-noncredit-catalog.ts",
     "verify:schema:consolidation": "node scripts/acceptance/check-public-schema-consolidation.mjs",
     "verify:site:main-consolidation": "node scripts/acceptance/check-main-site-schema-consolidation.mjs",
-    "verify:person:main-cutover": "node scripts/acceptance/check-main-person-cutover.mjs"
+    "verify:person:main-cutover": "node scripts/acceptance/check-main-person-cutover.mjs",
+    "verify:person:main-fk-inventory": "node scripts/acceptance/check-main-person-fk-inventory.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
