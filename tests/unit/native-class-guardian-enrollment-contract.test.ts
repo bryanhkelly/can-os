@@ -11,7 +11,7 @@ describe("native Class guardian and minor enrollment",()=>{
  it("requires one existing real CAN guardian session and verified canonical identity link",()=>{
   expect(guard).toContain('actor.role!=="guardian"');
   expect(guard).toContain("actor.sessionAccountId");
-  expect(guard).toContain("account.personId!==actor.actorPersonId");
+  expect(guard).toContain("account?.personId!==actor.actorPersonId");
   expect(guard).toContain("accessAccountCanonicalPrincipals.revokedAt");
   expect(guard).toContain("links.length!==1");
  });
