@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -325,4 +325,56 @@ export const getMyNativeClassEnrollments=createServerFn({method:"GET"})
       .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
       .where(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId))
       .orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(100);
+  });
+
+
+/** Native source history for WS1's single My Activity read model.
+ * This is not another participation engine: only existing immutable
+ * class_enrollments rows are returned, with strict per-Person scope and
+ * keyset pagination so participants never lose older records after 100.
+ *
+ * WS1 owns the cross-domain projection and final unified UI. Consumers
+ * must not infer current lesson access from a historical status row.
+ */
+const myClassHistoryInput=z.object({
+  cursor:z.object({
+    enrolledAt:z.string().datetime({offset:true}),
+    classEnrollmentId:uuid,
+  }).strict().nullable().default(null),
+}).strict();
+
+export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>myClassHistoryInput.parse(raw))
+  .handler(async({data})=>{
+    guard();
+    const {learnerPersonId}=await requireLearner();
+    const older=data.cursor?or(
+      lt(canonicalClassEnrollments.enrolledAt,new Date(data.cursor.enrolledAt)),
+      and(eq(canonicalClassEnrollments.enrolledAt,new Date(data.cursor.enrolledAt)),
+        lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)),
+    ):undefined;
+    const rows=await db.select({
+      classEnrollmentId:canonicalClassEnrollments.id,
+      classId:canonicalClasses.id,
+      title:canonicalClasses.title,
+      deliveryMode:canonicalClasses.deliveryMode,
+      creditMode:canonicalClassEnrollments.creditMode,
+      status:canonicalClassEnrollments.status,
+      courseAttemptId:canonicalClassEnrollments.courseAttemptId,
+      enrolledAt:canonicalClassEnrollments.enrolledAt,
+      siteId:canonicalClasses.siteId,
+      enrollmentMethod:canonicalClassEnrollments.enrollmentMethod,
+      classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId,
+    }).from(canonicalClassEnrollments)
+      .innerJoin(canonicalClasses,
+        eq(canonicalClasses.id,canonicalClassEnrollments.classId))
+      .where(and(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),older))
+      .orderBy(desc(canonicalClassEnrollments.enrolledAt),
+        desc(canonicalClassEnrollments.id)).limit(51);
+    const items=rows.slice(0,50);
+    const last=items[items.length-1];
+    return {items,nextCursor:rows.length>50&&last?{
+      enrolledAt:last.enrolledAt.toISOString(),
+      classEnrollmentId:last.classEnrollmentId,
+    }:null};
   });
