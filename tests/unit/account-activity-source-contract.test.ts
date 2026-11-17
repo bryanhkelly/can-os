@@ -50,8 +50,10 @@ describe("account-wide participation source authority and pagination",()=>{
     "getCommandContext(getRequest())",
     "account.personId!==actor.actorPersonId",
     "accessAccountNoncreditPrincipals.accessPersonId",
-    "link.canonicalAccountId",
-    "link.canonicalPersonId",
+    "noncredit.canonicalAccountId",
+    "noncredit.canonicalPersonId",
+    "independentlyVerified.canonicalPersonId",
+    "noncredit.canonicalPersonId!==independentlyVerified.canonicalPersonId",
     'eq(canonicalAccountGrants.roleCode,"learner")',
     "readNativeClassHistoryPage",
   ])expect(method).toContain(phrase);
