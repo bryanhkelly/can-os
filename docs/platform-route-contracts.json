@@ -499,8 +499,8 @@
       "writeBoundary": "Download uses a recipient-bound POST with current credential validity check; no issuance or revocation action on this page"
     },
     {
-      "file": "src/routes/canonical_.noncredit-completion.tsx",
-      "route": "/canonical/noncredit-completion",
+      "file": "src/routes/canonical_.noncredit-review-queue.tsx",
+      "route": "/canonical/noncredit-review-queue",
       "owner": "learning",
       "verification": "pending",
       "roleJourney": "Privately scoped noncredit completion queue for current provider",
