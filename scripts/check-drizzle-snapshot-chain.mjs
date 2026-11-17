@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
 const entries = journal.entries;
 assert.ok(entries.length>0,"No committed Drizzle migration journal.");
-assert.ok(entries.at(-1).idx>=83,"Drizzle journal tip regressed behind the reviewed 0083 baseline.");
+assert.ok(entries.at(-1).idx>=84,"Drizzle journal tip regressed behind the reviewed 0084 CAN Person cutover.");
 
 const expectedNewTables = new Map([
   [79,"public.access_session_signals"],
@@ -49,6 +49,12 @@ assert.ok(previous,"No inspected snapshots.");
 assert.ok(previous.tables["public.access_site_contact_share_revisions"],"Tip snapshot lacks contact-sharing model.");
 assert.ok(previous.tables["public.access_account_favorite_sites"],"Tip snapshot lacks Site favorites.");
 assert.ok(previous.tables["public.access_account_signups"],"Tip snapshot lacks personal account setup.");
+const account=previous.tables["public.access_accounts"];
+assert.ok(account?.columns?.person_id,"Tip snapshot lacks immutable CAN Person account ownership.");
+assert.ok(account?.foreignKeys?.access_accounts_person_id_people_id_fk,
+  "Tip snapshot lacks authoritative Person foreign key.");
+assert.ok(account?.indexes?.access_accounts_person_id_uq?.isUnique,
+  "Tip snapshot lacks unique CAN Person account ownership.");
 assert.equal(Object.keys(previous.tables["public.access_sessions"].columns).length,16,
   "Tip snapshot lacks session/device security columns.");
 const favoritesSql=readFileSync("drizzle/0081_account_favorite_sites.sql","utf8");
