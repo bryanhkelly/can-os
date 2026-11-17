@@ -63,8 +63,8 @@ export function siteWallWeek(firstLocal:string,index:number):string{
   if(!localPattern.test(firstLocal)||!Number.isInteger(index)||index<0||index>52)
     throw new Error("Invalid Class scheduling week.");
   const [datePart,timePart]=firstLocal.split("T");
-  const [year,month,day]=datePart!.split("-").map(Number);
-  const [hour,minute]=timePart!.split(":").map(Number);
+  const [year=NaN,month=NaN,day=NaN]=datePart!.split("-").map(Number);
+  const [hour=NaN,minute=NaN]=timePart!.split(":").map(Number);
   return new Date(Date.UTC(year,month-1,day+index*7,hour,minute)).toISOString().slice(0,16);
 }
 export function buildSiteClassMeetings(
