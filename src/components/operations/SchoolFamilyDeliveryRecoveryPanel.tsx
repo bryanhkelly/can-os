@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { DeliveryReceiptFacts } from "@/components/communication/DeliveryReceiptFacts";
+import { EmptyState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import {
   getSchoolFamilyDeliveryAttempts, retrySchoolFamilyDelivery,
 } from "@/modules/communication/school-family-delivery-operations.functions";
@@ -51,36 +55,37 @@ export function SchoolFamilyDeliveryRecoveryPanel({onRecovered}:{onRecovered?:()
           Only terminal failed receipts may be requeued, and every recovery is audited.
         </p>
       </div>
-      <Button variant="outline" size="sm" type="button" disabled={results.isFetching}
+      <Button variant="outline" size="sm" type="button" loading={results.isFetching} disabled={results.isFetching}
         onClick={()=>void results.refetch()}>Refresh</Button>
     </div>
-    {notice&&<p role="status" className="mt-3 border p-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 border border-destructive p-3 text-sm">{error}</p>}
+    {notice&&<WorkspaceNotice tone={error?"attention":"success"} className="mt-3">
+      <p>{notice}</p>
+      {error&&<p className="mt-1">{error}</p>}
+    </WorkspaceNotice>}
+    {error&&!notice&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>
     {results.isPending&&<p role="status" className="mt-3 text-sm">Loading delivery receipts…</p>}
-    {results.isError&&<p role="alert" className="mt-3 text-sm">
+    {results.isError&&<WorkspaceNotice tone="danger" className="mt-3">
       Delivery history is unavailable for your current Site and Organization scope.
-    </p>}
+    </WorkspaceNotice>
     {results.data&&<>
-      {results.data.items.length===0&&<p className="mt-3 text-sm text-muted-foreground">
-        No delivery receipts in this view.
-      </p>}
+      {results.data.items.length===0&&<EmptyState title="No delivery receipts in this view." className="mt-3"/>}
       <div className="mt-3 divide-y border">
         {results.data.items.map(r=><article key={r.id} className="p-3 text-sm">
           <div className="flex flex-wrap justify-between gap-3">
             <div>
-              <p className="font-semibold">{r.channel==="sms"?"SMS":"Email"} · {r.state.replaceAll("_"," ")}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Attempted {r.attempts} time{r.attempts===1?"":"s"} · {new Date(r.createdAt).toLocaleString()}
-              </p>
-              <p className="mt-1 break-all text-xs text-muted-foreground">Receipt: {r.id}</p>
+              <p className="text-sm font-semibold">{r.channel==="sms"?"SMS":"Email"}</p>
+              <StatusBadge tone={r.state==="requires_provider_reconciliation"?"attention"
+                :r.state==="failed"||r.state==="provider_failed"||r.state==="complained"?"danger"
+                  :r.state==="provider_accepted"?"info":"neutral"}>
+                {r.state.replaceAll("_"," ")}
+              </StatusBadge>
+              <DeliveryReceiptFacts receipt={r} className="mt-3 gap-2"/>
               {r.state==="requires_provider_reconciliation"&&<p className="mt-2 text-xs text-muted-foreground">
                 SMS transport outcome is uncertain. Automated and manual retries
                 are disabled to prevent duplicate messages. Reconcile with the
                 messaging provider before taking further action.
               </p>}
-              {r.nextAttemptAt&&<p className="text-xs text-muted-foreground">
-                Next attempt: {new Date(r.nextAttemptAt).toLocaleString()}
-              </p>}
+
             </div>
             {r.canRetry&&<Button variant="outline" size="sm" type="button"
               disabled={!!busy} onClick={()=>{setCandidate(r.id);setReason("");setError("");}}>
@@ -88,15 +93,13 @@ export function SchoolFamilyDeliveryRecoveryPanel({onRecovered}:{onRecovered?:()
             </Button>}
           </div>
           {candidate===r.id&&<div className="mt-3 border p-3">
-            <label className="block text-xs font-medium" htmlFor="school-family-retry-reason">
-              Recovery reason (15 to 500 characters)
-            </label>
-            <textarea id="school-family-retry-reason" value={reason} maxLength={500}
-              onChange={e=>setReason(e.target.value)}
-              className="mt-2 min-h-20 w-full border bg-background p-2 text-sm"
-              placeholder="Explain why this terminal failure should be retried."/>
+            <Field label="Recovery reason (15 to 500 characters)" required>
+              <Textarea value={reason} maxLength={500}
+                onChange={e=>setReason(e.target.value)}
+                placeholder="Explain why this terminal failure should be retried."/>
+            </Field>
             <div className="mt-2 flex gap-2">
-              <Button size="sm" type="button" disabled={!!busy||reason.trim().length<15}
+              <Button size="sm" type="button" loading={busy===r.id} disabled={!!busy||reason.trim().length<15}
                 onClick={()=>void queueRetry(r.id)}>
                 {busy===r.id?"Queueing…":"Queue safe retry"}
               </Button>
