@@ -23,20 +23,11 @@ afterEach(() => {
 });
 
 describe("published Offering catalog deployment boundary", () => {
-  it("does not touch PostgreSQL when canonical catalog is disabled", async () => {
-    vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED", "false");
-    await expect(getAvailableOfferings(context, discovery)).rejects.toThrow(
-      "Published program discovery is not yet enabled",
-    );
-    expect(state.transaction).not.toHaveBeenCalled();
-  });
-
-  it("requires exact opt-in rather than truthy environment strings", async () => {
-    vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED", "1");
-    await expect(getAvailableOfferings(context, discovery)).rejects.toThrow(
-      "Published program discovery is not yet enabled",
-    );
-    expect(state.transaction).not.toHaveBeenCalled();
+  it("ignores obsolete rollout flags and retains current authorization",async()=>{
+    vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","false");
+    state.transaction.mockResolvedValueOnce([]);
+    await expect(getAvailableOfferings(context,discovery)).resolves.toEqual([]);
+    expect(state.transaction).toHaveBeenCalledTimes(1);
   });
 
   it("denies missing authorization before starting a catalog transaction", async () => {
