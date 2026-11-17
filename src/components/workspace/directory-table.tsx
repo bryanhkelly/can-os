@@ -36,7 +36,7 @@ export type DirectoryColumn<T> = {
 export type DirectorySort = { column: string; direction: "ascending" | "descending" };
 export type DirectoryRowAction<T> = {
   id: string;
-  label: string;
+  label: string | ((row: T) => string);
   allowed: (row: T) => boolean;
   disabled?: (row: T) => boolean;
   onClick: (row: T) => void;
@@ -119,7 +119,7 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
                 {rowActions.filter(action => action.allowed(row)).map(action =>
                   <Button key={action.id} type="button" variant="ghost" size="sm"
                     disabled={action.disabled?.(row) ?? false} onClick={() => action.onClick(row)}>
-                    {action.label}
+                    {typeof action.label === "function" ? action.label(row) : action.label}
                   </Button>)}
               </div>
             </TableCell>}
