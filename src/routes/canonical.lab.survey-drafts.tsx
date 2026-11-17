@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { DirectoryTable, WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { Button } from "@/components/ui/button";
@@ -190,31 +190,18 @@ function SurveyDraftForm({ organizationId, drafts, limit, surveyPublicationEnabl
         Read back from the same organization-bound PostgreSQL role that writes drafts.
         Showing at most {limit} drafts. No published, reviewer or respondent information is exposed.
       </p>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-            <tr><th scope="col" className="p-3 font-semibold">Survey</th>
-              <th scope="col" className="p-3 font-semibold">Purpose</th>
-              <th scope="col" className="p-3 font-semibold">Draft version</th>
-              <th scope="col" className="p-3 font-semibold">Questions</th></tr>
-          </thead>
-          <tbody>
-            {drafts.map(row => <tr key={row.versionId} className="border-b border-border last:border-0">
-              <th scope="row" className="p-3 font-medium">{row.title}
-                <p className="mt-1 font-mono text-xs text-muted-foreground">{row.code}</p>
-                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.surveyId}</p>
-              </th>
-              <td className="p-3">{row.purposeCode}</td>
-              <td className="p-3">{row.versionNo}
-                <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.versionId}</p>
-              </td>
-              <td className="p-3 tabular-nums">{row.questionCount}</td>
-            </tr>)}
-            {drafts.length === 0 && <tr><td colSpan={4} className="p-4 text-muted-foreground">
-              No survey drafts found for this organization.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DirectoryTable label="Survey drafts" caption="Organization-bound survey drafts; no respondent or reviewer information."
+        rows={drafts} rowKey={row=>row.versionId}
+        empty={<p className="p-4 text-sm text-muted-foreground">No survey drafts found for this organization.</p>}
+        columns={[
+          {id:"survey",title:"Survey",render:row=><>{row.title}
+            <p className="mt-1 font-mono text-xs text-muted-foreground">{row.code}</p>
+            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.surveyId}</p></>},
+          {id:"purpose",title:"Purpose",render:row=>row.purposeCode},
+          {id:"version",title:"Draft version",render:row=><>{row.versionNo}
+            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.versionId}</p></>},
+          {id:"questions",title:"Questions",render:row=>row.questionCount},
+        ]}/>
     </section>
   </WorkspaceShell>;
 }
