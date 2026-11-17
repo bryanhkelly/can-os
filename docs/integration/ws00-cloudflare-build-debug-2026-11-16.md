@@ -86,3 +86,33 @@ Vite Cloudflare bundle (client and server) and then TypeScript. For
 additional full-unit and cross-stream checks run
 `npm run verify:ws00`. Do not assert success until commands are
 actually executed and their logs identify the checkout SHA.
+
+
+## Prior build failure review
+
+Additional production build logs from November 16 were inspected to
+identify follow-on regressions that the immediate TanStack parser error
+would have hidden.
+
+- Earlier build `dcb6563b...` failed on malformed JSX in
+  `ClassroomProjectorPlayer.tsx` and `SiteNativeClassHandoff.tsx`.
+  Current `main` has the relevant JSX closures in place, and the
+  prebuild parser now examines those files again on every build.
+- Earlier build `eac77baf...` denied a client import of
+  `native-class-room-boundary.server` from
+  `native-class-sessions.functions.ts`. That specific forbidden import
+  no longer appears in the current module.
+- Earlier build `7b9e3abf...` reported three SSR missing exports of
+  `schoolPlanningLocationSchema` imported from
+  `site-setup-configuration.ts`. All three listed callers now import
+  from `@/domain/school-stub`. The newly supplied log also passed the
+  Site planning schema import preflight.
+- An earlier noncredit cohort operations failure imported
+  `canonical-capability-lab-access.server` into the client graph;
+  that specific source import no longer appears in current
+  `noncredit-cohort-operations.functions.ts`.
+
+These checks verify that the **same historical source patterns**
+are no longer present; they are not a passing client/SSR build.
+The exact source-graph and import-protection behavior is best verified
+by the next real Cloudflare build.
