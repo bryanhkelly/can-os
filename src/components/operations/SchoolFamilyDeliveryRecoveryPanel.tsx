@@ -10,7 +10,7 @@ import { normalizeClientError } from "@/lib/client-error";
  * Authorized source-owned receipts. The retry command never sends mail from
  * the browser; it requeues the original receipt and original idempotency key.
  */
-export function SchoolFamilyDeliveryRecoveryPanel(){
+export function SchoolFamilyDeliveryRecoveryPanel({onRecovered}:{onRecovered?:()=>void|Promise<void>}={}){
   const client=useQueryClient();
   const [cursor,setCursor]=useState<string|undefined>();
   const [previous,setPrevious]=useState<Array<string|undefined>>([]);
@@ -33,7 +33,7 @@ export function SchoolFamilyDeliveryRecoveryPanel(){
       try{
         await Promise.all([
           client.invalidateQueries({queryKey:["school-family-delivery-receipts"]}),
-          client.invalidateQueries({queryKey:["operations-outbox-health"]}),
+          Promise.resolve(onRecovered?.()),
         ]);
       }catch{
         setError("Retry queued, but status refresh failed. Refresh before taking another action.");
