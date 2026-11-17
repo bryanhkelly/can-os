@@ -62,7 +62,7 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
   });
   it("keeps all native Class admission modes on one guarded enrollment path",()=>{
     const ui=read(uiPath);
-    const occurrences=ui.match(/await enrollWithLinkedCanRecovery\\(\\{data:\\{/g)??[];
+    const occurrences=ui.match(/await enrollWithLinkedCanRecovery\(\{data:\{/g)??[];
     expect(occurrences).toHaveLength(3); // self, approved, invitation
     expect(ui).toContain("catch { throw originalError; }");
   });
