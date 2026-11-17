@@ -70,14 +70,9 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     const guardians=own.filter(g=>g.role==="guardian"&&g.organizationId);
     // Match each original organization/Site grant separately. A Site-only
     // grant never broadens to sibling sites just because the org matches.
-    const scope=(org:typeof s.programs.organizationId|typeof s.sites.organizationId,
-      site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId):SQL|undefined=>{
-      const authorized=[...student,...guardians].map(g=>
-        g.organizationId?
-          and(eq(org,g.organizationId),g.siteId?eq(site,g.siteId):undefined):undefined)
-        .filter((condition):condition is SQL=>Boolean(condition));
-      return authorized.length?or(...authorized):undefined;
-    };
+    // Each source Person profile must be matched to the role that actually
+    // authorizes that subject. A guardian grant must never broaden the
+    // account owner's student profile, or vice versa.
     const scoped=(kind:"student"|"guardian",
       org:typeof s.programs.organizationId|typeof s.sites.organizationId,
       site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId):SQL|undefined=>{
@@ -86,6 +81,17 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
           and(eq(org,g.organizationId),g.siteId?eq(site,g.siteId):undefined):undefined)
         .filter((condition):condition is SQL=>Boolean(condition));
       return permitted.length?or(...permitted):undefined;
+    };
+    const profileScope=(profiles:Map<string,{name:string|null;kind:"self"|"dependent"}>,
+      profileColumn:typeof s.enrollments.studentProfileId|typeof s.activityRegistrations.studentProfileId,
+      org:typeof s.programs.organizationId|typeof s.sites.organizationId,
+      site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId):SQL|undefined=>{
+      const selfIds=[...profiles].filter(([,p])=>p.kind==="self").map(([id])=>id);
+      const childIds=[...profiles].filter(([,p])=>p.kind==="dependent").map(([id])=>id);
+      return or(
+        selfIds.length?and(inArray(profileColumn,selfIds),scoped("student",org,site)):undefined,
+        childIds.length?and(inArray(profileColumn,childIds),scoped("guardian",org,site)):undefined,
+      );
     };
     const getProfiles=async(access:"academic"|"enrollment")=>{
       const profiles=new Map<string,{name:string|null;kind:"self"|"dependent"}>();
@@ -124,12 +130,10 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
 
     if(data.source==="school_section"){
       const profiles=await getProfiles("academic");
-      if(!profiles.size||!scope(s.programs.organizationId,s.sections.siteId))
+      if(!profiles.size||!profileScope(profiles,s.enrollments.studentProfileId,s.programs.organizationId,s.sections.siteId))
         return {items:[],nextCursor:null};
-      const schoolScope=or(
-        student.length?scoped("student",s.programs.organizationId,s.sections.siteId):undefined,
-        guardians.length?scoped("guardian",s.programs.organizationId,s.sections.siteId):undefined,
-      );
+      const schoolScope=profileScope(profiles,s.enrollments.studentProfileId,
+        s.programs.organizationId,s.sections.siteId);
       const rows=await db.select({
         id:s.enrollments.id,createdAtCursor:cursorText(s.enrollments.createdAt),
         enrollmentId:s.enrollments.id,enrollmentStatus:s.enrollments.status,
@@ -156,12 +160,13 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         organizationId:row.organizationId,organizationName:row.organizationName,
         siteId:row.siteId,siteName:row.siteName,
         startsAt:row.startsAt,endsAt:row.endsAt,
-        subject:profiles.get(row.studentProfileId)!,
+        subject:{kind:profiles.get(row.studentProfileId)!.kind,
+          displayName:profiles.get(row.studentProfileId)!.name},
       })),now));
     }
     if(data.source==="school_program"){
       const profiles=await getProfiles("enrollment");
-      if(!profiles.size||!scope(s.programs.organizationId,s.programs.siteId))
+      if(!profiles.size||!profileScope(profiles,s.enrollments.studentProfileId,s.programs.organizationId,s.programs.siteId))
         return {items:[],nextCursor:null};
       const rows=await db.select({
         id:s.enrollments.id,createdAtCursor:cursorText(s.enrollments.createdAt),
@@ -177,7 +182,8 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         .where(and(
           eq(s.enrollments.kind,"program"),
           inArray(s.enrollments.studentProfileId,[...profiles.keys()]),
-          scope(s.programs.organizationId,s.programs.siteId),
+          profileScope(profiles,s.enrollments.studentProfileId,
+            s.programs.organizationId,s.programs.siteId),
           before(s.enrollments.createdAt,s.enrollments.id,data.cursor),
         )).orderBy(desc(s.enrollments.createdAt),desc(s.enrollments.id)).limit(pageSize+1);
       return finish(rows,items=>projectSchoolPrograms(items.map(row=>({
@@ -188,7 +194,7 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     }
     if(data.source==="family_enrichment"){
       const profiles=await getProfiles("enrollment");
-      if(!profiles.size||!scope(s.sites.organizationId,s.activities.siteId))
+      if(!profiles.size||!profileScope(profiles,s.activityRegistrations.studentProfileId,s.sites.organizationId,s.activities.siteId))
         return {items:[],nextCursor:null};
       const rows=await db.select({
         id:s.activityRegistrations.id,
@@ -209,7 +215,8 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         .where(and(
           inArray(s.programs.type,extended),
           inArray(s.activityRegistrations.studentProfileId,[...profiles.keys()]),
-          scope(s.sites.organizationId,s.activities.siteId),
+          profileScope(profiles,s.activityRegistrations.studentProfileId,
+            s.sites.organizationId,s.activities.siteId),
           before(s.activityRegistrations.createdAt,s.activityRegistrations.id,data.cursor),
         )).orderBy(desc(s.activityRegistrations.createdAt),
           desc(s.activityRegistrations.id)).limit(pageSize+1);
