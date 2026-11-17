@@ -41,8 +41,8 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(command).toContain("assertCurrentCanonicalStaffForMutation");
     expect(command).toContain("assertSourceBoundCompletionEvidence");
     expect(command).toContain("actor.scope.siteIds?.length!==1");
-    expect(command).toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
-    expect(command).toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
+    expect(command).not.toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
+    expect(command).not.toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
   });
   it("requires approved evidence tied to specific Class and reviewer, not an arbitrary document",()=>{
     expect(bindingSql).toContain("class_completion_decision");
