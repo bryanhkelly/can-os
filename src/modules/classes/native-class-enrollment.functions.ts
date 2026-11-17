@@ -8,7 +8,7 @@ import { accessAccounts,accessAccountNoncreditPrincipals,
   accessAccountCanonicalPrincipals } from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {
-  auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
+  canonicalClasses, canonicalClassOfferings,
   canonicalClassOfferingVersions, canonicalClassEnrollments, canonicalPersons,
   canonicalClassOutcomes, canonicalClassAwards,
   canonicalAccounts, canonicalAccountGrants,
@@ -22,6 +22,7 @@ import {
   canonicalOfferingCourses, participationAttributions, networkMemberships,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
   assertOperationalClassOfferingTerms,
@@ -389,7 +390,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
             eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
             isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
           ));
-        await tx.insert(domainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           eventType:"ClassRepeatAuthorizationConsumed",
           aggregateType:"class_repeat_authorization",
           aggregateId:repeatAuthorization.id,actorPersonId:learnerPersonId,
@@ -404,7 +405,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           eq(canonicalClassEnrollmentApprovalRequests.id,approval.id),
           eq(canonicalClassEnrollmentApprovalRequests.state,"approved"),
         ));
-        await tx.insert(domainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           eventType:"ClassApprovalAccepted",aggregateType:"class_approval_request",
           aggregateId:approval.id,actorPersonId:learnerPersonId,
           payload:{classId:instance.id,classEnrollmentId:enrollment.id,
@@ -418,7 +419,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           eq(canonicalClassEnrollmentInvitations.id,invitation.id),
           eq(canonicalClassEnrollmentInvitations.state,"pending"),
         ));
-        await tx.insert(domainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           eventType:"ClassInvitationAccepted",aggregateType:"class_invitation",
           aggregateId:invitation.id,actorPersonId:learnerPersonId,
           payload:{classId:instance.id,classEnrollmentId:enrollment.id,
@@ -426,7 +427,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
             acceptedAt:now.toISOString()},
         });
       }
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:learnerPersonId,owningOrganizationId:current.operatingOrganizationId,
         eventCode:"class.enrollment.created",entityKind:"class_enrollment",entityId:enrollment.id,
         payload:{classId:instance.id,classOfferingVersionId:version.id,
@@ -434,7 +435,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           invitationId:invitation?.id??null,approvalRequestId:approval?.id??null,
           consentVersion:version.consentVersion,consentSha256},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"ClassEnrollmentCreated",aggregateType:"class_enrollment",
         aggregateId:enrollment.id,actorPersonId:learnerPersonId,
         payload:{classId:instance.id,courseAttemptId:attempt.id},
