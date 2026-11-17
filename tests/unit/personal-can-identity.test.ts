@@ -37,7 +37,7 @@ describe("Personal CAN account boundaries", () => {
     expect(personal).toContain("let personId=account.personId");
     expect(personal).toContain("if(!existing?.active)throw new Error");
     expect(school).toContain("associated[0]?.personId??account.personId");
-    expect(school).toContain("account.personId!==existingPersonId");
+    expect(school).toContain("existingPersonId!==account.personId");
     expect(signin).toContain("boundAccount.personId!==chosenGrant?.personId");
   });
 
