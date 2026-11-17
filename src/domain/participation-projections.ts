@@ -56,6 +56,7 @@ export interface NativeClassActivity {
   classEnrollmentId: string; classId: string; title: string; status: string;
   courseAttemptId: string | null; deliveryMode: string;
   enrolledAt: DateValue; siteId: string | null;
+  officialOutcome?: {label:string;referenceId:string}|null;
 }
 export function projectNativeClasses(
   rows: readonly NativeClassActivity[], now: Date,
@@ -76,7 +77,7 @@ export function projectNativeClasses(
       subject: {kind: "self", displayName: null},
       startAt: null, endAt: null, nextAt: null,
       progress: null,
-      outcome: null,
+      outcome: item.officialOutcome ?? null,
       action: hasLearningAccess ? {
         label: "Open class", href: "/classes/" + hrefId(item.classId) + "?view=learn&tab=lessons",
       } : null,
@@ -197,6 +198,84 @@ export function projectNoncreditOpportunities(
     return rank[a.state] - rank[b.state] || a.title.localeCompare(b.title);
   });
 }
+
+export interface SchoolProgramActivity {
+  enrollmentId:string;
+  programId:string;
+  studentProfileId:string;
+  title:string;
+  status:string;
+  organizationId:string;
+  organizationName:string|null;
+  siteId:string|null;
+  siteName:string|null;
+  subjectName:string|null;
+  startsAt:DateValue;
+  endsAt:DateValue;
+}
+
+/** An existing program Enrollment, never merely a Program visible in a catalog. */
+export function projectSchoolPrograms(rows:readonly SchoolProgramActivity[],now:Date):ParticipationRecord[] {
+  return rows.map(row=>{
+    const status=state(row.status);
+    return base({
+      source:"school_program",sourceId:row.enrollmentId,
+      key:"school_program:"+row.enrollmentId,
+      refs:{enrollmentId:row.enrollmentId,programId:row.programId,studentProfileId:row.studentProfileId},
+      kind:"program",status,sourceStatus:row.status,
+      title:row.title,detail:"School Program enrollment",
+      organizationId:row.organizationId,organizationName:row.organizationName,
+      siteId:row.siteId,siteName:row.siteName,
+      subject:row.subjectName?{kind:"dependent",displayName:row.subjectName}
+        :{kind:"self",displayName:null},
+      startAt:iso(row.startsAt),endAt:iso(row.endsAt),nextAt:null,
+      progress:null,outcome:null,
+      action:status==="active"||status==="scheduled"
+        ?{label:"View school program",href:row.subjectName?"/guardian/students":"/student/my-school"}
+        :null,
+    },now);
+  });
+}
+
+export interface AcceptedCalendarEventActivity {
+  participantId:string;
+  eventId:string;
+  title:string;
+  startsAt:DateValue;
+  endsAt:DateValue;
+  organizationId:string|null;
+  siteId:string|null;
+  programId:string|null;
+  cancelled:boolean;
+}
+
+/** Explicitly accepted attendance intent. An elapsed event is NOT a completion. */
+export function projectAcceptedCalendarEvents(
+  rows:readonly AcceptedCalendarEventActivity[],now:Date,
+):ParticipationRecord[] {
+  return rows.map(row=>{
+    const startAt=iso(row.startsAt),endAt=iso(row.endsAt);
+    const status:ParticipationStatus=row.cancelled?"cancelled":"scheduled";
+    const record=base({
+      source:"calendar_event",sourceId:row.participantId,
+      key:"calendar_event:"+row.participantId,
+      refs:{calendarEventParticipantId:row.participantId,calendarEventId:row.eventId,
+        ...(row.programId?{programId:row.programId}:{})},
+      kind:"event",status,sourceStatus:row.cancelled?"cancelled":"accepted",
+      title:row.title,detail:"Accepted event invitation. Attendance not verified.",
+      organizationId:row.organizationId,organizationName:null,
+      siteId:row.siteId,siteName:null,
+      subject:{kind:"self",displayName:null},
+      startAt,endAt,nextAt:null,
+      progress:null,outcome:null,
+      action:row.cancelled?null:{label:"View event",href:"/calendar?event="+hrefId(row.eventId)},
+    },now);
+    // Keep elapsed events in history without converting acceptance to attendance.
+    return !row.cancelled&&endAt&&Date.parse(endAt)<now.getTime()
+      ?{...record,bucket:"history" as const}:record;
+  });
+}
+
 export function assembleParticipation(records: readonly ParticipationRecord[]): ParticipationRecord[] {
   // A repeated read is not permission to show duplicate personal activity.
   const seen = new Set<string>();
