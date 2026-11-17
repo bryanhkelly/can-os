@@ -14,7 +14,7 @@ import { readCookie } from "@/domain/session-cookies";
  * Never use client-supplied actor IDs, role names or localStorage to grant access.
  */
 type SessionFailure = "cookie_missing" | "cookie_invalid" | "session_configuration" | "session_not_current" | "membership_unavailable";
-function rejectSession(request: Request, reason: SessionFailure): never {
+function rejectSession(_request: Request, reason: SessionFailure): never {
  // Only fixed categories enter logs. Never include headers, tokens, hashes,
  // account identifiers, grant identifiers, request URLs or driver exceptions.
  // Missing cookies on ordinary public page loads are expected, not warnings.
