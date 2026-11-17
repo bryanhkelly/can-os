@@ -2,8 +2,11 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useDeferredValue, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, MapPin, Search } from "lucide-react";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, QueryState, StatusBadge, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { getMyCanDiscoverablePrograms } from "@/modules/identity/my-can-discovery.functions";
 
 export const Route=createFileRoute("/explore/")({component:ExplorePage});
@@ -33,33 +36,32 @@ function ExplorePage(){
     actions={<Link to="/account" className="text-sm font-semibold text-primary underline underline-offset-4">My CAN account</Link>}>
     <section aria-label="Search available programs" className="mt-6 border border-border bg-card p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
-        <label className="block text-sm font-semibold" htmlFor="explore-query">
+        <Label className="block text-sm font-semibold" htmlFor="explore-query">
           Program or location
           <span className="relative mt-2 block">
             <Search className="pointer-events-none absolute left-3 top-3.5 size-4 text-muted-foreground" aria-hidden="true"/>
-            <input id="explore-query" type="search" value={text} onChange={event=>chooseText(event.target.value)}
+            <Input id="explore-query" type="search" value={text} onChange={event=>chooseText(event.target.value)}
               maxLength={100} placeholder="Program, site, city or region"
-              className="min-h-11 w-full border border-border bg-background pl-10 pr-3 text-sm"/>
+              className="min-h-11 pl-10"/>
           </span>
-        </label>
-        <label className="block text-sm font-semibold" htmlFor="explore-type">Program type
-          <select id="explore-type" value={category} onChange={event=>chooseCategory(event.target.value as Category)}
-            className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+        </Label
+        <Label className="block text-sm font-semibold" htmlFor="explore-type">Program type
+          <Select id="explore-type" value={category} onChange={event=>chooseCategory(event.target.value as Category)}
+            className="mt-2 min-h-11">
             <option value="all">All offerings</option>
             <option value="school">Schools and K–12</option>
             <option value="community">Summer and community</option>
-          </select>
-        </label>
+          </Select
+        </Label
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Searches reviewed public programs throughout the published directory. Private rosters and unpublished programs are never included.</p>
       <Link to="/learn/enroll" search={{}} className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-primary underline">
         Register for independent and facilitator-led adult training
       </Link>
     </section>
-    {query.isPending&&<p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Searching the published directory…</p>}
-    {query.isError&&<div role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
-      Program discovery is unavailable. <button type="button" className="text-primary underline" onClick={()=>void query.refetch()}>Try again</button>
-    </div>}
+    <QueryState loading={query.isPending ? "Searching the published directory…" : undefined}
+      error={query.isError ? "Program discovery is unavailable." : undefined}
+      onRetry={() => void query.refetch()} retrying={query.isFetching}/>
     {query.data&&<section aria-label="Published search results">
       <div className="mt-6 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-serif text-2xl">Available opportunities</h2>
@@ -72,7 +74,7 @@ function ExplorePage(){
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {program.category==="school"?"School":"Community program"}
             </span>
-            <span className="text-xs text-muted-foreground">{program.status}</span>
+            <StatusBadge tone="neutral">{program.status}</StatusBadge>
           </div>
           <h3 className="mt-3 font-serif text-2xl">{program.title}</h3>
           <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">{program.description}</p>
@@ -94,9 +96,8 @@ function ExplorePage(){
           </div>
         </article>)}
       </div>
-      {!matches.length&&<p role="status" className="mt-4 border border-border bg-card p-5 text-sm">
-        {query.data.hasMore?"No matching opportunities in this segment. Continue searching for more locations.":"No approved published opportunities match these filters."}
-      </p>}
+      {!matches.length&&<EmptyState kind="matches" className="mt-4" title="No published opportunities found"
+        description={query.data.hasMore ? "No matching opportunities in this segment. Continue searching for more locations." : "No approved published opportunities match these filters."}/>}
       <nav aria-label="Search result pages" className="mt-5 flex items-center gap-3">
         <Button variant="outline" disabled={query.isFetching||history.length===0}
           onClick={()=>{
