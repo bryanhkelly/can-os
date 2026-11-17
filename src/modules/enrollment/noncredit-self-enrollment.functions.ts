@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { z } from "zod";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
-  accountPersonGrants, accessAdultLearningReviews,
+  accessAdultLearningReviews,
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons,
