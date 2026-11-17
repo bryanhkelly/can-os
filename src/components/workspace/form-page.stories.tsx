@@ -3,6 +3,7 @@ import { useState } from "react";
 import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { FormActions, FormSection } from "./form-page";
 
 function DedicatedForm({ pending = false, onSubmit }: { pending?: boolean; onSubmit: (name: string) => void }) {
@@ -63,5 +64,25 @@ export const Pending: Story = {
     await expect(fireEvent.click(cancel)).toBe(false);
     await expect(canvasElement.querySelector("[data-action-footer=form]")).toBeInTheDocument();
     await expect(canvasElement.querySelector("[data-action-footer=form]")).toBeInTheDocument();
+  },
+};
+
+export const SingleColumnEvidenceReview: Story = {
+  render: () => <div className="bg-background p-6">
+    <FormSection title="Independent evidence review" columns={1}
+      description={<><p>Verify the current record and source evidence.</p>
+        <p>Reviewing this form does not approve a school opening.</p></>}>
+      <Field label="Rationale" required>
+        <Textarea minLength={10} placeholder="Document the reviewed evidence."/>
+      </Field>
+    </FormSection>
+  </div>,
+  play: async ({ canvasElement }) => {
+    const region = within(canvasElement).getByRole("region", {name:"Independent evidence review"});
+    const describedBy = region.getAttribute("aria-describedby");
+    await expect(describedBy).toBeTruthy();
+    await expect(document.getElementById(describedBy!)?.textContent).toContain("Verify the current record");
+    await expect(region.querySelector(".grid-cols-1")).not.toBeNull();
+    await expect(within(region).getByRole("textbox", {name:/Rationale/})).toBeRequired();
   },
 };
