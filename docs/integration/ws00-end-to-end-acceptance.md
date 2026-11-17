@@ -168,3 +168,30 @@ must continue to work without provisioning again.
 **Status:** review/activation/revocation code committed to `main`; migration, independent evidence integration, and signed-in QA tests not run.
 Issue #320 remains P0 / NO-GO until the independent review path and the above
 QA assertions are completed with exact SHA and database branch evidence.
+
+
+## 2026-11-17 adult review ledger migration verification
+
+The additive `patch-reviewed-adult-class-onboarding.sql` migration was applied as
+one transaction to Neon CAN OS project `sweet-hall-62441909`:
+
+| Environment | Neon branch ID | Rows | Columns | RLS / FORCE RLS | Policies | Custom triggers | Constraints |
+|---|---|---:|---:|---|---:|---:|---:|
+| QA `test01` | `br-bitter-feather-ar0u63x7` | 0 | 11 | on / on | 1 | 1 | 21 |
+| Default `main` | `br-restless-sea-ar9ooo55` | 0 | 11 | on / on | 1 | 1 | 21 |
+
+Both policies are scoped to `neondb_owner`; the restricted
+`can_v30_canonical_auth_reader` role has no direct SELECT on the review table.
+Neither migration seeded an adult identity, review approval, canonical Person,
+learner grant, Class, Enrollment or Course Attempt. Production evidence remains
+empty, and the reviewer form is gated by schema readiness rather than proof of
+reviewer/evidence operational signoff.
+
+**Migration applied does not mean release accepted.** The `test01` branch
+still has zero canonical Classes, so the required real signed-in WS00
+one-hour-Class acceptance cannot run without independently approved, published
+QA fixtures. Required execution evidence remains: independent DOB review,
+reviewer non-self authority, positive and negative review/activation/revocation,
+source-backed Class enrollment, access and historical activity, transactional
+retries/concurrency, restricted role RLS, typecheck/build, and a passing
+Playwright trace against the exact deployed SHA. Issue #320 remains P0 open.
