@@ -292,6 +292,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/canonical.index.tsx",
+      "route": "/canonical/",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "writeBoundary": "pending",
+      "readBoundary": "pending"
+    },
+    {
       "file": "src/routes/canonical.blueprint-reviews.tsx",
       "route": "/canonical/blueprint-reviews",
       "owner": "blueprints",
@@ -299,15 +308,6 @@
       "roleJourney": "Native v3.0.1 Organization-scoped independent reviewer views frozen Blueprint versions and records evidence-backed decisions; not a legacy School Hub session",
       "readBoundary": "Canonical session projection and independent Blueprint reviewer role; review queue and evidence are Organization-scoped, with no authoring authority",
       "writeBoundary": "POST review decision through canonical server function; reviewer independence, current verified evidence, component decisions, and audit required; review cannot activate a school or Offering"
-    },
-    {
-      "file": "src/routes/canonical.program-operations.tsx",
-      "route": "/canonical/program-operations",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "Verified canonical site_admin or registrar with class.manage; independent operator Site adoption overview; deny cross-Org and unapproved Site",
-      "readBoundary": "Only current operation-operator Organization grants with active approved Offering adoptions and authorized Site roles; version impact limited to visible Site IDs",
-      "writeBoundary": "Read-only dashboard; Class mutation and publisher approval require existing separately authorized commands"
     },
     {
       "file": "src/routes/canonical.blueprints.tsx",
@@ -353,15 +353,6 @@
       "roleJourney": "Independent reviewer sees only submitted manifests under current course-specific appointments, records category decisions and publishes only fully approved tracks",
       "readBoundary": "Current reviewer organization grant, independently verified course appointment, exclude own author and presenter tracks, no access to learner records",
       "writeBoundary": "Existing audited review and publish commands require current exact manifest and independent reviews covering academic, rights, accessibility, coverage and safeguarding"
-    },
-    {
-      "file": "src/routes/canonical.index.tsx",
-      "route": "/canonical/",
-      "owner": "shell",
-      "verification": "pending",
-      "roleJourney": "pending",
-      "writeBoundary": "pending",
-      "readBoundary": "pending"
     },
     {
       "file": "src/routes/canonical.lab.credentials.tsx",
@@ -488,6 +479,15 @@
       "roleJourney": "Feature-flagged canonical learner views issued noncredit certificates and badges for the authenticated recipient; final production placement is pending",
       "readBoundary": "Canonical native learner session, credential reader feature flag and subject-bound issuance search; no provider or other recipient records exposed",
       "writeBoundary": "Download uses a recipient-bound POST with current credential validity check; no issuance or revocation action on this page"
+    },
+    {
+      "file": "src/routes/canonical.program-operations.tsx",
+      "route": "/canonical/program-operations",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "Verified canonical site_admin or registrar with class.manage; independent operator Site adoption overview; deny cross-Org and unapproved Site",
+      "readBoundary": "Only current operation-operator Organization grants with active approved Offering adoptions and authorized Site roles; version impact limited to visible Site IDs",
+      "writeBoundary": "Read-only dashboard; Class mutation and publisher approval require existing separately authorized commands"
     },
     {
       "file": "src/routes/church.apply.tsx",
@@ -832,24 +832,6 @@
       "readBoundary": "pending"
     },
     {
-      "file": "src/routes/launch.site.tsx",
-      "route": "/launch/site",
-      "owner": "programs",
-      "verification": "pending",
-      "roleJourney": "Verified registrar chooses or creates a Site; delivery, network option and private program interest chips lead to the real website preview",
-      "writeBoundary": "New Site creation and private preferences use existing verified organization and Site-scoped commands; no Program, network or enrollment grants",
-      "readBoundary": "Existing Site list is scoped to the active registrar grant; preferences are read and saved for exact authorized Site"
-    },
-    {
-      "file": "src/routes/launch.site-preview.ts",
-      "route": "/launch/site-preview",
-      "owner": "sites",
-      "verification": "pending",
-      "roleJourney": "Authorized Site operator sees a private iframe preview rendered by the canonical Site website engine with proposed interests visibly distinguished from approved offerings",
-      "writeBoundary": "GET only; no Site publication, Program mutation, enrollment or form submission",
-      "readBoundary": "Exact Site and verified registrar membership, owned Site publication reservation; approved-only Program catalogs and private Site-owned design; no-store noindex and same-origin frame"
-    },
-    {
       "file": "src/routes/launch.school.tsx",
       "route": "/launch/school",
       "owner": "programs",
@@ -866,6 +848,24 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/launch.site.tsx",
+      "route": "/launch/site",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "Verified registrar chooses or creates a Site; delivery, network option and private program interest chips lead to the real website preview",
+      "writeBoundary": "New Site creation and private preferences use existing verified organization and Site-scoped commands; no Program, network or enrollment grants",
+      "readBoundary": "Existing Site list is scoped to the active registrar grant; preferences are read and saved for exact authorized Site"
+    },
+    {
+      "file": "src/routes/launch.site-preview.ts",
+      "route": "/launch/site-preview",
+      "owner": "sites",
+      "verification": "pending",
+      "roleJourney": "Authorized Site operator sees a private iframe preview rendered by the canonical Site website engine with proposed interests visibly distinguished from approved offerings",
+      "writeBoundary": "GET only; no Site publication, Program mutation, enrollment or form submission",
+      "readBoundary": "Exact Site and verified registrar membership, owned Site publication reservation; approved-only Program catalogs and private Site-owned design; no-store noindex and same-origin frame"
     },
     {
       "file": "src/routes/launch.staff.tsx",
@@ -895,6 +895,15 @@
       "readBoundary": "Verified exact-Site editor; approved public projection plus the Site's private self-reported setup context"
     },
     {
+      "file": "src/routes/learn.activity.tsx",
+      "route": "/learn/activity",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Authenticated WS00-compatible alias to the My Activity dashboard",
+      "readBoundary": "Authenticated workspace checked; alias only, no participation data read",
+      "writeBoundary": "No writes; redirects to /learn/my-activity"
+    },
+    {
       "file": "src/routes/learn.course.$courseAttemptId.tsx",
       "route": "/learn/course/$courseAttemptId",
       "owner": "learning",
@@ -911,6 +920,15 @@
       "roleJourney": "Public approved noncredit release discovery, verified adult sign-in, explicit consent, self-registration",
       "readBoundary": "Only published and currently approved release, provider and capacity projections",
       "writeBoundary": "Single verified legacy session maps to a new native Person only after explicit consent; participant IDs are server-derived"
+    },
+    {
+      "file": "src/routes/learn.my-activity.tsx",
+      "route": "/learn/my-activity",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Account holder, student and guardian view their authorized learning, programs, and separate enrollment opportunities",
+      "writeBoundary": "Read-only projection; enrollment, waitlist, grading and completion remain owned by source services",
+      "readBoundary": "Individual source readers enforce active identity and grants; historical coverage is partial, not guaranteed complete"
     },
     {
       "file": "src/routes/learn.my-courses.tsx",
@@ -1282,6 +1300,15 @@
       "readBoundary": "pending"
     },
     {
+      "file": "src/routes/release-fingerprint.ts",
+      "route": "/release-fingerprint",
+      "owner": "shell",
+      "verification": "pending",
+      "roleJourney": "Anonymous GET returns only immutable deployed source commit fingerprint; operator uses it to compare expected main source SHA",
+      "writeBoundary": "GET only; no mutation, no configuration or secrets",
+      "readBoundary": "Fixed application name and embedded build-time SHA, cache no-store, noindex; tenant host gate never exposes app endpoints to tenant origins"
+    },
+    {
       "file": "src/routes/safeguarding.tsx",
       "route": "/safeguarding",
       "owner": "safeguarding",
@@ -1316,15 +1343,6 @@
       "roleJourney": "Settings reuses the same exact-Site School Profile, Site Information, team, academic, compliance and Website Studio workflows as Launch Hub",
       "writeBoundary": "Delegates to the same revision-checked, audited Site and domain commands; Settings adds no authority",
       "readBoundary": "Verified registrar-capable membership and explicit Site selection; no silent substitution of another Site"
-    },
-    {
-      "file": "src/routes/release-fingerprint.ts",
-      "route": "/release-fingerprint",
-      "owner": "shell",
-      "verification": "pending",
-      "roleJourney": "Anonymous GET returns only immutable deployed source commit fingerprint; operator uses it to compare expected main source SHA",
-      "writeBoundary": "GET only; no mutation, no configuration or secrets",
-      "readBoundary": "Fixed application name and embedded build-time SHA, cache no-store, noindex; tenant host gate never exposes app endpoints to tenant origins"
     },
     {
       "file": "src/routes/site-identity.tsx",
