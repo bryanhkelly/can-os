@@ -84,6 +84,15 @@ try {
   if (Number(authority.rows[0]?.count) !== 1) {
     throw Error("Independent approver must have exactly one current approved institutional or platform reviewer grant");
   }
+  // One account has one Person, including the independent approver.
+  // A legacy cross-Person grant must never approve new platform authority.
+  const approverConflicts = await client.query(`
+    SELECT count(*)::int AS count FROM public.account_person_grants
+    WHERE account_id = $1 AND active = true AND person_id <> $2
+  `, [approver.id, approver.person_id]);
+  if (Number(approverConflicts.rows[0]?.count) !== 0) {
+    throw Error("Independent approver has conflicting active Person grants");
+  }
   // Serialize concurrent provisioning requests for this specific account.
   if (execute) {
     await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text))",
