@@ -15,6 +15,7 @@ export { ActionDialog } from "./action-dialog";
 export { PageNavigation } from "./page-navigation";
 export { DirectoryPage, DirectoryTable, type DirectoryColumn, type DirectorySort } from "./directory-table";
 export { FilterBar } from "./filter-bar";
+export { RosterList } from "./roster-list";
 
 export { DashboardLayout, DashboardPanel, DashboardShortcut } from "./dashboard-layout";
 export { DashboardHome, DashboardHero } from "./dashboard-home";
