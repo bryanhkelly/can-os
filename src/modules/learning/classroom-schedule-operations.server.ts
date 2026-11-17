@@ -57,7 +57,7 @@ export async function auditPlan(tx:Tx,host:Host,planId:string,event:string,paylo
   });
   await tx.insert(domainEvents).values({
     actorPersonId:host.actor.actorPersonId!,
-    eventType:"ClassroomPlan"+event[0].toUpperCase()+event.slice(1),
+    eventType:"ClassroomPlan"+(event[0]??"").toUpperCase()+event.slice(1),
     aggregateType:"facilitated_classroom_plan",aggregateId:planId,
     payload,
   });
