@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { formatTimestamp } from "@/modules/calendar/timezone";
+import { FieldTripFacts } from "@/components/field-trips/FieldTripFacts";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -66,9 +66,6 @@ function TripPermissions({ items }: { items: Trip[] }) {
       },
     );
   }
-  const money = (cents: number) => new Intl.NumberFormat("en-US", {
-    style: "currency", currency: "USD",
-  }).format(cents / 100);
   return (
     <WorkspaceShell
       eyebrow="Family"
@@ -84,16 +81,7 @@ function TripPermissions({ items }: { items: Trip[] }) {
           <p className="text-xs uppercase tracking-wide text-muted-foreground">{item.studentName}</p>
           <h2 className="mt-2 text-xl font-semibold">{item.title}</h2>
           <p className="mt-2 text-sm">{item.destination}</p>
-          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-muted-foreground">Departure</dt>
-              <dd>{formatTimestamp(item.departsAt, item.timezone)} ({item.timezone})</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Return</dt>
-              <dd>{formatTimestamp(item.returnsAt, item.timezone)} ({item.timezone})</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Permission deadline</dt>
-              <dd>{item.deadline ? formatTimestamp(item.deadline, item.timezone) : "Before departure"}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Fee</dt>
-              <dd>{item.feeAmountCents ? money(item.feeAmountCents) : "No fee"}</dd></div>
-          </dl>
+          <FieldTripFacts trip={item}/>
           {item.status === "permission_complete"
             ? <div className="mt-4 space-y-3 rounded-lg border p-3 text-sm">
                 <p>Permission recorded.</p>
