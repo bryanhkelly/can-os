@@ -113,8 +113,8 @@ export function activityStatus(raw: string | null | undefined): ParticipationSta
     case "active": case "enrolled": case "in_progress": return "active";
     case "registered": case "scheduled": return "scheduled";
     case "pending": case "requested": return "pending";
-    case "completed": case "complete": case "approved_complete": return "completed";
-    case "withdrawn": case "dropped": return "withdrawn";
+    case "completed": case "complete": case "approved_complete": case "graduated": return "completed";
+    case "withdrawn": case "dropped": case "transferred": return "withdrawn";
     case "cancelled": case "canceled": return "cancelled";
     case "waiting": case "waitlisted": return "waitlisted";
     case "invited": return "invited";
