@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { and, eq } from "drizzle-orm";
+import { and, eq, asc, desc } from "drizzle-orm";
 
 /** Bounded, explicitly synthetic Site planning preview. Never return this
  * private-draft projection for arbitrary organizations or Sites, and never
@@ -40,8 +40,8 @@ export const getDemoCenter=createServerFn({method:"GET"}).handler(async()=>{
       eq(native.courses.id,"ca270000-0000-4000-8000-000000000041"),
       eq(native.courses.publisherOrganizationId,
         "ca270000-0000-4000-8000-000000000001"),
-      eq(native.courseVersions.id,
-        "ca270000-0000-4000-8000-000000000042"),
-    )).limit(1);
+    ))
+    .orderBy(desc(native.courseVersions.versionNo),asc(native.courseLessons.lessonOrder))
+    .limit(1);
   return {site:{id:site.id,name:site.name},plans,nativeCourse:course??null};
 });
