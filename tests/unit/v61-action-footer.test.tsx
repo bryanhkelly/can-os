@@ -1,8 +1,31 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ActionFooter } from "@/components/workspace/action-footer";
-import { FormActions } from "@/components/workspace/form-page";
+import { FormActions, FormSection } from "@/components/workspace/form-page";
 import { ActionDialog } from "@/components/workspace/action-dialog";
+
+describe("V6.1 shared FormSection", () => {
+  it("provides accessible rich descriptions without nesting paragraphs", () => {
+    const html = renderToStaticMarkup(<FormSection title="Evidence review"
+      description={<><p>Check the official source.</p><p>Do not invent evidence.</p></>}
+      columns={1}><label htmlFor="evidence-note">Review note</label><textarea id="evidence-note"/></FormSection>);
+    const titleId = html.match(/aria-labelledby="([^"]+)"/)?.[1];
+    const descriptionId = html.match(/aria-describedby="([^"]+)"/)?.[1];
+    expect(titleId).toBeTruthy();
+    expect(descriptionId).toBeTruthy();
+    expect(html).toContain(`id="${titleId}"`);
+    expect(html).toContain(`id="${descriptionId}"`);
+    expect(html).toContain('<p>Check the official source.</p>');
+    expect(html).toContain('<p>Do not invent evidence.</p>');
+    expect(html).toContain("grid-cols-1");
+    expect(html).not.toContain("sm:grid-cols-2");
+  });
+  it("retains two-column layout by default without an empty description reference", () => {
+    const html = renderToStaticMarkup(<FormSection title="School dates"><span>Start</span></FormSection>);
+    expect(html).toContain("sm:grid-cols-2");
+    expect(html).not.toContain("aria-describedby=");
+  });
+});
 
 describe("V6.1 shared action layout", () => {
   it("renders a neutral footer without creating another form", () => {
