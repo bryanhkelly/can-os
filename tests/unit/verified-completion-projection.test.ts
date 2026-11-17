@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   countCurrentNoncreditCompletions, projectCurrentNoncreditCompletion,
-  projectUnverifiedClassOutcome,
+  projectUnverifiedClassOutcome,projectCurrentNativeClassCompletion,
   type NoncreditCompletionDecisionRef,
 } from "@/domain/verified-completion-projection";
 
@@ -73,5 +73,45 @@ describe("WS3 completion reference source of truth",()=>{
     expect(countCurrentNoncreditCompletions(new Map([
       ["registration-A",[old,old]],
     ]))).toEqual({verifiedCompletions:0,undeterminedRegistrations:["registration-A"]});
+  });
+});
+
+
+describe("WS3 native Class Activity projection",()=>{
+  const first={
+    id:"class-decision-1",classEnrollmentId:"class-enrollment-A",
+    sourceKind:"ws3_governed",completionPolicyVersionId:"class-policy-A",
+    resultCode:"completed" as const,supersedesOutcomeId:null,
+    currentValidity:true,
+  };
+  it("shows verified Class outcome only after canonical current source is valid",()=>{
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[first]))
+      .toEqual({state:"completed",verifiedCompletion:true,
+        decisionId:"class-decision-1",
+        outcome:{label:"Verified Class completion",referenceId:"class-decision-1"}});
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[
+      {...first,currentValidity:false},
+    ])).toMatchObject({state:"source_invalid",verifiedCompletion:false});
+  });
+  it("retains terminal Enrollment history without treating a correction as valid",()=>{
+    const revised={...first,id:"class-decision-2",resultCode:"voided" as const,
+      supersedesOutcomeId:"class-decision-1",currentValidity:false};
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[
+      first,revised,
+    ])).toMatchObject({state:"voided",verifiedCompletion:false,
+      decisionId:"class-decision-2"});
+  });
+  it("fails closed for unapproved Class outcomes, duplicate or branching source",()=>{
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[
+      {...first,sourceKind:"unverified_host_note"},
+    ]).state).toBe("unavailable");
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[first,first])
+      .state).toBe("unavailable");
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[
+      first,{...first,id:"extra-root"},
+    ]).state).toBe("unavailable");
+    expect(projectCurrentNativeClassCompletion("class-enrollment-A",[
+      {...first,classEnrollmentId:"other-Class"},
+    ]).state).toBe("unavailable");
   });
 });
