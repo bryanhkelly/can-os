@@ -49,12 +49,14 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getCommandContext(getRequest());
-    if(!actor.actorPersonId||!actor.accountId)
-      throw new AuthorizationError("verified account Person");
+    if(!actor.actorPersonId||!actor.accountId||actor.sessionAccountId)
+      throw new AuthorizationError("real verified account Person");
     const [account]=await db.select({
       email:s.accessAccounts.emailNormalized,personId:s.accessAccounts.personId,
+      disabled:s.accessAccounts.disabled,verifiedAt:s.accessAccounts.emailVerifiedAt,
     }).from(s.accessAccounts).where(eq(s.accessAccounts.id,actor.accountId)).limit(1);
-    if(!account||account.personId!==actor.actorPersonId)
+    if(!account||account.disabled||!account.verifiedAt||
+       account.personId!==actor.actorPersonId)
       throw new AuthorizationError("single CAN account Person");
     const {grants}=await readSessionGrants(actor.accountId,account.email);
     // Explicitly match original live grants to this single authenticated
