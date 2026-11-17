@@ -27,6 +27,21 @@ describe("V6.1 shared FormSection", () => {
   });
 });
 
+describe("V6.1 inline record actions", () => {
+  it("reuses the footer geometry without introducing a form or dialog", () => {
+    const html = renderToStaticMarkup(<ActionFooter layout="inline">
+      <button type="button">Approve record</button>
+      <button type="button">Cancel edit</button>
+    </ActionFooter>);
+    expect(html).toContain('data-action-footer="inline"');
+    expect(html).toContain("mt-3");
+    expect(html).not.toContain("data-form-actions");
+    expect(html).not.toContain("data-dialog-actions");
+    expect(html).not.toContain("<form");
+    expect(html.indexOf("Approve record")).toBeLessThan(html.indexOf("Cancel edit"));
+  });
+});
+
 describe("V6.1 shared action layout", () => {
   it("renders a neutral footer without creating another form", () => {
     const html = renderToStaticMarkup(
