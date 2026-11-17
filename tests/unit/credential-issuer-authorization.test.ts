@@ -14,8 +14,14 @@ describe("P0 independent credential issuer authorization",()=>{
       expect(canonicalRoleCapabilities[role]).not.toContain("credential.issue");
     }
     const issuance=file("src/modules/learning/credential-issuance.functions.ts");
-    expect(issuance).not.toContain("CAN_CREDENTIAL_ISSUANCE_ENABLED");
-    expect(issuance).toContain("assertCurrentCredentialIssuer(tx,getRequest(),actor)");
+    expect(issuance).toContain('process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true"');
+    expect(issuance).toContain("assertCurrentCredentialIssuer(tx, getRequest(), actor)");
+    expect(issuance).toContain("assertNoncreditCompletionSiteScope(tx, actor, registration)");
+    expect(issuance).toContain("registration.participantPersonId === actor.actorPersonId");
+    expect(issuance.indexOf("assertCurrentCredentialIssuer(tx, getRequest(), actor)"))
+      .toBeLessThan(issuance.indexOf("if (existing?.issuanceId)"));
+    expect(issuance.indexOf("assertNoncreditCompletionSiteScope(tx, actor, registration)"))
+      .toBeLessThan(issuance.indexOf("if (existing?.issuanceId)"));
     expect(issuance).not.toContain('assertCapability(actor, "credential.issue")');
   });
   it("only an existing verified CAN login can hold active issuance authority",()=>{
