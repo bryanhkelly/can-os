@@ -10,7 +10,7 @@ describe("native Class evidence consolidates on existing canonical engines",()=>
     expect(source).toContain('access.source!=="class"');
     expect(source).toContain("cls.courseVersionId!==access.courseVersionId");
     expect(source).toContain('setResponseHeader("Cache-Control","private, no-store")');
-    expect(source).toContain('process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true"');
+    expect(source).not.toContain('process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED');
   });
   it("reuses canonical assessment grants, finalized results and lesson evidence without creating a second ledger",()=>{
     const source=read("src/modules/classes/native-class-canonical-evidence.functions.ts");
