@@ -13,7 +13,7 @@ describe("noncredit 48-hour invitation delivery",()=>{
       releaseClosesAt:new Date(until.getTime()+60_000),now,
     };
     expect(currentWaitlistEmailOpportunity(valid)).toBe(true);
-    expect(currentWaitlistEmailOpportunity(opportunity)...valid,waitlistStatus:"accepted"})).toBe(false);
+    expect(currentWaitlistEmailOpportunity({...valid,waitlistStatus:"accepted"})).toBe(false);
     expect(currentWaitlistEmailOpportunity({...valid,waitlistStatus:"cancelled"})).toBe(false);
     expect(currentWaitlistEmailOpportunity({...valid,invitationExpiresAt:null})).toBe(false);
     expect(currentWaitlistEmailOpportunity({...valid,deliveryInvitationExpiresAt:new Date(until.getTime()-1)})).toBe(false);
@@ -32,7 +32,7 @@ describe("noncredit 48-hour invitation delivery",()=>{
   it("rechecks live eligibility and verified adult identity through its source adapter",()=>{
     const worker=read("src/modules/enrollment/noncredit-waitlist-delivery.server.ts");
     const dispatcher=read("src/modules/communication/outbound-dispatcher.server.ts");
-    expect(worker).toContain("currentWaitlistEmailOpportunity({");
+    expect(worker).toContain("currentWaitlistEmailOpportunity(opportunity)");
     expect(worker).toContain("record.delivery.invitationExpiresAt");
     expect(worker).toContain("readEligibleSelfEnrollmentReleases(db, record.releaseId)");
     expect(worker).toContain("record.releaseStatus");
