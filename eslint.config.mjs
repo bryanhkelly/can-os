@@ -108,5 +108,16 @@ export default tseslint.config(
       }],
     },
   },
+  // Evidence family is fully on canonical form primitives; new native controls are forbidden.
+  {
+    files: ["src/components/evidence/**/*.tsx"],
+    ignores: ["src/components/evidence/**/*.stories.tsx", "src/components/evidence/**/*.test.tsx"],
+    rules: {
+      "no-restricted-syntax": ["error", {
+        selector: "JSXOpeningElement[name.name=/^(button|input|select|textarea|label)$/]",
+        message: "Evidence components must use V6.1 Button, Field, Input, Select or Textarea.",
+      }],
+    },
+  },
   ...storybook.configs["flat/recommended"],
 );
