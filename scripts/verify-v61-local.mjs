@@ -2,8 +2,10 @@
 /**
  * CAN OS V6.1 local engineering gate.
  *
- * No GitHub Actions, Netlify, credentials, database writes, deployments or
- * remote browser acceptance. Records what actually ran at an exact main SHA.
+ * Never invokes GitHub Actions, Netlify, migrations, deployments or remote
+ * browser acceptance. Records what actually ran at one local main SHA.
+ * Database environment variables are scrubbed, but a test or local .env file
+ * can introduce its own connection: this is not a database isolation sandbox.
  */
 import { spawnSync } from "node:child_process";
 import { closeSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
@@ -105,15 +107,31 @@ const evidence = {
 function save() {
   writeFileSync(join(directory, "results.json"), JSON.stringify(evidence, null, 2) + "\n");
 }
+function sourceIntegrity() {
+  const observedBranch = git("branch", "--show-current");
+  const observedSha = git("rev-parse", "HEAD");
+  const trackedChanges = git("status", "--porcelain", "--untracked-files=no");
+  return {
+    observedBranch, observedSha, trackedChanges: trackedChanges || null,
+    valid: observedBranch === context.branch &&
+      observedSha === context.sha && !trackedChanges,
+  };
+}
 console.log(`[V6.1] Local gate for main @ ${context.sha}`);
 console.log(`[V6.1] Evidence folder: ${directory}`);
-console.log("[V6.1] No database, Netlify, GitHub Actions or deployment commands are executed.");
+console.log("[V6.1] No migration, deploy, Netlify or GitHub Actions commands are executed.");
+console.log("[V6.1] Review local .env files before testing; scrubbed shell vars do not isolate external services.");
 save();
 
+let sourceInvalid = false;
 for (const step of checks) {
   const command = `${step.cmd} ${step.args.join(" ")}`;
-  const blockedBy = step.id === "dependencies" ? [] : [
-    ...(evidence.checks.find(c => c.id === "dependencies")?.status === "passed" ? [] : ["dependencies"]),
+  const before = sourceIntegrity();
+  if (!before.valid) sourceInvalid = true;
+  const blockedBy = [
+    ...(sourceInvalid ? ["main SHA / clean-tree integrity"] : []),
+    ...(step.id === "dependencies" || evidence.checks.find(c => c.id === "dependencies")?.status === "passed"
+      ? [] : ["dependencies"]),
     ...(step.requires ?? []).filter(id => evidence.checks.find(c => c.id === id)?.status !== "passed"),
   ];
   if (blockedBy.length) {
@@ -131,9 +149,12 @@ for (const step of checks) {
     timeout: 20 * 60 * 1000,
   });
   closeSync(fd);
-  const status = r.status === 0 && !r.error ? "passed" : "failed";
+  const after = sourceIntegrity();
+  if (!after.valid) sourceInvalid = true;
+  const status = !after.valid ? "invalidated" : r.status === 0 && !r.error ? "passed" : "failed";
   const record = {
     id: step.id, name: step.name, command, status,
+    integrityBefore: before, integrityAfter: after,
     startedAt: started.toISOString(),
     durationMs: Date.now() - started.getTime(),
     exitCode: r.status,
@@ -142,20 +163,25 @@ for (const step of checks) {
   };
   evidence.checks.push(record);
   console.log(`[V6.1] ${status.toUpperCase()} ${step.id}${r.error ? ": " + r.error.message : ""}`);
-  if (status === "failed") {
+  if (status !== "passed") {
+    if (status === "invalidated") {
+      console.error("[V6.1] SOURCE INTEGRITY LOST: branch, HEAD or tracked files changed during verification.");
+    }
     const tail = readFileSync(logFile, "utf8").trim().split("\n").slice(-12).join("\n");
     if (tail) console.error(tail);
   }
   save();
 }
 
-const dirty = git("status", "--porcelain", "--untracked-files=no");
-evidence.trackedChangesAfterChecks = dirty || null;
+const finalIntegrity = sourceIntegrity();
+evidence.sourceIntegrityAtEnd = finalIntegrity;
 evidence.finishedAt = new Date().toISOString();
-evidence.result = evidence.checks.every(x => x.status === "passed") && !dirty
+evidence.result = evidence.checks.every(x => x.status === "passed") && finalIntegrity.valid && !sourceInvalid
   ? "engineering-gate-passed" : "engineering-gate-not-passed";
 save();
-if (dirty) console.error("[V6.1] Tracked files changed during verification:\n" + dirty);
+if (!finalIntegrity.valid) {
+  console.error("[V6.1] Source changed or tracked files are dirty; evidence cannot certify the starting SHA.");
+}
 console.log(`[V6.1] ${evidence.result} at ${context.sha}`);
 console.log(`[V6.1] Logs and evidence: ${directory}`);
 console.log("[V6.1] This is NOT a production or authenticated-browser acceptance certificate.");
