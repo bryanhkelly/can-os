@@ -51,6 +51,7 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
       accessPersonId:accessAdultLearningReviews.accessPersonId,
       canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
       canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
+    verifiedBirthDate:accessAdultLearningReviews.verifiedBirthDate,
     }).from(accessAdultLearningReviews).where(
       eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
     ).limit(1):[];
@@ -71,8 +72,10 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
       disabledAt:canonicalAccounts.disabledAt,verifiedAt:canonicalAccounts.emailVerifiedAt,
     }).from(canonicalAccounts)
       .where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
-    const [person]=await tx.select({id:canonicalPersons.id})
+    const [person]=await tx.select({id:canonicalPersons.id,birthDate:canonicalPersons.birthDate})
       .from(canonicalPersons).where(eq(canonicalPersons.id,link.canonicalPersonId)).limit(1);
+    if(adultReview&&person?.birthDate!==adultReview.verifiedBirthDate)
+      throw new AuthorizationError("canonical adult date of birth differs from approved evidence");
     if(!native || !person || native.disabledAt || !native.verifiedAt ||
        native.email!==owner.email)
       throw new AuthorizationError("verified native identity unavailable");
