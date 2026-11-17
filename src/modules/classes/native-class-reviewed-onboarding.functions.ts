@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { setResponseHeader } from "@tanstack/react-start/server";
+import { appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
@@ -183,6 +183,6 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
     const cookie=await issueNativeLearnerSession(tx,nativeAccountId,grantId,now);
     return {cookie};
   });
-  setResponseHeader("Set-Cookie",result.cookie);
+  appendResponseHeader("Set-Cookie",result.cookie);
   return {ready:true as const};
  });
