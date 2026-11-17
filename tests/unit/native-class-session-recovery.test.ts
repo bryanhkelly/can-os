@@ -51,7 +51,7 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
     expect(source).toContain('pg_advisory_xact_lock(hashtext(');
     expect(source).toContain('eventCode:"class.learner.session.resumed"');
     expect(source).toContain("issueNativeLearnerSession(tx,native.accountId,grant.id,now)");
-    expect(source.indexOf('setResponseHeader("Set-Cookie",cookie)'))
+    expect(source.indexOf('appendResponseHeader("Set-Cookie",cookie)'))
       .toBeGreaterThan(source.indexOf("const {cookie}=await db.transaction"));
   });
   it("offers recoverable UX without claiming a new user's identity is already verified",()=>{
