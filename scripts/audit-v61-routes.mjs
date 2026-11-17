@@ -31,6 +31,8 @@ const sourceGuarded = new Set([
   "guardian.report-cards.tsx",
   "student.assignments.tsx",
   "operations.insights.tsx",
+  "admissions.families.tsx",
+  "operations.course-requests.tsx",
   "platform.tsx",
 ]);
 
