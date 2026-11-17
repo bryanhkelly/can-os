@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { DirectoryTable, WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -26,39 +26,19 @@ function AssessmentLabPage() {
         Authoring, item review, secure scoring and readiness decisions remain with their owned workflows.
       </p>
     </section>
-    <div className="mt-5 overflow-x-auto border border-border bg-card">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-          <tr>
-            <th scope="col" className="p-3 font-semibold">Assessment</th>
-            <th scope="col" className="p-3 font-semibold">Purpose</th>
-            <th scope="col" className="p-3 font-semibold">Status</th>
-            <th scope="col" className="p-3 font-semibold">Versions</th>
-            <th scope="col" className="p-3 font-semibold">Course linkage</th>
-          </tr>
-        </thead>
-        <tbody>
-          {assessments.map(row => <tr key={row.id} className="border-b border-border align-top last:border-0">
-            <th scope="row" className="p-3 font-medium">{row.title}
-              <p className="mt-1 font-mono text-xs font-normal text-muted-foreground">{row.key}</p>
-              <p className="mt-1 break-all font-mono text-xs font-normal text-muted-foreground">{row.id}</p>
-            </th>
-            <td className="p-3">{row.purpose}</td>
-            <td className="p-3">{row.status}</td>
-            <td className="p-3 tabular-nums">{row.versionCount}
-              <p className="mt-1 text-xs text-muted-foreground">
-                {row.latestVersionNo === null ? "No versions" : "Latest v" + row.latestVersionNo + " · " + row.latestLifecycle}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {row.hasPublishedVersion ? "Published version exists" : "None published"}
-              </p>
-            </td>
-            <td className="p-3">{row.isCourseLinked ? "Version linked" : "Not linked"}</td>
-          </tr>)}
-          {assessments.length === 0 && <tr><td colSpan={5} role="status"
-            className="p-5 text-muted-foreground">No organization-owned assessment definitions in this scope.</td></tr>}
-        </tbody>
-      </table>
-    </div>
+    <DirectoryTable label="Assessment inventory" caption="Organization-owned assessment definitions; learner answers and secure scoring are excluded."
+      rows={assessments} rowKey={row=>row.id}
+      empty={<p className="p-4 text-sm text-muted-foreground">No organization-owned assessment definitions in this scope.</p>}
+      columns={[
+        {id:"assessment",title:"Assessment",render:row=><>{row.title}
+          <p className="mt-1 font-mono text-xs text-muted-foreground">{row.key}</p>
+          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.id}</p></>},
+        {id:"purpose",title:"Purpose",render:row=>row.purpose},
+        {id:"status",title:"Status",render:row=>row.status},
+        {id:"versions",title:"Versions",render:row=><>{row.versionCount}
+          <p className="mt-1 text-xs text-muted-foreground">{row.latestVersionNo===null?"No versions":"Latest v"+row.latestVersionNo+" · "+row.latestLifecycle}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{row.hasPublishedVersion?"Published version exists":"None published"}</p></>},
+        {id:"linkage",title:"Course linkage",render:row=>row.isCourseLinked?"Version linked":"Not linked"},
+      ]}/>
   </WorkspaceShell>;
 }
