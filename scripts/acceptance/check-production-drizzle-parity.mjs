@@ -14,7 +14,7 @@ import { neon } from "@neondatabase/serverless";
 const PROJECT = "sweet-hall-62441909";
 const BRANCH = "br-restless-sea-ar9ooo55";
 const start = 76;
-const tip = 83;
+const tip = 84;
 const expectedAdded = new Map([
   [79, "public.access_session_signals"],
   [81, "public.access_account_favorite_sites"],
@@ -54,6 +54,13 @@ assert.ok(current.tables["public.access_site_contact_share_revisions"], "Contact
 assert.ok(current.tables["public.access_account_signups"], "Personal CAN signup missing from snapshot tip.");
 assert.equal(Object.keys(current.tables["public.access_sessions"].columns).length, 16,
   "Account session security columns missing from tip snapshot.");
+
+const account=current.tables["public.access_accounts"];
+assert.ok(account?.columns?.person_id,"Immutable CAN Person column absent from migration snapshot tip.");
+assert.ok(account?.foreignKeys?.access_accounts_person_id_people_id_fk,
+  "Account Person foreign key absent from migration snapshot tip.");
+assert.ok(account?.indexes?.access_accounts_person_id_uq?.isUnique,
+  "Unique account/Person ownership index absent from migration snapshot tip.");
 
 const expectedRows = entries.filter(entry => entry.idx >= 79).map(entry => {
   const path = `drizzle/${entry.tag}.sql`;
@@ -111,9 +118,18 @@ const [check] = await query`
      WHERE schemaname='public' AND tablename='access_site_contact_share_revisions'
        AND policyname='account_contact_shares_own_only') AS consent_rls,
    EXISTS (SELECT 1 FROM pg_roles
-     WHERE rolname='can_v30_site_identity_writer' AND NOT rolbypassrls AND NOT rolcanlogin) AS scoped_writer
+     WHERE rolname='can_v30_site_identity_writer' AND NOT rolbypassrls AND NOT rolcanlogin) AS scoped_writer,
+   EXISTS (SELECT 1 FROM information_schema.columns
+     WHERE table_schema='public' AND table_name='access_accounts'
+       AND column_name='person_id') AS account_person_anchor,
+   EXISTS (SELECT 1 FROM pg_indexes
+     WHERE schemaname='public' AND indexname='access_accounts_person_id_uq') AS account_person_unique,
+   EXISTS (SELECT 1 FROM pg_trigger
+     WHERE tgname='can_account_person_immutable' AND tgenabled IN ('O','A')) AS account_person_immutable,
+   EXISTS (SELECT 1 FROM pg_trigger
+     WHERE tgname='can_account_grants_one_person_guard' AND tgenabled IN ('O','A')) AS one_person_grant_guard
 `;
-assert.equal(Number(check?.migration_count), 85, "Drizzle migration ledger must contain exactly 85 records.");
+assert.equal(Number(check?.migration_count), 86, "Drizzle migration ledger must contain exactly 86 records.");
 for (const [key, value] of Object.entries(check)) {
   if (key !== "migration_count") assert.equal(value, true, `Missing required production object: ${key}`);
 }
@@ -125,7 +141,7 @@ console.log(JSON.stringify({
   role:identity.database_user,
   migrations:Number(check.migration_count),
   last_migration:expectedRows.at(-1).tag,
-  tip_snapshot:"0083_snapshot.json",
+  tip_snapshot:"0084_snapshot.json",
   models:Object.keys(current.tables).length,
   note:"Read-only schema/ledger check; does NOT establish Cloudflare deployment, role-based browser acceptance or production rollback.",
 },null,2));
