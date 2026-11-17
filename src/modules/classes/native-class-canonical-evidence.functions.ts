@@ -1,4 +1,4 @@
-import { and, eq, inArray, desc } from "drizzle-orm";
+import { and, eq, inArray, desc, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -124,6 +124,36 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
           eq(canonicalClassOutcomes.outcomeKind,"completion"))).limit(101);
       if(completionRecords.length>100)
         throw new AuthorizationError("Class completion history needs pagination");
+      // WS3-protected lookup is unavailable until the authoritative SQL patch,
+      // independent source binding and feature are deployed. Earlier generic
+      // Class Outcomes are never promoted to verified completion.
+      let classCompletionAuthorityVerified=false;
+      if(process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED==="true"){
+        const governed=await tx.select({
+          id:canonicalClassOutcomes.id,
+          resultCode:canonicalClassOutcomes.resultCode,
+          supersedesOutcomeId:canonicalClassOutcomes.supersedesOutcomeId,
+        }).from(canonicalClassOutcomes)
+          .where(and(
+            eq(canonicalClassOutcomes.classEnrollmentId,enrollment.id),
+            eq(canonicalClassOutcomes.outcomeKind,"completion"),
+            eq(canonicalClassOutcomes.sourceKind,"ws3_governed"),
+          )).limit(501);
+        if(governed.length>500)
+          throw new AuthorizationError("Governed completion history needs pagination");
+        const superseded=new Set(governed.flatMap(row=>row.supersedesOutcomeId?
+          [row.supersedesOutcomeId]:[]));
+        const current=governed.filter(row=>!superseded.has(row.id));
+        if(governed.length && current.length!==1)
+          throw new AuthorizationError("Conflicting governed Class completion");
+        if(current.length===1 && current[0]!.resultCode==="completed"){
+          const validity=await tx.execute(sql`
+            SELECT education_v30.v301_ws3_class_completion_is_current(
+              ${current[0]!.id}::uuid) AS valid
+          `);
+          classCompletionAuthorityVerified=validity.rows[0]?.valid===true;
+        }
+      }
       return {
         courseAttemptId:access.courseAttemptId,
         completedLessons,totalLessons:lessons.length,
@@ -131,7 +161,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
         finalizedAssessments:valid.length,
         finalizedPassed:valid.filter(row=>row.outcome==="pass").length,
         classCompletionOutcomeRecorded:completionRecords.length>0,
-        classCompletionAuthorityVerified:false,
+        classCompletionAuthorityVerified,
         classCompletionEvidenceCount:completionRecords.length,
         note:"Recorded Class outcome evidence is not a verified completion decision until an independently approved participant-pinned completion policy and authorized decision are established. Finalized assessments, lesson ticks, room playback and attendance cannot grant a certificate, academic credit or award.",
       };
