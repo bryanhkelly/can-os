@@ -253,6 +253,24 @@ for (const [path, component] of Object.entries(statusConsumers)) {
   }
 }
 
+// Domain telemetry composes the shared metric and status patterns.
+// A list of source-authorized values is not a custom dashboard card API.
+const metricConsumers = {
+  "operations/OutboxHealthPanel.tsx": ["<StatCard", "<WorkspaceNotice", "<QueryState"],
+  "operations/SiteStaffingFeedback.tsx": ["<WorkspaceNotice", "<Button"],
+};
+for (const [file, required] of Object.entries(metricConsumers)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of required) if (!source.includes(fragment)) {
+    console.error(`${file} must use ${fragment}`);
+    process.exitCode = 1;
+  }
+  if (radiusUtility.test(source)) {
+    console.error(`${file} must retain V6.1 rectangular geometry`);
+    process.exitCode = 1;
+  }
+}
+
 // Shared workflow history must render through the V6.1 pattern while retaining
 // the domain's existing decisions, credentials and server authorization.
 const statusTimeline = readFileSync(join(root, "workflow/status-timeline.tsx"), "utf8");
