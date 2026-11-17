@@ -13,12 +13,15 @@ import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 
 export const Route=createFileRoute("/class")({
-  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string}=>({
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string}=>({
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
     classId:typeof value.classId==="string"&&
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.classId)
       ?value.classId:undefined,
+    siteId:typeof value.siteId==="string"&&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.siteId)
+      ?value.siteId:undefined,
   }),
   component:NativeLearnerClasses,
 });
@@ -226,12 +229,16 @@ function NativeLearnerClasses(){
   const [searchText,setSearchText]=useState(requested.search??"");
   const [search,setSearch]=useState(requested.search??"");
   const [filteredClassId,setFilteredClassId]=useState(requested.classId??"");
+  const siteId=requested.siteId;
+  const [deliveryMode,setDeliveryMode]=useState<"all"|"self_paced"|"scheduled"|"facilitated"|"hybrid">("all");
   const catalog=useInfiniteQuery({
-    queryKey:["native-public-class-catalog",search,filteredClassId],
+    queryKey:["native-public-class-catalog",search,filteredClassId,siteId,deliveryMode],
     initialPageParam:null as {title:string;classId:string}|null,
     queryFn:({pageParam})=>getNativePublicClassCatalogPage({data:{
       search,cursor:pageParam,
       ...(filteredClassId?{classId:filteredClassId}:{}),
+      ...(siteId?{siteId}:{}),
+      ...(deliveryMode==="all"?{}:{deliveryMode}),
     }}),
     getNextPageParam:last=>last.nextCursor,
     retry:false,
@@ -253,7 +260,7 @@ function NativeLearnerClasses(){
   const enrolledItems=enrolled.data?.pages.flatMap(page=>page.items)??[];
   async function refresh(){
     await Promise.all([
-      client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId]}),
+      client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId,siteId,deliveryMode]}),
       client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]}),
       client.invalidateQueries({queryKey:["native-my-class-invitations"]}),
       // WS1 projects this source independently. Enrollment and withdrawal must
@@ -297,6 +304,9 @@ function NativeLearnerClasses(){
     <section className="mt-8">
       <h2 className="font-serif text-2xl">Explore Classes</h2>
       <p className="mt-2 text-sm text-muted-foreground">Only currently published public Class Offerings are listed. Private and unlisted Classes are not shown.</p>
+      {siteId&&<p className="mt-2 text-sm text-muted-foreground">
+        Browsing public Classes at the selected Site. Current Site and Offering authority are verified on every page.
+      </p>}
       <form className="mt-4 flex flex-wrap gap-2" role="search"
         onSubmit={event=>{event.preventDefault();setFilteredClassId("");setSearch(searchText.trim());}}>
         <label className="sr-only" htmlFor="native-class-catalog-search">Search Classes</label>
@@ -304,6 +314,16 @@ function NativeLearnerClasses(){
           value={searchText} onChange={event=>setSearchText(event.target.value)}
           placeholder="Search by Class name"
           className="min-h-11 min-w-[14rem] flex-1 border border-border bg-background px-3 text-sm"/>
+        <label className="sr-only" htmlFor="native-class-delivery-mode">Delivery format</label>
+        <select id="native-class-delivery-mode" value={deliveryMode}
+          onChange={event=>setDeliveryMode(event.target.value as typeof deliveryMode)}
+          className="min-h-11 border border-border bg-background px-3 text-sm">
+          <option value="all">All formats</option>
+          <option value="self_paced">Self-paced</option>
+          <option value="scheduled">Scheduled</option>
+          <option value="facilitated">Facilitated</option>
+          <option value="hybrid">Hybrid</option>
+        </select>
         <Button type="submit">Search Classes</Button>
         {(search||filteredClassId)&&<Button type="button" variant="outline"
           onClick={()=>{setFilteredClassId("");setSearch("");setSearchText("");}}>

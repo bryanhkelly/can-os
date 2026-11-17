@@ -27,4 +27,10 @@ describe("native Class route ownership", () => {
     expect(read("src/domain/site-enrollment-opportunities.ts")).toContain('"/class?classId="');
     expect(read("src/domain/participation-projections.ts")).toContain('href: "/class/" + hrefId(item.classId)');
   });
+  it("filters public discovery on the server before pagination, not by hiding result cards", () => {
+    const catalog=read("src/modules/classes/native-class-enrollment.functions.ts");
+    expect(catalog).toContain("data.siteId?eq(canonicalClasses.siteId,data.siteId):undefined");
+    expect(catalog).toContain("data.deliveryMode?eq(canonicalClasses.deliveryMode,data.deliveryMode):undefined");
+    expect(read("src/routes/class.tsx")).toContain("...(deliveryMode===\"all\"?{}:{deliveryMode})");
+  });
 });

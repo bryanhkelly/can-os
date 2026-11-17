@@ -529,3 +529,7 @@ An internal assigned Class need not publish a Class Offering.
 This integration is on draft PR #298 only, with no production migration,
 deployment or classroom E2E acceptance. Apply the two ordered SQL patches only
 to an approved disposable QA branch before any database-first staging cutover.
+
+## November 17 canonical route cutover
+
+The application has a canonical native Class directory at `/class` and scoped workspace at `/class/:classId`; its former `/learn/classes` and `/classes/:classId` route files were deleted without redirect aliases. The native public catalog is paginated and can filter by exact Site and delivery format at the SQL level before disclosure-safe authority checks. **The Section-backed academic `/classes` route, service and schema are NOT retired yet**, and must not be described as complete or used as the native Class directory. Official school grading, guardianship, transcripts and attendance must be migrated before destructive DDL.

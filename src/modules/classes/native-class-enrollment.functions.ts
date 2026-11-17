@@ -113,6 +113,8 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
 const nativeCatalogPageInput=z.object({
   search:z.string().trim().max(100).default(""),
   classId:uuid.optional(),
+  siteId:uuid.optional(),
+  deliveryMode:z.enum(["self_paced","scheduled","facilitated","hybrid"]).optional(),
   cursor:z.object({title:z.string().min(1).max(200),classId:uuid}).strict().nullable().default(null),
 }).strict();
 
@@ -146,6 +148,8 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
           eq(canonicalClassOfferingVersions.visibility,"public"),
           eq(canonicalClasses.state,"active"),
           data.classId?eq(canonicalClasses.id,data.classId):undefined,
+          data.siteId?eq(canonicalClasses.siteId,data.siteId):undefined,
+          data.deliveryMode?eq(canonicalClasses.deliveryMode,data.deliveryMode):undefined,
           or(isNull(canonicalClassOfferingVersions.opensAt),lte(canonicalClassOfferingVersions.opensAt,now)),
           or(isNull(canonicalClassOfferingVersions.closesAt),gt(canonicalClassOfferingVersions.closesAt,now)),
           data.search?ilike(canonicalClasses.title,"%"+escaped+"%"):undefined,
