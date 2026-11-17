@@ -12,8 +12,8 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
     expect(source).toContain("requireVerifiedAdultAccount()");
     expect(source).toContain("probeCanonicalAuthReader()");
     expect(source).toContain('can.personId!==owner.personId');
-    expect(source).toContain("memberships.some(");
-    expect(source).toContain('grant.role==="student"');
+    expect(source).toContain("assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx)");
+    expect(read("src/modules/identity/unambiguous-adult-account.server.ts")).toContain('grant.role === "student"');
     expect(source).toContain("links.length!==1");
     expect(source).toContain("link.accessPersonId");
     expect(source).toContain("accessAccountCanonicalPrincipals");
