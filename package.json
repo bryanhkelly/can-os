@@ -40,6 +40,7 @@
     "test:family:p0:site-day": "node scripts/run-integration-tests.mjs journey-c",
     "test:family:p0:browser": "playwright test --config playwright.authenticated-routes.config.ts",
     "test:ws00:contracts": "node scripts/acceptance/check-ws00-cross-stream-guards.mjs",
+    "verify:ws00:qa-readiness": "node scripts/acceptance/check-ws00-qa-readiness.mjs",
     "verify:ws00": "node scripts/acceptance/run-ws00-local-gate.mjs",
     "check:build-source-syntax": "node scripts/acceptance/check-build-source-syntax.mjs",
     "typecheck": "tsc --noEmit",
