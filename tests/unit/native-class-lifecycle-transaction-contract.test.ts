@@ -72,7 +72,11 @@ describe("WS2 native Class transaction and integration invariants",()=>{
   it("exposes complete per-Person Class history through stable keyset pagination",()=>{
     expect(self).toContain("export const getMyNativeClassEnrollmentHistoryPage=");
     expect(self).toContain("myClassHistoryInput.parse(raw)");
-    expect(self).toContain("lt(canonicalClassEnrollments.enrolledAt,");
+    expect(self).toContain("::timestamptz");
+    expect(self).toContain("AT TIME ZONE 'UTC'");
+    expect(self).toContain("HH24:MI:SS.US");
+    expect(self).toContain("enrolledAt:last.enrolledAtCursor");
+    expect(self).not.toContain("new Date(data.cursor.enrolledAt)");
     expect(self).toContain("lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)");
     expect(self).toContain("eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId)");
     expect(self).toContain("desc(canonicalClassEnrollments.id)).limit(51)");
