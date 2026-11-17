@@ -36,7 +36,8 @@ export async function readBoundedNativeClassHistory<T extends {classEnrollmentId
     }
     if (!page.nextCursor) return {items, hasMore: false};
     if (page.items.length === 0 ||
-        (cursor?.classEnrollmentId === page.nextCursor.classEnrollmentId &&
+        (cursor !== null &&
+         cursor.classEnrollmentId === page.nextCursor.classEnrollmentId &&
          cursor.enrolledAt === page.nextCursor.enrolledAt))
       throw new Error("Native Class history pagination did not advance");
     cursor = page.nextCursor;
