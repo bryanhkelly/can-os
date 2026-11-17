@@ -33,14 +33,14 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
 let client;
 try {
   client = await pool.connect();
-  await client.query("BEGIN");
+  await client.query(execute ? "BEGIN" : "BEGIN READ ONLY");
   const result = await client.query(`
     SELECT a.id, a.person_id, a.email_normalized, a.email_verified_at,
       a.disabled, p.active AS person_active
     FROM public.access_accounts a
     JOIN public.people p ON p.id = a.person_id
     WHERE a.email_normalized = ANY($1::text[])
-    ORDER BY a.email_normalized FOR UPDATE OF a
+    ORDER BY a.email_normalized ${execute ? "FOR UPDATE OF a" : ""}
   `, [[email, approverEmail]]);
   const target = result.rows.find(row => row.email_normalized === email);
   const approver = result.rows.find(row => row.email_normalized === approverEmail);
@@ -67,8 +67,10 @@ try {
     throw Error("Independent approver must have exactly one current approved institutional or platform reviewer grant");
   }
   // Serialize concurrent provisioning requests for this specific account.
-  await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text))",
-    ["platform-admin-provision:" + target.id]);
+  if (execute) {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1::text))",
+      ["platform-admin-provision:" + target.id]);
+  }
   const conflicts = await client.query(`
     SELECT COUNT(*)::int AS count
     FROM public.account_person_grants
@@ -81,7 +83,7 @@ try {
     SELECT id, person_id, organization_id, site_id
     FROM public.account_person_grants
     WHERE account_id = $1 AND role = 'app_admin' AND active = true
-    FOR UPDATE
+    ${execute ? "FOR UPDATE" : ""}
   `, [target.id]);
   if (existing.rows.some(row => row.person_id !== target.person_id ||
       row.organization_id !== null || row.site_id !== null) ||
