@@ -157,7 +157,7 @@ export async function processNoncreditWaitlistEmailDeliveries(
         subject:"CAN learning: a place is available",
         text:"A place is available in a CAN learning program you joined the waitlist for. "+
           "Sign in to your own CAN account to review and accept the invitation before "+
-          record.actualExpiry.toISOString()+". An invitation is not an enrollment.",
+          record.actualExpiry!.toISOString()+". An invitation is not an enrollment.",
         ...(actionUrl?{actionUrl}:{}),
       },claimed.id);
       const attempt=record.delivery.attempts+1;
