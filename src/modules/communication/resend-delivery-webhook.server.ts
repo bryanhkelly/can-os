@@ -9,11 +9,6 @@ import {
   type ResendReceiptEvent,
 } from "@/domain/resend-webhook";
 
-function processingOrSent(status: typeof notificationOutboundDeliveries.status) {
-  return or(eq(status, "pending"), eq(status, "processing"),
-    eq(status, "accepted"), eq(status, "failed"));
-}
-
 /**
  * Signed source evidence only. Never disclose the recipient, alter canonical
  * enrollment or send a second email. A provider callback may arrive before
@@ -39,7 +34,8 @@ async function attachResendReceiptEvent(event: ResendReceiptEvent) {
       eq(r.id, event.receiptId),
       eq(r.channel, "email"),
       or(isNull(r.providerMessageId), eq(r.providerMessageId, event.providerMessageId)),
-      processingOrSent(r.status),
+      or(eq(r.status, "pending"), eq(r.status, "processing"),
+        eq(r.status, "accepted"), eq(r.status, "failed")),
     ));
     return;
   }
@@ -58,7 +54,8 @@ async function attachResendReceiptEvent(event: ResendReceiptEvent) {
   }).where(and(
     eq(r.id, event.receiptId),
     or(isNull(r.providerMessageId), eq(r.providerMessageId, event.providerMessageId)),
-    processingOrSent(r.status),
+    or(eq(r.status, "pending"), eq(r.status, "processing"),
+        eq(r.status, "accepted"), eq(r.status, "failed")),
   ));
 }
 
