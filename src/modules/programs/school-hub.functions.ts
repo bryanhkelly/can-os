@@ -20,8 +20,9 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   const actor=await getCommandContext(getRequest());assertCapability(actor,"program.read");
   if(!hasRegistrarAuthority(actor.role))throw new AuthorizationError("school launch workspace");
   const options=await listLaunchOptions();
-  // Catalog authority remains bounded by Site scope and restricted DB roles.
-  const canonicalCatalogEnabled=true;
+  // The public Site and the canonical program catalog have independent grants.
+  let canonicalCatalogEnabled=false;
+  let catalogState:"ready"|"unlinked"|"blocked"|"unavailable"="unlinked";
   if(!data.siteId)return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
   if(!z.string().uuid().safeParse(data.siteId).success)
     return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,
@@ -30,6 +31,19 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   // An unauthorized or stale Site selector returns the authorized picker.
   if(!site || (actor.grantSiteId && actor.grantSiteId!==site.id))
     return {canonicalCatalogEnabled,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
+  if(!data.module || data.module==="academics"){
+    try {
+      const {resolveLaunchSiteCatalogContext}=await import("./launch-site-catalog.server");
+      const resolved=await resolveLaunchSiteCatalogContext(getRequest(),site.id);
+      catalogState=resolved.kind;
+      canonicalCatalogEnabled=resolved.kind==="ready";
+    }catch(error){
+      console.error("School Hub canonical catalog scope unavailable",{
+        errorType:error instanceof Error?error.name:"unknown",
+      });
+      catalogState="unavailable";
+    }
+  }
   // Planned modules are real route destinations. They do not need a database read
   // or a fictional operational workflow just to render their landing page.
   if(data.module==="promote"||data.module==="recruitment"||data.module==="events")
@@ -79,6 +93,6 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   if(!data.module)
     for(const module of ["promote","recruitment","events"] as const)
       statuses[module]=plannedHubStatus;
-  return {canonicalCatalogEnabled,options,launches,selectedProgramId,statuses,
+  return {canonicalCatalogEnabled,catalogState,options,launches,selectedProgramId,statuses,
     selectionError:invalidProgram?"The requested Program is not available at this school. Choose an authorized Program.":null};
  });
