@@ -11,11 +11,11 @@ export function LaunchOpeningTask({ launch, busy, open }: {
   open: (recipientPersonId?: string) => Promise<void>;
 }) {
   const [recipient, setRecipient] = useState("");
-  return <div className="mt-4 rounded-xl border border-warning/40 bg-background p-4">
+  return <div className="mt-4 border border-warning/40 bg-background p-4">
     {launch.siteId && <Label className="block text-sm">Receiving site operator (required)
       <Select aria-label={`Receiving site operator for ${launch.name}`} value={recipient}
         onChange={event => setRecipient(event.target.value)}
-        className="mt-1 block w-full rounded-lg border bg-card p-2 text-sm">
+        className="mt-1 block w-full">
         <option value="">Select the named receiving operator</option>
         {launch.openingOperators.map(operator => <option key={operator.personId} value={operator.personId}>
           {operator.firstName} {operator.lastName}
@@ -31,7 +31,7 @@ export function LaunchOpeningTask({ launch, busy, open }: {
     </Label>}
     <Button type="button" disabled={busy || Boolean(launch.siteId && !recipient)}
       onClick={() => void open(recipient || undefined)}
-      className="mt-4 min-h-11 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+      className="mt-4 min-h-11">
       Activate
     </Button>
     <p className="mt-2 text-xs text-muted-foreground">
