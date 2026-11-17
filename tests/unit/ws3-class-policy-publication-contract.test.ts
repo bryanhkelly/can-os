@@ -9,8 +9,8 @@ const evidenceReview=file("src/modules/learning/completion-evidence-review.funct
 
 describe("WS3 Class completion policy publication",()=>{
   it("requires independent exact-Site staff and correct Class creator authority",()=>{
-    expect(publish).toContain("CAN_WS3_CLASS_POLICY_PUBLICATION_ENABLED");
-    expect(publish).toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
+    expect(publish).not.toContain("CAN_WS3_CLASS_POLICY_PUBLICATION_ENABLED");
+    expect(publish).not.toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
     expect(publish).toContain("assertCapability(actor,\"class.manage\")");
     expect(publish).toContain("cls.createdByPersonId===actor.actorPersonId");
     expect(publish).toContain("validateClassAuthority");
