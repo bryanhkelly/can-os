@@ -38,7 +38,7 @@ import { getTeacherClassRequestOptions } from "@/modules/programs/section-creati
 import { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, MutationFeedback } from "@/components/workspace";
 import { safeLoader, type LoadOutcome } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -370,7 +370,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
               <Link to={data.role === "teacher" ? "/teacher/discussions" : "/student/discussions"} search={{ section: data.section.id, thread: thread.id }}
                 className="font-semibold underline">{thread.title}</Link>
               <p className="mt-1 text-xs text-muted-foreground">{thread.locked ? "Locked · read only" : "Open for class responses"}{thread.lessonId === null ? " · Class-wide discussion" : ""}</p>
-            </li>)}</ul>
+            </li>)}
+          </ul>
             {data.role === "teacher" && <Link to="/teacher/discussions" search={{ section: data.section.id, lesson: lesson.id }} className="text-sm underline">Start a discussion from this lesson</Link>}
           </section> : undefined}/>
         {data.role === "teacher" && <ClassSupplementForm key={lesson.id} title={resourceTitle} url={resourceUrl}
@@ -537,4 +538,3 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     </div>}
   </UnifiedCoursePlayer>;
 }
-import { MutationFeedback } from "@/components/workspace/mutation-feedback";

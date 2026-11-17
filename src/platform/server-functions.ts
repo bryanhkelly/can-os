@@ -14,7 +14,13 @@ export type SerializableResult =
  * Server-only factories. The authenticated identity always comes from the
  * verified request session, never from submitted input.
  *
- * TanStack Start validates generic handlers with a conditional serializability\n * type that cannot prove an unresolved TResult is serializable. We disable\n * that framework-only check for these generic factories; the JSON result\n * constraint and Zod validator remain explicit. Do not return classes,\n * Dates, Maps, or other non-JSON transport values from these wrappers.\n *\n * Authorization beyond authentication is deliberately explicit: capability
+ * TanStack Start validates generic handlers with a conditional serializability
+ * type that cannot prove an unresolved TResult is serializable. We disable
+ * that framework-only check for these generic factories; the JSON result
+ * constraint and Zod validator remain explicit. Do not return classes,
+ * Dates, Maps, or other non-JSON transport values from these wrappers.
+ *
+ * Authorization beyond authentication is deliberately explicit: capability
  * and resource guards must remain in the domain service or handler.
  */
 function privateResponse() {
