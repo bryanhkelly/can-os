@@ -6,7 +6,7 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
 import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import { DomainError } from "@/domain/errors";
-import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
+import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, secondaryActionClassName } from "@/components/workspace";
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {LocalDateTimeField} from "@/components/workspace/local-datetime-field";
@@ -169,7 +169,7 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
           Permission closes {trip.deadline ? formatTimestamp(trip.deadline, trip.timezone) : "before departure"}
         </p>
       </div>
-      <span className="rounded-full border px-3 py-1 text-xs">{trip.status}</span>
+      <StatusBadge tone={trip.status === "approved" ? "info" : "neutral"}>Trip: {trip.status}</StatusBadge>
     </div>
     {!trip.hasPublishedPermission && <p className="mt-3 text-sm text-amber-700">
       This older trip has no valid versioned permission statement. Invitations are unavailable.
@@ -210,11 +210,17 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
         {trip.roster.map(participant =>
           <div key={participant.id} className="rounded-lg border p-3 text-sm">
             <p className="font-medium">{participant.name}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {participant.status === "permission_complete" ? "Permission received" : participant.status === "declined" ? "Guardian declined — NOT authorized to board" : "Awaiting permission"}
-              {trip.feeAmountCents > 0 &&
-                (participant.feeObligationCreated ? " · Fee due in finance" : " · Fee needs finance review")}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <StatusBadge tone={participant.status === "permission_complete" ? "success"
+                : participant.status === "declined" ? "danger" : "attention"}>
+                {participant.status === "permission_complete" ? "Permission received"
+                  : participant.status === "declined" ? "Guardian declined — NOT authorized to board"
+                    : "Awaiting permission"}
+              </StatusBadge>
+              {trip.feeAmountCents > 0 && <span className="text-xs text-muted-foreground">
+                {participant.feeObligationCreated ? "Fee due in finance" : "Fee needs finance review"}
+              </span>}
+            </div>
             <p className="mt-2 text-xs">
               Departure: {participant.departure === "boarded" ? "Boarded" :
                 participant.departure === "absent" ? "Absent" : "Not recorded"}
