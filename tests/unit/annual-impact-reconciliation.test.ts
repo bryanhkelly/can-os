@@ -44,11 +44,24 @@ describe("annual impact reconciliation", () => {
     expect(result.totals).toEqual({
       registrations: 3, distinctPeople: 2, withdrawals: 1,
       verifiedAttendanceOccurrences: 1, verifiedAttendees: 1,
-      verifiedCompletions: 1, awardsIssued: 2, awardsCurrentlyValid: 1, awardsRevoked: 1,
+      verifiedCompletions: 1, awardsIssued: 2, awardsIssuedInPeriodStillValid: 1, awardsRevoked: 1,
     });
     expect(result.bySite.map(x => x.registrations)).toEqual([1, 2]);
     expect(result.bySite.reduce((sum, site) => sum + site.distinctPeople, 0)).toBe(3);
     expect(result.totals.distinctPeople).toBe(2);
+  });
+  it("retains valid issued awards when a newer approved completion supersedes the original decision", () => {
+    const original = makeEvidence();
+    const evidence: ImpactSourceBundle = {
+      ...original,
+      completions: [...original.completions, {
+        id: "c4", participation: ref("e1"), decidedAt: "2026-04-03T00:00:00Z",
+        revision: 2, status: "completed", verified: true,
+      }],
+    };
+    const report = reconcileAnnualImpact(evidence, proof, period);
+    expect(report.totals.awardsIssuedInPeriodStillValid).toBe(1);
+    expect(report.totals.verifiedCompletions).toBe(1);
   });
   it("rejects invented annual numbers, even when Site totals match", () => {
     const evidence = makeEvidence();
