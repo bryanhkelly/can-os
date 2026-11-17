@@ -1,7 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest, setResponseHeader} from "@tanstack/react-start/server";
-import {
-  projectSchoolPrograms, projectAcceptedCalendarEvents,AuthorizationError} from "@/domain/command-context";
+import {AuthorizationError} from "@/domain/command-context";
 import {readWorkspaceSession} from "@/modules/identity/workspace-session.server";
 import {
   PARTICIPATION_READ_MODEL_VERSION, assertParticipationReadModel,
@@ -10,6 +9,7 @@ import {
 } from "@/domain/participation-read-model";
 import {
   assembleParticipation, projectSchoolSections, projectNativeClasses,
+  projectSchoolPrograms, projectAcceptedCalendarEvents,
   projectNoncreditCourses, projectFamilyEnrichment, projectNoncreditOpportunities,
 } from "@/domain/participation-projections";
 import {getCourseRegistration} from "@/modules/learning/course-registration.functions";
