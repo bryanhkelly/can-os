@@ -15,6 +15,10 @@ import {completeRegistrarEnrollmentExit} from "@/modules/enrollment/registrar-en
 import {AttentionQueue} from "@/components/operations/AttentionQueue";
 import {buildDailyOperationsAttention} from "@/domain/daily-operations";
 import {ActionDialog} from "@/components/workspace/action-dialog";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import {mutationErrorMessage} from "@/lib/mutation-feedback";
 import { plural } from "@/lib/format";
 import type { SupplementaryRead } from "@/lib/supplementary-read";
@@ -379,14 +383,14 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
   destructive={dialog.kind==="exit"} pending={busy!==null||exitMutation.isSubmitting}
   confirmDisabled={commandsBlocked||dialogNote.trim().length<(dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1)||(dialog.kind==="exit"&&!exitConfirmed)}
   onClose={()=>{setDialog(null);setDialogNote("");setError("");}} onConfirm={()=>void confirmActionInput()}>
-  <label className="block text-sm">{dialog.kind==="deadline"?"Reason for deadline change":"Resolution note"}
-   <textarea required minLength={dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1} maxLength={dialog.kind==="deadline"?500:2000}
-    value={dialogNote} onChange={event=>setDialogNote(event.target.value)} rows={4}
-    className="mt-2 w-full rounded-lg border bg-background p-3"/></label>
-  {dialog.kind==="exit"&&<label className="flex items-start gap-3 text-sm">
-   <input type="checkbox" checked={exitConfirmed} onChange={event=>setExitConfirmed(event.target.checked)}/>
+  <Field label={dialog.kind==="deadline"?"Reason for deadline change":"Resolution note"} required>
+   <Textarea required minLength={dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1} maxLength={dialog.kind==="deadline"?500:2000}
+    value={dialogNote} onChange={event=>setDialogNote(event.target.value)} rows={4}/>
+  </Field>
+  {dialog.kind==="exit"&&<Label className="flex items-start gap-3 text-sm">
+   <Checkbox checked={exitConfirmed} onChange={event=>setExitConfirmed(event.target.checked)}/>
    I confirm the registrar has verified this institutional exit and understand that enrollment and student access may end immediately.
-  </label>}
+  </Label>}
   {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
  </ActionDialog>}
  </DashboardHome>;
