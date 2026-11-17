@@ -12,7 +12,7 @@ import {
   assembleParticipation,projectNativeClasses,projectNoncreditCourses,
   projectNoncreditOpportunities,
 } from "@/domain/participation-projections";
-import {getMyNativeClassEnrollmentHistoryPage} from
+import {getMyNativeClassHistoryForCanAccountPage} from
   "@/modules/classes/native-class-enrollment.functions";
 import {getMyNoncreditSelfEnrollmentHistoryPage} from
   "@/modules/enrollment/noncredit-self-enrollment.functions";
@@ -59,7 +59,7 @@ async function readSourcePage(
     return {items:result.items,nextCursor:outputCursor(result.nextCursor)};
   }
   if(source==="native_class"){
-    const result=await getMyNativeClassEnrollmentHistoryPage({
+    const result=await getMyNativeClassHistoryForCanAccountPage({
       data:{cursor:cursor as {enrolledAt:string;classEnrollmentId:string}|null},
     });
     return {
