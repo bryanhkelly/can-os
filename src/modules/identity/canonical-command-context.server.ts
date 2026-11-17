@@ -9,6 +9,7 @@ import { getCommandContext } from "./command-context.server";
 import { resolveCanonicalSiteStaffFromCan } from "./canonical-can-staff-bridge.server";
 import { Pool, type PoolClient } from "@neondatabase/serverless";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import {
   canonicalAuthReaderDatabaseRole,
   canonicalSessionCookie,
@@ -149,8 +150,14 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
     if (actor.role === "site_admin" || actor.role === "registrar") {
       return resolveCanonicalSiteStaffFromCan(actor, request);
     }
-    if (!hasNative || !actor.actorPersonId || actor.sessionAccountId) {
+    if (!actor.actorPersonId || actor.sessionAccountId) {
       throw new AuthorizationError("authorized canonical identity for active CAN account");
+    }
+    // Only the ABSENCE of a native learner cookie is recoverable. An invalid,
+    // mismatched, revoked, staff or reviewer session is an authorization denial
+    // and must never trigger automatic privilege or identity recovery.
+    if (!hasNative) {
+      throw new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED");
     }
 
     // Adult noncredit learners can retain their existing native course-session
