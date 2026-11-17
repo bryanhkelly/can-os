@@ -21,6 +21,7 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { usStatesAndTerritories } from "@/domain/site-setup-configuration";
 import { saveSiteLaunchPreferences } from "@/modules/programs/site-launch-preferences.functions";
+import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 
 type Options = Awaited<ReturnType<typeof listLaunchOptions>>;
 type Delivery = "physical" | "digital" | "both";
@@ -64,6 +65,12 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const [timezone,setTimezone] = useState("");
   const [delivery,setDelivery] = useState<Delivery>(initialPreferences?.delivery??"both");
   const [chosen,setChosen] = useState<string[]>(initialPreferences?.interestIds??[]);
+  const [savedPreferences,setSavedPreferences]=useState<SiteLaunchPreferences>(
+    initialPreferences??{delivery:"both",interestIds:[]});
+  const preferencesDirty=JSON.stringify({delivery,interestIds:chosen})!==JSON.stringify(savedPreferences);
+  const siteFieldsDirty=!siteId&&Boolean(name||organizationId||city||state||timezone);
+  const releaseNavigation=useLaunchUnsavedChanges(preferencesDirty||siteFieldsDirty,
+    "Leave Site setup? Unsaved Site details or program interests will be lost.");
   const [error,setError] = useState("");
   const [savingPreferences,setSavingPreferences] = useState(false);
   const [previewKey,setPreviewKey] = useState(0);
@@ -88,7 +95,10 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
     setError("");
     if(siteId) {
       try {
-        await saveSiteLaunchPreferences({data:{siteId,preferences:{delivery,interestIds:chosen}}});
+        const preferences={delivery,interestIds:chosen};
+        await saveSiteLaunchPreferences({data:{siteId,preferences}});
+        setSavedPreferences(preferences);
+        releaseNavigation();
         goTo("network");
       } catch(cause) {setError(mutationErrorMessage(cause,"Unable to save this Site’s selected delivery mode."));}
       return;
@@ -102,6 +112,8 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
       if(saved.status==="ignored")return;
       // Site and initial planning preferences commit in one transaction.
       setSiteId(saved.value.siteId);
+      setSavedPreferences({delivery,interestIds:chosen});
+      releaseNavigation();
       goTo("network",saved.value.siteId);
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to establish your Site. Nothing has been published."));}
   }
@@ -111,7 +123,10 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
     if(!siteId||savingPreferences)return;
     setSavingPreferences(true);setError("");
     try {
-      await saveSiteLaunchPreferences({data:{siteId,preferences:{delivery,interestIds:chosen}}});
+      const preferences={delivery,interestIds:chosen};
+      await saveSiteLaunchPreferences({data:{siteId,preferences}});
+      setSavedPreferences(preferences);
+      releaseNavigation();
       goTo("preview");
     }catch(cause){setError(mutationErrorMessage(cause,"Unable to save program interests. The Site remains private."));}
     finally{setSavingPreferences(false);}
