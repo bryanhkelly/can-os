@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
-import { StatusTimeline } from "@/components/workflow";
+import { RecordedTime, StatusTimeline } from "@/components/workflow";
+import { WorkspaceNotice } from "@/components/workspace/notice";
 import type { getDeliveryHistory } from "@/modules/communication/delivery-history.functions";
 
 type History = Awaited<ReturnType<typeof getDeliveryHistory>>;
@@ -21,10 +22,10 @@ export function DeliveryHistory({ history, cursor, notification, refreshing, onR
       Watched record details are not included because access can change.
     </p>
     <div className="mt-4">
-      {!history && <p role="alert" className="border p-5 text-sm">
+      {!history && <WorkspaceNotice tone="danger">
         Delivery history is unavailable. Retry or return to the latest deliveries.
         Your notifications are still available above.
-      </p>}
+      </WorkspaceNotice>}
       {history && <StatusTimeline label="Watch delivery history"
         emptyMessage="No watch delivery records on this page."
         entries={history.items.map(item => ({
@@ -45,14 +46,14 @@ export function DeliveryHistory({ history, cursor, notification, refreshing, onR
               <div><dt className="inline font-semibold">Delivery ID: </dt><dd className="inline">{item.id}</dd></div>
               {item.acceptedAt && <div><dt className="inline font-semibold">
                 {item.channel === "in_app" ? "Created in CAN: " : "Provider accepted: "}
-              </dt><dd className="inline"><time dateTime={item.acceptedAt}>{new Date(item.acceptedAt).toLocaleString()}</time></dd></div>}
-              {item.nextAttemptAt && <div><dt className="inline font-semibold">Next attempt: </dt><dd className="inline"><time dateTime={item.nextAttemptAt}>{new Date(item.nextAttemptAt).toLocaleString()}</time></dd></div>}
+              </dt><dd className="inline"><RecordedTime value={item.acceptedAt}/></dd></div>}
+              {item.nextAttemptAt && <div><dt className="inline font-semibold">Next attempt: </dt><dd className="inline"><RecordedTime value={item.nextAttemptAt}/></dd></div>}
             </dl>
           </div>,
         }))}/>}
     </div>
     <nav aria-label="Delivery history pages" className="mt-4 flex flex-wrap gap-4 text-sm">
-      <Button type="button" size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing..." : "Refresh delivery status"}</Button>
+      <Button type="button" size="sm" variant="outline" loading={refreshing} disabled={refreshing} onClick={onRefresh}>{refreshing ? "Refreshing..." : "Refresh delivery status"}</Button>
       {cursor && <Link to="/notifications" search={{ notification }} className="underline">Latest deliveries</Link>}
       {history?.nextCursor && <Link to="/notifications" search={{ notification, deliveryCursor: history.nextCursor }} className="underline">Older deliveries</Link>}
     </nav>
