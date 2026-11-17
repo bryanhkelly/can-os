@@ -84,12 +84,17 @@ export const getSchoolFamilyDeliveryAttempts=createServerFn({method:"GET"})
         items:page.map(({receipt:r})=>({
           id:r.id,channel:r.channel,status:r.status,
           attempts:r.attempts,
-          state:r.status==="accepted"?"provider_accepted":
-            r.lastError==="sms_provider_outcome_unconfirmed"?"requires_provider_reconciliation":
-            r.status==="failed"&&r.nextAttemptAt?"retry_scheduled":r.status,
+          state:r.channel==="email"&&r.providerFailedAt
+            ? r.providerFailureKind==="email.complained"?"complained":"provider_failed"
+            : r.channel==="email"&&r.providerDeliveredAt?"provider_delivered"
+            : r.status==="accepted"?"provider_accepted"
+            : r.lastError==="sms_provider_outcome_unconfirmed"?"requires_provider_reconciliation"
+            : r.status==="failed"&&r.nextAttemptAt?"retry_scheduled":r.status,
           canRetry:canRecoverTerminalDelivery(r),
           createdAt:r.createdAt.toISOString(),
           acceptedAt:r.acceptedAt?.toISOString()??null,
+          providerDeliveredAt:r.providerDeliveredAt?.toISOString()??null,
+          providerFailedAt:r.providerFailedAt?.toISOString()??null,
           nextAttemptAt:r.nextAttemptAt?.toISOString()??null,
         })),
         nextCursor:rows.length>PAGE_SIZE?page[page.length-1]!.receipt.id:null,
