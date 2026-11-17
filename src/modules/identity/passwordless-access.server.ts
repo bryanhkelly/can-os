@@ -229,6 +229,15 @@ export async function redeemOneTimeAccess(rawToken:string,device?:SessionDeviceC
     : [];
   const launchSiteId=existingOpenSchool.length?undefined:candidateLaunchSiteId;
   const homeSiteId=existingOpenSchool.length?candidateLaunchSiteId:undefined;
+  // Mint a bearer only for the immutable Person who owns this CAN account.
+  // Accepting a new role changes authority, never the account's human identity.
+  const [boundAccount]=await tx.select({personId:accessAccounts.personId})
+    .from(accessAccounts).where(eq(accessAccounts.id,account.id)).limit(1);
+  const [chosenGrant]=await tx.select({personId:accountPersonGrants.personId})
+    .from(accountPersonGrants).where(eq(accountPersonGrants.id,activeGrant.id)).limit(1);
+  if(!boundAccount?.personId ||
+     boundAccount.personId!==chosenGrant?.personId)
+    throw new InvalidAccessCredentialError("Verified CAN Person unavailable");
   const secret=issueOpaqueSecret();
   const [session]=await tx.insert(accessSessions).values({
    accountId:account.id,secretHash:hashAccessSecret(secret,secretPepper()),
