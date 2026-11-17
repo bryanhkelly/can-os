@@ -37,8 +37,12 @@ describe("Class identity and optional enrollment publication",()=>{
       "for(\"update\")","verifiedAdultOn","canonicalAccountGrants",
       "eq(canonicalAccountGrants.roleCode,\"learner\")",
       "eq(canonicalAccountGrants.organizationId,cls.operatingOrganizationId)",
-      "if(cls.capacity!==null","classOfferingVersionId:null",
+      "assertNativeClassSeatAvailable({method:\"assignment\"","classOfferingVersionId:null",
     ])expect(src).toContain(rule);
+    const policy=read("src/domain/native-class-lifecycle.ts");
+    expect(policy).toContain("args.method===\"self\"");
+    expect(policy).toContain("args.activeOrPending>=cap");
+    expect(src).toContain("assertNativeClassOperatorExitScope(actor,cls)");
     expect(src).not.toContain("enrollmentMethod:\"self\"");
     expect(src).not.toContain("creditMode:z.enum([\"for_credit\"");
   });

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -15,9 +15,14 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
+import {
+  assertNativeClassRepeatEligible, assertOperationalClassOfferingTerms,
+  assertNativeClassSeatAvailable,
+} from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { assertCurrentNativeClassLearnerForMutation } from "./native-class-learner-session.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
@@ -36,11 +41,12 @@ function guard(){
   setResponseHeader("Referrer-Policy","no-referrer");
 }
 async function requireLearner(){
-  const actor=await getCanonicalCommandContext(getRequest());
+  const request=getRequest();
+  const actor=await getCanonicalCommandContext(request);
   if(!actor.actorPersonId || actor.role!=="learner")
     throw new AuthorizationError("verified canonical learner Person");
   assertCapability(actor,"learning.participate");
-  return actor.actorPersonId;
+  return {learnerPersonId:actor.actorPersonId,actor,request};
 }
 
 /** A live Class is permitted only while publisher/adoption/deployment and
@@ -75,12 +81,25 @@ export const getNativePublicClassCatalog=createServerFn({method:"GET"})
     const allowed=[];
     for(const row of rows){
       try{
-        const authority=await db.transaction(tx=>currentClassAuthority(tx,row.classId,now));
-        // Do not advertise a larger publication limit than the underlying
-        // Class can actually seat across assignment and self-registration.
+        // Previously published, unsupported methods remain invisible until
+        // fully authorized invitation/approval commands are delivered.
+        assertOperationalClassOfferingTerms(row);
+        const {authority,openSeats}=await db.transaction(async tx=>{
+          const authority=await currentClassAuthority(tx,row.classId,now);
+          const [occupancy]=await tx.select({total:count()})
+            .from(canonicalClassEnrollments).where(and(
+              eq(canonicalClassEnrollments.classId,row.classId),
+              inArray(canonicalClassEnrollments.status,["pending","active"]),
+            ));
+          return {authority,openSeats:occupancy?.total??0};
+        });
+        // All enrollment methods share one occupied-seat count. The optional
+        // publication limit narrows only self-registration, not assignment.
         const limits=[row.capacity,authority.classCapacity]
           .filter((n):n is number=>n!==null);
-        allowed.push({...row,capacity:limits.length?Math.min(...limits):null});
+        const capacity=limits.length?Math.min(...limits):null;
+        allowed.push({...row,capacity,
+          remainingSeats:capacity===null?null:Math.max(0,capacity-openSeats)});
       }catch(e){if(!(e instanceof AuthorizationError))throw e;}
     }
     return allowed;
@@ -135,10 +154,19 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
       const items=[];
       for(const row of page){
         try{
+          assertOperationalClassOfferingTerms(row);
           const authority=await currentClassAuthority(tx,row.classId,now);
+          const [occupancy]=await tx.select({total:count()})
+            .from(canonicalClassEnrollments).where(and(
+              eq(canonicalClassEnrollments.classId,row.classId),
+              inArray(canonicalClassEnrollments.status,["pending","active"]),
+            ));
           const limits=[row.capacity,authority.classCapacity]
             .filter((n):n is number=>n!==null);
-          items.push({...row,capacity:limits.length?Math.min(...limits):null});
+          const capacity=limits.length?Math.min(...limits):null;
+          items.push({...row,capacity,
+            remainingSeats:capacity===null?null:
+              Math.max(0,capacity-(occupancy?.total??0))});
         }catch(error){
           if(!(error instanceof AuthorizationError))throw error;
         }
@@ -155,15 +183,32 @@ export const getNativePublicClassCatalogPage=createServerFn({method:"GET"})
 export const enrollInNativeClass=createServerFn({method:"POST"})
   .validator((raw:unknown)=>selfInput.parse(raw))
   .handler(async({data})=>{
-    guard();const learnerPersonId=await requireLearner();
+    guard();const {learnerPersonId,actor,request}=await requireLearner();
     return db.transaction(async tx=>{
-      const now=new Date();
-      const [version]=await tx.select().from(canonicalClassOfferingVersions)
-        .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId)).limit(1);
-      if(!version)throw new AuthorizationError("valid Class Offering version");
+      // Resolve the parent Class ID without locking the Offering. Publisher
+      // publication/closure also locks Class before Offering; using the same
+      // order avoids deadlocks. This first read is only a locator, NEVER the
+      // authoritative published terms for a seat-changing decision.
+      const [sourceVersion]=await tx.select({
+        classId:canonicalClassOfferingVersions.classId,
+      }).from(canonicalClassOfferingVersions)
+        .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId))
+        .limit(1);
+      if(!sourceVersion)throw new AuthorizationError("valid Class Offering version");
       const [instance]=await tx.select({id:canonicalClasses.id}).from(canonicalClasses)
-        .where(eq(canonicalClasses.id,version.classId)).for("update").limit(1);
+        .where(eq(canonicalClasses.id,sourceVersion.classId)).for("update").limit(1);
       if(!instance)throw new AuthorizationError("current Class");
+      // Re-read + lock published terms AFTER waiting for the Class lock.
+      // Otherwise an Offering closed by the publisher while this request
+      // waits could be admitted using its stale pre-lock publication state.
+      const [version]=await tx.select().from(canonicalClassOfferingVersions)
+        .where(and(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId),
+          eq(canonicalClassOfferingVersions.classId,instance.id)))
+        .for("update").limit(1);
+      if(!version)throw new AuthorizationError("current Class Offering version");
+      // Evaluate temporal eligibility at the actual admission decision time,
+      // not before waiting on another transaction's Class/Offering locks.
+      const now=new Date();
       const current=await currentClassAuthority(tx,instance.id,now);
       if(!current.siteId)throw new AuthorizationError("Class enrollment requires a Site");
       const [offering]=await tx.select({id:canonicalClassOfferings.id})
@@ -189,23 +234,38 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       }).from(canonicalClassEnrollments).where(and(
         eq(canonicalClassEnrollments.classId,instance.id),
         eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
-      )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(5);
-      const existing=previous.find(row=>["pending","active"].includes(row.status));
+        inArray(canonicalClassEnrollments.status,["pending","active"]),
+      )).limit(2);
+      if(previous.length>1)
+        throw new AuthorizationError("duplicate open Class enrollments require reconciliation");
+      const existing=previous[0];
       if(existing){
         if(existing.creditMode!==data.creditMode || !existing.courseAttemptId)
           throw new AuthorizationError("existing enrollment requires governed modification");
         return {classEnrollmentId:existing.id,courseAttemptId:existing.courseAttemptId,alreadyEnrolled:true};
       }
-      if(previous.some(row=>row.status==="completed"))
-        throw new AuthorizationError("repeat participation requires approved Class repeat policy");
+      // A bounded recent-history query is not sufficient for completed
+      // participants who later withdrew multiple times. Check the complete
+      // completion history via its indexed status predicate.
+      const [completed]=await tx.select({id:canonicalClassEnrollments.id})
+        .from(canonicalClassEnrollments).where(and(
+          eq(canonicalClassEnrollments.classId,instance.id),
+          eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
+          eq(canonicalClassEnrollments.status,"completed"),
+        )).limit(1);
+      assertNativeClassRepeatEligible(completed?["completed"]:[]);
       const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.classId,instance.id),
           inArray(canonicalClassEnrollments.status,["pending","active"])));
+      assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
-      if((current.classCapacity!==null && (occupancy?.total??0)>=current.classCapacity)||
-         (version.capacity!==null && (occupancy?.total??0)>=version.capacity))
-        throw new AuthorizationError("Class is at capacity");
+      assertNativeClassSeatAvailable({method:"self",
+        activeOrPending:occupancy?.total??0,
+        classCapacity:current.classCapacity,offeringCapacity:version.capacity});
+      // Revocation between preflight and insertion must fail inside the same
+      // transaction as the seat change, including cross-provider public Classes.
+      await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
       const consentSha256=createHash("sha256")
         .update(version.consentVersion!).update("\u0000").update(version.consentText!)
         .digest("hex");
@@ -269,7 +329,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
 
 export const getMyNativeClassEnrollments=createServerFn({method:"GET"})
   .handler(async()=>{
-    guard();const learnerPersonId=await requireLearner();
+    guard();const {learnerPersonId}=await requireLearner();
     return db.select({
       classEnrollmentId:canonicalClassEnrollments.id,classId:canonicalClasses.id,
       title:canonicalClasses.title,deliveryMode:canonicalClasses.deliveryMode,
@@ -282,4 +342,61 @@ export const getMyNativeClassEnrollments=createServerFn({method:"GET"})
       .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollments.classId))
       .where(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId))
       .orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(100);
+  });
+
+
+/** Native source history for WS1's single My Activity read model.
+ * This is not another participation engine: only existing immutable
+ * class_enrollments rows are returned, with strict per-Person scope and
+ * keyset pagination so participants never lose older records after 100.
+ *
+ * WS1 owns the cross-domain projection and final unified UI. Consumers
+ * must not infer current lesson access from a historical status row.
+ */
+const myClassHistoryInput=z.object({
+  cursor:z.object({
+    enrolledAt:z.string().datetime({offset:true}),
+    classEnrollmentId:uuid,
+  }).strict().nullable().default(null),
+}).strict();
+
+export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>myClassHistoryInput.parse(raw))
+  .handler(async({data})=>{
+    guard();
+    const {learnerPersonId}=await requireLearner();
+    // Date objects truncate PostgreSQL microseconds to milliseconds. Using
+    // them for a keyset cursor can skip same-millisecond history rows.
+    // Cast the validated ISO cursor directly in PostgreSQL instead.
+    const older=data.cursor?or(
+      sql`${canonicalClassEnrollments.enrolledAt} < ${data.cursor.enrolledAt}::timestamptz`,
+      and(sql`${canonicalClassEnrollments.enrolledAt} = ${data.cursor.enrolledAt}::timestamptz`,
+        lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)),
+    ):undefined;
+    const rows=await db.select({
+      classEnrollmentId:canonicalClassEnrollments.id,
+      classId:canonicalClasses.id,
+      title:canonicalClasses.title,
+      deliveryMode:canonicalClasses.deliveryMode,
+      creditMode:canonicalClassEnrollments.creditMode,
+      status:canonicalClassEnrollments.status,
+      courseAttemptId:canonicalClassEnrollments.courseAttemptId,
+      enrolledAt:canonicalClassEnrollments.enrolledAt,
+      // Exact UTC microsecond cursor is kept separate from display Date.
+      enrolledAtCursor:sql<string>`to_char(${canonicalClassEnrollments.enrolledAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
+      siteId:canonicalClasses.siteId,
+      enrollmentMethod:canonicalClassEnrollments.enrollmentMethod,
+      classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId,
+    }).from(canonicalClassEnrollments)
+      .innerJoin(canonicalClasses,
+        eq(canonicalClasses.id,canonicalClassEnrollments.classId))
+      .where(and(eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),older))
+      .orderBy(desc(canonicalClassEnrollments.enrolledAt),
+        desc(canonicalClassEnrollments.id)).limit(51);
+    const items=rows.slice(0,50);
+    const last=items[items.length-1];
+    return {items,nextCursor:rows.length>50&&last?{
+      enrolledAt:last.enrolledAtCursor,
+      classEnrollmentId:last.classEnrollmentId,
+    }:null};
   });

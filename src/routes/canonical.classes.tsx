@@ -22,11 +22,14 @@ type Method=ClassOfferingTerms["enrollmentMethods"][number];
 type CreditMode=ClassOfferingTerms["allowedCreditModes"][number];
 const methodOptions: {value:Method;label:string}[]=[
   {value:"self",label:"Self-enrollment"},{value:"assignment",label:"Assignment"},
-  {value:"invitation",label:"Invitation"},{value:"approval",label:"Approval"},
+  // Invitation and approval are not publishable until the verified offer,
+  // expiration, guardian and approval-queue commands exist.
 ];
 const creditOptions: {value:CreditMode;label:string}[]=[
   {value:"not_applicable",label:"No academic credit"},
-  {value:"audit",label:"Audit"},{value:"for_credit",label:"For credit (eligibility required)"},
+  {value:"audit",label:"Audit"},
+  // For-credit Class enrollment needs independent academic eligibility and
+  // issuer approval; the direct adult Class command does not establish these.
 ];
 const deliveryOptions=["self_paced","scheduled","facilitated","hybrid"] as const;
 function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:string;courseVersionId:string}){
