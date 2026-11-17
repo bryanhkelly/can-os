@@ -228,6 +228,7 @@ describe("gradebook section grade finalization panel", () => {
     expect(html).toContain("Corrected letter grade for Ada Lovelace");
     expect(html).toContain("Correction reason for Ada Lovelace");
     expect(html).toContain("Grading period to finalize");
+    expect(html).toContain('data-action-footer="inline"');
     expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
   });
 
