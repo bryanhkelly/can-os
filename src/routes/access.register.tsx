@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { WorkspaceShell } from "@/components/workspace";
 import { safeAccessReturnTo } from "@/domain/access-navigation";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -81,12 +83,12 @@ function RegisterPersonalAccount() {
         </div>
         <Field label="Email address" required><Input name="email" type="email" autoComplete="email"
           required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} /></Field>
-        <label className="flex items-start gap-3 text-sm leading-6">
-          <input type="checkbox" required checked={adultConfirmed}
+        <Label className="flex items-start gap-3 text-sm leading-6">
+          <Checkbox required checked={adultConfirmed}
             onChange={event => setAdultConfirmed(event.target.checked)}
-            className="mt-1 size-4 accent-primary"/>
+            className="mt-1"/>
           I am at least 18 years old. Student accounts for minors are set up through an authorized school or guardian.
-        </label>
+        </Label>
         <p className="text-sm leading-6 text-muted-foreground">We'll email you a single-use link. Your details stay in CAN OS; joining a participating organization requires a separate registration or invitation.</p>
         <Button type="submit" disabled={!hydrated || busy} className="w-full">
           {busy ? "Sending verification…" : "Continue with email"}
