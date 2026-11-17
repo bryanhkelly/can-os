@@ -225,3 +225,80 @@ describe("navigation link targets", () => {
     ).toEqual([]);
   });
 });
+
+
+describe("canonical in-app navigation", () => {
+  it("does not link users through retired route aliases", () => {
+    const aliases = new Set([
+      "/learn/my-programs", "/learn/activity", "/learn/my-courses",
+      "/teacher/notices", "/student/notifications",
+      "/guardian/study-group-consent", "/launch/hub/school/new",
+    ]);
+    const offenders: string[] = [];
+    for (const file of sourceFiles(join(repoRoot, "src"))) {
+      if (file.endsWith("routeTree.gen.ts")) continue;
+      const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      const visit = (node: ts.Node): void => {
+        if (ts.isJsxAttribute(node) && ["to", "href"].includes(node.name.getText(source)) && node.initializer) {
+          const expression = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
+          if (expression) for (const value of literalTargets(expression)) {
+            if (aliases.has(linkPath(value))) offenders.push(
+              `${file.slice(repoRoot.length + 1)}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1} -> ${value}`,
+            );
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
+
+
+describe("course overview navigation", () => {
+  it("renders the enrolled student overview without silently replacing its URL", () => {
+    const source = readFileSync(join(routesDir, "student.courses.tsx"), "utf8");
+    expect(source).not.toContain('return <Navigate to="/classes"');
+    expect(source).toContain('title="Class overview"');
+    expect(source).toContain('>Open classroom</Link>');
+  });
+});
+
+describe("single My Activity training workspace", () => {
+  it("uses the same noncredit command component in canonical and legacy URLs", () => {
+    const activity = readFileSync(join(routesDir, "learn.my-activity.tsx"), "utf8");
+    const legacy = readFileSync(join(routesDir, "learn.my-courses.tsx"), "utf8");
+    const commands = readFileSync(join(repoRoot, "src/components/learning/NoncreditEnrollmentManagement.tsx"), "utf8");
+    expect(activity).toContain("<NoncreditEnrollmentManagement/>");
+    expect(legacy).toContain("<NoncreditEnrollmentManagement/>");
+    for (const method of ["openMyNoncreditCourse", "withdrawMyNoncreditRegistration", "cancelMyNoncreditWaitlist"]) {
+      expect(commands).toContain(method);
+      expect(activity).not.toContain(method);
+      expect(legacy).not.toContain(method);
+    }
+    expect(commands).not.toContain("window.location.assign");
+    expect(activity).toContain('id="noncredit-management"');
+    expect(activity).toContain('registrationId={item.refs.registrationId}');
+    expect(activity).toContain('releaseId={item.releaseId}');
+    expect(activity).toContain('showAllTraining&&<NoncreditEnrollmentManagement/>');
+    expect(commands).toContain('enabled:!releaseId');
+    expect(commands).toContain('enabled:!registrationId');
+  });
+});
+
+describe("Site and network workspace composition", () => {
+  it("renders a single Site directory component without redirecting a one-Site operator", () => {
+    const siteRoute=readFileSync(join(routesDir,"sites.index.tsx"),"utf8");
+    const network=readFileSync(join(repoRoot,"src/components/home/NetworkHome.tsx"),"utf8");
+    const shared=readFileSync(join(repoRoot,"src/components/operations/ScopedSiteDirectory.tsx"),"utf8");
+    expect(siteRoute).toContain("<ScopedSiteDirectory");
+    expect(network).toContain("<ScopedSiteDirectory");
+    expect(siteRoute).not.toContain("throw redirect(");
+    expect(siteRoute).toContain("profileLinks");
+    expect(network).not.toContain("profileLinks");
+    expect(shared).toContain("profileLinks=false");
+    expect(shared).toContain("sites.map(");
+  });
+});

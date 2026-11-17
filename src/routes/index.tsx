@@ -54,7 +54,7 @@ function HomePage() {
         <div className="mt-5 flex flex-wrap gap-3">
           {signedIn ? <>
             <Link to="/account" className="inline-flex min-h-11 items-center border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">My CAN account</Link>
-            <Link to="/learn/my-programs" className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-semibold text-primary">My Learning & Programs</Link>
+            <Link to="/learn/my-activity" className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-semibold text-primary">My Activity</Link>
           </> : <Link to="/access" search={{returnTo:"/"}} className="inline-flex min-h-11 items-center border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Sign in</Link>}
           <Link to="/explore" className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-semibold text-primary">Explore programs</Link>
         </div>

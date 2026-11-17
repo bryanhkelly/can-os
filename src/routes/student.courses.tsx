@@ -1,5 +1,5 @@
 import { hasRegistrarAuthority } from "@/domain/school-roles";
-import { createFileRoute, Link, Navigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { getCourseRegistration, requestCourseChange, decideCourseChange } from "@/modules/learning/course-registration.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -117,7 +117,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
  const enrolled=data.sections.filter(item=>item.enrollmentStatus==="active");
  const course=enrolled.find(item=>item.id===section);
  const work=(data.classwork??[]).filter(item=>item.sectionId===course?.id);
- if(course&&tab==="overview")return <Navigate to="/classes" search={{section:course.id,tab:"lessons"}} replace/>;
+ 
  const connections=course?<WorkspacePanel title="Class connections">
    <nav aria-label="Class connections" className="grid gap-4 text-sm">
     <Link to="/classes" search={{section:course.id}} className="underline">Class lessons, files and announcements</Link>
@@ -144,10 +144,17 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     </WorkspacePanel>)}
    </div>:<>
     <DetailNavigation label="Class detail">
+     <SectionTab current={tab==="overview"} link={{to:"/student/courses",search:{section:course.id,tab:"overview"}}}>Overview</SectionTab>
      <SectionTab current={false} link={{to:"/classes",search:{section:course.id,tab:"lessons"}}}>Classroom</SectionTab>
      {(["classwork","grades"] as const).map(value=><SectionTab key={value} current={tab===value} link={{to:"/student/courses",search:{section:course.id,tab:value}}}>{value==="classwork"?"Classwork":"Grades & feedback"}</SectionTab>)}
     </DetailNavigation>
-    <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
+    {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
+      <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map(teacher=>teacher.name).join(", ") : "Not assigned"}</p>
+      <div className="mt-5 flex flex-wrap gap-3 text-sm">
+        <Link to="/classes" search={{section:course.id,tab:"lessons"}} className="rounded-lg bg-foreground px-4 py-2 font-semibold text-background">Open classroom</Link>
+        <Link to="/student/courses" search={{section:course.id,tab:"classwork"}} className="rounded-lg border px-4 py-2">View classwork</Link>
+      </div>
+    </WorkspacePanel> : <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
      <div className="divide-y">{work.filter(item=>tab!=="grades"||item.status==="graded"||item.status==="returned").map(item=><article key={item.assessmentId} className="flex flex-wrap items-start justify-between gap-3 py-4 first:pt-0">
       <div className="min-w-0"><h3 className="font-semibold"><Link to="/student/assignments" search={{section:course.id,assessment:item.assessmentId}} className="underline">{item.title}</Link></h3>
@@ -156,7 +163,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
       <StatusBadge tone={item.timeliness==="missing"?"attention":item.status==="graded"?"success":"neutral"}>{item.timeliness==="missing"?"Missing":item.status??"Assigned"}</StatusBadge>
      </article>)}</div>
      {!work.some(item=>tab!=="grades"||item.status==="graded"||item.status==="returned")&&<p className="text-sm text-muted-foreground">{tab==="grades"?"No graded work or revision feedback yet.":"No published assignments in this class yet."}</p>}
-    </WorkspacePanel>
+    </WorkspacePanel>}
    </>}
  </>;
  return course?<ClassroomWorkspace title={course.title}

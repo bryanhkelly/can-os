@@ -7,7 +7,7 @@ import { Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
 import { listNetworkAffiliations, reviewNetworkAffiliation } from "@/modules/networks/network-affiliations.functions";
-import { EmptyState } from "@/components/workspace";
+import {ScopedSiteDirectory} from "@/components/operations/ScopedSiteDirectory";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -133,13 +133,8 @@ function NetworkSites({ data }: { data: NetworkData }) {
     </section>
     <section id="network-locations" className="mt-8 border bg-card p-5">
       <h2 className="font-serif text-2xl">Directly operated locations</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {data.sites.map(site => <article key={site.id} className="rounded-xl border bg-card p-5">
-          <h3 className="font-semibold">{site.name}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{site.slug} · {site.timezone}</p>
-        </article>)}
-      </div>
-      {!data.sites.length && <EmptyState title="No headquarters-operated sites yet." />}
+      <div className="mt-4"><ScopedSiteDirectory sites={data.sites}
+        emptyMessage="No headquarters-operated sites yet."/></div>
     </section>
   </DashboardHome>;
 }

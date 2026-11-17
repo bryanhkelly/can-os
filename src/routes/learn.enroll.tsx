@@ -108,7 +108,7 @@ function PublicSelfEnrollment() {
   }
   return <WorkspaceShell eyebrow="Learning" width="wide" title="Register for learning"
     subtitle="Choose an approved training, confirm your participation, and use your own CAN account. A school application is a separate experience."
-    actions={<Link to="/learn/my-courses" className="text-sm font-semibold text-primary underline underline-offset-4">My courses</Link>}>
+    actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}>
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,.55fr)]">
       <div className="space-y-5">
         <section className="border border-border bg-card p-5">
@@ -254,7 +254,7 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     </div>}
     {waitlistStatus&&<p role="status" className="mt-4 text-sm text-muted-foreground">
       Waitlist: {invited?"Reserved invitation, confirm enrollment before it expires":waitlistStatus}.
-      <Link to="/learn/my-courses" className="ml-2 text-primary underline">Manage</Link>
+      <Link to="/learn/my-activity" className="ml-2 text-primary underline">Manage</Link>
     </p>}
     {isStudent&&<p role="status" className="mt-4 text-sm text-muted-foreground">Adult self-registration requires an independently verified adult CAN account. Switch to an eligible account to enroll.</p>}
     {signedIn && !enrolled && !isStudent && <Button type="button" className="mt-5 min-h-11"
@@ -265,7 +265,7 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     </Button>}
     {message && <p role={messageError?"alert":"status"} className="mt-4 border border-border bg-muted/20 p-4 text-sm">{message}</p>}
     {enrolled && <div className="mt-4 space-y-2">
-      <Link to="/learn/my-courses" className="inline-block font-semibold text-primary underline underline-offset-4">
+      <Link to="/learn/my-activity" className="inline-block font-semibold text-primary underline underline-offset-4">
         Go to my courses
       </Link>
     </div>}
