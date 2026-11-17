@@ -1,5 +1,5 @@
 import {describe,it,expect} from "vitest";
-import {assertGrantSelection,resolveAccessContext,roleCapabilities,type VerifiedAccessGrant} from "@/domain/access-context";
+import {assertGrantSelection,assertSingleAccountPerson,resolveAccessContext,roleCapabilities,type VerifiedAccessGrant} from "@/domain/access-context";
 const grant:VerifiedAccessGrant={id:"grant-1",accountId:"account-1",personId:"person-1",role:"teacher",organizationId:"org-1",siteId:"site-1",active:true};
 describe("provider-independent authorization context",()=>{
  it("derives the actor, capabilities and scope from verified grants",()=>{
@@ -44,6 +44,18 @@ describe("provider-independent authorization context",()=>{
    expect(roleCapabilities[role]).not.toContain("assignments:grade");
    expect(roleCapabilities[role]).not.toContain("enrollment:manage");
   }
+ });
+ it("requires exactly one Person per real account across Site and role grants",()=>{
+  const own=[grant,{...grant,id:"grant-2",role:"guardian",siteId:"site-2"}];
+  expect(()=>assertSingleAccountPerson("account-1",own)).not.toThrow();
+  expect(()=>assertSingleAccountPerson("account-1",[
+   grant,{...grant,id:"grant-2",personId:"person-2",role:"guardian"},
+  ])).toThrow();
+  expect(()=>assertSingleAccountPerson("account-1",[])).toThrow();
+  expect(()=>assertSingleAccountPerson("account-1",[
+   {...grant,active:false},
+  ])).toThrow();
+  expect(()=>assertSingleAccountPerson("account-2",[grant])).toThrow();
  });
  it("rejects an account trying to use another account's membership",()=>{
   expect(()=>resolveAccessContext({accountId:"account-2",sessionId:"session-2",activeGrantId:"grant-1"},[grant])).toThrow();
