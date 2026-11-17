@@ -8,6 +8,8 @@
     "assets:prepare": "node scripts/prepare-template-images.mjs",
     "prebuild": "npm run check:build-source-syntax && npm run assets:prepare",
     "prebuild:cloudflare": "npm run check:build-source-syntax && node scripts/verify-site-planning-imports.mjs && npm run assets:prepare",
+    "postbuild": "npm run typecheck",
+    "postbuild:cloudflare": "npm run typecheck",
     "prebuild-storybook": "npm run assets:prepare",
     "prestorybook": "npm run assets:prepare",
     "preview": "node scripts/preview.mjs",
