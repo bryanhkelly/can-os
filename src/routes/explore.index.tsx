@@ -30,7 +30,7 @@ function ExplorePage(){
     site.programs.map(program=>({...program,site})))??[];
   return <WorkspaceShell eyebrow="Discovery" title="Explore programs and places" width="wide"
     subtitle="Find approved programs across participating schools and learning centers. Your CAN account follows you to new locations."
-    actions={<Link to="/account/" className="text-sm font-semibold text-primary underline underline-offset-4">My CAN account</Link>}>
+    actions={<Link to="/account" className="text-sm font-semibold text-primary underline underline-offset-4">My CAN account</Link>}>
     <section aria-label="Search available programs" className="mt-6 border border-border bg-card p-5">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_15rem]">
         <label className="block text-sm font-semibold" htmlFor="explore-query">
