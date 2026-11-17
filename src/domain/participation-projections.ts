@@ -27,6 +27,7 @@ export interface SchoolSectionActivity {
   siteId?:string|null;siteName?:string|null;
   startsAt?:DateValue;endsAt?:DateValue;
   subject?:{kind:"self"|"dependent";displayName:string|null};
+  officialOutcome?:{label:string;referenceId:string}|null;
 }
 export function projectSchoolSections(
   sections: readonly SchoolSectionActivity[], now: Date,
@@ -45,9 +46,9 @@ export function projectSchoolSections(
       subject:section.subject??{kind:"self",displayName:null},
       startAt:iso(section.startsAt),endAt:iso(section.endsAt),nextAt:null,
       progress: null,
-      // Enrollment completion is not a grade or a credential decision.
-      // Official assessment/completion evidence is provided only by WS3.
-      outcome: null,
+      // A finalized grading-period reference is source-owned evidence, not
+      // an inference from the Enrollment status or a claim of course credit.
+      outcome:section.officialOutcome??null,
       action: status === "active"
         ? {label: "Open school class", href: "/student/courses?section=" + hrefId(section.id)}
         : status === "scheduled"
@@ -257,6 +258,8 @@ export interface AcceptedCalendarEventActivity {
   siteId:string|null;
   programId:string|null;
   cancelled:boolean;
+  siteName?:string|null;organizationName?:string|null;
+  subject?:{kind:"self"|"dependent";displayName:string|null};
 }
 
 /** Explicitly accepted attendance intent. An elapsed event is NOT a completion. */
@@ -273,9 +276,9 @@ export function projectAcceptedCalendarEvents(
         ...(row.programId?{programId:row.programId}:{})},
       kind:"event",status,sourceStatus:row.cancelled?"cancelled":"accepted",
       title:row.title,detail:"Accepted event invitation. Attendance not verified.",
-      organizationId:row.organizationId,organizationName:null,
-      siteId:row.siteId,siteName:null,
-      subject:{kind:"self",displayName:null},
+      organizationId:row.organizationId,organizationName:row.organizationName??null,
+      siteId:row.siteId,siteName:row.siteName??null,
+      subject:row.subject??{kind:"self",displayName:null},
       startAt,endAt,nextAt:null,
       progress:null,outcome:null,
       action:row.cancelled?null:{label:"View event",href:"/calendar?event="+hrefId(row.eventId)},
