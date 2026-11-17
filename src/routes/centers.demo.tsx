@@ -5,6 +5,7 @@ import {
   PageFrame, RecordHeader, WorkspaceNotice, WorkspacePanel, StatusBadge,
 } from "@/components/workspace";
 import { getDemoCenter } from "@/modules/activities/demo-center.functions";
+import { SiteNativeClassHandoff } from "@/components/launch-studio/SiteNativeClassHandoff";
 
 export const Route = createFileRoute("/centers/demo")({
   loader: safeLoader(() => getDemoCenter()),
@@ -22,7 +23,7 @@ function DemoCenterPage() {
     <RecordHeader eyebrow="Community Learning Center · Synthetic demonstration"
       title={site.name} subtitle="After-school and summer program planning"/>
     <div className="mt-6 space-y-5">
-      <WorkspacePanel title="Open the Class workspace"
+      <WorkspacePanel title="Explore Classes and programs"
         description="One Class directory for enrollment, teaching, sessions and management.">
         <p className="text-sm leading-6 text-muted-foreground">
           These saved program plans are not native Classes or enrollable seats.
@@ -42,6 +43,7 @@ function DemoCenterPage() {
         teaching Session or safety approval is implied by these records.
         A native Class requires a published Course and approved adoption.
       </WorkspaceNotice>
+      <SiteNativeClassHandoff publicSiteId={site.id}/>
       <div className="grid gap-4 md:grid-cols-2">
         {plans.map(plan=><WorkspacePanel key={plan.seasonId}
           title={plan.activityName} description={plan.programName}>
