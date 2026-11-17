@@ -78,7 +78,7 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
  </>;
  if(module==="academics") {
   if(current)return <>{catalogDiscovery}{data.academic ? <LaunchAcademicSetupWorkspace key={current.id} hubMode data={data.academic}/> : <p role="alert" className="mt-6 border p-5">Academic records could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry academic records</Button></p>}</>;
-  if(data.draftFailed)return <><p role="alert" className="mt-6 border p-5">Your saved academic setup could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry saved draft</Button></p></>;
+  if(data.draftFailed)return <>{catalogDiscovery}<p role="alert" className="mt-6 border p-5">Your saved academic setup could not be loaded. <Button variant="outline" onClick={()=>void router.invalidate()}>Retry saved draft</Button></p></>;
     const wizardData:LaunchWizardData={options:{...data.options,canCreateSite:false,sites:data.options.sites.filter(item=>item.id===siteId),organizations:data.options.organizations.filter(org=>org.id===site?.organizationId)},launches:{launches:data.launches},preparationPrograms:[],familyInvitations:null,admissionsCounts:null,enrollmentCounts:null,extendedPlanning:null,jurisdictionGuidance:{},jurisdictionResearch:data.jurisdictionResearch??{},jurisdictionResearchUnavailable:data.jurisdictionResearchUnavailable,authError:"",draft:data.draft,draftContext:`${siteId}:`};
   return <>{catalogDiscovery}<LaunchWizardPage hubMode selection={{siteId,step:"school"}} data={wizardData}/></>;
  }
