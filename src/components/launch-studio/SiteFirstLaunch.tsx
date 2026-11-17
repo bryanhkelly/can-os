@@ -22,6 +22,7 @@ import { suggestedLaunchSlug } from "@/domain/launch-slug";
 import { usStatesAndTerritories } from "@/domain/site-setup-configuration";
 import { saveSiteLaunchPreferences } from "@/modules/programs/site-launch-preferences.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
+import { siteLaunchPreparation } from "@/domain/site-launch-preparation";
 
 type Options = Awaited<ReturnType<typeof listLaunchOptions>>;
 type Delivery = "physical" | "digital" | "both";
@@ -78,6 +79,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const siteMutation=useWorkspaceMutation({mutationFn:createLaunchSite});
   const known=options.sites.find(s=>s.id===siteId);
   const siteName=known?.name??name;
+  const preparation=siteLaunchPreparation(sitePrograms,chosen);
   const siteCity=known?.planningLocation?.city??city;
   const siteState=known?.planningLocation?.state??state;
   const previewUrl=siteId
@@ -289,8 +291,9 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
                 className="block font-semibold text-primary underline">Verify existing Site identity connection</Link>}
               <Link to="/canonical/blueprints" search={{}}
                 className="block font-semibold text-primary underline">Manage approved educational blueprints</Link>
-              {siteId&&<Link to="/settings/school/$module" params={{module:"compliance"}} search={{siteId}}
-                className="block font-semibold text-primary underline">School opening and compliance</Link>}
+              {siteId&&preparation.showSchoolOpeningPreparation&&
+                <Link to="/settings/school/$module" params={{module:"compliance"}} search={{siteId}}
+                  className="block font-semibold text-primary underline">School opening and compliance</Link>}
             </div>
           </details>
         </aside>
