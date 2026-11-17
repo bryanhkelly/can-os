@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { StatusBadge } from "@/components/workspace";
 import {
  getSectionLifecycle,setSectionLifecycleState,updateSectionLifecycleSchedule,replaceLifecycleTeacher,
  transitionLifecycleEnrollment,queueLifecycleWaitlist,resolveLifecycleWaitlist,transferLifecycleEnrollment,promoteLifecycleWaitlist,offerLifecycleWaitlistSeat
@@ -98,16 +99,16 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
    candidate.programId===section.programId&&candidate.termId===section.termId);
  const selectedDestination=destinations.some(candidate=>candidate.id===destination)?destination:"";
  const [enrollmentStatus,setEnrollmentStatus]=useState<"withdrawn"|"transferred">("withdrawn");
- return <article className="rounded-xl border bg-card p-5">
+ return <article className="border bg-card p-5">
   <div className="flex flex-wrap items-center justify-between gap-2">
    <h3 className="font-semibold">{section.title} · {section.code}</h3>
-   <span className="rounded-full border px-3 py-1 text-xs">{section.active?"Active":"Closed"}</span>
+   <StatusBadge tone={section.active?"success":"neutral"}>{section.active?"Active":"Closed"}</StatusBadge>
   </div>
   <p className="mt-2 text-xs text-muted-foreground">
    {section.students.length} active section enrollments · {section.teachers.length} instructors · {section.waitlist.length} waiting · {section.allocations.filter(a=>a.status==="held"||a.status==="committed").length} live capacity reservations
   </p>
   <div className="mt-4 grid gap-3 md:grid-cols-2">
-   <div className="rounded-lg border p-3">
+   <div className="border p-3">
     <h4 className="font-semibold text-sm">Instructor replacement</h4>
     <Field className="mt-2" label="Outgoing teacher">
      <Select value={outgoing} onChange={e=>setOutgoing(e.target.value)}>
@@ -126,7 +127,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
      onClick={()=>void run(section.id,()=>replaceLifecycleTeacher({data:{sectionId:section.id,oldPersonId:outgoing,newPersonId:newTeacher,reason}}),"Instructor replacement recorded.")}
      className="mt-3">Replace instructor</Button>
    </div>
-   <div className="rounded-lg border p-3">
+   <div className="border p-3">
     <h4 className="font-semibold text-sm">Schedule changes</h4>
     <Field className="mt-2" label="Start"><Input type="datetime-local" value={start} onChange={e=>setStart(e.target.value)}/></Field>
     <Field className="mt-2" label="End"><Input type="datetime-local" value={end} onChange={e=>setEnd(e.target.value)}/></Field>
@@ -136,7 +137,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       {section.scheduleOptions.map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
      </Select>
     </Field>
-    <div className="mt-3 rounded border bg-muted p-2 text-xs">
+    <div className="mt-3 border bg-muted p-2 text-xs">
      <strong>Schedule impact preview:</strong> {section.students.length} active enrollments,
      {" "}{section.teachers.length} assigned instructors and
      {" "}{section.allocations.filter(a=>a.status==="held"||a.status==="committed").length} active capacity allocations.
@@ -147,7 +148,7 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
         startsAt:start?new Date(start).toISOString():null,endsAt:end?new Date(end).toISOString():null,reason}}),
       "Schedule updated.")} className="mt-3">Save schedule</Button>
    </div>
-   <div className="rounded-lg border p-3">
+   <div className="border p-3">
     <h4 className="font-semibold text-sm">Enrollment transition</h4>
     <Field className="mt-2" label="Enrolled student">
       <Select value={selectedEnrollment} onChange={e=>setEnrollmentId(e.target.value)}>
@@ -174,13 +175,13 @@ function LifecycleSection({section,staff,busy,reason,allSections,run}:{
       ()=>transitionLifecycleEnrollment({data:{enrollmentId:selectedEnrollment,status:enrollmentStatus,reason}}),"Enrollment status updated.")}
       className="mt-3">Record transition</Button>
    </div>
-   <div className="rounded-lg border p-3">
+   <div className="border p-3">
     <h4 className="font-semibold text-sm">Waitlist and closure</h4>
     <SectionWaitlistPicker sectionId={section.id} disabled={busy||!section.active}
      onAdd={(studentProfileId,reset)=>void run(section.id,
       ()=>queueLifecycleWaitlist({data:{sectionId:section.id,studentProfileId,reason}}),
       "Student placed on waitlist.",reset)}/>
-    {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 rounded border p-2 text-xs">
+    {section.waitlist.map(w=><div key={w.id} className="mt-2 flex justify-between gap-2 border p-2 text-xs">
      <span>{lifecycleStudentLabel(w)} · {w.status}</span>
      {w.status!=="in_progress"&&<Button variant="ghost" size="sm" disabled={busy} onClick={()=>void run(section.id,
        ()=>offerLifecycleWaitlistSeat({data:{actionId:w.id,expiresAt:new Date(Date.now()+3*86400000).toISOString()}}),
@@ -212,7 +213,7 @@ function CapacityReplacement({section,reason,busy,run}:{section:Snapshot[number]
  },[section.demandId]);
  const reservations=section.allocations.filter(a=>a.status==="committed");
  if(!section.demandId||!reservations.length)return null;
- return <div className="mt-4 rounded-lg border p-3">
+ return <div className="mt-4 border p-3">
   <h4 className="text-sm font-semibold">Replace a committed network instructor</h4>
   <p className="mt-1 text-xs text-muted-foreground">Choose an existing committed allocation and a compatible instructor offering. The replacement and release happen together.</p>
   <Field className="mt-2" label="Existing allocation">
