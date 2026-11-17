@@ -59,7 +59,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS ws3_evidence_award_version_uq
 
 CREATE UNIQUE INDEX IF NOT EXISTS ws3_evidence_class_enrollment_version_uq
  ON education_v30.learning_completion_evidence_bindings
- (class_enrollment_id,expected_class_outcome_id,evidence_version_id,purpose)
+ (class_enrollment_id,expected_class_outcome_id,evidence_version_id,purpose) NULLS NOT DISTINCT
  WHERE class_enrollment_id IS NOT NULL;
 
 -- Cross-check the immutable target, Person and original Site attribution.
