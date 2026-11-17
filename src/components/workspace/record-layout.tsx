@@ -31,17 +31,19 @@ export function RecordHeader({ eyebrow, title, subtitle, leading, status, action
         </div>
         {leading && <div className="shrink-0">{leading}</div>}
       </div>
-      {(status || actions) && <div className="flex min-w-0 flex-wrap items-center gap-2">{status}{actions}</div>}
+      {(status || actions) && <div className="flex min-w-0 flex-wrap items-center gap-2">{status}{actions && <div role="group" aria-label="Record actions" className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}</div>}
     </div>
   </header>;
 }
 
-export function RecordLayout({ header, navigation, main, rail, activity, className }: {
+export function RecordLayout({ header, navigation, main, rail, activity, railLabel = "Related record context", activityLabel = "Record activity", className }: {
   header: React.ReactNode;
   navigation?: React.ReactNode;
   main: React.ReactNode;
   rail?: React.ReactNode;
   activity?: React.ReactNode;
+  railLabel?: string;
+  activityLabel?: string;
   className?: string;
 }) {
   return <div className={cn("min-w-0 space-y-5", className)}>
@@ -49,10 +51,37 @@ export function RecordLayout({ header, navigation, main, rail, activity, classNa
     {navigation && <DetailNavigation label="Record sections" variant="record">{navigation}</DetailNavigation>}
     <div className={cn("grid min-w-0 items-start gap-5", rail && "xl:grid-cols-[minmax(0,1fr)_18rem]")}>
       <div className="min-w-0 space-y-5">{main}</div>
-      {rail && <aside aria-label="Related record context" className="min-w-0 space-y-4">{rail}</aside>}
+      {rail && <aside aria-label={railLabel} className="min-w-0 space-y-4">{rail}</aside>}
     </div>
-    {activity && <section aria-label="Record activity" className="border border-border bg-card p-5">{activity}</section>}
+    {activity && <section aria-label={activityLabel} className="border border-border bg-card p-5">{activity}</section>}
   </div>;
+}
+
+export interface RecordFact {
+  /** Human-readable fact name. Values always come from the owning route's authorized reader. */
+  label: string;
+  value: React.ReactNode;
+}
+
+/** Compact semantic record metadata, not a metric dashboard or editable form. */
+export function RecordFacts({ items, columns = 2, label, className }: {
+  items: readonly RecordFact[];
+  columns?: 1 | 2 | 3;
+  label?: string;
+  className?: string;
+}) {
+  if (items.length === 0) return null;
+  return <dl aria-label={label} className={cn(
+    "grid min-w-0 gap-4 text-sm",
+    columns === 2 && "sm:grid-cols-2",
+    columns === 3 && "sm:grid-cols-3",
+    className,
+  )}>
+    {items.map((item, index) => <div key={index} className="min-w-0">
+      <dt className="text-xs text-muted-foreground">{item.label}</dt>
+      <dd className="mt-1 min-w-0 wrap-break-word text-foreground">{item.value}</dd>
+    </div>)}
+  </dl>;
 }
 
 type EntityCardLinkProps = {
