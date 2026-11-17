@@ -317,7 +317,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           eq(canonicalClassEnrollments.classId,instance.id),
           eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
           eq(canonicalClassEnrollments.status,"completed"),
-        )).limit(1);
+        )).orderBy(desc(canonicalClassEnrollments.enrolledAt)).limit(1);
       const repeatAuthorization=completed
         ?await requireNativeRepeatAuthorization(tx,instance.id,learnerPersonId,completed.id,now)
         :null;
