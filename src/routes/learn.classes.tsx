@@ -1,11 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  getNativePublicClassCatalogPage, getMyNativeClassEnrollments, enrollInNativeClass,
+  getNativePublicClassCatalogPage, getMyNativeClassEnrollmentHistoryPage, enrollInNativeClass,
 } from "@/modules/classes/native-class-enrollment.functions";
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
@@ -93,7 +93,7 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
   </article>;
 }
-type EnrolledClass=Awaited<ReturnType<typeof getMyNativeClassEnrollments>>[number];
+type EnrolledClass=Awaited<ReturnType<typeof getMyNativeClassEnrollmentHistoryPage>>["items"][number];
 function EnrolledClassCard({item,onChanged}:{item:EnrolledClass;onChanged:()=>Promise<void>}){
   const [confirm,setConfirm]=useState(false);
   const [busy,setBusy]=useState(false);
@@ -161,12 +161,20 @@ function NativeLearnerClasses(){
     retry:false,
   });
   const catalogItems=catalog.data?.pages.flatMap(page=>page.items)??[];
-  const enrolled=useQuery({queryKey:["native-my-class-enrollments"],
-    queryFn:()=>getMyNativeClassEnrollments(),retry:false});
+  const enrolled=useInfiniteQuery({
+    queryKey:["native-my-class-enrollment-history"],
+    initialPageParam:null as {enrolledAt:string;classEnrollmentId:string}|null,
+    queryFn:({pageParam})=>getMyNativeClassEnrollmentHistoryPage({
+      data:{cursor:pageParam},
+    }),
+    getNextPageParam:last=>last.nextCursor,
+    retry:false,
+  });
+  const enrolledItems=enrolled.data?.pages.flatMap(page=>page.items)??[];
   async function refresh(){
     await Promise.all([
       client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId]}),
-      client.invalidateQueries({queryKey:["native-my-class-enrollments"]}),
+      client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]}),
     ]);
   }
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Classes"
@@ -177,10 +185,15 @@ function NativeLearnerClasses(){
       {enrolled.isPending&&<p role="status" className="mt-3 text-sm">Loading your Classes…</p>}
       {enrolled.isError&&<p role="alert" className="mt-3 border border-border p-4 text-sm">Native Class records are not yet enabled for this session or environment.</p>}
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        {(enrolled.data??[]).map(item=><EnrolledClassCard
+        {enrolledItems.map(item=><EnrolledClassCard
           key={item.classEnrollmentId} item={item} onChanged={refresh}/>)}
       </div>
-      {enrolled.isSuccess&&enrolled.data.length===0&&<p className="mt-4 text-sm text-muted-foreground">You have no native Class enrollments yet.</p>}
+      {enrolled.isSuccess&&enrolledItems.length===0&&<p className="mt-4 text-sm text-muted-foreground">You have no native Class enrollments yet.</p>}
+      {enrolled.hasNextPage&&<Button type="button" size="sm" variant="outline" className="mt-4"
+        disabled={enrolled.isFetchingNextPage}
+        onClick={()=>void enrolled.fetchNextPage()}>
+        {enrolled.isFetchingNextPage?"Loading history…":"Load older Classes"}
+      </Button>}
     </section>
     <section className="mt-8">
       <h2 className="font-serif text-2xl">Explore Classes</h2>
