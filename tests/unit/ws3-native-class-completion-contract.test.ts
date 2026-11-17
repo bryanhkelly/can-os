@@ -55,6 +55,20 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(sql).toContain("binding.approved_by_person_id<>NEW.completion_decided_by_person_id");
     expect(sql).toContain("class_completion_is_current");
   });
+  it("resolves exactly one historical learner delivery Site for site-less Classes",()=>{
+    expect(command).toContain("participationAttributions.deliverySiteId");
+    expect(command).toContain("attribution.length!==1");
+    expect(sql).toContain("attribution_count<>1");
+    expect(sql).toContain("min(a.delivery_site_id)");
+    expect(sql).toContain("attr.delivery_site_id=delivery_site");
+    expect(sql).toContain("plan.site_id=delivery_site");
+    expect(sql).toContain("room.site_id=delivery_site");
+    expect(sql).toContain("cls.site_id IS NULL OR cls.site_id=attr.delivery_site_id");
+    expect(sql).toContain("plan.site_id=attr.delivery_site_id");
+    expect(sql).toContain("room.site_id=attr.delivery_site_id");
+    expect(sql).not.toContain("plan.site_id=e.site_id");
+    expect(sql).not.toContain("room.site_id=cls.site_id");
+  });
   it("requires Class-linked ended room host assertions, never playback, pairing or agendas",()=>{
     expect(command).toContain("canonicalClassSessions.classroomPlanId");
     expect(command).toContain("facilitatedClassroomPlans.facilitatedSessionId");
