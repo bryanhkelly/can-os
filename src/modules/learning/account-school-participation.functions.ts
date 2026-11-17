@@ -77,13 +77,13 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
       return permitted.length?or(...permitted):undefined;
     };
     const profileScope=(profiles:Map<string,{name:string|null;kind:"self"|"dependent"}>,
-      profileColumn:typeof s.enrollments.studentProfileId|typeof s.activityRegistrations.studentProfileId,
+      profileColumn:SQLWrapper,
       org:SQLWrapper,site:SQLWrapper):SQL|undefined=>{
       const selfIds=[...profiles].filter(([,p])=>p.kind==="self").map(([id])=>id);
       const childIds=[...profiles].filter(([,p])=>p.kind==="dependent").map(([id])=>id);
       return or(
-        selfIds.length?and(inArray(profileColumn,selfIds),scoped("student",org,site)):undefined,
-        childIds.length?and(inArray(profileColumn,childIds),scoped("guardian",org,site)):undefined,
+        selfIds.length?and(inArray(sql<string>`${profileColumn}`,selfIds),scoped("student",org,site)):undefined,
+        childIds.length?and(inArray(sql<string>`${profileColumn}`,childIds),scoped("guardian",org,site)):undefined,
       );
     };
     const getProfiles=async(access:"academic"|"enrollment")=>{
