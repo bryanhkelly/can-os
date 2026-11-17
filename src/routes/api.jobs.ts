@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { runScheduledJobs } from "@/workers/scheduled-jobs";
+import { isAuthorizedJobRequest } from "@/lib/job-auth.server";
 
 /**
  * Authenticated maintenance endpoint invoked by netlify/functions/scheduled-jobs.ts.
@@ -9,8 +10,7 @@ export const Route = createFileRoute("/api/jobs")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const secret = process.env.CAN_JOB_SECRET;
-        if (!secret || request.headers.get("x-can-job-secret") !== secret) {
+        if (!isAuthorizedJobRequest(request)) {
           return Response.json({ error: "Unauthorized" }, { status: 401 });
         }
         const result = await runScheduledJobs();
