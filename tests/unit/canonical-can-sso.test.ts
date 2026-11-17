@@ -132,6 +132,30 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(bridge).not.toContain("insert(canonicalAccountGrants)");
   });
 
+  it("keeps aggregate staff readiness aligned with restricted reader identity guards", () => {
+    const readiness = source("scripts/acceptance/check-canonical-staff-readiness.mjs");
+    const restricted = source("database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql");
+    const sharedGuards = [
+      "person_link.verified_by_account_id",
+      "native_org.status = 'active'",
+      "can_person.active = true",
+      "other_grant.person_id",
+      "other_link.canonical_principal_id",
+    ];
+    for (const guard of sharedGuards) {
+      expect(readiness, `Readiness must check ${guard}`).toContain(guard);
+    }
+    expect(restricted).toContain("person_link.verified_by_account_id");
+    expect(restricted).toContain("native_org.status = 'active'");
+    expect(restricted).toContain("person.active = true");
+    expect(restricted).toContain("other_grant.person_id");
+    expect(restricted).toContain("other_link.canonical_principal_id");
+    expect(readiness).toContain("BEGIN READ ONLY");
+    expect(readiness).toContain("eligible_staff_paths");
+    expect(readiness).not.toContain("INSERT INTO");
+    expect(readiness).not.toContain("UPDATE public.");
+  });
+
   it("never allows dual-cookie learning persistence to bypass CAN Person verification", () => {
     const sourceCode = source("src/modules/identity/learning-command-context.server.ts");
     expect(sourceCode).toContain("accessSessionCookie");
