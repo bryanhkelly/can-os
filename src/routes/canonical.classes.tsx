@@ -454,6 +454,10 @@ function NativeClasses(){
               const status=rolloutReadiness[index]?.status??"adoption_required";
               const incomplete=!!exactRolloutOptions.hasNextPage||exactRolloutOptions.isPending||
                 exactRolloutOptions.isError||exactRolloutOptions.isFetching;
+              const existingAtSite=(classes.data??[]).filter(item=>
+                item.siteId===rolloutSiteId&&
+                item.offeringVersionId===recipePlan.offeringVersionId&&
+                item.courseVersionId===course.courseVersionId).length;
               return <div key={course.courseVersionId} className="flex flex-wrap items-center justify-between gap-3 border border-border bg-card p-3 text-sm">
                 <div>
                   <p className="font-semibold">{course.courseTitle} {course.isRequired?"· Required":"· Optional"}</p>
@@ -464,9 +468,15 @@ function NativeClasses(){
                       :incomplete?"Checking other approved Deployment/adoption results…"
                       :"No approved adoption of this Offering version for your organization."}
                   </p>
+                  {existingAtSite>0&&<p className="mt-1 text-xs text-muted-foreground">
+                    At least {existingAtSite} existing Class(es) for this Course at the selected Site.
+                    Preparing another is appropriate only for a distinct cohort or delivery.
+                  </p>}
                 </div>
                 <Button type="button" variant="outline" disabled={status!=="ready"||exactRolloutOptions.isError}
-                  onClick={()=>chooseRolloutCourse(course)}>Prepare Class</Button>
+                  onClick={()=>chooseRolloutCourse(course)}>
+                  {existingAtSite>0?"Prepare another Class":"Prepare Class"}
+                </Button>
               </div>;
             })}
             {exactRolloutOptions.hasNextPage&&<Button type="button" variant="outline"
