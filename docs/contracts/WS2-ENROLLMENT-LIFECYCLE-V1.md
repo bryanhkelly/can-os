@@ -35,15 +35,18 @@ grant, and Site context is not nullable merely to make a report roll up.
 | --- | --- | --- |
 | Self | `enrollInNativeClass` | Allowed for verified adults under published consent and current Site/Course authority |
 | Assignment | `assignAdultToNativeClass` | Allowed for already-affiliated verified adults with current exact-Site registrar authority; may omit Class Offering |
-| Invitation | no audited Class invitation/acceptance/expiry authority yet | **Blocked** at publish; draft enum alone does not confer support |
+| Invitation | `issueNativeClassInvitation`, `getMyNativeClassInvitations`, `declineNativeClassInvitation`, and `enrollInNativeClass` acceptance | Available for verified adults with current exact-Site invitation authority, fresh consent, 48-hour expiry and admission-time capacity checks; no seat hold |
 | Approval | no Class approval queue with verified guardian/eligibility decisions yet | **Blocked** at publish |
 | Youth/guardian | existing school and enrichment registration services only | **No native youth Class endpoint** until existing verified relationships/consents are integrated |
 
-`publishUnifiedClassOffering` rejects non-operational methods and native
+`publishUnifiedClassOffering` rejects unsupported approval methods and native
 `for_credit` participation while independent academic eligibility is not
 implemented. Both Class catalogs suppress already-published versions
 advertising unimplemented methods or for-credit access; the write command
-rechecks the same policy. The composer exposes only operational choices.
+rechecks the same policy. The composer exposes self, assignment and verified-adult invitation.
+Native guardian/youth, approval, transfer and completed-repeat commands are not production-complete.
+The current Class management roster exposes invitation issuance only for published invitation terms;
+recipient acceptance is independent and does not reserve seats.
 
 | From | Command | To | Course Attempt | Seat |
 | --- | --- | --- | --- | --- |
