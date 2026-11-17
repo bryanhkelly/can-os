@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 
 /** Canonical permissions share CAN sign-in when staff identity and Site grants are linked. */
@@ -13,6 +14,10 @@ export function CanonicalBlueprintLoadError({
       Your CAN sign-in is shared across workspaces. An independent reviewer must
       connect the school Site and your canonical staff identity before protected
       canonical records can be accessed. Signing in again cannot grant missing permissions.
+    </p>
+    <p className="mt-4 text-sm">
+      If you administer this Site, <Link to="/site-identity" className="font-semibold text-primary underline underline-offset-4">open Site identity verification</Link>
+      {" "}to review the required association and independent approval. The verification workflow does not automatically grant access.
     </p>
   </WorkspaceShell>;
 }
