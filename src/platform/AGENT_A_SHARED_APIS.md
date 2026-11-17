@@ -55,28 +55,16 @@ The registry is resource-specific, not a universal authorization layer.
 
 Unexpected errors can be reported through `onUnexpectedError`; user-facing messages do not expose internal exception text. Optional secondary services should catch their own failures at the call site and preserve the primary result.
 
-## Validation and remaining adoption
+## Current verification checklist
 
-Unit tests added for timezone, loader classification, server-function authorization patterns, and the shared mutation hook. No feature routes were modified. Full repository TypeScript, Vitest, and lint commands require a checked-out workspace with dependencies; they have **not** been executed by the GitHub connector. Run `npm run typecheck`, `npx vitest run src/lib/safe-loader.test.ts src/modules/calendar/site-local-time.test.ts`, and focused ESLint before merging. Feature-agent adoption remains outstanding. The mutation-hook tests exercise the submit guard and invalidation callbacks; a browser-mounted integration test is still recommended.
+- `npm run typecheck` and `npm run lint`
+- `npx vitest run tests/unit/class-announcement-attempt.test.ts tests/unit/class-download.test.ts tests/unit/scope-registry.test.ts src/lib/safe-loader.test.ts`
+- Confirm that Cloudflare runs scheduled jobs only from `src/server.ts`
+- Browser-test authorized class resource downloads, retry-after-timeout announcements, and `/classes` with both learning and Site Admin roles
+- Verify the production CSP permits Google Fonts stylesheets and font files while preserving other restrictions
 
-## Final integration checklist
-
-- `npm run typecheck`
-- `npx vitest run src/platform/server-functions.test.ts src/lib/safe-loader.test.ts src/hooks/useWorkspaceMutation.test.tsx src/modules/calendar/site-local-time.test.ts`
-- `npx eslint src/platform/server-functions.ts src/platform/server-functions.test.ts src/lib/safe-loader.ts src/lib/safe-loader.test.ts src/lib/loader-failure.tsx src/hooks/useWorkspaceMutation.ts src/hooks/useWorkspaceMutation.test.tsx src/modules/calendar/site-local-time.ts src/modules/calendar/site-local-time.test.ts`
-- Run a browser-level test against a real authenticated endpoint before widespread migration.
-
-GitHub connector commits are not proof of successful compilation or tests. No validation results are claimed here.
-
-## Integration update (latest FullFlow)
-
-- The working branch was fast-forwarded to canonical FullFlow commit `310e16d` before these follow-up edits. No merge into FullFlow was performed.
-- `SerializableResult` constrains shared server-function outputs to JSON-compatible values; avoid returning Date, Map, Set, functions, undefined, or class instances. Domain results should be converted to explicit DTOs at the server boundary.
-- Feature agents should migrate only after the real TanStack typecheck and code-verification workflow pass. The older mocked server-function tests are not a substitute for framework type verification.
-- The new `platform-code-verification.yml` runs on PRs targeting FullFlow and pushes to the Agent A branch. It does not use Neon credentials. The manually triggered `fullflow-release-acceptance.yml` remains unchanged, isolated, and gated by preflight.
-- Integration owner should require the code-verification job in FullFlow branch protection and separately require recorded connected acceptance before release, without running connected fixtures on ordinary PRs.
-- Agent D owns admissions-specific connected acceptance. Agents C and E should adopt the typed mutation result discriminant and preserve existing domain authorization.
-- Actual typecheck, unit, lint, and build results are pending CI execution. Do not infer green status from commits alone.
+The GitHub connector can change repository files but cannot itself certify a successful
+local build or browser run. Report CI and browser acceptance separately from code commits.
 
 ## Reusable loader presentation (component extraction)
 
