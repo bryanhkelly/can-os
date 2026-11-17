@@ -2,7 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { readRestrictedCanonicalSession } from "./restricted-canonical-session-reader.server";
-import { accessAccounts, accessAccountNoncreditPrincipals } from "@/db/schema";
+import { accessAccounts, accessAccountNoncreditPrincipals, accessAdultLearningReviews } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 import { accessSessionCookie } from "@/domain/access-tokens";
@@ -162,6 +162,23 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
         links[0]?.nativePersonId !== native.person_id) {
       throw new AuthorizationError("one verified CAN-to-canonical learner identity");
     }
+    // A native bearer and a CAN cookie cannot together bypass a revoked or
+    // half-consumed reviewed identity. The review applies to this account,
+    // NOT to every independent native learner who has never had a review.
+    const [adultReview] = await db.select({
+      status:accessAdultLearningReviews.status,
+      consumedAt:accessAdultLearningReviews.consumedAt,
+      personId:accessAdultLearningReviews.accessPersonId,
+      canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
+      canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
+    }).from(accessAdultLearningReviews).where(
+      eq(accessAdultLearningReviews.accessAccountId,actor.accountId),
+    ).limit(1);
+    if(adultReview && (adultReview.status!=="approved"||
+       !adultReview.consumedAt||adultReview.personId!==actor.actorPersonId||
+       adultReview.canonicalAccountId!==native.account_id||
+       adultReview.canonicalPersonId!==native.person_id))
+      throw new AuthorizationError("current reviewed learner identity");
     return projectCanonicalCommandContext(native);
   }
   return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
