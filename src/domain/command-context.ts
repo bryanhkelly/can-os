@@ -66,6 +66,20 @@ export function assertProgramScope(
   assertScopedId(context.scope.programIds, programId, "program scope");
 }
 
+/**
+ * Require an explicit current Program grant for a privileged write.
+ * The legacy assertProgramScope helper treats undefined scope as unrestricted
+ * for backwards compatibility; enrollment mutations must fail closed instead.
+ */
+export function assertExplicitProgramScope(
+  context: CommandContext,
+  programId: string,
+): void {
+  if (!programId || !context.scope.programIds?.includes(programId)) {
+    throw new AuthorizationError(`program scope: ${programId}`);
+  }
+}
+
 export function assertSectionScope(
   context: CommandContext,
   sectionId: string | null | undefined,
