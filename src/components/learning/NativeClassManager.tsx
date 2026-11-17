@@ -316,9 +316,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         adoptedCourses:options.status,
         visibleAdoptedCourseCount:optionsData.length,
         visibleDraftClasses:classes.status,
-        visibleDraftClassCount:preferredSiteId
-          ?(classes.data??[]).filter(cls=>cls.siteId===preferredSiteId).length
-          :(classes.data?.length??0),
+        visibleDraftClassCount:classes.data?.length??0,
         filtered:Boolean(search),
       }}/>
     </div>
