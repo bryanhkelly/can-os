@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, accessAccountNoncreditPrincipals,
-  accessAccountCanonicalPrincipals, accessAdultLearningReviews, people,
+  accessAccountCanonicalPrincipals, accessAdultLearningReviews, people, documents,
 } from "@/db/schema";
 import { canonicalAccounts, canonicalPersons, canonicalEnrollmentOrganizations, canonicalAccountGrants, canonicalSessions } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -28,7 +28,7 @@ const reviewInput=z.object({
   accessAccountId:z.string().uuid(),
   organizationId:z.string().uuid(),
   verifiedBirthDate:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  evidenceReference:z.string().trim().regex(/^[a-z][a-z0-9_-]{1,24}:[a-zA-Z0-9_-]{8,180}$/),
+  evidenceReference:z.string().trim().regex(/^document:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
   evidenceIndependentlyChecked:z.literal(true),
 }).strict();
 
@@ -123,6 +123,31 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
            existingPerson.birthDate!==data.verifiedBirthDate))
          throw new AuthorizationError("existing canonical Person requires independently reviewed reconciliation");
      }
+     const evidenceId=data.evidenceReference.slice("document:".length);
+     const [evidence]=await tx.select({
+       subjectType:documents.subjectType,
+       subjectId:documents.subjectId,
+       category:documents.category,
+       sensitivity:documents.sensitivityTier,
+       verifiedAt:documents.verifiedAt,
+       verifiedByPersonId:documents.verifiedByPersonId,
+       expiresAt:documents.expiresAt,
+       metadata:documents.metadata,
+     }).from(documents).where(eq(documents.id,evidenceId)).limit(1);
+     // A browser checkbox or free-text case reference is not independent proof.
+     // The referenced protected document must already have been verified by a
+     // distinct Person, for this exact CAN Person and reviewed birth date.
+     if(!evidence||evidence.subjectType!=="person"||
+        evidence.subjectId!==account.personId||
+        evidence.category!=="adult_identity_verification"||
+        !["restricted","sensitive","high"].includes(evidence.sensitivity)||
+        !evidence.verifiedAt||evidence.verifiedAt>now||
+        !evidence.verifiedByPersonId||
+        evidence.verifiedByPersonId===account.personId||
+        evidence.expiresAt!==null&&evidence.expiresAt<=now||
+        evidence.metadata.verifiedBirthDate!==data.verifiedBirthDate||
+        evidence.metadata.verificationOutcome!=="approved")
+       throw new AuthorizationError("independently verified adult identity evidence");
      const [org]=await tx.select({id:canonicalEnrollmentOrganizations.id})
        .from(canonicalEnrollmentOrganizations).where(and(
          eq(canonicalEnrollmentOrganizations.id,data.organizationId),
