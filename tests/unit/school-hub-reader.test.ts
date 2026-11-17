@@ -28,15 +28,13 @@ describe("exact-Site Hub reader",()=>{
    vi.unstubAllEnvs();
   }
  });
- it("reports the canonical catalog as disabled by default",async()=>{
+ it("does not turn off the canonical catalog because of an obsolete environment variable",async()=>{
   vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED","false");
-  try {
+  try{
    const result=await getSchoolHubData({data:{siteId,module:"academics"}});
-   expect(result.canonicalCatalogEnabled).toBe(false);
+   expect(result.canonicalCatalogEnabled).toBe(true);
    expect("canonicalBlueprintEnabled" in result).toBe(false);
-  } finally {
-   vi.unstubAllEnvs();
-  }
+  }finally{vi.unstubAllEnvs();}
  });
 
  it("returns real empty preparation without inventing approvals",async()=>{
