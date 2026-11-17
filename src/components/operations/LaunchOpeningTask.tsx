@@ -29,7 +29,7 @@ export function LaunchOpeningTask({ launch, busy, open }: {
         No active site registrar/operator is available. An existing authorized site grant is required.
       </span>}
     </Label>}
-    <Button type="button" disabled={busy || Boolean(launch.siteId && !recipient)}
+    <Button type="button" loading={busy} loadingLabel="Activating…" disabled={busy || Boolean(launch.siteId && !recipient)}
       onClick={() => void open(recipient || undefined)}
       className="mt-4 min-h-11">
       Activate
