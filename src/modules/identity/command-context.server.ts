@@ -1,6 +1,6 @@
 import {and,eq,gt,isNull,inArray,not} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,accountPersonGrants,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
@@ -46,6 +46,18 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  // A real login cannot change Person by switching its active grant. This
  // invariant applies across all Site and Organization roles, not just staff.
  if(!demoAccountSwitching){
+  // readSessionGrants deliberately filters some memberships (for example
+  // unaccepted sandbox invitations). That filtered set is NOT adequate to
+  // establish the one-Person account invariant. Check the underlying active
+  // grants instead, before selecting a persona or expanding Site authority.
+  const originalPersons=await db.select({personId:accountPersonGrants.personId})
+   .from(accountPersonGrants)
+   .where(and(eq(accountPersonGrants.accountId,session.accountId),
+     eq(accountPersonGrants.active,true))).limit(2);
+  const activePerson=grants.find(grant=>grant.id===session.activeGrantId)?.personId;
+  if(!activePerson || originalPersons.length===0 ||
+     originalPersons.some(row=>row.personId!==activePerson))
+   return rejectSession(request,"membership_unavailable");
   try{assertSingleAccountPerson(session.accountId,grants);}
   catch{return rejectSession(request,"membership_unavailable");}
  }
