@@ -36,6 +36,7 @@ describe("canonical CAN Person production cutover gate",()=>{
   expect(migration).toContain("can_account_grants_one_person_guard");
   expect(migration).toContain("COALESCE(account.person_id,NEW.person_id)");
   expect(migration).toContain("CAN account already belongs to another Person");
+  expect(migration).toContain("Existing CAN role grant identity cannot be reassigned");
  });
  it("blocks an unprepared production Cloudflare deployment",()=>{
   const pkg=JSON.parse(read("package.json")) as {
