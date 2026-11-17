@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
+  dispatchOutboundMessages, type OutboundAdapter, type OutboundSendResult,
 } from "@/modules/communication/outbound-dispatcher.server";
 
 const start = new Date("2026-11-17T17:00:00.000Z");
 function createAdapter(settings: {
-  send?: (message: string, key: string) => Promise<boolean>;
+  send?: (message: string, key: string) => Promise<OutboundSendResult>;
   prepared?: "ready" | "suppress" | "defer" | "fail";
   renew?: boolean;
   throwDuringPrepare?: boolean;
 } = {}) {
   let receipt: { id: string; status: string; attempts: number; leaseUntil: Date | null;
-    nextAttemptAt: Date | null; acceptedAt: Date | null } = {
+    nextAttemptAt: Date | null; acceptedAt: Date | null; providerMessageId: string | null } = {
       id: "stable-receipt", status: "pending", attempts: 0, leaseUntil: null,
-      nextAttemptAt: null, acceptedAt: null,
+      nextAttemptAt: null, acceptedAt: null, providerMessageId: null,
     };
   const send = vi.fn(settings.send ?? (async () => true));
   const adapter: OutboundAdapter<string> = {
@@ -53,7 +53,8 @@ function createAdapter(settings: {
         receipt.leaseUntil?.getTime() !== claim.leaseUntil.getTime()) return false;
       receipt = { ...receipt, status: outcome.kind, attempts: outcome.attempts,
         nextAttemptAt: outcome.nextAttemptAt, leaseUntil: null,
-        acceptedAt: outcome.kind === "accepted" ? outcome.now : null };
+        acceptedAt: outcome.kind === "accepted" ? outcome.now : null,
+        providerMessageId: outcome.providerMessageId ?? receipt.providerMessageId };
       return true;
     },
     async attemptsAfterError(claim) {
@@ -76,6 +77,16 @@ describe("generic source-owned outbound dispatcher", () => {
     expect(send).toHaveBeenCalledWith("safe message", "stable-receipt");
     expect(receipt().status).toBe("accepted");
     expect(receipt().attempts).toBe(1);
+  });
+
+  it("carries provider message identifiers without claiming inbox delivery", async () => {
+    const { adapter, receipt } = createAdapter({
+      send: async () => ({ accepted: true, providerMessageId: "email-provider-id-123" }),
+    });
+    const result = await dispatchOutboundMessages(adapter, { clock: () => start });
+    expect(result.accepted).toBe(1);
+    expect(receipt().providerMessageId).toBe("email-provider-id-123");
+    expect(receipt().status).toBe("accepted");
   });
 
   it("suppresses revoked eligibility without calling transport", async () => {
