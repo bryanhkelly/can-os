@@ -34,6 +34,7 @@ describe("notification outbox source boundaries", () => {
     expect(school).toContain("function schoolFamilyReceipt()");
     expect((school.match(/schoolFamilyReceipt\\(\\)/g) ?? []).length).toBeGreaterThanOrEqual(3);
     expect(school).toContain("SMS_PROVIDER_OUTCOME_UNCONFIRMED");
+    expect(school).toContain("if (!workers) return 0;");
     expect(school).toContain("nextAllowedDelivery");
     expect(shared).toContain("adapter.renew(active");
     expect(shared).toContain("adapter.send(prepared.message, active.id)");
