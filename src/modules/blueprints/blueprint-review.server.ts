@@ -202,6 +202,7 @@ export async function decideBlueprintReview(
       ));
     assertComponentCoverage(selectedComponents.map(item => item.id), input);
 
+    if (!version.owningOrganizationId) throw new AuthorizationError("review requires an owning Organization");
     // A review must cite verified evidence belonging to the Organization under
     // review; arbitrary document UUIDs are not approval.
     const evidenceIds = [...new Set([
