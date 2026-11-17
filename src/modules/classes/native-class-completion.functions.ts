@@ -53,7 +53,7 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
     throw new AuthorizationError("independent actual Class enrollment");
   const [cls]=await tx.select().from(canonicalClasses)
     .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
-  if (!cls || cls.operatingOrganizationId!==actor.scope.organizationIds[0] ||
+  if (!cls || cls.operatingOrganizationId!==actor.scope.organizationIds?.[0] ||
       !["active","completed"].includes(cls.state))
     throw new AuthorizationError("exact current Class Organization");
   const attribution=await tx.select({
@@ -62,7 +62,7 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
   }).from(participationAttributions)
     .where(eq(participationAttributions.classEnrollmentId,enrollment.id)).limit(2);
   if(attribution.length!==1 ||
-     attribution[0]!.deliverySiteId!==actor.scope.siteIds[0] ||
+     attribution[0]!.deliverySiteId!==actor.scope.siteIds?.[0] ||
      (cls.siteId!==null && cls.siteId!==attribution[0]!.deliverySiteId))
     throw new AuthorizationError("immutable original Class delivery Site and Person");
   const deliverySiteId=attribution[0]!.deliverySiteId;
@@ -519,12 +519,12 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
       await assertCurrentCanonicalStaffForMutation(tx,request,actor);
       const [cls]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId)).limit(1);
-      if(!cls || cls.operatingOrganizationId!==actor.scope.organizationIds[0] ||
-         (cls.siteId && cls.siteId!==actor.scope.siteIds[0]))
+      if(!cls || cls.operatingOrganizationId!==actor.scope.organizationIds?.[0] ||
+         (cls.siteId && cls.siteId!==actor.scope.siteIds?.[0]))
         throw new AuthorizationError("exact authorized Class");
       await validateClassAuthority(tx,{
         actor,organizationId:cls.operatingOrganizationId,
-        siteIds:[actor.scope.siteIds[0]!],
+        siteIds:[actor.scope.siteIds?.[0]!],
       },{
         deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
         offeringVersionId:cls.offeringVersionId,
@@ -549,7 +549,7 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
           eq(canonicalPersons.id,canonicalClassEnrollments.learnerPersonId))
         .innerJoin(participationAttributions,and(
           eq(participationAttributions.classEnrollmentId,canonicalClassEnrollments.id),
-          eq(participationAttributions.deliverySiteId,actor.scope.siteIds[0]!),
+          eq(participationAttributions.deliverySiteId,actor.scope.siteIds?.[0]!),
         ))
         .where(and(
           eq(canonicalClassEnrollments.classId,cls.id),
