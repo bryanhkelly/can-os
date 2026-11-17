@@ -286,6 +286,14 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 - `RecordFacts` now has `plain` (default) and `tiles` presentation variants.
   Tiles use V6.1 square surfaces for concise, read-only verification evidence,
   not analytics metrics. Labels, values and status meanings remain feature-owned.
+- `EntityCard` is now also used by the public enrichment catalog. Every
+  offering exposes one complete, keyboard-focusable card link through the
+  router adapter instead of separate title and CTA links to the same detail
+  route. Prices, availability, dates and publishing remain the catalog
+  reader's responsibility.
+- `npm run design:inventory` now counts `RecordHeader`, `RecordFacts`,
+  `EntityCard`, `FieldTripFacts`, `ActionFooter`, `StatCard` and
+  `WorkspacePanel` as canonical components, in addition to primitives.
 - A single `FieldTripFacts` feature composition renders departure, return,
   deadline and fee for both authorized student and guardian projections. Consent,
   boarding permission and participant identity remain in the existing,
