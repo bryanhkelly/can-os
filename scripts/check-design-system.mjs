@@ -127,6 +127,14 @@ const canonicalControlConsumers = {
     imports: ['@/components/ui/field', '@/components/ui/select'],
     forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
+  "operations/SectionFacilitatorPanel.tsx": {
+    imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/select', './SiteStaffingFeedback'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
+  "operations/LocalSiteDelegationPanel.tsx": {
+    imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/select', './SiteStaffingFeedback'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
   "operations/LaunchOpeningTask.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/select', '@/components/ui/label'],
     forbidden: [/<(?:input|select|textarea|button|label)\b/],
