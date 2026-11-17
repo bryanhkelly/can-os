@@ -14,5 +14,5 @@ export const getOutboxHealthSummary = createServerFn({ method: "GET" }).handler(
   if (!actor.actorPersonId || !hasRegistrarAuthority(actor.role) || !actor.scope.siteIds?.length)
     throw new AuthorizationError("authorized school operator");
   const { getOutboxHealth } = await import("@/workers/domain-event-worker");
-  return getOutboxHealth();
+  return getOutboxHealth(actor.scope.siteIds);
 });
