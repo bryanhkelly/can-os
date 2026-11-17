@@ -51,3 +51,9 @@ export type DecideBlueprintReviewInput = z.infer<typeof decideBlueprintReviewInp
 export const blueprintReviewReadInputSchema = z.object({
   configurationVersionId: uuid,
 }).strict();
+
+/** Bounded page of authorized append-only decisions for a single frozen version. */
+export const blueprintReviewHistoryInputSchema = z.object({
+  configurationVersionId: uuid,
+  page: z.number().int().min(0).max(100).default(0),
+}).strict();
