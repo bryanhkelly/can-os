@@ -14,6 +14,7 @@ import {assertCurrentCanonicalStaffForMutation} from "@/modules/identity/canonic
 import {currentClassAuthority} from "./native-class-authority.server";
 import {assertNativeClassOperatorExitScope} from "@/domain/native-class-lifecycle";
 import {verifiedAdultOn} from "@/domain/native-class-enrollment";
+import {requireNativeGuardianChild} from "./native-class-guardian-authority.server";
 
 const uuid=z.string().uuid();
 const requestInput=z.object({classOfferingVersionId:uuid,requestId:uuid}).strict();
@@ -151,6 +152,14 @@ export const decideNativeClassApproval=createServerFn({method:"POST"})
     return {approvalRequestId:approval.id,state:approval.state,duplicate:true};
    if(approval.state!=="pending"||approval.expiresAt<=now)
     throw new AuthorizationError("current pending approval request");
+   if(approval.guardianPersonId){
+     if(approval.applicantPersonId!==approval.guardianPersonId)
+       throw new AuthorizationError("guardian must be original applicant");
+     await requireNativeGuardianChild(tx,approval.guardianPersonId,
+       approval.learnerPersonId,now);
+   }else if(approval.applicantPersonId!==approval.learnerPersonId){
+     throw new AuthorizationError("verified adult applicant only");
+   }
    const current=await currentClassAuthority(tx,cls.id,now);
    if(current.classState!=="active"||current.siteId!==approval.siteId)
     throw new AuthorizationError("active authorized Class and Site");
