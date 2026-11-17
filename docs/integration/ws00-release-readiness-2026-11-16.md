@@ -1,3 +1,18 @@
+> **WS00 follow-up reviewed 2026-11-16, after the initial baseline snapshot below.** This file retains the original initial report for audit provenance. The latest state has advanced:
+>
+> - `main` advanced nine commits to `5f0f09a59d0d14eb0d1cc8a16f2b09d32dd160aa`. WS00 merged that main commit non-destructively into integration at `ffbe2a48a9e7e418d11693cc8c0b805a31132d0a`. GitHub comparison verified zero commits behind main and only WS00 docs differing immediately after sync.
+> - All six workstreams now have implementation branches and draft PRs: WS1 #308, WS2 #309, WS3 #311, WS5 #312, WS4 #313, WS6 #314. Their code is **not merged** into integration. Earlier “zero implementation commits” statements below apply only to the initial snapshot.
+> - **P0 integration risks identified:** WS5 publisher loses WS2 `assertOperationalClassOfferingTerms(terms)` guard if overwritten; WS3 completion command uses Enrollment-first locking versus WS2 Class-first lifecycle locking. Both require corrections and concurrency/reconciliation evidence. PR comments posted to #312 and #311.
+> - Additional shared-file collisions: `canonical.classes.tsx` WS2+WS5; `learn.classes.tsx` WS1+WS2; `docs/platform-route-contracts.json` and workspace nav WS1+WS5; WS4 schedule cancellation vs WS6 reporting. Avoid choosing one branch's complete file in place of the other.
+> - **Read-only direct Neon test01 inspection:** canonical Class, Session, Enrollment tables present but each has **zero rows**. One noncredit release exists; **zero null-Site releases and zero null-Site claims** now. This supersedes the previously documented null-Site datum. WS3 completion policy/pins, WS4 agenda, and WS5 publisher rollout proposed tables are **absent**, as expected; none has been applied by WS00.
+> - **Contract:** WS00 provisionally adopted WS1 v1.1.0 as a *display-only* preview interface, **not** a complete history or reporting authority. See [decision](./ws00-contract-decision-v1.1.md).
+> - **New integration static guard:** `node scripts/acceptance/check-ws00-cross-stream-guards.mjs`, JS syntax parsed but not executed against a merged repo. Must run after source integration and before any release.
+> - **CI remains blocked/inconclusive:** GitHub Actions startup failures with zero jobs observed. App/Cloudflare build, TypeScript, unit, isolated migration and authenticated browser acceptance are still **NOT RUN by WS00**.
+>
+> **Current release decision remains NO-GO.** No production schema or feature flag changes, no main merge.
+
+---
+
 # WS00 Initial Release-Readiness Report
 
 **Date:** 2026-11-16  
