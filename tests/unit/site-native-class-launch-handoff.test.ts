@@ -23,10 +23,10 @@ describe("Site-first native-Class handoff",()=>{
   expect(panel).not.toContain("Schedule and run Sessions");
  });
  it("preselects only native Site-authorized Course options",()=>{
-  const route=source("src/routes/canonical.classes.tsx");
-  expect(route).toContain('siteId:z.string().uuid().optional()');
+  const route=source("src/components/learning/NativeClassManager.tsx");
+  expect(source("src/routes/class.tsx")).toContain("siteId:typeof value.siteId");
   expect(route).toContain('row.siteOptions.some(site=>site.id===preferredSiteId)');
   expect(route).toContain("createUnifiedClassDraft({data:");
-  expect(route).toContain('<NativeClasses key={siteId??"all"}/>');
+  expect(source("src/routes/class.tsx")).toContain("<NativeClassManager key={selected.siteId");
  });
 });
