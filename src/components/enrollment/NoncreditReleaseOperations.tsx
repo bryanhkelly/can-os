@@ -8,6 +8,7 @@ import {
   attachFourWeekCohortPlans,
 } from "@/modules/enrollment/noncredit-cohort-operations.functions";
 import {normalizeClientError} from "@/lib/client-error";
+import {NoncreditDeliveryRecoveryPanel} from "./NoncreditDeliveryRecoveryPanel";
 
 export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
   const client=useQueryClient();
@@ -108,6 +109,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           query.data.metrics.waiting===0||query.data.seatsAvailable<=0}
           onClick={()=>void invite()}>{busy==="invite"?"Reserving…":"Invite next waiting adult"}</Button>
       </div>
+      <NoncreditDeliveryRecoveryPanel releaseId={releaseId}/>
       <h3 className="mt-7 text-base font-semibold">Dated classroom sessions</h3>
       <p className="mt-2 text-sm text-muted-foreground">
         Facilitators schedule approved courses in <Link to="/canonical/lab/facilitated" className="text-primary underline">Facilitated learning</Link>.
