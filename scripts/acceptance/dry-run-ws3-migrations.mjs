@@ -81,7 +81,7 @@ try{
       executed++;
     }
   }
-  const check=await client.query(\`
+  const check=await client.query(`
     SELECT
       (SELECT count(*) FROM pg_trigger
         WHERE NOT tgisinternal AND tgname IN (
@@ -103,7 +103,7 @@ try{
       (education_v30.v301_ws3_class_completion_is_current(
         '00000000-0000-4000-8000-000000000000'::uuid) IS FALSE)
         AS "unknownSourceNotCompleted"
-  \`);
+  `);
   const row=check.rows[0];
   if(Number(row.guardTriggers)!==6 ||
      Number(row.protectedTables)!==4 ||
@@ -159,12 +159,12 @@ try{
   if(historyGuard[0]?.historyImmutable!==true)
     throw new Error("Governed Class history was mutable or non-WS3 outcomes were blocked");
   await client.query("ROLLBACK TO SAVEPOINT ws3_migration_dry_run");
-  const undone=await client.query(\`
+  const undone=await client.query(`
     SELECT to_regclass('education_v30.class_completion_policy_versions') IS NULL
        AND to_regclass('education_v30.learning_completion_evidence_bindings') IS NULL
        AND to_regclass('education_v30.learning_completion_evidence_review_requests') IS NULL
        AS "rolledBack"
-  \`);
+  `);
   if(undone.rows[0]?.rolledBack!==true)
     throw new Error("Proposed WS3 schema was not rolled back");
   passed=true;
