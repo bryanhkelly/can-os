@@ -40,7 +40,7 @@ describe("portable Course -> Site Class launch setup",()=>{
   });
   it("keeps Class discovery and manager roster paginated and independently authorized",()=>{
     const catalog=readFileSync("src/modules/classes/native-class-enrollment.functions.ts","utf8");
-    const learner=readFileSync("src/routes/learn.classes.tsx","utf8");
+    const learner=readFileSync("src/routes/class.tsx","utf8");
     const manager=readFileSync("src/modules/classes/native-class-workspace.functions.ts","utf8");
     expect(catalog).toContain("getNativePublicClassCatalogPage");
     expect(catalog).toContain('eq(canonicalClassOfferingVersions.visibility,"public")');

@@ -548,7 +548,7 @@
       "route": "/classes",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "V6.4 focused classroom with compact metadata, persistent media stage, native playback and seek/speed footer, outline/progress, Overview/Transcript/My notes/Discussion and canonical assignment next steps; absent lessons retain explicit transcript/notes limitations; notes migration unapplied; student/teacher/related guardian acceptance pending",
+      "roleJourney": "Section-backed academic route awaiting full migration to canonical Class; not a native Class directory or approved final architecture",
       "writeBoundary": "preserve assigned-teacher private-video upload authorization, 500 MiB verification and deployment gate; own notes bind actor/section/published version/lesson with revision conflicts and transactional audit/outbox excluding note text; assigned teachers create idempotent canonical calendar occurrences/events or edit links on directly managed events with calendar capabilities; no live migration performed",
       "readBoundary": "current class scope and active enrollment/teaching/guardian relationship; preserve same-program/site/version private-video verification; note reads require own actor and current delivered lesson and never expose notes to guardians; meeting scope matches canonical event/occurrence; guardian DTO excludes meeting links; discussion links select an already authorized canonical thread"
     },
@@ -1750,20 +1750,20 @@
       "writeBoundary": "pending"
     },
     {
-      "file": "src/routes/classes_.$classId.tsx",
-      "route": "/classes_/$classId",
+      "file": "src/routes/class_.$classId.tsx",
+      "route": "/class_/$classId",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "Current Class Enrollment or staff assignment authorizes role-scoped native Class workspace",
       "readBoundary": "pending",
       "writeBoundary": "pending"
     },
     {
-      "file": "src/routes/learn.classes.tsx",
-      "route": "/learn/classes",
+      "file": "src/routes/class.tsx",
+      "route": "/class",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "pending",
+      "roleJourney": "Verified Person discovers eligible native Classes, sees own invitations and enrollment history, no school role required",
       "readBoundary": "pending",
       "writeBoundary": "pending"
     }

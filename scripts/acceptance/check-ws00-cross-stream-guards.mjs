@@ -159,11 +159,11 @@ check("WS3 governed completion and WS6 reporting routes are indexed, no duplicat
     "/canonical/classes/completion",
     "/canonical/completion-evidence-reviews",
     "/canonical/noncredit/completion",
-    "/reports/classes/$classId",
+    "/reports/class/$classId",
     "/reports/",
   ])required(urls.has(url),"Missing governed completion/reporting route "+url);
-  const detail=read("src/routes/classes_.$classId.tsx");
-  required(detail.includes('to="/reports/classes/$classId"'),
+  const detail=read("src/routes/class_.$classId.tsx");
+  required(detail.includes('to="/reports/class/$classId"'),
     "Existing Class Reports tab is not wired to WS6 verified reporting route");
   required(read("src/components/shell/workspace-navigation.registry.ts")
       .includes('path: "/reports/"'),

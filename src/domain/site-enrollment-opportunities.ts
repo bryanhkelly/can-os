@@ -82,7 +82,7 @@ export function projectSiteEnrollmentOpportunities(
     ...(origin&&uuid.test(item.classId)?{action:{
       // Exact public Class identity, never a cross-Site title-only lookup.
       // The learner catalog still validates public Offering terms and authority.
-      href:origin+"/learn/classes?classId="+encodeURIComponent(item.classId),
+      href:origin+"/class?classId="+encodeURIComponent(item.classId),
       label:"View this Class",
     }}:{}),
   }));

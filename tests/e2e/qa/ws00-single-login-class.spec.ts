@@ -18,7 +18,7 @@ test("one verified CAN account completes native Class enroll, learn, Activity an
     const initial=await context.cookies(baseURL);
     expect(initial.some(cookie=>cookie.name==="__Host-can_os_v3_session")).toBe(false);
 
-    await page.goto("/learn/classes?classId="+encodeURIComponent(classId));
+    await page.goto("/class?classId="+encodeURIComponent(classId));
     await expect(page.getByRole("heading",{name:"My Classes"})).toBeVisible();
     const enroll=page.getByRole("button",{name:"Enroll in Class"});
     await expect(enroll).toBeDisabled();
@@ -37,7 +37,7 @@ test("one verified CAN account completes native Class enroll, learn, Activity an
     await expect(page.getByRole("heading",{name:"My Activity"})).toBeVisible();
     await expect(page.locator('[data-participation-key^="native_class:"]')).toHaveCount(1);
 
-    await page.goto("/learn/classes");
+    await page.goto("/class");
     await page.getByRole("button",{name:"Withdraw from Class"}).click();
     await page.getByRole("button",{name:"Confirm withdrawal"}).click();
     await expect(page.getByText("Participation withdrawn. Your learning history is preserved.")).toBeVisible();

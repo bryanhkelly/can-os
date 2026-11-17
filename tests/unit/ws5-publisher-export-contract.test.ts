@@ -40,7 +40,7 @@ describe("WS5 publisher composition export and Site launch boundaries",()=>{
     expect(page).toContain('site.allowedDeliveryModes.includes(deliveryMode)');
     expect(page).toContain('value={siteId} required');
     expect(page).toContain('disabled={busy||!item.siteId}');
-    expect(page).toContain('to="/classes/$classId"');
+    expect(page).toContain('to="/class/$classId"');
     expect(page).toContain('tab:"sessions"');
   });
   it("rejects cross-tenant authority claims in a recipe and incomplete Course components",()=>{

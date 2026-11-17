@@ -8,7 +8,7 @@ const source=(path:string)=>readFileSync(path,"utf8");
  * multi-Class Site isolation and physical attendance acceptance tests. */
 describe("native facilitated classroom end-to-end wiring",()=>{
   it("connects the single Class learner workspace to QR pairing and Course Attempt evidence",()=>{
-    const page=source("src/routes/classes_.$classId.tsx");
+    const page=source("src/routes/class_.$classId.tsx");
     const companion=source("src/components/learning/NativeClassroomCompanion.tsx");
     expect(page).toContain("<NativeClassroomCompanion courseAttemptId={learner.courseAttemptId}/>");
     expect(companion).toContain("FacilitatedLearnerPairing");
@@ -20,7 +20,7 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(learner).toContain("facilitatedRoomActivityResponses");
   });
   it("provides a single private teacher control surface distinct from the shared audience display",()=>{
-    const page=source("src/routes/classes_.$classId.tsx");
+    const page=source("src/routes/class_.$classId.tsx");
     const host=source("src/components/learning/NativeClassroomHostPanel.tsx");
     const publicPage=source("src/routes/classroom.$sessionId.presentation.tsx");
     expect(page).toContain("canSchedule showConsole");
@@ -85,7 +85,7 @@ describe("native facilitated classroom end-to-end wiring",()=>{
   });
   it("requires an audited exact-Site administrator emergency revocation path",()=>{
     const session=source("src/modules/classes/native-class-sessions.functions.ts");
-    const workspace=source("src/routes/classes_.$classId.tsx");
+    const workspace=source("src/routes/class_.$classId.tsx");
     expect(session).toContain("export const revokeNativeClassSession");
     // An idempotent Class Session open cannot return an old, ended room.
     expect(session).toContain('facilitatedRoomOperationalState(room,now)!=="live"');
@@ -131,7 +131,7 @@ describe("native facilitated classroom end-to-end wiring",()=>{
     expect(choices).toContain("siteName:canonicalEnrollmentSites.name");
     expect(choices).toContain("classId:candidate.classId");
     expect(join).toContain("if(chosen?.classId)");
-    expect(join).toContain('to:"/classes/$classId"');
+    expect(join).toContain('to:"/class/$classId"');
     expect(join).toContain('search:{view:"learn",tab:"sessions"}');
     // A QR code is never sufficient to choose the wrong Class or create one.
     expect(join).toContain("pairWithFacilitatedRoom");
@@ -139,7 +139,7 @@ describe("native facilitated classroom end-to-end wiring",()=>{
   });
   it("shows a permitted enrollment path without silently enrolling QR visitors",()=>{
     const join=source("src/routes/join.tsx");
-    expect(join).toContain('to="/learn/classes"');
+    expect(join).toContain('to="/class"');
     expect(join).toContain("Scanning a QR code never enrolls you");
     expect(join).toContain("getClassroomConnectCourseChoices");
     expect(join).not.toContain("enrollInClassroom");

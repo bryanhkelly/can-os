@@ -17,7 +17,7 @@ describe("Authenticated Site-first multipage navigation",()=>{
   });
   it("never rewrites existing approved registration actions, external links or forms",()=>{
     const html='<a href="https://app.example.org/learn/enroll?release=abc">Register</a>'+
-      '<a href="/learn/classes?classId=abc">Class</a>'+
+      '<a href="/class?classId=abc">Class</a>'+
       '<a href="/launch/site">Admin</a>'+
       '<form action="/enroll"></form><a href="#faq">FAQ</a>';
     expect(linkPrivateSitePreviewPages(html,id)).toBe(html);

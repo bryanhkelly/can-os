@@ -43,12 +43,12 @@ async function withNativePerson<T>(
 test("four dated Sessions remain Site-scoped for independent facilitators",async({browser})=>{
   for(const [owner,other] of [[siteA,siteB],[siteB,siteA]] as const){
     await withNativePerson(browser,owner.facilitator,async page=>{
-      await page.goto("/classes/"+owner.classId+"?view=teach&tab=sessions");
+      await page.goto("/class/"+owner.classId+"?view=teach&tab=sessions");
       await expect(page.getByRole("heading",{name:"Class Sessions"})).toBeVisible();
       for(let i=1;i<=4;i++)
         await expect(page.getByText("Session "+i,{exact:true})).toBeVisible();
       await expect(page.getByText("Session 5",{exact:true})).toHaveCount(0);
-      await page.goto("/classes/"+other.classId+"?view=teach&tab=sessions");
+      await page.goto("/class/"+other.classId+"?view=teach&tab=sessions");
       await expect(page.getByRole("heading",{name:"Class unavailable"})).toBeVisible();
       await expect(page.getByRole("heading",{name:"Class Sessions"})).toHaveCount(0);
     });
@@ -58,20 +58,20 @@ test("four dated Sessions remain Site-scoped for independent facilitators",async
 test("Class learners see four own Sessions and cannot see the other Site",async({browser})=>{
   for(const [owner,other] of [[siteA,siteB],[siteB,siteA]] as const){
     await withNativePerson(browser,owner.learner,async page=>{
-      await page.goto("/classes/"+owner.classId+"?view=learn&tab=sessions");
+      await page.goto("/class/"+owner.classId+"?view=learn&tab=sessions");
       await expect(page.getByRole("heading",{name:"Class Sessions"})).toBeVisible();
       for(let i=1;i<=4;i++)
         await expect(page.getByText("Session "+i,{exact:true})).toBeVisible();
       await expect(page.getByRole("button",{name:"Emergency revoke room"})).toHaveCount(0);
       await expect(page.getByRole("button",{name:"Cancel or reschedule Session"})).toHaveCount(0);
-      await page.goto("/classes/"+other.classId+"?view=learn&tab=sessions");
+      await page.goto("/class/"+other.classId+"?view=learn&tab=sessions");
       await expect(page.getByRole("heading",{name:"Class unavailable"})).toBeVisible();
     });
   }
 });
 
 test("no canonical Session grants Class read or facilitator controls",async({page})=>{
-  await page.goto("/classes/"+siteA.classId+"?view=teach&tab=sessions");
+  await page.goto("/class/"+siteA.classId+"?view=teach&tab=sessions");
   await expect(page.getByRole("heading",{name:"Class unavailable"})).toBeVisible();
   await expect(page.getByRole("button",{name:"Open room"})).toHaveCount(0);
 });
