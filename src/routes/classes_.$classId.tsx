@@ -416,8 +416,13 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         {workspace.tab==="reports"&&<>
           <h2 className="font-serif text-2xl">Reporting</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Authoritative Class outcomes, attendance and awards will contribute to authorized reporting after native assessment and Session evidence are connected.
+            Inspect source-backed registrations, scheduled and delivered Sessions, facilitator-attested presence, assessments and recorded outcomes.
+            Formal Class completion remains unavailable until independently governed decisions are verified.
           </p>
+          <Link to="/reports/classes/$classId" params={{classId:workspace.classId}}
+            className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
+            Open Class evidence report
+          </Link>
         </>}
       </section>
       <aside className="border border-border bg-card p-5">
