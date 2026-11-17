@@ -266,6 +266,19 @@ export function getActiveWorkspacePath(
 
 export function isFocusedClassroomRoute(pathname: string, searchStr: string, role: string | null): boolean {
   const search = new URLSearchParams(searchStr);
+  // The canonical native Class route uses an exact Class ID, not the retired
+  // Section query param. Focus only learning and teaching work, never roster
+  // or manager views. Server-side Class permissions remain authoritative.
+  if (/^\\/class\\/[0-9a-f-]{36}\\/?$/i.test(pathname)) {
+    const view = search.get("view");
+    const tab = search.get("tab");
+    const learner = ["student", "guardian", "learner"].includes(role ?? "");
+    const teacher = ["teacher", "room_facilitator"].includes(role ?? "");
+    return (view === "learn" && learner && ["lessons", "sessions"].includes(tab ?? "")) ||
+      (view === "teach" && teacher && ["lessons", "sessions", "classroom"].includes(tab ?? ""));
+  }
+  // Existing Section readers cannot be removed until their academic records
+  // and dependent access have completed independent cutover acceptance.
   if (!search.has("section")) return false;
   if (pathname === "/classes") return role === "student" || role === "guardian" || role === "teacher";
   return pathname === "/student/courses" && search.get("view") !== "catalog" && role === "student";
