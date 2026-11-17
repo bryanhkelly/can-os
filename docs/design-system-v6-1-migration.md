@@ -177,7 +177,10 @@ record lifecycles and audit commands remain unchanged by presentation migration.
   `src/components/workspace`, `src/components/workflow` and `src/components/evidence`
   TSX components, plus their existing component-specific ownership contracts.
 - ESLint prohibits reintroduction of raw inputs, buttons, labels, selects and textareas
-  in the migrated evidence family and specifically governed consumer components.
+  throughout shared `workspace`, `workflow` and `evidence` component families,
+  and in specifically governed feature consumers.
+- `npm run design:inventory` emits an AST-backed adoption inventory grouped by component family
+  and lists remaining raw-control consumers. It is diagnostic, not a compliance percentage.
 - Storybook loading Button uses the actual `loading` API.
 - Unit tests cover canonical Button loading/keyboard semantics, labelled selection,
   evidence review labels, status reuse and square geometry.
