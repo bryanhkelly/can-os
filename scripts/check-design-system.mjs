@@ -223,3 +223,24 @@ for (const [file, required] of Object.entries(migratedApplicationSurfaces)) {
     process.exitCode = 1;
   }
 }
+
+// Blueprint and Section lifecycle screens use shared status presentation.
+// The latest Blueprint decision is not a complete historical event stream.
+const governedLifecycleStatuses = {
+  "routes/canonical.blueprint-reviews.tsx": ["StatusBadge", "item.latestDecision", "No operating permission was granted"],
+  "components/launch-studio/CanonicalBlueprintWorkspace.tsx": ["StatusBadge", "review.latestReview.decision", "planning-only"],
+  "components/operations/SectionLifecycleManager.tsx": ["StatusBadge", "section.active"],
+};
+for (const [file, required] of Object.entries(governedLifecycleStatuses)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of required) {
+    if (!source.includes(fragment)) {
+      console.error(file + " must preserve shared status presentation and scope: missing " + fragment);
+      process.exitCode = 1;
+    }
+  }
+  if (radiusUtility.test(source)) {
+    console.error(file + " violates V6.1 square-corner geometry");
+    process.exitCode = 1;
+  }
+}
