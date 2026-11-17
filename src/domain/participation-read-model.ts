@@ -32,6 +32,8 @@ export interface ParticipationSourceReferences {
   releaseId?: string;
   seasonId?: string;
   studentProfileId?: string;
+  /** Only projected after the source verified a current Person relationship. */
+  studentPersonId?: string;
 }
 export interface ParticipationRecord {
   /** Namespaced by source, never a replacement canonical enrollment ID. */
