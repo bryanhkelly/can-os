@@ -33,6 +33,17 @@ const tableQueries = {
   native_course_versions: "SELECT count(*)::bigint AS n FROM education_v30.course_versions",
   legacy_distinct_section_course_versions: "SELECT count(DISTINCT course_template_version_id)::bigint AS n FROM public.sections",
   legacy_distinct_section_profiles: "SELECT count(DISTINCT student_profile_id)::bigint AS n FROM public.enrollments WHERE section_id IS NOT NULL",
+  orphaned_section_enrollment_profiles: `SELECT count(*)::bigint AS n FROM public.enrollments e
+    WHERE e.section_id IS NOT NULL AND NOT EXISTS
+      (SELECT 1 FROM public.student_profiles p WHERE p.id=e.student_profile_id)`,
+  orphaned_section_enrollment_classes: `SELECT count(*)::bigint AS n FROM public.enrollments e
+    WHERE e.section_id IS NOT NULL AND NOT EXISTS
+      (SELECT 1 FROM public.sections s WHERE s.id=e.section_id)`,
+  duplicate_active_section_placements: `SELECT count(*)::bigint AS n FROM (
+    SELECT student_profile_id,section_id FROM public.enrollments
+    WHERE section_id IS NOT NULL AND status::text='active'
+    GROUP BY student_profile_id,section_id HAVING count(*)>1
+  ) duplicates`,
   native_class_enrollments: "SELECT count(*)::bigint AS n FROM education_v30.class_enrollments",
   identity_links_noncredit: "SELECT count(*)::bigint AS n FROM public.access_account_noncredit_principals",
   identity_links_staff: "SELECT count(*)::bigint AS n FROM public.access_account_canonical_principals",
@@ -138,10 +149,15 @@ try {
     counts.active_native_sessions !== 0;
   const unmatchedPublishedCourses = counts.missing_published_course_matches ?? null;
   const ambiguousPublishedCourses = counts.ambiguous_published_course_matches ?? null;
+  const sourceIntegrityViolations = [
+    "orphaned_section_enrollment_profiles",
+    "orphaned_section_enrollment_classes",
+    "duplicate_active_section_placements",
+  ].filter(name => counts[name] !== 0);
   const result = {
     target: "test01", counts, missing, blockingLegacy, dualIdentity,
     dependentRows, blockingDependents, identityDiverged,
-    unmatchedPublishedCourses, ambiguousPublishedCourses,
+    unmatchedPublishedCourses, ambiguousPublishedCourses, sourceIntegrityViolations,
     sectionRetirementReady: blockingLegacy.length === 0 && blockingDependents.length === 0 && missing.length === 0,
     singleIdentityConsolidationReady: dualIdentity.length === 0 && !identityDiverged && missing.length === 0,
     note: "Aggregate preflight only. It does not prove record-level migration, retention, RLS, or functional parity.",
@@ -151,6 +167,8 @@ try {
     "BLOCKED: Section records still need evidence-preserving migration");
   assert.equal(blockingDependents.length, 0,
     "BLOCKED: dependent Section foreign-key records require migration");
+  assert.equal(sourceIntegrityViolations.length, 0,
+    "BLOCKED: source academic placement identity or uniqueness inconsistent");
   assert.equal(unmatchedPublishedCourses, 0,
     "BLOCKED: legacy Courses lack publisher-owned published native equivalents");
   assert.equal(ambiguousPublishedCourses, 0,
