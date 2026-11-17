@@ -88,7 +88,8 @@
     "db:network:test01:verify": "node scripts/acceptance/check-network-attribution-schema.mjs",
     "check:route-identifiers": "node scripts/acceptance/check-route-identifier-collisions.mjs",
     "test:route-identifiers": "node --test scripts/acceptance/check-route-identifier-collisions.test.mjs",
-    "db:canonical:one-person-cutover-preflight": "node scripts/acceptance/check-one-person-cutover.mjs"
+    "db:canonical:one-person-cutover-preflight": "node scripts/acceptance/check-one-person-cutover.mjs",
+    "test:identity:account-constraints": "node scripts/acceptance/test-one-person-account-constraints.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
