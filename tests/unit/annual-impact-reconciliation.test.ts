@@ -25,7 +25,7 @@ const makeEvidence = (): ImpactSourceBundle => ({
   ],
   attendance: [
     {id: "a1", participation: ref("e1"), sessionId: "s1", observedAt: "2026-03-01T00:00:00Z", revision: 1, status: "present"},
-    {id: "a2", participation: ref("e1"), sessionId: "s1", observedAt: "2026-03-02T00:00:00Z", revision: 2, status: "absent"},
+    {id: "a2", participation: ref("e1"), sessionId: "s1", observedAt: "2026-03-01T00:00:00Z", assertedAt: "2026-03-02T00:00:00Z", revision: 2, status: "absent"},
     {id: "a3", participation: ref("e2"), sessionId: "s2", observedAt: "2026-03-01T00:00:00Z", revision: 1, status: "present"},
   ],
   completions: [
@@ -80,11 +80,8 @@ describe("annual impact reconciliation", () => {
   });
   it("attributes late attendance corrections to original session and respects as-of", () => {
     const evidence = makeEvidence();
-    evidence.attendance[1] = {
-      ...evidence.attendance[1]!,
-      observedAt: "2026-03-01T00:00:00Z",
-      assertedAt: "2027-01-10T00:00:00Z",
-    };
+    evidence = {...evidence, attendance: evidence.attendance.map((row, i) =>
+      i === 1 ? {...row, assertedAt: "2027-01-10T00:00:00Z"} : row)};
     const before = reconcileAnnualImpact(evidence, proof, period);
     expect(before.totals.verifiedAttendanceOccurrences).toBe(2);
     const after = reconcileAnnualImpact(evidence, proof, {...period, asOf: "2027-01-11T00:00:00Z"});
@@ -92,19 +89,13 @@ describe("annual impact reconciliation", () => {
   });
   it("does not relocate a corrected 2025 session into 2026 attendance", () => {
     const evidence = makeEvidence();
-    evidence.participations[0] = {
-      ...evidence.participations[0]!,
-      registeredAt: "2025-02-01T00:00:00Z",
-    };
-    evidence.attendance[0] = {
-      ...evidence.attendance[0]!,
-      observedAt: "2025-03-01T00:00:00Z",
-      assertedAt: "2026-03-01T00:00:00Z",
-    };
-    evidence.attendance[1] = {
-      ...evidence.attendance[1]!,
-      observedAt: "2025-03-01T00:00:00Z",
-      assertedAt: "2026-03-02T00:00:00Z",
+    evidence = {
+      ...evidence,
+      participations: evidence.participations.map((row, i) =>
+        i === 0 ? {...row, registeredAt: "2025-02-01T00:00:00Z"} : row),
+      attendance: evidence.attendance.map((row, i) =>
+        i < 2 ? {...row, observedAt: "2025-03-01T00:00:00Z",
+          assertedAt: i === 0 ? "2026-03-01T00:00:00Z" : "2026-03-02T00:00:00Z"} : row),
     };
     const report = reconcileAnnualImpact(evidence, proof, period);
     expect(report.totals.verifiedAttendanceOccurrences).toBe(1);
@@ -112,11 +103,10 @@ describe("annual impact reconciliation", () => {
   });
   it("rejects an award outside its authorized source even when it is only revoked in period", () => {
     const evidence = makeEvidence();
-    evidence.awards[0] = {...evidence.awards[0]!,
-      participation: ref("ungranted"),
-      issuedAt: "2025-05-01T00:00:00Z",
-      revokedAt: "2026-06-01T00:00:00Z",
-    };
+    evidence = {...evidence, awards: evidence.awards.map((row, i) => i === 0 ? {
+      ...row, participation: ref("ungranted"),
+      issuedAt: "2025-05-01T00:00:00Z", revokedAt: "2026-06-01T00:00:00Z",
+    } : row)};
     expect(() => reconcileAnnualImpact(evidence, proof, period))
       .toThrow("missing or unauthorized participation");
   });
