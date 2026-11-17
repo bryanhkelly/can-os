@@ -27,6 +27,7 @@
     "db:canonical:v301:instructional-isolation": "node scripts/acceptance/check-instructional-learner-isolation.mjs",
     "db:seed:canonical:v301:demo": "node scripts/seed-canonical-v301-demo.mjs",
     "db:test:canonical:v301:blueprint-flow": "node scripts/check-canonical-v301-blueprint-flow.mjs",
+    "db:test:canonical:v301:blueprint-roles": "node scripts/acceptance/check-test01-blueprint-roles.mjs",
     "db:migrate:fullflow": "node scripts/migrate-fullflow-neon.mjs",
     "db:review:fullflow": "node scripts/review-fullflow-migrations.mjs",
     "db:seed:test": "node scripts/apply-seed-chain.mjs",
