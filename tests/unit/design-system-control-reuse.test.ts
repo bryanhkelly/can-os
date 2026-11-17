@@ -6,6 +6,8 @@ const files = [
   "src/components/workspace/site-program-fields.tsx",
   "src/components/workspace/local-datetime-field.tsx",
   "src/components/evidence/FileSelectionField.tsx",
+  "src/components/evidence/EvidencePicker.tsx",
+  "src/components/learning/GradebookSectionSelector.tsx",
   "src/components/shell/WorkspaceContextSwitcher.tsx",
   "src/components/launch-studio/LaunchStudioShell.tsx",
   "src/components/launch-studio/LaunchStudioEntry.tsx",
