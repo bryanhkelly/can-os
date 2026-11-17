@@ -1,6 +1,6 @@
 import {describe,it,expect} from "vitest";
 import {resolveAccessContext,authorizedProgramIds} from "@/domain/access-context";
-import {assertCapability,assertProgramScope,assertExplicitProgramScope,AuthorizationError} from "@/domain/command-context";
+import {assertCapability,assertProgramScope,assertExplicitProgramScope,assertProgramCommandAccess,AuthorizationError} from "@/domain/command-context";
 const principal={accountId:"account",sessionId:"session",activeGrantId:"guardian-grant"};
 const grants=[
  {id:"guardian-grant",accountId:"account",personId:"guardian",role:"guardian",organizationId:"org",siteId:null,active:true},
@@ -42,6 +42,15 @@ describe("cross-persona admissions authorization",()=>{
   expect(()=>assertExplicitProgramScope(guardian,"")).toThrow(AuthorizationError);
   guardian.scope.programIds=[];
   expect(()=>assertExplicitProgramScope(guardian,"program-one")).toThrow(AuthorizationError);
+ });
+ it("requires capability and exact Program grant together for every command",()=>{
+  const guardian=resolveAccessContext(principal,grants);
+  guardian.scope.programIds=["program-one"];
+  expect(()=>assertProgramCommandAccess(guardian,"enrollment.apply","program-one")).not.toThrow();
+  expect(()=>assertProgramCommandAccess(guardian,"enrollment.decide","program-one")).toThrow(AuthorizationError);
+  expect(()=>assertProgramCommandAccess(guardian,"enrollment.apply","foreign-program")).toThrow(AuthorizationError);
+  guardian.scope.programIds=[];
+  expect(()=>assertProgramCommandAccess(guardian,"enrollment.apply","program-one")).toThrow(AuthorizationError);
  });
  it("limits site grants to their site and excludes organization-wide unsited programs",()=>{
   const programs=[{id:"campus-a",siteId:"site-a"},{id:"campus-b",siteId:"site-b"},{id:"network",siteId:null}];
