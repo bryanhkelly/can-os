@@ -52,6 +52,21 @@ describe("native Course draft authoring",()=>{
     expect(service).not.toContain('lifecycle:"published"');
   });
 
+  it("keeps release diagnostics on the same verified native Course and never approves them",()=>{
+    const service=source("src/modules/learning/native-course-draft.functions.ts");
+    const editor=source("src/components/learning/NativeCourseDraftEditor.tsx");
+    expect(service).toContain("getNativeCourseReleaseReadiness=createServerFn");
+    expect(service).toContain("requireAssignedNativeDraft(tx,actor,data.courseVersionId)");
+    expect(service).toContain("canonicalOfferingCourses.courseVersionId,data.courseVersionId");
+    expect(service).toContain("offerings.publisherOrganizationId,course.organizationId");
+    expect(service).toContain("independentPublicationVerified:false");
+    expect(service).toContain("siteAndOperatorAuthorizationVerified:false");
+    expect(editor).toContain("getNativeCourseReleaseReadiness");
+    expect(editor).toContain("Release prerequisites");
+    expect(editor).toContain("not a publication request");
+    expect(editor).not.toContain("approveNativeCourse");
+  });
+
   it("only authorized creators see native draft versions, not reviewer inventories",()=>{
     const workspace=source("src/modules/learning/provider-content-workspace.functions.ts");
     const home=source("src/components/learning/ProviderInstructionHome.tsx");

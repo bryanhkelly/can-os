@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { nativeCourseLessonEditableSchema } from "@/domain/native-course-lesson-draft";
 import {
-  getNativeCourseDraftLessons,saveNativeCourseLessonDraft,
+  getNativeCourseDraftLessons,getNativeCourseReleaseReadiness,
+  saveNativeCourseLessonDraft,
 } from "@/modules/learning/native-course-draft.functions";
 
 type DraftVersion={id:string;label:string};
@@ -94,6 +95,11 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
     queryFn:()=>getNativeCourseDraftLessons({data:{courseVersionId:selectedVersion!}}),
     enabled:Boolean(selectedVersion),retry:false,
   });
+  const readiness=useQuery({
+    queryKey:["native-course-release-readiness",selectedVersion],
+    queryFn:()=>getNativeCourseReleaseReadiness({data:{courseVersionId:selectedVersion!}}),
+    enabled:Boolean(selectedVersion),retry:false,
+  });
   const lessons=outline.data?.lessons??[];
   const selectedLesson=lessons.find(lesson=>lesson.id===lessonId)??null;
   return <WorkspacePanel title="Edit native Course lesson drafts"
@@ -134,6 +140,51 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
     {outline.isSuccess&&!lessons.length&&<p className="mt-4 text-sm text-muted-foreground">
       This Course version contains no native lessons.
     </p>}
+    {selectedVersion&&<section className="mt-5 border-t border-border pt-5"
+      aria-label="Native Course release prerequisites">
+      <h3 className="font-semibold">Release prerequisites</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Live records for this exact Course version. This is a private diagnostic,
+        not a publication request, independent approval, or Class activation.
+      </p>
+      {readiness.isPending&&<p role="status" className="mt-3 text-sm">
+        Checking publisher and adoption records…
+      </p>}
+      {readiness.isError&&<p role="alert" className="mt-3 text-sm">
+        Release prerequisites could not be checked under your current Course appointment.
+        The Course remains unpublished; no approval can be assumed.
+      </p>}
+      {readiness.data&&<>
+        <ul className="mt-3 space-y-2 text-sm">
+          <li className="border border-border p-3">
+            <strong>Native Course v{readiness.data.versionNo}:</strong>
+            {" "}private draft with {readiness.data.lessonCount} lesson(s).
+            Independent Course publication has not been verified.
+          </li>
+          {readiness.data.offerings.map(item=><li key={item.offeringVersionId}
+            className="border border-border p-3">
+            <strong>{item.offeringTitle} · Offering v{item.versionNo}:</strong>
+            {" "}{item.published?"published":"not published"} ({item.lifecycle}).
+            {" "}{item.proposedAdoptions} proposed and {item.approvedAdoptions} approved adoption record(s).
+            {item.activeDeployments>0&&<>{" "}{item.activeDeployments} active Deployment record(s).</>}
+            {item.activeOperations>0&&<>{" "}{item.activeOperations} active Operation record(s).</>}
+          </li>)}
+          {!readiness.data.offerings.length&&<li className="border border-border p-3">
+            No Offering version is linked to this exact native Course version.
+          </li>}
+        </ul>
+        {readiness.data.limited&&<p role="alert" className="mt-3 text-sm">
+          The release record list was truncated. Do not treat it as complete.
+        </p>}
+        <p className="mt-3 text-xs text-muted-foreground">
+          Approved adoption records do not establish active, effective-dated Site
+          and operator permissions. An independent reviewer must publish the native
+          Course and Offering, approve exact-version adoption, and authorize local
+          operations before Class creation and enrollment. No older curriculum
+          publisher is used.
+        </p>
+      </>}
+    </section>}
     {selectedLesson&&selectedVersion&&<div className="mt-5 border-t border-border pt-5">
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="font-semibold">{selectedLesson.unitTitle}</h3>

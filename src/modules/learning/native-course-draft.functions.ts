@@ -1,11 +1,12 @@
 import { createHash } from "node:crypto";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, count, eq } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { courseLessons,courseUnits,courses,courseVersions,
-  type JsonObject } from "@/db/canonical-v301";
+import { canonicalOfferingCourses,courseLessons,courseUnits,courses,courseVersions,
+  deploymentOfferingAdoptions,educationOperations,offeringVersions,offerings,
+  programDeployments,type JsonObject } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import {
@@ -136,5 +137,83 @@ export const saveNativeCourseLessonDraft=createServerFn({method:"POST"})
           independentPublicationRequired:true},
       });
       return {revision:nextRevision,changed:true};
+    });
+  });
+
+/**
+ * Publisher-scoped, read-only preflight for a private native Course draft.
+ * This is deliberately separate from lesson editing: missing downstream
+ * review permissions must not prevent an appointed author from saving content.
+ * Rows show recorded statuses only, NEVER approval, site authority or readiness
+ * to activate a Class. No mutation or publication capability is exposed here.
+ */
+export const getNativeCourseReleaseReadiness=createServerFn({method:"GET"})
+  .validator((value:unknown)=>z.object({courseVersionId:uuid}).strict().parse(value))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      const course=await requireAssignedNativeDraft(tx,actor,data.courseVersionId);
+      const [lessonSummary]=await tx.select({count:count()}).from(courseLessons)
+        .where(eq(courseLessons.courseVersionId,data.courseVersionId));
+      const rows=await tx.select({
+        offeringVersionId:offeringVersions.id,
+        offeringTitle:offerings.title,
+        versionNo:offeringVersions.versionNo,
+        offeringLifecycle:offeringVersions.lifecycle,
+        offeringPublishedAt:offeringVersions.publishedAt,
+        adoptionId:deploymentOfferingAdoptions.id,
+        approvalStatus:deploymentOfferingAdoptions.approvalStatus,
+        deploymentStatus:programDeployments.status,
+        operationStatus:educationOperations.status,
+      }).from(canonicalOfferingCourses)
+        .innerJoin(offeringVersions,eq(offeringVersions.id,
+          canonicalOfferingCourses.offeringVersionId))
+        .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
+        .leftJoin(deploymentOfferingAdoptions,eq(
+          deploymentOfferingAdoptions.offeringVersionId,offeringVersions.id))
+        .leftJoin(programDeployments,eq(
+          programDeployments.id,deploymentOfferingAdoptions.deploymentId))
+        .leftJoin(educationOperations,eq(
+          educationOperations.id,programDeployments.operationId))
+        .where(and(eq(canonicalOfferingCourses.courseVersionId,data.courseVersionId),
+          eq(offerings.publisherOrganizationId,course.organizationId)))
+        .limit(81);
+      const byVersion=new Map<string,{
+        offeringVersionId:string;offeringTitle:string;versionNo:number;
+        lifecycle:string;published:boolean;proposedAdoptions:number;
+        approvedAdoptions:number;activeDeployments:number;activeOperations:number;
+      }>();
+      for(const row of rows.slice(0,80)){
+        let item=byVersion.get(row.offeringVersionId);
+        if(!item){
+          item={
+            offeringVersionId:row.offeringVersionId,offeringTitle:row.offeringTitle,
+            versionNo:row.versionNo,lifecycle:row.offeringLifecycle,
+            published:row.offeringLifecycle==="published"&&!!row.offeringPublishedAt,
+            proposedAdoptions:0,approvedAdoptions:0,
+            activeDeployments:0,activeOperations:0,
+          };
+          byVersion.set(row.offeringVersionId,item);
+        }
+        if(row.adoptionId){
+          if(row.approvalStatus==="proposed")item.proposedAdoptions++;
+          if(row.approvalStatus==="approved")item.approvedAdoptions++;
+          if(row.deploymentStatus==="active")item.activeDeployments++;
+          if(row.operationStatus==="active")item.activeOperations++;
+        }
+      }
+      return {
+        courseVersionId:data.courseVersionId,courseTitle:course.courseTitle,
+        versionNo:course.versionNo,courseLifecycle:"draft" as const,
+        lessonCount:lessonSummary?.count??0,
+        limited:rows.length>80,
+        offerings:[...byVersion.values()],
+        // No Course release approval is inferred from lesson content or from
+        // proposed Offering adoption. A publisher reviewer must complete the
+        // separately governed native publication workflow.
+        independentPublicationVerified:false,
+        siteAndOperatorAuthorizationVerified:false,
+      };
     });
   });
