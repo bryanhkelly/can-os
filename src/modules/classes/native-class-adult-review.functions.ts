@@ -184,7 +184,9 @@ export const revokeAdultClassLearnerReview=createServerFn({method:"POST"})
        .where(eq(accessAdultLearningReviews.accessAccountId,data.accessAccountId))
        .for("update").limit(1);
      if(!review)throw new AuthorizationError("review record unavailable");
-     if(review.status==="revoked")return {revoked:true as const,alreadyRevoked:true};
+     // Repeated revocation is a reconciliation command: always invalidate
+     // dependent credentials, even if the review was previously revoked.
+     const alreadyRevoked=review.status==="revoked";
      const now=new Date();
      if(review.canonicalAccountId&&review.canonicalPersonId){
        await tx.update(canonicalAccountGrants).set({
@@ -202,13 +204,13 @@ export const revokeAdultClassLearnerReview=createServerFn({method:"POST"})
            isNull(canonicalSessions.revokedAt),
          ));
      }
-     await tx.update(accessAdultLearningReviews).set({status:"revoked"})
+     if(!alreadyRevoked)await tx.update(accessAdultLearningReviews).set({status:"revoked"})
        .where(eq(accessAdultLearningReviews.accessAccountId,data.accessAccountId));
      await writeAudit(tx,actor,{
        action:"class.adult_identity.review_revoked",
        entityType:"access_account",entityId:data.accessAccountId,
        after:{status:"revoked",reason:data.reason},
      });
-     return {revoked:true as const,alreadyRevoked:false};
+     return {revoked:true as const,alreadyRevoked};
    });
  });
