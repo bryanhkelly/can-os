@@ -2,7 +2,7 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { QueryState, WorkspaceNotice } from "@/components/workspace";
+import { ActionFooter, QueryState, WorkspaceNotice } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -243,7 +243,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                     value={correctionReason} disabled={busy}
                     onChange={(event) => setCorrectionReason(event.target.value)}/>
                 </Field>
-                <div className="flex gap-3">
+                <ActionFooter layout="inline" className="mt-0">
                   <Button type="button" disabled={busy || correctionReason.trim().length < 5 ||
                       (!correctionPercentage.trim() && !correctionLetter.trim())}
                     onClick={() => void correct(grade)}>
@@ -253,7 +253,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                     onClick={() => { setCorrectingId(""); setCorrectionPercentage(""); setCorrectionLetter(""); setCorrectionReason(""); }}>
                     Cancel
                   </Button>
-                </div>
+                </ActionFooter>
               </div>}
             </li>;
           })}
