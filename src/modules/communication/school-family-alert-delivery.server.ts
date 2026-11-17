@@ -8,7 +8,7 @@ import {
   dispatchOutboundMessages, type OutboundClaim, type OutboundPreparation,
 } from "./outbound-dispatcher.server";
 import {
-  sendNotificationEmail, type NotificationEmailMessage,
+  sendNotificationEmailWithReceipt, type NotificationEmailMessage,
 } from "./notification-email.server";
 import {
   getNotificationPreferences, nextAllowedDelivery, sendOptedInSms,
@@ -196,7 +196,10 @@ const schoolFamilyAdapter = {
   },
   async send(message: OutboundMessage, key: string): Promise<boolean> {
     if (message.channel === "email")
-      return sendNotificationEmail(message.email, key);
+      return sendNotificationEmailWithReceipt({
+        ...message.email,
+        providerReceipt: { source: "school_family", receiptId: key },
+      }, key);
     // SMS never includes free-form publisher content.
     return sendOptedInSms(
       message.phone,
@@ -207,6 +210,7 @@ const schoolFamilyAdapter = {
   async settle(claim: OutboundClaim, result: {
     kind: "accepted" | "failed" | "suppressed";
     now: Date; attempts: number; nextAttemptAt: Date | null; reason: string | null;
+    providerMessageId?: string;
   }): Promise<boolean> {
     // Twilio's current sender does not provide a durable idempotent receipt.
     // A timeout or worker exception can follow provider acceptance, so SMS
@@ -216,6 +220,7 @@ const schoolFamilyAdapter = {
       status: result.kind, attempts: result.attempts,
       acceptedAt: result.kind === "accepted" ? result.now : null,
       lastError: outcome.lastError,
+      ...(result.providerMessageId ? { providerMessageId: result.providerMessageId } : {}),
       nextAttemptAt: outcome.nextAttemptAt,
       leaseUntil: null, updatedAt: result.now,
     }).where(owned(claim)).returning({ id: delivery.id });
