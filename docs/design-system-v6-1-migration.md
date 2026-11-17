@@ -399,3 +399,54 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 **Important:** Source commits to `main` do not certify full cross-product migration or
 production readiness. Route-level adoption beyond the governed consumer sets and
 live authenticated acceptance remain separate tasks while CI gates are failing.
+
+### Route-by-route source migration log (2026-11-17)
+
+This rollout answers the requirement to **inspect and migrate every page** while
+continuing to compose one V6.1 primitive/pattern library. Do not create a second
+route-specific kit or change domain commands to make a page easier to style.
+
+- Repository inventory: 180 route TSX files and 368 component TSX files
+  (including test/story files in component-file totals, depending on inventory).
+- 20 routes are now protected by the route-level source-control manifest in
+  `scripts/check-design-system.mjs`; 19 were edited during this increment
+  and `/access` already used the approved visible control patterns.
+- All 20 source-gated routes were fetched and scanned from `main`: zero visible
+  raw JSX form controls and zero legacy radius utilities in those route files.
+  Authentication's native `type="hidden"` POST fields are intentionally excluded.
+- This is **not** 20 fully accepted journeys. Imported feature components may
+  still contain legacy presentation, and browser behavior, keyboard/accessibility,
+  responsive and themed visual acceptance are not verified.
+- `npm run design:routes` reports every route filename, URL, direct and
+  transitive-source signals, and which paths are governed. Use `-- --json` for
+  tooling. The source inventory must not label a page as production accepted.
+
+| Audience | Source-gated pages |
+| --- | --- |
+| Authentication | `/access`, `/access/register`, `/access/verify` |
+| Account | `/account`, `/account/sessions` |
+| Discovery and learning | `/explore`, `/learn/enroll`, `/learn/my-activity`, `/student/settings`, `/student/assignments` |
+| Family | `/guardian/students`, `/guardian/report-cards`, `/guardian/attendance`, `/guardian/enrichment`, `/guardian/field-trips` |
+| Staff and operations | `/teacher/discussions`, `/operations/insights`, `/operations/course-requests`, `/admissions/families`, `/platform` |
+
+**Next inspection areas, page by page:**
+
+1. `/class` and related native Class pages, `/classes`, `/student/courses`:
+   preserve roster identity, assessment scope, enrollment authorization and
+   specialized classroom/gradebook keyboard mechanics.
+2. `/calendar`, attendance, Site Day, and related operations workspaces:
+   preserve date controls, calendar ownership, timezone semantics and incident access.
+3. `/admissions` and remaining family/registrar workflow pages:
+   preserve independent approval gates, evidence review and saved-but-refresh-failed states.
+4. `/launch`, Blueprint Studio, school settings and site websites:
+   align compositional shells, dialogs, records and editing controls without
+   adding duplicate setup models.
+5. Remaining public, network, staff, teacher and student pages:
+   retire legacy geometry and visual status variants only after feature inspection.
+
+For each migrated page, require shared primitives/patterns, route-level
+regression coverage, and a feature-component review; then typecheck, lint,
+relevant tests and 390/768/1024/1440 visual/keyboard review on the exact SHA.
+No GitHub Actions or Netlify dependency is assumed. **Typecheck, build, lint,
+Storybook, and authenticated browser acceptance were not executed for this
+source-only increment.**
