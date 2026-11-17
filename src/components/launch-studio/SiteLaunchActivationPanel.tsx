@@ -65,7 +65,7 @@ export function SiteLaunchActivationPanel({siteId,site,programs,readState}:{
           <item.icon className="size-5 text-primary"/>
           <h4 className="mt-3 text-sm font-semibold">{item.title}</h4>
           {item.href==="website"?<Link to="/launch/website" search={{siteId,returnToHub:false}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
-           item.href==="events"?<Link to="/operations/interest-events" search={{siteId}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
+           item.href==="events"?<Link to="/operations/interest-events" search={{siteId,programId:undefined}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
            item.href==="profile"?<Link to="/sites/$siteId/profile" params={{siteId}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
            <Link to="/settings/school/$module" params={{module:item.href}} search={{siteId}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>}
         </div>)}
