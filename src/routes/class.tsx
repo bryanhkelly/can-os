@@ -9,6 +9,7 @@ import {
 } from "@/modules/classes/native-class-enrollment.functions";
 import { getMyNativeClassInvitations, declineNativeClassInvitation } from
   "@/modules/classes/native-class-invitations.functions";
+import {requestNativeClassApproval,getMyNativeClassApprovals} from "@/modules/classes/native-class-approvals.functions";
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 
@@ -40,7 +41,21 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
   const [message,setMessage]=useState("");
   const [error,setError]=useState("");
   const self=item.enrollmentMethods.includes("self");
+  const approvalRequired=!self&&item.enrollmentMethods.includes("approval");
   const full=item.remainingSeats===0;
+  async function requestApproval(){
+    if(!approvalRequired||busy)return;
+    setBusy(true);setMessage("");setError("");
+    try{
+      const result=await requestNativeClassApproval({data:{
+        classOfferingVersionId:item.classOfferingVersionId,requestId:crypto.randomUUID(),
+      }});
+      setMessage(result.duplicate?"Your request was already received.":
+        "Request submitted for independent review. No seat is reserved until approval is accepted.");
+      await onJoined();
+    }catch(e){setError(normalizeClientError(e,"Class approval request was not submitted.").message)}
+    finally{setBusy(false)}
+  }
   async function enroll(){
     if(!self||full||!adult||!consent||busy)return;
     setBusy(true);setMessage("");setError("");
@@ -91,10 +106,60 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       <Button className="mt-4" disabled={!adult||!consent||busy||full} onClick={()=>void enroll()}>
         {busy?"Enrolling…":full?"Class full":"Enroll in Class"}
       </Button>
-    </>:<p className="mt-4 text-sm text-muted-foreground">
+    </>:approvalRequired?<div className="mt-4">
+      <p className="text-sm text-muted-foreground">Approval required. Staff review eligibility independently. A request is not a seat reservation or enrollment.</p>
+      <Button className="mt-4" disabled={busy||full} onClick={()=>void requestApproval()}>
+        {busy?"Submitting…":"Request approval"}</Button>
+    </div>:<p className="mt-4 text-sm text-muted-foreground">
       This Class is available by {item.enrollmentMethods.join(", ")}. Self-enrollment is not enabled.
     </p>}
     {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
+    {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
+  </article>;
+}
+type NativeApproval=Awaited<ReturnType<typeof getMyNativeClassApprovals>>[number];
+function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>Promise<void>}){
+  const [mode,setMode]=useState<CreditMode>((item.allowedCreditModes[0]??"not_applicable") as CreditMode);
+  const [adult,setAdult]=useState(false);
+  const [consent,setConsent]=useState(false);
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  const eligible=item.state==="approved"&&!item.acceptedEnrollmentId;
+  async function accept(){
+    if(!eligible||!adult||!consent||busy)return;
+    setBusy(true);setNotice("");setError("");
+    try{
+      await enrollInNativeClass({data:{
+        classOfferingVersionId:item.classOfferingVersionId,
+        approvalRequestId:item.approvalRequestId,
+        creditMode:mode,adultAttested:true,consentAccepted:true,
+      }});
+      setNotice("Approved Class enrollment accepted. Your Course Attempt is ready.");
+      await onChanged();
+    }catch(e){setError(normalizeClientError(e,"Could not accept Class approval.").message)}
+    finally{setBusy(false)}
+  }
+  return <article className="border border-border bg-card p-5">
+    <h3 className="font-serif text-lg">{item.title}</h3>
+    <p className="mt-2 text-sm">Approval status: {item.state}</p>
+    {eligible&&<>
+      <p className="mt-2 text-sm">Approval expires {new Date(item.expiresAt).toLocaleString()}. A seat is not reserved.</p>
+      <label className="mt-3 block text-sm font-semibold">Participation mode
+        <select value={mode} onChange={e=>setMode(e.target.value as CreditMode)}
+          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          {item.allowedCreditModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
+        </select>
+      </label>
+      <p className="mt-3 whitespace-pre-wrap text-sm">{item.consentText}</p>
+      <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={adult}
+        onChange={e=>setAdult(e.target.checked)}/>I confirm that I am at least 18.</label>
+      <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={consent}
+        onChange={e=>setConsent(e.target.checked)}/>I accept the current Class participation and data-use terms.</label>
+      <Button className="mt-4" disabled={!adult||!consent||busy}
+        onClick={()=>void accept()}>{busy?"Accepting…":"Accept approved place"}</Button>
+    </>}
+    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
     {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
   </article>;
 }
@@ -244,6 +309,10 @@ function NativeLearnerClasses(){
     retry:false,
   });
   const catalogItems=catalog.data?.pages.flatMap(page=>page.items)??[];
+  const approvals=useQuery({
+    queryKey:["native-my-class-approvals"],
+    queryFn:()=>getMyNativeClassApprovals(),retry:false,
+  });
   const invitations=useQuery({
     queryKey:["native-my-class-invitations"],
     queryFn:()=>getMyNativeClassInvitations(),retry:false,
@@ -263,6 +332,7 @@ function NativeLearnerClasses(){
       client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId,siteId,deliveryMode]}),
       client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]}),
       client.invalidateQueries({queryKey:["native-my-class-invitations"]}),
+      client.invalidateQueries({queryKey:["native-my-class-approvals"]}),
       // WS1 projects this source independently. Enrollment and withdrawal must
       // invalidate the unified view without writing a second participation row.
       client.invalidateQueries({queryKey:["my-activity"]}),
@@ -284,6 +354,13 @@ function NativeLearnerClasses(){
       <div className="mt-3 grid gap-3 md:grid-cols-2">
         {invitations.data?.map(item=><InvitationCard key={item.invitationId}
           item={item} onChanged={refresh}/>)} 
+      </div>
+    </section>
+    <section className="mt-6">
+      <h2 className="font-serif text-2xl">My Class approvals</h2>
+      {approvals.isError&&<p role="alert" className="mt-3 text-sm">Approval history could not be loaded.</p>}
+      <div className="mt-3 grid gap-3 md:grid-cols-2">
+        {approvals.data?.map(item=><ApprovedClassCard key={item.approvalRequestId} item={item} onChanged={refresh}/>)}
       </div>
     </section>
     <section className="mt-6">
