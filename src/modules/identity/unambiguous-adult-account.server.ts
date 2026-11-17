@@ -1,6 +1,6 @@
 import { and, eq, not } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accountPersonGrants } from "@/db/schema";
+import { accessAccounts, accountPersonGrants } from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 
 type GrantReader = Pick<typeof db, "select">;
@@ -30,6 +30,13 @@ export async function assertRawAccountPerson(
 export async function assertUnambiguousAdultAccount(
   accountId: string, personId: string, reader: GrantReader = db,
 ): Promise<void> {
+  const [account] = await reader.select({
+    personId: accessAccounts.personId,
+    disabled: accessAccounts.disabled,
+    emailVerifiedAt: accessAccounts.emailVerifiedAt,
+  }).from(accessAccounts).where(eq(accessAccounts.id, accountId)).limit(1);
+  if (!account || account.disabled || !account.emailVerifiedAt || account.personId !== personId)
+    throw new AuthorizationError("verified account Person anchor");
   await assertRawAccountPerson(accountId, personId, reader);
   const grants = await reader.select({
     personId: accountPersonGrants.personId,
