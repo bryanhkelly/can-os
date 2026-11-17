@@ -56,6 +56,32 @@ describe("WS3 independently reviewed source evidence binding",()=>{
     expect(matches({...approved,approvedAt:new Date("invalid")})).toBe(false);
     expect(matchesApprovedEvidenceBinding(null,correction,claim,now)).toBe(false);
   });
+  it("permits only independently approved evidence for this Class outcome and prior",()=>{
+    const target={
+      purpose:"class_completion_decision" as const,
+      classEnrollmentId:"class-enrollment-A",
+      expectedClassOutcomeId:null,approvedClassOutcome:"completed" as const,
+    };
+    const bound:EvidenceBinding={
+      ...approved,purpose:"class_completion_decision",
+      noncreditRegistrationId:null,expectedDecisionId:null,
+      approvedCorrectionOutcome:null,awardIssuanceId:null,
+      classEnrollmentId:"class-enrollment-A",
+      expectedClassOutcomeId:null,approvedClassOutcome:"completed",
+    };
+    expect(matchesApprovedEvidenceBinding(bound,target,claim,now)).toBe(true);
+    expect(matchesApprovedEvidenceBinding(bound,{
+      ...target,classEnrollmentId:"other-enrollment",
+    },claim,now)).toBe(false);
+    expect(matchesApprovedEvidenceBinding(bound,{
+      ...target,approvedClassOutcome:"voided",
+    },claim,now)).toBe(false);
+    expect(matchesApprovedEvidenceBinding(bound,{
+      ...target,expectedClassOutcomeId:"prior-decision",
+    },claim,now)).toBe(false);
+    expect(matchesApprovedEvidenceBinding({...bound,approvedByPersonId:"registrar-A"},
+      target,claim,now)).toBe(false);
+  });
   it("authorizes an award revocation only for the exact issued award",()=>{
     const awardTarget={purpose:"award_revocation" as const,issuanceId:"issuance-ONE"};
     const awardLink:EvidenceBinding={
