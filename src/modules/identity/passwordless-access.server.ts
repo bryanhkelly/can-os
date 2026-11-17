@@ -2,6 +2,7 @@ import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { db } from "@/db/client";
 import { accessAccounts,accessAccountSignups,accessChallenges,accessSessions,accountPersonGrants,churchOnboardingRequests,people,programs,schoolSetupSignups } from "@/db/schema";
 import { roleCapabilities } from "@/domain/access-context";
+import { assertMembershipSwitchIdentity } from "@/domain/membership-switch-policy";
 import { AuthorizationError } from "@/domain/command-context";
 import { AccessInfrastructureError, InvalidAccessCredentialError, type AccessFailureReason } from "@/domain/access-errors";
 import { clearSessionCookieHeader,hashAccessSecret,issueOpaqueSecret,normalizeAccessEmail,sessionCookieHeader,sessionIdleCutoff } from "@/domain/access-tokens";
@@ -370,6 +371,7 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
   const now=new Date();
   const [session]=await tx.select({
    accountId:accessSessions.accountId,email:accessAccounts.emailNormalized,
+   personId:accessAccounts.personId,
   }).from(accessSessions)
    .innerJoin(accessAccounts,eq(accessAccounts.id,accessSessions.accountId))
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
@@ -377,9 +379,21 @@ export async function selectAccessGrant(sessionId:string,accountId:string,grantI
     gt(accessSessions.expiresAt,now),gt(accessSessions.updatedAt,sessionIdleCutoff(now))))
    .limit(1).for("update");
   if(!session)throw new AuthorizationError("authenticated session");
-  const {grants}=await readSessionGrants(session.accountId,session.email,tx);
-  const grant=grants.find(candidate=>candidate.id===grantId);
-  if(!grant||!Object.hasOwn(roleCapabilities,grant.role))throw new AuthorizationError("active membership");
+  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email,tx);
+  // Independently verify the entire real account inside the locked session
+  // transaction. Filtered invitation grants cannot conceal a second Person.
+  const activePersonIds=demoAccountSwitching?[]:(
+   await tx.select({personId:accountPersonGrants.personId}).from(accountPersonGrants)
+    .where(and(eq(accountPersonGrants.accountId,accountId),
+      eq(accountPersonGrants.active,true))).limit(101)
+  ).map(row=>row.personId);
+  if(!demoAccountSwitching&&activePersonIds.length>100)
+   throw new AuthorizationError("account Person reconciliation");
+  const grant=assertMembershipSwitchIdentity({
+   accountId,accountPersonId:session.personId,targetGrantId:grantId,
+   grants,activePersonIds,demoAccountSwitching,
+  });
+  if(!Object.hasOwn(roleCapabilities,grant.role))throw new AuthorizationError("active membership");
   const [changed]=await tx.update(accessSessions).set({activeGrantId:grant.id,updatedAt:new Date(),lastActivityAt:new Date()})
    .where(and(eq(accessSessions.id,sessionId),eq(accessSessions.accountId,accountId),
     isNull(accessSessions.revokedAt),gt(accessSessions.expiresAt,now),
