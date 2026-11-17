@@ -73,6 +73,11 @@ export function SchoolFamilyDeliveryRecoveryPanel({onRecovered}:{onRecovered?:()
                 Attempted {r.attempts} time{r.attempts===1?"":"s"} · {new Date(r.createdAt).toLocaleString()}
               </p>
               <p className="mt-1 break-all text-xs text-muted-foreground">Receipt: {r.id}</p>
+              {r.state==="requires_provider_reconciliation"&&<p className="mt-2 text-xs text-muted-foreground">
+                SMS transport outcome is uncertain. Automated and manual retries
+                are disabled to prevent duplicate messages. Reconcile with the
+                messaging provider before taking further action.
+              </p>}
               {r.nextAttemptAt&&<p className="text-xs text-muted-foreground">
                 Next attempt: {new Date(r.nextAttemptAt).toLocaleString()}
               </p>}
