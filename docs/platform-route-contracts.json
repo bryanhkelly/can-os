@@ -301,6 +301,15 @@
       "writeBoundary": "POST review decision through canonical server function; reviewer independence, current verified evidence, component decisions, and audit required; review cannot activate a school or Offering"
     },
     {
+      "file": "src/routes/canonical.program-operations.tsx",
+      "route": "/canonical/program-operations",
+      "owner": "programs",
+      "verification": "pending",
+      "roleJourney": "Verified canonical site_admin or registrar with class.manage; independent operator Site adoption overview; deny cross-Org and unapproved Site",
+      "readBoundary": "Only current operation-operator Organization grants with active approved Offering adoptions and authorized Site roles; version impact limited to visible Site IDs",
+      "writeBoundary": "Read-only dashboard; Class mutation and publisher approval require existing separately authorized commands"
+    },
+    {
       "file": "src/routes/canonical.blueprints.tsx",
       "route": "/canonical/blueprints",
       "owner": "blueprints",
@@ -902,24 +911,6 @@
       "roleJourney": "Public approved noncredit release discovery, verified adult sign-in, explicit consent, self-registration",
       "readBoundary": "Only published and currently approved release, provider and capacity projections",
       "writeBoundary": "Single verified legacy session maps to a new native Person only after explicit consent; participant IDs are server-derived"
-    },
-    {
-      "file": "src/routes/learn.activity.tsx",
-      "route": "/learn/activity",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Authenticated WS00-compatible alias to the My Activity dashboard",
-      "readBoundary": "Authenticated workspace checked; alias only, no participation data read",
-      "writeBoundary": "No writes; redirects to /learn/my-activity"
-    },
-    {
-      "file": "src/routes/learn.my-activity.tsx",
-      "route": "/learn/my-activity",
-      "owner": "learning",
-      "verification": "pending",
-      "roleJourney": "Account holder, student and guardian view their authorized learning, programs, and separate enrollment opportunities",
-      "writeBoundary": "Read-only projection; enrollment, waitlist, grading and completion remain owned by source services",
-      "readBoundary": "Individual source readers enforce active identity and grants; historical coverage is partial, not guaranteed complete"
     },
     {
       "file": "src/routes/learn.my-courses.tsx",

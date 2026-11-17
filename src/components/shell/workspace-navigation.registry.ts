@@ -119,6 +119,7 @@ const schoolAdministrationLinks = [
   { title: "Students", path: "/staff/students", icon: "users" },
   { title: "School years", path: "/operations/school-years", icon: "calendar" },
   { title: "Curriculum", path: "/operations/curriculum", icon: "book" },
+  { title: "Program operations", path: "/canonical/program-operations", icon: "book" },
   { title: "Teachers", path: "/operations/teacher-marketplace", icon: "users" },
   { title: "Administration", path: "/admin", icon: "users" },
 ] satisfies readonly WorkspaceNavigationItem[];
@@ -131,7 +132,7 @@ const siteAdminProfileLink = {
  * Role-specific destinations. Home and Messages are generated once below.
  */
 const roleLinks = {
-  account_holder: [{ title: "My Activity", path: "/learn/my-activity", icon: "book" }],
+  account_holder: [],
   academic_content_creator: [],
   academic_content_reviewer: [],
   site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
@@ -166,14 +167,12 @@ const roleLinks = {
   can_credential_reviewer: [],
   can_jurisdiction_reviewer: [],
   student: [
-    { title: "My Activity", path: "/learn/my-activity", icon: "book" },
     { title: "Learn", path: "/student/courses", icon: "book" },
     { title: "School profile", path: "/student/my-school", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
     { title: "Support", path: "/student/support", icon: "support" },
   ],
   guardian: [
-    { title: "My Activity", path: "/learn/my-activity", icon: "book" },
     { title: "Students", path: "/guardian/students", icon: "book" },
     { title: "School profile", path: "/guardian/experiences", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
