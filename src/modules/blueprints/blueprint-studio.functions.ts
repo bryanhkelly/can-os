@@ -11,6 +11,7 @@ import {
 } from "@/domain/blueprint-configuration";
 import {
   blueprintReviewReadInputSchema,
+  blueprintReviewHistoryInputSchema,
   decideBlueprintReviewInputSchema,
 } from "@/domain/blueprint-review";
 import { programDiscoveryInputSchema } from "@/domain/program-discovery";
@@ -27,7 +28,7 @@ import {
   saveBlueprintConfiguration,
   submitBlueprintConfiguration,
 } from "./blueprint-configuration.server";
-import { decideBlueprintReview, getBlueprintReview } from "./blueprint-review.server";
+import { decideBlueprintReview, getBlueprintReview, getBlueprintReviewHistory } from "./blueprint-review.server";
 import { executeBlueprintConfiguration } from "./blueprint-execution.server";
 
 function noStore() {
@@ -128,6 +129,13 @@ export const readCanonicalBlueprintReview = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     noStore();
     return getBlueprintReview(await getCanonicalCommandContext(getRequest()), data);
+  });
+
+export const readCanonicalBlueprintReviewHistory = createServerFn({ method: "GET" })
+  .validator((value: unknown) => blueprintReviewHistoryInputSchema.parse(value))
+  .handler(async ({ data }) => {
+    noStore();
+    return getBlueprintReviewHistory(await getCanonicalCommandContext(getRequest()), data);
   });
 
 export const decideCanonicalBlueprintReview = createServerFn({ method: "POST" })
