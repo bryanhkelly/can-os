@@ -13,7 +13,7 @@ export function MutationFeedback({ state, pendingMessage, successAction, classNa
     {state.refreshFailed ? "Refreshing saved changes..." : pendingMessage}
     {state.refreshFailed && state.notice && <span className="block">{state.notice}</span>}
   </WorkspaceNotice>;
-  if (state.error) return <WorkspaceNotice tone="danger" className={className}>
+  if (state.error) return <WorkspaceNotice tone={state.refreshFailed ? "attention" : "danger"} className={className}>
     {state.refreshFailed ? "The command succeeded. " : "The command could not be confirmed. "}
     {state.error}{state.refreshFailed && <>
       {state.notice && <span className="block">{state.notice}</span>}
