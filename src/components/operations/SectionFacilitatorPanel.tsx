@@ -1,7 +1,8 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { QueryState, WorkspaceNotice } from "@/components/workspace";
+import { QueryState } from "@/components/workspace";
+import { SiteStaffingFeedback } from "./SiteStaffingFeedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -55,7 +56,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
     }
   }
 
-  return <section className="mt-7  border bg-card p-5" aria-label="Section facilitator assignments">
+  return <section className="mt-7 border bg-card p-5" aria-label="Section facilitator assignments">
     <h2 className="font-serif text-2xl">Staff each onsite class</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Assign multiple verified local adults to the Sections they actually support.
@@ -63,15 +64,8 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
       Each appointment expires within 90 days, and active oversight, staff screening,
       teaching plans, and physical coverage must be checked separately.
     </p>
-    {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
-    {notice && !mutation.data?.refreshWarning &&
-      <WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
-    {mutation.data?.refreshWarning && <WorkspaceNotice tone="attention" className="mt-3">
-      {notice && <p>{notice}</p>}
-      <p className={notice ? "mt-1" : undefined}>{mutation.data.refreshWarning}</p>
-      <Button type="button" variant="outline" size="sm" className="mt-2"
-        onClick={retry} loading={busy} disabled={busy}>Refresh staffing</Button>
-    </WorkspaceNotice>}
+    <SiteStaffingFeedback error={error} notice={notice}
+      refreshWarning={mutation.data?.refreshWarning} onRetry={retry} busy={busy}/>
     <QueryState loading={query.isPending ? "Loading class staffing…" : undefined}
       error={query.isError ? mutationErrorMessage(query.error, "Unable to load class staffing.") : undefined}
       onRetry={retry} retrying={busy}>
@@ -91,7 +85,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
           const effective = (a: (typeof current)[number]) =>
             !!a.effectiveFrom && Date.parse(a.effectiveFrom) <= Date.now() &&
             !!a.effectiveThrough && Date.parse(a.effectiveThrough) > Date.now();
-          return <div key={key} className="mt-5  border p-4">
+          return <div key={key} className="mt-5 border p-4">
             <h3 className="font-semibold">{section.code} · {section.title}</h3>
             <p className="mt-2 text-xs text-muted-foreground">
               Current named classroom support (not verified physical attendance)
@@ -133,7 +127,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
                 expectedAssignmentId: existing?.id ?? null,
                 validThrough:appointmentExpiryToIso(through),
               })}
-              className="mt-3  border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+              className="mt-3">
               {existing ? "Renew Section appointment" : "Add Section facilitator"}
             </Button>
           </div>;
