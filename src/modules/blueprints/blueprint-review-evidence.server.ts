@@ -3,7 +3,6 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { evidenceDocuments, evidenceDocumentVersions } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
-import { DomainError } from "@/domain/errors";
 import { blueprintDatabaseRole } from "@/domain/blueprint-database-role";
 
 export const blueprintReviewEvidenceInputSchema = z.object({
