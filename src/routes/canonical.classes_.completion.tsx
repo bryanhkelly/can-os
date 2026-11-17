@@ -5,9 +5,10 @@ import { z } from "zod";
  * is now promoted into /class/:classId. This route forwards old bookmarks,
  * never creates reviewer rights or a parallel completion workflow. */
 export const Route=createFileRoute("/canonical/classes_/completion")({
-  validateSearch:(search:Record<string,unknown>)=>z.object({
-    classId:z.string().uuid().optional(),
-  }).strip().parse(search),
+  validateSearch:(search:Record<string,unknown>)=>{
+    const classId=z.string().uuid().safeParse(search.classId);
+    return {classId:classId.success?classId.data:undefined};
+  },
   component:StagedClassCompletionLocation,
 });
 function StagedClassCompletionLocation(){
