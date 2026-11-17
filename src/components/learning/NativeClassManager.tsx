@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
@@ -36,7 +36,7 @@ function toggle<T extends string>(list:T[],name:T):T[]{
 }
 function utc(value:string):string|null{return value?new Date(value).toISOString():null;}
 
-export function NativeClassManager({preferredSiteId,preferredOfferingVersionId}: {preferredSiteId?: string;preferredOfferingVersionId?:string}) {
+export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation}: {preferredSiteId?: string;preferredOfferingVersionId?:string;navigation?:ReactNode}) {
   const client=useQueryClient();
   const [searchDraft,setSearchDraft]=useState("");
   const [search,setSearch]=useState("");
@@ -303,6 +303,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId}:
         Canonical workspace
       </Link>
     </div>}>
+    {navigation}
     <section className="mt-5 border border-border bg-card p-5" aria-label="Approved Offering hierarchy">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
