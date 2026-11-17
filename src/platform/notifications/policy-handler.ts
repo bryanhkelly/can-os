@@ -22,16 +22,22 @@ export async function handleNotificationPolicyEvent(eventId: string): Promise<vo
       .select()
       .from(domainEvents)
       .where(eq(domainEvents.id, eventId))
-      .limit(1);
+      .limit(1)
+      .for("update");
 
     if (!event || event.status === "processed") return;
 
     const policy = getNotificationPolicy(event.eventType);
-    if (!policy) return;
+    if (policy) {
+      const context = await policy.load(tx, event);
+      if (context) await applyNotificationPolicy(tx, event, policy, context);
+    }
 
-    const context = await policy.load(tx, event);
-    if (!context) return;
-
-    await applyNotificationPolicy(tx, event, policy, context);
+    // Acknowledge the event in the same transaction as its notification rows.
+    // A crash after that transaction must not replay the notification policy.
+    // Subscription fan-out retains its own independent recovery mechanism.
+    await tx.update(domainEvents).set({
+      status: "processed", processedAt: new Date(), nextAttemptAt: null,
+    }).where(eq(domainEvents.id, eventId));
   });
 }
