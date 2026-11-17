@@ -2,21 +2,24 @@ import { useBlocker } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 
 export function launchNavigationLosesInput(current: { pathname: string; search: Record<string, unknown> },
-  next: { pathname: string; search: Record<string, unknown> }) {
+  next: { pathname: string; search: Record<string, unknown> },
+  options: {includeStep?:boolean} = {}) {
   if (current.pathname !== next.pathname) return true;
   const scope = (search: Record<string, unknown>) => Object.entries(search)
-    .filter(([key, value]) => key !== "step" && value !== undefined).sort(([a], [b]) => a.localeCompare(b));
+    .filter(([key, value]) => (options.includeStep || key !== "step") && value !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b));
   return JSON.stringify(scope(current.search)) !== JSON.stringify(scope(next.search));
 }
 
 export function useLaunchUnsavedChanges(dirty: boolean | (() => boolean),
-  message = "Leave setup? Changes you haven\u0027t saved or submitted will be lost. Stay to save them, or leave without saving.") {
+  message = "Leave setup? Changes you haven\u0027t saved or submitted will be lost. Stay to save them, or leave without saving.",
+  includeStepChanges = false) {
   const released = useRef(false);
   const isDirty = () => typeof dirty === "function" ? dirty() : dirty;
   useBlocker({
     shouldBlockFn: ({ current, next }) => {
       if (released.current) { released.current = false; return false; }
-      return isDirty() && launchNavigationLosesInput(current, next)
+      return isDirty() && launchNavigationLosesInput(current, next,{includeStep:includeStepChanges})
         && !window.confirm(message);
     },
     enableBeforeUnload: isDirty,
