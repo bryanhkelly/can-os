@@ -33,7 +33,7 @@ describe("WS3 independent evidence reviewer workflow",()=>{
     expect(reviewService).toContain("submittedByPersonId:record.submittedByPersonId");
   });
   it("requires independent staff session and separately approved issuer for awards",()=>{
-    expect(reviewService).toContain("CAN_WS3_EVIDENCE_REVIEW_ENABLED");
+    expect(reviewService).not.toContain("CAN_WS3_EVIDENCE_REVIEW_ENABLED");
     expect(reviewService).toContain("assertCurrentCanonicalStaffForMutation(tx,request,actor)");
     expect(reviewService).toContain("assertCurrentCredentialIssuer(tx,request,actor)");
     expect(reviewService).toContain("actor.actorPersonId===record.submittedByPersonId");
@@ -56,7 +56,7 @@ describe("WS3 independent evidence reviewer workflow",()=>{
     expect(classRoute).toContain("NativeClassCompletionOperatorPanel");
   });
   it("does not claim verified learner completion until current canonical function agrees",()=>{
-    expect(learnerSource).toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
+    expect(learnerSource).not.toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
     expect(learnerSource).toContain("v301_ws3_class_completion_is_current");
     expect(classSql).toContain("NOT policy.require_all_lessons");
     expect(classSql).toContain("policy.required_verified_sessions=0");
