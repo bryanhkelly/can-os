@@ -2,11 +2,11 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getMyNoncreditSelfEnrollments } from "@/modules/enrollment/noncredit-self-enrollment.functions";
+import { getMyNoncreditSelfEnrollments, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { openMyNoncreditCourse } from "@/modules/enrollment/noncredit-self-enrollment-resume.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
 import { normalizeClientError } from "@/lib/client-error";
-import {getMyNoncreditWaitlist,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
+import {getMyNoncreditWaitlist,getMyNoncreditWaitlistByRelease,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
 export function NoncreditEnrollmentManagement({registrationId,releaseId}:{registrationId?:string;releaseId?:string}={}){
   const navigate=useNavigate();
@@ -15,10 +15,18 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
   const [withdrawBusy,setWithdrawBusy]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
-  const query=useQuery({queryKey:["my-noncredit-self-enrollments"],
-    queryFn:()=>getMyNoncreditSelfEnrollments(),enabled:!releaseId,retry:false,staleTime:15_000});
+  const query=useQuery({queryKey:["my-noncredit-self-enrollments",registrationId??"all"],
+    queryFn:async()=>{
+      if(!registrationId)return getMyNoncreditSelfEnrollments();
+      const record=await getMyNoncreditRegistrationById({data:{registrationId}});
+      return record?[record]:[];
+    },enabled:!releaseId,retry:false,staleTime:15_000});
   const [busy,setBusy]=useState<string|null>(null);
-  const waiting=useQuery({queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),enabled:!registrationId,retry:false,staleTime:15_000});
+  const waiting=useQuery({queryKey:["my-noncredit-waitlist",releaseId??"all"],queryFn:async()=>{
+    if(!releaseId)return getMyNoncreditWaitlist();
+    const entry=await getMyNoncreditWaitlistByRelease({data:{releaseId}});
+    return entry?[entry]:[];
+  },enabled:!registrationId,retry:false,staleTime:15_000});
   const [error,setError]=useState("");
   async function open(courseAttemptId:string) {
     if(busy)return;
@@ -54,8 +62,8 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       setWithdrawBusy(null);
     }
   }
-  const visibleCourses=releaseId ? [] : registrationId ? query.data?.filter(course=>course.registrationId===registrationId) : query.data;
-  const visibleWaitlist=registrationId ? [] : releaseId ? waiting.data?.filter(item=>item.releaseId===releaseId) : waiting.data;
+  const visibleCourses=releaseId ? [] : query.data;
+  const visibleWaitlist=registrationId ? [] : waiting.data;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
     {!releaseId&&query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
@@ -64,8 +72,10 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     </p>}
     {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-4 border border-border bg-card p-4 text-sm">{notice}</p>}
-    {waiting.isError&&releaseId&&<p role="alert" className="text-sm">Your waiting-list status is temporarily unavailable. <button type="button" className="font-semibold underline" onClick={()=>void waiting.refetch()}>Try again</button></p>}
-    {waiting.isPending&&releaseId&&<p role="status" className="text-sm">Loading waiting-list controls…</p>}
+    {waiting.isError&&<p role="alert" className="text-sm">Your waiting-list status is temporarily unavailable. <button type="button" className="font-semibold underline" onClick={()=>void waiting.refetch()}>Try again</button></p>}
+    {waiting.isPending&&!registrationId&&<p role="status" className="text-sm">Loading waiting-list controls…</p>}
+    {releaseId&&waiting.isSuccess&&!visibleWaitlist?.length&&<p role="status" className="text-sm">This waiting-list entry is no longer available in your account.</p>}
+    {registrationId&&query.isSuccess&&!visibleCourses?.length&&<p role="status" className="text-sm">This registration is no longer available in your account.</p>}
     {waiting.isSuccess&&Boolean(visibleWaitlist?.length)&&<section className="mt-6 border border-border bg-card p-5" aria-label="My training waiting lists">
       {!releaseId&&<h2 className="font-serif text-2xl">Waiting lists and reserved invitations</h2>}
       <p className="mt-2 text-sm text-muted-foreground">A waiting place is not enrollment. Reserved invitations expire and require you to confirm your registration personally.</p>
