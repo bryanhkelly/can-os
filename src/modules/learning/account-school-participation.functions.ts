@@ -6,6 +6,7 @@ import {db} from "@/db/client";
 import * as s from "@/db/schema";
 import {AuthorizationError} from "@/domain/command-context";
 import {guardianRelationshipPredicate} from "@/domain/guardian-relationship";
+import {selectActivityMemberships} from "@/domain/account-activity-grants";
 import {
   projectSchoolSections,projectSchoolPrograms,projectFamilyEnrichment,
   projectAcceptedCalendarEvents,
@@ -59,15 +60,12 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     }).from(s.accessAccounts).where(eq(s.accessAccounts.id,actor.accountId)).limit(1);
     if(!account||account.personId!==actor.actorPersonId)
       throw new AuthorizationError("single CAN account Person");
-    const {grants,demoAccountSwitching}=await readSessionGrants(actor.accountId,account.email);
-    // Demo switches must not combine different People in My Activity.
-    const own=grants.filter(g=>g.accountId===actor.accountId&&
-      g.personId===actor.actorPersonId&&g.active);
-    if(!demoAccountSwitching&&own.some(g=>g.personId!==account.personId))
-      throw new AuthorizationError("account Person invariant");
-
-    const student=own.filter(g=>g.role==="student"&&g.organizationId);
-    const guardians=own.filter(g=>g.role==="guardian"&&g.organizationId);
+    const {grants}=await readSessionGrants(actor.accountId,account.email);
+    // Explicitly match original live grants to this single authenticated
+    // Person. Demo delegation cannot ever merge a second Person's history.
+    const {student,guardian:guardians}=selectActivityMemberships(
+      grants,actor.accountId,actor.actorPersonId,
+    );
     // Match each original organization/Site grant separately. A Site-only
     // grant never broadens to sibling sites just because the org matches.
     // Each source Person profile must be matched to the role that actually
