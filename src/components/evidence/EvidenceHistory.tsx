@@ -1,3 +1,4 @@
+import { EvidenceStatus } from "./EvidenceStatus";
 export interface EvidenceHistoryVersion {
   id: string;
   version: number;
@@ -11,8 +12,9 @@ export function EvidenceHistory({ versions }: { versions: readonly EvidenceHisto
   return <details className="mt-3 text-xs">
     <summary>Version history ({versions.length})</summary>
     <ul className="mt-2 space-y-2">{versions.map(version => <li key={version.id} className="border-l pl-3">
-      v{version.version} · {version.fileName} · {version.status}
-      {version.isCurrent ? " · current" : " · superseded"}
+      <span className="mr-2">v{version.version} · {version.fileName}</span>
+      <EvidenceStatus status={version.status}/>
+      <span>{version.isCurrent ? " · current" : " · superseded"}</span>
       {version.reviewReason && <span> · Review: {version.reviewReason}</span>}
     </li>)}</ul>
   </details>;
