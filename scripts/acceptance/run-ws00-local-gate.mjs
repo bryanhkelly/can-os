@@ -63,6 +63,7 @@ const steps=[
   [npm,["run","typecheck"],"TypeScript after route generation"],
   [npm,["run","lint"],"Lint and design-system validation"],
   [npx,["vitest","run",
+    "tests/unit/build-source-syntax-regression.test.ts",
     "tests/unit/participation-read-model.test.ts",
     "tests/unit/native-class-history-pagination.test.ts",
     "src/domain/native-class-lifecycle.test.ts",
