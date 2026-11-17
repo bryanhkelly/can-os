@@ -23,6 +23,7 @@ function base(input: Omit<ParticipationRecord, "bucket">, now: Date): Participat
 export interface SchoolSectionActivity {
   id: string; title: string; code: string;
   enrollmentId: string | null; enrollmentStatus: string | null;
+  studentPersonId?: string | null;
   organizationId?: string|null;organizationName?:string|null;
   siteId?:string|null;siteName?:string|null;
   startsAt?:DateValue;endsAt?:DateValue;
@@ -38,7 +39,8 @@ export function projectSchoolSections(
     const status = state(section.enrollmentStatus);
     return base({
       key: "school_section:" + sourceId, source: "school_section", sourceId,
-      refs: {enrollmentId: sourceId, sectionId: section.id},
+      refs: {enrollmentId: sourceId, sectionId: section.id,
+        ...(section.studentPersonId?{studentPersonId:section.studentPersonId}:{})},
       kind: "learning", status, sourceStatus: section.enrollmentStatus ?? "unknown",
       title: section.title, detail: section.code,
       organizationId: section.organizationId??null,organizationName:section.organizationName??null,
