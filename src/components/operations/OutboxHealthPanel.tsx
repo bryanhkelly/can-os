@@ -78,7 +78,7 @@ export function OutboxHealthPanel() {
             </div>)}
         </div>
       </div>}
-      {health && <SchoolFamilyDeliveryRecoveryPanel />}
+      {health && <SchoolFamilyDeliveryRecoveryPanel onRecovered={refresh} />}
       {health && health.pendingUnhandled > 0 && <p role="status" className="mt-4 rounded-lg border border-dashed p-3 text-sm">
         {health.pendingUnhandled} pending event{health.pendingUnhandled === 1 ? "" : "s"} have no registered
         consumer and will not drain until a handler is registered.
