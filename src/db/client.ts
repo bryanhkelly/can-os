@@ -18,7 +18,8 @@ function makePoolDatabase(connectionString: string) {
 
 type PoolDatabase = ReturnType<typeof makePoolDatabase>;
 type DatabaseClient = PoolDatabase["database"];
-type RequestDatabase = PoolDatabase & { closed: boolean };
+type RequestResource = { close: () => Promise<void> };
+type RequestDatabase = PoolDatabase & { closed: boolean; resources: Map<string, RequestResource> };
 
 const requestDatabase = new AsyncLocalStorage<RequestDatabase>();
 let nodeDatabase: PoolDatabase | undefined;
@@ -52,15 +53,36 @@ export async function withRequestDatabase<T>(
   const scoped: RequestDatabase = {
     ...makePoolDatabase(connectionString ?? ""),
     closed: false,
+    resources: new Map(),
   };
   return requestDatabase.run(scoped, async () => {
     try {
       return await operation();
     } finally {
       scoped.closed = true;
-      await scoped.pool.end();
+      try {
+        await Promise.allSettled([...scoped.resources.values()].map(resource => resource.close()));
+      } finally {
+        await scoped.pool.end();
+      }
     }
   });
+}
+
+/** Resolve one additional restricted resource per Worker request. Outside a
+ * Worker request scope, Node callers may manage their own reusable instance.
+ */
+export function getRequestScopedResource<T extends RequestResource>(
+  key: string, create: () => T,
+): T | undefined {
+  const scoped = requestDatabase.getStore();
+  if (!scoped) return undefined;
+  if (scoped.closed) throw new Error("Database request scope has finished");
+  const existing = scoped.resources.get(key);
+  if (existing) return existing as T;
+  const resource = create();
+  scoped.resources.set(key, resource);
+  return resource;
 }
 
 /**
