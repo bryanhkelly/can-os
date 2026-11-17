@@ -14,7 +14,7 @@ describe("P0 independent credential issuer authorization",()=>{
       expect(canonicalRoleCapabilities[role]).not.toContain("credential.issue");
     }
     const issuance=file("src/modules/learning/credential-issuance.functions.ts");
-    expect(issuance).toContain('CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true"');
+    expect(issuance).not.toContain("CAN_CREDENTIAL_ISSUANCE_ENABLED");
     expect(issuance).toContain("assertCurrentCredentialIssuer(tx,getRequest(),actor)");
     expect(issuance).not.toContain('assertCapability(actor, "credential.issue")');
   });
