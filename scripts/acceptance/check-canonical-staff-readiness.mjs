@@ -76,7 +76,8 @@ try {
         (SELECT count(*)::int FROM education_v30.site_organization_roles
           WHERE role_code IN ('operator','host') AND valid_from <= now()
             AND (valid_through IS NULL OR valid_through > now())) AS active_site_relationships,
-        (SELECT count(*)::int
+        (SELECT count(*)::int FROM (
+          SELECT a.id AS account_id, public_grant.id AS public_grant_id
            FROM public.access_accounts a
            JOIN public.account_person_grants public_grant
              ON public_grant.account_id = a.id
@@ -138,16 +139,22 @@ try {
                 AND rel.valid_from <= now()
                 AND (rel.valid_through IS NULL OR rel.valid_through > now())
             )
-        ) AS eligible_staff_paths
+          GROUP BY a.id, public_grant.id
+          HAVING count(*) = 1
+        ) uniquely_authorized_staff) AS eligible_staff_paths
     `)).rows;
     await client.query("ROLLBACK");
-    // Mirrors the restricted staff-session reader's identity and scope gates.\n    // An active browser session and role SET permission must still be tested.\n    // Independent positive counters are NOT sufficient: they may belong to
+    // Mirrors the restricted staff-session reader's identity and scope gates.
+    // Exactly one canonical match per CAN active grant is mandatory.
+    // An active browser session and role SET permission must still be tested.
+    // Independent positive counters are NOT sufficient: they may belong to
     // different schools, people and grants. Require a complete joined path.
     const ready = Number(counts.eligible_staff_paths) > 0;
     const firstAdminProvisioningBlocked = Number(counts.eligible_app_admin_grants) === 0
       && Number(counts.eligible_institutional_approver_grants) === 0;
     console.log(JSON.stringify({
       infrastructure: "present", ...counts,
+      acceptance_ready: ready,
       staff_path_ready: ready,
       first_admin_provisioning_blocked: firstAdminProvisioningBlocked,
       browser_acceptance: "not-verified",
