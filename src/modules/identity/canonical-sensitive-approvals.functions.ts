@@ -15,7 +15,7 @@ import { assertCANCredentialIssuerReviewer } from "@/domain/credential-issuer-re
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
-import { getCommandContext } from "./command-context.server";
+import { getIdentityContext } from "./command-context.server";
 import { getCanonicalCommandContext } from "./canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "./canonical-transaction-authorization.server";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
@@ -42,7 +42,7 @@ function protect() {
 }
 
 async function requireIndependentInstitutionalReviewer() {
-  const reviewer=await getCommandContext(getRequest());
+  const reviewer=await getIdentityContext(getRequest());
   if(reviewer.sessionAccountId)throw new AuthorizationError("actual reviewer account");
   const organizationId=reviewer.scope.organizationIds?.length===1
     ? reviewer.scope.organizationIds[0]:null;
@@ -140,7 +140,7 @@ export const requestCanonicalCredentialIssuerApproval=createServerFn({method:"PO
   .handler(async({data})=>{
     protect();
     const request=getRequest();
-    const can=await getCommandContext(request);
+    const can=await getIdentityContext(request);
     if(!can.actorPersonId||can.sessionAccountId||
        !["site_admin","registrar"].includes(can.role))
       throw new AuthorizationError("verified non-demo Site administrator");
@@ -199,7 +199,7 @@ export const getMyCredentialIssuerApproval=createServerFn({method:"GET"})
   .handler(async()=>{
     protect();
     const request=getRequest();
-    const can=await getCommandContext(request);
+    const can=await getIdentityContext(request);
     if(can.sessionAccountId||!["site_admin","registrar"].includes(can.role))
       throw new AuthorizationError("current CAN school staff");
     const canonical=await getCanonicalCommandContext(request);
