@@ -19,6 +19,10 @@ const nativeOwners = [
   "src/modules/classes/class-staff.functions.ts",
   "src/modules/classes/native-class-workspace.functions.ts",
   "src/routes/class_.$classId.tsx",
+  "src/routes/class.tsx",
+  "src/components/learning/NativeClassManager.tsx",
+  "src/components/learning/NativeClassHomeNavigation.tsx",
+  "src/components/learning/PublisherCourseActivityEditor.tsx",
 ];
 const forbidden = [
   { term: /\bsectionTeachers\b|\bsectionIds\b|\bsectionId\b/, reason: "legacy Section ownership" },
@@ -54,5 +58,23 @@ if (coreStart < 0 || legacyStart < 0 ||
   console.error("Core identity must not project retiring school Section scope");
   errors++;
 }
+// Once a staged Class interface is promoted, the parking-lot route must
+// never reacquire independent business logic. Keep publisher commands in
+// the reusable editor and server authorization boundaries.
+const stagedActivities = readFileSync(
+  resolve(root, "src/routes/canonical.course-activities.tsx"), "utf8");
+const productionClasses = readFileSync(resolve(root, "src/routes/class.tsx"), "utf8");
+const promotedActivities = readFileSync(
+  resolve(root, "src/components/learning/PublisherCourseActivityEditor.tsx"), "utf8");
+if (!stagedActivities.includes('to="/class" search={{view:"activities"}}') ||
+    stagedActivities.includes("createCanonicalSurveyDraft") ||
+    stagedActivities.includes("createCanonicalObjectiveDraft") ||
+    !productionClasses.includes('value.view==="activities"') ||
+    !productionClasses.includes("PublisherCourseActivityEditor") ||
+    !promotedActivities.includes("getPublisherCourseActivityOptions")) {
+  console.error("Native Class architecture: publisher activities must be owned by /class");
+  errors++;
+}
+
 if (errors > 0) process.exitCode = 1;
 else console.log(`Native Class architecture boundary verified: ${nativeOwners.length} owners`);
