@@ -230,7 +230,7 @@ describe("navigation link targets", () => {
 describe("canonical in-app navigation", () => {
   it("does not link users through retired route aliases", () => {
     const aliases = new Set([
-      "/learn/my-programs", "/learn/activity",
+      "/learn/my-programs", "/learn/activity", "/learn/my-courses",
       "/teacher/notices", "/student/notifications",
       "/guardian/study-group-consent", "/launch/hub/school/new",
     ]);
@@ -263,5 +263,22 @@ describe("course overview navigation", () => {
     expect(source).not.toContain('return <Navigate to="/classes"');
     expect(source).toContain('title="Class overview"');
     expect(source).toContain('>Open classroom</Link>');
+  });
+});
+
+describe("single My Activity training workspace", () => {
+  it("uses the same noncredit command component in canonical and legacy URLs", () => {
+    const activity = readFileSync(join(routesDir, "learn.my-activity.tsx"), "utf8");
+    const legacy = readFileSync(join(routesDir, "learn.my-courses.tsx"), "utf8");
+    const commands = readFileSync(join(repoRoot, "src/components/learning/NoncreditEnrollmentManagement.tsx"), "utf8");
+    expect(activity).toContain("<NoncreditEnrollmentManagement/>");
+    expect(legacy).toContain("<NoncreditEnrollmentManagement/>");
+    for (const method of ["openMyNoncreditCourse", "withdrawMyNoncreditRegistration", "cancelMyNoncreditWaitlist"]) {
+      expect(commands).toContain(method);
+      expect(activity).not.toContain(method);
+      expect(legacy).not.toContain(method);
+    }
+    expect(commands).not.toContain("window.location.assign");
+    expect(activity).toContain('id="noncredit-management"');
   });
 });
