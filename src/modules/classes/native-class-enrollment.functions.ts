@@ -305,6 +305,10 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
         throw new AuthorizationError("duplicate open Class enrollments require reconciliation");
       const existing=previous[0];
       if(existing){
+        // Idempotent responses are still current privileged learner reads.
+        // The native session may have been revoked while this transaction
+        // was waiting for the Class/Offering lock.
+        await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
         if(existing.creditMode!==data.creditMode || !existing.courseAttemptId)
           throw new AuthorizationError("existing enrollment requires governed modification");
         return {classEnrollmentId:existing.id,courseAttemptId:existing.courseAttemptId,alreadyEnrolled:true};
@@ -327,7 +331,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
-      assertNativeClassSeatAvailable({method:invitation?"invitation":"self",
+      assertNativeClassSeatAvailable({method:invitation?"invitation":approval?"approval":"self",
         activeOrPending:occupancy?.total??0,
         classCapacity:current.classCapacity,offeringCapacity:version.capacity});
       // Revocation between preflight and insertion must fail inside the same
