@@ -48,7 +48,7 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(activation).toContain('if(!consumed)');
     expect(activation).toContain('eventCode:"class.learner.identity.activated"');
     expect(activation).toContain('issueNativeLearnerSession(tx,nativeAccountId,grantId,now)');
-    expect(activation.indexOf('setResponseHeader("Set-Cookie",result.cookie)'))
+    expect(activation.indexOf('appendResponseHeader("Set-Cookie",result.cookie)'))
       .toBeGreaterThan(activation.indexOf('db.transaction(async tx=>'));
   });
   it("restricts evidence mutation and requires a different reviewer",()=>{
