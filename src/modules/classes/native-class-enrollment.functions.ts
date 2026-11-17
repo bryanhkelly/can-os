@@ -285,7 +285,7 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       assertOperationalClassOfferingTerms(version);
       if(!version.allowedCreditModes.includes(data.creditMode))
         throw new AuthorizationError("allowed learner credit/audit participation mode");
-      assertNativeClassSeatAvailable({method:"self",
+      assertNativeClassSeatAvailable({method:invitation?"invitation":"self",
         activeOrPending:occupancy?.total??0,
         classCapacity:current.classCapacity,offeringCapacity:version.capacity});
       // Revocation between preflight and insertion must fail inside the same
