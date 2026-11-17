@@ -7,6 +7,15 @@ describe("Launch Studio input protection", () => {
   it("allows step changes without discarding mounted input", () => {
     expect(launchNavigationLosesInput(current, { ...current, search: { step: "documents", application: "child" } })).toBe(false);
   });
+  it("optionally protects Site-first step transitions that unmount unsaved inputs", () => {
+    const site={pathname:"/launch/site",search:{siteId:"one",step:"interests"}};
+    expect(launchNavigationLosesInput(site,{
+      pathname:"/launch/site",search:{siteId:"one",step:"network"},
+    },{includeStep:true})).toBe(true);
+    expect(launchNavigationLosesInput(site,{
+      pathname:"/launch/site",search:{siteId:"one",step:"network"},
+    })).toBe(false);
+  });
   it("protects dashboard exits and changes of school or child", () => {
     expect(launchNavigationLosesInput(current, { pathname: "/home", search: {} })).toBe(true);
     expect(launchNavigationLosesInput(current, { ...current, search: { application: "different-child", step: "application" } })).toBe(true);
