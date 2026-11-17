@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { readRestrictedCanonicalSession } from "./restricted-canonical-session-reader.server";
+import { assertCurrentReviewedNativeLearner } from "./reviewed-learning-evidence.server";
 import { accessAccounts, accessAccountNoncreditPrincipals, accessAdultLearningReviews } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
@@ -48,7 +49,10 @@ async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessi
   const records = await readRestrictedCanonicalSession("native", digest);
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
-  return canonicalSessionRowSchema.parse(records[0]);
+  const native=canonicalSessionRowSchema.parse(records[0]);
+  if(native.role_code==="learner")
+    await assertCurrentReviewedNativeLearner(native.account_id,native.person_id);
+  return native;
 }
 
 /**
