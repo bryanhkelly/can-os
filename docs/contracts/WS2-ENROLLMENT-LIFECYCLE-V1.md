@@ -81,6 +81,13 @@ duplicate open identities rather than silently selecting a recent record.
 This is not a five-record history search; completed-history repeat policy
 is independently checked across all prior completions.
 
+Self-enrollment resolves the Offering's Class ID only as an untrusted
+locator, acquires the canonical Class row lock, and then locks/re-reads the
+published Offering Version before checking current Session, open window,
+capacity, and consent. The admission clock is sampled **after** the locks,
+preventing a concurrent operator closure or registration-window expiry
+from silently accepting stale terms.
+
 The public Class catalog may display approximate `remainingSeats`, derived
 from the same open-participation count. This is a read-only estimate, not a
 reservation or guaranteed seat. Only the Class-row-locked write command can
@@ -138,6 +145,11 @@ state stored in the DB. WS1 owns its exact read-model shape.
   never authorizes a Class/Section enrollment by itself.
 - School Section: use the actual institutional Enrollment/Section eligibility
   and school/guardian authority; do not reinterpret it from noncredit or Class.
+- The WS2-native Class history reader offers 50-item, Person-scoped,
+  descending `(enrolled_at, class_enrollment_id)` keyset pagination.
+  The native My Classes view can load older entries beyond its former
+  first-100 cap. WS1 remains sole owner of the cross-domain My Activity
+  presentation and must reconcile the shared learner route before integration.
 - Historical `completed`, `withdrawn`, `cancelled` belongs in personal
   Activity history; it never confers future content, session or assessment access.
 
