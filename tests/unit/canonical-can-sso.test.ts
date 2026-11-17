@@ -159,6 +159,17 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(readiness).toContain("eligible_app_admin_grants");
     expect(readiness).toContain("eligible_institutional_approver_grants");
     expect(readiness).toContain("first_admin_provisioning_blocked");
+    // Each potential first-admin approver must satisfy the same exact-one
+    // qualifying authority constraint as the audited provisioning command.
+    expect(readiness).toContain("authorized.account_id = a.id");
+    expect(readiness).toContain("authorized.person_id = a.person_id");
+    expect(readiness).toContain("authorized.active = true");
+    expect(readiness).toContain("conflicting.person_id <> a.person_id");
+    expect(readiness).toContain("authority_org.type = 'can_network'");
+    expect(readiness).toContain(") = 1");
+    const provision = source("scripts/provision-platform-admin.mjs");
+    expect(provision).toContain("Number(authority.rows[0]?.count) !== 1");
+    expect(provision).toContain("person_id <> $2");
     expect(readiness).toContain("An initial institutional reviewer needs a separately governed, audited appointment.");
     expect(readiness).not.toContain("INSERT INTO");
     expect(readiness).not.toContain("UPDATE public.");
