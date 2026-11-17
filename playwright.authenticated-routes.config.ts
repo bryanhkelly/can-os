@@ -1,5 +1,6 @@
 import { defineConfig } from "@playwright/test";
 import { execFileSync } from "node:child_process";
+import { requireLocalHttpUrl } from "./tests/e2e/config/guards";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 if (!databaseUrl || process.env.DATABASE_URL !== databaseUrl ||
@@ -10,10 +11,7 @@ if (!databaseUrl || process.env.DATABASE_URL !== databaseUrl ||
 }
 
 const baseURL = process.env.PLAYWRIGHT_AUTHENTICATED_ROUTES_BASE_URL ?? "http://localhost:3191";
-const target = new URL(baseURL);
-if (target.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(target.hostname)) {
-  throw new Error("Authenticated route smoke tests require a localhost application URL.");
-}
+const target = requireLocalHttpUrl(baseURL, "Authenticated route smoke tests");
 
 execFileSync(process.execPath, ["scripts/verify-admissions-neon-branch.mjs"], {
   stdio: "inherit",
