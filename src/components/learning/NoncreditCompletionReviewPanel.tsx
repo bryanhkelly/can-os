@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { getNoncreditCompletionReview } from "@/modules/learning/noncredit-completion-review.functions";
 import { correctNoncreditCompletion } from "@/modules/learning/noncredit-completion-corrections.functions";
+import { requestCompletionEvidenceReview } from "@/modules/learning/completion-evidence-review.functions";
 
 /** Design system 6.1 operator component. Parent roster must already
  * authorize the actual registration and never pass a browser-supplied Person.
@@ -20,6 +21,17 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
     queryKey:["ws3-noncredit-completion-review",registrationId],
     queryFn:()=>getNoncreditCompletionReview({data:{registrationId}}),
     retry:false,
+  });
+  const evidenceReview=useMutation({
+    mutationFn:async(expectedDecisionId:string)=>
+      requestCompletionEvidenceReview({data:{
+        purpose:"completion_correction",
+        registrationId,
+        expectedDecisionId,
+        approvedOutcome:outcome,
+        evidenceVersionId:evidenceVersionId.trim(),
+        reason:reason.trim(),
+      }}),
   });
   const correction=useMutation({
     mutationFn:async(expectedCurrentDecisionId:string)=>
@@ -141,6 +153,25 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
           <Textarea value={reason} onChange={event=>setReason(event.target.value)}
             placeholder="Document the independently verified reason" required/>
         </label>
+        <p className="text-xs text-muted-foreground">
+          First request independent approval for this exact registration,
+          current decision, proposed outcome, provider Site and evidence.
+          Another authorized reviewer must approve it before the
+          correction command can succeed.
+        </p>
+        <Button type="button" variant="outline"
+          disabled={!correctionReady||evidenceReview.isPending}
+          onClick={()=>evidenceReview.mutate(current.decisionId)}>
+          {evidenceReview.isPending?"Submitting evidence…":"Request independent approval"}
+        </Button>
+        {evidenceReview.isSuccess&&<p role="status" className="text-sm">
+          Evidence review requested. An independent reviewer must approve it,
+          then you can record the exact correction below.
+        </p>}
+        {evidenceReview.isError&&<p role="alert" className="text-sm">
+          Evidence review request was denied. Verify your current Site,
+          registration and independently verified document.
+        </p>}
         <Button type="submit" disabled={!correctionReady}>
           {correction.isPending?"Recording…":"Record correction"}
         </Button>

@@ -6,6 +6,7 @@ import { db } from "@/db/client";
 import {
   auditEvents, domainEvents, canonicalPersons,
   canonicalClasses, canonicalClassEnrollments, canonicalClassOutcomes,
+  participationAttributions,
   canonicalClassSessions, canonicalClassStaffAssignments,
   classEnrollmentCompletionPins, classCompletionPolicyVersions,
   courseVersions, courseLessons, learnerLessonProgress, learnerCourseAttempts,
@@ -51,13 +52,22 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
     throw new AuthorizationError("independent actual Class enrollment");
   const [cls]=await tx.select().from(canonicalClasses)
     .where(eq(canonicalClasses.id,enrollment.classId)).limit(1);
-  if (!cls || !cls.siteId || cls.siteId!==actor.scope.siteIds[0] ||
-      cls.operatingOrganizationId!==actor.scope.organizationIds[0] ||
+  if (!cls || cls.operatingOrganizationId!==actor.scope.organizationIds[0] ||
       !["active","completed"].includes(cls.state))
-    throw new AuthorizationError("exact current Class Organization and Site");
+    throw new AuthorizationError("exact current Class Organization");
+  const attribution=await tx.select({
+    deliverySiteId:participationAttributions.deliverySiteId,
+    classEnrollmentId:participationAttributions.classEnrollmentId,
+  }).from(participationAttributions)
+    .where(eq(participationAttributions.classEnrollmentId,enrollment.id)).limit(2);
+  if(attribution.length!==1 ||
+     attribution[0]!.deliverySiteId!==actor.scope.siteIds[0] ||
+     (cls.siteId!==null && cls.siteId!==attribution[0]!.deliverySiteId))
+    throw new AuthorizationError("immutable original Class delivery Site and Person");
+  const deliverySiteId=attribution[0]!.deliverySiteId;
   await validateClassAuthority(tx,{
     actor,organizationId:cls.operatingOrganizationId,
-    siteIds:[cls.siteId],
+    siteIds:[deliverySiteId],
   },{
     deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
     offeringVersionId:cls.offeringVersionId,
@@ -111,11 +121,11 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
       policy?.publishedAt>enrollment.enrolledAt ||
       policy?.effectiveAt>enrollment.enrolledAt))
     throw new AuthorizationError("immutable original enrollment policy");
-  return {enrollment,cls,attempt,policy};
+  return {enrollment,cls,attempt,policy,deliverySiteId};
 }
 
 async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeReview>>){
-  const {enrollment,cls,attempt,policy}=data;
+  const {enrollment,cls,attempt,policy,deliverySiteId}=data;
   const now=new Date();
   const lessons=await tx.select({id:courseLessons.id}).from(courseLessons)
     .where(eq(courseLessons.courseVersionId,cls.courseVersionId)).limit(501);
@@ -150,7 +160,7 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
       eq(facilitatedLearningSessions.id,facilitatedClassroomPlans.facilitatedSessionId),
       eq(facilitatedLearningSessions.courseVersionId,cls.courseVersionId),
       eq(facilitatedLearningSessions.deploymentId,cls.deploymentId),
-      eq(facilitatedLearningSessions.siteId,cls.siteId!),
+      eq(facilitatedLearningSessions.siteId,deliverySiteId),
       eq(facilitatedLearningSessions.hostOrganizationId,cls.operatingOrganizationId),
     ))
     .innerJoin(facilitatedRoomAttendanceAssertions,and(
@@ -161,7 +171,7 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
       eq(canonicalClassSessions.deliverySessionId,facilitatedClassroomPlans.deliverySessionId),
       eq(canonicalClassSessions.facilitatorPersonId,facilitatedClassroomPlans.facilitatorPersonId),
       eq(facilitatedClassroomPlans.state,"started"),
-      eq(facilitatedClassroomPlans.siteId,cls.siteId!),
+      eq(facilitatedClassroomPlans.siteId,deliverySiteId),
       eq(facilitatedClassroomPlans.hostOrganizationId,cls.operatingOrganizationId),
       eq(facilitatedClassroomPlans.courseVersionId,cls.courseVersionId),
     )).orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
@@ -275,12 +285,39 @@ async function currentGovernedOutcome(tx:Tx, classEnrollmentId:string){
       eq(canonicalClassOutcomes.sourceKind,"ws3_governed")))
     .limit(501);
   if(rows.length>500)throw new AuthorizationError("Class outcome paging required");
-  const superseded=new Set(rows.flatMap(r=>r.supersedesOutcomeId?
-    [r.supersedesOutcomeId]:[]));
-  const heads=rows.filter(r=>!superseded.has(r.id));
-  if(rows.length && heads.length!==1)
+  if(!rows.length)return null;
+  const byId=new Map(rows.map(row=>[row.id,row]));
+  if(byId.size!==rows.length)
+    throw new AuthorizationError("duplicate authoritative Class outcome history");
+  const superseded=new Map<string,number>();
+  for(const row of rows){
+    if(!row.completionPolicyVersionId ||
+       (row.supersedesOutcomeId &&
+         (row.supersedesOutcomeId===row.id ||
+          !byId.has(row.supersedesOutcomeId) ||
+          byId.get(row.supersedesOutcomeId)?.completionPolicyVersionId!==
+            row.completionPolicyVersionId)))
+      throw new AuthorizationError("invalid Class outcome provenance");
+    if(row.supersedesOutcomeId)
+      superseded.set(row.supersedesOutcomeId,
+        (superseded.get(row.supersedesOutcomeId)??0)+1);
+  }
+  const heads=rows.filter(row=>!superseded.has(row.id));
+  const roots=rows.filter(row=>row.supersedesOutcomeId===null);
+  if(heads.length!==1 || roots.length!==1 ||
+     [...superseded.values()].some(count=>count!==1))
     throw new AuthorizationError("conflicting official Class completion decisions");
-  return heads[0]??null;
+  const visited=new Set<string>();
+  let next= heads[0];
+  while(next){
+    if(visited.has(next.id))
+      throw new AuthorizationError("cyclic Class outcome history");
+    visited.add(next.id);
+    next=next.supersedesOutcomeId?byId.get(next.supersedesOutcomeId):undefined;
+  }
+  if(visited.size!==rows.length)
+    throw new AuthorizationError("incomplete Class completion decision chain");
+  return heads[0]!;
 }
 
 export const getNativeClassCompletionReview=createServerFn({method:"GET"})
@@ -329,25 +366,12 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
     const request=getRequest();
     const actor=await getCanonicalCommandContext(request);
     return db.transaction(async tx=>{
-      // WS00/WS2 shared lock order: parent Class -> exact Enrollment -> Course Attempt.
-      // The preliminary lookup does not confer authority. Recheck its parent
-      // under both locks before accessing governed completion evidence.
-      const [link]=await tx.select({classId:canonicalClassEnrollments.classId})
-        .from(canonicalClassEnrollments)
-        .where(eq(canonicalClassEnrollments.id,data.classEnrollmentId)).limit(1);
-      if(!link)throw new AuthorizationError("current Class enrollment");
-      const [lockedClass]=await tx.select({id:canonicalClasses.id})
-        .from(canonicalClasses)
-        .where(eq(canonicalClasses.id,link.classId))
-        .for("update").limit(1);
-      if(!lockedClass)throw new AuthorizationError("current Class");
+      // Serializes with WS2 withdrawal/cancel and concurrent outcome reviews.
       const [locked]=await tx.select({id:canonicalClassEnrollments.id})
         .from(canonicalClassEnrollments)
-        .where(and(
-          eq(canonicalClassEnrollments.id,data.classEnrollmentId),
-          eq(canonicalClassEnrollments.classId,lockedClass.id),
-        )).for("update").limit(1);
-      if(!locked)throw new AuthorizationError("current exact Class enrollment");
+        .where(eq(canonicalClassEnrollments.id,data.classEnrollmentId))
+        .for("update").limit(1);
+      if(!locked)throw new AuthorizationError("current Class enrollment");
       const authorized=await authorizeReview(tx,locked.id,actor);
       if(!authorized.policy || authorized.policy.id!==data.expectedPolicyVersionId)
         throw new AuthorizationError("original independently approved Class policy");
@@ -389,7 +413,7 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
         evidenceVersionId:data.evidenceVersionId,
         participantPersonId:authorized.enrollment.learnerPersonId,
         organizationId:authorized.cls.operatingOrganizationId,
-        deliverySiteId:authorized.cls.siteId!,
+        deliverySiteId:authorized.deliverySiteId,
         actorPersonId:actor.actorPersonId!,
         reason:data.reason,
       });
@@ -430,7 +454,7 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
         courseVersionId:authorized.cls.courseVersionId,
         participantPersonId:authorized.enrollment.learnerPersonId,
         operatingOrganizationId:authorized.cls.operatingOrganizationId,
-        siteId:authorized.cls.siteId,
+        siteId:authorized.deliverySiteId,
         completionPolicyVersionId:authorized.policy.id,
         evidenceVersionId:data.evidenceVersionId,
         priorOutcomeId:data.expectedPriorOutcomeId,
@@ -483,12 +507,12 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
       await assertCurrentCanonicalStaffForMutation(tx,request,actor);
       const [cls]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId)).limit(1);
-      if(!cls||!cls.siteId || cls.siteId!==actor.scope.siteIds[0] ||
-         cls.operatingOrganizationId!==actor.scope.organizationIds[0])
+      if(!cls || cls.operatingOrganizationId!==actor.scope.organizationIds[0] ||
+         (cls.siteId && cls.siteId!==actor.scope.siteIds[0]))
         throw new AuthorizationError("exact authorized Class");
       await validateClassAuthority(tx,{
         actor,organizationId:cls.operatingOrganizationId,
-        siteIds:[cls.siteId],
+        siteIds:[actor.scope.siteIds[0]!],
       },{
         deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
         offeringVersionId:cls.offeringVersionId,
@@ -511,6 +535,10 @@ export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
       }).from(canonicalClassEnrollments)
         .innerJoin(canonicalPersons,
           eq(canonicalPersons.id,canonicalClassEnrollments.learnerPersonId))
+        .innerJoin(participationAttributions,and(
+          eq(participationAttributions.classEnrollmentId,canonicalClassEnrollments.id),
+          eq(participationAttributions.deliverySiteId,actor.scope.siteIds[0]!),
+        ))
         .where(and(
           eq(canonicalClassEnrollments.classId,cls.id),
           inArray(canonicalClassEnrollments.status,["active","completed"]),

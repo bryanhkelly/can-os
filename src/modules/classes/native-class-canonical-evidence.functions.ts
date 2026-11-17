@@ -163,7 +163,9 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
         classCompletionOutcomeRecorded:completionRecords.length>0,
         classCompletionAuthorityVerified,
         classCompletionEvidenceCount:completionRecords.length,
-        note:"Recorded Class outcome evidence is not a verified completion decision until an independently approved participant-pinned completion policy and authorized decision are established. Finalized assessments, lesson ticks, room playback and attendance cannot grant a certificate, academic credit or award.",
+        note:classCompletionAuthorityVerified
+          ?"This Class completion currently meets its independently approved original policy and authoritative evidence. Academic credit, grades and award issuance remain separately governed."
+          :"Recorded Class outcome evidence alone is not a verified completion decision until an independently approved participant-pinned policy and authorized decision are current. Finalized assessments, lesson ticks, room playback and attendance cannot issue an academic award.",
       };
     });
   });

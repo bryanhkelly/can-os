@@ -1,16 +1,18 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   noncreditCompletionDecisions, noncreditRegistrations,
+  participationAttributions,
   noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { projectCurrentNoncreditCompletion } from "@/domain/verified-completion-projection";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertNoncreditCompletionSiteScope } from "@/modules/learning/verified-completion-site.server";
+import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
 
 const input = z.object({ registrationId: z.string().uuid() }).strict();
 
@@ -85,5 +87,81 @@ export const getNoncreditCompletionReview = createServerFn({ method: "GET" })
         })),
         note:"Completion is a separately authorized provider decision. Revoking a credential requires independent issuer approval and verified evidence. Lesson clicks, surveys and provisional scores do not issue credentials.",
       };
+    });
+  });
+
+const queueInput=z.object({
+  page:z.number().int().min(0).max(100).default(0),
+}).strict();
+
+/** Person-centered, exact provider/Site completion review queue. The
+ * original noncredit Registration remains source authority, independent of
+ * Class, Program, network affiliation or copied student records.
+ * No public learner, network or cross-Site review access is granted.
+ */
+export const getNoncreditCompletionQueue=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>queueInput.parse(raw))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private,no-store");
+    if(process.env.CAN_WS3_OPERATOR_REVIEW_ENABLED!=="true")
+      throw new AuthorizationError("noncredit completion queue not activated");
+    const request=getRequest(),actor=await getCanonicalCommandContext(request);
+    if(!actor.actorPersonId ||
+       !["site_admin","registrar"].includes(actor.role??"") ||
+       actor.scope.organizationIds?.length!==1 ||
+       actor.scope.siteIds?.length!==1)
+      throw new AuthorizationError("current exact provider and Site reviewer");
+    assertCapability(actor,"noncredit.completion.decide");
+    return db.transaction(async tx=>{
+      await assertCurrentCanonicalStaffForMutation(tx,request,actor);
+      const rows=await tx.select({
+        registrationId:noncreditRegistrations.id,
+        status:noncreditRegistrations.status,
+        participantPersonId:noncreditRegistrations.participantPersonId,
+        completionPolicyId:noncreditRegistrations.completionPolicyId,
+        registeredAt:noncreditRegistrations.registeredAt,
+        trainingTitle:noncreditTrainingVersions.title,
+      }).from(noncreditRegistrations)
+        .innerJoin(noncreditTrainingVersions,and(
+          eq(noncreditTrainingVersions.id,noncreditRegistrations.trainingVersionId),
+          eq(noncreditTrainingVersions.providerOrganizationId,
+            actor.scope.organizationIds[0]!),
+          eq(noncreditTrainingVersions.offeringVersionId,
+            noncreditRegistrations.offeringVersionId),
+        ))
+        .innerJoin(participationAttributions,and(
+          eq(participationAttributions.noncreditRegistrationId,
+            noncreditRegistrations.id),
+          eq(participationAttributions.deliverySiteId,actor.scope.siteIds[0]!),
+        ))
+        .where(inArray(noncreditRegistrations.status,
+          ["registered","active","completed"]))
+        .orderBy(asc(noncreditRegistrations.registeredAt),
+          asc(noncreditRegistrations.id))
+        .limit(21).offset(data.page*20);
+      const visible=rows.slice(0,20);
+      const decisions=visible.length?await tx.select().from(noncreditCompletionDecisions)
+        .where(inArray(noncreditCompletionDecisions.registrationId,
+          visible.map(row=>row.registrationId)))
+        .orderBy(desc(noncreditCompletionDecisions.decidedAt))
+        .limit(10001):[];
+      if(decisions.length>10000)
+        throw new AuthorizationError("noncredit completion decisions pagination required");
+      const participants=visible.map(row=>{
+        const scoped=decisions.filter(d=>d.registrationId===row.registrationId);
+        const current=projectCurrentNoncreditCompletion(row.registrationId,scoped);
+        return {
+          registrationId:row.registrationId,
+          status:row.status,
+          trainingTitle:row.trainingTitle,
+          participantReference:row.participantPersonId,
+          completionPolicyPinned:!!row.completionPolicyId,
+          currentState:current.state,
+          currentDecisionId:"decisionId" in current?current.decisionId:null,
+          verifiedCompletion:current.state==="completed",
+        };
+      });
+      return {page:data.page,hasMore:rows.length>20,
+        participants,source:"noncredit_registration" as const};
     });
   });
