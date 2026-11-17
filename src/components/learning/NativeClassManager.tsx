@@ -333,7 +333,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         </div>
       </div>
       {options.isSuccess&&offeringGroups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
-        No currently authorized published Course adoption is available. Publisher approval and local adoption are separate from this workspace.
+        {search
+          ?"No matching approved Courses are visible for this search. Clear the search to inspect the current operator catalog."
+          :"No approved published Course adoption is visible for the current operator scope. Publisher approval and local adoption are separate."}
       </p>}
       <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={event=>{
         event.preventDefault();setSearch(searchDraft.trim());setChoice("");
@@ -405,7 +407,9 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         {options.isPending&&<p role="status" className="mt-4 text-sm">Checking available Courses and operating authorizations…</p>}
         {options.isError&&<p role="alert" className="mt-4 border border-border p-3 text-sm">The native Class service is not available for this operator or environment. No changes were made.</p>}
         {options.isSuccess&&visibleOptions.length===0&&<p role="status" className="mt-4 text-sm">
-          {preferredSiteId?"No approved Course/Deployment is available for this Site and current canonical grant.":"No approved Course/Deployment combinations are currently available for your organization."}
+          {search?"No approved Course matching this search is visible. Clear the filter before assessing adoption.":preferredSiteId
+            ?"No approved Course/Deployment is visible for this Site and current canonical grant."
+            :"No approved Course/Deployment combinations are currently visible for your organization."}
         </p>}
         <section className="mt-5 border border-border bg-muted/20 p-4"
           aria-label="Network Class launch recipe">
