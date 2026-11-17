@@ -77,9 +77,7 @@ export async function startFamilyApplication(
   assertCapability(context, "enrollment.apply");
   // Check current program authorization even on an idempotency retry. A prior
   // submission does not preserve access after the guardian grant is revoked.
-  if (!context.scope.programIds?.includes(input.programId)) {
-    throw new AuthorizationError(`program scope: ${input.programId}`);
-  }
+  assertExplicitProgramScope(context, input.programId);
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
   if ((input.existingStudentProfileId || input.familyStartRequestId || input.originTransferActionId) && !input.parentSelfService) {
     throw new AuthorizationError("verified guardian application handoff");
