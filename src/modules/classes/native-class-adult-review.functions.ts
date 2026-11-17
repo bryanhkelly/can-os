@@ -121,6 +121,8 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
        subjectType:documents.subjectType,
        subjectId:documents.subjectId,
        category:documents.category,
+       storageProvider:documents.storageProvider,
+       storageKey:documents.storageKey,
        sensitivity:documents.sensitivityTier,
        verifiedAt:documents.verifiedAt,
        verifiedByPersonId:documents.verifiedByPersonId,
@@ -133,6 +135,8 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
      if(!evidence||evidence.subjectType!=="person"||
         evidence.subjectId!==account.personId||
         evidence.category!=="adult_identity_verification"||
+        evidence.storageProvider!=="cloudflare_r2"||
+        !evidence.storageKey||
         !["restricted","sensitive","high"].includes(evidence.sensitivity)||
         !evidence.verifiedAt||evidence.verifiedAt>now||
         !evidence.verifiedByPersonId||
