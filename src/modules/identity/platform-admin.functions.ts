@@ -1,8 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { accessAccounts } from "@/db/schema";
+import { accessAccounts, accessAdultLearningReviews } from "@/db/schema";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -65,8 +65,28 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
           AND c.relrowsecurity AND c.relforcerowsecurity
       ) AS ready
     `);
+    const reviewedAdultIdentityReady=reviewReadiness.rows[0]?.ready===true;
+    // Operator reconciliation without displaying DOB, identity documents
+    // or private verification metadata. The review itself remains immutable.
+    const reviewCases=reviewedAdultIdentityReady
+      ?await db.select({
+        accessAccountId:accessAdultLearningReviews.accessAccountId,
+        status:accessAdultLearningReviews.status,
+        reviewedAt:accessAdultLearningReviews.reviewedAt,
+        consumedAt:accessAdultLearningReviews.consumedAt,
+        nativeAccountId:accessAdultLearningReviews.canonicalAccountId,
+      }).from(accessAdultLearningReviews)
+        .orderBy(desc(accessAdultLearningReviews.reviewedAt)).limit(50)
+      :[];
     return {
-      reviewedAdultIdentityReady: reviewReadiness.rows[0]?.ready===true,
+      reviewedAdultIdentityReady,
+      reviewCases:reviewCases.map(record=>({
+        accessAccountId:record.accessAccountId,
+        status:record.status==="revoked"?"revoked":
+          record.consumedAt?"active":"approved_pending_activation",
+        reviewedAt:record.reviewedAt.toISOString(),
+        activated:Boolean(record.nativeAccountId),
+      })),
       organizations: Number(row?.organizations ?? 0),
       sites: Number(row?.sites ?? 0),
       activePlatformAdmins: Number(row?.active_platform_admins ?? 0),
