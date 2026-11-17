@@ -60,6 +60,7 @@ describe("staffing panels use shared query presentation", () => {
     expect(html).toContain("Pat Facilitator");
     expect(html).toContain("Algebra");
     expect(html).toContain("Add Section facilitator");
+    expect(html).toContain('data-action-footer="inline"');
     client.clear();
   });
 });
