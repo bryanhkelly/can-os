@@ -544,3 +544,38 @@ to an approved disposable QA branch before any database-first staging cutover.
 ## November 17 canonical route cutover
 
 The application has a canonical native Class directory at `/class` and scoped workspace at `/class/:classId`; its former `/learn/classes` and `/class/:classId` route files were deleted without redirect aliases. The native public catalog is paginated and can filter by exact Site and delivery format at the SQL level before disclosure-safe authority checks. **The Section-backed academic `/classes` route, service and schema are NOT retired yet**, and must not be described as complete or used as the native Class directory. Official school grading, guardianship, transcripts and attendance must be migrated before destructive DDL.
+
+## November 17 recorded-content promotion to /class
+
+- The verified **academic content creator** lands at `/class?view=content`, not
+  the UI staging path `/canonical/content`. Creating a recorded instructional
+  track, editing its versioned lesson bindings, saving revisions and submitting
+  the exact manifest all reuse the original `getProviderContentWorkspace`,
+  `getCreatorInstructionalDraft` and `instructional-tracks.functions` commands.
+- A draft can be opened at `/class?view=content&trackVersionId=<uuid>`.
+  The URL is a selection hint only. The server rechecks the verified Person,
+  publisher Organization, Course-specific professional appointment and content
+  rights on every read and write.
+- The independently verified **academic content reviewer** lands at
+  `/class?view=reviews`. That view uses the existing separate reviewer grant,
+  source-bound five-category review decisions, evidence requirements and
+  publication command. A site-level Class teacher or manager does **not**
+  gain content-authoring or reviewer rights by visiting the tab.
+- The three former `/canonical/content*` paths are redirects, retaining
+  bookmarks without preserving parallel business logic. The original component
+  implementations have been extracted into `ProviderInstructionHome`,
+  `ProviderInstructionDraft` and `ProviderInstructionReviews`. The source
+  architecture check prevents new authoring handlers from reappearing in the
+  staging routes.
+- **Media is not yet fully end-to-end**: the creator editor currently binds
+  approved, versioned content assets to published Course lessons. This
+  promotion does **not** implement an authenticated native video upload command,
+  associate the original synthetic demo video with an approved asset version,
+  publish a Course, enroll a new learner or start a live native Class Session.
+  The existing `ClassVideoUploadForm` is Section-scoped and must never be
+  passed a native Class ID.
+- Full acceptance remains blocked until build, verified browser role switching,
+  original asset R2 upload and independent review, governed Course publication,
+  local adoption, persistent Class enrollment, playback and Session evidence
+  can all be proven on an isolated QA branch.
+
