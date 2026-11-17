@@ -5,7 +5,7 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
 import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
-import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
+import { listInstitutionallyAuthorizedAcademicProgramIds } from "@/modules/programs/program-site-authorization.server";
 import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 
@@ -114,20 +114,8 @@ export async function getCommandContext(request: Request): Promise<AccessContext
       inArray(programs.academicProviderOrganizationId,organizations),
       not(inArray(programs.organizationId,organizations))));
   if(assignments.length){
-   const authorizedPrograms=new Set<string>();
-   const deniedPrograms=new Set<string>();
-   for(const assignment of assignments){
-    if(authorizedPrograms.has(assignment.programId)||deniedPrograms.has(assignment.programId))continue;
-    try{
-     await requireInstitutionalAcademicProgramAuthority(db,context,assignment.programId,[
-       "academic_instruction","curriculum",
-     ]);
-     authorizedPrograms.add(assignment.programId);
-    }catch(error){
-     if(!(error instanceof AuthorizationError))throw error;
-     deniedPrograms.add(assignment.programId);
-    }
-   }
+   const authorizedPrograms=await listInstitutionallyAuthorizedAcademicProgramIds(
+    db,context,assignments.map(row=>row.programId),["academic_instruction","curriculum"]);
    context.scope.sectionIds=[
     ...new Set([...(context.scope.sectionIds??[]),
       ...assignments.filter(row=>authorizedPrograms.has(row.programId)).map(row=>row.sectionId)]),
