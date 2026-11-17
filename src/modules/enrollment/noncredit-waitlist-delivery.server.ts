@@ -1,189 +1,196 @@
 import { and, asc, eq, gt, isNull, lte, notInArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { OUTBOUND_LEASE_MS, OUTBOUND_MAX_ATTEMPTS, outboundRetryDelayMs } from "@/domain/outbound-retry-policy";
 import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
 import {
-  noncreditEnrollmentWaitlist,noncreditSelfEnrollmentReleases,
+  noncreditEnrollmentWaitlist, noncreditSelfEnrollmentReleases,
   noncreditWaitlistEmailDeliveries,
 } from "@/db/canonical-v301";
-import { sendNotificationEmail } from "@/modules/communication/notification-email.server";
+import {
+  dispatchOutboundMessages, type OutboundClaim,
+  type OutboundPreparation,
+} from "@/modules/communication/outbound-dispatcher.server";
+import {
+  sendNotificationEmail, type NotificationEmailMessage,
+} from "@/modules/communication/notification-email.server";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import { readEligibleSelfEnrollmentReleases } from "./noncredit-self-enrollment-catalog.server";
 import { currentWaitlistEmailOpportunity } from "@/domain/noncredit-waitlist-email-policy";
 
-const LEASE_MS=OUTBOUND_LEASE_MS;
-const MAX_ATTEMPTS=OUTBOUND_MAX_ATTEMPTS;
-const nextRetry=outboundRetryDelayMs;
-const nowAfter=(start:Date)=>new Date(start.getTime()+Math.max(0,Date.now()-start.getTime()));
+function owned(claim: OutboundClaim) {
+  return and(
+    eq(noncreditWaitlistEmailDeliveries.id, claim.id),
+    eq(noncreditWaitlistEmailDeliveries.status, "processing"),
+    eq(noncreditWaitlistEmailDeliveries.leaseUntil, claim.leaseUntil),
+  );
+}
 
 /**
- * Retryable, leased delivery for invitations written atomically by the
- * provider command. Never send mail inside a DB transaction.
- *
- * We re-check the exact live invitation and the applicant's verified CAN
- * account/person relationship immediately before sending. External delivery
- * never enrolls a learner, accepts a seat or grants canonical identity.
+ * Source-specific adapter for the shared outbound dispatcher.
+ * The originating transaction creates the durable receipt; this worker
+ * rechecks release visibility, invitation expiry, verified account-to-person
+ * grants and demo suppression immediately before external delivery.
+ * A provider HTTP acceptance is NOT an inbox delivery confirmation.
  */
-export async function processNoncreditWaitlistEmailDeliveries(
-  now=new Date(),limit=30,
-):Promise<{accepted:number;suppressed:number;failed:number}> {
-  const processed:string[]=[];
-  let accepted=0,suppressed=0,failed=0;
-  const clock=()=>nowAfter(now);
-  while(processed.length<Math.min(Math.max(limit,0),100)){
-    const claimAt=clock();
-    let leaseUntil=new Date(claimAt.getTime()+LEASE_MS);
-    const [claimed]=await db.transaction(async tx=>{
-      const [row]=await tx.select({id:noncreditWaitlistEmailDeliveries.id})
-        .from(noncreditWaitlistEmailDeliveries).where(and(
-          ...(processed.length?[notInArray(noncreditWaitlistEmailDeliveries.id,processed)]:[]),
+const waitlistAdapter = {
+  async claim(now: Date, seenIds: readonly string[], leaseMs: number): Promise<OutboundClaim | null> {
+    return db.transaction(async tx => {
+      const [row] = await tx.select({
+        id: noncreditWaitlistEmailDeliveries.id,
+        attempts: noncreditWaitlistEmailDeliveries.attempts,
+      }).from(noncreditWaitlistEmailDeliveries)
+        .where(and(
+          ...(seenIds.length
+            ? [notInArray(noncreditWaitlistEmailDeliveries.id, [...seenIds])]
+            : []),
           or(
-            and(eq(noncreditWaitlistEmailDeliveries.status,"pending"),
+            and(eq(noncreditWaitlistEmailDeliveries.status, "pending"),
               or(isNull(noncreditWaitlistEmailDeliveries.nextAttemptAt),
-                lte(noncreditWaitlistEmailDeliveries.nextAttemptAt,claimAt))),
-            and(eq(noncreditWaitlistEmailDeliveries.status,"failed"),
-              lte(noncreditWaitlistEmailDeliveries.nextAttemptAt,claimAt)),
-            and(eq(noncreditWaitlistEmailDeliveries.status,"processing"),
-              lte(noncreditWaitlistEmailDeliveries.leaseUntil,claimAt)),
+                lte(noncreditWaitlistEmailDeliveries.nextAttemptAt, now))),
+            and(eq(noncreditWaitlistEmailDeliveries.status, "failed"),
+              lte(noncreditWaitlistEmailDeliveries.nextAttemptAt, now)),
+            and(eq(noncreditWaitlistEmailDeliveries.status, "processing"),
+              lte(noncreditWaitlistEmailDeliveries.leaseUntil, now)),
           ),
         )).orderBy(asc(noncreditWaitlistEmailDeliveries.createdAt))
-        .limit(1).for("update",{skipLocked:true});
-      if(!row)return [] as {id:string}[];
+        .limit(1).for("update", { skipLocked: true });
+      if (!row) return null;
+      const leaseUntil = new Date(now.getTime() + leaseMs);
       await tx.update(noncreditWaitlistEmailDeliveries).set({
-        status:"processing",leaseUntil,updatedAt:claimAt,
-      }).where(eq(noncreditWaitlistEmailDeliveries.id,row.id));
-      return [row];
+        status: "processing", leaseUntil, updatedAt: now,
+      }).where(eq(noncreditWaitlistEmailDeliveries.id, row.id));
+      return { id: row.id, attempts: row.attempts, leaseUntil };
     });
-    if(!claimed)break;
-    processed.push(claimed.id);
-    const owned=()=>and(
-      eq(noncreditWaitlistEmailDeliveries.id,claimed.id),
-      eq(noncreditWaitlistEmailDeliveries.status,"processing"),
-      eq(noncreditWaitlistEmailDeliveries.leaseUntil,leaseUntil),
-    );
-    const suppress=async(reason:string)=>{
-      const rows=await db.update(noncreditWaitlistEmailDeliveries).set({
-        status:"suppressed",lastError:reason,leaseUntil:null,nextAttemptAt:null,
-        updatedAt:clock(),
-      }).where(owned()).returning({id:noncreditWaitlistEmailDeliveries.id});
-      if(rows.length)suppressed++;
+  },
+
+  async prepare(claim: OutboundClaim, now: Date):
+    Promise<OutboundPreparation<NotificationEmailMessage>> {
+    const [record] = await db.select({
+      delivery: noncreditWaitlistEmailDeliveries,
+      releaseId: noncreditEnrollmentWaitlist.releaseId,
+      accountId: noncreditEnrollmentWaitlist.accessAccountId,
+      personId: noncreditEnrollmentWaitlist.accessPersonId,
+      waitlistStatus: noncreditEnrollmentWaitlist.status,
+      actualExpiry: noncreditEnrollmentWaitlist.inviteExpiresAt,
+      releaseStatus: noncreditSelfEnrollmentReleases.status,
+      releaseClosesAt: noncreditSelfEnrollmentReleases.closesAt,
+      organizationId: noncreditSelfEnrollmentReleases.registeringOrganizationId,
+    }).from(noncreditWaitlistEmailDeliveries)
+      .innerJoin(noncreditEnrollmentWaitlist,
+        eq(noncreditEnrollmentWaitlist.id, noncreditWaitlistEmailDeliveries.waitlistId))
+      .innerJoin(noncreditSelfEnrollmentReleases,
+        eq(noncreditSelfEnrollmentReleases.id, noncreditEnrollmentWaitlist.releaseId))
+      .where(owned(claim)).limit(1);
+    if (!record) return { kind: "suppress", reason: "source_receipt_unavailable" };
+    if (!currentWaitlistEmailOpportunity({
+      waitlistStatus: record.waitlistStatus,
+      invitationExpiresAt: record.actualExpiry,
+      deliveryInvitationExpiresAt: record.delivery.invitationExpiresAt,
+      releaseStatus: record.releaseStatus,
+      releaseClosesAt: record.releaseClosesAt,
+      now,
+    })) return { kind: "suppress", reason: "invitation_no_longer_active" };
+
+    // A published release alone does not confer authorization.
+    const [eligibleRelease] = await readEligibleSelfEnrollmentReleases(db, record.releaseId);
+    if (!eligibleRelease)
+      return { kind: "suppress", reason: "release_eligibility_revoked" };
+    if (await isDemoTenantOrganization(record.organizationId))
+      return { kind: "suppress", reason: "demo_tenant_external_delivery" };
+
+    const [recipient] = await db.select({ email: accessAccounts.emailNormalized })
+      .from(accessAccounts)
+      .innerJoin(accountPersonGrants, and(
+        eq(accountPersonGrants.accountId, accessAccounts.id),
+        eq(accountPersonGrants.personId, record.personId),
+        eq(accountPersonGrants.active, true),
+      ))
+      .innerJoin(people, and(
+        eq(people.id, accountPersonGrants.personId),
+        eq(people.active, true),
+      ))
+      .where(and(
+        eq(accessAccounts.id, record.accountId),
+        eq(accessAccounts.disabled, false),
+        gt(accessAccounts.emailVerifiedAt, new Date(0)),
+      )).limit(1);
+    if (!recipient?.email)
+      return { kind: "suppress", reason: "verified_account_person_unavailable" };
+    const grants = await db.select({
+      personId: accountPersonGrants.personId,
+      role: accountPersonGrants.role,
+    }).from(accountPersonGrants).where(and(
+      eq(accountPersonGrants.accountId, record.accountId),
+      eq(accountPersonGrants.active, true),
+    )).limit(101);
+    if (!grants.length || grants.length > 100 ||
+      grants.some(grant => grant.personId !== record.personId || grant.role === "student"))
+      return { kind: "suppress", reason: "adult_person_identity_reconciliation_required" };
+
+    // Only a fixed, HTTPS public origin may appear in outbound email.
+    const origin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
+    let actionUrl: string | undefined;
+    try {
+      if (origin && new URL(origin).protocol === "https:")
+        actionUrl = new URL("/learn/my-courses", origin).toString();
+    } catch { /* A message without a URL is still usable. */ }
+    return {
+      kind: "ready",
+      message: {
+        to: recipient.email,
+        subject: "CAN learning: a place is available",
+        text: "A place is available in a CAN learning program you joined the waitlist for. " +
+          "Sign in to your own CAN account to review and accept the invitation before " +
+          record.actualExpiry!.toISOString() + ". An invitation is not an enrollment.",
+        ...(actionUrl ? { actionUrl } : {}),
+      },
     };
-    try{
-      const [record]=await db.select({
-        delivery:noncreditWaitlistEmailDeliveries,
-        releaseId:noncreditEnrollmentWaitlist.releaseId,
-        accountId:noncreditEnrollmentWaitlist.accessAccountId,
-        personId:noncreditEnrollmentWaitlist.accessPersonId,
-        waitlistStatus:noncreditEnrollmentWaitlist.status,
-        actualExpiry:noncreditEnrollmentWaitlist.inviteExpiresAt,
-        releaseStatus:noncreditSelfEnrollmentReleases.status,
-        releaseClosesAt:noncreditSelfEnrollmentReleases.closesAt,
-        organizationId:noncreditSelfEnrollmentReleases.registeringOrganizationId,
-      }).from(noncreditWaitlistEmailDeliveries)
-        .innerJoin(noncreditEnrollmentWaitlist,eq(
-          noncreditEnrollmentWaitlist.id,noncreditWaitlistEmailDeliveries.waitlistId,
-        ))
-        .innerJoin(noncreditSelfEnrollmentReleases,eq(
-          noncreditSelfEnrollmentReleases.id,noncreditEnrollmentWaitlist.releaseId,
-        ))
-        .where(owned()).limit(1);
-      if(!record)continue;
-      if(!currentWaitlistEmailOpportunity({
-        waitlistStatus:record.waitlistStatus,
-        invitationExpiresAt:record.actualExpiry,
-        deliveryInvitationExpiresAt:record.delivery.invitationExpiresAt,
-        releaseStatus:record.releaseStatus,releaseClosesAt:record.releaseClosesAt,
-        now:clock(),
-      })){
-        await suppress("invitation_no_longer_active");continue;
-      }
-      // A published row is not automatically an authorized enrollment.
-      // Reuse the exact current release/Offering/operation/Site policy.
-      const [eligibleRelease]=await readEligibleSelfEnrollmentReleases(db,record.releaseId);
-      if(!eligibleRelease){
-        await suppress("release_eligibility_revoked");continue;
-      }
-      if(await isDemoTenantOrganization(record.organizationId)){
-        await suppress("demo_tenant_external_delivery");continue;
-      }
-      const [recipient]=await db.select({
-        email:accessAccounts.emailNormalized,
-      }).from(accessAccounts)
-        .innerJoin(accountPersonGrants,and(
-          eq(accountPersonGrants.accountId,accessAccounts.id),
-          eq(accountPersonGrants.personId,record.personId),
-          eq(accountPersonGrants.active,true),
-        ))
-        .innerJoin(people,and(
-          eq(people.id,accountPersonGrants.personId),
-          eq(people.active,true),
-        ))
-        .where(and(
-          eq(accessAccounts.id,record.accountId),
-          eq(accessAccounts.disabled,false),
-          gt(accessAccounts.emailVerifiedAt,new Date(0)),
-        )).limit(1);
-      if(!recipient?.email){
-        await suppress("verified_account_person_unavailable");continue;
-      }
-      const activeGrants=await db.select({
-        personId:accountPersonGrants.personId,
-        role:accountPersonGrants.role,
-      }).from(accountPersonGrants).where(and(
-        eq(accountPersonGrants.accountId,record.accountId),
-        eq(accountPersonGrants.active,true),
-      )).limit(101);
-      if(!activeGrants.length || activeGrants.length>100 ||
-        activeGrants.some(grant=>grant.personId!==record.personId ||
-          grant.role==="student")){
-        await suppress("adult_person_identity_reconciliation_required");continue;
-      }
-      const sendAt=clock(),renewedUntil=new Date(sendAt.getTime()+LEASE_MS);
-      const renewed=await db.update(noncreditWaitlistEmailDeliveries).set({
-        leaseUntil:renewedUntil,updatedAt:sendAt,
-      }).where(and(owned(),gt(noncreditWaitlistEmailDeliveries.leaseUntil,sendAt)))
-        .returning({id:noncreditWaitlistEmailDeliveries.id});
-      if(!renewed.length)continue;
-      leaseUntil=renewedUntil;
-      // No learner names, Person UUIDs, tokens, raw enrollment details or
-      // links with arbitrary hosts are included in outbound mail.
-      const origin=process.env.CAN_ACCESS_PUBLIC_ORIGIN;
-      let actionUrl: string | undefined;
-      try{
-        if(origin && new URL(origin).protocol==="https:")
-          actionUrl=new URL("/learn/my-courses",origin).toString();
-      }catch{ /* The email remains useful without a URL. */ }
-      const sent=await sendNotificationEmail({
-        to:recipient.email,
-        subject:"CAN learning: a place is available",
-        text:"A place is available in a CAN learning program you joined the waitlist for. "+
-          "Sign in to your own CAN account to review and accept the invitation before "+
-          record.actualExpiry!.toISOString()+". An invitation is not an enrollment.",
-        ...(actionUrl?{actionUrl}:{}),
-      },claimed.id);
-      const attempt=record.delivery.attempts+1;
-      const updated=await db.update(noncreditWaitlistEmailDeliveries).set({
-        status:sent?"accepted":"failed",attempts:attempt,
-        acceptedAt:sent?clock():null,
-        lastError:sent?null:"provider_not_accepted",
-        nextAttemptAt:sent||attempt>=MAX_ATTEMPTS?null:
-          new Date(clock().getTime()+nextRetry(attempt)),
-        leaseUntil:null,updatedAt:clock(),
-      }).where(owned()).returning({id:noncreditWaitlistEmailDeliveries.id});
-      if(updated.length){if(sent)accepted++;else failed++;}
-    }catch{
-      const [current]=await db.select({attempts:noncreditWaitlistEmailDeliveries.attempts})
-        .from(noncreditWaitlistEmailDeliveries).where(owned()).limit(1);
-      if(!current)continue;
-      const attempts=current.attempts+1;
-      const rows=await db.update(noncreditWaitlistEmailDeliveries).set({
-        status:"failed",attempts,lastError:"delivery_worker_error",
-        nextAttemptAt:attempts>=MAX_ATTEMPTS?null:
-          new Date(clock().getTime()+nextRetry(attempts)),
-        leaseUntil:null,updatedAt:clock(),
-      }).where(owned()).returning({id:noncreditWaitlistEmailDeliveries.id});
-      if(rows.length)failed++;
-    }
-  }
-  return {accepted,suppressed,failed};
+  },
+
+  async renew(claim: OutboundClaim, now: Date, leaseMs: number):
+    Promise<OutboundClaim | null> {
+    const leaseUntil = new Date(now.getTime() + leaseMs);
+    const rows = await db.update(noncreditWaitlistEmailDeliveries)
+      .set({ leaseUntil, updatedAt: now })
+      .where(and(owned(claim),
+        gt(noncreditWaitlistEmailDeliveries.leaseUntil, now)))
+      .returning({ id: noncreditWaitlistEmailDeliveries.id });
+    return rows.length ? { ...claim, leaseUntil } : null;
+  },
+
+  send(message: NotificationEmailMessage, key: string) {
+    return sendNotificationEmail(message, key);
+  },
+
+  async settle(claim: OutboundClaim, result: {
+    kind: "accepted" | "failed" | "suppressed";
+    now: Date;
+    attempts: number;
+    nextAttemptAt: Date | null;
+    reason: string | null;
+  }): Promise<boolean> {
+    const rows = await db.update(noncreditWaitlistEmailDeliveries).set({
+      status: result.kind,
+      attempts: result.attempts,
+      acceptedAt: result.kind === "accepted" ? result.now : null,
+      lastError: result.reason,
+      nextAttemptAt: result.nextAttemptAt,
+      leaseUntil: null,
+      updatedAt: result.now,
+    }).where(owned(claim))
+      .returning({ id: noncreditWaitlistEmailDeliveries.id });
+    return rows.length > 0;
+  },
+
+  async attemptsAfterError(claim: OutboundClaim): Promise<number | null> {
+    const [current] = await db.select({
+      attempts: noncreditWaitlistEmailDeliveries.attempts,
+    }).from(noncreditWaitlistEmailDeliveries).where(owned(claim)).limit(1);
+    return current ? current.attempts + 1 : null;
+  },
+};
+
+/** Backward-compatible scheduled job and Cloudflare entrypoint. */
+export function processNoncreditWaitlistEmailDeliveries(now = new Date(), limit = 30):
+  Promise<{ accepted: number; suppressed: number; failed: number }> {
+  return dispatchOutboundMessages(waitlistAdapter, { now, limit });
 }
