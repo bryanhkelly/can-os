@@ -56,6 +56,17 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
      if(!reviewer?.verified||reviewer.disabled||
         reviewer.personId!==actor.actorPersonId||isDemoAccountEmail(reviewer.email))
        throw new AuthorizationError("verified App Admin reviewer");
+     const [currentAdmin]=await tx.select({id:accountPersonGrants.id})
+       .from(accountPersonGrants).where(and(
+         eq(accountPersonGrants.id,actor.grantId),
+         eq(accountPersonGrants.accountId,actor.accountId),
+         eq(accountPersonGrants.personId,actor.actorPersonId),
+         eq(accountPersonGrants.role,"app_admin"),
+         eq(accountPersonGrants.active,true),
+         isNull(accountPersonGrants.organizationId),
+         isNull(accountPersonGrants.siteId),
+       )).limit(1);
+     if(!currentAdmin)throw new AuthorizationError("current independent App Admin grant");
      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"native-identity:"+data.accessAccountId}))`);
      const [account]=await tx.select({
        id:accessAccounts.id,personId:accessAccounts.personId,
