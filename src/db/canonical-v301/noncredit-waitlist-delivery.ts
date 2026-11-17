@@ -18,6 +18,10 @@ export const noncreditWaitlistEmailDeliveries=educationV30.table(
     nextAttemptAt:timestamp("next_attempt_at",{withTimezone:true}),
     leaseUntil:timestamp("lease_until",{withTimezone:true}),
     acceptedAt:timestamp("accepted_at",{withTimezone:true}),
+    providerMessageId:text("provider_message_id"),
+    providerDeliveredAt:timestamp("provider_delivered_at",{withTimezone:true}),
+    providerFailedAt:timestamp("provider_failed_at",{withTimezone:true}),
+    providerFailureKind:text("provider_failure_kind"),
     lastError:text("last_error"),
     createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
     updatedAt:timestamp("updated_at",{withTimezone:true}).notNull().defaultNow(),
@@ -25,5 +29,6 @@ export const noncreditWaitlistEmailDeliveries=educationV30.table(
     uniqueIndex("noncredit_waitlist_email_invitation_uq")
       .on(t.waitlistId,t.invitationExpiresAt),
     index("noncredit_waitlist_email_retry_idx").on(t.status,t.nextAttemptAt),
+    uniqueIndex("noncredit_waitlist_email_provider_message_uq").on(t.providerMessageId),
   ],
 );
