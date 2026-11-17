@@ -119,19 +119,19 @@ export const revokeLearningAwardIssuance = createServerFn({ method: "POST" })
       const [event] = await tx.insert(learningAwardIssuanceEvents).values({
         issuanceId: issuance.id, eventKind:"revoked", reason:data.reason,
         evidenceVersionId:data.evidenceVersionId,
-        decidedByPersonId:actor.actorPersonId,
+        decidedByPersonId:actor.actorPersonId!,
       }).returning({id:learningAwardIssuanceEvents.id});
       if (!event) throw new Error("Award revocation event not persisted");
       const payload={issuanceId:issuance.id,evidenceVersionId:data.evidenceVersionId,
         reason:data.reason};
       await tx.insert(auditEvents).values({
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         owningOrganizationId:issuance.issuerOrganizationId,
         eventCode:"learning.credential.revoked",entityKind:"credential_issuance",
         entityId:issuance.id,payload,
       });
       await tx.insert(domainEvents).values({
-        actorPersonId:actor.actorPersonId,eventType:"CredentialRevoked",
+        actorPersonId:actor.actorPersonId!,eventType:"CredentialRevoked",
         aggregateType:"credential_issuance",aggregateId:issuance.id,payload,
       });
       return {eventId:event.id,alreadyRevoked:false};
