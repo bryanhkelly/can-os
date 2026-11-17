@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, RosterList } from "@/components/workspace";
 import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
@@ -268,30 +268,27 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
     {isOperator&&pages.isError&&<p role="alert" className="mt-3 text-sm">
       Roster access is unavailable. Check your current Site authorization.
     </p>}
-    {namesAllowed&&<ul className="mt-4 divide-y divide-border">
-      {rows.map(row=><li key={row.enrollmentId} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-        <span className="font-semibold">{row.name}</span>
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-muted-foreground">{row.status} · {row.creditMode.replaceAll("_"," ")}</span>
-          {isOperator&&"courseAttemptId" in row&&typeof row.courseAttemptId==="string"&&row.status==="active"&&
-            <Button type="button" size="sm" variant="outline" disabled={!!grantBusy}
-              onClick={()=>void grantKnowledgeCheck(row.enrollmentId)}>
-              {grantBusy===row.enrollmentId?"Granting…":"Grant Course knowledge check"}
-            </Button>}
-          {isOperator&&(row.status==="active"||row.status==="pending")&&
-            <NativeClassRosterLifecycleAction
-              classEnrollmentId={row.enrollmentId} status={row.status}
-              onCompleted={setLifecycleNotice}
-              onChanged={async()=>{
-                await Promise.all([
-                  client.invalidateQueries({queryKey:["native-class-roster",workspace.classId]}),
-                  client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]}),
-                ]);
-              }}/>}
-
-        </div>
-      </li>)}
-    </ul>}
+    {namesAllowed&&<RosterList rows={rows} rowKey={row=>row.enrollmentId}
+      primary={row=>row.name}
+      detail={row=>`${row.status} · ${row.creditMode.replaceAll("_"," ")}`}
+      actions={row=><>
+        {isOperator&&"courseAttemptId" in row&&typeof row.courseAttemptId==="string"&&row.status==="active"&&
+          <Button type="button" size="sm" variant="outline" disabled={!!grantBusy}
+            onClick={()=>void grantKnowledgeCheck(row.enrollmentId)}>
+            {grantBusy===row.enrollmentId?"Granting…":"Grant Course knowledge check"}
+          </Button>}
+        {isOperator&&(row.status==="active"||row.status==="pending")&&
+          <NativeClassRosterLifecycleAction
+            classEnrollmentId={row.enrollmentId} status={row.status}
+            onCompleted={setLifecycleNotice}
+            onChanged={async()=>{
+              await Promise.all([
+                client.invalidateQueries({queryKey:["native-class-roster",workspace.classId]}),
+                client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]}),
+              ]);
+            }}/>}
+      </>}
+      emptyMessage="No active or pending learners in this Class."/>}
     {lifecycleNotice&&<p role="status" className="mt-3 text-sm">{lifecycleNotice}</p>}
     {grantMessage&&<p role="status" className="mt-3 text-sm">{grantMessage}</p>}
     {grantError&&<p role="alert" className="mt-3 text-sm text-destructive">{grantError}</p>}
