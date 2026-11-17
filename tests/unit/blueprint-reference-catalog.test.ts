@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { getBlueprintReferenceCatalog } from "@/modules/blueprints/blueprint-reference-catalog.server";
 import {
@@ -89,22 +90,9 @@ describe("canonical Blueprint reference catalog", () => {
     )).rejects.toMatchObject({ name: "AuthorizationError" });
   });
 
-  it("fails closed before any database operation when canonical rollout is disabled", async () => {
-    const context = {
-      actorPersonId: "00000000-0000-4000-8000-000000000009",
-      capabilities: new Set(["program.launch.start"]),
-      scope: {
-        siteIds: [first.itemId],
-        organizationIds: ["00000000-0000-4000-8000-000000000010"],
-      },
-    };
-    vi.stubEnv("CAN_CANONICAL_CATALOG_ENABLED", "false");
-    try {
-      await expect(getBlueprintReferenceCatalog(context, {
-        siteId: first.itemId,
-      })).rejects.toMatchObject({ code: "UNAVAILABLE" });
-    } finally {
-      vi.unstubAllEnvs();
-    }
+  it("keeps Site authorization while removing the catalog rollout gate",()=>{
+    const source=readFileSync("src/modules/blueprints/blueprint-reference-catalog.server.ts","utf8");
+    expect(source).not.toContain("CAN_CANONICAL_CATALOG_ENABLED");
+    expect(source).toContain('assertCapability(context,"program.launch.start")');
   });
 });
