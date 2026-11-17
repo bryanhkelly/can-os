@@ -46,8 +46,6 @@ export const nativeClassSessionScheduleSchema=z.object({
 export const scheduleNativeClassSessions=createServerFn({method:"POST"})
   .validator((raw:unknown)=>nativeClassSessionScheduleSchema.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     requireFacilitatedLearningEnabled();
     setResponseHeader("Cache-Control","private, no-store");
     const host=await requireCanonicalFacilitator();
@@ -145,8 +143,6 @@ export const nativeClassSessionChangeSchema=z.object({
 export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
   .validator((raw:unknown)=>nativeClassSessionChangeSchema.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     requireFacilitatedLearningEnabled();
     setResponseHeader("Cache-Control","private, no-store");
     const host=await requireCanonicalFacilitator();
@@ -280,8 +276,6 @@ const openInput=z.object({classId:uuid,classSessionId:uuid}).strict();
 export const openNativeClassSession=createServerFn({method:"POST"})
   .validator((raw:unknown)=>openInput.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     requireFacilitatedLearningEnabled();
     setResponseHeader("Cache-Control","private, no-store");
     const host=await requireCanonicalFacilitator();
@@ -334,8 +328,8 @@ export const openNativeClassSession=createServerFn({method:"POST"})
           alreadyStarted:true};
       }
       if(requiresClassSessionAgenda({
-        featureEnabled:process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true",
-        mandatoryFrom:process.env.CAN_WS4_AGENDA_REQUIRED_FROM,
+        featureEnabled:true,
+        mandatoryFrom:"1970-01-01T00:00:00.000Z",
         sessionCreatedAt:link.createdAt,
       })){
         const [agenda]=await tx.select({id:classSessionAgendaRevisions.id})
