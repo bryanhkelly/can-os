@@ -6,33 +6,33 @@ import {
 } from "@/domain/site-noncredit-bridge";
 
 const complete:SiteNoncreditPreflight={
-  mappingReady:true,releasesReady:true,publicSchema:true,nativeSchema:true,
-  mappingRead:true,releaseRead:true,
+  sitesReady:true,releasesReady:true,publicSchema:true,nativeSchema:true,
+  siteRead:true,nativeSiteRead:true,releaseRead:true,
 };
-describe("actual Site-to-canonical DB reader verification",()=>{
-  it("only accepts all six independently verified permissions and relations",()=>{
+describe("single-Site noncredit catalog reader verification",()=>{
+  it("checks all seven required permissions and relations",()=>{
     expect(siteCatalogReaderAccessible(complete)).toBe(true);
-    for(const key of Object.keys(complete) as (keyof SiteNoncreditPreflight)[]){
+    for(const key of Object.keys(complete) as (keyof SiteNoncreditPreflight)[])
       expect(siteCatalogReaderAccessible({...complete,[key]:false})).toBe(false);
-    }
   });
-  it("reads an approved Site identity only, checks an actual SQL reader and reports blocked states",()=>{
+  it("filters by a shared, exact Site ID without a translation or link approval",()=>{
     const api=readFileSync(resolve(process.cwd(),
       "src/modules/sites/site-noncredit-releases.server.ts"),"utf8");
-    expect(api).toContain("status='approved'");
+    expect(api).toContain("native_site.id=platform_site.id");
+    expect(api).toContain("siteId:publicSiteId,limit:40");
     expect(api).toContain("readEligibleSelfEnrollmentReleases(executor");
     expect(api).toContain("probeSiteNoncreditCatalogReader(executor)");
     expect(api).toContain("reader_permission_missing");
-    expect(api).toContain("SELECT 1 FROM education_v30.noncredit_self_enrollment_releases LIMIT 0");
+    expect(api).not.toContain("site_canonical_identity_links");
+    expect(api).not.toContain("mappingReady");
   });
-  it("requires a real independently approved Site and published release in isolated acceptance",()=>{
+  it("keeps the main catalog acceptance read-only and refuses other branches",()=>{
     const script=readFileSync(resolve(process.cwd(),
-      "scripts/acceptance/check-site-noncredit-bridge.ts"),"utf8");
-    expect(script).toContain("CAN_SITE_BRIDGE_VALIDATION");
-    expect(script).toContain("CAN_EXPECTED_NEON_BRANCH_ID");
-    expect(script).toContain("process.env.DATABASE_URL===process.env.TEST_DATABASE_URL");
-    expect(script).toContain("m.status='approved'");
-    expect(script).toContain("readLinkedSiteNoncreditReleases(row.publicSiteId)");
-    expect(script).not.toContain("INSERT INTO public.site_canonical_identity_links");
+      "scripts/acceptance/check-site-noncredit-catalog.ts"),"utf8");
+    expect(script).toContain("CAN_SITE_CATALOG_VALIDATION");
+    expect(script).toContain("br-restless-sea-ar9ooo55");
+    expect(script).toContain("readLinkedSiteNoncreditReleases(siteId)");
+    expect(script).toContain("native.id=p.id");
+    expect(script).not.toMatch(/sql`\s*(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b/i);
   });
 });
