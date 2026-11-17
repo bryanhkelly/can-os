@@ -57,6 +57,9 @@ export const Pending: Story = {
     const action = within(canvasElement).getByRole("button", { name: "Creating school year…" });
     await expect(action).toBeDisabled();
     await expect(action).toHaveAttribute("aria-busy", "true");
+    const cancel = within(canvasElement).getByRole("link", { name: "Cancel" });
+    await expect(cancel).toHaveAttribute("aria-disabled", "true");
+    await expect(cancel).toHaveAttribute("tabindex", "-1");
     await expect(canvasElement.querySelector("[data-action-footer=form]")).toBeInTheDocument();
   },
 };
