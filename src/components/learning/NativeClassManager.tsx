@@ -526,7 +526,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <p className="mt-2 flex flex-wrap gap-4 text-xs font-semibold">
               <Link to="/canonical/lab/deployments" className="underline">Deployment and adoption</Link>
               <Link to="/operations/curriculum" className="underline">Curriculum</Link>
-              <Link to="/class" search={{view:"activities"}} className="underline">Course activities</Link>
+              <Link to="/class" search={{view:"activities",courseVersionId:selected.courseVersionId}} className="underline">Course activities</Link>
             </p>
           </aside>}
           <div><label className="block text-sm font-semibold" htmlFor="native-class-title">Class name</label>
