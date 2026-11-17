@@ -137,3 +137,19 @@ The read-only retirement preflight now fails on missing/ambiguous native Course
 version candidates and on divergent native Person/account IDs, even if the
 legacy identity-link tables happen to be empty. This closes the misleading
 "no links means one identity" loophole.
+
+### Source integrity sanity check
+
+Independent read-only SQL on `test01` found **zero** orphaned
+learner-profile references, **zero** orphaned class references, and **zero**
+duplicate active learner/class placements in the legacy enrollment table.
+These positive source-quality checks do not authorize a migration: eleven
+published Course versions still have no matching native published Course
+version under the same publisher and version number.
+
+The retirement preflight now requires these source-integrity conditions and
+checks nonoverlapping native Person/Account IDs and active native sessions.
+`npm run db:test01:class-cutover-candidates` generates the per-class
+candidate and evidence inventory, exiting nonzero when there are remaining
+legacy academic classes. Treat the report as a review input, never as
+permission to merge identities, rekey foreign keys or delete the old data.
