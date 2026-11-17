@@ -1,4 +1,5 @@
 import type { DailyAttentionItem } from "@/domain/daily-operations";
+import { EmptyState, StatusBadge } from "@/components/workspace";
 
 const categoryLabels = {
   opening: "Opening handoff",
@@ -21,17 +22,17 @@ export function AttentionQueue({ items = [], empty = "Nothing needs your attenti
         <h2 className="font-serif text-2xl">What needs my attention</h2>
         <p className="mt-1 text-sm text-muted-foreground">Canonical work and source-derived follow-ups for your current role and scope.</p>
       </div>
-      {items.length > 0 && <span className="rounded-full border px-3 py-1 text-xs">{items.length} open</span>}
+      {items.length > 0 && <StatusBadge tone="neutral">{items.length} open</StatusBadge>}
     </div>
-    {!items.length && <p className="mt-4 rounded-xl border p-5 text-sm text-muted-foreground">{empty}</p>}
+    {!items.length && <EmptyState className="mt-4" title={empty}/>}
     <div className="mt-4 space-y-3">
-      {items.map(item => <article key={item.id} className="rounded-xl border bg-card p-4">
+      {items.map(item => <article key={item.id} className="border bg-card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{categoryLabels[item.category]}</p>
             <h3 className="mt-1 font-semibold">{item.title}</h3>
           </div>
-          {item.priority !== "normal" && <span className="text-xs uppercase text-muted-foreground">{item.priority}</span>}
+          {item.priority !== "normal" && <StatusBadge tone={item.priority === "critical" ? "danger" : "attention"}>{item.priority}</StatusBadge>}
         </div>
         {item.detail && <p className="mt-2 text-sm text-muted-foreground">{item.detail}</p>}
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
