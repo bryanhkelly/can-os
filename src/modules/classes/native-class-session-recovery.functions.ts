@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, accessAccountNoncreditPrincipals,
-  accessAccountCanonicalPrincipals,
+  accessAccountCanonicalPrincipals, accessAdultLearningReviews,
 } from "@/db/schema";
 import {
   auditEvents, canonicalAccounts, canonicalPersons, canonicalAccountGrants,
@@ -77,8 +77,24 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         throw new AuthorizationError("current independently linked native Person");
       if(!verifiedAdultOn(native.birthDate,now))
         throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
+      const [review]=await tx.select({
+        status:accessAdultLearningReviews.status,
+        consumedAt:accessAdultLearningReviews.consumedAt,
+        accessPersonId:accessAdultLearningReviews.accessPersonId,
+        canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
+        canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
+        organizationId:accessAdultLearningReviews.organizationId,
+      }).from(accessAdultLearningReviews).where(
+        eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
+      ).limit(1);
+      if(review&&(review.status!=="approved"||!review.consumedAt||
+         review.accessPersonId!==owner.personId||
+         review.canonicalAccountId!==link.canonicalAccountId||
+         review.canonicalPersonId!==link.canonicalPersonId))
+        throw new AuthorizationError("revoked or conflicting adult identity review");
       const grants=await tx.select({
         id:canonicalAccountGrants.id,organizationId:canonicalAccountGrants.organizationId,
+        personId:canonicalAccountGrants.personId,
       }).from(canonicalAccountGrants)
         .innerJoin(canonicalEnrollmentOrganizations,and(
           eq(canonicalEnrollmentOrganizations.id,canonicalAccountGrants.organizationId),
@@ -91,10 +107,19 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
           eq(canonicalAccountGrants.active,true),
           isNull(canonicalAccountGrants.revokedAt),
           isNull(canonicalAccountGrants.siteId),
-        )).limit(2);
-      if(grants.length!==1)
+        )).orderBy(asc(canonicalAccountGrants.grantedAt),
+          asc(canonicalAccountGrants.id)).limit(101);
+      // Multiple approved providers must not force another interactive login.
+      // Every candidate must remain bound to the exact same native Person.
+      // For reviewed identities, use the one explicitly reviewed home grant;
+      // for legacy links, use the oldest still-active grant deterministically.
+      if(grants.length===0||grants.length>100||
+         grants.some(g=>g.personId!==link.canonicalPersonId))
         throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
-      const grant=grants[0]!;
+      const home=review?grants.filter(g=>g.organizationId===review.organizationId):[];
+      if(review&&home.length!==1)
+        throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
+      const grant=review?home[0]!:grants[0]!;
       const issued=await issueNativeLearnerSession(tx,native.accountId,grant.id,now);
       await tx.insert(auditEvents).values({
         actorPersonId:link.canonicalPersonId,
