@@ -21,7 +21,8 @@ async function context() { const [{ db }, s] = await Promise.all([import("@/db/c
 
 
 /** Only current, canonical, assigned Sections; never grant CAN teachers host-Site access. */
-async function activeTeacherReferralRoster(db: any, s: any, actor: Actor) {
+type TeacherReferralRosterRow = {studentProfileId:string;sectionId:string;sectionTitle:string;siteId:string;programId:string;firstName:string;lastName:string};
+async function activeTeacherReferralRoster(db: any, s: any, actor: Actor):Promise<TeacherReferralRosterRow[]> {
  const ids=(await accessibleClasses(actor)).map(section=>section.id);
  if(!ids.length)return [];
  const programMembership=alias(s.enrollments,"teacher_referral_active_program");
@@ -160,7 +161,7 @@ export const listTeacherReferralStudents=createServerFn({method:"GET"}).handler(
  const actor=await requireActor(["teacher"],"referrals:create");
  const {db,s}=await context();
  const rows=await activeTeacherReferralRoster(db,s,actor);
- return [...new Map(rows.map((row: any)=>[row.studentProfileId,{
+ return [...new Map<string,{id:string;name:string;sectionTitle:string}>(rows.map((row)=>[row.studentProfileId,{
   id:row.studentProfileId,
   name:personLegalName({legalFirstName:row.firstName,legalLastName:row.lastName}),
   sectionTitle:row.sectionTitle,
