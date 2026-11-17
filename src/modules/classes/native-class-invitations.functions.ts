@@ -151,11 +151,14 @@ export const getMyNativeClassInvitations=createServerFn({method:"GET"}).handler(
     classOfferingVersionId:canonicalClassEnrollmentInvitations.classOfferingVersionId,
     title:canonicalClasses.title,
     creditMode:canonicalClassEnrollmentInvitations.creditMode,
+    consentText:canonicalClassOfferingVersions.consentText,
+    consentVersion:canonicalClassOfferingVersions.consentVersion,
     state:canonicalClassEnrollmentInvitations.state,
     expiresAt:canonicalClassEnrollmentInvitations.expiresAt,
     acceptedEnrollmentId:canonicalClassEnrollmentInvitations.acceptedEnrollmentId,
   }).from(canonicalClassEnrollmentInvitations)
     .innerJoin(canonicalClasses,eq(canonicalClasses.id,canonicalClassEnrollmentInvitations.classId))
+    .innerJoin(canonicalClassOfferingVersions,eq(canonicalClassOfferingVersions.id,canonicalClassEnrollmentInvitations.classOfferingVersionId))
     .where(eq(canonicalClassEnrollmentInvitations.learnerPersonId,actor.actorPersonId))
     .orderBy(desc(canonicalClassEnrollmentInvitations.invitedAt)).limit(100);
   const now=new Date();
