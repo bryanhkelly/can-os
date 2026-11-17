@@ -366,14 +366,22 @@ export const getOpenNoncreditSelfEnrollmentById=createServerFn({method:"GET"})
   });
 
 /** Only the signed-in Person's explicitly bridged canonical Course history. */
-export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
-  .handler(async()=>{
+
+// Original registration/attempt rows remain the only participation authority.
+// A cursor is an ordering hint, never a Person, Site or scope selector.
+const personalNoncreditCursor=z.object({
+  registeredAt:z.string().datetime({offset:true}),
+  registrationId:z.string().uuid(),
+}).strict();
+async function readMyNoncreditHistoryPage(
+  cursor:z.infer<typeof personalNoncreditCursor>|null,
+){
     setResponseHeader("Cache-Control","private, no-store");
     const { requireVerifiedAdultAccount } = await import("./noncredit-self-enrollment-identity.server");
     const owner=await requireVerifiedAdultAccount();
     const [link]=await db.select().from(accessAccountNoncreditPrincipals)
       .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId)).limit(1);
-    if(!link || link.accessPersonId!==owner.personId)return [];
+    if(!link || link.accessPersonId!==owner.personId)return {items:[],nextCursor:null};
     const [native]=await db.select({id:canonicalAccounts.id})
       .from(canonicalAccounts).where(and(
         eq(canonicalAccounts.id,link.canonicalAccountId),
@@ -381,7 +389,7 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
         isNull(canonicalAccounts.disabledAt),
         isNotNull(canonicalAccounts.emailVerifiedAt),
       )).limit(1);
-    if(!native)return [];
+    if(!native)return {items:[],nextCursor:null};
     const registrations=await db.select({
       releaseId:noncreditSelfEnrollmentClaims.releaseId,
       registrationId:noncreditRegistrations.id,
@@ -392,6 +400,7 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
       registrationStatus:noncreditRegistrations.status,
       attemptStatus:learnerCourseAttempts.status,
       registeredAt:noncreditRegistrations.registeredAt,
+      registeredAtCursor:sql<string>`to_char(${noncreditRegistrations.registeredAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
     }).from(noncreditSelfEnrollmentClaims)
       .innerJoin(noncreditSelfEnrollmentReleases,eq(
         noncreditSelfEnrollmentReleases.id,noncreditSelfEnrollmentClaims.releaseId))
@@ -409,8 +418,17 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
         eq(noncreditSelfEnrollmentClaims.canonicalAccountId,link.canonicalAccountId),
         eq(noncreditSelfEnrollmentClaims.participantPersonId,link.canonicalPersonId),
         eq(noncreditRegistrations.participantPersonId,link.canonicalPersonId),
-      )).orderBy(desc(noncreditRegistrations.registeredAt)).limit(100);
-    const releaseIds=[...new Set(registrations.map(r=>r.releaseId))];
+        cursor?or(
+          sql`${noncreditRegistrations.registeredAt} < ${cursor.registeredAt}::timestamptz`,
+          and(sql`${noncreditRegistrations.registeredAt} = ${cursor.registeredAt}::timestamptz`,
+            lt(noncreditRegistrations.id,cursor.registrationId)),
+        ):undefined,
+      )).orderBy(desc(noncreditRegistrations.registeredAt),desc(noncreditRegistrations.id)).limit(51);
+    const page=registrations.slice(0,50);
+    const last=page[page.length-1];
+    const nextCursor=registrations.length>50&&last
+      ?{registeredAt:last.registeredAtCursor,registrationId:last.registrationId}:null;
+    const releaseIds=[...new Set(page.map(r=>r.releaseId))];
     const plans=releaseIds.length?await db.select({
       releaseId:facilitatedClassroomPlans.enrollmentReleaseId,
       startsAt:canonicalDeliverySessions.startsAt,
@@ -425,7 +443,7 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
     // Only the source-owned, latest non-superseded formal decisions are
     // displayed. Progress, elapsed time, registration, and assessment alone
     // are never promoted into an official completion.
-    const registrationIds=[...new Set(registrations.map(row=>row.registrationId))];
+    const registrationIds=[...new Set(page.map(row=>row.registrationId))];
     const decisions=registrationIds.length?await db.select({
       id:noncreditCompletionDecisions.id,
       registrationId:noncreditCompletionDecisions.registrationId,
@@ -441,7 +459,7 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
     for(const item of decisions)
       if(!superseded.has(item.id)&&!current.has(item.registrationId))
         current.set(item.registrationId,item);
-    return registrations.map(r=>({
+    return {items:page.map(r=>({
       ...r,officialOutcome:current.has(r.registrationId)?{
         referenceId:current.get(r.registrationId)!.id,
         label:"Completion decision: "+current.get(r.registrationId)!.outcome.replaceAll("_"," "),
@@ -451,5 +469,20 @@ export const getMyNoncreditSelfEnrollments = createServerFn({method:"GET"})
           startsAt:p.startsAt.toISOString(),endsAt:p.endsAt.toISOString(),
         })),
       schedulePartial:plans.length>1000,
-    }));
+    })),nextCursor};
+
+}
+export const getMyNoncreditSelfEnrollmentHistoryPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    cursor:personalNoncreditCursor.nullable().default(null),
+  }).strict().parse(raw))
+  .handler(async({data})=>readMyNoncreditHistoryPage(data.cursor));
+
+/** Existing bounded view; My Activity advances through source-owned pages. */
+export const getMyNoncreditSelfEnrollments=createServerFn({method:"GET"})
+  .handler(async()=>{
+    const first=await readMyNoncreditHistoryPage(null);
+    if(!first.nextCursor)return first.items;
+    const second=await readMyNoncreditHistoryPage(first.nextCursor);
+    return [...first.items,...second.items];
   });
