@@ -98,6 +98,9 @@ check("WS6 maintains evidence metrics without fabricated formal Class completion
   required(report.includes("inArray(learnerCourseAttempts.classEnrollmentId,enrollmentIds)") &&
            report.includes("courseAttemptIds:attemptsByEnrollment.get(e.id)"),
     "WS6 must query all exact Class Enrollment retakes; selected pointer is not history");
+  required(report.includes("attempt.adoptionId!==cls.adoptionId") &&
+           report.includes("attempt.offeringVersionId!==cls.offeringVersionId"),
+    "WS6 retakes must retain the exact adopted Course/Offering origin");
   required(s.includes("courseAttemptIds?: readonly string[]") &&
            s.includes("const attemptToEnrollment=new Map<string,string>()"),
     "Class reporting must reconcile retakes without duplicating registration or Person");
