@@ -135,6 +135,16 @@ people, change enrollment, merge lifecycle models, or override course/credit
 assessment authority. Native roster pagination and actions remain native;
 Section/academic gradebook actions remain Section-owned.
 
+**Status and history composition:** `StatusTimeline` in
+`src/components/workflow/` renders authorized, source-owned status history
+with semantic timestamps, optional status badges and explicit empty states.
+The noncredit completion review now uses it for formal completion decisions and
+credential issuance/current-validity records. The source services determine
+ordering, supersession, issuer validity and access; visual timelines do not
+infer transitions, manufacture audit history or expose additional records.
+`DashboardTimeline` remains the simpler scheduled-event widget and is not
+a substitute for an authoritative workflow history.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
