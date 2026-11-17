@@ -284,7 +284,8 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
     </section>}
     {step===4&&<section className="mt-6">
       <Button variant="outline" onClick={backward} className="mb-4"><ArrowLeft className="size-4"/> Return to website preview</Button>
-      <SiteLaunchActivationPanel siteId={siteId} site={known??null} programs={sitePrograms} readState={programsState}/>
+      <SiteLaunchActivationPanel siteId={siteId} site={known??null} programs={sitePrograms}
+         readState={programsState} interestIds={chosen}/>
     </section>}
   </PageFrame>;
 }
