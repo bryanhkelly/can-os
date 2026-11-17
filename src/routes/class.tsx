@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { WorkspaceShell, StatusBadge } from "@/components/workspace";
 import { NativeClassHomeNavigation } from "@/components/learning/NativeClassHomeNavigation";
 import { Select } from "@/components/ui/select";
@@ -398,7 +398,7 @@ function ClassHome(){
     :<NativeLearnerClasses navigation={navigation}/>;
 }
 
-function NativeLearnerClasses({navigation}:{navigation:React.ReactNode}){
+function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
   const [recovering,setRecovering]=useState(false);
   const [recoveryNotice,setRecoveryNotice]=useState("");
   const [recoveryError,setRecoveryError]=useState("");
