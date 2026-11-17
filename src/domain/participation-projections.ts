@@ -90,6 +90,7 @@ export interface NoncreditCourseActivity {
   trainingTitle: string; deliveryMode: string; siteName: string | null;
   registrationStatus: string; attemptStatus: string; registeredAt: DateValue;
   upcomingSessions: readonly {startsAt: string; endsAt: string}[];
+  officialOutcome?: {label:string;referenceId:string}|null;
 }
 export function projectNoncreditCourses(
   rows: readonly NoncreditCourseActivity[], now: Date,
@@ -120,7 +121,7 @@ export function projectNoncreditCourses(
       subject: {kind: "self", displayName: null},
       startAt: null, endAt: null, nextAt: next,
       progress: null,
-      outcome: null,
+      outcome: row.officialOutcome ?? null,
       // Resume command enforces current native entitlement before a course opens.
       action: status === "active" ? {
         label: "Manage training", href: "/learn/my-courses",
