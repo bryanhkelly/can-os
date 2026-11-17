@@ -37,14 +37,18 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
     const enabled = new Set<ActivitySource>();
     function register(
       source: ParticipationSource,
-      reader: () => Promise<ParticipationRecord[]>,
+      reader: () => Promise<
+        ParticipationRecord[] | {items: ParticipationRecord[]; message: string | null}
+      >,
     ): void {
       enabled.add(source);
       work.push((async () => {
         try {
           const permitted = await reader();
-          records.push(...permitted);
-          sources.push({source, state: "ready", coverage: "partial", message: null});
+          const items = Array.isArray(permitted) ? permitted : permitted.items;
+          const message = Array.isArray(permitted) ? null : permitted.message;
+          records.push(...items);
+          sources.push({source, state: "ready", coverage: "partial", message});
         } catch {
           // Never leak which records exist, or an internal auth/database error.
           sources.push({
@@ -99,11 +103,16 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
         // This is a bounded display projection, never a second Enrollment
         // authority. Keeping coverage explicitly "partial" also avoids
         // promising complete lifetime history from an unbounded query.
-        const {items} = await readBoundedNativeClassHistory(
+        const {items, hasMore} = await readBoundedNativeClassHistory(
           cursor => getMyNativeClassEnrollmentHistoryPage({data: {cursor}}),
           10,
         );
-        return projectNativeClasses(items, now, session.sites);
+        return {
+          items: projectNativeClasses(items, now, session.sites),
+          message: hasMore
+            ? "Additional native Class history exists beyond the 500-record Activity limit. Use the Classes history view to access older records."
+            : null,
+        };
       });
     }
     await Promise.all(work);
