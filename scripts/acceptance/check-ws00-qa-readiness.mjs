@@ -28,13 +28,18 @@ async function run(){
   await verifyAdmissionsNeonBranch({
     ...env, CAN_ADMISSIONS_TEST_BRANCH_ID:expectedBranch,
   });
-  const ids=[
-    required("CAN_WS00_QA_ONE_HOUR_CLASS_ID"),
-    required("CAN_WS00_QA_FOUR_SESSION_CLASS_A_ID"),
-    required("CAN_WS00_QA_FOUR_SESSION_CLASS_B_ID"),
-  ];
-  if(ids.some(id=>!uuid.test(id))||new Set(ids).size!==3)
-    throw new Error("WS00 QA needs three distinct real test-only canonical Class UUIDs");
+  // The one-account / one-Class P0 test is independently runnable.
+  // Full WS00 pilot acceptance still requires both four-session Site pilots.
+  const singleLoginOnly=env.CAN_WS00_QA_SCOPE==="single_login_class";
+  const ids=singleLoginOnly
+    ?[required("CAN_WS00_QA_ONE_HOUR_CLASS_ID")]
+    :[
+      required("CAN_WS00_QA_ONE_HOUR_CLASS_ID"),
+      required("CAN_WS00_QA_FOUR_SESSION_CLASS_A_ID"),
+      required("CAN_WS00_QA_FOUR_SESSION_CLASS_B_ID"),
+    ];
+  if(ids.some(id=>!uuid.test(id))||new Set(ids).size!==ids.length)
+    throw new Error("WS00 QA requires distinct real canonical Class UUIDs");
   const sql=neon(url);
   const [schema]=await sql`
     SELECT
@@ -90,28 +95,32 @@ async function run(){
      fresh.canonical_account_id||!fresh.reviewer_verified||
      fresh.reviewer_disabled||fresh.home_org_status!=="active")
     throw new Error("WS00 QA requires unused independently reviewed CAN-only adult fixture");
-  const rows=await sql`
-    SELECT id::text AS id,site_id::text AS site_id,
-           course_version_id::text AS course_version_id,state
-    FROM education_v30.classes
-    WHERE id IN (${ids[0]}::uuid,${ids[1]}::uuid,${ids[2]}::uuid)
-  `;
-  if(rows.length!==3||rows.some(row=>!row.site_id||!row.course_version_id||row.state!=="active"))
-    throw new Error("WS00 QA requires three active, Site-bound, Course-version-pinned Classes");
-  if(rows[1].id===rows[2].id)throw new Error("Distinct Class IDs required");
-  const siteA=rows.find(row=>row.id===ids[1])?.site_id;
-  const siteB=rows.find(row=>row.id===ids[2])?.site_id;
-  if(!siteA||!siteB||siteA===siteB)
-    throw new Error("WS00 four-Session pilot must use two distinct approved delivery Sites");
-  const counts=await sql`
-    SELECT class_id::text AS class_id,count(*)::integer AS sessions
-    FROM education_v30.class_sessions
-    WHERE class_id IN (${ids[1]}::uuid,${ids[2]}::uuid)
-    GROUP BY class_id
-  `;
-  for(const id of ids.slice(1)){
-    if((counts.find(row=>row.class_id===id)?.sessions??0)<4)
-      throw new Error("WS00 QA requires at least four canonical Sessions per local pilot Class");
+  const rows=singleLoginOnly
+    ?await sql`SELECT id::text AS id,site_id::text AS site_id,
+      course_version_id::text AS course_version_id,state
+      FROM education_v30.classes WHERE id=${ids[0]}::uuid`
+    :await sql`SELECT id::text AS id,site_id::text AS site_id,
+      course_version_id::text AS course_version_id,state
+      FROM education_v30.classes
+      WHERE id IN (${ids[0]}::uuid,${ids[1]}::uuid,${ids[2]}::uuid)`;
+  if(rows.length!==ids.length||rows.some(row=>
+       !row.site_id||!row.course_version_id||row.state!=="active"))
+    throw new Error("WS00 QA requires active, Site-bound, Course-version-pinned Classes");
+  if(!singleLoginOnly){
+    const siteA=rows.find(row=>row.id===ids[1])?.site_id;
+    const siteB=rows.find(row=>row.id===ids[2])?.site_id;
+    if(!siteA||!siteB||siteA===siteB)
+      throw new Error("WS00 four-Session pilot must use two distinct approved delivery Sites");
+    const counts=await sql`
+      SELECT class_id::text AS class_id,count(*)::integer AS sessions
+      FROM education_v30.class_sessions
+      WHERE class_id IN (${ids[1]}::uuid,${ids[2]}::uuid)
+      GROUP BY class_id
+    `;
+    for(const id of ids.slice(1)){
+      if((counts.find(row=>row.class_id===id)?.sessions??0)<4)
+        throw new Error("WS00 QA requires at least four canonical Sessions per local pilot Class");
+    }
   }
   const [security]=await sql`
     SELECT count(*)::integer AS forced_rls
@@ -125,9 +134,10 @@ async function run(){
     throw new Error("WS00 QA found missing FORCE RLS on required canonical relations");
   console.log(JSON.stringify({
     gate:"WS00 isolated QA source-fixture readiness", passed:true,
-    branchId:expectedBranch,oneHourClasses:1,
-    fourSessionClasses:2,distinctDeliverySites:2,
-    minimumSessionsPerPilotClass:4,forcedRlsTables:5,
+    branchId:expectedBranch,scope:singleLoginOnly?"single_login_class":"full_ws00",
+    oneHourClasses:1,fourSessionClasses:singleLoginOnly?0:2,
+    distinctDeliverySites:singleLoginOnly?0:2,
+    minimumSessionsPerPilotClass:singleLoginOnly?0:4,forcedRlsTables:5,
     reviewedFreshAdultFixture:true,reviewedAdultForceRls:true,
     actualSignedInE2ePassed:false,
   },null,2));
