@@ -4,7 +4,7 @@ import { useActiveWorkspaceMember } from "@/components/shell/workspace-session-c
 import { canonicalRoleCapabilities } from "@/domain/canonical-access";
 
 type Props = {
-  mode: "explore" | "manage";
+  mode: "explore" | "manage" | "activities";
   siteId?: string;
   search?: string;
   classId?: string;
@@ -28,6 +28,11 @@ export function NativeClassHomeNavigation({
       search={{view:"manage",siteId,offeringVersionId}}
       aria-current={mode==="manage"?"page":undefined}>
       Manage Classes
+    </Link>}
+    {(canManage || mode==="activities") && <Link to="/class"
+      search={{view:"activities"}}
+      aria-current={mode==="activities"?"page":undefined}>
+      Publisher activities
     </Link>}
   </DetailNavigation>;
 }
