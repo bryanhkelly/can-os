@@ -1,6 +1,10 @@
 import {useState} from "react";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {Button} from "@/components/ui/button";
+import {Field} from "@/components/ui/field";
+import {Textarea} from "@/components/ui/textarea";
+import {DeliveryReceiptFacts} from "@/components/communication/DeliveryReceiptFacts";
+import {EmptyState, StatusBadge, WorkspaceNotice} from "@/components/workspace";
 import {normalizeClientError} from "@/lib/client-error";
 import {
   getNoncreditDeliveryAttempts,retryNoncreditDelivery,
@@ -56,41 +60,36 @@ export function NoncreditDeliveryRecoveryPanel({releaseId}:{releaseId:string}){
      invitations and accepted receipts cannot be resent here.
     </p>
    </div>
-   <Button type="button" size="sm" variant="outline" disabled={history.isFetching}
+   <Button type="button" size="sm" variant="outline" loading={history.isFetching} disabled={history.isFetching}
      onClick={()=>void history.refetch()}>Refresh delivery status</Button>
   </div>
-  {notice&&<p role="status" className="mt-3 border border-border p-3 text-sm">{notice}</p>}
-  {error&&<p role="alert" className="mt-3 border border-destructive p-3 text-sm">{error}</p>}
+  {notice&&<WorkspaceNotice tone={error?"attention":"success"} className="mt-3">
+    <p>{notice}</p>
+    {error&&<p className="mt-1">{error}</p>}
+  </WorkspaceNotice>}
+  {error&&!notice&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
   {history.isPending&&<p role="status" className="mt-4 text-sm">Loading invitation receipts…</p>}
-  {history.isError&&<p role="alert" className="mt-4 text-sm">
+  {history.isError&&<WorkspaceNotice tone="danger" className="mt-4">
    Delivery status is unavailable. Check your current provider and Site authorization.
-  </p>}
+  </WorkspaceNotice>
   {history.data&&<div className="mt-4 divide-y divide-border border border-border">
    {history.data.items.map(row=><article key={row.id} className="p-3 text-sm">
     <div className="flex flex-wrap items-center justify-between gap-3">
-     <span className="font-semibold">{row.label}</span>
-     <span className="text-xs text-muted-foreground">
-      Queued {new Date(row.createdAt).toLocaleString()}
-     </span>
+     <StatusBadge tone={row.retryable?"attention":"neutral"}>{row.label}</StatusBadge>
     </div>
-    <p className="mt-1 text-xs text-muted-foreground">
-     Attempts: {row.attempts} · Receipt: {row.id}
-     {row.acceptedAt?" · Provider accepted "+new Date(row.acceptedAt).toLocaleString():""}
-     {row.nextAttemptAt?" · Scheduled "+new Date(row.nextAttemptAt).toLocaleString():""}
-    </p>
+    <DeliveryReceiptFacts receipt={row} className="mt-3 gap-2"/>
     {row.retryable&&<>
      {retryCandidate===row.id?<div className="mt-3 space-y-2">
-       <label className="block text-xs font-semibold">Why is another delivery attempt appropriate?
-        <textarea rows={2} maxLength={500} value={reason}
-         onChange={event=>setReason(event.target.value)}
-         className="mt-2 w-full border border-border bg-background p-2 text-sm"/>
-       </label>
+       <Field label="Why is another delivery attempt appropriate?" required>
+        <Textarea rows={2} maxLength={500} value={reason}
+         onChange={event=>setReason(event.target.value)}/>
+       </Field>
        <p className="text-xs text-muted-foreground">
         The worker will recheck the live invitation and account before emailing.
        </p>
        <div className="flex gap-2">
         <Button type="button" size="sm" disabled={busy!==null||reason.trim().length<15}
-         onClick={()=>void retry(row.id)}>{busy===row.id?"Queuing…":"Queue retry"}</Button>
+         onClick={()=>void retry(row.id)} loading={busy===row.id}>{busy===row.id?"Queuing…":"Queue retry"}</Button>
         <Button type="button" size="sm" variant="outline" disabled={busy!==null}
          onClick={()=>{setRetryCandidate(null);setReason("");}}>Cancel</Button>
        </div>
@@ -100,9 +99,7 @@ export function NoncreditDeliveryRecoveryPanel({releaseId}:{releaseId:string}){
       </Button>}
     </>}
    </article>)}
-   {!history.data.items.length&&<p className="p-4 text-sm text-muted-foreground">
-    No email receipts for this release.
-   </p>}
+   {!history.data.items.length&&<EmptyState title="No email receipts for this release."/>}
   </div>}
   <div className="mt-3 flex gap-3">
    {pages.length>0&&<Button type="button" variant="outline" size="sm"
