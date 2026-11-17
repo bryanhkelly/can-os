@@ -26,6 +26,9 @@ export type VerifiedSessionEvidence = {
   courseAttemptId: string;
   participantPersonId: string;
   evidenceVersionId: string | null;
+  /** Authoritative latest host roll-call assertion for the exact ended Class Session.
+   * This is not an evidence-document version or learner/device presence. */
+  canonicalAttendanceAssertionId?: string | null;
   verifiedByPersonId: string | null;
   verifiedAt: Date | null;
   occurredAt: Date;
@@ -102,7 +105,8 @@ export function evaluateCourseCompletion(input: {
   const verified = new Set(input.sessionEvidence.filter(e =>
     !replacedSessions.has(e.id) && e.courseAttemptId === scope.courseAttemptId &&
     e.participantPersonId === scope.participantPersonId &&
-    !!e.evidenceVersionId && !!e.verifiedByPersonId &&
+    (!!e.evidenceVersionId || !!e.canonicalAttendanceAssertionId) &&
+    !!e.verifiedByPersonId &&
     e.verifiedByPersonId !== scope.participantPersonId &&
     dateValid(e.verifiedAt, now) && dateValid(e.occurredAt, now)
   ).map(e => e.sessionId));
