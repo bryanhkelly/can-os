@@ -7,6 +7,21 @@ import { assertCapability, type CommandContext } from "@/domain/command-context"
  * Authentication and validation precede writes. Resource authorization,
  * idempotency reservation, business writes, and audit share the transaction.
  */
+export type CommandAudit<Result, Parsed, Tx> =
+  | {
+      audit: (tx: Tx, event: {
+        actor: CommandContext;
+        input: Parsed;
+        result: Result;
+      }) => Promise<void>;
+      auditOwnedByExecute?: never;
+    }
+  | {
+      /** Explicit acknowledgement: execute writes the authoritative audit in tx. */
+      auditOwnedByExecute: true;
+      audit?: never;
+    };
+
 export type CommandAdapters<Input, Parsed, Result, Tx> = {
   authenticate: () => Promise<CommandContext>;
   capability: string;
@@ -14,18 +29,12 @@ export type CommandAdapters<Input, Parsed, Result, Tx> = {
   authorize?: (tx: Tx, actor: CommandContext, input: Parsed) => Promise<void>;
   transaction: <T>(work: (tx: Tx) => Promise<T>) => Promise<T>;
   execute: (tx: Tx, actor: CommandContext, input: Parsed) => Promise<Result>;
-  /** Omit only if execute already appends the authoritative audit within tx. */
-  audit?: (tx: Tx, event: {
-    actor: CommandContext;
-    input: Parsed;
-    result: Result;
-  }) => Promise<void>;
   /** Feature adapter must atomically claim or load the command inside tx. */
   idempotency?: {
     key: (actor: CommandContext, input: Parsed) => string;
     run: (tx: Tx, key: string, work: () => Promise<Result>) => Promise<Result>;
   };
-};
+} & CommandAudit<Result, Parsed, Tx>;
 
 export async function executeCommand<Input, Parsed, Result, Tx>(
   input: Input,

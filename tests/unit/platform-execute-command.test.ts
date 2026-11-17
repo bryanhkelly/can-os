@@ -24,6 +24,24 @@ describe("shared command execution boundary", () => {
     expect(events).toEqual(["authenticate", "validate", "begin", "authorize", "execute", "audit", "commit"]);
   });
 
+  it("supports a domain-owned audit without invoking a second audit writer", async () => {
+    const events: string[] = [];
+    const result = await executeCommand(1, {
+      authenticate: async () => actor,
+      capability: "records:update",
+      validate: input => input,
+      transaction: async work => work({}),
+      auditOwnedByExecute: true,
+      execute: async () => {
+        events.push("domain-write");
+        events.push("domain-audit");
+        return "saved";
+      },
+    });
+    expect(result).toBe("saved");
+    expect(events).toEqual(["domain-write", "domain-audit"]);
+  });
+
   it("resource authorization failure rolls back before business writes", async () => {
     const events: string[] = [];
     const execute = vi.fn(async () => "written");
