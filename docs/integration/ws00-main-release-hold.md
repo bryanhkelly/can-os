@@ -44,3 +44,15 @@ The following are **not yet certified passing** on the exact integrated SHA:
    rollback testing and approval to remove the production-context skip.
 
 **Release decision: HOLD / NO-GO**, even if the source is present on `main`.
+
+
+## Main merge and first stabilization (2026-11-16 Pacific)
+
+- GitHub merged PR #307 at **`63c60ee0a951d047696b0150db2c53c6931ebc4c`** with `[skip netlify]` in the merge title. The original main SHA was preserved as a real backup branch and independently rechecked.
+- The GitHub cloud build gate triggered on the new main commit, but the run again reported `startup_failure` with zero jobs. This is not a passing application build.
+- Netlify `can-os-demo-new` and `can-os-demo` continued reporting their previously published, ready deployment IDs when checked after the merge. This is not evidence of any new deployment or validation.
+- The `npm run verify:ws00` fallback previously required the **integration** branch, which would make it unusable after the merge. On `main` it now accepts a clean main checkout only while `[context.production] ignore = "exit 0"` remains in `netlify.toml`, still accepts the integration branch, and rejects other branches.
+- The exact committed verifier was evaluated read-only with mocked git/npm invocations for four cases: main with hold, main without hold, integration, and unrelated feature branch. **All four routing/fail-closed checks passed**. The simulation deliberately aborts at `npm ci`; it is not an actual npm installation or test pass.
+- Netlify's `[context.production]` skip must be removed only after a separately authorized production release. This cannot prevent independent Cloudflare pipelines or manually triggered Netlify deploys.
+
+**Release remains HOLD / NO-GO, while development may proceed on main.**
