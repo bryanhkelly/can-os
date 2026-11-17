@@ -8,8 +8,9 @@ alternative writer or a public network data endpoint.
 
 - `reconcileAnnualImpact` counts source participation records once, deduplicates
   canonical Person IDs across authorized Sites, preserves withdrawals, resolves
-  corrected room/session participation assertions, and excludes reversed
-  completion decisions and revoked awards from current-valid totals.
+  corrected room/session participation assertions using original occurrence
+  timestamps and independent assertion timestamps, and excludes reversed
+  completion decisions and revoked awards from issuance-period still-valid totals.
 - Each attendance, completion, and award input carries source participation
   identity. Missing, foreign-Site, duplicated or conflicting source facts fail
   closed. Award provenance requires the same participation and an original
@@ -50,7 +51,12 @@ alternative writer or a public network data endpoint.
    canonical source reference/count manifest, generated-at, and approval
    history. It should reproduce the Site report under identical scope and
    timing, without copying student-level evidence into a public report.
-7. **Release acceptance:** Use test01 with verified adult, staff and network
+7. **Status caveat:** The current participation rollup counts withdrawal as
+   the source status at query time for registrations in the selected period.
+   It is NOT an event-time withdrawal measure or a reproducible as-of status
+   without enrollment lifecycle history. A production annual report must
+   explicitly label or replace this measure before publication.
+8. **Release acceptance:** Use test01 with verified adult, staff and network
    principals, two independent Sites, cross-Site duplicate Persons, repeated
    attempts, late corrections, withdrawals, zero/unknown states, revocations,
    and denied cross-Organization access. Run unit, integration, RLS, browser
