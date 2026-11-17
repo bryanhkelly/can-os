@@ -10,7 +10,7 @@ import {
   type OutboundPreparation,
 } from "@/modules/communication/outbound-dispatcher.server";
 import {
-  sendNotificationEmail, type NotificationEmailMessage,
+  sendNotificationEmailWithReceipt, type NotificationEmailMessage,
 } from "@/modules/communication/notification-email.server";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { AuthorizationError } from "@/domain/command-context";
@@ -158,7 +158,10 @@ const waitlistAdapter = {
   },
 
   send(message: NotificationEmailMessage, key: string) {
-    return sendNotificationEmail(message, key);
+    return sendNotificationEmailWithReceipt({
+      ...message,
+      providerReceipt: { source: "noncredit_waitlist", receiptId: key },
+    }, key);
   },
 
   async settle(claim: OutboundClaim, result: {
@@ -167,12 +170,14 @@ const waitlistAdapter = {
     attempts: number;
     nextAttemptAt: Date | null;
     reason: string | null;
+    providerMessageId?: string;
   }): Promise<boolean> {
     const rows = await db.update(noncreditWaitlistEmailDeliveries).set({
       status: result.kind,
       attempts: result.attempts,
       acceptedAt: result.kind === "accepted" ? result.now : null,
       lastError: result.reason,
+      ...(result.providerMessageId ? { providerMessageId: result.providerMessageId } : {}),
       nextAttemptAt: result.nextAttemptAt,
       leaseUntil: null,
       updatedAt: result.now,
