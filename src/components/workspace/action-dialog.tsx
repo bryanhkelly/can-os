@@ -1,4 +1,4 @@
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { ActionFooter } from "./action-footer";
@@ -20,10 +20,25 @@ export function ActionDialog({ open, title, description, confirmLabel, pending =
   const cancel = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const descriptionId = useId();
+  // Guard the event-handler gap before the parent's pending prop can update.
+  // Reset only after the dialog closes or a pending command settles.
+  const submitted = useRef(false);
+  const wasPending = useRef(pending);
+  useEffect(() => {
+    if (!open || (wasPending.current && !pending)) submitted.current = false;
+    wasPending.current = pending;
+  }, [open, pending]);
+  function confirm(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!open || pending || confirmDisabled || submitted.current) return;
+    submitted.current = true;
+    try { onConfirm(); }
+    catch (error) { submitted.current = false; throw error; }
+  }
   return <Modal open={open} label={title} labelledBy={titleId} describedBy={descriptionId}
     busy={pending} className="max-w-lg p-6" initialFocus={cancel}
     dismissOnBackdrop={false} dismissible={!pending} onClose={onClose}>
-    <form onSubmit={event => { event.preventDefault(); if (!pending && !confirmDisabled) onConfirm(); }}>
+    <form onSubmit={confirm}>
       <h2 id={titleId} className="font-serif text-2xl">{title}</h2>
       <div id={descriptionId} className="mt-3 text-sm text-muted-foreground">{description}</div>
       <fieldset disabled={pending} className="mt-4 space-y-3">{children}</fieldset>
