@@ -31,6 +31,7 @@ export * from "./account-favorites";
 export * from "./account-signups";
 export * from "./account-contact-sharing";
 export * from "./account-noncredit-link";
+export * from "./adult-learning-review";
 export * from "./launch-drafts";
 export * from "./demo-school-tenants";
 export * from "./school-setup-signups";
