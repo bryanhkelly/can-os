@@ -275,12 +275,39 @@ async function currentGovernedOutcome(tx:Tx, classEnrollmentId:string){
       eq(canonicalClassOutcomes.sourceKind,"ws3_governed")))
     .limit(501);
   if(rows.length>500)throw new AuthorizationError("Class outcome paging required");
-  const superseded=new Set(rows.flatMap(r=>r.supersedesOutcomeId?
-    [r.supersedesOutcomeId]:[]));
-  const heads=rows.filter(r=>!superseded.has(r.id));
-  if(rows.length && heads.length!==1)
+  if(!rows.length)return null;
+  const byId=new Map(rows.map(row=>[row.id,row]));
+  if(byId.size!==rows.length)
+    throw new AuthorizationError("duplicate authoritative Class outcome history");
+  const superseded=new Map<string,number>();
+  for(const row of rows){
+    if(!row.completionPolicyVersionId ||
+       (row.supersedesOutcomeId &&
+         (row.supersedesOutcomeId===row.id ||
+          !byId.has(row.supersedesOutcomeId) ||
+          byId.get(row.supersedesOutcomeId)?.completionPolicyVersionId!==
+            row.completionPolicyVersionId)))
+      throw new AuthorizationError("invalid Class outcome provenance");
+    if(row.supersedesOutcomeId)
+      superseded.set(row.supersedesOutcomeId,
+        (superseded.get(row.supersedesOutcomeId)??0)+1);
+  }
+  const heads=rows.filter(row=>!superseded.has(row.id));
+  const roots=rows.filter(row=>row.supersedesOutcomeId===null);
+  if(heads.length!==1 || roots.length!==1 ||
+     [...superseded.values()].some(count=>count!==1))
     throw new AuthorizationError("conflicting official Class completion decisions");
-  return heads[0]??null;
+  const visited=new Set<string>();
+  let next= heads[0];
+  while(next){
+    if(visited.has(next.id))
+      throw new AuthorizationError("cyclic Class outcome history");
+    visited.add(next.id);
+    next=next.supersedesOutcomeId?byId.get(next.supersedesOutcomeId):undefined;
+  }
+  if(visited.size!==rows.length)
+    throw new AuthorizationError("incomplete Class completion decision chain");
+  return heads[0]!;
 }
 
 export const getNativeClassCompletionReview=createServerFn({method:"GET"})
