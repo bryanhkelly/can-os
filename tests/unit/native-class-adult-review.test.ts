@@ -41,6 +41,8 @@ describe("independent App Admin review for first-time Class learner activation",
  });
  it("revocation ends all original learner grants and native sessions without deleting history",()=>{
    expect(source).toContain("export const revokeAdultClassLearnerReview");
+   expect(source).toContain('const alreadyRevoked=review.status==="revoked"');
+   expect(source).not.toContain('if(review.status==="revoked")return');
    expect(source).toContain("reason:z.string().trim().min(10).max(500)");
    expect(source).toContain('eq(canonicalAccountGrants.roleCode,"learner")');
    expect(source).toContain('eq(canonicalAccountGrants.accountId,review.canonicalAccountId)');
