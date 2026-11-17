@@ -41,10 +41,6 @@ const storedSnapshot=z.object({
 }).strict();
 
 async function approvalAuthority(purpose:Purpose){
-  const flag=purpose==="assessment_reviewer"
-    ?process.env.CAN_CANONICAL_ASSESSMENT_REVIEW_ENABLED
-    :process.env.CAN_CANONICAL_ASSESSMENT_PUBLICATION_ENABLED;
-  if(flag!=="true")throw new AuthorizationError("canonical assessment approval release disabled");
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCanonicalCommandContext(getRequest());
   if(!actor.actorPersonId||
