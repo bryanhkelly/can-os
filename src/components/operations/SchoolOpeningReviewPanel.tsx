@@ -47,7 +47,9 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
     void refresh().catch(()=>{});
   }
   const decide=async(decision:"approve"|"suspend")=>{
-    if(busy||loading||!opening)return;
+    if(busy||loading||!opening||!opening.canDecide||reason.trim().length<10||reason.trim().length>500)return;
+    if(decision==="approve"&&(!opening.approvalReady||opening.status!=="draft"))return;
+    if(decision==="suspend"&&opening.status!=="approved")return;
     const reviewed=opening;
     await mutation.run(
       ()=>decideChurchSchoolOpeningFn({data:{
