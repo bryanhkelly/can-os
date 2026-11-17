@@ -3,6 +3,7 @@ import { ArrowRight, BookOpen, Globe2, ShieldCheck, Users, CalendarDays, Graduat
 import type { listLaunchOptions, listLaunches } from "@/modules/programs/launch.functions";
 import { programTypeLabels } from "@/domain/program-offerings";
 import { SiteNativeClassHandoff } from "./SiteNativeClassHandoff";
+import { preparesSchoolYear, siteLaunchPreparation } from "@/domain/site-launch-preparation";
 
 type Site=Awaited<ReturnType<typeof listLaunchOptions>>["sites"][number];
 type Program=Awaited<ReturnType<typeof listLaunches>>["launches"][number];
@@ -10,9 +11,21 @@ type State="ready"|"empty"|"unauthorized"|"unavailable";
 
 /** A read-only handoff. Canonical Offering and release authorization are not
  * inferred from private Site interests or legacy school launch records. */
-export function SiteLaunchActivationPanel({siteId,site,programs,readState}:{
+export function SiteLaunchActivationPanel({siteId,site,programs,readState,interestIds=[]}:{
   siteId:string;site:Site|null;programs:Program[]|null;readState:State;
+  interestIds?:readonly string[];
 }) {
+  const preparation=siteLaunchPreparation(programs,interestIds);
+  const workspaceItems=[
+    {title:"Website and brand",icon:Globe2,href:"website"},
+    {title:"Site details",icon:GraduationCap,href:"profile"},
+    {title:"Team and permissions",icon:Users,href:"team"},
+    {title:"Interest events",icon:CalendarDays,href:"events"},
+    ...(preparation.showAcademicPreparation
+      ?[{title:"Academic preparation",icon:BookOpen,href:"academics"} as const]:[]),
+    ...(preparation.showSchoolOpeningPreparation
+      ?[{title:"School opening preparation",icon:ShieldCheck,href:"compliance"} as const]:[]),
+  ] as const;
   const website=site?.websiteDraft?.status==="published"?"Published":site?.websiteDraft?"Private draft":"Not started";
   return <section aria-label="Site activation workspace" className="border bg-card p-6 sm:p-8">
     <p className="text-xs font-semibold uppercase tracking-wider text-primary">After the preview</p>
@@ -34,34 +47,34 @@ export function SiteLaunchActivationPanel({siteId,site,programs,readState}:{
         <Link to="/sites/$siteId/profile" params={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Site details <ArrowRight className="size-4"/></Link>
       </article>
       <article className="border p-5">
-        <h3 className="flex items-center gap-2 text-sm font-semibold"><BookOpen className="size-4 text-primary"/> School and enrichment launch records</h3>
+        <h3 className="flex items-center gap-2 text-sm font-semibold"><BookOpen className="size-4 text-primary"/> Saved Program preparation</h3>
         {readState==="unauthorized"||readState==="unavailable"?
           <p role="status" className="mt-4 text-sm">Program launch records are {readState==="unavailable"?"temporarily unavailable":"not authorized"}. No program absence or readiness is assumed.</p>:
           programs?.length?<ul className="mt-4 space-y-3">{programs.map(program=><li key={program.id} className="border p-3">
             <p className="font-semibold">{program.name}</p>
             <p className="mt-1 text-xs text-muted-foreground">{programTypeLabels[program.type]} · {program.status}</p>
-            <Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId,programId:program.id}}
-              className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Continue setup <ArrowRight className="size-4"/></Link>
+{preparesSchoolYear(program) ?
+              <Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId,programId:program.id}}
+                className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Continue academic preparation <ArrowRight className="size-4"/></Link>
+              :<p className="mt-2 text-xs text-muted-foreground">Use the Classes and delivery workspace below for approved Course-based learning.</p>}
           </li>)}</ul>:
           <p className="mt-4 text-sm text-muted-foreground">No saved school launch records are visible for this Site. Canonical offerings and enrollment releases are tracked separately.</p>}
-        <Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId}} className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Prepare academics <ArrowRight className="size-4"/></Link>
+        {preparation.showAcademicPreparation&&<Link to="/settings/school/$module" params={{module:"academics"}} search={{siteId}}
+          className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Prepare school-year academics <ArrowRight className="size-4"/></Link>}
       </article>
     </div>
     <section aria-label="Launch workspaces" className="mt-7">
       <h3 className="font-serif text-2xl">Finish setting up your Site</h3>
       <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-        These actions use your existing authorized operational records, not another Launch Studio.
-        Complete the work relevant to your program before requesting approval or publishing.
+        Choose only the setup relevant to your Site. An afterschool, summer or adult Class
+        does not require a school-year opening workflow. Saved academic Program plans
+        reveal additional school preparation, never approval or school-of-record authority.
       </p>
+      {!preparation.programRecordsAvailable&&<p role="status" className="mt-3 border border-border p-3 text-sm">
+        Program records cannot be verified right now. No school readiness or Program absence is assumed.
+      </p>}
       <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {([
-          {title:"Website and brand",icon:Globe2,href:"website"},
-          {title:"School details",icon:GraduationCap,href:"profile"},
-          {title:"Team and permissions",icon:Users,href:"team"},
-          {title:"Academic configuration",icon:BookOpen,href:"academics"},
-          {title:"Interest events",icon:CalendarDays,href:"events"},
-          {title:"Opening compliance",icon:ShieldCheck,href:"compliance"},
-        ] as const).map(item=><div key={item.title} className="border bg-card p-4">
+        {workspaceItems.map(item=><div key={item.title} className="border bg-card p-4">
           <item.icon className="size-5 text-primary"/>
           <h4 className="mt-3 text-sm font-semibold">{item.title}</h4>
           {item.href==="website"?<Link to="/launch/website" search={{siteId,returnToHub:false}} className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">Open workspace <ArrowRight className="size-4"/></Link>:
