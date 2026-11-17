@@ -62,6 +62,12 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
     if(!self||full||!adult||!consent||busy)return;
     setBusy(true);setMessage("");setError("");
     try{
+      // A verified, previously bound adult should not need to discover a
+      // separate native-login recovery action before joining a Class.
+      // The server independently validates the CAN account, native Person,
+      // adulthood and current learner grant before issuing the cookie.
+      // Never silently create or impersonate a native account here.
+      await resumeLinkedNativeClassLearner();
       const result=await enrollInNativeClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
