@@ -255,7 +255,7 @@ export function TeacherConferencePanel() {
       description={cancelTarget
         ? `Cancel ${cancelTarget.seriesTitle} on ${format(cancelTarget.startsAt)}? The appointment will be canceled and its slot will open for another family.`
         : "Cancel this appointment? The slot will open for another family."}
-      confirmLabel="Cancel booking" destructive pending={mutation.pending} confirmDisabled={busy}
+      confirmLabel="Cancel booking" destructive pending={mutation.pending} pendingLabel="Cancelling booking…" confirmDisabled={busy}
       onClose={() => { setCancelTarget(null); setCancelSubmitting(false); }}
       onConfirm={() => {
         if (!cancelTarget) return;
@@ -276,7 +276,7 @@ export function TeacherConferencePanel() {
         ? `Record the outcome for ${completionTarget.booking.studentName}'s ${completionTarget.booking.seriesTitle} appointment. Notes default to staff-private; share only an appropriate summary with the family.`
         : "Record this conference outcome."}
       confirmLabel={completionTarget?.outcome === "held" ? "Mark held" : "Record no-show"}
-      pending={mutation.pending}
+      pending={mutation.pending} pendingLabel="Recording outcome…"
       confirmDisabled={busy || (createFollowUp && followUpTitle.trim().length < 3) ||
         (completionTarget !== null && conferenceOutcomeProblem({
           status: completionTarget.booking.status,
