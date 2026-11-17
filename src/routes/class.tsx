@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { NativeClassManager } from "@/components/learning/NativeClassManager";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell, StatusBadge } from "@/components/workspace";
@@ -19,7 +20,8 @@ import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-s
 import { enrollCurrentPersonInClass } from "@/modules/classes/native-class-entry.client";
 
 export const Route=createFileRoute("/class")({
-  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string}=>({
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;view?:"manage"}=>({
+    view:value.view==="manage"?"manage":undefined,
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
     classId:typeof value.classId==="string"&&
@@ -29,7 +31,7 @@ export const Route=createFileRoute("/class")({
       /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.siteId)
       ?value.siteId:undefined,
   }),
-  component:NativeLearnerClasses,
+  component:ClassHome,
 });
 type Item=Awaited<ReturnType<typeof getNativePublicClassCatalogPage>>["items"][number];
 type CreditMode="for_credit"|"audit"|"not_applicable";
@@ -367,6 +369,29 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
   </article>;
 }
 
+/** One canonical Class entry. Staff creation and learner discovery share
+ * the same route, without a second Class management implementation.
+ * All commands remain independently scoped and authorized server-side. */
+function ClassHome(){
+  const selected=Route.useSearch();
+  return <div className="min-w-0">
+    <nav aria-label="Class workspace mode" className="flex flex-wrap gap-2 px-4 pt-4 sm:px-6">
+      <Link to="/class" search={{search:selected.search,classId:selected.classId,siteId:selected.siteId,view:undefined}}
+        aria-current={!selected.view?"page":undefined}
+        className={"min-h-11 border px-4 py-3 text-sm font-semibold "+(!selected.view?"border-primary bg-muted":"border-border")}>
+        Explore and enroll
+      </Link>
+      <Link to="/class" search={{siteId:selected.siteId,view:"manage"}}
+        aria-current={selected.view==="manage"?"page":undefined}
+        className={"min-h-11 border px-4 py-3 text-sm font-semibold "+(selected.view==="manage"?"border-primary bg-muted":"border-border")}>
+        Manage Classes (authorized staff)
+      </Link>
+    </nav>
+    {selected.view==="manage"
+      ?<NativeClassManager key={selected.siteId??"all"} preferredSiteId={selected.siteId}/>
+      :<NativeLearnerClasses/>}
+  </div>;
+}
 function NativeLearnerClasses(){
   const [recovering,setRecovering]=useState(false);
   const [recoveryNotice,setRecoveryNotice]=useState("");
