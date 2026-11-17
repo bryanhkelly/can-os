@@ -60,7 +60,7 @@ export async function assertCurrentCANGrantForMutation(
         ON verified_org.id=current_grant.organization_id`
     : sql``;
   const organizationCheck = expected.organizationType
-    ? sql`AND verified_org.type=${expected.organizationType}::text`
+    ? sql`AND verified_org.type::text=${expected.organizationType}::text`
     : sql``;
   const lockTargets = expected.organizationType
     ? sql`FOR SHARE OF session,account,current_grant,person,verified_org`
