@@ -1,5 +1,6 @@
 import type { CommandContext } from "@/domain/command-context";
 import { canonicalSessionCookie, projectCanonicalCommandContext } from "@/domain/canonical-access";
+import { accessSessionCookie } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { getCanonicalCommandContext, getCanonicalSessionRow } from "./canonical-command-context.server";
 import { getCommandContext } from "./command-context.server";
@@ -28,6 +29,19 @@ export async function getInstructionalLearnerSession(request: Request): Promise<
   const canonical = cookies.split(";").some(value =>
     value.trim().startsWith(canonicalSessionCookie + "="));
   if (canonical) {
+    // When both cookies are present, never let a native bearer override an
+    // independently authenticated CAN account. Revalidate the binding first,
+    // including the selected CAN Person and current grant, before returning a
+    // learning persistence session.
+    const hasCan = cookies.split(";").some(value =>
+      value.trim().startsWith(accessSessionCookie + "="));
+    if (hasCan) {
+      const context = await getCanonicalCommandContext(request);
+      const row = await getCanonicalSessionRow(request);
+      if (context.actorPersonId !== row.person_id)
+        throw new AuthorizationError("one verified learning Person");
+      return {context,sessionId:row.session_id};
+    }
     const row = await getCanonicalSessionRow(request);
     return { context: projectCanonicalCommandContext(row), sessionId: row.session_id };
   }
