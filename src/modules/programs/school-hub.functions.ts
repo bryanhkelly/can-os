@@ -36,7 +36,16 @@ export const getSchoolHubData=createServerFn({method:"GET"})
       const {resolveLaunchSiteCatalogContext}=await import("./launch-site-catalog.server");
       const resolved=await resolveLaunchSiteCatalogContext(getRequest(),site.id);
       catalogState=resolved.kind;
-      canonicalCatalogEnabled=resolved.kind==="ready";
+      if(resolved.kind==="ready"){
+        // Verify restricted catalog access with the canonical service instead
+        // of promising discovery based on identity alone.
+        const {getAvailableOfferings}=await import("./program-discovery.server");
+        await getAvailableOfferings(resolved.actor,{
+          subject:{kind:"site",siteId:resolved.canonicalSiteId},
+          deliveryContext:"remote",
+        });
+        canonicalCatalogEnabled=true;
+      }
     }catch(error){
       console.error("School Hub canonical catalog scope unavailable",{
         errorType:error instanceof Error?error.name:"unknown",
