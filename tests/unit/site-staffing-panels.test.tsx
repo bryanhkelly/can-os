@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { LocalSiteDelegationPanel } from "@/components/operations/LocalSiteDelegationPanel";
 import { SectionFacilitatorPanel } from "@/components/operations/SectionFacilitatorPanel";
+import { SiteStaffingFeedback } from "@/components/operations/SiteStaffingFeedback";
 import { QueryState } from "@/components/workspace";
 import { siteStaffingKeys } from "@/modules/operations/site-staffing.queries";
 
@@ -60,6 +61,41 @@ describe("staffing panels use shared query presentation", () => {
     expect(html).toContain("Algebra");
     expect(html).toContain("Add Section facilitator");
     client.clear();
+  });
+});
+
+describe("shared Site staffing command feedback", () => {
+  const base = { onRetry: () => undefined, busy: false };
+  it("shows command errors in danger without implying a successful save", () => {
+    const html=renderToStaticMarkup(<SiteStaffingFeedback {...base} error="Not authorized" />);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("border-danger/50");
+    expect(html).not.toContain("Refresh staffing");
+    expect(html).not.toContain("saved");
+  });
+  it("shows saved changes in success only when refresh succeeded", () => {
+    const html=renderToStaticMarkup(<SiteStaffingFeedback {...base} notice="Appointment recorded" />);
+    expect(html).toContain('role="status"');
+    expect(html).toContain("border-success/50");
+    expect(html).not.toContain("Refresh staffing");
+  });
+  it("shows exactly one attention warning after a saved command could not refresh", () => {
+    const html=renderToStaticMarkup(<SiteStaffingFeedback {...base}
+      notice="Appointment recorded" refreshWarning="Saved, but records could not refresh." />);
+    expect(html).toContain("Appointment recorded");
+    expect(html).toContain("Saved, but records could not refresh.");
+    expect(html).toContain("border-warning/50");
+    expect(html).not.toContain("border-success/50");
+    expect(html.match(/role="alert"/g)).toHaveLength(1);
+    expect(html.match(/Refresh staffing/g)).toHaveLength(1);
+    expect(html).toContain('type="button"');
+  });
+  it("locks repeat retries while the current refresh is busy", () => {
+    const html=renderToStaticMarkup(<SiteStaffingFeedback {...base}
+      refreshWarning="Saved but stale" busy />);
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('disabled=""');
+    expect(html).toContain("animate-spin");
   });
 });
 
