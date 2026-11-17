@@ -64,6 +64,35 @@ describe("WS6 evidence reconciliation",()=>{
    const missingSubmission=base.assessments.map(a=>a.id==="k2"?{...a,submittedAt:null}:a);
    expect(aggregateClassEvidence({...base,assessments:missingSubmission}).metrics.assessmentsSubmitted).toBe(1);
  });
+ it("attributes historical retake evidence without creating a second registration",()=>{
+   const enrollments=base.enrollments.map(e=>e.id==="e1"
+     ?{...e,courseAttemptIds:["ca1","ca1-retake"]}
+     :{...e,courseAttemptIds:e.courseAttemptId?[e.courseAttemptId]:[]});
+   const attendance=[...base.attendance,{
+     id:"a-retake",roomId:"r1",courseAttemptId:"ca1-retake",
+     status:"present" as const,assertedAt:"2026-11-08T10:15:00Z",
+   }];
+   const assessments=[...base.assessments,{
+     id:"k-retake",courseAttemptId:"ca1-retake",state:"submitted",
+     createdAt:"2026-11-07T12:00:00Z",submittedAt:"2026-11-10T12:00:00Z",
+   }];
+   const {metrics}=aggregateClassEvidence({...base,enrollments,attendance,assessments});
+   expect(metrics.registrations).toBe(3);
+   expect(metrics.uniquePeople).toBe(2);
+   expect(metrics.verifiedAttendance).toBe(2);
+   expect(metrics.verifiedAttendees).toBe(2);
+   expect(metrics.assessmentsSubmitted).toBe(3);
+ });
+ it("rejects an unlinked selected Course Attempt or duplicate historical identity",()=>{
+   const disconnected=base.enrollments.map(e=>e.id==="e1"
+     ?{...e,courseAttemptIds:["ca1-retake"]}:e);
+   expect(()=>aggregateClassEvidence({...base,enrollments:disconnected}))
+     .toThrow("Selected Course Attempt is not linked");
+   const reused=base.enrollments.map(e=>e.id==="e2"
+     ?{...e,courseAttemptIds:["ca2","ca1"]}:e);
+   expect(()=>aggregateClassEvidence({...base,enrollments:reused}))
+     .toThrow("Course Attempt belongs to multiple Class Enrollments");
+ });
  it("never promotes a recorded outcome into independently verified completion",()=>{
    const {metrics}=aggregateClassEvidence(base);
    expect(metrics.recordedCompletionOutcomes).toBe(1);
