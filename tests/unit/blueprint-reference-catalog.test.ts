@@ -93,6 +93,6 @@ describe("canonical Blueprint reference catalog", () => {
   it("keeps Site authorization while removing the catalog rollout gate",()=>{
     const source=readFileSync("src/modules/blueprints/blueprint-reference-catalog.server.ts","utf8");
     expect(source).not.toContain("CAN_CANONICAL_CATALOG_ENABLED");
-    expect(source).toContain('assertCapability(context,"program.launch.start")');
+    expect(source).toContain('assertCapability(context, "program.launch.start")');
   });
 });
