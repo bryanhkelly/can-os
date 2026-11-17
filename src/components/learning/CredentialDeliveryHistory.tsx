@@ -14,7 +14,7 @@ export function CredentialDeliveryHistory({ records }: {
     emptyMessage="No delivery receipts loaded."
     entries={records.map(record => ({
       id: record.id,
-      title: `${record.recipientName} · ${record.recipientEmail}`,
+      title: `Delivery requested · ${record.recipientName} · ${record.recipientEmail}`,
       occurredAt: new Date(record.createdAt).toISOString(),
       status: record.status === "accepted" ? "Accepted by provider"
         : record.status === "failed" ? "Failed" : "Pending",
