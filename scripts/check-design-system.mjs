@@ -187,6 +187,7 @@ const sharedPatternContracts = {
   "workspace/filter-bar.tsx": ['from "@/components/ui/input"', 'from "@/components/ui/button"', 'from "@/components/ui/field"'],
   "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
   "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions', '"inline"'],
+  "workspace/record-layout.tsx": ['export function RecordHeader', 'export function RecordLayout', 'export function RecordFacts', 'export function EntityCard', 'aria-label="Record actions"'],
   "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
     'aria-describedby={description ? descriptionId : undefined}', 'columns === 1'],
   "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
@@ -207,6 +208,19 @@ for (const [file, required] of Object.entries(sharedPatternContracts)) {
   }
 }
 
+
+// Feature-owned readers provide record facts; only their visual semantics are shared.
+const governedRecordConsumers = {
+  "routes/actions.$actionId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Action metadata"'],
+  "routes/enrichment_.$seasonId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Program details"'],
+};
+for (const [file, required] of Object.entries(governedRecordConsumers)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of required) if (!source.includes(fragment)) {
+    console.error(`${file} must reuse V6.1 record composition: missing ${fragment}`);
+    process.exitCode = 1;
+  }
+}
 
 // Inline record actions share the same spacing and wrapping contract without
 // turning record decisions into additional forms or changing server commands.
