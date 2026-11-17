@@ -64,12 +64,13 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const [city,setCity] = useState("");
   const [state,setState] = useState("");
   const [timezone,setTimezone] = useState("");
+  const [siteKind,setSiteKind] = useState<"physical"|"virtual"|"mobile">("physical");
   const [delivery,setDelivery] = useState<Delivery>(initialPreferences?.delivery??"both");
   const [chosen,setChosen] = useState<string[]>(initialPreferences?.interestIds??[]);
   const [savedPreferences,setSavedPreferences]=useState<SiteLaunchPreferences>(
     initialPreferences??{delivery:"both",interestIds:[]});
   const preferencesDirty=JSON.stringify({delivery,interestIds:chosen})!==JSON.stringify(savedPreferences);
-  const siteFieldsDirty=!siteId&&Boolean(name||organizationId||city||state||timezone);
+  const siteFieldsDirty=!siteId&&Boolean(name||organizationId||city||state||timezone||siteKind!=="physical");
   const releaseNavigation=useLaunchUnsavedChanges(preferencesDirty||siteFieldsDirty,
     "Leave Site setup? Unsaved Site details or program interests will be lost.",true);
   const [error,setError] = useState("");
@@ -108,7 +109,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
     try {
       const saved=await siteMutation.submit({data:{
         organizationId,name,slug:suggestedLaunchSlug(name)||"learning-site",timezone,
-        stubOnly:false,planningLocation:{city,state},
+        siteKind,stubOnly:false,planningLocation:{city,state},
         launchPreferences:{delivery,interestIds:chosen},
       }});
       if(saved.status==="ignored")return;
@@ -175,6 +176,13 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
             <Field label="State" required><Select required value={state} onChange={e=>setState(e.target.value)}><option value="">Select state</option>{Object.entries(usStatesAndTerritories).map(([code,label])=><option key={code} value={code}>{label}</option>)}</Select></Field>
           </div>
           <SiteTimezoneField label="Site time zone" value={timezone} onChange={setTimezone}/>
+          <Field label="Site format" required>
+            <Select value={siteKind} onChange={e=>setSiteKind(e.target.value as typeof siteKind)}>
+              <option value="physical">Physical location</option>
+              <option value="virtual">Virtual Site</option>
+              <option value="mobile">Mobile Site</option>
+            </Select>
+          </Field>
         </>}
         <fieldset><legend className="mb-3 text-sm font-semibold">How will you deliver learning?</legend>
           <div className="grid gap-3 sm:grid-cols-3">{([
