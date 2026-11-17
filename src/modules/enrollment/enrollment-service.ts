@@ -804,19 +804,14 @@ export async function activateEnrollmentFromApplication(
       })
       .where(eq(journeys.id, journey.id));
 
-    await writeAudit(tx, {
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "journey.activate",
-      resourceType: "journey",
-      resourceId: journey.id,
+      entityType: "journey",
+      entityId: journey.id,
       scope: { programId: application.programId },
       before: { status: journey.status },
       after: { status: "active" },
-      context: {
-        requestId: context.requestId ?? null,
-        applicationId,
-        enrollmentId: enrollment.id,
-      },
+      contextExtras: { applicationId, enrollmentId: enrollment.id },
     });
 
     await emitEvent(tx, {
@@ -832,22 +827,13 @@ export async function activateEnrollmentFromApplication(
       },
     });
 
-    await writeAudit(tx, {
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "enrollment.activate",
-      resourceType: "enrollment",
-      resourceId: enrollment.id,
+      entityType: "enrollment",
+      entityId: enrollment.id,
       scope: { programId: application.programId },
-      after: {
-        status: "active",
-        kind: "program",
-        schoolYearId,
-      },
-      context: {
-        requestId: context.requestId ?? null,
-        applicationId,
-        journeyId: journey.id,
-      },
+      after: { status: "active", kind: "program", schoolYearId },
+      contextExtras: { applicationId, journeyId: journey.id },
     });
 
     return enrollment.id;
