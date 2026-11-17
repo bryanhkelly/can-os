@@ -28,6 +28,8 @@ describe("Cloudflare route generation syntax regression",()=>{
       {scripts:Record<string,string>};
     expect(packageJson.scripts["prebuild:cloudflare"]).toContain("check:build-source-syntax");
     expect(packageJson.scripts.prebuild).toContain("check:build-source-syntax");
+    expect(packageJson.scripts["postbuild:cloudflare"]).toBe("npm run typecheck");
+    expect(packageJson.scripts.postbuild).toBe("npm run typecheck");
     expect(packageJson.scripts["check:build-source-syntax"])
       .toContain("check-build-source-syntax.mjs");
   });
