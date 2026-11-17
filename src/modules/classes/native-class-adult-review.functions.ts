@@ -143,7 +143,9 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
         evidence.verifiedByPersonId===account.personId||
         evidence.expiresAt!==null&&evidence.expiresAt<=now||
         evidence.metadata.verifiedBirthDate!==data.verifiedBirthDate||
-        evidence.metadata.verificationOutcome!=="approved")
+        evidence.metadata.verificationOutcome!=="approved"||
+        evidence.metadata.privateObjectVerified!==true||
+        evidence.metadata.revokedAt!=null)
        throw new AuthorizationError("independently verified adult identity evidence");
      const [verifierGrant]=await tx.select({id:accountPersonGrants.id})
        .from(accountPersonGrants).innerJoin(accessAccounts,and(
