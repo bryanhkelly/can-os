@@ -10,7 +10,7 @@ const routeRoot = join(root, "routes");
 const nativePattern = /<(?:button|input|select|textarea|label)\b/g;
 function visibleNativeCount(source) {
   // Hidden authentication POST fields are native by design, never styled controls.
-  const withoutHidden = source.replace(/<input\\s+type=["']hidden["'][^>]*\\/>/g, "");
+  const withoutHidden = source.replace(/<input\s+type=["']hidden["'][^>]*\/>/g, "");
   return [...withoutHidden.matchAll(nativePattern)].length;
 }
 const radiusPattern = /(?:^|[\s"'\x60])(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=[\s"'\x60])/g;
