@@ -14,6 +14,7 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-feedback-categories.sql",
   "database/production/2026-11-17-consolidate-static-reference-tables.sql",
   "database/production/2026-11-17-consolidate-36-empty-legacy-tables.sql",
+  "database/production/2026-11-17-consolidate-8-empty-operational-tables.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
