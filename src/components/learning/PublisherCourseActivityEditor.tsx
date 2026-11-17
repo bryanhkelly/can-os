@@ -30,14 +30,14 @@ function validQuiz(questions:Quiz[]){
     item.choices.every(choice=>choice.trim().length>0)&&
     item.correctIndex>=0&&item.correctIndex<item.choices.length);
 }
-export function PublisherCourseActivityEditor({navigation}:{navigation?:ReactNode}){
+export function PublisherCourseActivityEditor({navigation,preferredCourseVersionId}:{navigation?:ReactNode;preferredCourseVersionId?:string}){
   const queryClient=useQueryClient();
   const courses=useQuery({
     queryKey:["publisher-course-activity-options"],
     queryFn:()=>getPublisherCourseActivityOptions(),
     retry:false,
   });
-  const [courseVersionId,setCourseVersionId]=useState("");
+  // Deep links are suggestions only; the privileged Course options reader\n  // determines whether the current publisher may actually author this version.\n  const [courseVersionId,setCourseVersionId]=useState(preferredCourseVersionId??"");
   const [quiz,setQuiz]=useState<Quiz[]>(freshQuiz);
   const [feedback,setFeedback]=useState<Feedback[]>(freshFeedback);
   const [passing,setPassing]=useState(0.8);
