@@ -78,6 +78,48 @@ describe("annual impact reconciliation", () => {
         issuedAt: "2026-05-01T00:00:00Z", revokedAt: null}],
     }, proof, period)).toThrow("same-participation");
   });
+  it("attributes late attendance corrections to original session and respects as-of", () => {
+    const evidence = makeEvidence();
+    evidence.attendance[1] = {
+      ...evidence.attendance[1]!,
+      observedAt: "2026-03-01T00:00:00Z",
+      assertedAt: "2027-01-10T00:00:00Z",
+    };
+    const before = reconcileAnnualImpact(evidence, proof, period);
+    expect(before.totals.verifiedAttendanceOccurrences).toBe(2);
+    const after = reconcileAnnualImpact(evidence, proof, {...period, asOf: "2027-01-11T00:00:00Z"});
+    expect(after.totals.verifiedAttendanceOccurrences).toBe(1);
+  });
+  it("does not relocate a corrected 2025 session into 2026 attendance", () => {
+    const evidence = makeEvidence();
+    evidence.participations[0] = {
+      ...evidence.participations[0]!,
+      registeredAt: "2025-02-01T00:00:00Z",
+    };
+    evidence.attendance[0] = {
+      ...evidence.attendance[0]!,
+      observedAt: "2025-03-01T00:00:00Z",
+      assertedAt: "2026-03-01T00:00:00Z",
+    };
+    evidence.attendance[1] = {
+      ...evidence.attendance[1]!,
+      observedAt: "2025-03-01T00:00:00Z",
+      assertedAt: "2026-03-02T00:00:00Z",
+    };
+    const report = reconcileAnnualImpact(evidence, proof, period);
+    expect(report.totals.verifiedAttendanceOccurrences).toBe(1);
+    expect(report.totals.verifiedAttendees).toBe(1);
+  });
+  it("rejects an award outside its authorized source even when it is only revoked in period", () => {
+    const evidence = makeEvidence();
+    evidence.awards[0] = {...evidence.awards[0]!,
+      participation: ref("ungranted"),
+      issuedAt: "2025-05-01T00:00:00Z",
+      revokedAt: "2026-06-01T00:00:00Z",
+    };
+    expect(() => reconcileAnnualImpact(evidence, proof, period))
+      .toThrow("missing or unauthorized participation");
+  });
   it("rejects conflicting attendance revisions and duplicate evidence IDs", () => {
     const evidence = makeEvidence();
     expect(() => reconcileAnnualImpact({
