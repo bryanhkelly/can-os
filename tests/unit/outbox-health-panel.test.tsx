@@ -72,6 +72,8 @@ describe("operations outbox health panel", () => {
     const html = renderToStaticMarkup(render());
     expect(html).toContain("Event outbox");
     expect(html).toContain("Pending");
+    expect(html).toContain("Processing");
+    expect(html).toContain(">1</p>");
     expect(html).toContain("Unhandled");
     expect(html).toContain("Failed");
     expect(html).toContain(">9</p>");
