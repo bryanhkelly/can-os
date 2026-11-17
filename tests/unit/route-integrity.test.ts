@@ -255,3 +255,13 @@ describe("canonical in-app navigation", () => {
     expect(offenders).toEqual([]);
   });
 });
+
+
+describe("course overview navigation", () => {
+  it("renders the enrolled student overview without silently replacing its URL", () => {
+    const source = readFileSync(join(routesDir, "student.courses.tsx"), "utf8");
+    expect(source).not.toMatch(/<Navigate\\s+to=["']\\/classes/);
+    expect(source).toContain('title="Class overview"');
+    expect(source).toContain('>Open classroom</Link>');
+  });
+});
