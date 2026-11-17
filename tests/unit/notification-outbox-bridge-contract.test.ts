@@ -31,6 +31,9 @@ describe("notification outbox source boundaries", () => {
     expect(school).toContain("smsOptedIn");
     expect(school).toContain("select 1 from public.notifications source_notification");
     expect(school).toContain("source_action.type = 'school_family_bulletin'");
+    expect(school).toContain("function schoolFamilyReceipt()");
+    expect((school.match(/schoolFamilyReceipt\\(\\)/g) ?? []).length).toBeGreaterThanOrEqual(3);
+    expect(school).toContain("SMS_PROVIDER_OUTCOME_UNCONFIRMED");
     expect(school).toContain("nextAllowedDelivery");
     expect(shared).toContain("adapter.renew(active");
     expect(shared).toContain("adapter.send(prepared.message, active.id)");
