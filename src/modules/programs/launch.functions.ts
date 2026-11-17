@@ -1,4 +1,5 @@
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
+import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
 import { assertCapability,AuthorizationError } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -540,6 +541,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
   address:physicalSiteAddressSchema.optional(),
   stubOnly:z.boolean().optional(),
   planningLocation:schoolPlanningLocationSchema.optional(),
+  launchPreferences:siteLaunchPreferencesSchema.optional(),
  }).strict().refine(value=>!value.stubOnly||Boolean(value.planningLocation), "A school stub requires city and state").parse(v))
  .handler(async({data})=>{
   const actor=await registrarContext("program.launch.start");
@@ -561,7 +563,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
      eq(s.sites.slug,data.slug),
      sql`lower(${s.sites.name}) = ${data.name.trim().toLowerCase()}`,
     )))
-    .limit(1);
+    .limit(1).for("update");
    if(existing) {
     const savedPlanningLocation=schoolPlanningLocationSchema.safeParse(existing.metadata.schoolPlanningLocation);
     // Exact replay returns the original canonical Site and its website reservation;
@@ -574,6 +576,19 @@ export const createLaunchSite = createServerFn({method:"POST"})
       const publicSiteDraft=data.stubOnly ? null : await ensureExistingSitePublicationDraftForLaunch(tx,actor,{
         id:existing.id,organizationId:data.organizationId,slug:existing.slug,
       });
+      if(data.launchPreferences &&
+         JSON.stringify(existing.metadata.launchPreferences)!==JSON.stringify(data.launchPreferences)){
+        await tx.update(s.sites).set({
+          metadata:{...existing.metadata,launchPreferences:data.launchPreferences},
+          updatedAt:new Date(),
+        }).where(eq(s.sites.id,existing.id));
+        await writeAudit(tx,actor,{
+          action:"site.launch_preferences.update",entityType:"site",entityId:existing.id,
+          scope:{organizationId:data.organizationId,siteId:existing.id},
+          before:{preferences:existing.metadata.launchPreferences??null},
+          after:{preferences:data.launchPreferences},
+        });
+      }
       return {siteId:existing.id,publicSiteDraft,replayed:true};
     }
     throw new Error(`This church already has the site "${existing.name}" (${existing.slug}). Select its saved record and edit it instead of creating another Site.`);
@@ -583,6 +598,7 @@ export const createLaunchSite = createServerFn({method:"POST"})
      slug:data.slug,timezone:data.timezone,address:data.address,updatedAt:createdAt,
      metadata:{siteIdentityRevision:createdAt.toISOString(),
       ...(data.planningLocation?{schoolPlanningLocation:data.planningLocation}:{}),
+      ...(data.launchPreferences?{launchPreferences:data.launchPreferences}:{}),
       ...(data.address?{sitePhysicalAddressRevision:createdAt.toISOString()}:{})}})
      .returning({id:s.sites.id});
    if(!site)throw new Error("Failed to create Site");
