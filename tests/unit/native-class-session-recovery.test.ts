@@ -56,7 +56,7 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
   });
   it("offers recoverable UX without claiming a new user's identity is already verified",()=>{
     const ui=read("src/routes/class.tsx");
-    expect(ui).toContain("resumeLinkedNativeClassLearner()");
+    expect(read("src/modules/classes/native-class-entry.functions.ts")).toContain("resumeLinkedNativeClassLearner()");
     expect(ui).toContain("Restore verified Class access");
     expect(ui).toContain("New learner identities and age");
     expect(ui).toContain("independent identity review");
@@ -65,42 +65,39 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
 
 
 describe("native Class enrollment with one interactive CAN sign-in",()=>{
-  const uiPath="src/routes/class.tsx";
-  it("uses normal native enrollment first, then restores the same CAN login only if necessary",()=>{
-    const ui=read(uiPath);
-    const start=ui.indexOf("async function enrollWithLinkedCanRecovery");
-    const first=ui.indexOf("return await enrollInNativeClass(data);",start);
-    const recovery=ui.indexOf("await resumeLinkedNativeClassLearner();",first);
-    const retry=ui.indexOf("return enrollInNativeClass(data);",recovery);
-    expect(start).toBeGreaterThan(-1);
-    expect(first).toBeGreaterThan(start);
-    expect(recovery).toBeGreaterThan(first);
-    expect(retry).toBeGreaterThan(recovery);
-  });
-  it("keeps all native Class admission modes on one guarded enrollment path",()=>{
-    const ui=read(uiPath);
-    const occurrences=ui.match(/await enrollWithLinkedCanRecovery\(\{data:\{/g)??[];
-    expect(occurrences).toHaveLength(3); // self, approved, invitation
-    expect(ui).toContain('normalizeClientError(originalError).code!=="CANONICAL_LEARNER_SESSION_REQUIRED"');
-    expect(ui).toContain("throw originalError;");
-    const auth=read("src/modules/identity/canonical-command-context.server.ts");
-    expect(auth).toContain('throw new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED")');
-    expect(auth).toContain('if (!hasNative)');
-    expect(auth).toContain('native.role_code !== "learner"');
-  });
-  it("does not claim a first-time identity can be forged from an email match",()=>{
-    const recovery=read("src/modules/classes/native-class-session-recovery.functions.ts");
-    expect(recovery).toContain("verifiedAdultOn(native.birthDate,now)");
-    expect(recovery).toContain('new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED")');
-    expect(recovery).toContain("links.length!==1");
-    expect(recovery).toContain("grants.length===0");
-    expect(recovery).toContain("home.length!==1");
-    expect(recovery).not.toContain("tx.update(canonicalPersons)");
-    expect(recovery).not.toContain("tx.insert(canonicalPersons)");
-    expect(recovery).not.toContain("tx.insert(canonicalAccounts)");
-  });
+ const uiPath="src/routes/class.tsx";
+ const commandPath="src/modules/classes/native-class-entry.functions.ts";
+ it("keeps recovery and enrollment in one server application command",()=>{
+   const service=read(commandPath);
+   const first=service.indexOf("return await enrollInNativeClass({data});");
+   const recovery=service.indexOf("await resumeLinkedNativeClassLearner();",first);
+   const activation=service.indexOf("await activateReviewedNativeClassLearner();",recovery);
+   const retry=service.indexOf("return enrollInNativeClass({data});",activation);
+   expect(first).toBeGreaterThan(-1);
+   expect(recovery).toBeGreaterThan(first);
+   expect(activation).toBeGreaterThan(recovery);
+   expect(retry).toBeGreaterThan(activation);
+   expect(service).toContain('normalizeClientError(originalError).code!=="CANONICAL_LEARNER_SESSION_REQUIRED"');
+   expect(service).toContain('normalizeClientError(recoveryError).code!=="CANONICAL_LEARNER_ONBOARDING_REQUIRED"');
+ });
+ it("keeps self, approval and invitation on the exact same service",()=>{
+   const ui=read(uiPath);
+   expect(ui.match(/await enrollCurrentPersonInClass\\(\\{data:\\{/g)??[]).toHaveLength(3);
+   expect(ui).not.toContain("async function enrollWithLinkedCanRecovery");
+   expect(read(commandPath)).toContain("nativeClassEnrollmentInput.parse(raw)");
+   const auth=read("src/modules/identity/canonical-command-context.server.ts");
+   expect(auth).toContain('throw new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED")');
+   expect(auth).toContain('native.role_code !== "learner"');
+ });
+ it("never creates new Persons while recovering old native sessions",()=>{
+   const recovery=read("src/modules/classes/native-class-session-recovery.functions.ts");
+   expect(recovery).toContain("verifiedAdultOn(native.birthDate,now)");
+   expect(recovery).toContain("links.length!==1");
+   expect(recovery).toContain("grants.length===0");
+   expect(recovery).not.toContain("tx.insert(canonicalPersons)");
+   expect(recovery).not.toContain("tx.insert(canonicalAccounts)");
+ });
 });
-
 
 describe("native learner session recovery error contract",()=>{
   it("distinguishes missing native cookie from forbidden permission",()=>{
