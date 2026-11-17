@@ -3,6 +3,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { EventTypes } from "@/domain/event-types";
 import { auditEvents, domainEvents, learnerCourseAttempts, noncreditRegistrations,
   noncreditTrainingVersions, noncreditCompletionPolicies,
   noncreditCompletionDecisions } from "@/db/canonical-v301";
@@ -85,7 +86,7 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
         owningOrganizationId:training.providerOrganizationId,
         eventCode:"learning.noncredit.completed",entityKind:"noncredit_completion_decision",
         entityId:created.id,payload});
-      await tx.insert(domainEvents).values({eventType:"NoncreditTrainingCompleted",
+      await tx.insert(domainEvents).values({eventType:EventTypes.NoncreditTrainingCompleted,
         aggregateType:"noncredit_completion_decision",aggregateId:created.id,
         actorPersonId:actor.actorPersonId!,payload});
       return {decisionId:created.id,alreadyCompleted:false};
