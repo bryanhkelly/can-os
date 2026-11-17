@@ -52,7 +52,7 @@ export async function listInstitutionallyAuthorizedAcademicProgramIds(
   const churchPrograms = new Map<string, OperatingProgramIdentity>();
   for (const row of rows) {
     const hostId = row.hostOrganizationId ?? row.organizationId;
-    if (row.hostType !== "church" || row.institutionOrganizationId === hostId) {
+    // An unrelated caller cannot turn a permissive same-host/non-church\n    // Program into an arbitrary authorization result.\n    if (!actor.scope.organizationIds?.includes(row.institutionOrganizationId)) continue;\n    if (row.hostType !== "church" || row.institutionOrganizationId === hostId) {
       permitted.add(row.id);
       continue;
     }
