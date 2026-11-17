@@ -4,7 +4,7 @@ import type {ParticipationRecord} from "@/domain/participation-read-model";
 const record=(source:ParticipationRecord["source"],status:ParticipationRecord["status"],
  subject:ParticipationRecord["subject"]["kind"]="self"):ParticipationRecord=>({
  key:source+":enrollment",source,sourceId:"enrollment",
- refs:{sectionId:"section-1",classId:"class-1"},
+ refs:{sectionId:"section-1",classId:"class-1",studentPersonId:"dependent-person-1"},
  kind:"learning",bucket:status==="active"?"current":"history",status,
  sourceStatus:status,title:"Example",detail:null,organizationName:null,organizationId:null,
  siteName:null,siteId:null,subject:{kind:subject,displayName:null},
@@ -19,7 +19,7 @@ describe("My Activity source-owned outcome navigation",()=>{
  });
  it("guardian and staff navigation never get student-only links",()=>{
   expect(activityEvidenceLinks(record("school_section","completed","dependent"),"guardian")
-   .map(row=>row.href)).toContain("/guardian/attendance");
+   .map(row=>row.href)).toContain("/guardian/attendance?student=dependent-person-1");
   expect(activityEvidenceLinks(record("school_section","active"),"network_admin")).toEqual([]);
   expect(activityEvidenceLinks(record("school_section","active","dependent"),"student")).toEqual([]);
  });
