@@ -76,7 +76,7 @@ function ProgramOperations(){
     title="Program operations"
     subtitle="Follow the approved publisher product from immutable Course versions to each authorized local Class. Independent operators do not need a network affiliation."
     actions={<div className="flex flex-wrap gap-4 text-sm font-semibold">
-      <Link to="/canonical/classes" className="underline underline-offset-4">Manage local Classes</Link>
+      <Link to="/class" search={{view:"manage"}} className="underline underline-offset-4">Manage local Classes</Link>
       <Link to="/canonical/blueprints" className="underline underline-offset-4">Publisher Blueprints</Link>
       <Link to="/canonical/lab/deployments" className="underline underline-offset-4">Deployments and adoption</Link>
     </div>}>
@@ -202,7 +202,7 @@ function ProgramOperations(){
         </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
           <Link to="/canonical/lab/deployments" className="underline">Review approved adoption</Link>
-          <Link to="/canonical/classes" className="underline">Prepare or revise local Class</Link>
+          <Link to="/class" search={{view:"manage"}} className="underline">Prepare or revise local Class</Link>
         </div>
       </div>}
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
