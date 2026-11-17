@@ -24,8 +24,6 @@ export const getNoncreditCompletionReview = createServerFn({ method: "GET" })
   .validator((raw: unknown) => input.parse(raw))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control","private, no-store");
-    if (process.env.CAN_WS3_OPERATOR_REVIEW_ENABLED !== "true")
-      throw new AuthorizationError("WS3 operator review not activated");
     const actor=await getCanonicalCommandContext(getRequest());
     if (!actor.actorPersonId || !["registrar","site_admin"].includes(actor.role??""))
       throw new AuthorizationError("authorized completion operator");
@@ -103,8 +101,6 @@ export const getNoncreditCompletionQueue=createServerFn({method:"GET"})
   .validator((raw:unknown)=>queueInput.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_WS3_OPERATOR_REVIEW_ENABLED!=="true")
-      throw new AuthorizationError("noncredit completion queue not activated");
     const request=getRequest(),actor=await getCanonicalCommandContext(request);
     if(!actor.actorPersonId ||
        !["site_admin","registrar"].includes(actor.role??"") ||
