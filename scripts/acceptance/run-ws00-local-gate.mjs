@@ -34,7 +34,8 @@ if(branch==="main"){
   // The main branch is development-only during stabilization. Refuse to
   // certify it with this helper if the Git production-build hold vanished.
   const netlify=readFileSync("netlify.toml","utf8");
-  if(!netlify.includes('[context.production]\\n  ignore = "exit 0"'))
+  const production=netlify.split("[context.production]")[1]?.split(/^\\[/m)[0];
+  if(!production || !production.includes('ignore = "exit 0"'))
     throw new Error("Main WS00 release hold missing: Netlify production builds may auto-publish");
 }
 if(porcelain)throw new Error(
