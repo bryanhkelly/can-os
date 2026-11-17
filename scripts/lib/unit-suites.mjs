@@ -13,7 +13,7 @@ export const UNIT_SUITE_PREFIXES = Object.freeze({
   ],
   family: ["guardian-", "conference-", "pickup-", "field-trip-", "workspace-migration-"],
   classroom: [
-    "facilitated-learning", "canonical-learning-activity", "classroom-",
+    "facilitated-learning", "canonical-learning-activity", "canonical-learning-release-", "classroom-",
     "site-noncredit-bridge-", "noncredit-waitlist-delivery-",
   ],
   enrollment: ["noncredit-self-enrollment", "personal-can-"],
@@ -26,7 +26,7 @@ export const UNIT_SUITE_PREFIXES = Object.freeze({
     "canonical-objective-", "network-class-", "site-native-class-",
     "site-first-launch-", "native-facilitated-classroom-",
   ],
-  network: ["network-attribution-", "noncredit-self-enrollment"],
+  network: ["network-attribution", "noncredit-self-enrollment"],
 });
 
 const testFile = /\.test\.(?:[cm]?[jt]sx?)$/;
