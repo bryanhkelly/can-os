@@ -534,6 +534,16 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
     "@/components/ui/choice", "@/components/ui/label", "<Field",
   ],
+  "routes/guardian.report-cards.tsx": [
+    "@/components/ui/select", "@/components/ui/label", "<QueryState",
+  ],
+  "routes/student.assignments.tsx": [
+    "<StatCard", "<EmptyState", "<WorkspaceNotice", "<StatusBadge",
+  ],
+  "routes/operations.insights.tsx": [
+    "@/components/ui/button", "<StatusBadge", "<EmptyState", "<WorkspaceNotice",
+    "<ActionDialog", "<QueryState",
+  ],
   "routes/platform.tsx": [
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
     "<StatCard", "<WorkspaceNotice",
