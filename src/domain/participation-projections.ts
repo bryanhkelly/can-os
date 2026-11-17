@@ -49,11 +49,14 @@ export function projectSchoolSections(
       // A finalized grading-period reference is source-owned evidence, not
       // an inference from the Enrollment status or a claim of course credit.
       outcome:section.officialOutcome??null,
-      action: status === "active"
-        ? {label: "Open school class", href: "/student/courses?section=" + hrefId(section.id)}
-        : status === "scheduled"
-        ? {label: "View course registration", href: "/student/courses?section=" + hrefId(section.id)}
-        : null,
+      action:section.subject?.kind==="dependent"
+        ?(status==="active"||status==="scheduled"
+          ?{label:"View dependent's school",href:"/guardian/students"}:null)
+        :status==="active"
+        ?{label:"Open school class",href:"/student/courses?section="+hrefId(section.id)}
+        :status==="scheduled"
+        ?{label:"View course registration",href:"/student/courses?section="+hrefId(section.id)}
+        :null,
     }, now);
   });
 }
