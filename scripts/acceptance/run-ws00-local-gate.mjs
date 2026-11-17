@@ -55,6 +55,7 @@ const steps=[
   [npm,["run","lint"],"Lint and design-system validation"],
   [npx,["vitest","run",
     "tests/unit/participation-read-model.test.ts",
+    "tests/unit/native-class-history-pagination.test.ts",
     "src/domain/native-class-lifecycle.test.ts",
     "tests/unit/ws3-completion-command-contract.test.ts",
     "tests/unit/ws3-assessment-revisions.test.ts",
