@@ -32,6 +32,14 @@ async function mustDeny(sql,params,code){
 }
 try{
   await client.query("BEGIN");begun=true;
+  const target=await client.query(
+    "SELECT current_setting('neon.project_id',true) AS project_id, "+
+    "current_setting('neon.branch_id',true) AS branch_id",
+  );
+  assert.equal(target.rows[0]?.project_id,"sweet-hall-62441909",
+    "Identity constraint acceptance must target the CAN OS project");
+  assert.equal(target.rows[0]?.branch_id,"br-bitter-feather-ar0u63x7",
+    "Synthetic identity acceptance is permitted only on test01");
   const personA=randomUUID(),personB=randomUUID();
   const accountA=randomUUID(),accountB=randomUUID();
   const accountMailA="can-person-qa-"+accountA+"@example.invalid";
