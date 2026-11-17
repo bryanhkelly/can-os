@@ -111,15 +111,15 @@ export function NoncreditCompletionReviewPanel({registrationId}:{
           A superseded completion, revocation or expiry can invalidate an award
           without deleting its original issuance.
         </p>
-        {query.data.awards.length===0
-          ?<p className="text-sm text-muted-foreground">No issued achievements.</p>
-          :<ul className="divide-y divide-border border border-border">
-            {query.data.awards.map(award=><li key={award.issuanceId}
-              className="flex items-center justify-between gap-4 p-3 text-sm">
-              <span>Issued {new Date(award.issuedAt).toLocaleDateString()}</span>
-              <strong>{award.currentlyValid?"Currently valid":"No longer valid"}</strong>
-            </li>)}
-          </ul>}
+        <StatusTimeline label="Achievement issuance history"
+          emptyMessage="No issued achievements."
+          entries={query.data.awards.map(award=>({
+            id:award.issuanceId,
+            title:"Issued achievement",
+            occurredAt:award.issuedAt,
+            status:award.currentlyValid?"Currently valid":"No longer valid",
+            tone:award.currentlyValid?"success":"attention",
+          }))}/>
       </section>
       {isValidDecision && current &&
       <form className="space-y-3 border-t border-border pt-4" onSubmit={event=>{
