@@ -114,3 +114,24 @@ for (const [file, contract] of Object.entries(governedFeatureControls)) {
     process.exitCode = 1;
   }
 }
+
+
+// Layer 2 ownership: every directory uses the shared FilterBar composition,
+// and neither the pattern nor its table may reintroduce rounded surfaces.
+const sharedPatternContracts = {
+  "workspace/filter-bar.tsx": ['from "@/components/ui/input"', 'from "@/components/ui/button"', 'from "@/components/ui/field"'],
+  "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
+};
+for (const [file, required] of Object.entries(sharedPatternContracts)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of required) {
+    if (!source.includes(fragment)) {
+      console.error(`${file} must reuse shared application patterns: missing ${fragment}`);
+      process.exitCode = 1;
+    }
+  }
+  if (radiusUtility.test(source)) {
+    console.error(`${file} must retain V6.1 square-corner geometry`);
+    process.exitCode = 1;
+  }
+}
