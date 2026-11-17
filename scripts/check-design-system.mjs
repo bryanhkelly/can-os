@@ -257,3 +257,16 @@ if (!blueprintHistoryPanel.includes("readCanonicalBlueprintReviewHistory") ||
   console.error("Launch Studio Blueprint review history must use the authorized paginated StatusTimeline");
   process.exitCode = 1;
 }
+
+// Native learner Class cards now compose governed status/choice/select controls;
+// the historical read-model remains owned by native Class enrollment.
+const nativeClassPage = readFileSync(join(srcRoot, "routes/class.tsx"), "utf8");
+const nativeCardStart = nativeClassPage.indexOf("function EnrolledClassCard(");
+const nativeCardEnd = nativeClassPage.indexOf("function NativeLearnerClasses", nativeCardStart);
+const nativeCard = nativeClassPage.slice(nativeCardStart, nativeCardEnd < 0 ? undefined : nativeCardEnd);
+if (nativeCardStart < 0 || !nativeCard.includes("<StatusBadge") ||
+    !nativeCard.includes("<Select") || !nativeCard.includes("<Checkbox") ||
+    /<(?:select|input)\b/.test(nativeCard) || radiusUtility.test(nativeCard)) {
+  console.error("Native enrolled-Class lifecycle must compose V6.1 status and form primitives");
+  process.exitCode = 1;
+}
