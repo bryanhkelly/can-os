@@ -14,6 +14,7 @@ const projectId=process.env.CAN_WS2_QA_PROJECT_ID;
 const branchId=process.env.CAN_WS2_QA_BRANCH_ID;
 const url=process.env.CAN_WS2_QA_DATABASE_URL;
 const requireJourney=process.argv.includes("--require-journey-fixtures");
+const requireIntents=process.argv.includes("--require-enrollment-intents");
 const productionBranch="br-restless-sea-ar9ooo55";
 if(process.env.CAN_WS2_QA_READ_ONLY!=="1" || !url ||
    !projectId || !branchId ||
@@ -77,6 +78,33 @@ try{
   for(const name of guards){
     assert(triggers.rows.some(x=>x.tgname===name),"Missing active Class guard "+name);
   }
+  const intentRelations=[
+    "class_enrollment_invitations","class_enrollment_approval_requests",
+    "class_enrollment_transfer_requests","class_enrollment_repeat_authorizations",
+  ];
+  const installedIntents=await query(`
+    SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])
+  `,[intentRelations]);
+  const installedNames=new Set(installedIntents.rows.map(row=>row.relname));
+  const missingIntents=intentRelations.filter(name=>!installedNames.has(name));
+  const approvalContract=await query(`
+    SELECT conname FROM pg_constraint
+    WHERE conrelid=to_regclass('education_v30.class_enrollment_approval_requests')
+      AND conname='ws2_approval_acceptance_only_after_review'
+  `);
+  const adultApprovalMigrationReady=approvalContract.rows.length===1;
+  if(requireIntents){
+    assert.equal(missingIntents.length,0,
+      "Native enrollment-intent migrations are missing: "+missingIntents.join(", "));
+    for(const relation of installedIntents.rows){
+      assert(relation.relrowsecurity&&relation.relforcerowsecurity,
+        "Missing forced enrollment-intent RLS: "+relation.relname);
+    }
+    assert(adultApprovalMigrationReady,
+      "Adult approval lifecycle migration is absent or not applied");
+  }
   const facts=await query(`
     SELECT
       (SELECT count(*)::int FROM education_v30.classes) AS classes,
@@ -106,6 +134,8 @@ try{
     outcome:"read-only-schema-verified",
     projectId,branchId,readOnly:true,identityChecked:true,
     structuralGuards:guards.length,
+    missingEnrollmentIntentTables:missingIntents,
+    adultApprovalMigrationReady,
     fixtureCounts:summary,
     twoSiteFourSession:requireJourney?"fixture-shape-present-only":"NOT_TESTED",
     commandAuthorization:"NOT_TESTED",
