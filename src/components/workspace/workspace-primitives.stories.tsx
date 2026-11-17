@@ -53,6 +53,14 @@ export const ErrorWithRetry: Story = {
     onRetry={fn()} /></div>,
 };
 
+export const AttentionNotice: Story = {
+  render: () => <div className="bg-background p-6">
+    <WorkspaceNotice tone="attention">
+      The enrollment update was saved, but the records could not be refreshed. Retry refreshing before submitting again.
+    </WorkspaceNotice>
+  </div>,
+};
+
 export const SuccessConfirmation: Story = {
   render: () => <div className="bg-background p-6"><WorkspaceNotice tone="success">Application received. Independent guardian verification is still required.</WorkspaceNotice></div>,
 };
