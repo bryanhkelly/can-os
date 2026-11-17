@@ -23,6 +23,10 @@ function base(input: Omit<ParticipationRecord, "bucket">, now: Date): Participat
 export interface SchoolSectionActivity {
   id: string; title: string; code: string;
   enrollmentId: string | null; enrollmentStatus: string | null;
+  organizationId?: string|null;organizationName?:string|null;
+  siteId?:string|null;siteName?:string|null;
+  startsAt?:DateValue;endsAt?:DateValue;
+  subject?:{kind:"self"|"dependent";displayName:string|null};
 }
 export function projectSchoolSections(
   sections: readonly SchoolSectionActivity[], now: Date,
@@ -36,9 +40,10 @@ export function projectSchoolSections(
       refs: {enrollmentId: sourceId, sectionId: section.id},
       kind: "learning", status, sourceStatus: section.enrollmentStatus ?? "unknown",
       title: section.title, detail: section.code,
-      organizationId: null, organizationName: null, siteId: null, siteName: null,
-      subject: {kind: "self", displayName: null},
-      startAt: null, endAt: null, nextAt: null,
+      organizationId: section.organizationId??null,organizationName:section.organizationName??null,
+      siteId:section.siteId??null,siteName:section.siteName??null,
+      subject:section.subject??{kind:"self",displayName:null},
+      startAt:iso(section.startsAt),endAt:iso(section.endsAt),nextAt:null,
       progress: null,
       // Enrollment completion is not a grade or a credential decision.
       // Official assessment/completion evidence is provided only by WS3.
@@ -133,6 +138,9 @@ export function projectNoncreditCourses(
 export interface FamilyEnrichmentActivity {
   id: string; studentProfileId: string; seasonId: string; status: string;
   offeringName: string; seasonName: string; startsOn: DateValue; endsOn: DateValue;
+  organizationId?:string|null;organizationName?:string|null;
+  siteId?:string|null;siteName?:string|null;
+  subjectKind?:"self"|"dependent";
 }
 export interface FamilyChildActivity {
   studentProfileId: string; name: string | null; lastName: string | null;
@@ -152,8 +160,9 @@ export function projectFamilyEnrichment(
         studentProfileId: item.studentProfileId},
       kind: "program", status, sourceStatus: item.status, title: item.offeringName,
       detail: item.seasonName,
-      organizationId: null, organizationName: null, siteId: null, siteName: null,
-      subject: {kind: "dependent", displayName: childNames.get(item.studentProfileId) ?? null},
+      organizationId:item.organizationId??null,organizationName:item.organizationName??null,
+      siteId:item.siteId??null,siteName:item.siteName??null,
+      subject: {kind:item.subjectKind??"dependent",displayName:childNames.get(item.studentProfileId) ?? null},
       startAt: iso(item.startsOn), endAt: iso(item.endsOn), nextAt: null,
       progress: null,
       outcome: null,
