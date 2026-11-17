@@ -1,3 +1,4 @@
+import {readFileSync} from "node:fs";
 import {describe,it,expect} from "vitest";
 import {assertGrantSelection,assertSingleAccountPerson,resolveAccessContext,roleCapabilities,type VerifiedAccessGrant} from "@/domain/access-context";
 const grant:VerifiedAccessGrant={id:"grant-1",accountId:"account-1",personId:"person-1",role:"teacher",organizationId:"org-1",siteId:"site-1",active:true};
@@ -44,6 +45,17 @@ describe("provider-independent authorization context",()=>{
    expect(roleCapabilities[role]).not.toContain("assignments:grade");
    expect(roleCapabilities[role]).not.toContain("enrollment:manage");
   }
+ });
+ it("checks all underlying active grants, not only filtered workspace grants",()=>{
+  const server=readFileSync("src/modules/identity/command-context.server.ts","utf8");
+  expect(server).toContain("from(accountPersonGrants)");
+  expect(server).toContain("eq(accountPersonGrants.accountId,session.accountId)");
+  expect(server).toContain("eq(accountPersonGrants.active,true)");
+  expect(server).toContain("not(eq(accountPersonGrants.personId,activePerson))");
+  expect(server).toContain("if(conflicting.length)");
+  // A first-page or bounded lookup cannot prove the absence of a conflicting
+  // grant in the account's full active grant set.
+  expect(server).not.toContain("originalPersons.length===0");
  });
  it("requires exactly one Person per real account across Site and role grants",()=>{
   const own=[grant,{...grant,id:"grant-2",role:"guardian",siteId:"site-2"}];
