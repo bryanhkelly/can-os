@@ -168,7 +168,8 @@ export function projectFamilyEnrichment(
       startAt: iso(item.startsOn), endAt: iso(item.endsOn), nextAt: null,
       progress: null,
       outcome: null,
-      action: {label: "Manage family program", href: "/guardian/enrichment"},
+      action:item.subjectKind==="self"?null:
+        {label:"Manage family program",href:"/guardian/enrichment"},
     }, now);
   });
 }
@@ -285,7 +286,10 @@ export function projectAcceptedCalendarEvents(
       action:row.cancelled?null:{label:"View event",href:"/calendar?event="+hrefId(row.eventId)},
     },now);
     // Keep elapsed events in history without converting acceptance to attendance.
-    return !row.cancelled&&endAt&&Date.parse(endAt)<now.getTime()
+    const elapsed=endAt??startAt;
+    // Elapsed accepted invitations belong to history even if the event has
+    // no explicit end time. Neither case implies verified attendance.
+    return !row.cancelled&&elapsed&&Date.parse(elapsed)<now.getTime()
       ?{...record,bucket:"history" as const}:record;
   });
 }
