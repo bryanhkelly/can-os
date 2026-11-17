@@ -1,6 +1,6 @@
-import {and,eq,gt,isNull,inArray,not} from "drizzle-orm";
+import {and,eq,gt,isNull,inArray} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessSessions,accountPersonGrants,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
+import {accessAccounts,accessSessions,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
@@ -8,6 +8,7 @@ import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
 import { listInstitutionallyAuthorizedAcademicProgramIds } from "@/modules/programs/institutional-academic-authority-read.server";
 import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
+import { assertRawAccountPerson } from "./unambiguous-adult-account.server";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -56,13 +57,8 @@ export async function getCommandContext(request: Request): Promise<AccessContext
   if(!activePerson || !session.accountPersonId ||
      session.accountPersonId!==activePerson)
    return rejectSession(request,"membership_unavailable");
-  const conflicting=await db.select({id:accountPersonGrants.id})
-   .from(accountPersonGrants)
-   .where(and(eq(accountPersonGrants.accountId,session.accountId),
-     eq(accountPersonGrants.active,true),
-     not(eq(accountPersonGrants.personId,activePerson)))).limit(1);
-  if(conflicting.length)
-   return rejectSession(request,"membership_unavailable");
+  try{await assertRawAccountPerson(session.accountId, activePerson);}
+  catch{return rejectSession(request,"membership_unavailable");}
   try{assertSingleAccountPerson(session.accountId,grants);}
   catch{return rejectSession(request,"membership_unavailable");}
  }
