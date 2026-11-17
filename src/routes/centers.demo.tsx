@@ -17,7 +17,7 @@ function DemoCenterPage() {
   return <PageFrame width="wide">
     <RecordHeader eyebrow="Community Learning Center · Synthetic demonstration" title={site.name}
       subtitle="After-school enrichment and summer programs. Classes are stored in the CAN OS database." />
-    <div className="mt-6 space-y-5">
+    <div className="mt-6 space-y-5">\n      <div className="border border-border bg-card p-5">\n        <h2 className="font-semibold">Teacher-led class rehearsal</h2>\n        <p className="mt-2 text-sm text-muted-foreground">Practice the AI and Digital Skills lesson with an original video and five saved teaching segments. This is not an enrollment or a live class.</p>\n        <Link to="/centers/demo/classroom" className="mt-3 inline-block min-h-11 border border-border px-4 py-3 text-sm font-semibold">Open teacher rehearsal</Link>\n      </div>
       <WorkspaceNotice tone="info">These are planning records, not operating approval.
         Registration opens only after independently verified safety, staffing, session,
         publication, and guardian-consent requirements are met.</WorkspaceNotice>
