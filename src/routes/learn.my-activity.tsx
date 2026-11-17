@@ -1,15 +1,16 @@
 import {createFileRoute, Link, redirect} from "@tanstack/react-router";
 import {useQuery} from "@tanstack/react-query";
-import {useState} from "react";
+import {useMemo,useRef,useState} from "react";
 import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw, Users} from "lucide-react";
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
-import {getMyActivity} from "@/modules/learning/my-activity.functions";
+import {getMyActivity,getMyActivitySourcePage} from "@/modules/learning/my-activity.functions";
+import {assembleParticipation} from "@/domain/participation-projections";
 import {
-  activityStatusLabel, resolveActivityFilters,
-  type ParticipationBucket, type ParticipationKind,
-  type ParticipationRecord, type ParticipationOpportunity,
+  activityStatusLabel,resolveActivityFilters,
+  type ParticipationBucket,type ParticipationKind,type ParticipationSource,
+  type ParticipationRecord,type ParticipationOpportunity,
 } from "@/domain/participation-read-model";
 
 export const Route = createFileRoute("/learn/my-activity")({
@@ -121,8 +122,56 @@ function MyActivityPage() {
     retry: false,
     staleTime: 15_000,
   });
-  const records = activity.data?.records ?? [];
+  const pageKey=activity.data
+    ?activity.data.activeGrantId+":"+activity.data.generatedAt:"none";
+  const pageKeyRef=useRef(pageKey);
+  pageKeyRef.current=pageKey;
+  const [extraPages,setExtraPages]=useState<{
+    key:string;records:ParticipationRecord[];
+    cursors:Partial<Record<ParticipationSource,string>>;
+  }>({key:"none",records:[],cursors:{}});
+  const [loadingOlder,setLoadingOlder]=useState(false);
+  const [olderError,setOlderError]=useState("");
+  const extra=extraPages.key===pageKey?extraPages.records:[];
+  const nextCursors=extraPages.key===pageKey
+    ?extraPages.cursors:activity.data?.nextCursors??{};
+  const canLoadOlder=Object.values(nextCursors).some(value=>Boolean(value));
+  const records=useMemo(
+    ()=>assembleParticipation([...(activity.data?.records??[]),...extra]),
+    [activity.data?.records,extra],
+  );
   const shown = resolveActivityFilters(records, bucket, kind);
+  async function loadOlder(){
+    if(!activity.data||loadingOlder||!canLoadOlder)return;
+    const key=pageKey;
+    const requests=Object.entries(nextCursors)
+      .filter((entry):entry is [ParticipationSource,string]=>Boolean(entry[1]));
+    setLoadingOlder(true);setOlderError("");
+    try{
+      const result=await Promise.allSettled(requests.map(async([source,cursor])=>
+        getMyActivitySourcePage({data:{source,cursor}})));
+      if(pageKeyRef.current!==key)return;
+      const next={...nextCursors};
+      const added:ParticipationRecord[]=[];
+      let failed=false;
+      for(const [i,response] of result.entries()){
+        const source=requests[i]![0];
+        if(response.status==="rejected"){failed=true;continue;}
+        const value=response.value;
+        if(value.source!==source){failed=true;continue;}
+        added.push(...value.items);
+        if(value.nextCursor)next[source]=value.nextCursor;
+        else delete next[source];
+      }
+      setExtraPages(previous=>({
+        key,records:assembleParticipation([
+          ...(previous.key===key?previous.records:[]),...added,
+        ]),cursors:next,
+      }));
+      if(failed)setOlderError(
+        "Some history sources could not be verified. Retry to continue those sources.");
+    }finally{if(pageKeyRef.current===key)setLoadingOlder(false);}
+  }
   const opportunities = bucket === "upcoming" && kind === "all" ? activity.data?.opportunities ?? [] : [];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
   const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial") ?? [];
@@ -195,7 +244,7 @@ function MyActivityPage() {
       <section className="mt-6" aria-label={bucket + " activity"}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-serif text-2xl">{views.find(view => view.id === bucket)?.title} activity</h2>
-          <p className="text-sm text-muted-foreground">{shown.length} participation {shown.length === 1 ? "record" : "records"}{opportunities.length > 0 ? ` · ${opportunities.length} enrollment opportunities` : ""}</p>
+          <p className="text-sm text-muted-foreground">Showing {shown.length} {shown.length===1?"record":"records"}{canLoadOlder?" · More history available":""}{opportunities.length>0?` · ${opportunities.length} enrollment opportunities`:""}</p>
         </div>
         {shown.length ? <div className="mt-3 grid gap-3">
           {shown.map(item => <ActivityCard key={item.key} item={item}/>)}
@@ -212,6 +261,18 @@ function MyActivityPage() {
           </div>
         </div> : null}
       </section>
+      {canLoadOlder&&<div className="mt-5 flex flex-wrap items-center gap-3">
+        <Button type="button" variant="outline" className="rounded-none"
+          disabled={loadingOlder} onClick={()=>void loadOlder()}>
+          {loadingOlder?"Loading older records…":"Load older activity"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Paged across verified sources; older history is not discarded.
+        </span>
+      </div>}
+      {olderError&&<p role="alert" className="mt-3 text-sm text-destructive">
+        {olderError}
+      </p>}
       {opportunities.length > 0 && <section className="mt-8" aria-label="Enrollment opportunities">
         <h2 className="font-serif text-2xl">Enrollment opportunities</h2>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -224,10 +285,8 @@ function MyActivityPage() {
       </section>}
       <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
         <h2 className="font-semibold text-foreground">One CAN account, independently authorized access</h2>
-        <p className="mt-2">This view uses your current verified workspace and each provider's own permissions.
-          Another Site, guardian relationship, or staff role does not grant access to private learner activity.
-          History is retained by its original records, not recreated here.</p>
-        <p className="mt-2">This is a partial view from current authorized readers, not a certified lifetime transcript. Some sources return at most 100 items and closed school Sections may be absent.</p>
+        <p className="mt-2">Personal records are assembled across independently verified memberships and guardian relationships, while every provider retains authority over its own records. An unverified Site, other Person, or staff role never grants learner access.</p>
+        <p className="mt-2">Load older activity to continue through source-owned history. Source outages and missing academic outcomes are shown as incomplete, never treated as evidence of no participation. This dashboard is not an official transcript.</p>
         <p className="mt-3">
           <Link to="/account" className="font-semibold text-primary underline">Manage authorized workspaces</Link>
           {" · "}
