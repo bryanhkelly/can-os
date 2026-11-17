@@ -26,6 +26,8 @@ describe("reusable workflow presentation", () => {
     const html = renderToStaticMarkup(<MutationFeedback state={{...idle,error:"Reopen this page",notice:"Saved",refreshFailed:true}}
       pendingMessage="Saving..." successAction={<a href="#saved">Open saved record</a>}/>);
     expect(html).toContain("The command succeeded.");
+    expect(html).toContain("border-warning/50");
+    expect(html).not.toContain("border-danger/50");
     expect(html).toContain('href="#saved"');
     expect(html.match(/role="alert"/g)).toHaveLength(1);
     expect(html).not.toContain('role="status"');
@@ -84,6 +86,16 @@ describe("reusable workflow presentation", () => {
       expect(renderToStaticMarkup(<QueryState {...props}><p>Stale records</p></QueryState>)).not.toContain("Stale records");
     }
   });
+  it("disables repeated query retries through the canonical busy Button", () => {
+    const html = renderToStaticMarkup(<QueryState
+      error="Reader unavailable" onRetry={() => undefined} retrying />);
+    expect(html).toContain("Retrying…");
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('disabled=""');
+    expect(html).toContain("animate-spin");
+    expect(html).not.toContain("Authorized records");
+  });
+
   it("renders custom loading content", () => {
     const html = renderToStaticMarkup(<QueryState loading={<strong>Loading records</strong>}/>);
     expect(html).toContain("<strong>Loading records</strong>");
