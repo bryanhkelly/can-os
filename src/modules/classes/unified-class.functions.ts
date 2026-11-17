@@ -4,12 +4,13 @@ import { and, asc, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, lte,
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
+   canonicalClasses, canonicalClassOfferings,
   canonicalClassOfferingVersions, canonicalOfferingCourses, courseVersions, courses,
   deploymentOfferingAdoptions, offeringVersions, offerings, programDeployments,
   educationOperations, educationOperationOrganizationRoles, educationOperationSites,
   siteOrganizationRoles, catalogSites, canonicalEnrollmentSites, classroomDeploymentSites,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
 import { assertOperationalClassOfferingTerms } from "@/domain/native-class-lifecycle";
 import { publishedOfferingKind } from "@/domain/network-program-rollout";
@@ -95,7 +96,7 @@ export const createUnifiedClassDraft = createServerFn({method:"POST"})
         classOfferingId=offering.id;
         classOfferingVersionId=version.id;
       }
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:operator.actor.actorPersonId!,
         owningOrganizationId:operator.organizationId,
         eventCode:"class.draft_created",entityKind:"class",entityId:created.id,
@@ -103,7 +104,7 @@ export const createUnifiedClassDraft = createServerFn({method:"POST"})
           deploymentId:data.definition.deploymentId,siteId:data.definition.siteId,
           classOfferingVersionId},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"ClassDraftCreated",aggregateType:"class",aggregateId:created.id,
         actorPersonId:operator.actor.actorPersonId!,
         payload:{operatingOrganizationId:operator.organizationId,classOfferingVersionId},
@@ -141,13 +142,13 @@ export const activateUnifiedClass=createServerFn({method:"POST"})
       await tx.update(canonicalClasses).set({
         state:"active",updatedAt:new Date(),
       }).where(eq(canonicalClasses.id,instance.id));
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:operator.actor.actorPersonId!,
         owningOrganizationId:operator.organizationId,
         eventCode:"class.activated",entityKind:"class",entityId:instance.id,
         payload:{classOfferingRequired:false},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:operator.actor.actorPersonId!,
         eventType:"ClassActivated",aggregateType:"class",aggregateId:instance.id,
         payload:{classOfferingRequired:false},
@@ -276,13 +277,13 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       if(instance.state!=="active") await tx.update(canonicalClasses)
         .set({state:"active",updatedAt:now})
         .where(eq(canonicalClasses.id,instance.id));
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:operator.actor.actorPersonId!,
         owningOrganizationId:operator.organizationId,
         eventCode:"class.offering_published",entityKind:"class_offering_version",entityId:terms.id,
         payload:{classId:instance.id,operatingOrganizationId:operator.organizationId},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"ClassOfferingPublished",aggregateType:"class",aggregateId:instance.id,
         actorPersonId:operator.actor.actorPersonId!,
         payload:{classOfferingVersionId:terms.id,organizationId:operator.organizationId},
@@ -323,7 +324,7 @@ export const closeUnifiedClassOffering = createServerFn({method:"POST"})
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClassOfferingVersions).set({state:"closed",closedAt:now})
         .where(eq(canonicalClassOfferingVersions.id,data.classOfferingVersionId));
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:operator.actor.actorPersonId!,owningOrganizationId:operator.organizationId,
         eventCode:"class.offering_closed",entityKind:"class_offering_version",entityId:data.classOfferingVersionId,
         payload:{classId:instance.id},
@@ -379,7 +380,7 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
         state:"draft",
       }).returning({id:canonicalClassOfferingVersions.id});
       if(!created)throw new Error("Cannot create Class Offering version");
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:operator.actor.actorPersonId!,owningOrganizationId:operator.organizationId,
         eventCode:"class.offering_new_draft",entityKind:"class_offering_version",
         entityId:created.id,payload:{classId:instance.id,versionNo:nextVersion},
