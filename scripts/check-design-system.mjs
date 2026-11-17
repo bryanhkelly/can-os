@@ -244,3 +244,16 @@ for (const [file, required] of Object.entries(governedLifecycleStatuses)) {
     process.exitCode = 1;
   }
 }
+
+// Blueprint history must come from its own authorized, bounded reader instead
+// of reconstructing an event stream from latestReview or local UI transitions.
+const blueprintHistoryPanel = readFileSync(join(root, "launch-studio/BlueprintReviewHistoryPanel.tsx"), "utf8");
+const blueprintWorkspace = readFileSync(join(root, "launch-studio/CanonicalBlueprintWorkspace.tsx"), "utf8");
+if (!blueprintHistoryPanel.includes("readCanonicalBlueprintReviewHistory") ||
+    !blueprintHistoryPanel.includes("<StatusTimeline") ||
+    !blueprintHistoryPanel.includes("history.data.hasMore") ||
+    !blueprintWorkspace.includes("<BlueprintReviewHistoryPanel") ||
+    radiusUtility.test(blueprintHistoryPanel)) {
+  console.error("Launch Studio Blueprint review history must use the authorized paginated StatusTimeline");
+  process.exitCode = 1;
+}
