@@ -22,13 +22,8 @@ async function run(){
   const url=required("TEST_DATABASE_URL");
   if(env.DATABASE_URL!==url)
     throw new Error("WS00 QA application and tests must target the same isolated database");
-  for(const flag of ["CAN_UNIFIED_CLASS_COMMANDS_ENABLED",
-    "CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED",
-    "CAN_WS3_EVIDENCE_REVIEW_ENABLED",
-    "CAN_WS4_SESSION_AGENDAS_ENABLED"]){
-    if(env[flag]!=="true")
-      throw new Error("QA application must enable the isolated-test-only capability "+flag);
-  }
+  // Capabilities are always active in code. QA readiness is a material
+  // schema, grant, authorization and fixture check, not a feature toggle.
   const expectedBranch=required("CAN_E2E_TEST_BRANCH_ID");
   await verifyAdmissionsNeonBranch({
     ...env, CAN_ADMISSIONS_TEST_BRANCH_ID:expectedBranch,
