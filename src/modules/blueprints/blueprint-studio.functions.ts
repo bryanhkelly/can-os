@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
-import { AuthorizationError } from "@/domain/command-context";
+import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { requireBlueprintSiteScope } from "@/domain/blueprint-studio-scope";
 import {
   createBlueprintConfigurationInputSchema,
@@ -38,6 +38,7 @@ export const readCanonicalBlueprintHome = createServerFn({ method: "GET" })
   .handler(async () => {
     noStore();
     const context = await getCanonicalCommandContext(getRequest());
+    assertCapability(context, "blueprint.read");
     return {
       role: context.role,
       siteIds: context.scope.siteIds ?? [],
