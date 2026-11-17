@@ -224,6 +224,25 @@ record lifecycles and audit commands remain unchanged by presentation migration.
   tests, and Storybook interaction coverage guard the reusable patterns.
   CI and authenticated end-to-end acceptance still need to pass for release.
 
+### Component-first adoption increment: guarded confirmation and accessible form sections
+
+- `ActionDialog` now holds a synchronous submission guard between the
+  first confirmation event and the parent mutation's pending update.
+  Duplicate clicks do not invoke the same confirmation twice; the guard resets
+  after the dialog closes or a pending operation settles. The parent still
+  owns authorization, command idempotency and persistence.
+- `FormSection` supports `columns={1}` for evidence narratives and lengthy
+  review fields while keeping the existing two-column layout by default.
+  The optional description is associated via `aria-describedby` and supports
+  semantic block content.
+- `FormActions` retains a non-submitting, context-preserving Cancel link
+  that is removed from keyboard navigation and whose click is prevented while
+  the parent reports pending.
+- Tests and interactive Storybook examples cover duplicate confirmation,
+  reopen/reset, disabled pending navigation, semantic descriptions and
+  one-column form layout. The shared-component checker enforces these
+  composition contracts, not route-specific business rules.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
