@@ -4,9 +4,10 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents, domainEvents, canonicalClasses, canonicalClassEnrollments,
+   canonicalClasses, canonicalClassEnrollments,
   canonicalPersons, learnerCourseAttempts,canonicalClassEnrollmentApprovalRequests,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
   planNativeClassExit, assertNativeClassOperatorExitScope,
@@ -178,13 +179,13 @@ async function exitNativeClass(command:ExitRequest){
       courseAttemptIdsWithdrawn:closedAttemptIds,
       occurredAt:now.toISOString(),
     };
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:actor.actorPersonId,occurredAt:now,
       owningOrganizationId:cls.operatingOrganizationId,
       eventCode:"class.enrollment."+decision.enrollmentStatus,
       entityKind:"class_enrollment",entityId:enrollment.id,payload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       actorPersonId:actor.actorPersonId,occurredAt:now,eventType,
       aggregateType:"class_enrollment",aggregateId:enrollment.id,payload,
     });
