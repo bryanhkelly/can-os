@@ -45,6 +45,51 @@ async function run(){
   `;
   if(!schema || Object.values(schema).some(value=>value!==true))
     throw new Error("WS00 QA missing migrated WS3/WS4 governance schema; no E2E acceptance");
+  // A first-time adult must be genuinely new and separately reviewed, not a
+  // synthetic native cookie or an age claim supplied by the browser.
+  const freshAccountId=required("CAN_WS00_QA_FRESH_LEARNER_CAN_ACCOUNT_ID");
+  if(!uuid.test(freshAccountId))
+    throw new Error("WS00 fresh CAN adult fixture needs a valid account UUID");
+  const [reviewSchema]=await sql`
+    SELECT to_regclass('public.access_adult_learning_reviews') IS NOT NULL AS exists,
+      EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='access_adult_learning_reviews'
+          AND c.relrowsecurity AND c.relforcerowsecurity) AS forced_rls
+  `;
+  if(!reviewSchema?.exists||!reviewSchema.forced_rls)
+    throw new Error("WS00 QA missing reviewed adult onboarding schema or FORCE RLS");
+  const [fresh]=await sql`
+    SELECT a.id,review.access_person_id,review.status,
+      review.consumed_at,review.canonical_account_id,
+      reviewer.email_verified_at AS reviewer_verified,
+      reviewer.disabled AS reviewer_disabled,
+      o.status AS home_org_status
+    FROM public.access_accounts a
+    JOIN public.access_adult_learning_reviews review ON
+      review.access_account_id=a.id AND review.access_person_id=a.person_id
+    JOIN public.access_accounts reviewer ON reviewer.id=review.reviewed_by_account_id
+    JOIN education_v30.organizations o ON o.id=review.organization_id
+    WHERE a.id=${freshAccountId}::uuid
+      AND a.email_verified_at IS NOT NULL AND a.disabled=false
+      AND reviewer.id<>a.id
+      AND review.reviewed_at <= now()
+      AND review.reviewed_at > now() - interval '365 days'
+      AND review.verified_birth_date <= current_date - interval '18 years'
+      AND review.verified_birth_date >= current_date - interval '125 years'
+      AND NOT EXISTS(SELECT 1 FROM public.access_account_noncredit_principals p
+        WHERE p.access_account_id=a.id)
+      AND NOT EXISTS(SELECT 1 FROM education_v30.canonical_accounts n
+        WHERE n.email_normalized=a.email_normalized)
+      AND EXISTS(SELECT 1 FROM public.account_person_grants g
+        WHERE g.account_id=a.id AND g.person_id=a.person_id AND g.active)
+      AND NOT EXISTS(SELECT 1 FROM public.account_person_grants g
+        WHERE g.account_id=a.id AND g.active AND
+          (g.person_id<>a.person_id OR g.role='student'))
+  `;
+  if(!fresh||fresh.status!=="approved"||fresh.consumed_at||
+     fresh.canonical_account_id||!fresh.reviewer_verified||
+     fresh.reviewer_disabled||fresh.home_org_status!=="active")
+    throw new Error("WS00 QA requires unused independently reviewed CAN-only adult fixture");
   const rows=await sql`
     SELECT id::text AS id,site_id::text AS site_id,
            course_version_id::text AS course_version_id,state
@@ -83,6 +128,7 @@ async function run(){
     branchId:expectedBranch,oneHourClasses:1,
     fourSessionClasses:2,distinctDeliverySites:2,
     minimumSessionsPerPilotClass:4,forcedRlsTables:5,
+    reviewedFreshAdultFixture:true,reviewedAdultForceRls:true,
     actualSignedInE2ePassed:false,
   },null,2));
 }
