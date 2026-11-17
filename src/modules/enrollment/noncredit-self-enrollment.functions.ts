@@ -451,10 +451,14 @@ async function readMyNoncreditHistoryPage(
       registrationId:noncreditCompletionDecisions.registrationId,
       outcome:noncreditCompletionDecisions.outcome,
       supersedesId:noncreditCompletionDecisions.supersedesId,
-    }).from(noncreditCompletionDecisions).where(
+    }).from(noncreditCompletionDecisions).where(and(
       inArray(noncreditCompletionDecisions.registrationId,registrationIds),
-    ).orderBy(desc(noncreditCompletionDecisions.decidedAt),desc(noncreditCompletionDecisions.id))
-      .limit(1000):[];
+      sql`NOT EXISTS(
+        SELECT 1 FROM education_v30.noncredit_completion_decisions later
+        WHERE later.supersedes_id=${noncreditCompletionDecisions.id}
+      )`,
+    )).orderBy(desc(noncreditCompletionDecisions.decidedAt),
+      desc(noncreditCompletionDecisions.id)):[];
     const superseded=new Set(decisions.flatMap(item=>
       item.supersedesId?[item.supersedesId]:[]));
     const current=new Map<string,(typeof decisions)[number]>();
