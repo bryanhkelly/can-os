@@ -171,6 +171,21 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 | 07 | DirectoryTable and pagination | Shared directory, bulk toolbar, known-count and unknown-total pagination are present | Tabular listings only; cards, gradebooks, matrices and personal timelines remain specialized |
 | 08 | RecordLayout, EntityCard, navigation, evidence and workflow shells | Existing canonical components, Storybook examples and source contracts | Extract presentation only where equivalent semantics and two or more consumers exist |
 
+### Component-first adoption increment: QueryState, notices, staffing and operational metrics
+
+- `WorkspaceNotice` now supports a governed `attention` tone for an
+  authorized write that succeeded but whose read model has not refreshed. This
+  must not be represented as a failed command or a completed reconciliation.
+  Its content wrapper supports block content without invalid paragraph nesting.
+- `QueryState` uses the canonical Button's pending state while retrying.
+- The Site director and Section facilitator workspaces share `SiteStaffingFeedback`
+  and canonical Button/Field/Select controls. Their authorization, effective-dated
+  assignments, optimistic concurrency and persisted refresh guard remain feature-owned.
+- `OutboxHealthPanel` composes canonical `StatCard` for both event and
+  school-family delivery counts, and uses `WorkspaceNotice` for unhandled events.
+- Component tests, Storybook states and lint/checker rules cover these adapters.
+  They are source-level changes, **not live-site or production acceptance**.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
