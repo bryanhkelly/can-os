@@ -151,3 +151,76 @@ test01 Drizzle ledger has not been stamped to mimic production:
 migration history reconciliation requires checking exact
 migration hashes and already-applied changes separately.
 This work does **not** lift the deployment hold.
+
+
+## Follow-up: index, trigger, RLS, constraint and migration-ledger audit
+
+A second read-only audit compared all `public` and `education_v30`
+index definitions, non-internal triggers, RLS policies, constraints, and
+`drizzle.__drizzle_migrations` between Neon `main` and `test01`.
+
+**Completed additive repairs on test01:**
+- Restored the missing `blueprint_configuration_review_append_only`
+  BEFORE UPDATE/DELETE trigger on
+  `education_v30.configuration_reviews`, using the existing
+  `education_v30.v27_reject_update_delete()` function. Verified it
+  is enabled on both branches.
+- Recreated six missing nonunique btree indexes from the reviewed
+  main schema: four foreign-key lookup indexes on
+  `education_v30.canonical_account_grants` (account, Person,
+  organization and Site) and two on
+  `education_v30.canonical_sessions` (account and active
+  grant/account). No existing rows were changed.
+- Confirmed the two jurisdiction uniqueness requirements were
+  already enforced on test01 by exact equivalent unique **indexes**.
+  The attempt to add identically named UNIQUE constraints was
+  rejected because those indexes already exist; the transaction
+  made no change and no duplicate constraint was installed.
+
+**Post-fix structural results:**
+
+| Catalog | Main | Test01 | Structural result |
+| --- | ---: | ---: | --- |
+| Indexes | 2,788 | 2,788 | Same definitions after normalizing index names |
+| User-defined triggers | 384 | 384 | Same enabled trigger definitions |
+| RLS policies | 412 | 398 | Policy differences require role-by-role review |
+| Migration ledger entries | 87 | 78 | Historical migration identities and hashes differ |
+
+**Intentional or not-yet-remediated differences:**
+- Fifteen owner/specialized read policies exist only on main, mostly
+  `can_v30_trusted_owner_access`; test01 alone has one
+  `site_identity_links_public_site_app_read` policy because that
+  branch has the `can_v30_public_site_app` login role, which main
+  does not. A blanket copy would create/broaden authority, so
+  neither branch's grants/RLS policies were changed.
+- The `site_local_content_status_ck` in main correctly permits
+  `draft`, `published`, and `review_required` (four draft
+  revisions exist there); test01's older constraint permits only
+  `published` and `review_required`. The approved source
+  migration `drizzle/0077_website_private_drafts.sql` defines
+  the desired `draft` option. **Replacing the existing QA
+  constraint requires a separately authorized DROP/ADD constraint
+  migration**. It was not done in this additive-only pass.
+- Some jurisdiction foreign-key and UNIQUE constraints have
+  different names but enforce the same relationships; equivalent
+  unique indexes exist in test01. No redundant constraints were
+  created.
+- Drizzle has **87 entries on main and 78 on test01**, and several
+  older matching timestamps have different hashes. The most recent
+  index/trigger repairs were applied as direct additive schema
+  reconciliation, not mislabeled as previously executed Drizzle
+  migrations. The migration ledger was not rewritten or stamped
+  to conceal divergent history.
+
+**Repeatable inspection:** `npm run db:canonical:drift-audit` invokes
+`scripts/acceptance/check-main-qa-db-drift.mjs` with explicitly
+verified branch IDs and read-only transactions on both databases.
+It compares normalized index definitions, active trigger definitions,
+relations and column types/defaults, reports security policies,
+constraints and migration-hash differences, and fails when structural
+drift persists. The script is committed, but was not executed against
+runtime database connection strings here; the direct Neon catalog
+queries above provide the verification evidence.
+
+Neither the database repair nor the source audit changes the existing
+Cloudflare application release HOLD/NO-GO status.
