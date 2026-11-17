@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, StatusBadge } from "@/components/workspace";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -311,7 +313,7 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
   const current=item.status==="active"||item.status==="pending";
   return <article className="border border-border bg-card p-5">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-      {item.status} · {item.creditMode.replace("_"," ")}
+      <StatusBadge tone={item.status==="active"||item.status==="completed"?"success":item.status==="pending"?"attention":"neutral"}>{item.status.replace("_"," ")}</StatusBadge> · {item.creditMode.replace("_"," ")}
     </p>
     <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
     <p className="mt-2 text-sm text-muted-foreground">{item.deliveryMode.replace("_"," ")}</p>
@@ -332,34 +334,34 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
         <label className="mt-3 block text-sm font-semibold" htmlFor={"transfer-"+item.classEnrollmentId}>
           Destination Class
         </label>
-        <select id={"transfer-"+item.classEnrollmentId} value={transferVersion}
+        <Select id={"transfer-"+item.classEnrollmentId} value={transferVersion}
           onChange={e=>{setTransferVersion(e.target.value);setTransferConsent(false);}}
-          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="mt-2">
           <option value="">Select a destination</option>
           {destinations.filter(row=>row.classId!==item.classId&&
             row.enrollmentMethods.includes("self")).map(row=>
             <option key={row.classOfferingVersionId} value={row.classOfferingVersionId}>
               {row.classTitle}
             </option>)}
-        </select>
+        </Select>
         {target&&<>
           <label className="mt-3 block text-sm font-semibold">Participation
-            <select value={transferCredit}
+            <Select value={transferCredit}
               onChange={e=>setTransferCredit(e.target.value as typeof transferCredit)}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2">
               {target.allowedCreditModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
-            </select>
+            </Select>
           </label>
           <p className="mt-3 whitespace-pre-wrap border border-border bg-muted/20 p-3 text-sm">
             {target.consentText}
           </p>
           <label className="mt-3 flex gap-2 text-sm">
-            <input type="checkbox" checked={transferAdult}
+            <Checkbox checked={transferAdult}
               onChange={e=>setTransferAdult(e.target.checked)}/>
             I confirm I am at least 18.
           </label>
           <label className="mt-3 flex gap-2 text-sm">
-            <input type="checkbox" checked={transferConsent}
+            <Checkbox checked={transferConsent}
               onChange={e=>setTransferConsent(e.target.checked)}/>
             I accept the destination Class terms and understand my current Class access ends.
           </label>
