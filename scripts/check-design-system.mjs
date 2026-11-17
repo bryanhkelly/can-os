@@ -135,6 +135,15 @@ const canonicalControlConsumers = {
     imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/select', './SiteStaffingFeedback'],
     forbidden: [/<(?:input|select|textarea|button|label)\\b/],
   },
+  "operations/SchoolOpeningReviewPanel.tsx": {
+    imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/input'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
+  "learning/SectionGradeFinalization.tsx": {
+    imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/input',
+      '@/components/ui/select', '@/components/ui/textarea'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
   "operations/LaunchOpeningTask.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/select', '@/components/ui/label'],
     forbidden: [/<(?:input|select|textarea|button|label)\b/],
