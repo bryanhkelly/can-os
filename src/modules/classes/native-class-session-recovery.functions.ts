@@ -11,6 +11,7 @@ import {
   canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { DomainError } from "@/domain/errors";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import {
@@ -54,7 +55,7 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId),
       ).limit(2);
       if(links.length!==1||links[0]!.accessPersonId!==owner.personId)
-        throw new AuthorizationError("independently linked learner identity required");
+        throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
       const link=links[0]!;
       const [operatorLink]=await tx.select({id:accessAccountCanonicalPrincipals.id})
         .from(accessAccountCanonicalPrincipals).where(and(
@@ -72,9 +73,10 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         eq(canonicalPersons.id,link.canonicalPersonId),
       ).where(eq(canonicalAccounts.id,link.canonicalAccountId)).limit(1);
       const now=new Date();
-      if(!native||native.email!==owner.email||!native.verified||native.disabledAt||
-         !verifiedAdultOn(native.birthDate,now))
-        throw new AuthorizationError("current independently verified adult native Person");
+      if(!native||native.email!==owner.email||!native.verified||native.disabledAt)
+        throw new AuthorizationError("current independently linked native Person");
+      if(!verifiedAdultOn(native.birthDate,now))
+        throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
       const grants=await tx.select({
         id:canonicalAccountGrants.id,organizationId:canonicalAccountGrants.organizationId,
       }).from(canonicalAccountGrants)
@@ -91,7 +93,7 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
           isNull(canonicalAccountGrants.siteId),
         )).limit(2);
       if(grants.length!==1)
-        throw new AuthorizationError("one current native learner home Organization grant");
+        throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
       const grant=grants[0]!;
       const issued=await issueNativeLearnerSession(tx,native.accountId,grant.id,now);
       await tx.insert(auditEvents).values({
