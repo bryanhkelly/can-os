@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import {
-  PageFrame, RecordHeader, RecordLayout, WorkspaceNotice, WorkspacePanel, StatusBadge,
+  PageFrame, RecordHeader, RecordLayout, RecordFacts, WorkspaceNotice, WorkspacePanel, StatusBadge,
 } from "@/components/workspace";
 import { getDemoCenter } from "@/modules/activities/demo-center.functions";
 import { SiteNativeClassHandoff } from "@/components/launch-studio/SiteNativeClassHandoff";
@@ -31,15 +31,12 @@ function DemoCenterPage() {
           a Course and an operator must establish a Class and its required approvals.
           The teacher then opens the actual Class, not a separate demo classroom.
         </p>
-        <Link to="/site-identity" search={{mode:"request",siteId:site.id}}
-          className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
-          Connect this Site to Class operations
-        </Link>
+
 
         <Link to="/class" search={{}} className="mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
           Explore available Classes
         </Link>
-        <Link to="/class" search={{view:"manage"}} className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
+        <Link to="/class" search={{view:"manage",siteId:site.id}} className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
           Manage Classes (authorized staff)
         </Link>
         <Link to="/class" search={{view:"content"}}
@@ -61,8 +58,11 @@ function DemoCenterPage() {
             <strong className="text-base">{nativeCourse.title}</strong>
             <StatusBadge tone="neutral">Course version: {nativeCourse.lifecycle}</StatusBadge>
           </div>
-          <p className="text-muted-foreground">Course code: {nativeCourse.courseCode}</p>
-          <p><strong>First lesson:</strong> {nativeCourse.lessonTitle??"Not created"}</p>
+          <RecordFacts variant="tiles" columns={3} label="Native Course details" items={[
+            {label:"Course code",value:nativeCourse.courseCode},
+            {label:"First lesson",value:nativeCourse.lessonTitle??"Not created"},
+            {label:"Release status",value:nativeCourse.lifecycle==="published"?"Published":"Not published"},
+          ]}/>
           <p className="text-muted-foreground">
             This Course exists in the native education schema. Its version must
             complete independent publication and be adopted by this Site
