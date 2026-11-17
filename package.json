@@ -41,6 +41,7 @@
     "test:family:p0:browser": "playwright test --config playwright.authenticated-routes.config.ts",
     "test:ws00:contracts": "node scripts/acceptance/check-ws00-cross-stream-guards.mjs",
     "verify:ws00:qa-readiness": "node scripts/acceptance/check-ws00-qa-readiness.mjs",
+    "test:e2e:ws00:single-login": "playwright test --config playwright.ws00-single-login.config.ts",
     "verify:ws00": "node scripts/acceptance/run-ws00-local-gate.mjs",
     "check:build-source-syntax": "node scripts/acceptance/check-build-source-syntax.mjs",
     "typecheck": "tsc --noEmit",
