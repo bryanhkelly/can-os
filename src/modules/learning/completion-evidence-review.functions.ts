@@ -225,8 +225,6 @@ export const requestCompletionEvidenceReview=createServerFn({method:"POST"})
   .validator((raw:unknown)=>requestSchema.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    if(process.env.CAN_WS3_EVIDENCE_REVIEW_ENABLED!=="true")
-      throw new AuthorizationError("evidence review flow not enabled");
     const request=getRequest(),actor=await getCanonicalCommandContext(request);
     assertPurposeCapability(actor,data.purpose);
     return db.transaction(async tx=>{
@@ -276,8 +274,6 @@ export const getPendingCompletionEvidenceReviews=createServerFn({method:"GET"})
   .validator((raw:unknown)=>pendingQueueInput.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_WS3_EVIDENCE_REVIEW_ENABLED!=="true")
-      throw new AuthorizationError("evidence review flow not enabled");
     const request=getRequest(),actor=await getCanonicalCommandContext(request);
     if(!actor.actorPersonId || !["site_admin","registrar"].includes(actor.role??"") ||
        actor.scope.organizationIds?.length!==1 || actor.scope.siteIds?.length!==1)
@@ -329,8 +325,6 @@ export const decideCompletionEvidenceReview=createServerFn({method:"POST"})
   .validator((raw:unknown)=>decisionSchema.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_WS3_EVIDENCE_REVIEW_ENABLED!=="true")
-      throw new AuthorizationError("evidence review flow not enabled");
     const request=getRequest(),actor=await getCanonicalCommandContext(request);
     return db.transaction(async tx=>{
       const [record]=await tx.select().from(learningCompletionEvidenceReviewRequests)
