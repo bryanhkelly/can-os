@@ -5,12 +5,13 @@ import {and,asc,count,desc,eq,gt,inArray,isNull,lte,or} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
- auditEvents,domainEvents,canonicalClasses,canonicalClassOfferings,
+ canonicalClasses,canonicalClassOfferings,
  canonicalClassEnrollmentRepeatAuthorizations,
  canonicalClassOfferingVersions,canonicalClassEnrollments,
  canonicalClassEnrollmentApprovalRequests,canonicalPersons,
  guardianAuthorities,learnerProfiles,learnerCourseAttempts,participationAttributions,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
 import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
@@ -124,7 +125,7 @@ export const requestNativeGuardianClassApproval=createServerFn({method:"POST"})
       lte(canonicalClassEnrollmentApprovalRequests.expiresAt,new Date()),
     )).returning({id:canonicalClassEnrollmentApprovalRequests.id});
    for(const item of expired){
-    await tx.insert(domainEvents).values({eventType:"ClassApprovalExpired",
+    await emitCanonicalDomainEvent(tx,{eventType:"ClassApprovalExpired",
       aggregateType:"class_approval_request",aggregateId:item.id,
       actorPersonId:guardian.personId,payload:{classId:cls.id,reason:"expired"}});
    }
@@ -144,13 +145,13 @@ export const requestNativeGuardianClassApproval=createServerFn({method:"POST"})
     requestedAt:createdAt,expiresAt:new Date(createdAt.getTime()+expiryMs),
    }).returning({id:canonicalClassEnrollmentApprovalRequests.id});
    if(!saved)throw new Error("guardian Class application not saved");
-   await tx.insert(auditEvents).values({actorPersonId:guardian.personId,
+   await writeCanonicalAudit(tx,{actorPersonId:guardian.personId,
     owningOrganizationId:current.operatingOrganizationId,
     eventCode:"class.guardian_approval.requested",
     entityKind:"class_approval_request",entityId:saved.id,
     payload:{classId:cls.id,learnerPersonId:data.learnerPersonId,guardianPersonId:guardian.personId,
       siteId:current.siteId,seatReserved:false}});
-   await tx.insert(domainEvents).values({eventType:"ClassGuardianApprovalRequested",
+   await emitCanonicalDomainEvent(tx,{eventType:"ClassGuardianApprovalRequested",
     aggregateType:"class_approval_request",aggregateId:saved.id,
     actorPersonId:guardian.personId,
     payload:{classId:cls.id,learnerPersonId:data.learnerPersonId,siteId:current.siteId}});
@@ -302,7 +303,7 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
        eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
        isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
      ));
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
      eventType:"ClassRepeatAuthorizationConsumed",
      aggregateType:"class_repeat_authorization",aggregateId:repeatAuthorization.id,
      actorPersonId:guardian.personId,
@@ -318,11 +319,11 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
     learnerPersonId:approval.learnerPersonId,guardianPersonId:guardian.personId,
     classEnrollmentId:enrollment.id,courseAttemptId:attempt.id,
     approvalRequestId:approval.id,consentVersion:terms.consentVersion,consentSha256};
-   await tx.insert(auditEvents).values({actorPersonId:guardian.personId,
+   await writeCanonicalAudit(tx,{actorPersonId:guardian.personId,
     owningOrganizationId:current.operatingOrganizationId,
     eventCode:"class.guardian_approval.accepted",entityKind:"class_enrollment",
     entityId:enrollment.id,payload});
-   await tx.insert(domainEvents).values({actorPersonId:guardian.personId,
+   await emitCanonicalDomainEvent(tx,{actorPersonId:guardian.personId,
     eventType:"ClassGuardianEnrollmentCreated",aggregateType:"class_enrollment",
     aggregateId:enrollment.id,payload});
    return {classEnrollmentId:enrollment.id,courseAttemptId:attempt.id};
@@ -371,11 +372,11 @@ export const withdrawMyGuardianNativeClassEnrollment=createServerFn({method:"POS
    const payload={classId:cls.id,classEnrollmentId:enrollment.id,
     learnerPersonId:enrollment.learnerPersonId,guardianPersonId:guardian.personId,
     reason:"guardian_requested"};
-   await tx.insert(auditEvents).values({actorPersonId:guardian.personId,
+   await writeCanonicalAudit(tx,{actorPersonId:guardian.personId,
     owningOrganizationId:cls.operatingOrganizationId,
     eventCode:"class.guardian_enrollment.withdrawn",entityKind:"class_enrollment",
     entityId:enrollment.id,payload});
-   await tx.insert(domainEvents).values({actorPersonId:guardian.personId,
+   await emitCanonicalDomainEvent(tx,{actorPersonId:guardian.personId,
     eventType:"ClassEnrollmentWithdrawn",aggregateType:"class_enrollment",
     aggregateId:enrollment.id,payload});
    return {alreadyWithdrawn:false};
