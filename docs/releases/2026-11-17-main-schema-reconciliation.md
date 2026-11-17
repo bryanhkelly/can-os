@@ -98,3 +98,56 @@ DATABASE_URL="$DATABASE_URL" npm run db:canonical:main-schema
 The database inspections above were executed directly. The new script,
 application typecheck, unit suite, Cloudflare build, and authenticated
 browser acceptance were **not** executed in this review.
+
+
+## November 17 follow-up: column-level parity across main and test01
+
+A read-only comparison of all `public` and `education_v30`
+columns identified that the five earlier differences were **not**
+missing production columns. `main` already had 14 more columns
+than `test01`:
+
+- `education_v30.canonical_sessions`: seven coarse session-device
+  fields (client instance, device category, browser family, OS family,
+  IP address, observation time and shared-device marker).
+- `education_v30.learning_session_events`: one `evidence_level`
+  field with the bounded evidence-category check.
+- `public.access_sessions`: six coarse session-device metadata
+  fields, with an account/client-instance lookup index.
+
+The other two drifted tables,
+`education_v30.noncredit_self_enrollment_releases` and
+`public.jurisdiction_profile_versions`, only differed in physical
+column order. No incompatible types, nullability or defaults were
+found.
+
+**Migration applied:** the existing, additive
+`drizzle/0079_session_device_evidence.sql` and
+`drizzle/0080_session_device_retention.sql` definitions were
+applied to Neon **test01 only** using 29 controlled DDL statements,
+after explicitly verifying the Neon branch ID. The existing
+`learning_session_events_evidence_level_ck` constraint was
+not dropped; it was created directly on the previously missing
+column. No production data or schema was altered in this follow-up.
+No historic session, account, learner or evidence rows were copied,
+rewritten or deleted.
+
+**Post-migration verification:**
+- Both branches now expose **689 tables/views**, with zero
+  relations missing in either direction.
+- Both `public` and `education_v30` expose **6,044 column
+  definitions**, with zero missing names or differences in
+  data type, nullability or defaults.
+- `access_sessions_client_instance_idx` and the
+  `learning_session_events_evidence_level_ck` constraint
+  are present on both branches.
+- Existing `public.access_sessions` rows were retained:
+  274 on main; 15 on test01 when checked.
+
+**Scope limitation:** this confirms relation and column parity,
+not every historical migration ledger entry, trigger body, policy
+definition, row count or production runtime integration. The
+test01 Drizzle ledger has not been stamped to mimic production:
+migration history reconciliation requires checking exact
+migration hashes and already-applied changes separately.
+This work does **not** lift the deployment hold.
