@@ -90,7 +90,9 @@ describe("one native Class route and reusable manager",()=>{
     const staging=read("src/routes/canonical.course-activities.tsx");
     const manager=read("src/components/learning/NativeClassManager.tsx");
     expect(home).toContain('value.view==="activities"');
-    expect(home).toContain("<PublisherCourseActivityEditor navigation={navigation}/>");
+    expect(home).toContain("<PublisherCourseActivityEditor key={selected.courseVersionId");
+    expect(home).toContain("preferredCourseVersionId={selected.courseVersionId}");
+    expect(home).toContain("courseVersionId:selectedClassUuid(value.courseVersionId)");
     expect(tabs).toContain('search={{view:"activities"}}');
     expect(editor).toContain("export function PublisherCourseActivityEditor");
     expect(editor).toContain("getPublisherCourseActivityOptions()");
