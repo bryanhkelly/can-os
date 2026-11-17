@@ -267,6 +267,8 @@ for (const [path, component] of Object.entries(statusConsumers)) {
 const metricConsumers = {
   "operations/OutboxHealthPanel.tsx": ["<StatCard", "<WorkspaceNotice", "<QueryState"],
   "operations/SiteStaffingFeedback.tsx": ["<WorkspaceNotice", "<Button"],
+  "operations/SchoolOpeningReviewPanel.tsx": ["<StatusBadge", "<MutationFeedback", "<QueryState", "<Field", "<Button"],
+  "learning/SectionGradeFinalization.tsx": ["<WorkspaceNotice", "<MutationFeedback", "<QueryState", "<Field", "<Button"],
 };
 for (const [file, required] of Object.entries(metricConsumers)) {
   const source = readFileSync(join(root, file), "utf8");
