@@ -1,6 +1,6 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
 import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -10,6 +10,11 @@ import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getProviderContentWorkspace } from "@/modules/learning/provider-content-workspace.functions";
 import { createRecordedInstructionDraft } from "@/modules/learning/instructional-tracks.functions";
 import { ProviderVideoUploadForm } from "@/components/learning/ProviderVideoUploadForm";
+
+const NativeCourseDraftEditor=lazy(async()=>{
+  const module=await import("@/components/learning/NativeCourseDraftEditor");
+  return {default:module.NativeCourseDraftEditor};
+});
 
 export function ProviderInstructionHome({navigation}:{navigation?:import("react").ReactNode}) {
   const workspace = useQuery({
@@ -33,6 +38,9 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
   const { courses, tracks, assignmentsLimited } = workspace.data;
   const versions = courses.flatMap(course => course.publishedVersions.map(version => ({
     id: version.id, label: `${course.code} · ${course.title} · Course v${version.versionNo}`,
+  })));
+  const draftVersions=courses.flatMap(course=>course.draftVersions.map(version=>({
+    id:version.id,label:`${course.code} · ${course.title} · Draft v${version.versionNo}`,
   })));
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -82,6 +90,11 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating content draft…"/>
       {!versions.length && <p role="status" className="mt-4 text-sm">No published Course versions are assigned to your currently verified provider appointment.</p>}
     </section>
+    {draftVersions.length>0&&<Suspense fallback={<p role="status" className="mt-5 text-sm">
+      Opening authorized Course drafts…
+    </p>}>
+      <NativeCourseDraftEditor versions={draftVersions}/>
+    </Suspense>}
     <ProviderVideoUploadForm versions={versions}/>
     <section className="mt-7" aria-label="My instructional track versions">
       <h2 className="font-serif text-2xl">My tracks</h2>
