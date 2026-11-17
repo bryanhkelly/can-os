@@ -6,8 +6,9 @@ import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassStaffAssignments,
   canonicalAccountGrants, canonicalAccounts, canonicalPersons,
-  auditEvents, domainEvents,
+  
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { validateClassAuthority } from "./unified-class-authority.server";
@@ -103,7 +104,7 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
         state:"approved",beginsAt:new Date(),assignedByPersonId:manager.actor.actorPersonId!,
       }).returning({id:canonicalClassStaffAssignments.id});
       if(!assignment)throw new Error("Staff assignment was not saved");
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:manager.actor.actorPersonId!,
         owningOrganizationId:manager.organizationId,
         eventCode:"class.staff_assigned",
@@ -111,7 +112,7 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
         payload:{classId:instance.id,personId:data.personId,roleCode:data.roleCode,
           attendanceAuthorized:data.canVerifyAttendance},
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"ClassStaffAssigned",aggregateType:"class",aggregateId:instance.id,
         actorPersonId:manager.actor.actorPersonId!,
         payload:{assignmentId:assignment.id,personId:data.personId,roleCode:data.roleCode,
@@ -140,7 +141,7 @@ export const endNativeClassStaffAssignment=createServerFn({method:"POST"})
       await tx.update(canonicalClassStaffAssignments)
         .set({state:"ended",endsAt:endedAt})
         .where(eq(canonicalClassStaffAssignments.id,assignment.id));
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:manager.actor.actorPersonId!,
         owningOrganizationId:manager.organizationId,
         eventCode:"class.staff_ended",
