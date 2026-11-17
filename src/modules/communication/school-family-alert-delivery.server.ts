@@ -2,6 +2,7 @@ import { and, asc, eq, gt, isNotNull, isNull, lte, notInArray, or, sql } from "d
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/domain/outbound-sms-safety";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import {
   dispatchOutboundMessages, type OutboundClaim, type OutboundPreparation,
@@ -205,12 +206,12 @@ const schoolFamilyAdapter = {
     // Twilio's current sender does not provide a durable idempotent receipt.
     // A timeout or worker exception can follow provider acceptance, so SMS
     // failures are deliberately terminal until provider-side reconciliation.
-    const uncertainSms = claim.sourceChannel === "sms" && result.kind === "failed";
+    const outcome = outboundAttemptOutcome(claim.sourceChannel ?? "unknown", result);
     const rows = await db.update(delivery).set({
       status: result.kind, attempts: result.attempts,
       acceptedAt: result.kind === "accepted" ? result.now : null,
-      lastError: uncertainSms ? "sms_provider_outcome_unconfirmed" : result.reason,
-      nextAttemptAt: uncertainSms ? null : result.nextAttemptAt,
+      lastError: outcome.lastError,
+      nextAttemptAt: outcome.nextAttemptAt,
       leaseUntil: null, updatedAt: result.now,
     }).where(owned(claim)).returning({ id: delivery.id });
     return rows.length > 0;
@@ -230,7 +231,7 @@ export async function processSchoolFamilyOutboundDeliveries(now = new Date(), li
   const clock = new Date(Math.max(Date.now(), now.getTime()));
   await db.update(delivery).set({
     status: "failed", nextAttemptAt: null, leaseUntil: null,
-    lastError: "sms_provider_outcome_unconfirmed", updatedAt: clock,
+    lastError: SMS_PROVIDER_OUTCOME_UNCONFIRMED, updatedAt: clock,
   }).where(and(
     eq(delivery.channel, "sms"),
     eq(delivery.status, "processing"),
