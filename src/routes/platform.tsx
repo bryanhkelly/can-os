@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { normalizeClientError } from "@/lib/client-error";
 import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@/modules/classes/native-class-adult-review.functions";
-import { WorkspaceShell } from "@/components/workspace";
+import { DirectoryTable, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
 
@@ -49,25 +49,14 @@ function PlatformAdministration() {
         An approved correspondence and a canonical Site record are prerequisites
         for further staff identity verification. This view does not approve them.
       </p>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead><tr className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-            <th scope="col" className="py-3 pr-4">Site</th>
-            <th scope="col" className="py-3 pr-4">Identity review</th>
-            <th scope="col" className="py-3">Canonical Site</th>
-          </tr></thead>
-          <tbody>
-            {summary.siteReadiness.map(site => <tr key={site.siteId} className="border-b border-border">
-              <td className="py-3 pr-4 font-medium">{site.siteName}</td>
-              <td className="py-3 pr-4">{site.linkStatus.replaceAll("_", " ")}</td>
-              <td className="py-3">{site.canonicalSiteExists ? "Present" : "Not established"}</td>
-            </tr>)}
-          </tbody>
-        </table>
-        {summary.siteReadiness.length === 0 && <p className="py-5 text-sm text-muted-foreground">
-          No Sites are registered in the school directory.
-        </p>}
-      </div>
+      <DirectoryTable label="Site identity readiness" caption="Sites visible to the authorized platform administrator."
+        rows={summary.siteReadiness} rowKey={site=>site.siteId}
+        empty={<p className="p-4 text-sm text-muted-foreground">No Sites are registered in the school directory.</p>}
+        columns={[
+          {id:"site",title:"Site",render:site=>site.siteName},
+          {id:"identity",title:"Identity review",render:site=>site.linkStatus.replaceAll("_"," ")},
+          {id:"canonical",title:"Canonical Site",render:site=>site.canonicalSiteExists?"Present":"Not established"},
+        ]}/>
       {summary.sites > summary.siteReadiness.length &&
         <p className="mt-3 text-xs text-muted-foreground">
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
