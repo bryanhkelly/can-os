@@ -53,8 +53,8 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
     subtitle="Discuss classwork with enrolled students. The assigned teaching team can respond, lock discussions and moderate posts."
     breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Updating class discussion..."/>
-    {section && !sections.length && <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This class is unavailable in your current teaching membership.</p>}
-    {sections.length > 0 && <details className="mt-6 rounded-xl border bg-card p-5" open={lesson?true:undefined}>
+    {section && !sections.length && <p role="alert" className="mt-5  border p-4 text-sm">This class is unavailable in your current teaching membership.</p>}
+    {sections.length > 0 && <details className="mt-6  border bg-card p-5" open={lesson?true:undefined}>
       <summary className="cursor-pointer font-semibold">Start a class discussion</summary>
       <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();
@@ -97,13 +97,13 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
       {thread.curriculumLessonId&&<p className="mb-2 text-xs text-muted-foreground">
         Publisher lesson: {data.sections.find(item=>item.id===thread.sectionId)?.curriculumLessons.find(item=>item.id===thread.curriculumLessonId)?.title??thread.curriculumLessonId}
       </p>}
-      <button type="button" disabled={busy} onClick={() => void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: !thread.locked } }))}
-        className="text-sm underline disabled:opacity-50">{thread.locked ? "Unlock discussion" : "Lock discussion"}</button>
-      <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={"rounded-lg border p-4 text-sm " + (message.parentMessageId ? "ml-4" : "")}>
+      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: !thread.locked } }))}
+        className="text-sm underline">{thread.locked ? "Unlock discussion" : "Lock discussion"}</Button>
+      <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={" border p-4 text-sm " + (message.parentMessageId ? "ml-4" : "")}>
         <p className="text-xs text-muted-foreground">{message.authorLabel} · {new Date(message.createdAt).toLocaleString()}</p>
         <p className="mt-2 whitespace-pre-wrap">{message.body}</p>
-        {message.canModerate && <button type="button" disabled={busy} onClick={() => void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: !message.hidden } }))}
-          className="mt-3 text-xs underline disabled:opacity-50">{message.hidden ? "Restore post" : "Hide post"}</button>}
+        {message.canModerate && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: !message.hidden } }))}
+          className="mt-3 text-xs underline">{message.hidden ? "Restore post" : "Hide post"}</Button>}
       </article>)}</div>
       {!thread.locked && <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();
@@ -125,7 +125,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
       </form>}
     </WorkspacePanel>)}</div>
     {selectedThread && <p className="mt-4 text-sm"><Link to="/teacher/discussions" search={{ section, lesson }} className="underline">Show all class discussions</Link></p>}
-    {!threads.length && <p role="status" className="mt-5 rounded-xl border p-5 text-sm text-muted-foreground">
+    {!threads.length && <p role="status" className="mt-5  border p-5 text-sm text-muted-foreground">
       {selectedThread ? "This discussion is not available in your selected class or lesson." :
         lesson ? "No discussions are linked to this lesson yet." : "No class discussions yet."}
     </p>}
