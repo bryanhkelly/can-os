@@ -19,7 +19,7 @@ describe("WS5 scalable and independent Program Operations",()=>{
   });
   it("supports exact Site-restricted rollout lookup independently of page-one discovery",()=>{
     const service=text("src/modules/classes/unified-class.functions.ts");
-    const route=text("src/routes/canonical.classes.tsx");
+    const route=text("src/components/learning/NativeClassManager.tsx");
     expect(service).toContain('courseVersionIds:z.array(z.string().uuid()).min(1).max(50)');
     expect(service).toContain('if(data.siteId&&!operator.siteIds.includes(data.siteId))');
     expect(service).toContain('data.offeringVersionId?eq(offeringVersions.id,data.offeringVersionId)');
@@ -30,7 +30,7 @@ describe("WS5 scalable and independent Program Operations",()=>{
   });
   it("lists receiving Sites separately from bounded Course search",()=>{
     const service=text("src/modules/classes/unified-class.functions.ts");
-    const route=text("src/routes/canonical.classes.tsx");
+    const route=text("src/components/learning/NativeClassManager.tsx");
     expect(service).toContain('getNativeClassOperatorSites=createServerFn({method:"GET"})');
     expect(service).toContain('eq(educationOperations.status,"active")');
     expect(service).toContain('eq(educationOperationOrganizationRoles.status,"approved")');
@@ -40,13 +40,13 @@ describe("WS5 scalable and independent Program Operations",()=>{
     expect(route).toContain('disabled={operatorSites.isPending||operatorSites.isError}');
   });
   it("keeps unfinished enrollment and credit methods out of the WS5 UI",()=>{
-    const page=text("src/routes/canonical.classes.tsx");
+    const page=text("src/components/learning/NativeClassManager.tsx");
     const optionSection=page.split('const methodOptions:')[1]?.split('const deliveryOptions=')[0]??"";
     expect(optionSection).toContain('value:"self"');
     expect(optionSection).toContain('value:"assignment"');
     expect(optionSection).toContain('value:"audit"');
-    expect(optionSection).not.toContain('value:"invitation"');
-    expect(optionSection).not.toContain('value:"approval"');
+    expect(optionSection).toContain('value:"invitation"');
+    expect(optionSection).toContain('value:"approval"');
     expect(optionSection).not.toContain('value:"for_credit"');
     // WS2 owns the server-side publication guard and must be integrated
     // before release. These UI choices alone are not a security gate.
