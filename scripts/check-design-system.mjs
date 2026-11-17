@@ -490,6 +490,15 @@ if (nativeCardStart < 0 || !nativeCard.includes("<StatusBadge") ||
 // feature component, role, responsive layout or production flow was accepted.
 // Each route keeps its existing readers, authorization and mutation ownership.
 const migratedV61RouteControls = {
+  "routes/access.index.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/field",
+    "<WorkspacePanel", "<Field",
+  ],
+  "routes/access.register.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/field",
+    "@/components/ui/choice", "@/components/ui/label", "<Field",
+  ],
+  "routes/access.verify.tsx": ["@/components/ui/button", "<Button"],
   "routes/account.index.tsx": [
     "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
     "@/components/ui/choice", "@/components/ui/label",
@@ -532,9 +541,12 @@ for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   }
   // This only scans component consumers. The underlying shared native elements
   // are correct and must not be prohibited inside the primitives themselves.
-  if (/<(?:button|input|select|textarea|label)\\b/.test(source) ||
+  // Hidden POST fields in passwordless authentication are deliberately native:
+  // the styled Input primitive must never make a hidden credential visible.
+  const visibleSource = source.replace(/<input\\s+type=["']hidden["'][^>]*\\/>/g, "");
+  if (/<(?:button|input|select|textarea|label)\\b/.test(visibleSource) ||
       radiusUtility.test(source)) {
-    console.error(`${file} reintroduced a native control or legacy rounded geometry`);
+    console.error(`${file} reintroduced a native visible control or legacy rounded geometry`);
     process.exitCode = 1;
   }
 }
