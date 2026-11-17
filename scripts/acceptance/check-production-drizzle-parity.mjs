@@ -14,7 +14,7 @@ import { neon } from "@neondatabase/serverless";
 const PROJECT = "sweet-hall-62441909";
 const BRANCH = "br-restless-sea-ar9ooo55";
 const start = 76;
-const tip = 84;
+const tip = 85;
 const expectedAdded = new Map([
   [79, "public.access_session_signals"],
   [81, "public.access_account_favorite_sites"],
@@ -129,7 +129,7 @@ const [check] = await query`
    EXISTS (SELECT 1 FROM pg_trigger
      WHERE tgname='can_account_grants_one_person_guard' AND tgenabled IN ('O','A')) AS one_person_grant_guard
 `;
-assert.equal(Number(check?.migration_count), 86, "Drizzle migration ledger must contain exactly 86 records.");
+assert.equal(Number(check?.migration_count), 87, "Drizzle migration ledger must contain exactly 87 records.");
 for (const [key, value] of Object.entries(check)) {
   if (key !== "migration_count") assert.equal(value, true, `Missing required production object: ${key}`);
 }
@@ -141,7 +141,7 @@ console.log(JSON.stringify({
   role:identity.database_user,
   migrations:Number(check.migration_count),
   last_migration:expectedRows.at(-1).tag,
-  tip_snapshot:"0084_snapshot.json",
+  tip_snapshot:"0085_snapshot.json",
   models:Object.keys(current.tables).length,
   note:"Read-only schema/ledger check; does NOT establish Cloudflare deployment, role-based browser acceptance or production rollback.",
 },null,2));
