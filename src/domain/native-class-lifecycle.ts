@@ -173,7 +173,7 @@ export function assertVerifiedAdultNativeClassExit(
  * Call under the Class's FOR UPDATE lock after the open-enrollment lookup.
  */
 export function assertNativeClassSeatAvailable(args:{
-  method:"self"|"assignment";
+  method:"self"|"invitation"|"assignment";
   activeOrPending:number;
   classCapacity:number|null;
   offeringCapacity?:number|null;
@@ -182,7 +182,7 @@ export function assertNativeClassSeatAvailable(args:{
     throw new AuthorizationError("valid Class occupancy count");
   }
   const capacities=[args.classCapacity,
-    ...(args.method==="self"?[args.offeringCapacity??null]:[])];
+    ...(args.method!=="assignment"?[args.offeringCapacity??null]:[])];
   for(const cap of capacities){
     if(cap!==null && (!Number.isSafeInteger(cap)||cap<=0)){
       throw new AuthorizationError("valid positive Class capacity");
