@@ -38,6 +38,30 @@ Run with current database evidence; do not assume these observations remain true
 - There are currently zero `app_admin` grants. Do not claim an App Admin
   login or password exists.
 
+## Verified administrator-bootstrap blocker (2026-11-17)
+
+Read-only Neon queries against both `main` (production) and `test01`
+returned zero eligible, active `app_admin` grants and zero eligible,
+active CAN institutional `can_network_steward` approver grants.
+The eligibility checks require independently verified, active, non-demo
+accounts and Persons with exact authorized grant scope.
+
+`npm run db:canonical:staff-readiness` now reports
+`first_admin_provisioning_blocked: true` when neither eligible authority
+exists. This is an operational deadlock, **not** permission for the
+application to self-appoint an administrator.
+
+An institutional authority outside this provisioner must first authorize
+the named reviewer through a separate, auditable appointment process.
+Only after that approved authority exists may the existing
+`npm run admin:provision` preflight and independent-approver path be used.
+Do not create a production steward or App Admin via a seed, migration,
+shared Valor demo identity, matching email, or unreviewed API request.
+
+The staff-readiness query is source-level and count-based: it never
+provisions privileges and is not a substitute for authenticated browser
+acceptance, restricted-role execution, or the complete Blueprint lifecycle.
+
 ## Separate trusted App Admin bootstrap
 
 1. Independently choose the actual operator-owned, existing verified CAN account
