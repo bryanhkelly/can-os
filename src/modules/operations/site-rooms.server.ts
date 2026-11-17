@@ -58,6 +58,7 @@ export async function createSchoolRoom(actor: AccessContext, value: z.infer<type
     capability: "program.launch.start",
     validate: input => createSiteRoomSchema.parse(input),
     transaction: work => db.transaction(work),
+    auditOwnedByExecute: true,
     execute: async (tx, context, input) => {
       const school = await roomSchool(tx, context as AccessContext, input.programId);
       // createRoomRecord owns stable room-ID replay, event and audit writes.
