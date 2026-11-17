@@ -41,9 +41,12 @@ export function BlueprintReviewHistoryPanel({ configurationVersionId }: {
         tone: item.decision === "approved" ? "success" as const :
           item.decision === "rejected" ? "danger" as const :
           item.decision === "conditional" ? "attention" as const : "neutral" as const,
-        description: item.evidenceVersionId
-          ? `Supporting evidence version: ${item.evidenceVersionId}`
-          : "No supporting evidence version recorded",
+        description: <div className="space-y-1">
+          {item.rationale && <p>{item.rationale}</p>}
+          <p>{item.evidenceVersionId
+            ? `Supporting evidence version: ${item.evidenceVersionId}`
+            : "No supporting evidence version recorded"}</p>
+        </div>,
       }))}/>}
     {history.data && (page > 0 || history.data.hasMore) &&
       <nav aria-label="Blueprint review history pages" className="flex flex-wrap items-center gap-3 text-sm">
