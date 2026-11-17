@@ -108,6 +108,7 @@ const waitlistCursor=z.object({
 }).strict();
 async function readMyNoncreditWaitlistPage(
   cursor:z.infer<typeof waitlistCursor>|null,
+  releaseId?:string,
 ){
   privateGuard();
   const actor=await getCommandContext(getRequest());
@@ -140,6 +141,7 @@ async function readMyNoncreditWaitlistPage(
     .where(and(
       eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId),
       eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId),
+      releaseId?eq(noncreditEnrollmentWaitlist.releaseId,releaseId):undefined,
       inArray(noncreditEnrollmentWaitlist.status,["waiting","invited"]),
       cursor?or(
         sql`${noncreditEnrollmentWaitlist.joinedAt} < ${cursor.joinedAt}::timestamptz`,
@@ -181,6 +183,15 @@ export const getMyNoncreditWaitlistPage=createServerFn({method:"GET"})
     cursor:waitlistCursor.nullable().default(null),
   }).strict().parse(raw))
   .handler(async({data})=>readMyNoncreditWaitlistPage(data.cursor));
+
+/** Exact authorized waiting-list record for the signed-in verified CAN Person.
+ * The release ID narrows the existing ownership query, never supplies authority. */
+export const getMyNoncreditWaitlistByRelease=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({releaseId:z.string().uuid()}).strict().parse(raw))
+  .handler(async({data})=>{
+    const page=await readMyNoncreditWaitlistPage(null,data.releaseId);
+    return page.items[0]??null;
+  });
 
 /** Existing first-100 reader for the training management page. */
 export const getMyNoncreditWaitlist=createServerFn({method:"GET"})

@@ -368,14 +368,6 @@ function MyActivityPage() {
              managing={managingKey===item.key} onManage={()=>{setShowAllTraining(false);setManagingKey(current=>current===item.key?null:item.key);}}/>)}
         </div>
       </section>}
-      <section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
-         <button type="button" aria-expanded={showAllTraining}
-           className="min-h-11 text-sm font-semibold text-primary underline underline-offset-4"
-           onClick={()=>{setManagingKey(null);setShowAllTraining(value=>!value);}}>
-           {showAllTraining?"Hide all training controls":"Manage all training registrations and waiting lists"}
-         </button>
-         {showAllTraining&&<NoncreditEnrollmentManagement/>}
-       </section>
        <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
         <h2 className="font-semibold text-foreground">One CAN account, independently authorized access</h2>
         <p className="mt-2">Personal records are assembled across independently verified memberships and guardian relationships, while every provider retains authority over its own records. An unverified Site, other Person, or staff role never grants learner access.</p>
@@ -385,5 +377,15 @@ function MyActivityPage() {
         </p>
       </section>
     </>}
+    {/* Training controls use separate source-authorized readers and remain
+        available even when the assembled participation read model fails. */}
+      <section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
+         <button type="button" aria-expanded={showAllTraining}
+           className="min-h-11 text-sm font-semibold text-primary underline underline-offset-4"
+           onClick={()=>{setManagingKey(null);setShowAllTraining(value=>!value);}}>
+           {showAllTraining?"Hide all training controls":"Manage all training registrations and waiting lists"}
+         </button>
+         {showAllTraining&&<NoncreditEnrollmentManagement/>}
+       </section>
   </WorkspaceShell>;
 }
