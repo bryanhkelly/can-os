@@ -203,19 +203,16 @@ for (const eventType of [
   EventTypes.FamilyInvitationBatchCompleted,
   EventTypes.StudentLearningAccessApproved,
   EventTypes.SectionProvisioned,
-  EventTypes.SectionScheduleChanged,
   EventTypes.SectionClosed,
   EventTypes.SectionReopened,
   EventTypes.SectionTeacherReplaced,
   EventTypes.SectionEnrollmentChanged,
   EventTypes.SectionEnrollmentActivated,
   EventTypes.SectionEnrollmentDropped,
-  EventTypes.SectionEnrollmentWithdrawn,
   EventTypes.SectionStudentTransferred,
   EventTypes.SectionWaitlistAdded,
   EventTypes.SectionWaitlistResolved,
   EventTypes.SectionWaitlistPromoted,
-  EventTypes.SectionWaitlistSeatOffered,
   EventTypes.SectionWaitlistOfferExpired,
   EventTypes.SectionFacilitatorAppointed,
   EventTypes.SectionFacilitatorRevoked,
@@ -224,8 +221,6 @@ for (const eventType of [
   EventTypes.CourseRegistrationGuardianDecision,
   EventTypes.CourseRegistrationPolicyChanged,
   EventTypes.SectionCreationRequested,
-  EventTypes.SectionCreationRequestDeclined,
-  EventTypes.SectionCreationRequestFulfilled,
   EventTypes.CurriculumCartridgeValidated,
   EventTypes.CurriculumSupplementAdded,
   EventTypes.CurriculumSupplementChanged,
@@ -291,8 +286,8 @@ for (const eventType of [
   registerDomainEventHandler(eventType, handleAcademicPassThroughEvent);
 }
 
-// Schedule changes must fan out to scoped recipients through the notification
-// policy; do not let the generic audit-only pass-through swallow them.
+// These lifecycle events have notification policies and must not be consumed
+// by the audit-only pass-through registry above.
 registerDomainEventHandler(EventTypes.SectionScheduleChanged, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionEnrollmentWithdrawn, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionWaitlistSeatOffered, handleNotificationPolicyEvent);
