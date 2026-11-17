@@ -67,7 +67,7 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
 describe("native Class enrollment with one interactive CAN sign-in",()=>{
  const uiPath="src/routes/class.tsx";
  const commandPath="src/modules/classes/native-class-entry.client.ts";
- it("keeps recovery and enrollment in one server application command",()=>{
+ it("keeps recovery and enrollment in one reusable browser application flow",()=>{
    const service=read(commandPath);
    const first=service.indexOf("return await enrollInNativeClass(input);");
    const recovery=service.indexOf("await resumeLinkedNativeClassLearner();",first);
@@ -82,7 +82,7 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
  });
  it("keeps self, approval and invitation on the exact same service",()=>{
    const ui=read(uiPath);
-   expect(ui.match(/await enrollCurrentPersonInClass\\(\\{data:\\{/g)??[]).toHaveLength(3);
+   expect(ui.match(/await enrollCurrentPersonInClass\(\{data:\{/g)??[]).toHaveLength(3);
    expect(ui).not.toContain("async function enrollWithLinkedCanRecovery");
    expect(read(commandPath)).toContain("Each createServerFn call is its own HTTP round trip");
    const auth=read("src/modules/identity/canonical-command-context.server.ts");
