@@ -59,11 +59,14 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
         isNull(accessAccountCanonicalPrincipals.revokedAt),
       )).limit(1);
     const [linked]=await tx.select({
-      id:accessAccountNoncreditPrincipals.canonicalAccountId,
+      accountId:accessAccountNoncreditPrincipals.canonicalAccountId,
+      personId:accessAccountNoncreditPrincipals.canonicalPersonId,
+      accessPersonId:accessAccountNoncreditPrincipals.accessPersonId,
     }).from(accessAccountNoncreditPrincipals).where(
       eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId),
     ).limit(1);
-    if(operator||linked)throw new AuthorizationError("existing canonical identity requires separate reconciliation");
+    if(operator||linked&&linked.accessPersonId!==owner.personId)
+      throw new AuthorizationError("existing canonical identity requires separate reconciliation");
     const [review]=await tx.select().from(accessAdultLearningReviews)
       .where(eq(accessAdultLearningReviews.accessAccountId,owner.accountId))
       .for("update").limit(1);
@@ -87,30 +90,84 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
         eq(canonicalEnrollmentOrganizations.status,"active"),
       )).limit(1);
     if(!org)throw new AuthorizationError("reviewed learner home Organization is not active");
-    const [sameEmail]=await tx.select({id:canonicalAccounts.id})
-      .from(canonicalAccounts)
-      .where(eq(canonicalAccounts.emailNormalized,owner.email)).limit(1);
-    if(sameEmail)throw new AuthorizationError("native account requires independent reconciliation");
-    const [nativeAccount]=await tx.insert(canonicalAccounts).values({
-      emailNormalized:owner.email,emailVerifiedAt:now,
-    }).returning({id:canonicalAccounts.id});
-    const [nativePerson]=await tx.insert(canonicalPersons).values({
-      preferredName:owner.preferredName,birthDate:review.verifiedBirthDate,
-    }).returning({id:canonicalPersons.id});
-    if(!nativeAccount||!nativePerson)throw new Error("native learner identity unavailable");
-    await tx.insert(accessAccountNoncreditPrincipals).values({
-      accessAccountId:owner.accountId,accessPersonId:owner.personId,
-      canonicalAccountId:nativeAccount.id,canonicalPersonId:nativePerson.id,
-      linkageMethod:"verified_existing_can_session",
-    });
-    const [grant]=await tx.insert(canonicalAccountGrants).values({
-      accountId:nativeAccount.id,personId:nativePerson.id,
-      organizationId:org.id,siteId:null,roleCode:"learner",active:true,
-    }).returning({id:canonicalAccountGrants.id});
-    if(!grant)throw new Error("native learning grant unavailable");
+    const [sameEmail]=await tx.select({
+      id:canonicalAccounts.id,
+      verified:canonicalAccounts.emailVerifiedAt,
+      disabledAt:canonicalAccounts.disabledAt,
+    }).from(canonicalAccounts).where(
+      eq(canonicalAccounts.emailNormalized,owner.email),
+    ).limit(1);
+    if(Boolean(sameEmail)!==Boolean(linked)||
+       linked&&(linked.accountId!==sameEmail?.id||!sameEmail?.verified||
+         sameEmail.disabledAt))
+      throw new AuthorizationError("existing canonical account needs independent reconciliation");
+    let nativeAccountId:string;
+    let nativePersonId:string;
+    if(linked){
+      nativeAccountId=linked.accountId;
+      nativePersonId=linked.personId;
+      const [existingPerson]=await tx.select({
+        id:canonicalPersons.id,birthDate:canonicalPersons.birthDate,
+      }).from(canonicalPersons).where(
+        eq(canonicalPersons.id,linked.personId),
+      ).for("update").limit(1);
+      if(!existingPerson||existingPerson.birthDate&&
+         existingPerson.birthDate!==review.verifiedBirthDate)
+        throw new AuthorizationError("verified date of birth conflicts with canonical Person");
+      if(!existingPerson.birthDate){
+        await tx.update(canonicalPersons).set({
+          birthDate:review.verifiedBirthDate,
+        }).where(and(eq(canonicalPersons.id,linked.personId),
+          isNull(canonicalPersons.birthDate)));
+      }
+    }else{
+      const [account]=await tx.insert(canonicalAccounts).values({
+        emailNormalized:owner.email,emailVerifiedAt:now,
+      }).returning({id:canonicalAccounts.id});
+      const [person]=await tx.insert(canonicalPersons).values({
+        preferredName:owner.preferredName,birthDate:review.verifiedBirthDate,
+      }).returning({id:canonicalPersons.id});
+      if(!account||!person)throw new Error("native learner identity unavailable");
+      nativeAccountId=account.id;
+      nativePersonId=person.id;
+      await tx.insert(accessAccountNoncreditPrincipals).values({
+        accessAccountId:owner.accountId,accessPersonId:owner.personId,
+        canonicalAccountId:account.id,canonicalPersonId:person.id,
+        linkageMethod:"verified_existing_can_session",
+      });
+    }
+    const existingGrants=await tx.select({
+      id:canonicalAccountGrants.id,
+      roleCode:canonicalAccountGrants.roleCode,
+      organizationId:canonicalAccountGrants.organizationId,
+      active:canonicalAccountGrants.active,
+      revokedAt:canonicalAccountGrants.revokedAt,
+      siteId:canonicalAccountGrants.siteId,
+      personId:canonicalAccountGrants.personId,
+    }).from(canonicalAccountGrants).where(
+      eq(canonicalAccountGrants.accountId,nativeAccountId),
+    ).limit(101);
+    if(existingGrants.length>100||
+       existingGrants.some(g=>g.personId!==nativePersonId||
+         g.roleCode!=="learner")||
+       existingGrants.some(g=>g.organizationId===org.id&&
+         (!g.active||g.revokedAt!==null||g.siteId!==null)))
+      throw new AuthorizationError("canonical grants require independent reconciliation");
+    const homeGrants=existingGrants.filter(g=>g.organizationId===org.id);
+    if(homeGrants.length>1)
+      throw new AuthorizationError("ambiguous canonical home learner grant");
+    let grantId=homeGrants[0]?.id;
+    if(!grantId){
+      const [created]=await tx.insert(canonicalAccountGrants).values({
+        accountId:nativeAccountId,personId:nativePersonId,
+        organizationId:org.id,siteId:null,roleCode:"learner",active:true,
+      }).returning({id:canonicalAccountGrants.id});
+      if(!created)throw new Error("native learning grant unavailable");
+      grantId=created.id;
+    }
     const [consumed]=await tx.update(accessAdultLearningReviews).set({
-      consumedAt:now,canonicalAccountId:nativeAccount.id,
-      canonicalPersonId:nativePerson.id,
+      consumedAt:now,canonicalAccountId:nativeAccountId,
+      canonicalPersonId:nativePersonId,
     }).where(and(
       eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
       eq(accessAdultLearningReviews.status,"approved"),
@@ -118,17 +175,17 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
     )).returning({accessAccountId:accessAdultLearningReviews.accessAccountId});
     if(!consumed)throw new AuthorizationError("approved adult review was already consumed");
     await tx.insert(auditEvents).values({
-      actorPersonId:nativePerson.id,owningOrganizationId:org.id,
+      actorPersonId:nativePersonId,owningOrganizationId:org.id,
       eventCode:"class.learner.identity.activated",
-      entityKind:"canonical_account",entityId:nativeAccount.id,
+      entityKind:"canonical_account",entityId:nativeAccountId,
       payload:{
         source:"independently_reviewed_can_adult",
         reviewAccountId:owner.accountId,
         reviewAt:review.reviewedAt.toISOString(),
-        enrollmentCreated:false,
+        enrollmentCreated:false,existingPersonReused:Boolean(linked),
       },
     });
-    const cookie=await issueNativeLearnerSession(tx,nativeAccount.id,grant.id,now);
+    const cookie=await issueNativeLearnerSession(tx,nativeAccountId,grantId,now);
     return {cookie};
   });
   setResponseHeader("Set-Cookie",result.cookie);
