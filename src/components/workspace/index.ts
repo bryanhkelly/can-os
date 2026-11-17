@@ -13,6 +13,8 @@ export { MutationFeedback } from "./mutation-feedback";
 export { LocalDateTimeField } from "./local-datetime-field";
 export { ActionDialog } from "./action-dialog";
 export { PageNavigation } from "./page-navigation";
+export { DirectoryPagination } from "./directory-pagination";
+export { DirectoryBulkActions, type DirectoryBulkAction } from "./directory-bulk-actions";
 export { DirectoryPage, DirectoryTable, type DirectoryColumn, type DirectorySort, type DirectoryRowAction } from "./directory-table";
 export { FilterBar } from "./filter-bar";
 export { RosterList } from "./roster-list";

@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
-import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
+import { CreateAction, DirectoryPagination, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, secondaryActionClassName } from "@/components/workspace";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -49,6 +49,11 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
   const search = selection;
   const events = data.events.filter(event => (!search.siteId || data.programs.some(program => program.id === event.programId && program.siteId === search.siteId)) &&
     (!search.programId || event.programId === search.programId));
+  const [eventPage, setEventPage] = useState(1);
+  const eventPageSize = 20;
+  const eventTotalPages = Math.max(1, Math.ceil(events.length / eventPageSize));
+  const visibleEventPage = Math.min(eventPage, eventTotalPages);
+  const visibleEvents = events.slice((visibleEventPage - 1) * eventPageSize, visibleEventPage * eventPageSize);
   const selectedEvent = mode==="detail" ? events.find(event => event.id===eventId) : undefined;
   const [programId, setProgramId] = useState(
     data.programs.find(program => program.id === search.programId)?.id ?? data.programs[0]?.id ?? "",
@@ -200,7 +205,10 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
       {shareLinks[createdEventId]&&<p className="break-all text-sm">Invite-only RSVP link: <a className="underline" href={shareLinks[createdEventId]}>{shareLinks[createdEventId]}</a></p>}
     </div>}
     {mode==="directory"&&<DirectoryTable label="Interest events" caption="Events in your authorized school scope."
-      rows={events} rowKey={event=>event.id} empty={<EmptyState title="No interest events yet"/>}
+      rows={visibleEvents} rowKey={event=>event.id}
+      pagination={events.length > eventPageSize ? <DirectoryPagination label="Interest events"
+        page={visibleEventPage} pageSize={eventPageSize} totalItems={events.length}
+        onPageChange={setEventPage} /> : undefined} empty={<EmptyState title="No interest events yet"/>}
       columns={[
         {id:"event",title:"Event",render:event=><Link to="/operations/interest-events/$eventId" params={{eventId:event.id}} search={selection} className="font-semibold underline">{event.title}</Link>},
         {id:"program",title:"Program",render:event=><Link to="/launch/school" search={{programId:event.programId}} className="underline">{event.programName}</Link>},

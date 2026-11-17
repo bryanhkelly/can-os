@@ -2,6 +2,7 @@ import {Link} from "@tanstack/react-router";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import {Button} from "@/components/ui/button";
+import {DirectoryTable} from "@/components/workspace";
 import {
   attachClassroomPlanToNoncreditRelease,getNoncreditReleaseOperations,
   releaseWithdrawnNoncreditSeat,inviteNextNoncreditWaitlist,
@@ -140,18 +141,13 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
       </div>
       <h3 className="mt-7 text-base font-semibold">Participant roster</h3>
       <p className="mt-1 text-xs text-muted-foreground">Named records are visible only to the authorized provider. Classroom pairing is not attendance.</p>
-      <div className="mt-3 overflow-x-auto border border-border">
-        <table className="w-full text-left text-sm">
-          <thead><tr className="border-b border-border bg-muted/30">
-            <th scope="col" className="p-3">Participant</th>
-            <th scope="col" className="p-3">Registration</th>
-            <th scope="col" className="p-3">Attendance</th>
-            <th scope="col" className="p-3">Completion</th>
-          </tr></thead>
-          <tbody>
-            {query.data.roster.map(person=><tr key={person.registrationId} className="border-b border-border">
-              <td className="p-3">{person.displayName}</td>
-              <td className="p-3">
+      <DirectoryTable label="Participant roster" caption="Authorized participant records for this release."
+        rows={query.data.roster} rowKey={person=>person.registrationId}
+        empty={<p className="p-4 text-sm text-muted-foreground">No participants registered for this release.</p>}
+        columns={[
+          {id:"participant",title:"Participant",render:person=>person.displayName},
+          {id:"registration",title:"Registration",render:person=><>
+
                 {person.status}
                 {person.seatReleased&&<p className="text-xs text-muted-foreground">Seat released</p>}
                 {["withdrawn","cancelled"].includes(person.status)&&!person.seatReleased&&
@@ -175,14 +171,11 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
                       </div>
                     </div>}
                   </div>}
-              </td>
-              <td className="p-3">{person.attendedLinkedSession?"Present at linked session":"Not verified"}</td>
-              <td className="p-3">{person.completionOutcome??"No final decision"}</td>
-            </tr>)}
-          </tbody>
-        </table>
-        {!query.data.roster.length&&<p className="p-3 text-sm text-muted-foreground">No participants registered for this release.</p>}
-      </div>
+              
+          </>},
+          {id:"attendance",title:"Attendance",render:person=>person.attendedLinkedSession?"Present at linked session":"Not verified"},
+          {id:"completion",title:"Completion",render:person=>person.completionOutcome??"No final decision"},
+        ]}/>
       {query.data.partial&&<p role="alert" className="mt-3 text-sm">The roster or evidence query was truncated. Do not use these figures as complete network totals.</p>}
       <p className="mt-3 text-xs leading-6 text-muted-foreground">{query.data.evidenceNote}</p>
     </>}
