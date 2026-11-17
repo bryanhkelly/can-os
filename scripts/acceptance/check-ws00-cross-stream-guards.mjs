@@ -95,6 +95,12 @@ check("WS6 maintains evidence metrics without fabricated formal Class completion
     "Reporting must be read-only under repeatable-read snapshot");
   required(report.includes("assertExactClassReportingScope"),
     "Missing exact-Site/Organization reporting security");
+  required(report.includes("inArray(learnerCourseAttempts.classEnrollmentId,enrollmentIds)") &&
+           report.includes("courseAttemptIds:attemptsByEnrollment.get(e.id)"),
+    "WS6 must query all exact Class Enrollment retakes; selected pointer is not history");
+  required(s.includes("courseAttemptIds?: readonly string[]") &&
+           s.includes("const attemptToEnrollment=new Map<string,string>()"),
+    "Class reporting must reconcile retakes without duplicating registration or Person");
 });
 check("Shared route registry preserves WS1 and WS5 without deleting either",()=>{
   const routes=JSON.parse(read("docs/platform-route-contracts.json"));
