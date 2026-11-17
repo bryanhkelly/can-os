@@ -268,7 +268,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
     {isOperator&&pages.isError&&<p role="alert" className="mt-3 text-sm">
       Roster access is unavailable. Check your current Site authorization.
     </p>}
-    {namesAllowed&&<RosterList rows={rows} rowKey={row=>row.enrollmentId}
+    {namesAllowed&&(!isOperator||pages.isSuccess)&&<RosterList rows={rows} rowKey={row=>row.enrollmentId}
       primary={row=>row.name}
       detail={row=>`${row.status} · ${row.creditMode.replaceAll("_"," ")}`}
       actions={row=><>
