@@ -3,8 +3,9 @@
 import { getRequest } from "@tanstack/react-start/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { auditEvents, canonicalDeliverySessions, domainEvents, facilitatedClassroomPlans,
+import { canonicalDeliverySessions, facilitatedClassroomPlans,
   noncreditSelfEnrollmentReleases } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -59,13 +60,13 @@ export async function assignCohortPlan(tx:Executor,scope:ScopedCohort,planId:str
     enrollmentReleaseId:release.id,updatedAt:new Date(),
   }).where(eq(facilitatedClassroomPlans.id,plan.id));
   const payload={releaseId:release.id,planId:plan.id,siteId:release.siteId};
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
     actorPersonId:provider.actor.actorPersonId!,
     owningOrganizationId:provider.organizationId,
     eventCode:"noncredit.cohort.session_assigned",
     entityKind:"facilitated_classroom_plan",entityId:plan.id,payload,
   });
-  await tx.insert(domainEvents).values({
+  await emitCanonicalDomainEvent(tx,{
     eventType:"NoncreditCohortSessionAssigned",
     aggregateType:"noncredit_self_enrollment_release",
     aggregateId:release.id,actorPersonId:provider.actor.actorPersonId!,
