@@ -10,9 +10,9 @@ export async function getInstructionalLearnerContext(request: Request): Promise<
   const cookies = request.headers.get("cookie") ?? "";
   const canonical = cookies.split(";").some(value =>
     value.trim().startsWith(canonicalSessionCookie + "="));
-  return canonical
-    ? getCanonicalCommandContext(request)
-    : getCommandContext(request);
+  // The canonical context resolver validates the CAN account whenever it is
+  // present. A second cookie must never supersede the selected CAN Person.
+  return canonical ? getCanonicalCommandContext(request) : getCommandContext(request);
 }
 
 
