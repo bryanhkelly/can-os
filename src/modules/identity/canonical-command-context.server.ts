@@ -8,7 +8,7 @@ import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
 import { accessSessionCookie } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
-import { getCommandContext } from "./command-context.server";
+import { getIdentityContext } from "./command-context.server";
 import { resolveCanonicalSiteStaffFromCan } from "./canonical-can-staff-bridge.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -111,7 +111,7 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   const hasCan = readCookie(request, accessSessionCookie) !== undefined;
   const hasNative = readCookie(request, canonicalSessionCookie) !== undefined;
   if (hasCan) {
-    const actor = await getCommandContext(request);
+    const actor = await getIdentityContext(request);
     if (actor.role === "site_admin" || actor.role === "registrar") {
       return resolveCanonicalSiteStaffFromCan(actor, request);
     }
