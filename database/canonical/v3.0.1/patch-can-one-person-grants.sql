@@ -1,73 +1,102 @@
--- One CAN account must have exactly one Person across all ACTIVE role grants.
--- Multiple roles, Organizations, and Sites for the same Person remain allowed.
--- This adds no separate login, identity mapping, or participation ledger.
--- Apply only after the read-only one-Person cutover preflight and isolated QA
--- authorization tests. This is an additive integrity constraint, NOT the
--- cross-schema identity/foreign-key cutover itself.
+-- CAN OS: one immutable CAN Person per account, across all active grants.
+-- Multiple roles, organizations, and Sites for this SAME Person remain valid.
+-- This is a real account ownership constraint, not an identity bridge.
+-- Isolated QA migration first; do not confuse this with the remaining
+-- education_v30 Person/Account foreign-key cutover.
 BEGIN;
 
 DO $preflight$
 BEGIN
   IF EXISTS (
-    SELECT 1
-    FROM public.account_person_grants left_grant
-    JOIN public.account_person_grants right_grant
-      ON right_grant.account_id = left_grant.account_id
-     AND right_grant.active = true
-     AND right_grant.person_id <> left_grant.person_id
-     AND right_grant.id <> left_grant.id
-    WHERE left_grant.active = true
+    SELECT 1 FROM public.account_person_grants a
+    JOIN public.account_person_grants b
+      ON a.account_id=b.account_id
+     AND a.active AND b.active AND a.person_id<>b.person_id
   ) THEN
-    RAISE EXCEPTION 'Cannot activate single-Person invariant: conflicting active CAN grants'
-      USING ERRCODE = '23514';
+    RAISE EXCEPTION 'Existing account has more than one active Person'
+      USING ERRCODE='23514';
   END IF;
-END
-$preflight$;
+  IF EXISTS (
+    SELECT 1
+    FROM (
+      SELECT person_id FROM public.account_person_grants
+      WHERE active GROUP BY person_id
+      HAVING count(DISTINCT account_id)>1
+    ) person_with_two_accounts
+  ) THEN
+    RAISE EXCEPTION 'Existing active Person is linked to multiple accounts'
+      USING ERRCODE='23514';
+  END IF;
+END $preflight$;
+
+ALTER TABLE public.access_accounts
+  ADD COLUMN IF NOT EXISTS person_id uuid
+  REFERENCES public.people(id) ON DELETE RESTRICT;
+
+-- An account with one established Person retains the same immutable identity
+-- even if all their roles are later revoked. Unclaimed new accounts may remain
+-- null only until an authorized first grant is issued.
+UPDATE public.access_accounts account
+SET person_id=source.person_id
+FROM (
+  SELECT account_id,min(person_id::text)::uuid AS person_id
+  FROM public.account_person_grants
+  WHERE active
+  GROUP BY account_id
+) source
+WHERE account.id=source.account_id AND account.person_id IS NULL;
+
+DO $check_anchor$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM public.access_accounts account
+    JOIN public.account_person_grants grant_row
+      ON grant_row.account_id=account.id AND grant_row.active
+    WHERE account.person_id IS DISTINCT FROM grant_row.person_id
+  ) THEN
+    RAISE EXCEPTION 'CAN account Person anchor conflicts with an active grant'
+      USING ERRCODE='23514';
+  END IF;
+END $check_anchor$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS access_accounts_person_id_uq
+  ON public.access_accounts(person_id) WHERE person_id IS NOT NULL;
 
 CREATE OR REPLACE FUNCTION public.can_enforce_one_person_per_account()
 RETURNS trigger
 LANGUAGE plpgsql
-SET search_path = pg_catalog, pg_temp
+SET search_path=pg_catalog,pg_temp
 AS $one_person$
+DECLARE anchored uuid;
 BEGIN
   IF NEW.active THEN
-    -- Serialize all potentially conflicting grant writes through the shared
-    -- account row. Checking only the visible first two grants is insufficient.
-    -- At READ COMMITTED the second writer observes the first after this lock.
-    PERFORM 1
-      FROM public.access_accounts
-      WHERE id = NEW.account_id
-      FOR UPDATE;
-    IF NOT FOUND THEN
-      RAISE EXCEPTION 'CAN account does not exist'
-        USING ERRCODE = '23503';
-    END IF;
-    IF EXISTS (
-      SELECT 1
-      FROM public.account_person_grants AS existing
-      WHERE existing.account_id = NEW.account_id
-        AND existing.active = true
-        AND existing.person_id <> NEW.person_id
-        AND existing.id <> NEW.id
-    ) THEN
-      RAISE EXCEPTION 'Active CAN account grants must reference one Person'
-        USING ERRCODE = '23514';
+    -- Updating the account row, not merely selecting it FOR UPDATE, is
+    -- important: under REPEATABLE READ competing attempts will serialize or
+    -- abort rather than both accept different Persons from stale snapshots.
+    UPDATE public.access_accounts account
+    SET person_id=COALESCE(account.person_id,NEW.person_id)
+    WHERE account.id=NEW.account_id
+      AND (account.person_id IS NULL OR account.person_id=NEW.person_id)
+    RETURNING account.person_id INTO anchored;
+    IF anchored IS DISTINCT FROM NEW.person_id THEN
+      RAISE EXCEPTION 'CAN account already belongs to another Person'
+        USING ERRCODE='23514';
     END IF;
   END IF;
   RETURN NEW;
-END
-$one_person$;
+END $one_person$;
 
 DROP TRIGGER IF EXISTS can_account_grants_one_person_guard
   ON public.account_person_grants;
 CREATE TRIGGER can_account_grants_one_person_guard
-  BEFORE INSERT OR UPDATE OF account_id, person_id, active
+  BEFORE INSERT OR UPDATE OF account_id,person_id,active
   ON public.account_person_grants
   FOR EACH ROW
   EXECUTE FUNCTION public.can_enforce_one_person_per_account();
 
+COMMENT ON COLUMN public.access_accounts.person_id IS
+  'Authoritative immutable CAN Person identity across all roles and Sites.';
 COMMENT ON FUNCTION public.can_enforce_one_person_per_account() IS
-  'One active Person per CAN account across all roles, Organizations and Sites. '
-  'Account row locking serializes concurrent grants; does not confer role authority.';
+  'Serializes active grant issuance through the owning account Person anchor.';
 
 COMMIT;
