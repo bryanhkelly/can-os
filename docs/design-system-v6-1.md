@@ -158,10 +158,15 @@ service was introduced.
 **Blueprint and Section lifecycle status (November 2026):** Independent
 Blueprint review queues, Launch Studio review readouts, and Section lifecycle
 operations now use the shared `StatusBadge` and square-corner panels.
-Blueprint configuration approval is not operating authorization. The Blueprint
-review reader currently exposes a latest decision, not the complete historical
-event stream; do not render a fabricated `StatusTimeline` until an authorized,
-paginated source history is available. School Section enrollment transitions
+Blueprint configuration approval is not operating authorization. The
+latest-decision reader remains authoritative for current approval; the separate
+`readCanonicalBlueprintReviewHistory` endpoint reads real append-only
+configuration review decisions, original rationale, evidence references and
+timestamps for one exact Blueprint version. It applies the same Blueprint
+read capability and database role, limits pages to 20 records and caps page
+indices. Launch Studio composes the resulting history with `StatusTimeline`,
+explicit loading/errors and previous/next controls. No historical decisions
+are synthesized from the latest status. School Section enrollment transitions
 remain owned by the Section lifecycle service and retain their independent
 reason, transfer, capacity and audit checks.
 
