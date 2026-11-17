@@ -2,7 +2,10 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { PrerequisiteChecklist } from "@/components/workspace/prerequisite-checklist";
 import { EvidenceDetails } from "@/components/evidence/EvidenceDetails";
 import {useCallback,useEffect,useRef,useState} from "react";
-import { MutationFeedback, QueryState } from "@/components/workspace";
+import { MutationFeedback, QueryState, StatusBadge } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import {
   decideChurchSchoolOpeningFn,getChurchSchoolOpeningFn,
 } from "@/modules/operations/school-opening.functions";
@@ -60,7 +63,7 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
       },
     );
   };
-  return <section className="mt-4 rounded-lg border p-4 text-sm">
+  return <section className="mt-4 border p-4 text-sm">
     <h3 className="font-semibold">Church school opening authorization</h3>
     <p className="mt-2 text-xs text-muted-foreground">
       An institutional reviewer must independently verify current legal, facility,
@@ -69,19 +72,22 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
       This does not certify that adults are physically present today.
     </p>
     <MutationFeedback state={mutation} className="mt-2" pendingMessage="Saving opening decision…"/>
-    {!readError&&<button type="button" onClick={reload} disabled={busy||loading}
-      className="mt-3 underline disabled:opacity-50">Reload review</button>}
+    {!readError&&<Button type="button" variant="ghost" size="sm" onClick={reload}
+      loading={loading} disabled={busy||loading} className="mt-3">Reload review</Button>}
     <QueryState loading={loading?"Loading current opening review…":undefined}
       error={readError||undefined} onRetry={reload} retrying={busy||loading}>
     {opening&&<>
-      <p className="mt-2">Configuration v{opening.version} · {opening.status}
-        {" · "}{opening.prerequisites.every(item=>item.satisfied)?"Current prerequisites met":"Opening prerequisites need attention"}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <span>Configuration v{opening.version}</span>
+        <StatusBadge tone={opening.status==="approved"?"success":opening.status==="suspended"?"danger":"neutral"}>{opening.status}</StatusBadge>
+        <span>{opening.prerequisites.every(item=>item.satisfied)?"Current prerequisites met":"Opening prerequisites need attention"}</span>
+      </div>
       <p className="mt-2 text-xs text-muted-foreground">
         Required reviewed categories: {opening.evidenceRequired.join(", ")}
       </p>
       <PrerequisiteChecklist label="School opening prerequisites" items={opening.prerequisites}/>
       <ul className="mt-3 space-y-3">
-        {opening.evidence.map(document=><li key={document.id} className="rounded border p-3">
+        {opening.evidence.map(document=><li key={document.id} className="border p-3">
           <p className="font-medium">{document.category.replace("school_opening_","").replaceAll("_"," ")}</p>
           <EvidenceDetails evidence={document}/>
         </li>)}
@@ -90,24 +96,22 @@ function SchoolOpeningReviewForm({programId}:{programId:string}){
         These are the latest independently verified records for each required category.
         Approval rechecks current evidence; this list does not provide document preview.
       </p>
-      <label className="mt-3 block">Reason for decision
-        <input className="mt-1 block w-full rounded border bg-background p-2"
-          value={reason} disabled={busy||loading} minLength={10} maxLength={500}
+      <Field label="Reason for decision" className="mt-3" required
+        description="Provide at least 10 characters explaining the independent review decision.">
+        <Input value={reason} disabled={busy||loading} minLength={10} maxLength={500}
           onChange={e=>setReason(e.target.value)}/>
-      </label>
+      </Field>
       <div className="mt-2 flex gap-2">
-        {opening.canDecide&&opening.status==="draft"&&<button type="button"
+        {opening.canDecide&&opening.status==="draft"&&<Button type="button"
           disabled={busy||loading||reason.trim().length<10||!opening.approvalReady}
-          onClick={()=>void decide("approve")}
-          className="rounded border px-3 py-2 disabled:opacity-50">
+          onClick={()=>void decide("approve")}>
           Approve independently reviewed opening
-        </button>}
-        {opening.canDecide&&opening.status==="approved"&&<button type="button"
+        </Button>}
+        {opening.canDecide&&opening.status==="approved"&&<Button type="button" variant="destructive"
           disabled={busy||loading||reason.trim().length<10}
-          onClick={()=>void decide("suspend")}
-          className="rounded border px-3 py-2 disabled:opacity-50">
+          onClick={()=>void decide("suspend")}>
           Suspend school opening authorization
-        </button>}
+        </Button>}
         {opening.status==="suspended"&&<p className="text-xs">
           Suspended. A new reviewed draft version is required to reopen.
         </p>}
