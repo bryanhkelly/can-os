@@ -12,7 +12,7 @@ import {
   projectNoncreditCourses, projectFamilyEnrichment, projectNoncreditOpportunities,
 } from "@/domain/participation-projections";
 import {getCourseRegistration} from "@/modules/learning/course-registration.functions";
-import {getMyNativeClassEnrollments} from "@/modules/classes/native-class-enrollment.functions";
+import {getMyNativeClassEnrollmentHistoryPage} from "@/modules/classes/native-class-enrollment.functions";
 import {getMyNoncreditSelfEnrollments} from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import {getMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 import {getEnrichmentFamily} from "@/modules/activities/enrichment-family.functions";
@@ -93,8 +93,24 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
     // Native Class service requires its own canonical learner grant and active
     // Class feature gate. Do not use a CAN student/guardian role as a substitute.
     if (["account_holder", "student", "guardian"].includes(session.role)) {
-      register("native_class", async () =>
-        projectNativeClasses(await getMyNativeClassEnrollments(), now, session.sites));
+      register("native_class", async () => {
+        // Reuse WS2's authoritative, Person-scoped Class history pagination.
+        // This is a bounded display projection, never a second Enrollment
+        // authority. Keeping coverage explicitly "partial" also avoids
+        // promising complete lifetime history from an unbounded query.
+        const rows: Awaited<ReturnType<typeof getMyNativeClassEnrollmentHistoryPage>>["items"] = [];
+        let cursor: {enrolledAt: string; classEnrollmentId: string} | null = null;
+        for (let page = 0; page < 10; page++) {
+          const batch = await getMyNativeClassEnrollmentHistoryPage({data: {cursor}});
+          rows.push(...batch.items);
+          if (!batch.nextCursor) break;
+          if (cursor?.classEnrollmentId === batch.nextCursor.classEnrollmentId &&
+              cursor.enrolledAt === batch.nextCursor.enrolledAt)
+            throw new Error("Native Class history pagination did not advance");
+          cursor = batch.nextCursor;
+        }
+        return projectNativeClasses(rows, now, session.sites);
+      });
     }
     await Promise.all(work);
     const allSources: ActivitySource[] = [
