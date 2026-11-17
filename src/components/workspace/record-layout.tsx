@@ -61,6 +61,8 @@ export interface RecordFact {
   /** Human-readable fact name. Values always come from the owning route's authorized reader. */
   label: string;
   value: React.ReactNode;
+  /** Stable identity when multiple facts share a label or values reorder. */
+  id?: string;
 }
 
 /** Compact semantic record metadata, not a metric dashboard or editable form. */
@@ -77,7 +79,7 @@ export function RecordFacts({ items, columns = 2, label, className }: {
     columns === 3 && "sm:grid-cols-3",
     className,
   )}>
-    {items.map((item, index) => <div key={index} className="min-w-0">
+    {items.map((item, index) => <div key={item.id ?? `${item.label}:${index}`} className="min-w-0">
       <dt className="text-xs text-muted-foreground">{item.label}</dt>
       <dd className="mt-1 min-w-0 wrap-break-word text-foreground">{item.value}</dd>
     </div>)}
@@ -119,7 +121,7 @@ export function EntityCard(props: EntityCardProps) {
     <div className="flex flex-1 flex-col p-5 sm:p-6">
       {children && <div className="text-sm text-muted-foreground">{children}</div>}
       <div className={cn("mt-auto flex items-center justify-between border-t border-border pt-4 text-xs", !meta && "justify-end")}>
-        {meta && <span className="min-w-0 text-muted-foreground">{meta}</span>}
+        {meta && <div className="min-w-0 text-muted-foreground">{meta}</div>}
         <span className="shrink-0 font-semibold text-primary" aria-hidden="true">{openLabel} →</span>
       </div>
     </div>
