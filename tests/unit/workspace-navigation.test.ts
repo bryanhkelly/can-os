@@ -47,7 +47,7 @@ describe("canonical workspace navigation",()=>{
   expect(roleCapabilities.site_admin).not.toContain("blueprint.review");
  });
  it("keeps the platform administrator separate from school operations",()=>{
-  expect(getWorkspaceHome("app_admin")).toBe("/canonical");
+  expect(getWorkspaceHome("app_admin")).toBe("/platform");
   expect(roleCapabilities.app_admin).toEqual(["platform.admin"]);
   expect(workspaceLinks.app_admin.some(item=>item.path==="/admin")).toBe(false);
   expect(workspaceLinks.app_admin.some(item=>item.path==="/canonical/blueprints")).toBe(false);
