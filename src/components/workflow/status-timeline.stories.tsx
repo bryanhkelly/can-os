@@ -35,3 +35,20 @@ export const NoRecordedEvents: Story = {
     await expect(canvas.getByRole("status")).toHaveTextContent("No decision has been recorded.");
   },
 };
+
+export const SiteLocalAuditTime: Story = {
+  args: {
+    label: "School review events",
+    timeZone: "America/Los_Angeles",
+    entries: [{
+      id: "school-review", title: "Independent review recorded",
+      occurredAt: "2026-11-17T19:00:00.000Z",
+      status: "Review complete", tone: "info",
+    }],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/11:00 AM PST/)).toBeVisible();
+    await expect(canvas.getByText("Independent review recorded")).toBeVisible();
+  },
+};
