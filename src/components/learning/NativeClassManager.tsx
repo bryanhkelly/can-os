@@ -372,7 +372,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId}:
                     ?deliveryMode:row.localClassPolicy.allowedDeliveryModes[0]!;
                   setDeliveryMode(mode);
                   setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId&&
-                    site.allowedDeliveryModes.some(mode=>mode===mode))?preferredSiteId:"");
+                    site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))?preferredSiteId:"");
                   setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
                 }}>Configure Class</Button>
             </li>)}
@@ -556,7 +556,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId}:
                 const mode=e.target.value as typeof deliveryMode;
                 setDeliveryMode(mode);
                 if(!selected?.siteOptions.some(site=>site.id===siteId&&
-                    site.allowedDeliveryModes.some(mode=>mode===mode)))setSiteId("");
+                    site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)))setSiteId("");
               }}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(mode=>mode===mode))
