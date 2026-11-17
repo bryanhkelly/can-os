@@ -526,6 +526,14 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "@/components/ui/select", "@/components/ui/label",
     "<StatusBadge",
   ],
+  "routes/guardian.attendance.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/textarea",
+    "@/components/ui/label", "<WorkspaceNotice",
+  ],
+  "routes/guardian.enrichment.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/choice", "@/components/ui/label", "<Field",
+  ],
   "routes/platform.tsx": [
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
     "<StatCard", "<WorkspaceNotice",
