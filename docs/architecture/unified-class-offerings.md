@@ -225,8 +225,18 @@ consent evidence and personal invitation exist.
 
 ### Publisher-friendly Course Activities without duplicated engines
 
-`/canonical/course-activities` restores the original five-question quiz and
-five-question feedback authoring **experience**, but uses existing canonical
+On November 17, 2026 the editor was extracted to the reusable
+`PublisherCourseActivityEditor` and composed within `/class`. The former
+`/canonical/course-activities` staging page now redirects to that view.
+A deep-linked Course version is only preselected if the existing publisher
+reader returns it under the current authorized organization; neither URL
+nor local Class assignment grants Course authorship. The editor remains
+code-split from learner discovery. The prebuild Class architecture check
+rejects reintroducing independent publisher commands into the staging route.
+
+
+`/class?view=activities` owns the five-question quiz and
+five-question feedback authoring **experience**, using existing canonical
 ownership and publication boundaries. A national publisher sees only its
 published Course versions and the approved, publisher-owned objective
 assessment inventory; a local Class operator cannot edit those questions.
