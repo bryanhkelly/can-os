@@ -86,6 +86,13 @@ describe("Phase D live family-to-school handoff contracts",()=>{
     expect(handoff).toContain("the Program's official attendance roster");
     expect(handoff).toContain('to="/home"');
     expect(handoff).toContain("not opening authorization");
+    expect(handoff).toContain("<RecordFacts");
+    expect(handoff).toContain('variant="tiles"');
+    expect(handoff).toContain('label: "Observed attendance"');
+    expect(handoff).toContain('result.preview?"Not yet observable":result.attendanceRecorded?"Recorded":"Not recorded"');
+    expect(handoff).toContain("<WorkspaceNotice");
+    expect(handoff).toContain("<Button");
+    expect(handoff).not.toMatch(/<(?:button|dl)\\b/);
   });
 });
 
