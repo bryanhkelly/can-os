@@ -23,7 +23,9 @@ describe("single-Site native Class handoff",()=>{
     expect(commands).toContain('if(data.siteId&&!operator.siteIds.includes(data.siteId))');
     expect(commands).toContain('data.siteId?eq(canonicalClasses.siteId,data.siteId):undefined');
     expect(panel).not.toContain(".filter(item=>item.siteId===canonicalSiteId)");
-    expect(panel).toContain('No native Classes appear in the authorized Site result (up to 100)');
+    expect(panel).toContain("classes.length>0&&<ul");
+    expect(panel).not.toContain("No native Classes appear in the authorized Site result");
+    expect(panel).not.toContain("There is no currently authorized adopted Course available");
   });
 
   it("reuses the 6.1 readiness projection and production Class workspace",()=>{
