@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import {
   accessAccountNoncreditPrincipals, accessAccounts, accountPersonGrants, people,
 } from "@/db/schema";
@@ -47,6 +47,7 @@ export const noncreditTrainingCompletedPolicy: NotificationPolicy<Context> = {
       .innerJoin(accessAccounts, and(
         eq(accessAccounts.id, accessAccountNoncreditPrincipals.accessAccountId),
         eq(accessAccounts.disabled, false),
+        isNotNull(accessAccounts.emailVerifiedAt),
       ))
       .innerJoin(accountPersonGrants, and(
         eq(accountPersonGrants.accountId, accessAccountNoncreditPrincipals.accessAccountId),
@@ -59,9 +60,6 @@ export const noncreditTrainingCompletedPolicy: NotificationPolicy<Context> = {
       ))
       .where(and(
         eq(accessAccountNoncreditPrincipals.canonicalPersonId, record.participantPersonId),
-        // An unverified or disabled CAN identity receives no notification.
-        // This is not a substitute for recipient authorization on later reads.
-        // isNotNull is used below via the existing verified-at column.
       )).limit(1);
     if (!account) return null;
     return { recipientPersonId: account.recipientPersonId, decisionId: record.id };
