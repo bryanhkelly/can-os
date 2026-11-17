@@ -330,6 +330,13 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 - The academic credential delivery route composes the shared history instead
   of maintaining duplicate list markup. Server-owned authorization, download,
   release consent and credential lifecycle logic are unchanged.
+- `StatusTimeline` now displays each source timestamp with an explicitly named
+  time zone, defaulting to UTC for deterministic server/client rendering.
+  Authorized Site views can supply `timeZone` to show a verified Site-local
+  clock time; the source ISO timestamp remains in the HTML `dateTime`
+  attribute and events retain their original supplied ordering. Invalid source
+  timestamps are labeled unavailable rather than guessed.
+
 - Added tests for transport state semantics, empty history, priority tones and
   duplicate history prevention; Storybook shows accepted and pending transport
   states. The shared-component checker now guards these consumers.
