@@ -78,6 +78,17 @@ async function ownedPlan(tx:Tx,host:Host,planId:string,lock=false){
   }
   return row;
 }
+/** Native Class Sessions have their own immutable lifecycle, audit and
+ * replacement operation. Never mutate their plans through generic calendar
+ * endpoints, even if the facilitator also has Site-wide room authority. */
+async function assertGenericCalendarMutation(tx:Tx,planId:string):Promise<void>{
+  const [native]=await tx.select({id:canonicalClassSessions.id})
+    .from(canonicalClassSessions)
+    .where(eq(canonicalClassSessions.classroomPlanId,planId)).limit(1);
+  if(native)throw new AuthorizationError(
+    "Use the Class Session schedule change command for native Class delivery",
+  );
+}
 export const getClassroomSchedule=createServerFn({method:"GET"})
   .handler(async()=>{
     guard();
@@ -95,6 +106,15 @@ export const getClassroomSchedule=createServerFn({method:"GET"})
           inArray(facilitatedClassroomPlans.siteId,host.siteIds),
           gt(canonicalDeliverySessions.endsAt,new Date(Date.now()-30*24*60*60_000)),
         )).orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+      const nativeLinks=rows.length?await tx.select({
+        planId:canonicalClassSessions.classroomPlanId,
+        classId:canonicalClassSessions.classId,
+        classSessionId:canonicalClassSessions.id,
+      }).from(canonicalClassSessions).where(inArray(
+        canonicalClassSessions.classroomPlanId,
+        rows.map(row=>row.plan.id),
+      )):[];
+      const nativeByPlan=new Map(nativeLinks.map(link=>[link.planId,link]));
       const plans=[];
       for(const row of rows.slice(0,100)){
         try {
@@ -104,6 +124,8 @@ export const getClassroomSchedule=createServerFn({method:"GET"})
           id:row.plan.id,deploymentId:row.plan.deploymentId,
           courseVersionId:row.plan.courseVersionId,siteId:row.plan.siteId,
           deliverySessionId:row.plan.deliverySessionId,
+          nativeClassId:nativeByPlan.get(row.plan.id)?.classId??null,
+          nativeClassSessionId:nativeByPlan.get(row.plan.id)?.classSessionId??null,
           state:row.plan.state,facilitatedSessionId:row.plan.facilitatedSessionId,
           startsAt:row.delivery.startsAt.toISOString(),
           endsAt:row.delivery.endsAt.toISOString(),
@@ -166,6 +188,7 @@ export const rescheduleClassroom=createServerFn({method:"POST"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const {plan,delivery}=await ownedPlan(tx,host,data.planId,true);
+      await assertGenericCalendarMutation(tx,plan.id);
       if(plan.state!=="scheduled")throw new AuthorizationError("reschedule a pending classroom only");
       const startsAt=new Date(data.startsAt),endsAt=new Date(data.endsAt);
       validateClassroomTimes(startsAt,endsAt,new Date());
@@ -190,6 +213,7 @@ export const cancelClassroomPlan=createServerFn({method:"POST"})
     guard();const host=await requireCanonicalFacilitator();
     return db.transaction(async tx=>{
       const {plan}=await ownedPlan(tx,host,data.planId,true);
+      await assertGenericCalendarMutation(tx,plan.id);
       if(plan.state==="cancelled")return {cancelled:true,alreadyCancelled:true};
       if(plan.state!=="scheduled")throw new AuthorizationError("cannot cancel an already started room");
       await tx.update(facilitatedClassroomPlans).set({
