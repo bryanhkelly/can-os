@@ -121,15 +121,15 @@ for (const [file, contract] of Object.entries(governedFeatureControls)) {
 const canonicalControlConsumers = {
   "evidence/EvidencePicker.tsx": {
     imports: ['@/components/ui/field', '@/components/ui/select'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
   "learning/GradebookSectionSelector.tsx": {
     imports: ['@/components/ui/field', '@/components/ui/select'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
   "operations/LaunchOpeningTask.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/select', '@/components/ui/label'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
 };
 for (const [file, contract] of Object.entries(canonicalControlConsumers)) {
