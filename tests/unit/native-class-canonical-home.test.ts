@@ -38,6 +38,17 @@ describe("one native Class route and reusable manager",()=>{
     expect(nav).not.toContain('path: "/canonical/classes"');
   });
 
+  it("keeps Class evidence within the authorized Class workspace",()=>{
+    const detail=read("src/routes/class_.$classId.tsx");
+    const manager=read("src/components/learning/NativeClassManager.tsx");
+    const legacy=read("src/routes/reports.classes_.$classId.tsx");
+    expect(detail).toContain("<NativeClassReportPanel classId={workspace.classId}/>");
+    expect(detail).not.toContain('to="/reports/classes/$classId"');
+    expect(manager).toContain('search={{view:"manage",tab:"reports"}}');
+    expect(legacy).toContain('<Navigate to="/class/$classId"');
+    expect(legacy).not.toContain("<NativeClassReportPanel");
+  });
+
   it("does not open a fake teacher classroom for the synthetic center",()=>{
     const center=read("src/routes/centers.demo.tsx");
     expect(center).toContain('to="/class"');
