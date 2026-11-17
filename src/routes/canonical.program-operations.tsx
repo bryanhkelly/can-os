@@ -3,9 +3,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
-import {
-  getUnifiedClassCourseOptions, getMyUnifiedClassDrafts,
-} from "@/modules/classes/unified-class.functions";
+import { getUnifiedClassCourseOptions } from "@/modules/classes/unified-class.functions";
 import { getNativeOfferingVersionImpact } from "@/modules/programs/publisher-version-impact.functions";
 import { localClassFields, publisherOwnedFields } from "@/domain/publisher-class-variation";
 import { projectedRolloutStages } from "@/domain/program-rollout-lifecycle";
@@ -30,10 +28,6 @@ function ProgramOperations(){
     getNextPageParam:page=>page.nextCursor??undefined,
     retry:false,
   });
-  const classes=useQuery({
-    queryKey:["native-class-operator-classes"],
-    queryFn:()=>getMyUnifiedClassDrafts(),retry:false,
-  });
   const rows=catalog.data?.pages.flatMap(page=>page.items)??[];
   const grouped=new Map<string,typeof rows>();
   for(const row of rows){
@@ -53,9 +47,6 @@ function ProgramOperations(){
     queryFn:()=>getNativeOfferingVersionImpact({data:{offeringId:selected!.first.offeringId}}),
     retry:false,
   });
-  const localClasses=(classes.data??[]).filter(cls=>selected&&
-    cls.offeringVersionId===selected.first.offeringVersionId&&
-    cls.deploymentId===selected.first.deploymentId);
   const classVersions=impact.data?.localClassImpact.filter(row=>
     row.offeringVersionId===selected?.first.offeringVersionId)??[];
   const classesAtVersion=classVersions.reduce((total,row)=>total+row.classCount,0);
@@ -178,6 +169,28 @@ function ProgramOperations(){
         {impact.data.publisherVersionsTruncated&&<p className="mt-2 text-xs text-muted-foreground">
           More than 100 publisher versions exist. The version history shown here is limited.
         </p>}
+        <h4 className="mt-4 text-sm font-semibold">Approved local adoption by Site</h4>
+        <div className="mt-2 space-y-2">
+          {impact.data.approvedAdoptions.map(adoption=><div key={adoption.adoptionId}
+            className="border border-border p-3 text-sm">
+            <p className="font-semibold">
+              {adoption.deploymentName} · publisher version {adoption.versionNo}
+              {impact.data.latestPublishedVersionNo!==null&&
+                adoption.versionNo<impact.data.latestPublishedVersionNo
+                ?" · Newer publisher version available":""}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Approved adoption does not by itself grant access to another Organization or Site.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {impact.data.adoptionSites.filter(site=>site.adoptionId===adoption.adoptionId)
+                .map(site=><span key={site.siteId}
+                  className="border border-border bg-muted/20 px-2 py-1 text-xs">
+                  {site.siteName} · {site.classroomPlacement?"Classroom placement":"Self-paced Site only"}
+                </span>)}
+            </div>
+          </div>)}
+        </div>
         <div className="mt-3 flex flex-wrap gap-4 text-sm font-semibold">
           <Link to="/canonical/lab/deployments" className="underline">Review approved adoption</Link>
           <Link to="/canonical/classes" className="underline">Prepare or revise local Class</Link>
@@ -206,18 +219,36 @@ function ProgramOperations(){
           </p>
         </div>
       </div>
-      <h3 className="mt-5 font-semibold">Local Class operations</h3>
-      {classes.isError&&<p role="alert" className="mt-2 text-sm">Class list unavailable.</p>}
-      {localClasses.length===0&&<p className="mt-2 text-sm text-muted-foreground">
-        No matching Class was found in the current bounded operator list. This does not establish zero Classes nationally.
-      </p>}
-      <div className="mt-3 grid gap-2 md:grid-cols-2">
-        {localClasses.map(cls=><Link key={cls.classId} to="/classes/$classId"
+      <h3 className="mt-5 font-semibold">Classes affected by publisher version changes</h3>
+      <p className="mt-2 text-sm text-muted-foreground">
+        These Classes belong to currently authorized Deployment/Site combinations in your
+        operating Organization. Each Class remains pinned to its original Offering and
+        Course versions until a separately approved local change.
+      </p>
+      {!impact.data&&<p role="status" className="mt-2 text-sm">Verifying affected Class identities…</p>}
+      {impact.data&&impact.data.affectedClasses.length===0&&
+        <p className="mt-2 text-sm text-muted-foreground">No currently authorized local Classes found for this Offering.</p>}
+      {impact.data&&<div className="mt-3 grid gap-2 md:grid-cols-2">
+        {impact.data.affectedClasses.map(cls=><Link key={cls.classId} to="/classes/$classId"
           params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
           className="block border border-border p-3 text-sm underline underline-offset-4">
-          <strong>{cls.title}</strong> · {cls.state} · {cls.deliveryMode.replaceAll("_"," ")}
+          <strong>{cls.title}</strong>
+          <span className="block mt-1 text-xs text-muted-foreground">
+            Publisher v{cls.versionNo} · {cls.state} · {cls.deliveryMode.replaceAll("_"," ")}
+          </span>
+          <span className="block mt-1 text-xs text-muted-foreground">
+            {impact.data.adoptionSites.find(site=>site.siteId===cls.siteId&&
+              site.deploymentId===cls.deploymentId)?.siteName??"Authorized Site"}
+            {impact.data.latestPublishedVersionNo!==null&&
+              cls.versionNo<impact.data.latestPublishedVersionNo
+              ?" · Review newer publisher version":""}
+          </span>
         </Link>)}
-      </div>
+      </div>}
+      {impact.data?.moreAffectedClasses&&<p className="mt-2 text-xs text-muted-foreground">
+        Only the first 100 affected Classes are shown. Counts above include all authorized
+        Classes. Use the Class workspace for focused lookup before any migration decision.
+      </p>}
     </section>}
   </WorkspaceShell>;
 }
