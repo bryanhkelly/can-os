@@ -7,3 +7,4 @@ export { WorkflowHandoff } from "./WorkflowHandoff";
 
 export { WorkflowWorkspace, WorkflowProgress, type WorkflowStepView, type WorkflowStepState } from "./workflow-workspace";
 export { UserFlowMap, type UserFlowStage, type UserFlowNode, type UserFlowState, type UserFlowKind, type UserFlowTransition } from "./user-flow-map";
+export { StatusTimeline, type StatusTimelineEntry } from "./status-timeline";
