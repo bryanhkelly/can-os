@@ -293,6 +293,7 @@ registerDomainEventHandler(EventTypes.SectionEnrollmentWithdrawn, handleNotifica
 registerDomainEventHandler(EventTypes.SectionWaitlistSeatOffered, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionCreationRequestDeclined, handleNotificationPolicyEvent);
 registerDomainEventHandler(EventTypes.SectionCreationRequestFulfilled, handleNotificationPolicyEvent);
+registerDomainEventHandler(EventTypes.NoncreditTrainingCompleted, handleNotificationPolicyEvent);
 
 /** Bounded retry: after this many failed attempts an event escalates to an ops Action. */
 const MAX_ATTEMPTS = 5;
