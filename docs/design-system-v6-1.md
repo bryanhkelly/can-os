@@ -117,6 +117,40 @@ Recorded integration checks for this classroom slice:
 - `git diff --check` passed. No classroom behavioral/database/browser test
   suite was run; those acceptance checks remain unverified.
 
+## Component architecture and adoption policy
+
+CAN OS V6.1 uses three layers of **one** design system, not three competing libraries.
+
+| Layer | Ownership | Existing examples | Rules |
+| --- | --- | --- | --- |
+| 1. Primitives | `src/components/ui/`, theme tokens and layout foundations | Button, Input, Select, Modal, Table, Field, PageFrame | Own geometry, focus, semantics and shared style. Feature UI must use these rather than styling equivalent native form controls. |
+| 2. Application patterns | `src/components/workspace/`, `src/components/workflow/`, shared form and directory composition | DirectoryTable, PageHeader, FormSection, FormActions, WorkflowProgress, RecordHeader, StatusBadge | Own responsive composition, empty/error/loading states and reusable interactions. Remain domain-neutral; do not query databases or implement permissions. |
+| 3. Feature components | Feature-specific folders and modules | EvidenceUploader, class roster, enrollment forms, blueprint workflows | Own domain-specific fields, presentation and commands; compose Layers 1 and 2. Authorization and business transitions remain server-owned. |
+
+**Reuse before invention:** For any new feature surface, look for an existing pattern
+before creating a new table, filter row, status display, stepper, form layout or header.
+Extend a shared pattern only when the behavior is genuinely reusable across multiple
+domains. Do not introduce duplicate names such as `DataTable` beside the existing
+`DirectoryTable` without a concrete migration and deprecation plan.
+
+**Dependency direction:** Features depend on shared patterns and primitives;
+patterns depend on primitives. Shared components must not import feature components.
+Server-side authorization, data ownership, audits and lifecycle transitions must
+never migrate into presentation components merely to enable reuse.
+
+**Design enforcement:** `scripts/check-design-system.mjs` already checks
+canonical primitives, shared shell geometry and evidence ownership. A governed
+feature-control manifest additionally checks migrated evidence upload controls for
+shared Button/Input/Label imports, prohibited raw native controls and rounded
+utility classes. Add feature components to the manifest as they migrate. CI should
+run the checker alongside lint, typecheck and component/story tests. This is an
+incremental adoption gate, not a claim that all legacy feature UI has been migrated.
+
+**Review criteria:** Shared-pattern changes require keyboard and accessible-label
+coverage, narrow/mobile layout checks, loading/empty/error state examples and
+at least two concrete feature use cases before extraction. Feature owners retain
+their own permissions and domain-specific tests.
+
 ## 1. Non-negotiable design decisions
 
 1. **Fonts:** DM Sans is the UI font; Instrument Serif is the editorial heading font. Long-form labels, tables, buttons, and metrics use DM Sans; restrained page and section headings may use Instrument Serif. Avoid the overbold compressed V6 presentation.
