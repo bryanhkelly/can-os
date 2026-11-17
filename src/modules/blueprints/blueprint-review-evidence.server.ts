@@ -20,9 +20,6 @@ export async function listBlueprintReviewEvidence(
 ) {
   if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
   assertCapability(context, "blueprint.review");
-  if (process.env.CAN_CANONICAL_BLUEPRINT_WRITE_ENABLED !== "true") {
-    throw new DomainError("UNAVAILABLE", "Canonical Blueprint review is not enabled.");
-  }
   const { owningOrganizationId } = blueprintReviewEvidenceInputSchema.parse(rawInput);
   if (!context.scope.organizationIds?.includes(owningOrganizationId)) {
     throw new AuthorizationError("Blueprint review evidence Organization scope");
