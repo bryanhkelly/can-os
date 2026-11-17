@@ -14,6 +14,7 @@ import {
   canonicalAccounts, canonicalAccountGrants,
   canonicalEnrollmentSites,
   canonicalClassEnrollmentInvitations,canonicalClassEnrollmentApprovalRequests,
+  canonicalClassEnrollmentRepeatAuthorizations,
   learnerCourseAttempts, courseVersions, courses, offeringVersions, offerings,
   programDeployments, deploymentOfferingAdoptions, educationOperations,
   educationOperationSites, classroomDeploymentSites, catalogSites, siteOrganizationRoles,
@@ -23,10 +24,11 @@ import {
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
-  assertNativeClassRepeatEligible, assertOperationalClassOfferingTerms,
+  assertOperationalClassOfferingTerms,
   assertNativeClassSeatAvailable,
 } from "@/domain/native-class-lifecycle";
 import { currentClassAuthority } from "./native-class-authority.server";
+import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentNativeClassLearnerForMutation } from "./native-class-learner-session.server";
@@ -316,7 +318,9 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
           eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
           eq(canonicalClassEnrollments.status,"completed"),
         )).limit(1);
-      assertNativeClassRepeatEligible(completed?["completed"]:[]);
+      const repeatAuthorization=completed
+        ?await requireNativeRepeatAuthorization(tx,instance.id,learnerPersonId,completed.id,now)
+        :null;
       const [occupancy]=await tx.select({total:count()}).from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.classId,instance.id),
           inArray(canonicalClassEnrollments.status,["pending","active"])));
@@ -374,6 +378,21 @@ export const enrollInNativeClass=createServerFn({method:"POST"})
       if(!attempt)throw new Error("Course Attempt insert failed");
       await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
         .where(eq(canonicalClassEnrollments.id,enrollment.id));
+      if(repeatAuthorization){
+        await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
+          .set({consumedByEnrollmentId:enrollment.id})
+          .where(and(
+            eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
+            isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
+          ));
+        await tx.insert(domainEvents).values({
+          eventType:"ClassRepeatAuthorizationConsumed",
+          aggregateType:"class_repeat_authorization",
+          aggregateId:repeatAuthorization.id,actorPersonId:learnerPersonId,
+          payload:{classId:instance.id,priorEnrollmentId:completed!.id,
+            classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
+        });
+      }
       if(approval){
         await tx.update(canonicalClassEnrollmentApprovalRequests).set({
           acceptedEnrollmentId:enrollment.id,
