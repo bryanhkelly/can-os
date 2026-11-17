@@ -148,7 +148,7 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
         not a publication request, independent approval, or Class activation.
       </p>
       {readiness.isPending&&<p role="status" className="mt-3 text-sm">
-        Checking publisher and adoption records…
+        Checking publisher Course and Offering records…
       </p>}
       {readiness.isError&&<p role="alert" className="mt-3 text-sm">
         Release prerequisites could not be checked under your current Course appointment.
@@ -165,9 +165,6 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
             className="border border-border p-3">
             <strong>{item.offeringTitle} · Offering v{item.versionNo}:</strong>
             {" "}{item.published?"published":"not published"} ({item.lifecycle}).
-            {" "}{item.proposedAdoptions} proposed and {item.approvedAdoptions} approved adoption record(s).
-            {item.activeDeployments>0&&<>{" "}{item.activeDeployments} active Deployment record(s).</>}
-            {item.activeOperations>0&&<>{" "}{item.activeOperations} active Operation record(s).</>}
           </li>)}
           {!readiness.data.offerings.length&&<li className="border border-border p-3">
             No Offering version is linked to this exact native Course version.
@@ -177,11 +174,11 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
           The release record list was truncated. Do not treat it as complete.
         </p>}
         <p className="mt-3 text-xs text-muted-foreground">
-          Approved adoption records do not establish active, effective-dated Site
-          and operator permissions. An independent reviewer must publish the native
-          Course and Offering, approve exact-version adoption, and authorize local
-          operations before Class creation and enrollment. No older curriculum
-          publisher is used.
+          This creator view does not inspect other organizations' adoption,
+          Deployment or Site records. Authorized local operators must verify
+          exact-version adoption and effective Site authority in Program Operations.
+          Independent Course and Offering publication remains required.
+          No older curriculum publisher is used.
         </p>
       </>}
     </section>}

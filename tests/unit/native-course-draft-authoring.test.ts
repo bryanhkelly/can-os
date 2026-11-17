@@ -61,6 +61,9 @@ describe("native Course draft authoring",()=>{
     expect(service).toContain("offerings.publisherOrganizationId,course.organizationId");
     expect(service).toContain("independentPublicationVerified:false");
     expect(service).toContain("siteAndOperatorAuthorizationVerified:false");
+    expect(service).not.toContain("deploymentOfferingAdoptions");
+    expect(service).not.toContain("programDeployments");
+    expect(editor).toContain("does not inspect other organizations' adoption");
     expect(editor).toContain("getNativeCourseReleaseReadiness");
     expect(editor).toContain("Release prerequisites");
     expect(editor).toContain("not a publication request");
