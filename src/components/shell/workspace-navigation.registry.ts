@@ -111,7 +111,6 @@ export const workspaceHome = {
 export type WorkspaceRole = keyof typeof workspaceHome;
 
 const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readonly string[]>>> = {
-  academic_content_creator: { "/class?view=content": [] },
   student: { "/student/courses": ["/student/courses/*"] },
   teacher: { "/teacher/gradebook": ["/teacher/gradebook/*"] },
 };
