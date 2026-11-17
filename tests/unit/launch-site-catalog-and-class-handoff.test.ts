@@ -1,0 +1,50 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+function source(path:string):string{
+  return readFileSync(new URL("../../"+path,import.meta.url),"utf8");
+}
+describe("Launch catalog, Class and persistence contracts",()=>{
+  it("resolves only independently approved public-to-canonical Site identities",()=>{
+    const server=source("src/modules/programs/launch-site-catalog.server.ts");
+    expect(server).toContain("assertSiteSetupScope(publicActor,site");
+    expect(server).toContain("status='approved'");
+    expect(server).toContain("confirmed_at IS NOT NULL");
+    expect(server).toContain("reviewed_at IS NOT NULL");
+    expect(server).toContain("getCanonicalCommandContext(request)");
+    expect(server).toContain("actor.scope.siteIds?.includes(canonicalSiteId)");
+  });
+  it("never treats the public Site ID as a canonical Offering discovery subject",()=>{
+    const commands=source("src/modules/programs/program-discovery.functions.ts");
+    const hub=source("src/modules/programs/school-hub.functions.ts");
+    expect(commands).toContain("resolveLaunchSiteCatalogContext(getRequest(),data.publicSiteId)");
+    expect(commands).toContain("siteId:scope.canonicalSiteId");
+    expect(hub).not.toContain("const canonicalCatalogEnabled=true");
+    expect(hub).toContain('catalogState=resolved.kind');
+  });
+  it("reuses canonical /class creator and preserves verified Offering version",()=>{
+    const panel=source("src/components/launch-studio/ProgramDiscoveryPanel.tsx");
+    const route=source("src/routes/class.tsx");
+    const manager=source("src/components/learning/NativeClassManager.tsx");
+    expect(panel).toContain("discoverLaunchSitePrograms");
+    expect(panel).toContain('to="/class"');
+    expect(panel).toContain("offeringVersionId:offering.offeringVersionId");
+    expect(route).toContain("preferredOfferingVersionId={selected.offeringVersionId}");
+    expect(manager).toContain("offeringVersionId:preferredOfferingVersionId");
+    expect(panel).not.toContain("createUnifiedClassDraft");
+  });
+  it("commits first Site preferences in the Site transaction, not a second mutation",()=>{
+    const site=source("src/modules/programs/launch.functions.ts");
+    const wizard=source("src/components/launch-studio/SiteFirstLaunch.tsx");
+    expect(site).toContain("launchPreferences:siteLaunchPreferencesSchema.optional()");
+    expect(site).toContain("launchPreferences:data.launchPreferences");
+    expect(wizard).toContain("launchPreferences:{delivery,interestIds:chosen}");
+    expect(wizard).not.toContain("siteId:saved.value.siteId,preferences");
+  });
+  it("uses the v6.1 rectilinear affiliation card",()=>{
+    const ui=source("src/components/operations/SiteAffiliationPanel.tsx");
+    expect(ui).toContain('className="mt-3 border border-border bg-card p-5"');
+    expect(ui).not.toContain("rounded-xl");
+    expect(ui).not.toContain("rounded-lg");
+  });
+});
