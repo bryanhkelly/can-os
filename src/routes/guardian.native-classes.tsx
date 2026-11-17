@@ -1,5 +1,5 @@
 import {createFileRoute,Link} from "@tanstack/react-router";
-import {useQuery,useQueryClient} from "@tanstack/react-query";
+import {useInfiniteQuery,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
@@ -17,6 +17,8 @@ export const Route=createFileRoute("/guardian/native-classes")({
 
 function GuardianNativeClasses(){
  const client=useQueryClient();
+ const [searchText,setSearchText]=useState("");
+ const [search,setSearch]=useState("");
  const [learner,setLearner]=useState("");
  const [target,setTarget]=useState("");
  const [busy,setBusy]=useState(false);
@@ -26,11 +28,13 @@ function GuardianNativeClasses(){
   queryKey:["guardian-native-class-learners"],
   queryFn:()=>getMyNativeGuardianLearners(),retry:false,
  });
- const catalog=useQuery({
-  queryKey:["guardian-native-class-catalog"],
-  queryFn:()=>getNativePublicClassCatalogPage({
-   data:{search:"",cursor:null},
-  }),retry:false,
+ const catalog=useInfiniteQuery({
+  queryKey:["guardian-native-class-catalog",search],
+  initialPageParam:null as {title:string;classId:string}|null,
+  queryFn:({pageParam})=>getNativePublicClassCatalogPage({
+   data:{search,cursor:pageParam},
+  }),
+  getNextPageParam:last=>last.nextCursor,retry:false,
  });
  const approvals=useQuery({
   queryKey:["guardian-native-class-approvals"],
@@ -40,7 +44,7 @@ function GuardianNativeClasses(){
   queryKey:["guardian-native-class-enrollments"],
   queryFn:()=>getMyNativeGuardianClassEnrollments(),retry:false,
  });
- const eligible=(catalog.data?.items??[]).filter(row=>
+ const eligible=(catalog.data?.pages.flatMap(page=>page.items)??[]).filter(row=>
   row.enrollmentMethods.includes("approval")&&row.remainingSeats!==0);
  async function refresh(){
   await Promise.all([
@@ -80,6 +84,15 @@ function GuardianNativeClasses(){
     No verified learners are linked to this guardian's canonical Person.
     Contact your registrar to complete the identity and relationship review.
    </p>}
+   <form className="mt-4 flex gap-2" role="search"
+    onSubmit={e=>{e.preventDefault();setSearch(searchText.trim());}}>
+    <label className="sr-only" htmlFor="guardian-native-class-search">Search Classes</label>
+    <input id="guardian-native-class-search" type="search" maxLength={100}
+     value={searchText} onChange={e=>setSearchText(e.target.value)}
+     placeholder="Search available Classes"
+     className="min-h-11 flex-1 border border-border bg-background px-3 text-sm"/>
+    <Button type="submit">Search</Button>
+   </form>
    <div className="mt-4 grid gap-4 md:grid-cols-2">
     <label className="text-sm font-semibold">Learner
      <select value={learner} onChange={e=>setLearner(e.target.value)}
@@ -98,6 +111,10 @@ function GuardianNativeClasses(){
      </select>
     </label>
    </div>
+   {catalog.hasNextPage&&<Button className="mt-3" variant="outline"
+    disabled={catalog.isFetchingNextPage} onClick={()=>void catalog.fetchNextPage()}>
+    {catalog.isFetchingNextPage?"Loading…":"Load more Classes"}
+   </Button>}
    <Button className="mt-4" disabled={!learner||!target||busy}
     onClick={()=>void requestApproval()}>{busy?"Submitting…":"Request Class approval"}</Button>
    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
