@@ -51,6 +51,16 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    ])expect(review).toContain(required);
    expect(review).not.toContain('data.evidenceReference.startsWith("https:")');
  });
+ it("does not interrupt Course enrollment while an existing Person awaits Class age activation",()=>{
+   const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
+   const auth=read("src/modules/identity/canonical-command-context.server.ts");
+   expect(noncredit).toContain("A newly approved but unconsumed review must not interrupt");
+   expect(noncredit).toContain("adultReview.consumedAt");
+   expect(noncredit).toContain("adultReview.canonicalAccountId!==null");
+   expect(auth).toContain("adultReview.consumedAt");
+   expect(auth).toContain("adultReview.canonicalAccountId!==null");
+   expect(auth).toContain('adultReview.status!=="approved"');
+ });
  it("keeps cookie recovery on separate browser RPCs",()=>{
    const flow=read("src/modules/classes/native-class-entry.client.ts");
    expect(flow).toContain("Each createServerFn call is its own HTTP round trip");
