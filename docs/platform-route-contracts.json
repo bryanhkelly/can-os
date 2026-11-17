@@ -904,6 +904,24 @@
       "writeBoundary": "Single verified legacy session maps to a new native Person only after explicit consent; participant IDs are server-derived"
     },
     {
+      "file": "src/routes/learn.activity.tsx",
+      "route": "/learn/activity",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Authenticated WS00-compatible alias to the My Activity dashboard",
+      "readBoundary": "Authenticated workspace checked; alias only, no participation data read",
+      "writeBoundary": "No writes; redirects to /learn/my-activity"
+    },
+    {
+      "file": "src/routes/learn.my-activity.tsx",
+      "route": "/learn/my-activity",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Account holder, student and guardian view their authorized learning, programs, and separate enrollment opportunities",
+      "writeBoundary": "Read-only projection; enrollment, waitlist, grading and completion remain owned by source services",
+      "readBoundary": "Individual source readers enforce active identity and grants; historical coverage is partial, not guaranteed complete"
+    },
+    {
       "file": "src/routes/learn.my-courses.tsx",
       "route": "/learn/my-courses",
       "owner": "enrollment",
