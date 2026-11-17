@@ -22,9 +22,6 @@ import { validateClassAuthority } from "./unified-class-authority.server";
 // These native commands are dormant until restricted RLS,
 // dedicated role provision and test01 acceptance are approved.
 function requireClassFeature() {
-  if (process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED !== "true") {
-    throw new AuthorizationError("unified Class release not activated");
-  }
   setResponseHeader("Cache-Control", "private, no-store");
 }
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
