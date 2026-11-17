@@ -22,7 +22,7 @@ export const getSchoolHubData=createServerFn({method:"GET"})
   const options=await listLaunchOptions();
   // The public Site and the canonical program catalog have independent grants.
   let canonicalCatalogEnabled=false;
-  let catalogState:"ready"|"unlinked"|"blocked"|"unavailable"="unlinked";
+  let catalogState:"ready"|"not_provisioned"|"blocked"|"unavailable"="not_provisioned";
   if(!data.siteId)return {canonicalCatalogEnabled,catalogState,options,launches:null,statuses:null,selectedProgramId:null,selectionError:null};
   if(!z.string().uuid().safeParse(data.siteId).success)
     return {canonicalCatalogEnabled,catalogState,options,launches:null,statuses:null,selectedProgramId:null,
