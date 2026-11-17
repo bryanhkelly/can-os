@@ -1,19 +1,20 @@
 import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
+import { RecordFacts } from "@/components/workspace";
 
 export function ChurchApplicationConfirmation({ churchName, siteName, contactEmail }: {
   churchName: string; siteName: string; contactEmail: string;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => { heading.current?.focus(); }, []);
-  return <section aria-labelledby="church-request-confirmation" className="space-y-4 rounded-xl border bg-card p-6">
+  return <section aria-labelledby="church-request-confirmation" className="space-y-4 border bg-card p-6">
     <h2 id="church-request-confirmation" ref={heading} tabIndex={-1} className="font-serif text-2xl">Request received</h2>
     <p>Keep these submission details for any follow-up with CAN.</p>
-    <dl className="space-y-2 text-sm">
-      <div><dt className="font-semibold">Church</dt><dd>{churchName}</dd></div>
-      <div><dt className="font-semibold">Proposed school site</dt><dd>{siteName}</dd></div>
-      <div><dt className="font-semibold">Contact email you provided</dt><dd className="break-words">{contactEmail}</dd></div>
-    </dl>
+    <RecordFacts label="Submitted church application details" columns={1} items={[
+      { id: "church", label: "Church", value: churchName },
+      { id: "site", label: "Proposed school site", value: siteName },
+      { id: "email", label: "Contact email you provided", value: contactEmail },
+    ]}/>
     <h3 className="font-semibold">What happens next</h3>
     <ol className="list-decimal space-y-2 pl-5 text-sm">
       <li>CAN reviews the information and independently verifies your authority to represent the church. The team may contact you for more information.</li>
