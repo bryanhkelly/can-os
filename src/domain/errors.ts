@@ -1,5 +1,5 @@
 export const clientErrorCodes = [
-  "AUTHENTICATION_REQUIRED", "FORBIDDEN", "VALIDATION_FAILED", "CONFLICT",
+  "AUTHENTICATION_REQUIRED", "FORBIDDEN", "CANONICAL_LEARNER_SESSION_REQUIRED", "VALIDATION_FAILED", "CONFLICT",
   "UNAVAILABLE", "CANCELLED", "UNEXPECTED", "WEBSITE_DRAFT_STORAGE_NOT_READY",
   "COURSE_CONTENT_REQUIRED", "COURSE_STAFFING_REQUIRED", "COURSE_CAPACITY_REACHED",
   "COURSE_CREDIT_LIMIT", "COURSE_SCHEDULE_CONFLICT", "COURSE_PREREQUISITES_REQUIRED",
@@ -15,6 +15,7 @@ export type ClientErrorCode = typeof clientErrorCodes[number];
 export const clientErrorMessages: Record<ClientErrorCode, string> = {
   AUTHENTICATION_REQUIRED: "Sign in with an authorized account to continue.",
   FORBIDDEN: "You do not have permission to perform this operation.",
+  CANONICAL_LEARNER_SESSION_REQUIRED: "Your verified CAN learner session must be linked before joining this Class.",
   VALIDATION_FAILED: "Check the entered information and try again.",
   CONFLICT: "This record has changed. Refresh the page before trying again.",
   UNAVAILABLE: "This information is temporarily unavailable.",
