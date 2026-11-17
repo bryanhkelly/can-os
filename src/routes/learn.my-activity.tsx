@@ -4,6 +4,7 @@ import {useMemo,useRef,useState} from "react";
 import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw, Users} from "lucide-react";
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
+import {NoncreditEnrollmentManagement} from "@/components/learning/NoncreditEnrollmentManagement";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
 import {getMyActivity,getMyActivitySourcePage,getMyActivityOpportunityPage} from "@/modules/learning/my-activity.functions";
 import {assembleParticipation} from "@/domain/participation-projections";
@@ -349,14 +350,17 @@ function MyActivityPage() {
           {opportunities.map(item => <OpportunityCard key={item.key} item={item}/>)}
         </div>
       </section>}
-      <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
+      <section className="mt-8 border-t border-border pt-6" aria-label="Noncredit enrollment management">
+         <NoncreditEnrollmentManagement/>
+       </section>
+       <section className="mt-8 border-t border-border pt-5 text-sm text-muted-foreground">
         <h2 className="font-semibold text-foreground">One CAN account, independently authorized access</h2>
         <p className="mt-2">Personal records are assembled across independently verified memberships and guardian relationships, while every provider retains authority over its own records. An unverified Site, other Person, or staff role never grants learner access.</p>
         <p className="mt-2">Load older activity to continue through source-owned history. Source outages and missing academic outcomes are shown as incomplete, never treated as evidence of no participation. This dashboard is not an official transcript.</p>
         <p className="mt-3">
           <Link to="/account" className="font-semibold text-primary underline">Manage authorized workspaces</Link>
           {" · "}
-          <Link to="/learn/my-courses" className="font-semibold text-primary underline">Manage training registrations and waiting lists</Link>
+          
         </p>
       </section>
     </>}
