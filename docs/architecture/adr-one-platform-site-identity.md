@@ -10,7 +10,7 @@ Updated: 2026-11-17
 - **One Organization entity**: `public.organizations.id`. Distinguish owner/host/operator/network roles through explicit, effective-dated scoped relationship records, **not** through duplicate Organizations.
 - **One account/person identity** used for sign-in, authorization and learning history; do not create canonical identity aliases.
 - Canonical capabilities such as Offers, Courses, Classes, Sessions, assessment, funding, completion, evidence and quality controls move **into `public`**. Existing verified security boundaries must survive.
-- **No Site identity bridge, crosswalk, mapping table, double-write, matching by names, or new education-only Site entity.** The pre-existing public-to-canonical correspondence tables must be retired **after** the consumers are converted.
+- **No Site identity bridge, crosswalk, matching by names, or new education-only Site entity.** The Site correspondence table is now physically retired on main. Remaining Person/account correspondence is a separate transitional issue to eliminate only when its live authorization consumers are migrated.
 
 ## What actually exists on Neon main
 
@@ -18,7 +18,7 @@ Current Neon main snapshot, 2026-11-17 (after 51 guarded table moves):
 
 | Metric | public | education_v30 |
 | --- | ---: | ---: |
-| Base tables | 242 | 433 |
+| Base tables | 241 | 433 |
 | Views | 0 | 6 |
 | SQL functions/procedures | 258 | 245 |
 | Sites | 9 | 1 (same Site UUID as its public record) |
@@ -49,7 +49,9 @@ The `education_v30.sites` table has 45 inbound FK constraints; `public.sites` ha
 10. Added `verify:schema:consolidation` to reconcile all **51** committed table moves on actual main without changing data. This check intentionally does not claim full schema unification while canonical objects remain.
 
 
-11. Relocated **eight further empty, noncolliding operational tables** in a checked main-only transaction, including `organization_relationships`, `organization_classifications`, `provider_authorizations`, `provider_eligibility_reviews`, `institutional_approvals`, `curriculum_rights_grants`, `production_opportunities`, and `session_staff`. Each retained its table identity and FK targets; none had existing business records. Source: `database/production/2026-11-17-consolidate-8-empty-operational-tables.sql`. **Current: 242 public tables, 433 canonical tables, 51 total tables relocated.**
+11. Relocated **eight further empty, noncolliding operational tables** in a checked main-only transaction, including `organization_relationships`, `organization_classifications`, `provider_authorizations`, `provider_eligibility_reviews`, `institutional_approvals`, `curriculum_rights_grants`, `production_opportunities`, and `session_staff`. Each retained its table identity and FK targets; none had existing business records. Source: `database/production/2026-11-17-consolidate-8-empty-operational-tables.sql`. **After these moves: 242 public tables, 433 canonical tables, 51 total tables relocated.**
+
+12. **Retired the empty Site identity bridge on Neon main:** `public.site_canonical_identity_links` was dropped with `RESTRICT` after confirming zero records, incoming FKs, dependent routines/views, or user triggers. Source: `database/production/2026-11-17-retire-empty-site-identity-bridge.sql`. Staff reviewer authorization now uses the same Site ID rather than a Site mapping; the old Site link request/confirm/review service was deleted, and the bookmarked `/site-identity` route is limited to independent staff Person verification. Current post-retirement count: **241 public / 433 education_v30** base tables. **The separate Person alias table still exists pending a one-Person model cutover**, as do the canonical identity tables. These are not yet unified.
 
 ## Production cutover (dependency order; not yet executed)
 
@@ -59,7 +61,7 @@ The `education_v30.sites` table has 45 inbound FK constraints; `public.sites` ha
 4. Move non-colliding canonical tables, sequences, types, views and routines into `public` with dependency ordering and verified rollback, keeping the existing object identities where supported. Move sensitive tables with dedicated least-privilege policies. Preserve canonical reference data.
 5. Rebind the empty canonical Site/Organization foreign keys to shared `public` identities, using **direct references**, not a persistent crosswalk. All new native Classes and Deployments use the platform Site UUID.
 6. Change Drizzle and server modules in the same release window; remove all schema-qualified `education_v30.` calls, legacy identity translation, duplicate publication paths and redundant enrollment implementations. Reconcile academic and noncredit participation into person-centered learning history without losing provenance.
-7. Retire the now-unreferenced canonical Site/Organization tables and the unused `site_canonical_identity_links` table. Remove the empty old namespaces only after inspecting all dependent SQL routines and roles.
+7. Retire the now-unreferenced canonical Site/Organization tables and remaining Person identity aliases, then remove the empty old namespaces only after inspecting all dependent SQL routines and roles. The Site crosswalk table has already been dropped.
 8. Exact SHA: typecheck, build, security/RLS negative cases, one-login, Launch Studio, Course/Offering adoption, Class and four Sessions, learner enrollment, attendance, completion, credential, reporting, website reentry, network and Site switching, plus replay and rollback validation.
 
 **Release gate:** Main is a live database. Schema movement, FK reassignment, routine replacement, RLS enforcement and object drops are destructive/availability-sensitive. Neither the above decision nor phase-1 additive changes assert that the full cutover was executed or verified. Stop before any unsafe, unreviewed cutover.
