@@ -5,6 +5,7 @@ const school=read("src/modules/learning/account-school-participation.functions.t
 const activity=read("src/modules/learning/my-activity.functions.ts");
 const native=read("src/modules/classes/native-class-enrollment.functions.ts");
 const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
+const waitlist=read("src/modules/enrollment/noncredit-waitlist.functions.ts");
 const ui=read("src/routes/learn.my-activity.tsx");
 
 describe("account-wide participation source authority and pagination",()=>{
@@ -71,6 +72,19 @@ describe("account-wide participation source authority and pagination",()=>{
     "noncredit_completion_decisions later",
   ])expect(noncredit).toContain(phrase);
   expect(noncredit).not.toContain("const registrations=await db.selectDistinctOn");
+ });
+ it("paginates only original Person-owned waitlist opportunities",()=>{
+  for(const phrase of [
+    "getMyNoncreditWaitlistPage",
+    "waitlistCursor",
+    "cursor.waitlistId",
+    "eq(noncreditEnrollmentWaitlist.accessAccountId,owner.accountId)",
+    "eq(noncreditEnrollmentWaitlist.accessPersonId,owner.personId)",
+    "owner.personId!==actor.actorPersonId",
+  ])expect(waitlist).toContain(phrase);
+  expect(waitlist).toContain("limit(51)");
+  expect(waitlist).toContain("nextCursor");
+  expect(waitlist).not.toContain("tx.insert(canonicalClassEnrollments)");
  });
  it("exposes unlimited continuation in My Activity, with per-source failures",()=>{
   expect(activity).toContain("getMyActivitySourcePage");
