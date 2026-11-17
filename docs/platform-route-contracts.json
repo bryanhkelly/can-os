@@ -328,6 +328,24 @@
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
+      "file": "src/routes/canonical.classes_.completion.tsx",
+      "route": "/canonical/classes/completion",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Exact Class Site registrar independently reviews pinned completion policy and authoritative evidence; no automatic certificate or grade",
+      "readBoundary": "Current canonical staff grant, exact Class and Site scope, governance schema feature gate, evidence ownership",
+      "writeBoundary": "Independent reviewer with verified source-bound evidence only; guarded by CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED"
+    },
+    {
+      "file": "src/routes/canonical.completion-evidence-reviews.tsx",
+      "route": "/canonical/completion-evidence-reviews",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Independent staff reviewer requests/approves canonical completion source evidence at verified provider scope",
+      "readBoundary": "Current canonical independently scoped reviewer and exact provider/Site/source authorization; no network-only access",
+      "writeBoundary": "Versioned source-bound review requests and decisions behind restricted WS3 review gating"
+    },
+    {
       "file": "src/routes/canonical.content.tsx",
       "route": "/canonical/content",
       "owner": "learning",
@@ -479,6 +497,24 @@
       "roleJourney": "Feature-flagged canonical learner views issued noncredit certificates and badges for the authenticated recipient; final production placement is pending",
       "readBoundary": "Canonical native learner session, credential reader feature flag and subject-bound issuance search; no provider or other recipient records exposed",
       "writeBoundary": "Download uses a recipient-bound POST with current credential validity check; no issuance or revocation action on this page"
+    },
+    {
+      "file": "src/routes/canonical_.noncredit-completion.tsx",
+      "route": "/canonical/noncredit-completion",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Privately scoped noncredit completion queue for current provider",
+      "readBoundary": "Bounded exact-Site and current provider entitlement, not a global completion search",
+      "writeBoundary": "Review workflow remains gated; no guessed credential or completion writer"
+    },
+    {
+      "file": "src/routes/canonical.noncredit.completion.tsx",
+      "route": "/canonical/noncredit/completion",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Provider reviews specific noncredit registration completion history and requests authorized corrections",
+      "readBoundary": "Current original provider Organization/delivery Site and original learner Registration; URL ID grants no permission",
+      "writeBoundary": "Existing canonical completion decisions, correction evidence and independent reviewer guards"
     },
     {
       "file": "src/routes/canonical.program-operations.tsx",
@@ -1307,6 +1343,24 @@
       "roleJourney": "Anonymous GET returns only immutable deployed source commit fingerprint; operator uses it to compare expected main source SHA",
       "writeBoundary": "GET only; no mutation, no configuration or secrets",
       "readBoundary": "Fixed application name and embedded build-time SHA, cache no-store, noindex; tenant host gate never exposes app endpoints to tenant origins"
+    },
+    {
+      "file": "src/routes/reports.index.tsx",
+      "route": "/reports/",
+      "owner": "reporting",
+      "verification": "pending",
+      "roleJourney": "Site Admin/Registrar accesses provider-private reports and the authorized Class drilldown",
+      "readBoundary": "Each report revalidates current Organization/Site and provider data rights; network membership alone denies",
+      "writeBoundary": "None; no public network publication or funding claims"
+    },
+    {
+      "file": "src/routes/reports.classes_.$classId.tsx",
+      "route": "/reports/classes/$classId",
+      "owner": "reporting",
+      "verification": "pending",
+      "roleJourney": "Current exact-Site Class manager inspects source-backed and disclosure-safe Class evidence",
+      "readBoundary": "Role and capability checked by reporting service; exact canonical Class and current operator/Site grant, read-only repeatable-read query",
+      "writeBoundary": "None; CSV internal only and formal completion remains unavailable until verified WS3 source"
     },
     {
       "file": "src/routes/safeguarding.tsx",
