@@ -93,3 +93,25 @@ Class approval and Site/Organization production schema still requires
 authorized migration and positive acceptance fixtures.
 
 **Release hold remains in force.**
+
+
+## November 17 schema reconciliation (database migrations applied; release hold retained)
+
+At the user's explicit direction to put all pending tables on Neon
+`main`, the additive sensitive-issuer and staged WS3, WS4, WS5
+migrations were applied to `test01` and then `main` in validated
+dependency order. The main branch now contains all 11 newly added
+relations with forced RLS and their available guard functions/triggers,
+including governed Class Outcome columns. All existing native Class and
+credential approval record counts remain zero. **This does not change
+the WS00 application release HOLD/NO-GO**, and it does not prove any
+authenticated Class journey or Cloudflare deployment.
+
+These DB migrations supersede the earlier text in this runbook stating
+that WS3/4/5 tables are absent, but they do not supersede the
+requirements for real-role authorization tests, published completion
+policies before enrolling a Class learner, current-SHA build acceptance,
+independent reviewer decisions, and production promotion approval.
+
+See [2026-11-17 main schema reconciliation](../releases/2026-11-17-main-schema-reconciliation.md)
+and the repeatable read-only `db:canonical:main-schema` check.
