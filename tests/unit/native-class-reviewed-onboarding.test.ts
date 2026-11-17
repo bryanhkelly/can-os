@@ -25,8 +25,8 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
   });
   it("cannot claim an existing canonical account by email or reuse an operator identity",()=>{
     expect(activation).toContain("accessAccountCanonicalPrincipals");
-    expect(activation).toContain('if(operator||linked)');
-    expect(activation).toContain('if(sameEmail)');
+    expect(activation).toContain('if(operator||linked&&linked.accessPersonId!==owner.personId)');
+    expect(activation).toContain('if(Boolean(sameEmail)!==Boolean(linked)');
     expect(activation).toContain('row.role==="student"');
     expect(activation).toContain('can.personId!==owner.personId');
   });
@@ -36,6 +36,8 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(activation).toContain('tx.insert(canonicalAccounts)');
     expect(activation).toContain('tx.insert(canonicalPersons)');
     expect(activation).toContain('birthDate:review.verifiedBirthDate');
+    expect(activation).toContain('eq(canonicalPersons.id,linked.personId)');
+    expect(activation).toContain('existingPersonReused:Boolean(linked)');
     expect(activation).toContain('tx.insert(accessAccountNoncreditPrincipals)');
     expect(activation).toContain('tx.insert(canonicalAccountGrants)');
     expect(activation).toContain('roleCode:"learner"');
@@ -44,7 +46,7 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(activation).toContain('.returning({accessAccountId:accessAdultLearningReviews.accessAccountId})');
     expect(activation).toContain('if(!consumed)');
     expect(activation).toContain('eventCode:"class.learner.identity.activated"');
-    expect(activation).toContain('issueNativeLearnerSession(tx,nativeAccount.id,grant.id,now)');
+    expect(activation).toContain('issueNativeLearnerSession(tx,nativeAccountId,grantId,now)');
     expect(activation.indexOf('setResponseHeader("Set-Cookie",result.cookie)'))
       .toBeGreaterThan(activation.indexOf('db.transaction(async tx=>'));
   });
