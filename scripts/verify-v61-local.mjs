@@ -8,7 +8,7 @@
  * can introduce its own connection: this is not a database isolation sandbox.
  */
 import { spawnSync } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -38,15 +38,16 @@ const checks = [
 ];
 
 if (flags.has("--help") || flags.has("-h")) {
-  console.log("Usage: node scripts/verify-v61-local.mjs [--list]");
+  console.log("Usage: node scripts/verify-v61-local.mjs [--list | --preflight]");
   console.log("Run only from a clean, checked-out main; requires Node >=22.");
   console.log("Runs locked dependencies, local build/check/test/Storybook gates.");
   console.log("Writes JSON and individual logs to the OS temporary directory.");
   console.log("Does not perform authenticated acceptance or certify hosted CI.");
   process.exit(0);
 }
-if (flags.size && !(flags.size === 1 && flags.has("--list"))) {
-  console.error("Unknown options. Use --help or --list.");
+if (flags.size && !(flags.size === 1 &&
+    (flags.has("--list") || flags.has("--preflight")))) {
+  console.error("Unknown options. Use --help, --list or --preflight.");
   process.exit(2);
 }
 if (flags.has("--list")) {
@@ -71,6 +72,19 @@ function preflight() {
   if (Number(process.versions.node.split(".")[0]) < 22) {
     throw new Error(`Node 22 or higher required; found ${process.version}`);
   }
+  // Vite and test runners may load ignored .env files even after shell vars
+  // are scrubbed. Refuse silent use of an unrelated Neon/test01/prod DB.
+  const credentialFiles = readdirSync(root).filter(name =>
+    (name === ".env" || name.startsWith(".env.") || name === ".dev.vars" ||
+      name.startsWith(".dev.vars.")) &&
+    name !== ".env.example" && name !== ".dev.vars.example");
+  const dangerousKey = /^\\s*(?:export\\s+)?(?:DATABASE_URL(?:_UNPOOLED)?|DIRECT_URL|NEON_DATABASE_URL|NEON_API_KEY|PGHOST|PGPASSWORD)\\s*=/m;
+  for (const name of credentialFiles) {
+    const contents = readFileSync(join(root, name), "utf8");
+    if (dangerousKey.test(contents)) {
+      throw new Error(`Local database credentials found in ${name}; use a credential-free checkout for the V6.1 engineering gate`);
+    }
+  }
   return { branch, sha };
 }
 
@@ -80,6 +94,11 @@ try {
 } catch (error) {
   console.error("[V6.1] PREFLIGHT BLOCKED: " + error.message);
   process.exit(1);
+}
+if (flags.has("--preflight")) {
+  console.log(`[V6.1] PREFLIGHT PASSED: clean ${context.branch} @ ${context.sha}`);
+  console.log("[V6.1] No dependencies or application checks were executed.");
+  process.exit(0);
 }
 
 const directory = mkdtempSync(join(tmpdir(), "can-os-v61-"));
