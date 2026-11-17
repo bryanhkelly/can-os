@@ -312,6 +312,30 @@ record lifecycles and audit commands remain unchanged by presentation migration.
   was moved into the presentation layer. Build, lint and authenticated acceptance
   still must pass for the exact `main` SHA before release.
 
+### Component-first adoption increment: canonical status and transport history
+
+- `StatusBadge` is now used by the school operations field-trip record and
+  participant permission display instead of locally styled status pills.
+  Trip approval and a guardian's permission are displayed as **distinct
+  states**. An approved trip does not prove permission to board.
+- `AttentionQueue` composes shared `StatusBadge` and `EmptyState`.
+  The supplied priorities retain their explicit critical/high/normal meaning;
+  the component does not infer new urgency from missing dates or ownership.
+- `CredentialDeliveryHistory` now adapts authorized academic credential
+  transport records into the existing `StatusTimeline`. The statuses are
+  **Pending**, **Accepted by provider**, or **Failed**. Provider acceptance
+  is informational, never confirmation of receipt by a school or person.
+  Original provider receipts, error text and requested-at timestamps remain
+  visible without inventing events, altering ordering, or broadening access.
+- The academic credential delivery route composes the shared history instead
+  of maintaining duplicate list markup. Server-owned authorization, download,
+  release consent and credential lifecycle logic are unchanged.
+- Added tests for transport state semantics, empty history, priority tones and
+  duplicate history prevention; Storybook shows accepted and pending transport
+  states. The shared-component checker now guards these consumers.
+- Changes are source-committed to `main`, **not** independently accepted
+  by production CI until the existing runner failures are resolved.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
