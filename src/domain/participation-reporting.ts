@@ -13,6 +13,8 @@ export type EvidenceInput={
   offerings:ReadonlyArray<{id:string;offeringId:string;state:string;publishedAt:string|null}>;
   enrollments:ReadonlyArray<{
     id:string;personId:string;courseAttemptId:string|null;
+    /** All exact Class-owned retakes. The single canonical pointer is only the selected attempt. */
+    courseAttemptIds?: readonly string[];
     status:EnrollmentStatus;enrolledAt:string;
   }>;
   sessions:ReadonlyArray<{
@@ -91,16 +93,32 @@ export function aggregateClassEvidence(input:EvidenceInput){
   const registered=input.enrollments.filter(r=>inPeriod(r.enrolledAt));
   const people=new Set(registered.map(r=>r.personId));
   const attemptToPerson=new Map<string,string>();
+  const attemptToEnrollment=new Map<string,string>();
+  function ownedAttempts(row:EvidenceInput["enrollments"][number]):readonly string[]{
+    const ids=row.courseAttemptIds??(row.courseAttemptId?[row.courseAttemptId]:[]);
+    if(new Set(ids).size!==ids.length || ids.some(id=>!id))
+      throw new Error("Duplicate or absent Class Course Attempt identity");
+    if(row.courseAttemptId && !ids.includes(row.courseAttemptId))
+      throw new Error("Selected Course Attempt is not linked to its Class Enrollment");
+    return ids;
+  }
   for(const r of input.enrollments){
     if(!r.personId)throw new Error("Registration without canonical Person");
-    if(!r.courseAttemptId)continue;
-    const previous=attemptToPerson.get(r.courseAttemptId);
-    if(previous && previous!==r.personId)throw new Error("Course Attempt belongs to multiple people");
-    attemptToPerson.set(r.courseAttemptId,r.personId);
+    for(const id of ownedAttempts(r)){
+      const previous=attemptToPerson.get(id);
+      if(previous && previous!==r.personId)
+        throw new Error("Course Attempt belongs to multiple people");
+      const owner=attemptToEnrollment.get(id);
+      if(owner && owner!==r.id)
+        throw new Error("Course Attempt belongs to multiple Class Enrollments");
+      attemptToPerson.set(id,r.personId);
+      attemptToEnrollment.set(id,r.id);
+    }
   }
-  // In-period attendance and assessments may belong to participants who registered earlier.
+  // Earlier retakes remain source-owned Class history. The selected pointer
+  // must not suppress valid facilitator-attested presence or assessments.
   const eligibleAttempts=new Set(input.enrollments.filter(r=>throughAsOf(r.enrolledAt))
-    .flatMap(r=>r.courseAttemptId?[r.courseAttemptId]:[]));
+    .flatMap(r=>[...ownedAttempts(r)]));
   const periodSessions=input.sessions.filter(s=>inPeriod(s.scheduledAt));
   const roomIds=new Set(periodSessions.filter(s=>s.roomId).map(s=>s.roomId!));
   const latestAttendance=new Map<string,EvidenceInput["attendance"][number]>();
