@@ -23,8 +23,6 @@ type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
  * rights to edit the publisher's Survey version or another Site's replies.
  */
 async function authorizeClassSurveyOperator(tx:Tx,classId:string){
-  if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-    throw new AuthorizationError("native Class release not activated");
   setResponseHeader("Cache-Control","private, no-store");
   const actor=await getCanonicalCommandContext(getRequest());
   if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
