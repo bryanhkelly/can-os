@@ -66,9 +66,11 @@ export interface RecordFact {
 }
 
 /** Compact semantic record metadata, not a metric dashboard or editable form. */
-export function RecordFacts({ items, columns = 2, label, className }: {
+export function RecordFacts({ items, columns = 2, variant = "plain", label, className }: {
   items: readonly RecordFact[];
   columns?: 1 | 2 | 3;
+  /** Tile presentation for concise record evidence states, not dashboard metrics. */
+  variant?: "plain" | "tiles";
   label?: string;
   className?: string;
 }) {
@@ -79,9 +81,10 @@ export function RecordFacts({ items, columns = 2, label, className }: {
     columns === 3 && "sm:grid-cols-3",
     className,
   )}>
-    {items.map((item, index) => <div key={item.id ?? `${item.label}:${index}`} className="min-w-0">
+    {items.map((item, index) => <div key={item.id ?? `${item.label}:${index}`}
+      className={cn("min-w-0", variant === "tiles" && "border border-border bg-card p-3")}>
       <dt className="text-xs text-muted-foreground">{item.label}</dt>
-      <dd className="mt-1 min-w-0 wrap-break-word text-foreground">{item.value}</dd>
+      <dd className={cn("mt-1 min-w-0 wrap-break-word text-foreground", variant === "tiles" && "font-semibold")}>{item.value}</dd>
     </div>)}
   </dl>;
 }
