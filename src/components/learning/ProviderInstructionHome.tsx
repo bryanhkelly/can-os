@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getProviderContentWorkspace } from "@/modules/learning/provider-content-workspace.functions";
 import { createRecordedInstructionDraft } from "@/modules/learning/instructional-tracks.functions";
+import { ProviderVideoUploadForm } from "@/components/learning/ProviderVideoUploadForm";
 
 export function ProviderInstructionHome({navigation}:{navigation?:import("react").ReactNode}) {
   const workspace = useQuery({
@@ -81,6 +82,7 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating content draft…"/>
       {!versions.length && <p role="status" className="mt-4 text-sm">No published Course versions are assigned to your currently verified provider appointment.</p>}
     </section>
+    <ProviderVideoUploadForm versions={versions}/>
     <section className="mt-7" aria-label="My instructional track versions">
       <h2 className="font-serif text-2xl">My tracks</h2>
       {!tracks.length && <p className="mt-3 border border-border bg-card p-5 text-sm">No instructional tracks created under your current appointments.</p>}
