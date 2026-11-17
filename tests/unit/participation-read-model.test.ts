@@ -7,6 +7,7 @@ import {
 import {
   assembleParticipation, projectFamilyEnrichment, projectNativeClasses,
   projectNoncreditCourses, projectNoncreditOpportunities, projectSchoolSections,
+  projectSchoolPrograms, projectAcceptedCalendarEvents,
 } from "@/domain/participation-projections";
 
 const now = new Date("2026-11-16T19:00:00.000Z");
@@ -212,4 +213,59 @@ describe("Participation Read Model v1", () => {
     }], now);
     expect(assembleParticipation([...one, ...one, ...two])).toHaveLength(2);
   });
+  it("projects only authoritative school Program enrollments, with dependent identity",()=>{
+    const program=projectSchoolPrograms([{
+      enrollmentId:uuid(11),programId:uuid(12),studentProfileId:uuid(13),
+      title:"Summer Learning",status:"active",
+      organizationId:uuid(14),organizationName:"Authorized provider",
+      siteId:uuid(15),siteName:"Center A",subjectKind:"dependent",subjectName:null,
+      startsAt:"2026-11-10",endsAt:"2026-12-15",
+    }],now)[0]!;
+    expect(program).toMatchObject({
+      source:"school_program",sourceId:uuid(11),kind:"program",
+      refs:{enrollmentId:uuid(11),programId:uuid(12)},
+      subject:{kind:"dependent",displayName:null},outcome:null,
+    });
+    expect(program.action?.href).toBe("/guardian/students");
+    const model:ParticipationReadModel={
+      version:PARTICIPATION_READ_MODEL_VERSION,generatedAt:now.toISOString(),
+      viewerRole:"guardian",activeGrantId:uuid(17),records:[program],
+      opportunities:[],sources:[{source:"school_program",state:"ready",coverage:"partial",message:null}],
+    };
+    expect(()=>assertParticipationReadModel(model)).not.toThrow();
+  });
+  it("records an accepted calendar event without inventing attendance or completion",()=>{
+    const record=projectAcceptedCalendarEvents([{
+      participantId:uuid(20),eventId:uuid(21),title:"Community Workshop",
+      startsAt:"2026-11-14T14:00:00Z",endsAt:"2026-11-14T15:00:00Z",
+      organizationId:uuid(22),siteId:uuid(23),programId:uuid(24),cancelled:false,
+    }],now)[0]!;
+    expect(record).toMatchObject({
+      source:"calendar_event",sourceId:uuid(20),kind:"event",
+      bucket:"history",status:"scheduled",outcome:null,
+      refs:{calendarEventId:uuid(21),calendarEventParticipantId:uuid(20)},
+    });
+    const model:ParticipationReadModel={
+      version:PARTICIPATION_READ_MODEL_VERSION,generatedAt:now.toISOString(),
+      viewerRole:"student",activeGrantId:uuid(25),records:[record],
+      opportunities:[],sources:[{source:"calendar_event",state:"ready",coverage:"partial",message:null}],
+    };
+    expect(()=>assertParticipationReadModel(model)).not.toThrow();
+    expect(()=>assertParticipationReadModel({...model,records:[{
+      ...record,sourceId:uuid(99),
+    }]})).toThrow(/identity/);
+  });
+  it("shows only explicitly supplied Class decision provenance, not enrollment completion",()=>{
+    const classes=projectNativeClasses([{
+      classEnrollmentId:uuid(30),classId:uuid(31),title:"AI Training",
+      status:"withdrawn",courseAttemptId:uuid(32),deliveryMode:"facilitated",
+      enrolledAt:now,siteId:null,
+      officialOutcome:{label:"Completion decision: pass",referenceId:uuid(33)},
+    }],now);
+    expect(classes[0]).toMatchObject({
+      bucket:"history",action:null,
+      outcome:{label:"Completion decision: pass",referenceId:uuid(33)},
+    });
+  });
+
 });
