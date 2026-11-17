@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import {
   accessAccounts, accountPersonGrants, accessAccountCanonicalPrincipals,
-  organizations,
+  organizations, sites,
 } from "@/db/schema";
 import {
   canonicalAccountGrants, canonicalAccounts,
@@ -317,6 +317,8 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
         personId:accountPersonGrants.personId,
       }).from(accountPersonGrants)
         .innerJoin(accessAccounts,eq(accessAccounts.id,accountPersonGrants.accountId))
+        .innerJoin(sites,and(eq(sites.id,accountPersonGrants.siteId),
+          eq(sites.organizationId,accountPersonGrants.organizationId)))
         .innerJoin(accessAccountCanonicalPrincipals,and(
           eq(accessAccountCanonicalPrincipals.accountId,accountPersonGrants.accountId),
           eq(accessAccountCanonicalPrincipals.canonicalPrincipalId,grant.personId),
@@ -328,14 +330,11 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
           eq(accountPersonGrants.active,true),
           eq(accessAccounts.disabled,false),
           isNotNull(accessAccounts.emailVerifiedAt),
-          sql`EXISTS (
-            SELECT 1 FROM public.site_canonical_identity_links link
-            WHERE link.public_site_id=${accountPersonGrants.siteId}
-              AND link.canonical_site_id=${grant.siteId}::uuid
-              AND link.status='approved'
-              AND link.confirmed_at IS NOT NULL
-              AND link.reviewed_at IS NOT NULL
-          )`,
+          // One shared platform Site and Organization UUID; no crosswalk.
+          // Revalidate current CAN grant, verified Person, exact Site and
+          // hosting organization before an independent issuer approval.
+          eq(accountPersonGrants.siteId,grant.siteId),
+          eq(accountPersonGrants.organizationId,grant.organizationId),
         )).limit(2);
       if(requesterMembership.length!==1||
          requesterMembership[0]?.personId===reviewer.actorPersonId)
