@@ -7,6 +7,7 @@ describe("native Class transfer and completed-repeat contracts",()=>{
  const repeat=read("src/modules/classes/native-class-repeats.functions.ts");
  const enrollment=read("src/modules/classes/native-class-enrollment.functions.ts");
  const assignment=read("src/modules/classes/native-class-assignment.functions.ts");
+ const guardian=read("src/modules/classes/native-class-guardian-enrollment.functions.ts");
  const learner=read("src/routes/class.tsx");
 
  it("locks both Classes deterministically before changing either enrollment",()=>{
@@ -36,7 +37,7 @@ describe("native Class transfer and completed-repeat contracts",()=>{
   expect(repeat).toContain("isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId)");
  });
  it("consumes authorized repeat only inside successful Class admission",()=>{
-  for(const source of [enrollment,assignment]){
+  for(const source of [enrollment,assignment,guardian]){
    expect(source).toContain("requireNativeRepeatAuthorization");
    expect(source).toContain("ClassRepeatAuthorizationConsumed");
    expect(source).toContain("consumedByEnrollmentId:enrollment.id");
