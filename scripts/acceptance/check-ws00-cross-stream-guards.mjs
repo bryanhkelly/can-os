@@ -107,6 +107,29 @@ check("Shared route registry preserves WS1 and WS5 without deleting either",()=>
   required(nav.includes("/learn/my-activity")&&nav.includes("/canonical/program-operations"),
     "One workstream overwrote another's navigation");
 });
+check("WS3 governed completion and WS6 reporting routes are indexed, no duplicate paths",()=>{
+  const routes=JSON.parse(read("docs/platform-route-contracts.json"));
+  const entries=Array.isArray(routes)?routes:routes.routes;
+  required(Array.isArray(entries),"Missing route registry array");
+  const urls=new Set();
+  for(const route of entries){
+    required(!urls.has(route.route),"Duplicate contract route "+route.route);
+    urls.add(route.route);
+  }
+  for(const url of [
+    "/canonical/classes/completion",
+    "/canonical/completion-evidence-reviews",
+    "/canonical/noncredit/completion",
+    "/reports/classes/$classId",
+    "/reports/",
+  ])required(urls.has(url),"Missing governed completion/reporting route "+url);
+  const detail=read("src/routes/classes_.$classId.tsx");
+  required(detail.includes('to="/reports/classes/$classId"'),
+    "Existing Class Reports tab is not wired to WS6 verified reporting route");
+  required(read("src/components/shell/workspace-navigation.registry.ts")
+      .includes('path: "/reports/"'),
+    "Authorized Site administration reports navigation missing");
+});
 check("Latest main Cloudflare planning preflight remains intact",()=>{
   const pkg=JSON.parse(read("package.json"));
   required(pkg.scripts?.["prebuild:cloudflare"]?.includes("verify-site-planning-imports.mjs"),
