@@ -38,7 +38,7 @@ describe("WS3 Class completion policy publication",()=>{
   it("does not let the same Site role review its own submitted evidence",()=>{
     expect(evidenceReview).toContain("actor.actorPersonId===record.submittedByPersonId");
     expect(evidenceReview).toContain("assertCurrentCanonicalStaffForMutation");
-    expect(evidenceReview).toContain("Review request");
+    expect(evidenceReview).toContain("CompletionEvidenceReviewRequested");
     expect(evidenceReview).toContain("learningCompletionEvidenceBindings");
   });
 });
