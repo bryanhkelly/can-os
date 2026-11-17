@@ -14,7 +14,7 @@ export const UNIT_SUITE_PREFIXES = Object.freeze({
   family: ["guardian-", "conference-", "pickup-", "field-trip-", "workspace-migration-"],
   classroom: [
     "facilitated-learning", "canonical-learning-activity", "canonical-learning-release-", "classroom-",
-    "notification-delivery-state",
+    "notification-delivery-state", "outbound-retry-policy",
     "site-noncredit-bridge-", "noncredit-waitlist-delivery-",
   ],
   enrollment: ["noncredit-self-enrollment", "personal-can-", "one-account-"],
