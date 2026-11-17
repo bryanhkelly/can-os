@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { FormActions, FormSection } from "./form-page";
@@ -60,6 +60,8 @@ export const Pending: Story = {
     const cancel = within(canvasElement).getByRole("link", { name: "Cancel" });
     await expect(cancel).toHaveAttribute("aria-disabled", "true");
     await expect(cancel).toHaveAttribute("tabindex", "-1");
+    await expect(fireEvent.click(cancel)).toBe(false);
+    await expect(canvasElement.querySelector("[data-action-footer=form]")).toBeInTheDocument();
     await expect(canvasElement.querySelector("[data-action-footer=form]")).toBeInTheDocument();
   },
 };
