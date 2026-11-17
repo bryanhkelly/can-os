@@ -40,6 +40,23 @@ const tableQueries = {
   can_people: "SELECT count(*)::bigint AS n FROM public.people",
   native_people: "SELECT count(*)::bigint AS n FROM education_v30.persons",
   native_accounts: "SELECT count(*)::bigint AS n FROM education_v30.canonical_accounts",
+  shared_person_ids: "SELECT count(*)::bigint AS n FROM public.people p JOIN education_v30.persons c ON c.id=p.id",
+  shared_account_ids: "SELECT count(*)::bigint AS n FROM public.access_accounts a JOIN education_v30.canonical_accounts c ON c.id=a.id",
+  active_native_sessions: "SELECT count(*)::bigint AS n FROM education_v30.canonical_sessions WHERE revoked_at IS NULL AND expires_at>now()",
+  exact_published_course_matches: `SELECT count(DISTINCT s.id)::bigint AS n
+    FROM public.sections s JOIN public.course_template_versions v ON v.id=s.course_template_version_id
+    JOIN public.course_templates t ON t.id=v.course_template_id
+    JOIN education_v30.courses c ON c.course_code=t.code AND c.publisher_organization_id=t.owning_organization_id
+    JOIN education_v30.course_versions cv ON cv.course_id=c.id AND cv.lifecycle='published'
+    WHERE v.status::text='published'`,
+  missing_published_course_matches: `SELECT count(DISTINCT s.id)::bigint AS n
+    FROM public.sections s JOIN public.course_template_versions v ON v.id=s.course_template_version_id
+    JOIN public.course_templates t ON t.id=v.course_template_id
+    WHERE v.status::text='published' AND NOT EXISTS (
+      SELECT 1 FROM education_v30.courses c
+      JOIN education_v30.course_versions cv ON cv.course_id=c.id AND cv.lifecycle='published'
+      WHERE c.course_code=t.code AND c.publisher_organization_id=t.owning_organization_id
+    )`,
 };
 const client = await pool.connect();
 try {
@@ -108,11 +125,15 @@ try {
   ].filter(name => counts[name] !== null && counts[name] !== 0);
   const dualIdentity = ["identity_links_noncredit", "identity_links_staff"]
     .filter(name => counts[name] !== null && counts[name] !== 0);
+  const identityDiverged = counts.native_people !== counts.shared_person_ids ||
+    counts.native_accounts !== counts.shared_account_ids ||
+    counts.active_native_sessions !== 0;
+  const unmatchedPublishedCourses = counts.missing_published_course_matches ?? null;
   const result = {
     target: "test01", counts, missing, blockingLegacy, dualIdentity,
-    dependentRows, blockingDependents,
+    dependentRows, blockingDependents, identityDiverged, unmatchedPublishedCourses,
     sectionRetirementReady: blockingLegacy.length === 0 && blockingDependents.length === 0 && missing.length === 0,
-    singleIdentityConsolidationReady: dualIdentity.length === 0 && missing.length === 0,
+    singleIdentityConsolidationReady: dualIdentity.length === 0 && !identityDiverged && missing.length === 0,
     note: "Aggregate preflight only. It does not prove record-level migration, retention, RLS, or functional parity.",
   };
   console.log(JSON.stringify(result, null, 2));
@@ -120,6 +141,10 @@ try {
     "BLOCKED: Section records still need evidence-preserving migration");
   assert.equal(blockingDependents.length, 0,
     "BLOCKED: dependent Section foreign-key records require migration");
+  assert.equal(unmatchedPublishedCourses, 0,
+    "BLOCKED: legacy Courses lack publisher-owned published native equivalents");
+  assert.equal(identityDiverged, false,
+    "BLOCKED: native Person/account identity remains separate or native sessions remain");
   assert.equal(dualIdentity.length, 0,
     "BLOCKED: dual-identity links still need reviewed consolidation");
   assert.equal(missing.length, 0, "BLOCKED: incomplete schema inspection");
