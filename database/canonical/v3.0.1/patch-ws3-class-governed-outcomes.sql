@@ -116,7 +116,9 @@ BEGIN
        prior.completion_policy_version_id<>p.id OR
        EXISTS (SELECT 1 FROM education_v30.class_outcomes newer
          WHERE newer.supersedes_outcome_id=prior.id) OR
-       NEW.result_code='completed' OR
+       (NEW.result_code='completed' AND (
+         prior.result_code<>'not_yet_completed' OR e.status<>'active' OR
+         e.attempt_state<>'active')) OR
        e.status NOT IN ('active','completed') THEN
       RAISE EXCEPTION 'Class completion correction must replace one current prior'
         USING ERRCODE='23514';
