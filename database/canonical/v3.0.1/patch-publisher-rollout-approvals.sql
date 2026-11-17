@@ -141,8 +141,51 @@ BEGIN
        USING ERRCODE='23514';
    END IF;
  END IF;
+ IF OLD.state IS DISTINCT FROM NEW.state THEN
+   IF TG_TABLE_NAME='publisher_rollout_plans' THEN
+     IF NOT (
+       (OLD.state='draft' AND NEW.state='submitted')
+       OR (OLD.state='submitted' AND NEW.state IN ('approved','denied'))
+       OR (OLD.state='approved' AND NEW.state IN ('superseded','retired'))
+     ) THEN
+       RAISE EXCEPTION 'Publisher rollout state transition is not permitted'
+         USING ERRCODE='23514';
+     END IF;
+     IF NEW.state IN ('approved','denied') AND NOT EXISTS (
+       SELECT 1 FROM education_v30.publisher_rollout_decisions d
+       WHERE d.plan_id=NEW.id AND d.decision=NEW.state
+     ) THEN
+       RAISE EXCEPTION 'A recorded independent publisher decision is required'
+         USING ERRCODE='23514';
+     END IF;
+   ELSE
+     IF NOT (
+       (OLD.state='draft' AND NEW.state IN ('submitted','withdrawn'))
+       OR (OLD.state='submitted' AND NEW.state IN ('approved','denied','withdrawn'))
+       OR (OLD.state='approved' AND NEW.state IN ('activated','withdrawn'))
+       OR (OLD.state='activated' AND NEW.state='retired')
+     ) THEN
+       RAISE EXCEPTION 'Operator rollout state transition is not permitted'
+         USING ERRCODE='23514';
+     END IF;
+     IF NEW.state IN ('approved','denied') AND NOT EXISTS (
+       SELECT 1 FROM education_v30.operator_rollout_decisions d
+       WHERE d.application_id=NEW.id AND d.decision=NEW.state
+     ) THEN
+       RAISE EXCEPTION 'A recorded independent operator rollout decision is required'
+         USING ERRCODE='23514';
+     END IF;
+     IF NEW.state='activated' AND NOT EXISTS (
+       SELECT 1 FROM education_v30.operator_rollout_class_links l
+       WHERE l.application_id=NEW.id
+     ) THEN
+       RAISE EXCEPTION 'Approved rollout must link a canonical Class before activation'
+         USING ERRCODE='23514';
+     END IF;
+   END IF;
+ END IF;
  RETURN NEW;
-END $$;
+END $;
 DROP TRIGGER IF EXISTS publisher_rollout_identity_immutable_trg
  ON education_v30.publisher_rollout_plans;
 CREATE TRIGGER publisher_rollout_identity_immutable_trg
