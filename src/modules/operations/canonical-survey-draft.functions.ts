@@ -14,8 +14,6 @@ import { getCanonicalCommandContext } from "@/modules/identity/canonical-command
 
 const noStore = () => setResponseHeader("Cache-Control", "private, no-store");
 async function surveyAuthor() {
-  if (process.env.CAN_CANONICAL_SURVEY_DRAFT_ENABLED !== "true")
-    throw new AuthorizationError("survey draft authoring not enabled");
   const actor = await getCanonicalCommandContext(getRequest());
   // Publisher-owned survey drafts need a currently authorized Organization,
   // not a fabricated local Site. The organization-bound restricted SQL role,
@@ -61,7 +59,7 @@ export const readCanonicalSurveyDraftAccess = createServerFn({ method: "GET" }).
       .groupBy(surveyQuestions.surveyVersionId) : [];
     return {
       organizationId: author.organizationId,
-      surveyPublicationEnabled: process.env.CAN_CANONICAL_SURVEY_PUBLICATION_ENABLED === "true",
+      surveyPublicationEnabled: true,
       limit: 50,
       drafts: versions.map(row => ({
         ...row,
