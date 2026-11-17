@@ -280,5 +280,10 @@ describe("single My Activity training workspace", () => {
     }
     expect(commands).not.toContain("window.location.assign");
     expect(activity).toContain('id="noncredit-management"');
+    expect(activity).toContain('registrationId={item.refs.registrationId}');
+    expect(activity).toContain('releaseId={item.releaseId}');
+    expect(activity).toContain('showAllTraining&&<NoncreditEnrollmentManagement/>');
+    expect(commands).toContain('enabled:!releaseId');
+    expect(commands).toContain('enabled:!registrationId');
   });
 });
