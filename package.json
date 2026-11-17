@@ -94,7 +94,8 @@
     "test:route-identifiers": "node --test scripts/acceptance/check-route-identifier-collisions.test.mjs",
     "db:canonical:one-person-cutover-preflight": "node scripts/acceptance/check-one-person-cutover.mjs",
     "test:identity:account-constraints": "node scripts/acceptance/test-one-person-account-constraints.mjs",
-    "verify:deploy:identity-schema": "node scripts/acceptance/check-one-person-deploy-schema.mjs"
+    "verify:deploy:identity-schema": "node scripts/acceptance/check-one-person-deploy-schema.mjs",
+    "db:canonical:main-schema": "node scripts/acceptance/check-main-extended-schema.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
