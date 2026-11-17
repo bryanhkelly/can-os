@@ -32,7 +32,7 @@ async function main(){
       (SELECT count(*)::int FROM education_v30.sites) AS duplicate_canonical_sites,
       (SELECT count(*)::int FROM public.organizations) AS platform_organizations,
       (SELECT count(*)::int FROM education_v30.organizations) AS duplicate_canonical_organizations,
-      (SELECT count(*)::int FROM public.site_canonical_identity_links) AS existing_link_rows,
+      to_regclass('public.site_canonical_identity_links') IS NULL AS site_identity_bridge_retired,
       (SELECT count(*)::int FROM education_v30.classes) AS native_classes,
       (SELECT count(*)::int FROM education_v30.class_sessions) AS native_sessions
   `;
