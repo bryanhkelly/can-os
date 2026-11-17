@@ -108,14 +108,15 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
       organizationId:org.id,siteId:null,roleCode:"learner",active:true,
     }).returning({id:canonicalAccountGrants.id});
     if(!grant)throw new Error("native learning grant unavailable");
-    await tx.update(accessAdultLearningReviews).set({
+    const [consumed]=await tx.update(accessAdultLearningReviews).set({
       consumedAt:now,canonicalAccountId:nativeAccount.id,
       canonicalPersonId:nativePerson.id,
     }).where(and(
       eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
       eq(accessAdultLearningReviews.status,"approved"),
       isNull(accessAdultLearningReviews.consumedAt),
-    ));
+    )).returning({accessAccountId:accessAdultLearningReviews.accessAccountId});
+    if(!consumed)throw new AuthorizationError("approved adult review was already consumed");
     await tx.insert(auditEvents).values({
       actorPersonId:nativePerson.id,owningOrganizationId:org.id,
       eventCode:"class.learner.identity.activated",
@@ -124,7 +125,6 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
         source:"independently_reviewed_can_adult",
         reviewAccountId:owner.accountId,
         reviewAt:review.reviewedAt.toISOString(),
-        reviewEvidenceReference:review.evidenceReference,
         enrollmentCreated:false,
       },
     });
