@@ -66,6 +66,35 @@ async function main() {
     GROUP BY tn.nspname,t.relname
     ORDER BY tn.nspname,t.relname
   `;
+  const inboundForeignKeys=await sql`
+    SELECT src_ns.nspname || '.' || src.relname AS referencing_table,
+           c.conname AS constraint_name,
+           trg_ns.nspname || '.' || target.relname AS target_table,
+           pg_get_constraintdef(c.oid) AS definition
+    FROM pg_constraint c
+      JOIN pg_class src ON src.oid=c.conrelid
+      JOIN pg_namespace src_ns ON src_ns.oid=src.relnamespace
+      JOIN pg_class target ON target.oid=c.confrelid
+      JOIN pg_namespace trg_ns ON trg_ns.oid=target.relnamespace
+    WHERE c.contype='f'
+      AND c.confrelid IN ('public.sites'::regclass,'education_v30.sites'::regclass)
+    ORDER BY referencing_table,constraint_name
+  `;
+  const siteIdColumns=await sql`
+    SELECT table_schema || '.' || table_name AS relation,column_name
+    FROM information_schema.columns
+    WHERE table_schema IN ('public','education_v30')
+      AND (column_name='site_id' OR column_name IN ('public_site_id','canonical_site_id'))
+    ORDER BY table_schema,table_name,column_name
+  `;
+  const siteRls=await sql`
+    SELECT n.nspname || '.' || c.relname AS relation,
+           c.relrowsecurity AS rls_enabled,
+           c.relforcerowsecurity AS rls_forced
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE c.oid IN ('public.sites'::regclass,'education_v30.sites'::regclass)
+    ORDER BY relation
+  `;
   const potentialNames=await sql`
     SELECT p.id AS public_id,c.id AS canonical_id,p.name AS public_name,c.name AS canonical_name
     FROM public.sites p
@@ -92,6 +121,9 @@ async function main() {
     target:"one platform Site UUID; education-only one-to-one extension",
     summary,
     referencingForeignKeys:references,
+    inboundForeignKeyDetails:inboundForeignKeys,
+    siteIdentifierColumnInventory:siteIdColumns,
+    currentSiteTableRls:siteRls,
     legacyLinks:identityLinks,
     sameNameDifferentUuidCandidates:potentialNames.map(row=>({...row,
       diagnosticOnly:"Never reconcile by matching names"
