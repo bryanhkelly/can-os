@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { ArrowRight, LoaderCircle } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { expect, userEvent, within } from "storybook/test";
 import { Button } from "./button";
 
@@ -22,9 +22,12 @@ export const Variants: Story = {
 };
 
 export const Loading: Story = {
-  render: () => <div className="bg-background p-6"><Button disabled aria-busy="true">
-    <LoaderCircle aria-hidden="true" className="animate-spin" />Saving changes…
-  </Button></div>,
+  render: () => <div className="bg-background p-6"><Button loading loadingLabel="Saving changes…">Save changes</Button></div>,
+  play: async ({ canvasElement }) => {
+    const button = within(canvasElement).getByRole("button", { name: "Saving changes…" });
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute("aria-busy", "true");
+  },
 };
 
 export const KeyboardFocus: Story = {
