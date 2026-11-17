@@ -203,6 +203,27 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 - A commit on `main` is **not** a passed build or live acceptance.
   Review/version/evidence tests must pass for the exact commit before release.
 
+### Component-first adoption increment: form and confirmation action footers
+
+- `ActionFooter` is the canonical presentation component for form and dialog
+  action rows. `FormActions` and `ActionDialog` compose it instead of independently
+  styling their action layouts. It does not own submissions, navigation, security or state.
+- Dedicated forms preserve **submit first**, then the context-preserving Cancel
+  link. Cancel is removed from the keyboard order and cannot navigate while a save
+  is pending. Other disabled forms retain their normal Cancel navigation.
+- Confirmation dialogs preserve **Cancel before Confirm**, initial focus on
+  Cancel, native form validation, no backdrop dismissal, and disabled dismissal
+  while the parent reports pending. The dialog's `pendingLabel` is customizable
+  while `confirmLabel` remains the stable action label at rest.
+- All current `ActionDialog` consumers in admissions offers, Insights,
+  Operations, teacher conferences, student experiences, study groups and
+  jurisdiction profiles supply contextual pending descriptions. Insights and
+  Operations confirmation inputs now compose `Field` and `Textarea`; registrar
+  institutional exit acknowledgment uses canonical `Checkbox` and `Label`.
+- `tests/unit/v61-action-footer.test.tsx`, the TypeScript-AST adoption
+  tests, and Storybook interaction coverage guard the reusable patterns.
+  CI and authenticated end-to-end acceptance still need to pass for release.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
