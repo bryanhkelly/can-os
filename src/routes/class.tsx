@@ -14,6 +14,7 @@ import {transferMyNativeClassEnrollment} from "@/modules/classes/native-class-tr
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
+import { activateReviewedNativeClassLearner } from "@/modules/classes/native-class-reviewed-onboarding.functions";
 
 export const Route=createFileRoute("/class")({
   validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string}=>({
@@ -47,7 +48,14 @@ async function enrollWithLinkedCanRecovery(data:Parameters<typeof enrollInNative
     // failures are not session-recovery signals. Never retry those mutations.
     if(normalizeClientError(originalError).code!=="CANONICAL_LEARNER_SESSION_REQUIRED")
       throw originalError;
-    await resumeLinkedNativeClassLearner();
+    try { await resumeLinkedNativeClassLearner(); }
+    catch(recoveryError){
+      if(normalizeClientError(recoveryError).code!=="CANONICAL_LEARNER_ONBOARDING_REQUIRED")
+        throw recoveryError;
+      // Only previously and independently approved evidence can create the
+      // first native Person and one home-Organization learner grant.
+      await activateReviewedNativeClassLearner();
+    }
     return enrollInNativeClass(data);
   }
 }
