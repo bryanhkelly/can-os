@@ -125,14 +125,14 @@ export const getNoncreditCompletionQueue=createServerFn({method:"GET"})
         .innerJoin(noncreditTrainingVersions,and(
           eq(noncreditTrainingVersions.id,noncreditRegistrations.trainingVersionId),
           eq(noncreditTrainingVersions.providerOrganizationId,
-            actor.scope.organizationIds[0]!),
+            actor.scope.organizationIds?.[0]!),
           eq(noncreditTrainingVersions.offeringVersionId,
             noncreditRegistrations.offeringVersionId),
         ))
         .innerJoin(participationAttributions,and(
           eq(participationAttributions.noncreditRegistrationId,
             noncreditRegistrations.id),
-          eq(participationAttributions.deliverySiteId,actor.scope.siteIds[0]!),
+          eq(participationAttributions.deliverySiteId,actor.scope.siteIds?.[0]!),
         ))
         .where(inArray(noncreditRegistrations.status,
           ["registered","active","completed"]))
