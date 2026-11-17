@@ -150,7 +150,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
   const followUpBlockers = preview?.blockers.filter((item) => item.status !== "submitted") ?? [];
   const finalizedForPeriod = (id: string) => grades.filter((grade) => grade.gradingPeriodId === id).length;
 
-  return <section aria-label="Grading period finalization" className="mt-8  border bg-card p-5">
+  return <section aria-label="Grading period finalization" className="mt-8 border bg-card p-5">
     <h2 className="text-lg font-semibold">Close grading period / finalize grades</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Finalizing a grading period computes each enrolled student&apos;s percentage from their latest submission, when graded,
@@ -171,8 +171,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
         {periods.length > 0 && <div className="mt-4 flex flex-wrap items-end gap-3">
           <Field label="Grading period" className="min-w-64">
             <Select aria-label="Grading period to finalize" value={periodId} disabled={busy}
-              onChange={(event) => {setPeriodId(event.target.value);setPreview(null);setCorrectingId("");setCorrectionPercentage("");setCorrectionLetter("");setCorrectionReason("");setError("");}}
-              >
+              onChange={(event) => {setPeriodId(event.target.value);setPreview(null);setCorrectingId("");setCorrectionPercentage("");setCorrectionLetter("");setCorrectionReason("");setError("");}}>
               {periods.map((period) => <option key={period.id} value={period.id}>
                 {period.name} ({new Date(`${period.startsOn}T00:00:00`).toLocaleDateString()} – {new Date(`${period.endsOn}T00:00:00`).toLocaleDateString()})
                 {" · "}{finalizedForPeriod(period.id)} of {model.enrolledStudents} finalized
@@ -184,7 +183,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
             {busy ? "Working…" : "Finalize grades"}
           </Button>
         </div>}
-        {preview&&<section aria-label="Grading period unfinished work" className="mt-4  border p-4 text-sm">
+        {preview&&<section aria-label="Grading period unfinished work" className="mt-4 border p-4 text-sm">
           <p>{preview.eligible} students ready to finalize. Review is a current snapshot; finalization rechecks the records.</p>
           <p className="mt-2 font-semibold">{submittedBlockers.length} submission{submittedBlockers.length===1?"":"s"} to grade · {followUpBlockers.length} assignment{followUpBlockers.length===1?"":"s"} needing student follow-up</p>
           {firstSubmittedBlocker&&<p className="mt-2"><Link to="/teacher/gradebook" search={{section:sectionId,student:firstSubmittedBlocker.studentProfileId,assessment:firstSubmittedBlocker.assessmentId}} className="underline font-semibold">Grade the first pending submission</Link></p>}
@@ -206,7 +205,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
           {periodGrades.map((grade) => {
             const period = periods.find((item) => item.id === grade.gradingPeriodId);
             const correcting = correctingId === grade.id;
-            return <li key={grade.id} className=" border p-4 text-sm">
+            return <li key={grade.id} className="border p-4 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p>
                   <span className="font-semibold">{grade.studentName}</span>
@@ -231,27 +230,23 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                   <Field label="Corrected percentage (0–100, optional)">
                     <Input aria-label={`Corrected percentage for ${grade.studentName}`} type="number" min={0} max={100} step="0.01"
                       value={correctionPercentage} disabled={busy}
-                      onChange={(event) => setCorrectionPercentage(event.target.value)}
-                      />
+                      onChange={(event) => setCorrectionPercentage(event.target.value)}/>
                   </Field>
                   <Field label="Corrected letter grade (optional)">
                     <Input aria-label={`Corrected letter grade for ${grade.studentName}`} maxLength={10}
                       value={correctionLetter} disabled={busy}
-                      onChange={(event) => setCorrectionLetter(event.target.value)}
-                      />
+                      onChange={(event) => setCorrectionLetter(event.target.value)}/>
                   </Field>
                 </div>
                 <Field label="Reason (recorded and shared with the student and guardians)" required>
                   <Textarea aria-label={`Correction reason for ${grade.studentName}`} rows={2} minLength={5} maxLength={500}
                     value={correctionReason} disabled={busy}
-                    onChange={(event) => setCorrectionReason(event.target.value)}
-                    />
+                    onChange={(event) => setCorrectionReason(event.target.value)}/>
                 </Field>
                 <div className="flex gap-3">
                   <Button type="button" disabled={busy || correctionReason.trim().length < 5 ||
                       (!correctionPercentage.trim() && !correctionLetter.trim())}
-                    onClick={() => void correct(grade)}
-                    >
+                    onClick={() => void correct(grade)}>
                     Record correction
                   </Button>
                   <Button type="button" variant="outline" disabled={busy}
