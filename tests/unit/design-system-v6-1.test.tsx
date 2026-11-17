@@ -39,6 +39,23 @@ describe("V6.1 reusable design system", () => {
     expect(empty).not.toContain("<ul");
   });
 
+  it("keeps Blueprint decisions and Section lifecycle statuses on the shared presentation contract", () => {
+    const sourcePaths = [
+      "src/routes/canonical.blueprint-reviews.tsx",
+      "src/components/launch-studio/CanonicalBlueprintWorkspace.tsx",
+      "src/components/operations/SectionLifecycleManager.tsx",
+    ];
+    for (const path of sourcePaths) {
+      const source = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+      expect(source).toContain("<StatusBadge");
+      expect(source).not.toMatch(/rounded(?:-xl|-lg|-full)/);
+    }
+    const reviewer = readFileSync(new URL("../../src/routes/canonical.blueprint-reviews.tsx", import.meta.url), "utf8");
+    expect(reviewer).toContain("No operating permission was granted");
+    const launch = readFileSync(new URL("../../src/components/launch-studio/CanonicalBlueprintWorkspace.tsx", import.meta.url), "utf8");
+    expect(launch).toContain("planning-only");
+  });
+
   it("loads the same V6.1 fonts in the app and Storybook", () => {
     const root = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
     const preview = readFileSync(new URL("../../.storybook/preview-head.html", import.meta.url), "utf8");
