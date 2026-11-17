@@ -2,7 +2,12 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { QueryState } from "@/components/workspace";
+import { QueryState, WorkspaceNotice } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import {
   correctSectionGrade,
   finalizeSectionGrades,
@@ -145,7 +150,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
   const followUpBlockers = preview?.blockers.filter((item) => item.status !== "submitted") ?? [];
   const finalizedForPeriod = (id: string) => grades.filter((grade) => grade.gradingPeriodId === id).length;
 
-  return <section aria-label="Grading period finalization" className="mt-8 rounded-xl border bg-card p-5">
+  return <section aria-label="Grading period finalization" className="mt-8  border bg-card p-5">
     <h2 className="text-lg font-semibold">Close grading period / finalize grades</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Finalizing a grading period computes each enrolled student&apos;s percentage from their latest submission, when graded,
@@ -154,34 +159,32 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
       Students with any unfinished scoreable work are skipped. Finalized grades are immutable: re-running
       finalization never recomputes them, and later changes go through a recorded correction instead.
     </p>
-    {error && <p role="alert" className="mt-4 rounded-lg border p-3 text-sm">{error}</p>}
+    {error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving grading-period changes..."/>
     <QueryState loading={loading ? "Loading grading periods…" : undefined}
       error={readError || undefined} onRetry={() => void refresh()} retrying={busy || loading}>
       {model?.connected && model.section && <>
-        {!model.gradeScaleConfigured && <p role="status" className="mt-4 rounded-lg border p-3 text-sm text-amber-800">
+        {!model.gradeScaleConfigured && <WorkspaceNotice tone="attention" className="mt-4">
           The school year has no configured grade scale, so finalization cannot compute letter grades until the school configures one.
-        </p>}
+        </WorkspaceNotice>}
         {periods.length === 0 && <p className="mt-4 text-sm">No grading periods are configured for this section&apos;s term.</p>}
         {periods.length > 0 && <div className="mt-4 flex flex-wrap items-end gap-3">
-          <label className="min-w-64 text-sm font-semibold">Grading period
-            <select aria-label="Grading period to finalize" value={periodId} disabled={busy}
+          <Field label="Grading period" className="min-w-64">
+            <Select aria-label="Grading period to finalize" value={periodId} disabled={busy}
               onChange={(event) => {setPeriodId(event.target.value);setPreview(null);setCorrectingId("");setCorrectionPercentage("");setCorrectionLetter("");setCorrectionReason("");setError("");}}
-              className="mt-2 block w-full rounded-lg border bg-background p-3 font-normal">
+              >
               {periods.map((period) => <option key={period.id} value={period.id}>
                 {period.name} ({new Date(`${period.startsOn}T00:00:00`).toLocaleDateString()} – {new Date(`${period.endsOn}T00:00:00`).toLocaleDateString()})
                 {" · "}{finalizedForPeriod(period.id)} of {model.enrolledStudents} finalized
               </option>)}
-            </select>
-          </label>
-          <button type="button" disabled={busy||!periodId} onClick={()=>void reviewBlockers()}
-            className="rounded-lg border px-4 py-3 text-sm font-semibold disabled:opacity-50">Review unfinished work</button>
-          <button type="button" disabled={busy || !periodId} onClick={() => void finalize()}
-            className="rounded-lg bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-50">
+            </Select>
+          </Field>
+          <Button type="button" variant="outline" disabled={busy||!periodId} onClick={()=>void reviewBlockers()}>Review unfinished work</Button>
+          <Button type="button" loading={busy} disabled={busy || !periodId} onClick={() => void finalize()}>
             {busy ? "Working…" : "Finalize grades"}
-          </button>
+          </Button>
         </div>}
-        {preview&&<section aria-label="Grading period unfinished work" className="mt-4 rounded-lg border p-4 text-sm">
+        {preview&&<section aria-label="Grading period unfinished work" className="mt-4  border p-4 text-sm">
           <p>{preview.eligible} students ready to finalize. Review is a current snapshot; finalization rechecks the records.</p>
           <p className="mt-2 font-semibold">{submittedBlockers.length} submission{submittedBlockers.length===1?"":"s"} to grade · {followUpBlockers.length} assignment{followUpBlockers.length===1?"":"s"} needing student follow-up</p>
           {firstSubmittedBlocker&&<p className="mt-2"><Link to="/teacher/gradebook" search={{section:sectionId,student:firstSubmittedBlocker.studentProfileId,assessment:firstSubmittedBlocker.assessmentId}} className="underline font-semibold">Grade the first pending submission</Link></p>}
@@ -203,7 +206,7 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
           {periodGrades.map((grade) => {
             const period = periods.find((item) => item.id === grade.gradingPeriodId);
             const correcting = correctingId === grade.id;
-            return <li key={grade.id} className="rounded-lg border p-4 text-sm">
+            return <li key={grade.id} className=" border p-4 text-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p>
                   <span className="font-semibold">{grade.studentName}</span>
@@ -212,11 +215,10 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                   {" · finalized "}{grade.finalizedAt ? new Date(grade.finalizedAt).toLocaleDateString() : "—"}
                   {grade.corrections > 0 && ` · ${grade.corrections} recorded correction${grade.corrections === 1 ? "" : "s"}`}
                 </p>
-                {!correcting && <button type="button" disabled={busy}
-                  onClick={() => { setCorrectingId(grade.id); setError(""); }}
-                  className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                {!correcting && <Button type="button" variant="outline" size="sm" disabled={busy}
+                  onClick={() => { setCorrectingId(grade.id); setError(""); }}>
                   Correct grade
-                </button>}
+                </Button>}
               </div>
               {correcting && <div className="mt-3 grid gap-3 border-t pt-3">
                 <p className="text-xs text-muted-foreground">
@@ -226,37 +228,36 @@ function SectionGradeFinalizationForm({ sectionId }: { sectionId: string }) {
                   finalization. Transcripts already issued keep their original snapshot.
                 </p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-semibold">Corrected percentage (0–100, optional)
-                    <input aria-label={`Corrected percentage for ${grade.studentName}`} type="number" min={0} max={100} step="0.01"
+                  <Field label="Corrected percentage (0–100, optional)">
+                    <Input aria-label={`Corrected percentage for ${grade.studentName}`} type="number" min={0} max={100} step="0.01"
                       value={correctionPercentage} disabled={busy}
                       onChange={(event) => setCorrectionPercentage(event.target.value)}
-                      className="mt-1 w-full rounded border bg-background p-2 font-normal" />
-                  </label>
-                  <label className="text-xs font-semibold">Corrected letter grade (optional)
-                    <input aria-label={`Corrected letter grade for ${grade.studentName}`} maxLength={10}
+                      />
+                  </Field>
+                  <Field label="Corrected letter grade (optional)">
+                    <Input aria-label={`Corrected letter grade for ${grade.studentName}`} maxLength={10}
                       value={correctionLetter} disabled={busy}
                       onChange={(event) => setCorrectionLetter(event.target.value)}
-                      className="mt-1 w-full rounded border bg-background p-2 font-normal" />
-                  </label>
+                      />
+                  </Field>
                 </div>
-                <label className="text-xs font-semibold">Reason (recorded and shared with the student and guardians)
-                  <textarea aria-label={`Correction reason for ${grade.studentName}`} rows={2} minLength={5} maxLength={500}
+                <Field label="Reason (recorded and shared with the student and guardians)" required>
+                  <Textarea aria-label={`Correction reason for ${grade.studentName}`} rows={2} minLength={5} maxLength={500}
                     value={correctionReason} disabled={busy}
                     onChange={(event) => setCorrectionReason(event.target.value)}
-                    className="mt-1 w-full rounded border bg-background p-2 font-normal" />
-                </label>
+                    />
+                </Field>
                 <div className="flex gap-3">
-                  <button type="button" disabled={busy || correctionReason.trim().length < 5 ||
+                  <Button type="button" disabled={busy || correctionReason.trim().length < 5 ||
                       (!correctionPercentage.trim() && !correctionLetter.trim())}
                     onClick={() => void correct(grade)}
-                    className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">
+                    >
                     Record correction
-                  </button>
-                  <button type="button" disabled={busy}
-                    onClick={() => { setCorrectingId(""); setCorrectionPercentage(""); setCorrectionLetter(""); setCorrectionReason(""); }}
-                    className="rounded-lg border px-4 py-2 text-xs disabled:opacity-50">
+                  </Button>
+                  <Button type="button" variant="outline" disabled={busy}
+                    onClick={() => { setCorrectingId(""); setCorrectionPercentage(""); setCorrectionLetter(""); setCorrectionReason(""); }}>
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               </div>}
             </li>;
