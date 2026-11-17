@@ -83,7 +83,7 @@ export const revokeLearningAwardIssuance = createServerFn({ method: "POST" })
         participantPersonId:decision.recipientPersonId,
         organizationId:issuance.issuerOrganizationId,
         deliverySiteId:actor.scope.siteIds[0]!,
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         reason:data.reason,
       });
       // Issuer approval is revalidated and locked inside the same transaction.
