@@ -39,22 +39,20 @@ export const Route = createFileRoute("/published-site")({
           status: 404, headers: { ...headers, "X-Robots-Tag": "noindex, nofollow", "Content-Type": "text/plain; charset=utf-8" },
         });
         try {
-          if (process.env.CAN_PUBLIC_SITE_CANONICAL_ENABLED === "true") {
-            const { getPublicSiteProjection } =
+          const { getPublicSiteProjection } =
               await import("@/modules/programs/public-operation-projection.server");
             const projection = await getPublicSiteProjection({ slug });
-            if (!projection) return new Response("Not found", {
-              status: 404,
-              headers: { ...headers, "X-Robots-Tag": "noindex, nofollow" },
-            });
-            return new Response(renderPublicSiteClaimsHtml(projection), {
+            if (projection) return new Response(renderPublicSiteClaimsHtml(projection), {
               status: 200,
               headers: {
                 ...headers,
                 "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
               },
             });
-          }
+            /* No approved canonical claims for this public Site: use its
+             * independently authorized published website catalog below. */
+
+
           const { readPublishedSiteCatalog } = await import("@/modules/sites/site-public-catalog.server");
           const catalog = await readPublishedSiteCatalog(slug);
           if (!catalog) return new Response("Not found", {
