@@ -27,7 +27,7 @@ describe("WS3 completion read and operator controls",()=>{
     expect(canonicalClassRead).toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
     expect(canonicalClassRead).toContain("classCompletionAuthorityVerified=validity.rows[0]?.valid===true");
     expect(canonicalClassPanel).toContain('?"Verified":"Not verified"');
-    expect(canonicalClassPanel).toContain("independent policy-backed decision is not yet verified");
+    expect(canonicalClassPanel).toContain("no current independently verified completion decision is available");
     expect(operatorPanel).not.toContain("canonicalClassAwards");
   });
   it("makes the database preflight explicitly read-only and opt-in",()=>{
