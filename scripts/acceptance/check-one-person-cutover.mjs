@@ -18,6 +18,14 @@ const pool=new Pool({connectionString:process.env.CAN_IDENTITY_QA_DATABASE_URL,m
 const client=await pool.connect();
 try{
   await client.query("BEGIN READ ONLY");
+  const target=await client.query(
+    "SELECT current_setting('neon.project_id',true) AS project_id, "+
+    "current_setting('neon.branch_id',true) AS branch_id",
+  );
+  assert.equal(target.rows[0]?.project_id,"sweet-hall-62441909",
+    "QA preflight must target the CAN OS Neon project");
+  assert.equal(target.rows[0]?.branch_id,"br-bitter-feather-ar0u63x7",
+    "QA preflight must target isolated test01, never production");
   const sql=readFileSync(
     new URL("../../database/canonical/v3.0.1/preflight-one-person-cutover.sql",import.meta.url),
     "utf8",
