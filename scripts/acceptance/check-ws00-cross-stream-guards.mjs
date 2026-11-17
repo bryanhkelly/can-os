@@ -97,12 +97,15 @@ check("WS1 activity distinguishes participation from waitlist and remains source
   required(read("src/routes/learn.activity.tsx").includes("/learn/my-activity") &&
            read("src/routes/learn.my-activity.tsx").includes("MyActivity"),
     "My Activity canonical URL/compatibility broken");
+  const paging=read("src/domain/native-class-history-pagination.ts");
   required(service.includes("getMyNativeClassEnrollmentHistoryPage") &&
-           service.includes("page < 10") &&
-           service.includes("if (!batch.nextCursor) break") &&
-           service.includes("pagination did not advance") &&
-           !service.includes("getMyNativeClassEnrollments()"),
-    "WS1 must reuse WS2 paginated native Class history with a bounded and fail-closed cursor");
+           service.includes("readBoundedNativeClassHistory") &&
+           !service.includes("getMyNativeClassEnrollments()") &&
+           paging.includes("n < maxPages") &&
+           paging.includes("maxPages > 10") &&
+           paging.includes("seen.has(row.classEnrollmentId)") &&
+           paging.includes("pagination did not advance"),
+    "WS1 must reuse WS2 native Class history with bounded deduplicated pages");
 });
 check("WS6 maintains evidence metrics without fabricated formal Class completions",()=>{
   const s=read("src/domain/participation-reporting.ts");
