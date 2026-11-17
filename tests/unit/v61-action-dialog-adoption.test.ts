@@ -21,7 +21,7 @@ function parsedDialogs(path: string) {
       : ts.isJsxSelfClosingElement(node) ? node : null;
     if (opening?.tagName.getText(file) === "ActionDialog") {
       const attributes = opening.attributes.properties
-        .filter(ts.isJsxAttribute).map(attribute => attribute.name.text);
+        .filter(ts.isJsxAttribute).map(attribute => attribute.name.getText(file));
       const nativeTags: string[] = [];
       function inside(child: ts.Node) {
         if (ts.isJsxOpeningElement(child) || ts.isJsxSelfClosingElement(child)) {
