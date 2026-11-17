@@ -1,14 +1,15 @@
 import { and, eq, gt, notInArray, isNull, lte, or, asc } from "drizzle-orm";
 import { db } from "@/db/client";
+import { OUTBOUND_LEASE_MS, OUTBOUND_MAX_ATTEMPTS, outboundRetryDelayMs } from "@/domain/outbound-retry-policy";
 import { domainEvents, subscriptionDeliveries, subscriptions, conversationMessages } from "@/db/schema";
 import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "./preferences";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 
-const LEASE_MS = 120_000;
-const MAX_ATTEMPTS = 5;
-const RETRY_MS = (attempt: number) => Math.min(60_000 * 2 ** Math.max(0, attempt - 1), 3_600_000);
+const LEASE_MS=OUTBOUND_LEASE_MS;
+const MAX_ATTEMPTS=OUTBOUND_MAX_ATTEMPTS;
+const RETRY_MS=outboundRetryDelayMs;
 
 /**
  * Claim one item just before processing. SKIP LOCKED serializes claims; the
