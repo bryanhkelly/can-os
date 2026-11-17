@@ -31,6 +31,9 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(lockedTerms).toBeGreaterThan(classLock);
     expect(self.slice(lockedTerms,currentTerms)).toContain('.for("update").limit(1)');
     expect(currentTerms).toBeGreaterThan(lockedTerms);
+    const admissionClock=self.indexOf("const now=new Date();",lockedTerms);
+    expect(admissionClock).toBeGreaterThan(lockedTerms);
+    expect(admissionClock).toBeLessThan(currentTerms);
     expect(self).not.toContain('eq(canonicalClasses.id,version.classId)).for("update")');
   });
 
