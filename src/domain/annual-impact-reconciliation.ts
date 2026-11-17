@@ -18,7 +18,8 @@ export type AttendanceEvidence = {
   id: string;
   participation: ImpactEvidenceReference;
   sessionId: string;
-  observedAt: string;
+  observedAt: string; // Session occurrence time, never correction time
+  assertedAt?: string; // When this assertion/revision was recorded
   revision: number;
   status: "present" | "absent" | "unknown";
 };
@@ -105,11 +106,15 @@ export function reconcileAnnualImpact(
   const latestAttendance = new Map<string, AttendanceEvidence>();
   for (const row of evidence.attendance) {
     requireSource(row.participation, row.observedAt);
+    if (millis(row.assertedAt ?? row.observedAt) < millis(row.observedAt))
+      throw new Error("Attendance assertion predates session occurrence");
     if (!row.sessionId || !Number.isInteger(row.revision) || row.revision < 1)
       throw new Error("Attendance requires session identity and valid revision");
-    if (!throughAsOf(row.observedAt)) continue;
+    if (!throughAsOf(row.assertedAt ?? row.observedAt)) continue;
     const identity = key(row.participation) + ":" + row.sessionId;
     const previous = latestAttendance.get(identity);
+    if (previous && previous.observedAt !== row.observedAt)
+      throw new Error("Attendance correction changed original session occurrence");
     if (!previous || row.revision > previous.revision) latestAttendance.set(identity, row);
     else if (row.revision === previous.revision)
       throw new Error("Conflicting attendance revision");
@@ -133,7 +138,7 @@ export function reconcileAnnualImpact(
     d.verified && d.status === "completed");
   const completionById = new Map(validCompletion.map(d => [d.id, d]));
 
-  const issued = evidence.awards.filter(a => {
+  const eligibleAwards = evidence.awards.filter(a => {
     requireSource(a.participation, a.issuedAt);
     if (a.revokedAt && millis(a.revokedAt) < millis(a.issuedAt))
       throw new Error("Award revocation predates issuance");
@@ -143,8 +148,9 @@ export function reconcileAnnualImpact(
     if (!linkedDecision || key(linkedDecision.participation) !== key(a.participation) ||
         millis(linkedDecision.decidedAt) > millis(a.issuedAt))
       throw new Error("Award lacks same-participation completion provenance");
-    return inPeriod(a.issuedAt);
+    return throughAsOf(a.issuedAt);
   });
+  const issued = eligibleAwards.filter(a => inPeriod(a.issuedAt));
   const validAwards = issued.filter(a => {
     const decision = completionById.get(a.completionDecisionId);
     return !!decision && (!a.revokedAt || !throughAsOf(a.revokedAt));
@@ -160,7 +166,7 @@ export function reconcileAnnualImpact(
       verifiedCompletions: validCompletion.filter(d => inPeriod(d.decidedAt)).length,
       awardsIssued: issued.length,
       awardsCurrentlyValid: validAwards.length,
-      awardsRevoked: evidence.awards.filter(a => a.revokedAt && inPeriod(a.revokedAt)).length,
+      awardsRevoked: eligibleAwards.filter(a => a.revokedAt && inPeriod(a.revokedAt)).length,
     },
     bySite: source.sites.map(s => ({
       siteId: s.id, registrations: s.registrations, distinctPeople: s.uniquePeople,
