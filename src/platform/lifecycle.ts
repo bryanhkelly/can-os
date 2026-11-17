@@ -23,6 +23,17 @@ export function defineLifecycle<S extends string, A extends string>(config: {
   transitions: Record<A, { from: readonly S[]; to: S }>;
 }): Lifecycle<S, A> {
   const states: readonly S[] = Object.freeze([...config.states]);
+  const declared = new Set(states);
+  if (!states.length || declared.size !== states.length) {
+    throw new Error("Lifecycle states must be nonempty and unique");
+  }
+  for (const [action, transition] of Object.entries(config.transitions) as [A, {from: readonly S[]; to: S}][]) {
+    if (!declared.has(transition.to) || !transition.from.length ||
+        transition.from.some(state => !declared.has(state)) ||
+        new Set(transition.from).size !== transition.from.length) {
+      throw new Error(`Invalid lifecycle definition for action "${action}"`);
+    }
+  }
   const transitions = new Map<A, { from: readonly S[]; to: S }>(
     Object.entries(config.transitions).map(([action, transition]) => {
       const t = transition as { from: readonly S[]; to: S };
