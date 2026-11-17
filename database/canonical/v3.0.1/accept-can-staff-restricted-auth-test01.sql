@@ -102,18 +102,26 @@ END $deny$;
 UPDATE public.site_canonical_identity_links SET status='approved'
  WHERE public_site_id='f1000000-0000-4000-8000-000000000003';
 
--- An account assigned to two independent Persons must never gain the
--- second Person's permissions by selecting the original staff role.
-INSERT INTO public.account_person_grants
- (id,account_id,person_id,role)
-VALUES
- ('faab0000-0000-4000-8000-000000000008',
-  'faab0000-0000-4000-8000-000000000001',
-  'faab0000-0000-4000-8000-000000000005','guardian');
+-- The immutable one-CAN-Person trigger now rejects the conflicting
+-- second grant at INSERT time, before the session projection can be used.
 DO $deny$
+DECLARE second_person_rejected boolean := false;
 BEGIN
- IF EXISTS(SELECT 1 FROM education_v30.v301_can_staff_session_context(repeat('a',64)))
- THEN RAISE EXCEPTION 'multi-Person account still has staff access'; END IF;
+ BEGIN
+  INSERT INTO public.account_person_grants
+   (id,account_id,person_id,role)
+  VALUES
+   ('faab0000-0000-4000-8000-000000000008',
+    'faab0000-0000-4000-8000-000000000001',
+    'faab0000-0000-4000-8000-000000000005','guardian');
+ EXCEPTION WHEN check_violation THEN
+  second_person_rejected := true;
+ END;
+ IF NOT second_person_rejected THEN
+  RAISE EXCEPTION 'second CAN Person grant was not rejected';
+ END IF;
+ IF (SELECT count(*) FROM education_v30.v301_can_staff_session_context(repeat('a',64)))<>1
+ THEN RAISE EXCEPTION 'rejected second Person disturbed legitimate access'; END IF;
 END $deny$;
 
 ROLLBACK TO SAVEPOINT can_staff_sso_accept;
