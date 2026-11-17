@@ -381,6 +381,7 @@ export function OperationsWorkspace({data: loaderData,selected}: {data:Operation
    :dialog.kind==="deadline"?(dialog.value?"New due date (your local time): "+dialog.value.replace("T"," "):"This removes the action's due date."):"Record how this action was resolved. The note is retained with the canonical Action."}</p></>}
   confirmLabel={dialog.kind==="resolve"?"Resolve action":dialog.kind==="deadline"?"Save deadline":"Complete official "+dialog.exitKind}
   destructive={dialog.kind==="exit"} pending={busy!==null||exitMutation.isSubmitting}
+  pendingLabel={dialog.kind==="exit"?"Recording institutional exit…":dialog.kind==="deadline"?"Saving deadline…":"Resolving action…"}
   confirmDisabled={commandsBlocked||dialogNote.trim().length<(dialog.kind==="exit"?20:dialog.kind==="deadline"?5:1)||(dialog.kind==="exit"&&!exitConfirmed)}
   onClose={()=>{setDialog(null);setDialogNote("");setError("");}} onConfirm={()=>void confirmActionInput()}>
   <Field label={dialog.kind==="deadline"?"Reason for deadline change":"Resolution note"} required>
