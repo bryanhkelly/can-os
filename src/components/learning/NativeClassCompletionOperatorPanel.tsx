@@ -11,6 +11,7 @@ import {
   requestCompletionEvidenceReview,getPendingCompletionEvidenceReviews,
   decideCompletionEvidenceReview,
 } from "@/modules/learning/completion-evidence-review.functions";
+import { publishNativeClassCompletionPolicy } from "@/modules/classes/native-class-completion-policy.functions";
 
 /** WS3 V6.1 right-angle operator workspace. Actual Class, learner,
  * reviewer and Site rights are always resolved from the original source.
@@ -24,6 +25,10 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
   const [outcome,setOutcome]=useState<"completed"|"not_yet_completed"|"voided">("completed");
   const [evidenceVersionId,setEvidenceVersionId]=useState("");
   const [reason,setReason]=useState("");
+  const [policyRequireLessons,setPolicyRequireLessons]=useState(true);
+  const [policySessions,setPolicySessions]=useState(0);
+  const [policyRequireAssessment,setPolicyRequireAssessment]=useState(false);
+  const [policyEvidence,setPolicyEvidence]=useState("");
   const [notice,setNotice]=useState("");
   const [view,setView]=useState<"participants"|"approvals">("participants");
   const list=useQuery({
@@ -64,6 +69,21 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
     onSuccess:async()=>{
       setNotice("Official Class decision recorded with its original completion policy and audit history.");
       await Promise.all([list.refetch(),detail.refetch()]);
+    },
+  });
+  const publishPolicy=useMutation({
+    mutationFn:()=>publishNativeClassCompletionPolicy({data:{
+      classId,
+      expectedLatestVersion:list.data?.latestCompletionPolicyVersion??null,
+      requireAllLessons:policyRequireLessons,
+      requiredVerifiedSessions:policySessions,
+      requirePassingAssessment:policyRequireAssessment,
+      policyEvidenceVersionId:policyEvidence.trim(),
+    }}),
+    onSuccess:async()=>{
+      setPolicyEvidence("");
+      setNotice("Completion policy published. It applies only to future Class Enrollments; existing pins remain unchanged.");
+      await list.refetch();
     },
   });
   const review=useMutation({
@@ -144,6 +164,52 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
         </p>}
         {list.data&&<div className="space-y-3">
           <h3 className="font-serif text-xl">{list.data.classTitle}</h3>
+          <details className="border border-border bg-card p-4">
+            <summary className="cursor-pointer font-semibold">
+              Publish completion requirements for future learners
+            </summary>
+            <div className="mt-4 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Latest policy version: {list.data.latestCompletionPolicyVersion??"None"}.
+                Publication requires another current exact-Site authorized
+                reviewer, independent of the Class creator, with verified policy evidence.
+                Existing enrollment policies cannot be rewritten.
+              </p>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={policyRequireLessons}
+                  onChange={e=>setPolicyRequireLessons(e.target.checked)}/>
+                Require every canonical Course lesson
+              </label>
+              <label className="block space-y-1 text-sm font-medium">
+                Required independently verified Sessions
+                <Input type="number" min={0} max={52} value={policySessions}
+                  onChange={e=>setPolicySessions(
+                    Math.max(0,Math.min(52,Number(e.target.value)||0)))}/>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={policyRequireAssessment}
+                  onChange={e=>setPolicyRequireAssessment(e.target.checked)}/>
+                Require a finalized passing canonical assessment
+              </label>
+              <label className="block space-y-1 text-sm font-medium">
+                Independently verified policy evidence version
+                <Input value={policyEvidence}
+                  onChange={e=>setPolicyEvidence(e.target.value)}
+                  placeholder="Verified evidence UUID"/>
+              </label>
+              <Button disabled={publishPolicy.isPending ||
+                  !(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+                    .test(policyEvidence.trim())) ||
+                  !(policyRequireLessons||policySessions>0||policyRequireAssessment)}
+                onClick={()=>publishPolicy.mutate()}>
+                Publish reviewed policy
+              </Button>
+              {publishPolicy.isError&&<p role="alert" className="text-sm">
+                Publication denied. Review the independent Class/Site authority,
+                verified evidence and current policy version.
+              </p>}
+            </div>
+          </details>
           <div className="divide-y divide-border border border-border">
             {list.data.participants.map(person=>
               <button key={person.classEnrollmentId} type="button"
