@@ -15,6 +15,10 @@ export const notificationOutboundDeliveries=pgTable("notification_outbound_deliv
  nextAttemptAt:timestamp("next_attempt_at",{withTimezone:true}),
  leaseUntil:timestamp("lease_until",{withTimezone:true}),
  acceptedAt:timestamp("accepted_at",{withTimezone:true}),
+ providerMessageId:text("provider_message_id"),
+ providerDeliveredAt:timestamp("provider_delivered_at",{withTimezone:true}),
+ providerFailedAt:timestamp("provider_failed_at",{withTimezone:true}),
+ providerFailureKind:text("provider_failure_kind"),
  lastError:text("last_error"),
  createdAt:createdAt(),updatedAt:updatedAt(),
 },t=>[
