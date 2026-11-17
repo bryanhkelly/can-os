@@ -2,7 +2,7 @@ import {and,eq,gt,isNull,inArray,not} from "drizzle-orm";
 import {db} from "@/db/client";
 import {accessAccounts,accessSessions,programs,sectionTeachers,sections,sites as schoolSites} from "@/db/schema";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
-import {resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
+import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
 import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
 import {readSessionGrants} from "./session-grants.server";
@@ -43,6 +43,12 @@ export async function getCommandContext(request: Request): Promise<AccessContext
  if(session.sharedDevice&&now.getTime()-session.lastActivityAt.getTime()>=5*60_000)
   return rejectSession(request,"session_not_current");
  const {grants,demoAccountSwitching}=await readSessionGrants(session.accountId,session.email);
+ // A real login cannot change Person by switching its active grant. This
+ // invariant applies across all Site and Organization roles, not just staff.
+ if(!demoAccountSwitching){
+  try{assertSingleAccountPerson(session.accountId,grants);}
+  catch{return rejectSession(request,"membership_unavailable");}
+ }
  const activeGrant=grants.find(grant=>grant.id===session.activeGrantId);
  if(!activeGrant)return rejectSession(request,"membership_unavailable");
  const context=resolveAccessContext({
