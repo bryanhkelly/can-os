@@ -26,7 +26,9 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(source).toContain('account.personId');
    expect(source).toContain('g.role==="student"');
    expect(source).toContain('eq(canonicalEnrollmentOrganizations.status,"active")');
-   expect(source).toContain('if(operator||link||native)');
+   expect(source).toContain('if(operator||Boolean(native)!==Boolean(link)');
+   expect(source).toContain('link.accessPersonId!==account.personId');
+   expect(source).toContain('existingPerson.birthDate!==data.verifiedBirthDate');
    expect(source).toContain('if(prior)');
  });
  it("never turns an adult review into an enrollment or a native session",()=>{
