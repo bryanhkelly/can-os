@@ -29,10 +29,16 @@ const tableQueries = {
   legacy_section_assessments: "SELECT count(*)::bigint AS n FROM public.assessments WHERE section_id IS NOT NULL",
   legacy_section_submissions: "SELECT count(*)::bigint AS n FROM public.submissions s JOIN public.assessments a ON a.id=s.assessment_id WHERE a.section_id IS NOT NULL",
   native_classes: "SELECT count(*)::bigint AS n FROM education_v30.classes",
+  native_courses: "SELECT count(*)::bigint AS n FROM education_v30.courses",
+  native_course_versions: "SELECT count(*)::bigint AS n FROM education_v30.course_versions",
+  legacy_distinct_section_course_versions: "SELECT count(DISTINCT course_template_version_id)::bigint AS n FROM public.sections",
+  legacy_distinct_section_profiles: "SELECT count(DISTINCT student_profile_id)::bigint AS n FROM public.enrollments WHERE section_id IS NOT NULL",
   native_class_enrollments: "SELECT count(*)::bigint AS n FROM education_v30.class_enrollments",
   identity_links_noncredit: "SELECT count(*)::bigint AS n FROM public.access_account_noncredit_principals",
   identity_links_staff: "SELECT count(*)::bigint AS n FROM public.access_account_canonical_principals",
   can_accounts: "SELECT count(*)::bigint AS n FROM public.access_accounts",
+  can_people: "SELECT count(*)::bigint AS n FROM public.people",
+  native_people: "SELECT count(*)::bigint AS n FROM education_v30.persons",
   native_accounts: "SELECT count(*)::bigint AS n FROM education_v30.canonical_accounts",
 };
 const client = await pool.connect();
