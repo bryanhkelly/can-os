@@ -80,6 +80,20 @@ export function assertExplicitProgramScope(
   }
 }
 
+/**
+ * Shared precondition for a domain command acting on a specific Program.
+ * Feature services still own admission/eligibility rules and transactional
+ * state transitions. Call this before any idempotent fast-path is returned.
+ */
+export function assertProgramCommandAccess(
+  context: CommandContext,
+  capability: string,
+  programId: string,
+): void {
+  assertCapability(context, capability);
+  assertExplicitProgramScope(context, programId);
+}
+
 export function assertSectionScope(
   context: CommandContext,
   sectionId: string | null | undefined,
