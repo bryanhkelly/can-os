@@ -151,6 +151,16 @@ describe("V6.1 reusable design system", () => {
     expect(html).not.toContain('<span class="min-w-0 text-muted-foreground"><p>');
   });
 
+  it("migrates Action and enrichment record metadata without duplicating tables", () => {
+    for (const path of ["src/routes/actions.$actionId.tsx", "src/routes/enrichment_.$seasonId.tsx"]) {
+      const source = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+      expect(source).toContain("<RecordHeader");
+      expect(source).toContain("<RecordLayout");
+      expect(source).toContain("<RecordFacts");
+      expect(source).not.toMatch(/<dl\b/);
+    }
+  });
+
   it("keeps directory cards as actual links with accessible record labels", () => {
     const html = renderToStaticMarkup(<EntityCard title="Valor Academy" href="/sites/valor" meta="Pacific">School site</EntityCard>);
     expect(html).toContain('href="/sites/valor"');
