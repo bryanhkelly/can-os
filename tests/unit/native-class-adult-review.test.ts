@@ -59,7 +59,7 @@ describe("independent App Admin review for first-time Class learner activation",
    expect(ui).toContain("approveAdultClassLearnerReview");
    expect(ui).toContain("revokeAdultClassLearnerReview");
    expect(ui).toContain("I independently checked identity and adult eligibility");
-   expect(ui).toContain("Evidence"); // Evidence handling stays independent of learning enrollment
+   expect(ui).toContain("Secure evidence reference");
    expect(service).toContain("access_adult_learning_reviews");
    expect(service).toContain("c.relforcerowsecurity");
  });
