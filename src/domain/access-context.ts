@@ -65,6 +65,25 @@ export const roleCapabilities: Readonly<Record<string, readonly string[]>> = Obj
  site_admin: [...baseRoleCapabilities.registrar, "school.setup.manage", "site.website.draft.read", "site.website.local.publish"],
 });
 
+/**
+ * One real CAN account represents one Person, even when they hold roles in
+ * multiple organizations and Sites. Demo delegation is a separate privileged
+ * testing mode and must not be treated as a real user's personal identity.
+ * This check does not grant access: resource and role authorization remain
+ * independent and must be evaluated for every command.
+ */
+export function assertSingleAccountPerson(
+ accountId: string,
+ grants: readonly VerifiedAccessGrant[],
+): void {
+ const persons = new Set(grants.filter(grant =>
+  grant.accountId === accountId && grant.active,
+ ).map(grant => grant.personId));
+ if (persons.size !== 1 || persons.has("")) {
+  throw new AuthorizationError("one verified account Person");
+ }
+}
+
 /** This may be called only after authenticating a server session and fetching grants from Neon. */
 export function resolveAccessContext(principal: SessionPrincipal, grants: readonly VerifiedAccessGrant[]): AccessContext {
  const grant = grants.find(g => g.id === principal.activeGrantId && g.accountId === principal.accountId && g.active);
