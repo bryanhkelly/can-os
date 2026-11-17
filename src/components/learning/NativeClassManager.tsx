@@ -91,6 +91,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const [consentVersion,setConsentVersion]=useState("");
   const [consentText,setConsentText]=useState("");
   const [busy,setBusy]=useState(false);
+  const [createdClassId,setCreatedClassId]=useState<string|null>(null);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const selected=combinedOptions.find(row=>optionKey(row)===choice);
@@ -221,6 +222,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   }
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
+    setCreatedClassId(null);
     if(!selected||busy||(createWithOffering&&(methods.length===0||creditModes.length===0)))return;
     setBusy(true);setError("");setNotice("");
     try{
@@ -243,6 +245,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       setNotice(result.classOfferingVersionId
         ?"Class and optional draft Class Offering created. Class ID: "+result.classId
         :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId);
+      setCreatedClassId(result.classId);
       setChoice("");setTitle("");setSiteId("");setClassCapacity("");
       setRecipeCourseId(null);
       await refresh();
@@ -681,6 +684,11 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       </section>
     </div>
     {notice&&<p role="status" className="mt-5 border border-border bg-card p-4 text-sm">{notice}</p>}
+    {createdClassId&&<Link to="/class/$classId" params={{classId:createdClassId}}
+      search={{view:"manage",tab:"overview"}}
+      className="mt-3 inline-flex min-h-11 items-center border border-border bg-card px-4 py-3 text-sm font-semibold text-primary">
+      Open newly created Class
+    </Link>}
     {error&&<p role="alert" className="mt-5 border border-border bg-card p-4 text-sm">{error}</p>}
   </WorkspaceShell>;
 }
