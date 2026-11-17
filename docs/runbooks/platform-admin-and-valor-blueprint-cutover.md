@@ -90,6 +90,41 @@ each requires its own audit, policy, and separate route-level permission.
    relevant unit/integration tests, production build and authenticated
    Playwright before promoting the work.
 
+## test01 restricted-role checks (2026-11-17)
+
+Read-only direct Neon checks using the isolated
+`can_v301_blueprint_acceptance_app` login and purpose-specific `SET LOCAL ROLE`
+confirmed:
+
+- 46 Blueprint-named RLS policies are installed; sampled planning tables
+  have FORCE ROW LEVEL SECURITY enabled.
+- Valor author role can see its exact native Site, cannot see the Barton Site,
+  may INSERT draft Blueprint configurations, and cannot INSERT reviews.
+- Independent Valor reviewer sees its own evidence, cannot see the sibling
+  evidence or INSERT drafts, and may INSERT reviews.
+- Neither purpose role may SELECT canonical sessions or UPDATE deployments.
+- Dedicated CAN authentication login can enter the restricted auth reader
+  role and rejects a nonmatching synthetic session digest.
+
+This confirms restricted SQL boundaries, **not** the full browser or
+transactional Blueprint draft -> save -> submit -> independent review -> execute
+journey. The additional read-only regression command is:
+
+```sh
+APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true \
+TEST_DATABASE_URL="<isolated-owner-connection>" \
+DATABASE_URL="<distinct-production-connection>" \
+CAN_CANONICAL_TEST_APP_DATABASE_URL="<isolated-restricted-connection>" \
+npm run db:test:canonical:v301:blueprint-roles
+```
+
+The shared isolated-target guard requires the explicit test-write flag even
+though this command only uses `BEGIN READ ONLY` and `ROLLBACK`. Never point
+either isolated connection to production. After a fully reviewed isolated test
+environment has been prepared, use the existing rollback-only
+`db:test:canonical:v301:blueprint-flow` acceptance command. Do not claim
+that command was executed by these read-only checks.
+
 ## Demo test strategy
 
 The `admin.demo@valorschool.demo` account and published shared code are
