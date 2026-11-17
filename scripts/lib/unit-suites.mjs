@@ -14,15 +14,17 @@ export const UNIT_SUITE_PREFIXES = Object.freeze({
   family: ["guardian-", "conference-", "pickup-", "field-trip-", "workspace-migration-"],
   classroom: [
     "facilitated-learning", "canonical-learning-activity", "canonical-learning-release-", "classroom-",
+    "notification-delivery-state",
     "site-noncredit-bridge-", "noncredit-waitlist-delivery-",
   ],
-  enrollment: ["noncredit-self-enrollment", "personal-can-"],
+  enrollment: ["noncredit-self-enrollment", "personal-can-", "one-account-"],
   site: [
     "site-content-", "site-first-preview", "website-studio-", "site-setup-",
     "site-enrollment-", "site-private-preview", "site-planning-",
   ],
   classes: [
     "class-", "native-class-", "unified-class", "unified-classroom-",
+    "activity-evidence-",
     "canonical-objective-", "network-class-", "site-native-class-",
     "site-first-launch-", "native-facilitated-classroom-",
   ],
