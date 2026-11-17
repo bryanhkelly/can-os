@@ -5,8 +5,9 @@
  * seeds databases, enables feature flags, or deploys.
  */
 import {spawnSync} from "node:child_process";
+import {readFileSync} from "node:fs";
 
-const expectedBranch="integration/programs-courses-classes";
+const approvedBranches=new Set(["main","integration/programs-courses-classes"]);
 function exec(bin,args,label,env=process.env){
   console.log("\n[WS00] "+label+"\n$ "+bin+" "+args.join(" "));
   const result=spawnSync(bin,args,{stdio:"inherit",env,shell:false});
@@ -27,8 +28,15 @@ function capture(bin,args){
 const branch=capture("git",["branch","--show-current"]);
 const sha=capture("git",["rev-parse","HEAD"]);
 const porcelain=capture("git",["status","--porcelain"]);
-if(branch!==expectedBranch)throw new Error(
-  "WS00 guard only runs on "+expectedBranch+"; actual branch: "+branch);
+if(!approvedBranches.has(branch))throw new Error(
+  "WS00 guard only runs on main or integration/programs-courses-classes; actual branch: "+branch);
+if(branch==="main"){
+  // The main branch is development-only during stabilization. Refuse to
+  // certify it with this helper if the Git production-build hold vanished.
+  const netlify=readFileSync("netlify.toml","utf8");
+  if(!netlify.includes('[context.production]\\n  ignore = "exit 0"'))
+    throw new Error("Main WS00 release hold missing: Netlify production builds may auto-publish");
+}
 if(porcelain)throw new Error(
   "Exact-SHA verification requires a clean working tree. Commit or stash before testing.");
 console.log("[WS00] Verified clean branch: "+branch);
