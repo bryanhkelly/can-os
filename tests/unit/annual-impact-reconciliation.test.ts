@@ -116,7 +116,7 @@ describe("annual impact reconciliation", () => {
       ...evidence,
       attendance: [...evidence.attendance, {
         id: "a4", participation: ref("e1"), sessionId: "s1",
-        observedAt: "2026-03-03T00:00:00Z", revision: 2, status: "present",
+        observedAt: "2026-03-01T00:00:00Z", assertedAt: "2026-03-03T00:00:00Z", revision: 2, status: "present",
       }],
     }, proof, period)).toThrow("Conflicting attendance");
     expect(() => reconcileAnnualImpact({
