@@ -170,6 +170,8 @@ describe("one CAN login for authorized canonical Site staff", () => {
     const provision = source("scripts/provision-platform-admin.mjs");
     expect(provision).toContain("Number(authority.rows[0]?.count) !== 1");
     expect(provision).toContain("person_id <> $2");
+    expect(provision).toContain("approverConflicts");
+    expect(provision).toContain("Independent approver has conflicting active Person grants");
     expect(provision).toContain('PRODUCTION_PROJECT_ID = "sweet-hall-62441909"');
     expect(provision).toContain('PRODUCTION_BRANCH_ID = "br-restless-sea-ar9ooo55"');
     expect(provision).toContain("current_setting('neon.project_id', true)");
