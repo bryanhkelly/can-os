@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, Square } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, CheckSquare, MinusSquare, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QueryState } from "./query-state";
@@ -65,6 +65,7 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
   const selectable = !!selectedKeys && !!onSelectionChange;
   const keysOnPage = rows.map(rowKey);
   const allSelected = keysOnPage.length > 0 && keysOnPage.every(key => selectedKeys?.has(key));
+  const someSelected = !allSelected && keysOnPage.some(key => selectedKeys?.has(key));
   function toggle(keys: readonly string[], selected: boolean) {
     if (!selectedKeys || !onSelectionChange) return;
     const next = new Set(selectedKeys);
@@ -85,8 +86,8 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
           {selectable && <TableHead scope="col" className="w-12 px-4">
             <Button type="button" variant="ghost" size="sm"
               aria-label={allSelected ? "Deselect page" : "Select page"}
-              aria-pressed={allSelected} onClick={() => toggle(keysOnPage, !allSelected)}>
-              {allSelected ? <CheckSquare aria-hidden="true" /> : <Square aria-hidden="true" />}
+              aria-pressed={allSelected ? true : someSelected ? "mixed" : false} onClick={() => toggle(keysOnPage, !allSelected)}>
+              {allSelected ? <CheckSquare aria-hidden="true" /> : someSelected ? <MinusSquare aria-hidden="true" /> : <Square aria-hidden="true" />}
             </Button>
           </TableHead>}
           {columns.map(column => {
