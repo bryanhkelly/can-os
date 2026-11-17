@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Link } from "@tanstack/react-router";
-import { RecordFacts } from "@/components/workspace";
+import { RecordFacts } from "@/components/workspace/record-layout";
 
 export function ChurchApplicationConfirmation({ churchName, siteName, contactEmail }: {
   churchName: string; siteName: string; contactEmail: string;
