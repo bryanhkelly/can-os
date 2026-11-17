@@ -97,7 +97,7 @@ async function resolveSource(tx:Tx,intent:ReviewIntent):Promise<ResolvedTarget> 
       JOIN education_v30.classes cls ON cls.id=e.class_id
       JOIN education_v30.participation_attributions attribution
         ON attribution.class_enrollment_id=e.id
-          AND attribution.delivery_site_id=cls.site_id
+          AND (cls.site_id IS NULL OR attribution.delivery_site_id=cls.site_id)
       JOIN education_v30.class_enrollment_completion_pins pin
         ON pin.class_enrollment_id=e.id
       WHERE e.id=${intent.classEnrollmentId}::uuid
