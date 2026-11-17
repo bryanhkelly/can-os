@@ -121,6 +121,14 @@ export const getProviderContentWorkspace = createServerFn({ method: "GET" }).han
           .filter(version => version.courseId === course.id && version.lifecycle === "published")
           .sort((a,b) => b.versionNo - a.versionNo)
           .map(version => ({id:version.id, versionNo:version.versionNo})),
+        // Native draft authoring is Course-appointed and creator-only.
+        // Reviewer users do not browse unpublished drafts through this feed.
+        draftVersions: role === "academic_content_creator"
+          ? versions.filter(version => version.courseId === course.id &&
+              version.lifecycle === "draft")
+              .sort((a,b) => b.versionNo - a.versionNo)
+              .map(version => ({id:version.id, versionNo:version.versionNo}))
+          : [],
       })),
       tracks: resultTracks,
     };
