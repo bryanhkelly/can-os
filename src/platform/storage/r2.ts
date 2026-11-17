@@ -157,3 +157,40 @@ export async function verifyPrivateObject({ key, keyPattern, expectedSize, expec
     throw new Error("File signature does not match the declared format");
   }
 }
+
+/** Hash the actual immutable private object in bounded streaming memory.
+ * Client-declared digests are not trusted for published instructional assets.
+ * The caller must first verify media type, size, signature and authorization.
+ * Synchronous verification may require a longer runtime for large files. */
+export async function hashPrivateObjectSha256(options:{
+  key:string;keyPattern:RegExp;expectedSize:number;
+}):Promise<string>{
+  const {key,keyPattern,expectedSize}=options;
+  if(!keyPattern.test(key)||!Number.isSafeInteger(expectedSize)||
+    expectedSize<16||expectedSize>500*1024*1024)
+    throw new Error("Invalid private object hash request");
+  const response=await fetch(signPrivateObjectUrl({
+    method:"GET",key,keyPattern,expiresSeconds:900,
+  }));
+  if(!response.ok||!response.body)
+    throw new Error("Private object could not be read for checksum verification");
+  const declared=response.headers.get("content-length");
+  if(declared!==null&&Number(declared)!==expectedSize)
+    throw new Error("Private object size changed before checksum verification");
+  const reader=response.body.getReader();
+  const hasher=createHash("sha256");
+  let total=0;
+  try{
+    while(true){
+      const result=await reader.read();
+      if(result.done)break;
+      total+=result.value.byteLength;
+      if(total>expectedSize)throw new Error("Private object exceeded verified size");
+      hasher.update(result.value);
+    }
+  }finally{
+    await reader.cancel().catch(()=>{});
+  }
+  if(total!==expectedSize)throw new Error("Private object was incomplete");
+  return hasher.digest("hex");
+}
