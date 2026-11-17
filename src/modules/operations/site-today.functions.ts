@@ -180,6 +180,9 @@ export const getSiteToday = createServerFn({ method: "GET" })
     const operatingDecision = deriveSiteOperatingDecision({
       programIds,
       openings: schoolOpenings,
+      openingReviewHref: actor.role === "site_admin" || actor.role === "registrar"
+        ? "/settings/school/compliance?siteId=" + encodeURIComponent(site.id)
+        : undefined,
       handoffs,
       staffing: snapshot.operational.staffing,
       projectionTruncated: snapshot.operational.projectionTruncated,

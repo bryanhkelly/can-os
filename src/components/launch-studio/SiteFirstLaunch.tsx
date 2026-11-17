@@ -149,7 +149,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
             void router.navigate({to:"/launch/site",
               search:{siteId:e.target.value||undefined,step:"site"},replace:true});
           }}>
-            <option value="">Create a new Site</option>{options.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
+            <option value="" disabled={!options.canCreateSite}>{options.canCreateSite ? "Create a new Site" : "Select a Site"}</option>{options.sites.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
           </Select>
         </Field>}
         {!siteId&&<>{!options.canCreateSite&&<p role="alert" className="border p-4 text-sm">This account cannot create a new Site. Select an authorized Site or request organization-wide Site creation access.</p>}

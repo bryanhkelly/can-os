@@ -328,6 +328,15 @@
       "readBoundary": "Native canonical session and single organization/Site scope; queries bound to provider-owned or current approved operator and Site participation records"
     },
     {
+      "file": "src/routes/canonical.classes.tsx",
+      "route": "/canonical/classes",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "Site Admin or Registrar opens native Class management from Program operations or Reports and selects Class evidence for a Class in scope",
+      "readBoundary": "Native Class services validate current operator, provider and Site scope; report reads independently reauthorize the exact Class",
+      "writeBoundary": "Existing native Class and Class Offering commands reauthorize the current operator and canonical Site"
+    },
+    {
       "file": "src/routes/canonical.classes_.completion.tsx",
       "route": "/canonical/classes/completion",
       "owner": "learning",

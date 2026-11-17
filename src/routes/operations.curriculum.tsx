@@ -20,7 +20,7 @@ export const loadCurriculum=(programId?:string)=>safeLoader(async()=>{
   const programs=await getCurriculumAdopterPrograms();
   const programIds=programId?[programId]:programs.map(program=>program.id);
   const marketplaces=await Promise.all(programIds.map(programId=>getCurriculumMarketplace({data:{programId}})));
-  const publisherProgram=marketplaces.find(market=>market.canPublish);
+  const publisherProgram=marketplaces.length===1&&marketplaces[0].canPublish?marketplaces[0]:null;
   const [studio,publisherPacks]=publisherProgram?await Promise.all([
    getCurriculumStudio({data:{programId:publisherProgram.program.id}}),
    getPublisherPackStudio({data:{programId:publisherProgram.program.id}}),
@@ -55,9 +55,9 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
  const selectedCourse=studio?.courses.find(course=>course.id===courseId);
  return <WorkspaceShell title={mode==="create"?"Create course":mode==="author"?selectedCourse?.title??"Course unavailable":mode==="publish"?"Publish curriculum":"Curriculum library"} eyebrow="Academic operations" width="wide"
   breadcrumbs={mode!=="library"?<Link to="/operations/curriculum" search={{programId:studio?.programId}} className="underline">Curriculum library</Link>:undefined}
-  actions={studio&&mode==="library"?<div className="flex flex-wrap gap-2">
-   <CreateAction><Link to="/operations/curriculum/new" search={{programId:studio.programId}}>Create course</Link></CreateAction>
-   <Link to="/operations/curriculum/publishing" search={{programId:studio.programId}} className={secondaryActionClassName}>Publishing</Link>
+  actions={mode==="library"?<div className="flex flex-wrap gap-2">
+   {studio&&<><CreateAction><Link to="/operations/curriculum/new" search={{programId:studio.programId}}>Create course</Link></CreateAction>
+   <Link to="/operations/curriculum/publishing" search={{programId:studio.programId}} className={secondaryActionClassName}>Publishing</Link></>}
    <Link to="/canonical/course-activities" className={secondaryActionClassName}>Course activities</Link>
   </div>:undefined}>
   <div className="space-y-8 pt-6">
@@ -68,6 +68,8 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
    <Link key={program.id} to="/operations/curriculum" search={{programId:program.id}} aria-current={data.marketplaces.length===1&&data.marketplaces[0]?.program.id===program.id?"page":undefined}
     className="rounded border px-3 py-2 text-sm">{program.name}</Link>)}</nav>}
   {!data.programs.length&&<p role="status">No curriculum access grants are available in this membership. An administrator must assign institutional curriculum authority.</p>}
+  {mode==="library"&&data.marketplaces.length>1&&data.marketplaces.some(market=>market.canPublish)&&
+   <p className="text-sm text-muted-foreground">Select a program to create courses or manage publishing.</p>}
   {mode==="library"&&<CurriculumLibrary marketplaces={data.marketplaces}/>}
   {!studio&&mode!=="library"&&<EmptyState title="Publisher workspace unavailable" description="No authorized publishing Program is available in this scope."/>}
   {studio&&<div className="space-y-6">

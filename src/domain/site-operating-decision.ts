@@ -18,6 +18,7 @@ export type SiteOperatingDecision = {
 };
 
 export function deriveSiteOperatingDecision(input: {
+  openingReviewHref?: string;
   programIds: readonly string[];
   openings: readonly { programId: string; blocked: boolean }[];
   handoffs: readonly { programId: string | null; status: string }[];
@@ -51,7 +52,9 @@ export function deriveSiteOperatingDecision(input: {
       input.programIds.some(programId => !input.openings.some(opening => opening.programId === programId)))
     return decision("opening_unverified", "Opening authorization not verified",
       "This workspace cannot verify an independent opening approval for the visible school. An active academic program is not permission to receive children.",
-      "Church registrar and CAN opening officer", "Confirm opening authorization", "#school-day-operating-decision");
+      "Church registrar and CAN opening officer",
+      input.openingReviewHref ? "Review opening requirements" : "Review opening handoff",
+      input.openingReviewHref ?? "#opening-handoffs");
   if (input.openings.some(opening => opening.blocked))
     return decision("opening_blocked", "School opening is not authorized",
       "One or more visible church-hosted programs lack a current CAN opening approval or an ongoing prerequisite.",
