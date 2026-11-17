@@ -105,7 +105,7 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
         participantPersonId:registration.participantPersonId,
         organizationId:training.providerOrganizationId,
         deliverySiteId:actor.scope.siteIds?.[0]??"",
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:actor.actorPersonId!,
         reason:data.reason,
       });
       if (current.id !== data.expectedCurrentDecisionId) {
@@ -129,7 +129,7 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
         assessmentResultId: null,
         outcome: data.outcome,
         decisionSource: "provider",
-        decidedByPersonId: actor.actorPersonId,
+        decidedByPersonId: actor.actorPersonId!,
         evidenceVersionId: data.evidenceVersionId,
         supersedesId: current.id,
       }).returning({ id: noncreditCompletionDecisions.id });
@@ -138,14 +138,14 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
         previousDecisionId: current.id, evidenceVersionId: data.evidenceVersionId,
         reason: data.reason, outcome: data.outcome };
       await tx.insert(auditEvents).values({
-        actorPersonId: actor.actorPersonId,
+        actorPersonId: actor.actorPersonId!,
         owningOrganizationId: training.providerOrganizationId,
         eventCode: "learning.noncredit.completion_corrected",
         entityKind: "noncredit_completion_decision",
         entityId: created.id, payload,
       });
       await tx.insert(domainEvents).values({
-        actorPersonId: actor.actorPersonId,
+        actorPersonId: actor.actorPersonId!,
         eventType: "NoncreditCompletionCorrected",
         aggregateType: "noncredit_completion_decision",
         aggregateId: created.id, payload,
