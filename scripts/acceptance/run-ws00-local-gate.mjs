@@ -57,6 +57,7 @@ const steps=[
     "tests/unit/participation-read-model.test.ts",
     "src/domain/native-class-lifecycle.test.ts",
     "tests/unit/ws3-completion-command-contract.test.ts",
+    "tests/unit/ws3-assessment-revisions.test.ts",
     "tests/unit/ws3-operator-workflow-contract.test.ts",
     "tests/unit/native-class-session-agenda.test.ts",
     "tests/unit/ws5-publisher-rollout-migration-contract.test.ts",
