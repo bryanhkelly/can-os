@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Radio } from "@/components/ui/choice";
 import { SiteTimezoneField } from "@/components/workspace/SiteTimezoneField";
 import { createLaunchSite, type listLaunchOptions } from "@/modules/programs/launch.functions";
 import { useWorkspaceMutation } from "@/hooks/useWorkspaceMutation";
@@ -163,8 +164,8 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
             {id:"physical",title:"Physical",detail:"In person",icon:Building2},
             {id:"digital",title:"Digital",detail:"Online",icon:Monitor},
             {id:"both",title:"Both",detail:"In person and online",icon:Globe2},
-          ] as const).map(x=><label key={x.id} className={`flex cursor-pointer flex-col gap-2 border p-4 ${delivery===x.id?"border-primary bg-accent":"bg-card"}`}>
-            <input className="sr-only" type="radio" name="delivery" checked={delivery===x.id} onChange={()=>setDelivery(x.id)}/>
+          ] as const).map(x=><label key={x.id} className={`flex cursor-pointer flex-col gap-2 border p-4 focus-within:outline-2 focus-within:outline-primary ${delivery===x.id?"border-primary bg-accent":"bg-card"}`}>
+            <Radio className="sr-only" name="delivery" checked={delivery===x.id} onChange={()=>setDelivery(x.id)}/>
             <x.icon className="size-5 text-primary"/><strong className="text-sm">{x.title}</strong><span className="text-xs text-muted-foreground">{x.detail}</span>
           </label>)}</div>
         </fieldset>
