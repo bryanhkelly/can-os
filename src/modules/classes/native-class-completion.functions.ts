@@ -89,8 +89,7 @@ async function authorizeReview(tx:Tx, classEnrollmentId:string, actor:Awaited<
   const assigned=await tx.select({id:canonicalClassStaffAssignments.id})
     .from(canonicalClassStaffAssignments)
     .where(and(eq(canonicalClassStaffAssignments.classId,cls.id),
-      eq(canonicalClassStaffAssignments.personId,actor.actorPersonId),
-      eq(canonicalClassStaffAssignments.state,"approved"))).limit(1);
+      eq(canonicalClassStaffAssignments.personId,actor.actorPersonId))).limit(1);
   if(assigned.length)
     throw new AuthorizationError("independent of Class instructional delivery");
 
@@ -159,6 +158,9 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
       eq(facilitatedRoomAttendanceAssertions.courseAttemptId,attempt.id),
     ))
     .where(and(eq(canonicalClassSessions.classId,cls.id),
+      eq(canonicalClassSessions.deliverySessionId,facilitatedClassroomPlans.deliverySessionId),
+      eq(canonicalClassSessions.facilitatorPersonId,facilitatedClassroomPlans.facilitatorPersonId),
+      eq(facilitatedClassroomPlans.state,"started"),
       eq(facilitatedClassroomPlans.siteId,cls.siteId!),
       eq(facilitatedClassroomPlans.hostOrganizationId,cls.operatingOrganizationId),
       eq(facilitatedClassroomPlans.courseVersionId,cls.courseVersionId),
@@ -201,12 +203,19 @@ async function collectReadiness(tx:Tx, data:Awaited<ReturnType<typeof authorizeR
         cls.operatingOrganizationId),
     )).limit(501):[];
   if(grants.length>500)throw new AuthorizationError("assessment grant paging required");
-  const attempts=grants.length?await tx.select({
+  const attempts=grants.length && learner?await tx.select({
     id:assessmentExecutionAttempts.id,
     state:assessmentExecutionAttempts.state,
   }).from(assessmentExecutionAttempts)
-    .where(inArray(assessmentExecutionAttempts.accessGrantId,grants.map(g=>g.id)))
-    .limit(501):[];
+    .innerJoin(assessmentAccess,and(
+      eq(assessmentExecutionAttempts.accessGrantId,assessmentAccess.id),
+      eq(assessmentExecutionAttempts.administrationId,assessmentAccess.administrationId),
+      eq(assessmentExecutionAttempts.learnerId,assessmentAccess.learnerId),
+    ))
+    .where(and(
+      inArray(assessmentExecutionAttempts.accessGrantId,grants.map(g=>g.id)),
+      eq(assessmentExecutionAttempts.learnerId,learner.id),
+    )).limit(501):[];
   if(attempts.length>500)throw new AuthorizationError("assessment attempt paging required");
   const attemptStates=new Map(attempts.map(a=>[a.id,a.state]));
   const results=attempts.length?await tx.select().from(assessmentExecutionResults)
@@ -278,7 +287,8 @@ export const getNativeClassCompletionReview=createServerFn({method:"GET"})
   .validator((raw:unknown)=>inspectInput.parse(raw))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private,no-store");
-    if(process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED!=="true")
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
+       process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED!=="true")
       throw new AuthorizationError("Class completion not activated");
     const actor=await getCanonicalCommandContext(getRequest());
     return db.transaction(async tx=>{
@@ -344,7 +354,8 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
         throw new AuthorizationError("nothing to void");
       if(current!==null && data.outcome==="completed")
         throw new AuthorizationError("completed terminal Class history cannot be restarted");
-      if(current===null && authorized.enrollment.status!=="active")
+      if(current===null && (authorized.enrollment.status!=="active" ||
+          authorized.cls.state!=="active"))
         throw new AuthorizationError("current active Class participant");
       const readiness=await collectReadiness(tx,authorized);
       if(data.outcome==="completed"&&!readiness.readyForIndependentReview)
