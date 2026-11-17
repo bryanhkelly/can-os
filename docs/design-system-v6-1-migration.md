@@ -154,14 +154,44 @@ For every route migration, assert:
 9. Add or update a corresponding Storybook story and regression test.
 10. Server security and audit contracts unchanged.
 
-## 10. Recommended implementation slices
-Each slice should be its own small PR after design-system merge, not one giant UI rewrite.
+## 10. Component-first rollout (supersedes page-first sequencing, November 17, 2026)
 
-1. Student home fidelity with real data and editorial wallpaper.
-2. Admissions applicant and operations Action first-class record detail.
-3. Site portfolio and Site Today operational hierarchy.
-4. Teacher and guardian role dashboards.
-5. School launch guided flow and readiness.
-6. Domain-specific pages, reporting, School Life and editorial publishing.
+The implementation unit is **one shared component family and all of its appropriate consumers**.
+Do not redesign a collection of pages independently. Domain-owned loaders, permission scopes,
+record lifecycles and audit commands remain unchanged by presentation migration.
 
-**Definition of system-ready:** all shared contracts, tokens, stories, tests and migration guides are present and CI is green. **Definition of product-migrated:** individual real routes pass the ten acceptance conditions above; the former does not imply the latter.
+| Order | Component contract | Current shared-library work | Completion boundary |
+| --- | --- | --- | --- |
+| 01 | Button and actions | Canonical Button handles native-button loading, busy announcements and repeat-submit disablement; FormActions and ActionDialog consume it | Inventory and migrate independent action styling in remaining feature consumers |
+| 02 | Field, Input, Select, Textarea and choice | EvidencePicker, EvidenceReviewForm and GradebookSectionSelector now use canonical Field/Select/Textarea; evidence native-control ban enforced | Continue form-component adoption by family, never auto-transform specialized native functionality |
+| 03 | QueryState, EmptyState, WorkspaceNotice, MutationFeedback | Shared notice and empty surfaces are rectangular; feature readers still own loading/error/retry | Migrate remaining independent state messages while keeping saved-versus-refresh-failed distinction |
+| 04 | Modal and ActionDialog | Confirmation submit now composes canonical loading Button | Retire duplicate confirmation UI only after keyboard/focus and destructive-action tests |
+| 05 | StatusBadge, PrerequisiteChecklist, StatusTimeline | WorkflowPrerequisites reuses PrerequisiteChecklist; EvidenceHistory reuses EvidenceStatus/StatusBadge | Map semantic states using authoritative domain results, never inferred by UI text or color alone |
+| 06 | FormSection, FormActions, unsaved guard | Shared FormActions composes loading Button | Standardize applicable create/edit workflows without collapsing validation or data ownership |
+| 07 | DirectoryTable and pagination | Shared directory, bulk toolbar, known-count and unknown-total pagination are present | Tabular listings only; cards, gradebooks, matrices and personal timelines remain specialized |
+| 08 | RecordLayout, EntityCard, navigation, evidence and workflow shells | Existing canonical components, Storybook examples and source contracts | Extract presentation only where equivalent semantics and two or more consumers exist |
+
+### Enforcement now applied
+
+- `scripts/check-design-system.mjs` checks geometry automatically for **all**
+  `src/components/workspace`, `src/components/workflow` and `src/components/evidence`
+  TSX components, plus their existing component-specific ownership contracts.
+- ESLint prohibits reintroduction of raw inputs, buttons, labels, selects and textareas
+  in the migrated evidence family and specifically governed consumer components.
+- Storybook loading Button uses the actual `loading` API.
+- Unit tests cover canonical Button loading/keyboard semantics, labelled selection,
+  evidence review labels, status reuse and square geometry.
+
+### Definition of component completed
+
+1. One canonical ownership path, documented props and explicit exceptions.
+2. All appropriate component consumers migrated or an inventoried exception retained.
+3. Accessibility, keyboard focus, 390/768/1024/1440 responsive behavior and themed contrast validated.
+4. Loading, error, empty, disabled, pending, conflict and saved-but-refresh-failed behavior covered as applicable.
+5. Unit/Storybook regression evidence passing and checker/lint prevention of drift.
+6. No changes to authorization, persistence, enrollment/evidence source, or audit semantics.
+7. CI is green for the exact SHA before release acceptance.
+
+**Important:** Source commits to `main` do not certify full cross-product migration or
+production readiness. Route-level adoption beyond the governed consumer sets and
+live authenticated acceptance remain separate tasks while CI gates are failing.
