@@ -31,6 +31,7 @@ export function normalizeClientError(error: unknown, fallback?: string): ClientE
   }
   const kinds = {
     AUTHENTICATION_REQUIRED: "authentication", FORBIDDEN: "authorization",
+    CANONICAL_LEARNER_SESSION_REQUIRED: "authentication",
     VALIDATION_FAILED: "validation", CONFLICT: "conflict",
     UNAVAILABLE: "unavailable", UNEXPECTED: "unexpected",
     WEBSITE_DRAFT_STORAGE_NOT_READY: "unavailable",
