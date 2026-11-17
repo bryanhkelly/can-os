@@ -19,6 +19,18 @@ type OutboundMessage =
   | { channel: "sms"; phone: string; organizationId: string };
 
 const delivery = s.notificationOutboundDeliveries;
+/** The source-specific queue predicate is shared by claim and stale lease cleanup. */
+function schoolFamilyReceipt() {
+  return sql`exists (
+          select 1 from public.notifications source_notification
+          join public.actions source_action on source_action.id = source_notification.resource_id
+          where source_notification.id = ${delivery.notificationId}
+            and source_notification.type = 'school_family_alert'
+            and source_notification.resource_type = 'action'
+            and source_action.type = 'school_family_bulletin'
+        )`;
+}
+
 function owned(claim: OutboundClaim) {
   return and(eq(delivery.id, claim.id),
     eq(delivery.status, "processing"),
@@ -40,14 +52,7 @@ const schoolFamilyAdapter = {
       }).from(delivery).where(and(
         // Only claim this feature's receipts. A correlated EXISTS avoids
         // locking a shared school bulletin Action during SKIP LOCKED claims.
-        sql`exists (
-          select 1 from public.notifications source_notification
-          join public.actions source_action on source_action.id = source_notification.resource_id
-          where source_notification.id = ${delivery.notificationId}
-            and source_notification.type = 'school_family_alert'
-            and source_notification.resource_type = 'action'
-            and source_action.type = 'school_family_bulletin'
-        )`,
+        schoolFamilyReceipt(),
         ...(seenIds.length ? [notInArray(delivery.id, [...seenIds])] : []),
         or(
           and(eq(delivery.status, "pending"),
@@ -233,6 +238,7 @@ export async function processSchoolFamilyOutboundDeliveries(now = new Date(), li
     status: "failed", nextAttemptAt: null, leaseUntil: null,
     lastError: SMS_PROVIDER_OUTCOME_UNCONFIRMED, updatedAt: clock,
   }).where(and(
+    schoolFamilyReceipt(),
     eq(delivery.channel, "sms"),
     eq(delivery.status, "processing"),
     lte(delivery.leaseUntil, clock),
