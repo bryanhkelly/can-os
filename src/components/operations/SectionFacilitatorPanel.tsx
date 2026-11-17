@@ -1,7 +1,10 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { QueryState } from "@/components/workspace";
+import { QueryState, WorkspaceNotice } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { updateSectionFacilitator, type SectionFacilitatorInput } from "@/modules/operations/site-section-facilitators.functions";
 import {
   sectionFacilitatorsQuery, siteStaffingKeys, siteStaffingMutationOptions, refreshSiteStaffing,
@@ -52,7 +55,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
     }
   }
 
-  return <section className="mt-7 rounded-xl border bg-card p-5" aria-label="Section facilitator assignments">
+  return <section className="mt-7  border bg-card p-5" aria-label="Section facilitator assignments">
     <h2 className="font-serif text-2xl">Staff each onsite class</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Assign multiple verified local adults to the Sections they actually support.
@@ -60,16 +63,19 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
       Each appointment expires within 90 days, and active oversight, staff screening,
       teaching plans, and physical coverage must be checked separately.
     </p>
-    {error && <p role="alert" className="mt-3 rounded border p-3 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-3 rounded border p-3 text-sm">{notice}</p>}
-    {mutation.data?.refreshWarning && <p role="alert" className="mt-3 rounded border p-3 text-sm">
-      {mutation.data.refreshWarning}
-      <button type="button" onClick={retry} disabled={busy} className="ml-3 underline disabled:opacity-50">Refresh staffing</button>
-    </p>}
+    {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {notice && !mutation.data?.refreshWarning &&
+      <WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
+    {mutation.data?.refreshWarning && <WorkspaceNotice tone="attention" className="mt-3">
+      {notice && <p>{notice}</p>}
+      <p className={notice ? "mt-1" : undefined}>{mutation.data.refreshWarning}</p>
+      <Button type="button" variant="outline" size="sm" className="mt-2"
+        onClick={retry} loading={busy} disabled={busy}>Refresh staffing</Button>
+    </WorkspaceNotice>}
     <QueryState loading={query.isPending ? "Loading class staffing…" : undefined}
       error={query.isError ? mutationErrorMessage(query.error, "Unable to load class staffing.") : undefined}
       onRetry={retry} retrying={busy}>
-    {data && (!data.hasConfiguration ? <p role="status" className="mt-4 rounded border p-3 text-sm">
+    {data && (!data.hasConfiguration ? <p role="status" className="mt-4 border p-3 text-sm">
         Appoint your local Site director first to establish a draft school-operations
         configuration. A draft does not authorize student attendance or school opening.
       </p> : <>
@@ -85,7 +91,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
           const effective = (a: (typeof current)[number]) =>
             !!a.effectiveFrom && Date.parse(a.effectiveFrom) <= Date.now() &&
             !!a.effectiveThrough && Date.parse(a.effectiveThrough) > Date.now();
-          return <div key={key} className="mt-5 rounded-lg border p-4">
+          return <div key={key} className="mt-5  border p-4">
             <h3 className="font-semibold">{section.code} · {section.title}</h3>
             <p className="mt-2 text-xs text-muted-foreground">
               Current named classroom support (not verified physical attendance)
@@ -94,42 +100,42 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
               {current.filter(effective).map(a =>
                 <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 text-sm">
                   <span>{a.name} · through {new Date(a.effectiveThrough!).toLocaleDateString()}</span>
-                  <button type="button" disabled={busy}
+                  <Button type="button" variant="outline" size="sm" disabled={busy}
                     onClick={() => void change({
                       sectionId:section.id, personId:a.personId,
                       action:"revoke", expectedAssignmentId:a.id,
-                    })} className="rounded border px-3 py-1 text-xs disabled:opacity-50">
+                    })}>
                     Revoke
-                  </button>
+                  </Button>
                 </li>)}
               {!current.some(effective) && <li className="text-sm text-muted-foreground">
                 No active named facilitators for this Section.
               </li>}
             </ul>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <label className="text-sm">Verified local facilitator
-                <select disabled={busy} value={personId}
+              <Field label="Verified local facilitator">
+                <Select disabled={busy} value={personId}
                   onChange={e => setSelected(old => ({ ...old, [key]: e.target.value }))}
-                  className="mt-1 w-full rounded border bg-background p-2">
+                  >
                   <option value="">Choose a person</option>
                   {data.staff.map(person =>
                     <option key={person.personId} value={person.personId}>
                       {person.first} {person.last}
                     </option>)}
-                </select>
-              </label>
+                </Select>
+              </Field>
               <AppointmentExpiryField label="Appointment ends" disabled={busy} value={through}
                 onChange={value => setExpires(old => ({ ...old, [key]: value }))}/>
             </div>
-            <button type="button" disabled={busy || !personId || !through}
+            <Button type="button" variant="outline" disabled={busy || !personId || !through}
               onClick={() => void change({
                 sectionId:section.id, personId, action:"appoint",
                 expectedAssignmentId: existing?.id ?? null,
                 validThrough:appointmentExpiryToIso(through),
               })}
-              className="mt-3 rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+              className="mt-3  border px-3 py-2 text-sm font-semibold disabled:opacity-50">
               {existing ? "Renew Section appointment" : "Add Section facilitator"}
-            </button>
+            </Button>
           </div>;
         })}
         {!data.staff.length && <p className="mt-4 text-sm">
