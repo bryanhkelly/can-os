@@ -413,6 +413,16 @@ async function readMyNoncreditHistoryPage(
       .innerJoin(learnerCourseAttempts,and(
         eq(learnerCourseAttempts.noncreditRegistrationId,noncreditRegistrations.id),
         isNull(learnerCourseAttempts.enrollmentId),
+        isNull(learnerCourseAttempts.classEnrollmentId),
+        // Registration is one participation identity even with multiple
+        // historical attempts. Select its latest original Course Attempt.
+        sql`${learnerCourseAttempts.id} = (
+          SELECT attempt.id FROM education_v30.learner_course_attempts attempt
+          WHERE attempt.noncredit_registration_id=${noncreditRegistrations.id}
+            AND attempt.enrollment_id IS NULL AND attempt.class_enrollment_id IS NULL
+          ORDER BY attempt.attempt_no DESC,attempt.started_at DESC,attempt.id DESC
+          LIMIT 1
+        )`,
       ))
       .innerJoin(noncreditTrainingVersions,
         eq(noncreditTrainingVersions.id,noncreditRegistrations.trainingVersionId))
