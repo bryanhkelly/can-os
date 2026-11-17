@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, exists, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, exists, gt, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -119,7 +119,7 @@ export const getNativeOfferingVersionImpact=createServerFn({method:"GET"})
         ));
       const eligibleSites=[...new Map(eligibleSiteRows.map(site=>[
         site.operationId+":"+site.siteId,site,
-      ])).values()];
+      ] as const)).values()];
       const placementRows=await tx.select({
         deploymentId:classroomDeploymentSites.deploymentId,
         siteId:classroomDeploymentSites.siteId,
