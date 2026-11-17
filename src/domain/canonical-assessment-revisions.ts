@@ -27,6 +27,10 @@ export function latestCanonicalAssessmentRevisions<T extends CanonicalAssessment
   }
   const current:T[]=[];
   for(const [attemptId,versions] of byAttempt){
+    // A malformed revision must poison its own assessment attempt, even if
+    // a different row for that attempt looks valid. Never emit both a
+    // supposedly current result and an ambiguity marker for the same source.
+    if(ambiguous.has(attemptId))continue;
     if(versions.length!==new Set(versions.map(row=>row.id)).size){
       ambiguous.add(attemptId);continue;
     }
