@@ -1,4 +1,4 @@
-import { timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 
 /**
@@ -12,7 +12,7 @@ export const classroomDeploymentSites = educationV30.table("deployment_sites", {
   siteId: uuid("site_id").notNull(),
 });
 
-export const classroomEnrollmentSitePlacements = educationV30.table("enrollment_site_placements", {
+export const classroomEnrollmentSitePlacements = pgTable("enrollment_site_placements", {
   id: uuid("id").primaryKey(),
   enrollmentId: uuid("enrollment_id").notNull(),
   deploymentId: uuid("deployment_id").notNull(),
