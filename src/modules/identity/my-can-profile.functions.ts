@@ -35,7 +35,7 @@ export const saveMyCanContact = createServerFn({ method: "POST" })
     return db.transaction(async tx => {
       const [current] = await tx.select({
         id: people.id, preferredName: people.preferredName, phone: people.phone,
-      }).from(people).where(and(eq(people.id, actor.actorPersonId),
+      }).from(people).where(and(eq(people.id, actor.actorPersonId!),
         eq(people.active, true))).for("update").limit(1);
       if (!current) throw new AuthorizationError("current Person");
       const preferredName = data.preferredName || null;
