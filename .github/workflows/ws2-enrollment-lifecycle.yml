@@ -1,0 +1,75 @@
+name: WS2 Enrollment Lifecycle Verification
+
+# Source-only verification runs on a disposable GitHub worker. It never reads
+# DATABASE_URL, deploys, changes Neon, sends mail or enables feature flags.
+on:
+  pull_request:
+    branches: [integration/programs-courses-classes, main]
+    paths:
+      - 'src/domain/native-class-*'
+      - 'src/modules/classes/native-class-*'
+      - 'src/modules/classes/unified-class.functions.ts'
+      - 'src/routes/learn.classes.tsx'
+      - 'src/routes/classes_.$classId.tsx'
+      - 'src/routes/canonical.classes.tsx'
+      - 'tests/unit/native-class-*'
+      - 'tests/unit/unified-class.test.ts'
+      - 'docs/contracts/WS2-ENROLLMENT-LIFECYCLE-V1.md'
+      - '.github/workflows/ws2-enrollment-lifecycle.yml'
+  push:
+    branches: [feature/enrollment-lifecycle]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ws2-code-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact event commit
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prove checkout SHA
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA" ||
+            { echo "::error::Build is not using the event SHA"; exit 1; }
+      - name: Node 22 with npm cache
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Verify canonical documentation links
+        run: npm run docs:check
+      - name: Build Cloudflare target
+        run: npm run build:cloudflare
+      - name: Build web app and generate route types
+        run: npm run build
+      - name: TypeScript
+        run: npm run typecheck
+      - name: ESLint and design-system 6.1
+        run: npm run lint
+      - name: Class-wide regression suite
+        run: npm run test:classes:unit
+      - name: WS2 lifecycle and source-contract regressions
+        run: npx vitest run src/domain/native-class-lifecycle.test.ts tests/unit/native-class-lifecycle-transaction-contract.test.ts
+      - name: Post release evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## WS2 verification"
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "These source tests do NOT prove canonical database transactions, live Notifications, 2-Site 4-Session E2E, or production safety."
+            echo "Isolated QA/database and authenticated tests are separate mandatory release gates."
+          } >> "$GITHUB_STEP_SUMMARY"
