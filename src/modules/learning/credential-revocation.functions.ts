@@ -27,9 +27,6 @@ export const revokeLearningAwardIssuance = createServerFn({ method: "POST" })
   .validator((raw: unknown) => input.parse(raw))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    if (process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true" ||
-        process.env.CAN_WS3_AWARD_REVOCATION_ENABLED !== "true")
-      throw new AuthorizationError("learning award revocation not activated");
     const request = getRequest();
     const actor = await getCanonicalCommandContext(request);
     if (!actor.actorPersonId || !["registrar", "site_admin"].includes(actor.role ?? "") ||
