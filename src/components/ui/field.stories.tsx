@@ -5,6 +5,7 @@ import { Button } from "./button";
 import { Checkbox, Radio } from "./choice";
 import { Field } from "./field";
 import { Input } from "./input";
+import { Select } from "./select";
 import { Label } from "./label";
 import { Textarea } from "./textarea";
 
@@ -78,4 +79,37 @@ export const ExplicitControlAssociations: Story = {
       <Input id="review-reference" aria-describedby="review-external-help"/>
     </Field>
   </div>,
+};
+
+function ControlledReviewExample() {
+  const [period, setPeriod] = useState("first");
+  const [reason, setReason] = useState("");
+  return <div className="grid max-w-xl gap-5 bg-background p-6">
+    <p className="text-sm text-muted-foreground">V6.1 control demonstration only. This does not record an approval or grade.</p>
+    <Field label="Grading period" required description="Select an authorized period before reviewing.">
+      <Select value={period} onChange={event => setPeriod(event.target.value)}>
+        <option value="first">Quarter one</option>
+        <option value="second">Quarter two</option>
+      </Select>
+    </Field>
+    <Field label="Review rationale" required description="At least ten characters for this preview.">
+      <Textarea value={reason} minLength={10} maxLength={500}
+        onChange={event => setReason(event.target.value)}/>
+    </Field>
+    <Button type="button" disabled={reason.trim().length < 10}>Preview reviewed decision</Button>
+  </div>;
+}
+export const ControlledReview: Story = {
+  render: () => <ControlledReviewExample/>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const select = canvas.getByRole("combobox", { name: /Grading period/ });
+    await userEvent.selectOptions(select, "second");
+    await expect(select).toHaveValue("second");
+    const reason = canvas.getByRole("textbox", { name: /Review rationale/ });
+    const action = canvas.getByRole("button", { name: "Preview reviewed decision" });
+    await expect(action).toBeDisabled();
+    await userEvent.type(reason, "Independently reviewed current evidence.");
+    await expect(action).toBeEnabled();
+  },
 };
