@@ -157,6 +157,8 @@ async function readMyNoncreditWaitlistPage(
     waitlistId:noncreditWaitlistEmailDeliveries.waitlistId,
     invitationExpiresAt:noncreditWaitlistEmailDeliveries.invitationExpiresAt,
     status:noncreditWaitlistEmailDeliveries.status,
+    providerDeliveredAt:noncreditWaitlistEmailDeliveries.providerDeliveredAt,
+    providerFailedAt:noncreditWaitlistEmailDeliveries.providerFailedAt,
   }).from(noncreditWaitlistEmailDeliveries)
     .where(inArray(noncreditWaitlistEmailDeliveries.waitlistId,
       page.map(row=>row.waitlistId))):[];
@@ -164,8 +166,14 @@ async function readMyNoncreditWaitlistPage(
     items:page.map(row=>({
       releaseId:row.releaseId,title:row.title,
       emailDeliveryStatus:row.status==="invited"&&row.inviteExpiresAt
-        ? deliveries.find(item=>item.waitlistId===row.waitlistId&&
-          item.invitationExpiresAt.getTime()===row.inviteExpiresAt!.getTime())?.status??"not_queued"
+        ? (() => {
+          const receipt=deliveries.find(item=>item.waitlistId===row.waitlistId&&
+            item.invitationExpiresAt.getTime()===row.inviteExpiresAt!.getTime());
+          return receipt?.providerFailedAt?"provider_failed"
+            :receipt?.providerDeliveredAt?"provider_delivered"
+            :receipt?.status==="accepted"?"provider_accepted"
+            :receipt?.status??"not_queued";
+        })()
         :null,
       status:row.status==="invited" && row.inviteExpiresAt &&
         row.inviteExpiresAt<=new Date()?"expired" as const:row.status,
