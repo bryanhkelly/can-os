@@ -84,7 +84,7 @@ describe("Every Site-first setup choice has a native template home",()=>{
     expect(reader).toContain("cv.state='published' AND cv.visibility='public'");
     expect(reader).toContain("adoption.approval_status='approved'");
     expect(reader).toContain("c.state='active'");
-    expect(reader).toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
+    expect(reader).not.toContain("CAN_UNIFIED_CLASS_COMMANDS_ENABLED");
     expect(reader).not.toContain("learner_person_id");
     expect(reader).not.toContain("room_url");
     const config=defaultSiteContentChannelConfig;
