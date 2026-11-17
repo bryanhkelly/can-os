@@ -14,6 +14,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { credentialIsCurrent, evaluateAchievementAward } from "@/domain/credential-awards";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCredentialIssuer } from "@/modules/identity/canonical-sensitive-authorization.server";
+import { assertNoncreditCompletionSiteScope } from "@/modules/learning/verified-completion-site.server";
 
 const inputSchema = z.object({
   credentialDefinitionVersionId: z.string().uuid(),
@@ -29,10 +30,14 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
   .validator((value: unknown) => inputSchema.parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
+    if (process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true")
+      throw new AuthorizationError("credential issuance disabled pending acceptance");
     const actor = await getCanonicalCommandContext(getRequest());
     if (!actor.actorPersonId || !["registrar", "site_admin"].includes(actor.role ?? ""))
       throw new AuthorizationError("authorized credential issuer");
-    // Credential issuance is NOT a role capability. A current, independently\n    // reviewed, expiring issuer approval is required inside the write transaction.
+    // Credential issuance is not inherited from the staff role. The current,
+    // independently approved issuer and exact delivery Site are rechecked
+    // inside the transaction even when a previous award already exists.
 
     return db.transaction(async tx => {
       const [definition] = await tx.select({
@@ -60,6 +65,13 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         .where(eq(noncreditRegistrations.id, completion.registrationId))
         .for("update").limit(1);
       if (!registration) throw new AuthorizationError("owned registration");
+      if (registration.participantPersonId === actor.actorPersonId)
+        throw new AuthorizationError("issuer and recipient must be independent");
+      await assertNoncreditCompletionSiteScope(tx, actor, registration);
+      // The approval row stays locked for the entire write transaction. This
+      // must run before the alreadyIssued fast path to prevent disclosure or
+      // authorization bypass on retries.
+      await assertCurrentCredentialIssuer(tx, getRequest(), actor);
 
       const [training] = await tx.select().from(noncreditTrainingVersions)
         .where(eq(noncreditTrainingVersions.id, registration.trainingVersionId)).limit(1);
@@ -124,7 +136,6 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
       }
       if (existing) throw new AuthorizationError("incomplete credential issuance");
 
-      await assertCurrentCredentialIssuer(tx,getRequest(),actor);
       const [award] = await tx.insert(learnerAchievementDecisions).values({
         credentialDefinitionVersionId: definition.versionId,
         recipientPersonId: registration.participantPersonId,
