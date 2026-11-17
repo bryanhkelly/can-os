@@ -108,14 +108,14 @@ export default tseslint.config(
       }],
     },
   },
-  // Evidence family is fully on canonical form primitives; new native controls are forbidden.
+  // Shared workspace, workflow and evidence families must use canonical controls.
   {
-    files: ["src/components/evidence/**/*.tsx"],
-    ignores: ["src/components/evidence/**/*.stories.tsx", "src/components/evidence/**/*.test.tsx"],
+    files: ["src/components/{workspace,workflow,evidence}/**/*.tsx"],
+    ignores: ["src/components/{workspace,workflow,evidence}/**/*.stories.tsx", "src/components/{workspace,workflow,evidence}/**/*.test.tsx"],
     rules: {
       "no-restricted-syntax": ["error", {
         selector: "JSXOpeningElement[name.name=/^(button|input|select|textarea|label)$/]",
-        message: "Evidence components must use V6.1 Button, Field, Input, Select or Textarea.",
+        message: "Shared components must use V6.1 Button, Field, Input, Select or Textarea.",
       }],
     },
   },
