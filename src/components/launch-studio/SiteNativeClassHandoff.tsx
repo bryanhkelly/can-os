@@ -44,7 +44,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
   </div>}
   {!scope.isPending&&!scope.isError&&scope.data?.kind!=="ready"&&<>
    <p role="status" className="mt-4 border border-border bg-muted p-4 text-sm">
-    {scope.data?.kind==="unlinked"
+    {scope.data?.kind==="not_provisioned"
       ?"This Site does not yet have native Class operations provisioned under its existing Site ID."
       :"The current account does not have an active native Class administration grant for this Site."}
     {" "}Creating a Class requires a published adopted Course and current operating authority.
