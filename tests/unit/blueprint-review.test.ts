@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   blueprintReviewReadInputSchema,
+  blueprintReviewHistoryInputSchema,
   decideBlueprintReviewInputSchema,
 } from "@/domain/blueprint-review";
 
@@ -36,6 +37,19 @@ describe("canonical Blueprint review commands", () => {
     });
     expect(result.decision).toBe("rejected");
     expect(result.components).toEqual([]);
+  });
+
+  it("bounds append-only review history reads to an exact version and page", () => {
+    expect(blueprintReviewHistoryInputSchema.parse({ configurationVersionId })).toEqual({
+      configurationVersionId, page: 0,
+    });
+    expect(blueprintReviewHistoryInputSchema.parse({ configurationVersionId, page: 100 }).page).toBe(100);
+    for (const page of [-1, 1.5, 101]) {
+      expect(blueprintReviewHistoryInputSchema.safeParse({ configurationVersionId, page }).success).toBe(false);
+    }
+    expect(blueprintReviewHistoryInputSchema.safeParse({
+      configurationVersionId, page: 0, organizationId: reviewId,
+    }).success).toBe(false);
   });
 
   it("requires evidence for all approvals", () => {
