@@ -21,6 +21,7 @@ describe("V6.1 academic credential transport history", () => {
     expect(html).toContain("border-info/40");
     expect(html).toContain("provider-ack-1");
     expect(html).toContain("Example Registrar");
+    expect(html).toContain("Delivery requested · Example Registrar");
     expect(html).toContain("2026-11-15T18:00:00.000Z");
     expect(html).not.toContain("Delivered to recipient");
     expect(html).not.toContain("border-success/50");
