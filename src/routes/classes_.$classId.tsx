@@ -270,7 +270,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
         <span className="font-semibold">{row.name}</span>
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-muted-foreground">{row.status} · {row.creditMode.replaceAll("_"," ")}</span>
-          {isOperator&&"courseAttemptId" in row&&row.courseAttemptId&&row.status==="active"&&
+          {isOperator&&"courseAttemptId" in row&&typeof row.courseAttemptId==="string"&&row.status==="active"&&
             <Button type="button" size="sm" variant="outline" disabled={!!grantBusy}
               onClick={()=>void grantKnowledgeCheck(row.enrollmentId)}>
               {grantBusy===row.enrollmentId?"Granting…":"Grant Course knowledge check"}
