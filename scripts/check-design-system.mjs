@@ -188,6 +188,7 @@ const sharedPatternContracts = {
   "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
   "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions', '"inline"'],
   "workspace/record-layout.tsx": ['export function RecordHeader', 'export function RecordLayout', 'export function RecordFacts', 'export function EntityCard', 'aria-label="Record actions"'],
+  "workflow/status-timeline.tsx": ['<StatusBadge', 'timeZone = "UTC"', 'timeZoneName: "short"', 'dateTime={entry.occurredAt}'],
   "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
     'aria-describedby={description ? descriptionId : undefined}', 'columns === 1'],
   "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
