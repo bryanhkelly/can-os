@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,gt,inArray,isNotNull,isNull,lte} from "drizzle-orm";
+import {and,desc,eq,inArray,isNotNull,isNull,lte} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
