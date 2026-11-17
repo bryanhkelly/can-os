@@ -40,7 +40,8 @@ export async function handleResendDeliveryWebhook(request: Request): Promise<Res
   } : {
     ...common,
     providerFailedAt: sql`coalesce(${receipt.providerFailedAt}, ${occurredAt})`,
-    providerFailureKind: event.type,
+    // Never downgrade a spam complaint when callbacks arrive out of order.
+    providerFailureKind: sql`case when ${receipt.providerFailureKind} = 'email.complained' then ${receipt.providerFailureKind} else ${event.type} end`,
   };
 
   await db.update(receipt).set(changes)
