@@ -6,16 +6,18 @@ import {z} from "zod";
 import {db} from "@/db/client";
 import {
  auditEvents,domainEvents,canonicalClasses,canonicalClassOfferings,
+ canonicalClassEnrollmentRepeatAuthorizations,
  canonicalClassOfferingVersions,canonicalClassEnrollments,
  canonicalClassEnrollmentApprovalRequests,canonicalPersons,
  guardianAuthorities,learnerProfiles,learnerCourseAttempts,participationAttributions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {currentClassAuthority} from "./native-class-authority.server";
+import {requireNativeRepeatAuthorization} from "./native-class-repeats.functions";
 import {requireNativeGuardian,requireNativeGuardianChild} from
  "./native-class-guardian-authority.server";
 import {assertOperationalClassOfferingTerms,assertNativeClassSeatAvailable,
- assertNativeClassRepeatEligible,assertNativeClassAttemptForExit} from "@/domain/native-class-lifecycle";
+ assertNativeClassAttemptForExit} from "@/domain/native-class-lifecycle";
 
 const uuid=z.string().uuid();
 const requestSchema=z.object({
@@ -257,7 +259,10 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
       eq(canonicalClassEnrollments.learnerPersonId,approval.learnerPersonId),
       eq(canonicalClassEnrollments.status,"completed"),
     )).limit(1);
-   assertNativeClassRepeatEligible(completed?["completed"]:[]);
+   const repeatAuthorization=completed
+     ?await requireNativeRepeatAuthorization(tx,cls.id,approval.learnerPersonId,
+       completed.id,new Date())
+     :null;
    const [seats]=await tx.select({total:count()}).from(canonicalClassEnrollments)
     .where(and(eq(canonicalClassEnrollments.classId,cls.id),
       inArray(canonicalClassEnrollments.status,["pending","active"])));
@@ -290,6 +295,21 @@ export const acceptNativeGuardianClassApproval=createServerFn({method:"POST"})
    if(!attempt)throw new Error("guardian Course Attempt not saved");
    await tx.update(canonicalClassEnrollments).set({courseAttemptId:attempt.id})
     .where(eq(canonicalClassEnrollments.id,enrollment.id));
+   if(repeatAuthorization){
+    await tx.update(canonicalClassEnrollmentRepeatAuthorizations)
+     .set({consumedByEnrollmentId:enrollment.id})
+     .where(and(
+       eq(canonicalClassEnrollmentRepeatAuthorizations.id,repeatAuthorization.id),
+       isNull(canonicalClassEnrollmentRepeatAuthorizations.consumedByEnrollmentId),
+     ));
+    await tx.insert(domainEvents).values({
+     eventType:"ClassRepeatAuthorizationConsumed",
+     aggregateType:"class_repeat_authorization",aggregateId:repeatAuthorization.id,
+     actorPersonId:guardian.personId,
+     payload:{classId:cls.id,priorEnrollmentId:completed!.id,
+       classEnrollmentId:enrollment.id,courseAttemptId:attempt.id},
+    });
+   }
    await tx.update(canonicalClassEnrollmentApprovalRequests)
     .set({acceptedEnrollmentId:enrollment.id})
     .where(and(eq(canonicalClassEnrollmentApprovalRequests.id,approval.id),
