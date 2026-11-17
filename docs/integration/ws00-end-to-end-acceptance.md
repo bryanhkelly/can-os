@@ -279,3 +279,35 @@ completion from the admission-only refactor. Actual signed-in Class publisher,
 QA fixtures, E2E browser, build/typecheck, and restricted-role negative tests
 remain unverified. Production roll-out of new review UX should not be
 considered accepted from database migration alone.
+
+
+### Cross-product authorization hardening, 2026-11-17 continuation
+
+Class review, activation, recovery and noncredit self-enrollment now call the
+same raw account-to-Person invariant. A previously noncredit-enrolled adult can
+retain existing Course participation while an independently approved Class
+identity review is **unconsumed**, provided the exact CAN-to-canonical Person
+link is intact; conflicting review evidence or revocation still denies access.
+
+The shared native session reader also revalidates active reviewed identity
+evidence for previously activated learners. Document revocation, expiration,
+verification mismatch or canonical birth-date mismatch invalidate authorization
+even if a native session has not yet expired.
+
+`appendResponseHeader("Set-Cookie", ...)` preserves other active cookies when
+a native learning session is issued; the separate client application service
+runs recovery/activation and enrollment in separate HTTP requests. Shared
+`resolveAuthorizedLearningPerson` provides the baseline native learner
+identity/capability check for Class enrollment and Class learning.
+
+The operator review screen now includes a bounded, redacted lifecycle list;
+authorization and evidence records remain server-only and audited.
+
+**No full signoff yet:** A governed private adult-document intake and
+independent verifier workflow is required to produce the specifically
+approved, R2-object-verified evidence consumed by the review command. The
+remaining two-cookie-to-one-cookie migration includes playback/session
+persistence outside the Class admission module. Neither migration was
+silently emulated by a weaker consent checkbox. The current QA Class and
+verified-review fixtures are absent; browser, typecheck/build and negative
+RLS authorization tests have not been demonstrated at the latest main SHA.
