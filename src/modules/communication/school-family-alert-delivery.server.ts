@@ -1,14 +1,15 @@
 import { and, asc, eq, gt, notInArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
+import { OUTBOUND_LEASE_MS, OUTBOUND_MAX_ATTEMPTS, outboundRetryDelayMs } from "@/domain/outbound-retry-policy";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { sendNotificationEmail } from "./notification-email.server";
 import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "@/platform/subscriptions/preferences";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 
-const MAX_ATTEMPTS=5;
-const LEASE_MS=120_000;
-const RETRY_MS=(attempt:number)=>Math.min(60_000*2**Math.max(0,attempt-1),3_600_000);
+const LEASE_MS=OUTBOUND_LEASE_MS;
+const MAX_ATTEMPTS=OUTBOUND_MAX_ATTEMPTS;
+const RETRY_MS=outboundRetryDelayMs;
 
 /** A scheduled transport worker; never send from inside the publication
  * transaction. Notification and original school Action remain authoritative.
