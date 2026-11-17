@@ -12,6 +12,8 @@ export const Route = createFileRoute("/")({
       throw redirect({ to: "/access", search: { returnTo: "/" } });
     }
     if (!session?.authenticated) return;
+    if (session.role==="academic_content_creator") throw redirect({to:"/class",search:{view:"content"}});
+    if (session.role==="academic_content_reviewer") throw redirect({to:"/class",search:{view:"reviews"}});
     const destination = session.role === "student"
       ? studentHomePath(session.studentPreferences ?? defaultStudentDisplayPreferences)
       : getWorkspaceHome(session.role);
