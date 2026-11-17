@@ -49,6 +49,39 @@ describe("one native Class route and reusable manager",()=>{
     expect(legacy).not.toContain("<NativeClassReportPanel");
   });
 
+  it("promotes governed completion without creating another Class authority",()=>{
+    const detail=read("src/routes/class_.$classId.tsx");
+    const staging=read("src/routes/canonical.classes_.completion.tsx");
+    const permissions=read("src/domain/class-views.ts");
+    expect(permissions).toContain('"reports", "completion"');
+    expect(detail).toContain('completion:"Completion"');
+    expect(detail).toContain("<NativeClassCompletionOperatorPanel classId={workspace.classId}/>");
+    expect(staging).toContain('<Navigate to="/class/$classId"');
+    expect(staging).toContain('tab:"completion"');
+    expect(staging).not.toContain("NativeClassCompletionOperatorPanel");
+  });
+
+  it("uses shared 6.1 navigation and the canonical role matrix",()=>{
+    const landing=read("src/routes/class.tsx");
+    const manage=read("src/components/learning/NativeClassManager.tsx");
+    const nav=read("src/components/learning/NativeClassHomeNavigation.tsx");
+    expect(landing).toContain("<NativeClassHomeNavigation");
+    expect(landing).toContain("<NativeLearnerClasses navigation={navigation}/>");
+    expect(manage).toContain("{navigation}");
+    expect(nav).toContain('DetailNavigation label="Class workspace sections"');
+    expect(nav).toContain("canonicalRoleCapabilities");
+    expect(nav).toContain('includes("class.manage")');
+    expect(nav).not.toContain("roleCapabilities } from \"@/domain/access-context\"");
+  });
+
+  it("checks requested delivery mode before retaining a selected Site",()=>{
+    const manager=read("src/components/learning/NativeClassManager.tsx");
+    expect(manager).not.toContain("some(mode=>mode===mode)");
+    expect(manager).toContain("site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)");
+    expect(manager).toContain("setCreatedClassId(result.classId)");
+    expect(manager).toContain("Open newly created Class");
+  });
+
   it("does not open a fake teacher classroom for the synthetic center",()=>{
     const center=read("src/routes/centers.demo.tsx");
     expect(center).toContain('to="/class"');
