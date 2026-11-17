@@ -47,7 +47,8 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(manager).not.toContain("surveyAnswers");
   });
   it("uses the canonical draft writer but does not falsely publish a quiz or survey",()=>{
-    const page=source("src/routes/canonical.course-activities.tsx");
+    const page=source("src/components/learning/PublisherCourseActivityEditor.tsx");
+    const staging=source("src/routes/canonical.course-activities.tsx");
     const options=source("src/modules/classes/publisher-course-activity-options.functions.ts");
     const packageJson=source("package.json");
     expect(page).toContain("createCanonicalSurveyDraft({data:value})");
@@ -59,6 +60,8 @@ describe("publisher Course Activities recover the original UX without a parallel
     expect(page).not.toContain("navigator.clipboard");
     expect(page).toContain("independent approval");
     expect(page).not.toContain("publishNativeCourseActivitySet");
+    expect(page).not.toContain("createFileRoute");
+    expect(staging).toContain('<Navigate to="/class" search={{view:"activities"}}');
     expect(page).not.toContain("tx.insert(assessmentExecutionResults)");
     expect(options).toContain('assertCapability(actor,"class.manage")');
     expect(page).toContain("/canonical/assessment-reviews");
