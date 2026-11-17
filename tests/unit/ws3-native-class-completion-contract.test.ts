@@ -69,9 +69,23 @@ describe("WS3 governed native Class completion contract",()=>{
     expect(command).toContain("assessmentExecutionResults");
     expect(command).toContain("assessmentExecutionAttempts");
     expect(command).toContain("assessmentFormAdministrations");
-    expect(command).toContain("versions.filter");
-    expect(command).toContain("replaced.has(v.id)");
-    expect(command).toContain('heads.length!==1');
+    expect(command).toContain("latestCanonicalAssessmentRevisions");
+    expect(command).toContain("ambiguousAttemptIds.length");
+    expect(command).toContain("ambiguous canonical assessment result revisions");
+  });
+  it("uses immutable delivery-Site attribution when optional Class Site is absent",()=>{
+    expect(command).toContain("participationAttributions.deliverySiteId");
+    expect(command).toContain("immutable original Class delivery Site");
+    expect(sql).toContain("(e.site_id IS NULL OR attr.delivery_site_id=e.site_id)");
+    expect(sql).toContain("binding.delivery_site_id=attr.delivery_site_id");
+  });
+  it("takes WS00 Class-first lock order to avoid WS2 withdrawal deadlocks",()=>{
+    const start=command.indexOf("export const decideNativeClassCompletion");
+    const code=command.slice(start);
+    const cls=code.indexOf(".from(canonicalClasses)");
+    const en=code.indexOf(".from(canonicalClassEnrollments)");
+    expect(cls).toBeGreaterThan(-1);
+    expect(en).toBeGreaterThan(cls);
   });
   it("does not claim release ready with the migrations disabled",()=>{
     expect(sql).toContain("DO NOT APPLY IN PRODUCTION");
