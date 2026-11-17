@@ -27,8 +27,6 @@ import { bindCanonicalAssessmentSession } from "@/modules/identity/canonical-ass
 export const createCanonicalObjectiveDraft=createServerFn({method:"POST"})
   .validator((raw:unknown)=>canonicalObjectiveDraftInput.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED!=="true")
-      throw new AuthorizationError("canonical objective assessment draft writer disabled");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["registrar","site_admin"].includes(actor.role??""))
@@ -94,8 +92,6 @@ export const listCanonicalObjectiveDrafts=createServerFn({method:"GET"})
     courseVersionId:z.string().uuid(),
   }).strict().parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_CANONICAL_ASSESSMENT_DRAFT_ENABLED!=="true")
-      throw new AuthorizationError("canonical objective assessment draft writer disabled");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["registrar","site_admin"].includes(actor.role??""))
