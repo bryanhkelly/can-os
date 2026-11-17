@@ -5,14 +5,19 @@ function source(path:string):string{
   return readFileSync(new URL("../../"+path,import.meta.url),"utf8");
 }
 describe("Launch catalog, Class and persistence contracts",()=>{
-  it("resolves only independently approved public-to-canonical Site identities",()=>{
+  it("uses the same platform Site ID without consulting an identity bridge",()=>{
     const server=source("src/modules/programs/launch-site-catalog.server.ts");
+    const handoff=source("src/components/launch-studio/SiteNativeClassHandoff.tsx");
+    const publicClasses=source("src/modules/sites/site-published-classes.server.ts");
     expect(server).toContain("assertSiteSetupScope(publicActor,site");
-    expect(server).toContain("status='approved'");
-    expect(server).toContain("confirmed_at IS NOT NULL");
-    expect(server).toContain("reviewed_at IS NOT NULL");
+    expect(server).toContain("eq(catalogSites.id,site.id)");
     expect(server).toContain("getCanonicalCommandContext(request)");
-    expect(server).toContain("actor.scope.siteIds?.includes(canonicalSiteId)");
+    expect(server).toContain("actor.scope.siteIds?.includes(site.id)");
+    expect(server).not.toContain("site_canonical_identity_links");
+    expect(handoff).toContain("getLaunchSiteClassScope");
+    expect(handoff).not.toContain("getSiteIdentityLinkStatus");
+    expect(publicClasses).toContain("WHERE c.site_id=${publicSiteId}::uuid");
+    expect(publicClasses).not.toContain("site_canonical_identity_links");
   });
   it("never treats the public Site ID as a canonical Offering discovery subject",()=>{
     const commands=source("src/modules/programs/program-discovery.functions.ts");
