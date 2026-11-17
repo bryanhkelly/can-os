@@ -7,6 +7,9 @@ const state = vi.hoisted(() => ({
   slots: [] as unknown[], cursor: 0, effects: [] as EffectCallback[],
   read: vi.fn(),
 }));
+vi.mock("@/components/operations/SchoolFamilyDeliveryRecoveryPanel", () => ({
+  SchoolFamilyDeliveryRecoveryPanel: () => "School-family delivery recovery",
+}));
 vi.mock("@/modules/operations/outbox-health.functions", () => ({
   getOutboxHealthSummary: state.read,
 }));
@@ -82,6 +85,7 @@ describe("operations outbox health panel", () => {
     expect(html).toContain(">2</p>");
     expect(html).toContain("3 pending events have no registered");
     expect(html).toContain("School-family outbound delivery");
+    expect(html).toContain("School-family delivery recovery");
     expect(html).toContain("Retry scheduled");
     expect(html).toContain("Provider accepted");
     expect(html).toContain("does not confirm inbox delivery");
