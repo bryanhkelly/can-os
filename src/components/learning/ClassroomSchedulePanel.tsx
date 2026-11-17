@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { fourWeeklyClassroomWindows } from "@/domain/classroom-scheduling";
@@ -157,7 +158,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
                 {scheduled} · {plan.state} · Site {plan.siteId.slice(0,8)}
               </p>
             </div>
-            {plan.state==="scheduled"&&<div className="flex flex-wrap gap-2">
+            {plan.state==="scheduled"&&!plan.nativeClassId&&<div className="flex flex-wrap gap-2">
               <Button type="button" size="sm"
                 disabled={!!busy||!withinStart}
                 onClick={()=>void run(plan.id+":start",async()=>{
@@ -178,12 +179,18 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
                     await cancelClassroomPlan({data:{planId:plan.id}});
                   });}}>Cancel</Button>
             </div>}
+            {plan.nativeClassId&&<Link
+              to="/class/$classId" params={{classId:plan.nativeClassId}}
+              search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}
+              className="inline-flex min-h-10 items-center border border-border px-3 text-sm font-medium">
+              Manage native Class Sessions
+            </Link>}
             {plan.state==="started"&&plan.facilitatedSessionId&&
               <p className="text-xs text-muted-foreground">
                 Room started. Find it under Your rooms and refresh its joining code as needed.
               </p>}
           </div>
-          {edit?.planId===plan.id&&<div className="mt-3 grid gap-3 border border-border p-4 sm:grid-cols-2">
+          {edit?.planId===plan.id&&!plan.nativeClassId&&<div className="mt-3 grid gap-3 border border-border p-4 sm:grid-cols-2">
             <label className="text-sm font-medium">New start
               <input type="datetime-local" value={edit.start}
                 onChange={e=>setEdit(current=>current?{...current,start:e.target.value}:null)}
