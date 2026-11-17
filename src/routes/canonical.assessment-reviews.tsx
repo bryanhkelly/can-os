@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/choice";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   listCanonicalObjectiveApprovalQueue,readCanonicalObjectiveApproval,
@@ -99,15 +102,15 @@ function CanonicalAssessmentReviewerPage(){
         <label htmlFor="assessment-review-version" className="mt-4 block text-sm font-semibold">
           Publisher assessment draft
         </label>
-        <select id="assessment-review-version" value={selected}
+        <Select id="assessment-review-version" value={selected}
           onChange={e=>{setSelected(e.target.value);setItemVersionId("");setNotice("");setError("");}}
-          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="mt-2">
           <option value="">Select a draft for independent review</option>
           {queue.data.versions.map(v=><option value={v.assessmentVersionId}
             key={v.assessmentVersionId}>
             {v.title} · {v.questionCount} questions
           </option>)}
-        </select>
+        </Select>
         {queue.data.versions.length===0&&<p className="mt-3 text-sm text-muted-foreground">
           No draft objective assessments are awaiting review.
         </p>}
@@ -143,10 +146,10 @@ function CanonicalAssessmentReviewerPage(){
               {k}: {latestState(data.reviews.items.filter(r=>r.itemVersionId===q.id),k)}
             </p>)}
           </div>
-          <button type="button" className="mt-3 text-sm font-semibold underline"
+          <Button type="button" variant="ghost" size="sm" className="mt-3 underline"
             onClick={()=>{setTarget("item");setKind("academic");setItemVersionId(q.id);}}>
             Review this question
-          </button>
+          </Button>
         </li>)}
       </ol>
       <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -174,41 +177,41 @@ function CanonicalAssessmentReviewerPage(){
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <label className="text-sm font-semibold">
             Review target
-            <select className="mt-1 min-h-11 w-full border border-border bg-background px-3"
+            <Select className="mt-1"
               value={target} disabled={busy}
               onChange={e=>{setTarget(e.target.value as typeof target);setKind("academic");}}>
               <option value="item">Individual question</option>
               <option value="assessment">Assessment version</option>
               <option value="form">Question form</option>
-            </select>
+            </Select>
           </label>
           {target==="item"&&<label className="text-sm font-semibold">
             Question
-            <select className="mt-1 min-h-11 w-full border border-border bg-background px-3"
+            <Select className="mt-1"
               value={itemVersionId} disabled={busy}
               onChange={e=>setItemVersionId(e.target.value)}>
               <option value="">Choose a question</option>
               {data.items.map((item,index)=><option key={item.id} value={item.id}>
                 Question {index+1}
               </option>)}
-            </select>
+            </Select>
           </label>}
           <label className="text-sm font-semibold">
             Review domain
-            <select className="mt-1 min-h-11 w-full border border-border bg-background px-3"
+            <Select className="mt-1"
               value={kind} disabled={busy}
               onChange={e=>setKind(e.target.value as typeof kind)}>
               {requiredKinds.map(k=><option key={k} value={k}>{k}</option>)}
-            </select>
+            </Select>
           </label>
           <label className="text-sm font-semibold">
             Decision
-            <select className="mt-1 min-h-11 w-full border border-border bg-background px-3"
+            <Select className="mt-1"
               value={decision} disabled={busy}
               onChange={e=>setDecision(e.target.value as typeof decision)}>
               <option value="approved">Approve</option>
               <option value="rejected">Reject</option>
-            </select>
+            </Select>
           </label>
         </div>
         <p className="mt-3 text-sm text-muted-foreground">
@@ -217,13 +220,13 @@ function CanonicalAssessmentReviewerPage(){
         <label className="mt-4 block text-sm font-semibold" htmlFor="assessment-review-reason">
           Evidence-based review rationale
         </label>
-        <textarea id="assessment-review-reason" value={rationale}
+        <Textarea id="assessment-review-reason" value={rationale}
           rows={4} minLength={20} maxLength={1500} disabled={busy}
           onChange={e=>setRationale(e.target.value)}
-          className="mt-2 w-full border border-border bg-background p-3 text-sm"
+          className="mt-2"
           placeholder="Describe the content checks, answer correctness, rights and accessibility evidence reviewed."/>
         <label className="mt-3 flex items-start gap-3 text-sm">
-          <input type="checkbox" checked={ack} disabled={busy}
+          <Checkbox checked={ack} disabled={busy}
             onChange={e=>setAck(e.target.checked)} className="mt-1"/>
           I personally performed this independent review. The decision will
           be attributed to my verified Person and recorded in the audit log.
