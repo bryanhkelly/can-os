@@ -115,8 +115,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
             </p>
             <Field label="Verified Site staff" className="mt-4">
               <Select disabled={busy} value={selections[item.key] ?? ""}
-                onChange={e => setSelections(old => ({ ...old, [item.key]: e.target.value }))}
->
+                onChange={e => setSelections(old => ({ ...old, [item.key]: e.target.value }))}>
                 <option value="">Choose staff member</option>
                 {candidates.map(person => <option key={person.personId} value={person.personId}>
                   {person.firstName} {person.lastName}
@@ -128,13 +127,11 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
               onChange={value => setExpirations(old => ({ ...old, [item.key]: value }))}/></div>
             <div className="mt-4 flex flex-wrap gap-2">
               <Button type="button" variant="outline" disabled={busy || !selections[item.key] || !expirations[item.key]}
-                onClick={() => void change(item.key, "appoint")}
-                >
+                onClick={() => void change(item.key, "appoint")}>
                 {effective ? "Replace appointment" : "Appoint"}
               </Button>
               <Button type="button" variant="outline" disabled={busy || !effective}
-                onClick={() => void change(item.key, "revoke")}
-                >
+                onClick={() => void change(item.key, "revoke")}>
                 Revoke
               </Button>
             </div>
