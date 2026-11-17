@@ -34,10 +34,8 @@ export async function readLinkedSitePublishedClasses(
     INNER JOIN education_v30.class_offerings co ON co.class_id=c.id
     INNER JOIN education_v30.class_offering_versions cv
       ON cv.class_id=c.id AND cv.class_offering_id=co.id
-    INNER JOIN public.sites platform_site
-      ON platform_site.id=c.site_id
-    INNER JOIN education_v30.sites s
-      ON s.id=platform_site.id AND s.status='active'
+    INNER JOIN public.sites s
+      ON s.id=c.site_id AND s.lifecycle_status='active'
     INNER JOIN education_v30.program_deployments pd
       ON pd.id=c.deployment_id AND pd.status='active'
     INNER JOIN education_v30.education_operations op

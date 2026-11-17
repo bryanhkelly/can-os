@@ -7,10 +7,10 @@ import {
 
 const complete:SiteNoncreditPreflight={
   sitesReady:true,releasesReady:true,publicSchema:true,nativeSchema:true,
-  siteRead:true,nativeSiteRead:true,releaseRead:true,
+  siteRead:true,releaseRead:true,
 };
 describe("single-Site noncredit catalog reader verification",()=>{
-  it("checks all seven required permissions and relations",()=>{
+  it("checks shared Site and release reader permissions",()=>{
     expect(siteCatalogReaderAccessible(complete)).toBe(true);
     for(const key of Object.keys(complete) as (keyof SiteNoncreditPreflight)[])
       expect(siteCatalogReaderAccessible({...complete,[key]:false})).toBe(false);
@@ -18,7 +18,8 @@ describe("single-Site noncredit catalog reader verification",()=>{
   it("filters by a shared, exact Site ID without a translation or link approval",()=>{
     const api=readFileSync(resolve(process.cwd(),
       "src/modules/sites/site-noncredit-releases.server.ts"),"utf8");
-    expect(api).toContain("native_site.id=platform_site.id");
+    expect(api).not.toContain("education_v30.sites");
+    expect(api).toContain("platform_site.lifecycle_status='active'");
     expect(api).toContain("siteId:publicSiteId,limit:40");
     expect(api).toContain("readEligibleSelfEnrollmentReleases(executor");
     expect(api).toContain("probeSiteNoncreditCatalogReader(executor)");
@@ -32,7 +33,7 @@ describe("single-Site noncredit catalog reader verification",()=>{
     expect(script).toContain("CAN_SITE_CATALOG_VALIDATION");
     expect(script).toContain("br-restless-sea-ar9ooo55");
     expect(script).toContain("readLinkedSiteNoncreditReleases(siteId)");
-    expect(script).toContain("native.id=p.id");
+    expect(script).not.toContain("education_v30.sites");
     expect(script).not.toMatch(/sql`\s*(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b/i);
   });
 });

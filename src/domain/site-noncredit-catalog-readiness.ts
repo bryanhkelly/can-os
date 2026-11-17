@@ -8,10 +8,9 @@ export type SiteNoncreditPreflight={
   publicSchema:boolean;
   nativeSchema:boolean;
   siteRead:boolean;
-  nativeSiteRead:boolean;
   releaseRead:boolean;
 };
 export function siteCatalogReaderAccessible(value:SiteNoncreditPreflight):boolean{
   return value.sitesReady&&value.releasesReady&&value.publicSchema&&
-    value.nativeSchema&&value.siteRead&&value.nativeSiteRead&&value.releaseRead;
+    value.nativeSchema&&value.siteRead&&value.releaseRead;
 }

@@ -46,16 +46,16 @@ function PlatformAdministration() {
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Site operations readiness</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Each Site has one platform identity. This view shows whether legacy native Class operations
-        have been provisioned at the exact same Site ID; it does not approve permissions.
+        Each Site has one platform identity. This view shows Site lifecycle and
+        whether an operational delivery assignment exists; it does not approve permissions.
       </p>
-      <DirectoryTable label="Site identity readiness" caption="Site identities and native operating provision status."
+      <DirectoryTable label="Site identity readiness" caption="Authoritative Site identities and delivery assignments."
         rows={summary.siteReadiness} rowKey={site=>site.siteId}
         empty={<p className="p-4 text-sm text-muted-foreground">No Sites are registered in the school directory.</p>}
         columns={[
           {id:"site",title:"Site",render:site=>site.siteName},
-          {id:"provisioning",title:"Class operations",render:site=>site.nativeSiteProvisioned?"Provisioned":"Not provisioned"},
-          {id:"lifecycle",title:"Native lifecycle",render:site=>site.nativeLifecycle.replaceAll("_"," ")},
+          {id:"provisioning",title:"Delivery assignment",render:site=>site.hasDeliveryAssignment?"Assigned":"Not assigned"},
+          {id:"lifecycle",title:"Site lifecycle",render:site=>site.siteLifecycle.replaceAll("_"," ")},
         ]}/>
       {summary.sites > summary.siteReadiness.length &&
         <p className="mt-3 text-xs text-muted-foreground">

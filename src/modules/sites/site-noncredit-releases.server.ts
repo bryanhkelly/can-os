@@ -14,17 +14,13 @@ export async function probeSiteNoncreditCatalogReader(
   executor:Reader=db,
 ):Promise<SiteNoncreditPreflight>{
   const result=await executor.execute(sql`
-    SELECT to_regclass('public.sites') IS NOT NULL
-             AND to_regclass('education_v30.sites') IS NOT NULL AS "sitesReady",
+    SELECT to_regclass('public.sites') IS NOT NULL AS "sitesReady",
       to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady",
       has_schema_privilege(current_user,'public','USAGE') AS "publicSchema",
       has_schema_privilege(current_user,'education_v30','USAGE') AS "nativeSchema",
       CASE WHEN to_regclass('public.sites') IS NOT NULL
         THEN has_table_privilege(current_user,'public.sites','SELECT')
         ELSE false END AS "siteRead",
-      CASE WHEN to_regclass('education_v30.sites') IS NOT NULL
-        THEN has_table_privilege(current_user,'education_v30.sites','SELECT')
-        ELSE false END AS "nativeSiteRead",
       CASE WHEN to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL
         THEN has_table_privilege(current_user,'education_v30.noncredit_self_enrollment_releases','SELECT')
         ELSE false END AS "releaseRead"
@@ -48,10 +44,8 @@ export async function readLinkedSiteNoncreditReleases(
   // exists. Exact-ID matching replaces the old independently approved bridge.
   const matching=await executor.execute(sql`
     SELECT 1 FROM public.sites platform_site
-    JOIN education_v30.sites native_site
-      ON native_site.id=platform_site.id
-       AND native_site.status='active'
     WHERE platform_site.id=${publicSiteId}::uuid
+      AND platform_site.lifecycle_status='active'
     LIMIT 1
   `);
   if(matching.rows.length!==1)return [];
@@ -99,10 +93,8 @@ export async function inspectSiteNoncreditReadiness(
     if(!siteCatalogReaderAccessible(state))return no("reader_permission_missing");
     const matching=await executor.execute(sql`
       SELECT 1 FROM public.sites platform_site
-      JOIN education_v30.sites native_site
-        ON native_site.id=platform_site.id
-          AND native_site.status='active'
-      WHERE platform_site.id=${publicSiteId}::uuid LIMIT 1
+      WHERE platform_site.id=${publicSiteId}::uuid
+        AND platform_site.lifecycle_status='active' LIMIT 1
     `);
     if(matching.rows.length!==1)return no("site_not_provisioned");
     const eligible=await readLinkedSiteNoncreditReleases(publicSiteId,executor);

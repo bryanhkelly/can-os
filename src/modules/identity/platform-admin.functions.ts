@@ -46,10 +46,10 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     // does not create another identity and never grants operator authority.
     const siteRows = await db.execute(sql`
       SELECT s.id AS "siteId", s.name AS "siteName",
-        CASE WHEN native.id IS NOT NULL THEN true ELSE false END AS "nativeSiteProvisioned",
-        COALESCE(native.status, 'not_provisioned') AS "nativeLifecycle"
+        EXISTS(SELECT 1 FROM education_v30.deployment_sites ds
+          WHERE ds.site_id=s.id) AS "hasDeliveryAssignment",
+        COALESCE(s.lifecycle_status,'unclassified') AS "siteLifecycle"
       FROM public.sites s
-      LEFT JOIN education_v30.sites native ON native.id=s.id
       ORDER BY s.name, s.id
       LIMIT 100
     `);
@@ -90,8 +90,8 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
       siteReadiness: siteRows.rows.map(item => ({
         siteId: String(item.siteId),
         siteName: String(item.siteName),
-        nativeSiteProvisioned: item.nativeSiteProvisioned === true,
-        nativeLifecycle: String(item.nativeLifecycle),
+        hasDeliveryAssignment: item.hasDeliveryAssignment === true,
+        siteLifecycle: String(item.siteLifecycle),
       })),
     };
   });
