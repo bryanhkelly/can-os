@@ -1,7 +1,7 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useState } from "react";
 import { useIsFetching, useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { QueryState } from "@/components/workspace";
+import { ActionFooter, QueryState } from "@/components/workspace";
 import { SiteStaffingFeedback } from "./SiteStaffingFeedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -127,7 +127,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
             <div className="mt-3"><AppointmentExpiryField label="Responsibility expires" disabled={writesBlocked}
               value={expirations[item.key] ?? ""}
               onChange={value => setExpirations(old => ({ ...old, [item.key]: value }))}/></div>
-            <div className="mt-4 flex flex-wrap gap-2">
+            <ActionFooter layout="inline" className="mt-4">
               <Button type="button" variant="outline" disabled={writesBlocked || !selections[item.key] || !expirations[item.key]}
                 onClick={() => void change(item.key, "appoint")}>
                 {effective ? "Replace appointment" : "Appoint"}
@@ -136,7 +136,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
                 onClick={() => void change(item.key, "revoke")}>
                 Revoke
               </Button>
-            </div>
+            </ActionFooter>
             {!candidates.length && <p className="mt-3 text-xs text-muted-foreground">
               No active email-verified staff with this role at this exact Site.
               Use your authorized staff invitation workflow first.
