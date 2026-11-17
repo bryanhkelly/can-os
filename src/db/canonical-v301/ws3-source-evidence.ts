@@ -10,7 +10,7 @@ export const learningCompletionEvidenceBindings=educationV30.table(
   "learning_completion_evidence_bindings", {
     id:uuid("id").defaultRandom().primaryKey(),
     purpose:text("purpose")
-      .$type<"completion_correction"|"award_revocation">().notNull(),
+      .$type<"completion_correction"|"award_revocation"|"class_completion_decision">().notNull(),
     evidenceVersionId:uuid("evidence_version_id").notNull(),
     noncreditRegistrationId:uuid("noncredit_registration_id"),
     expectedDecisionId:uuid("expected_decision_id"),
@@ -18,6 +18,10 @@ export const learningCompletionEvidenceBindings=educationV30.table(
       .$type<"not_yet_completed"|"voided">(),
     reviewReason:text("review_reason").notNull(),
     awardIssuanceId:uuid("award_issuance_id"),
+    classEnrollmentId:uuid("class_enrollment_id"),
+    expectedClassOutcomeId:uuid("expected_class_outcome_id"),
+    approvedClassOutcome:text("approved_class_outcome")
+      .$type<"completed"|"not_yet_completed"|"voided">(),
     participantPersonId:uuid("participant_person_id").notNull(),
     providerOrganizationId:uuid("provider_organization_id").notNull(),
     deliverySiteId:uuid("delivery_site_id").notNull(),
