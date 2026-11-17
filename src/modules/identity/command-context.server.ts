@@ -6,6 +6,7 @@ import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
 import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
 import {readSessionGrants} from "./session-grants.server";
+import { readCookie } from "@/domain/session-cookies";
 
 /**
  * Resolve the account and active persona from a server-issued session.
@@ -16,14 +17,12 @@ function rejectSession(request: Request, reason: SessionFailure): never {
  // Only fixed categories enter logs. Never include headers, tokens, hashes,
  // account identifiers, grant identifiers, request URLs or driver exceptions.
  // Missing cookies on ordinary public page loads are expected, not warnings.
- if (reason !== "cookie_missing" || new URL(request.url).pathname === "/access/session")
+ if (reason !== "cookie_missing")
   console.warn("Session validation rejected", { reason });
  throw new AuthorizationError(reason === "membership_unavailable" ? "active membership" : "authenticated session");
 }
 export async function getCommandContext(request: Request): Promise<AccessContext> {
- const cookie=request.headers.get("cookie")??"";
- const entry=cookie.split(";").map(x=>x.trim()).find(x=>x.startsWith(accessSessionCookie+"="));
- const value=entry?.slice(accessSessionCookie.length+1);
+ const value=readCookie(request,accessSessionCookie);
  if(!value) return rejectSession(request,"cookie_missing");
  if(!/^[A-Za-z0-9_-]{40,}$/.test(value)) return rejectSession(request,"cookie_invalid");
  const pepper=process.env.CAN_ACCESS_TOKEN_PEPPER;
