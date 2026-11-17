@@ -407,7 +407,7 @@ continuing to compose one V6.1 primitive/pattern library. Do not create a second
 route-specific kit or change domain commands to make a page easier to style.
 
 - Repository inventory: 180 route TSX files and 368 component TSX files
-  (including test/story files in component-file totals, depending on inventory).
+  (excluding `.stories.tsx`; test/spec TSX files may still be included).
 - 20 routes are now protected by the route-level source-control manifest in
   `scripts/check-design-system.mjs`; 19 were edited during this increment
   and `/access` already used the approved visible control patterns.
