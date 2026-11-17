@@ -74,12 +74,12 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
     }
     onSelectionChange(next);
   }
-  return <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={rows.length === 0} empty={empty}>
+  return <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={rows.length === 0 && !pagination} empty={empty}>
     <div className="mt-6 min-w-0 border bg-card">
       {selectable && bulkActions && bulkActions.length > 0 && <DirectoryBulkActions label={label}
         selectedKeys={selectedKeys!} actions={bulkActions} pending={bulkPending}
         onClear={() => onSelectionChange!(new Set())} />}
-      <Table aria-label={label} scrollLabel={`${label} scroll area`}>
+      {rows.length === 0 ? <div role="status" className="p-4">{empty ?? "No records in this page."}</div> : <Table aria-label={label} scrollLabel={`${label} scroll area`}>
         <TableCaption className="px-4 pb-4 text-left">{caption}</TableCaption>
         <TableHeader><TableRow>
           {selectable && <TableHead scope="col" className="w-12 px-4">
@@ -125,7 +125,7 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
             </TableCell>}
           </TableRow>;
         })}</TableBody>
-      </Table>
+      </Table>}
       {pagination && <div className="border-t p-4">{pagination}</div>}
     </div>
   </QueryState>;
