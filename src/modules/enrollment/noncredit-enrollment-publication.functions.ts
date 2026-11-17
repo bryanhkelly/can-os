@@ -5,7 +5,6 @@ import { and, asc, eq, exists, gt, inArray, isNotNull, isNull, lte, notExists, o
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents as canonicalAuditEvents,domainEvents as canonicalDomainEvents,
   canonicalEnrollmentOrganizations,canonicalEnrollmentSites,canonicalOfferingCourses,
   classroomDeploymentSites,courseVersions,deploymentOfferingAdoptions,
   educationOperationOrganizationRoles,educationOperationSites,educationOperations,
@@ -15,6 +14,7 @@ import {
   siteOrganizationRoles,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { noncreditPublishCommand, publishedNoncreditConsentHash } from "@/domain/noncredit-self-enrollment";
 
 type Executor = Pick<typeof db,"select">;
@@ -230,7 +230,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
         publishedByPersonId:provider.actor.actorPersonId!,
       }).returning({id:noncreditSelfEnrollmentReleases.id});
       if(!release)throw new Error("Could not publish enrollment");
-      await tx.insert(canonicalAuditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:provider.actor.actorPersonId!,
         owningOrganizationId:provider.organizationId,
         eventCode:"noncredit.self_enrollment.release_published",
@@ -239,7 +239,7 @@ export const publishNoncreditSelfEnrollment = createServerFn({method:"POST"})
           maxParticipants:data.maxParticipants,consentVersion:data.consentVersion,
           consentSha256:publishedNoncreditConsentHash(data.consentVersion,data.consentText)},
       });
-      await tx.insert(canonicalDomainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"NoncreditSelfEnrollmentReleasePublished",
         aggregateType:"noncredit_self_enrollment_release",
         aggregateId:release.id,actorPersonId:provider.actor.actorPersonId!,
@@ -275,7 +275,7 @@ export const closeNoncreditSelfEnrollment = createServerFn({method:"POST"})
       await tx.update(noncreditSelfEnrollmentReleases)
         .set({status:"closed",closedAt:new Date()})
         .where(eq(noncreditSelfEnrollmentReleases.id,release.id));
-      await tx.insert(canonicalAuditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:provider.actor.actorPersonId!,
         owningOrganizationId:provider.organizationId,
         eventCode:"noncredit.self_enrollment.release_closed",
@@ -370,13 +370,13 @@ export const publishNoncreditAcrossAuthorizedSites=createServerFn({method:"POST"
         const payload={siteId,releaseId:row.id,
           consentSha256:publishedNoncreditConsentHash(data.consentVersion,data.consentText),
           trainingVersionId:selected.trainingVersionId};
-        await tx.insert(canonicalAuditEvents).values({
+        await writeCanonicalAudit(tx,{
           actorPersonId:provider.actor.actorPersonId!,
           owningOrganizationId:provider.organizationId,
           eventCode:"noncredit.self_enrollment.site_release_published",
           entityKind:"noncredit_self_enrollment_release",entityId:row.id,payload,
         });
-        await tx.insert(canonicalDomainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           eventType:"NoncreditSiteEnrollmentReleasePublished",
           aggregateType:"noncredit_self_enrollment_release",
           aggregateId:row.id,actorPersonId:provider.actor.actorPersonId!,
