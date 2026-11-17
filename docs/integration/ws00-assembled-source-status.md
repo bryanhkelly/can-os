@@ -92,3 +92,16 @@ The cross-workstream static guard was tightened to insist on complete Class Enro
 - Success of the local source/build gate would still **not** authorize a database migration, changes to main, enabling feature flags or production deployment. Signed-in, isolated SQL, RLS and last-seat/concurrency acceptance remain mandatory.
 
 **Status remains DRAFT / NO-GO**, without altering main or production.
+
+
+## WS00 latest WS3 assessment revision reconciliation
+
+After the prior status update, WS3 pushed 11 more source commits. WS00 merged the new revision projection, native Class evidence reader, completion authorization SQL, two revised tests, integration-gate assertions and WS3 documentation at `70f889477187931862627848116d7f021e256a9f`. The original WS00 Class -> exact Enrollment lock discipline was preserved in WS3's new source. A final compare confirmed **all six feature branch heads were included** in the integration history at the time checked; integration remained **zero commits behind `main`**.
+
+The WS3 `latestCanonicalAssessmentRevisions` projection correctly chooses the highest revision instead of trusting a possibly incomplete `supersedes_id` chain. WS00 identified and corrected an additional edge case: if any row for a canonical assessment attempt has an invalid revision number, the adapter must mark that attempt ambiguous and suppress its ostensibly valid current result. This is now enforced at the pure domain boundary, not solely by downstream caller checks. Added a mixed-valid/invalid regression to `tests/unit/ws3-assessment-revisions.test.ts` and included it in both CI and the clean-checkout local verification path.
+
+Read-only V8 runtime evaluation of the retrieved pure TypeScript projection after type erasure passed **5 of 5 focused cases**: latest-revision selection, later voiding, mixed invalid and valid revision denial, duplicated latest revision denial and independent assessments. WS6's independent retake-evidence checks passed **4 of 4** in the same limited V8 technique. Cross-stream inspection passed **10 of 10 source gates** (the original nine checked together, new WS3 gate checked separately). These outcomes are **not** a compiled application, Vitest run, Neon mutation test or signed-in E2E pass.
+
+A later GitHub Actions integration run [44004753007](https://github.com/bryanhkelly/can-os/actions/runs/44004753007) also reported `startup_failure` with empty name and synthetic `BuildFailed` path; no jobs began. Issue [#317](https://github.com/bryanhkelly/can-os/issues/317) remains the CI P0 dependency. `npm run verify:ws00` is available on a clean checked-out integration branch as a **locally executable fallback**; WS00 could not execute it in the current environment.
+
+**NO-GO for main and production** pending an actual exact-SHA build, restricted database acceptance, migration approval and two-Site/guardian authenticated testing.
