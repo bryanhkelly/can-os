@@ -5,7 +5,7 @@ import { db } from "@/db/client";
 import { z } from "zod";
 import {
   accessAccounts, accessAccountCanonicalPrincipals, accessAccountNoncreditPrincipals,
-  accountPersonGrants,
+  accountPersonGrants, accessAdultLearningReviews,
 } from "@/db/schema";
 import {
   canonicalAccounts, canonicalAccountGrants, canonicalPersons,
@@ -38,9 +38,27 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
   const [link]=await tx.select().from(accessAccountNoncreditPrincipals)
     .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId))
     .for("update").limit(1);
+  const [adultReview]=await tx.select({
+    status:accessAdultLearningReviews.status,
+    consumedAt:accessAdultLearningReviews.consumedAt,
+    accessPersonId:accessAdultLearningReviews.accessPersonId,
+    canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
+    canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
+  }).from(accessAdultLearningReviews).where(
+    eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
+  ).limit(1);
+  if(adultReview&&(adultReview.status!=="approved"||
+     adultReview.accessPersonId!==owner.personId))
+    throw new AuthorizationError("revoked or mismatched adult learner review");
+  if(adultReview&&!link)
+    throw new AuthorizationError("approved adult review requires canonical learner activation first");
   if(link){
     if(link.accessPersonId!==owner.personId)
       throw new AuthorizationError("CAN identity changed; manual reconciliation required");
+    if(adultReview&&(!adultReview.consumedAt||
+       adultReview.canonicalAccountId!==link.canonicalAccountId||
+       adultReview.canonicalPersonId!==link.canonicalPersonId))
+      throw new AuthorizationError("conflicting reviewed adult identity cannot be reused");
     const [native]=await tx.select({
       id:canonicalAccounts.id,email:canonicalAccounts.emailNormalized,
       disabledAt:canonicalAccounts.disabledAt,verifiedAt:canonicalAccounts.emailVerifiedAt,
