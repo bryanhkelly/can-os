@@ -81,6 +81,8 @@ export interface ParticipationReadModel {
   records: ParticipationRecord[];
   /** Not included in participation counts or official completion reporting. */
   opportunities: ParticipationOpportunity[];
+  /** Server-issued per-source keyset positions for explicitly requested older pages. */
+  nextCursors?: Partial<Record<ParticipationSource,string>>;
   sources: Array<{
     source: ActivitySource;
     state: ActivitySourceState;
@@ -167,6 +169,12 @@ export function assertParticipationReadModel(model: ParticipationReadModel): voi
   if (model.version !== PARTICIPATION_READ_MODEL_VERSION)
     throw new Error("Unsupported participation contract version");
   assertUniqueParticipationKeys(model.records);
+  for(const [source,cursor] of Object.entries(model.nextCursors??{})){
+    if(!["school_section","school_program","calendar_event",
+      "family_enrichment","native_class","noncredit_course"].includes(source) ||
+      typeof cursor!=="string"||cursor.length<2||cursor.length>500)
+      throw new Error("Invalid source history cursor");
+  }
   for (const record of model.records) {
     if (!record.sourceId || record.key !== record.source + ":" + record.sourceId)
       throw new Error("Invalid participation source identity");
