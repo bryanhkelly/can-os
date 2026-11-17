@@ -34,9 +34,6 @@ const selfInput=z.object({
   networkMembershipId:z.string().uuid().optional(),
 }).strict();
 function guard(){
-  if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true"){
-    throw new AuthorizationError("native Class release not activated");
-  }
   setResponseHeader("Cache-Control","private, no-store");
   setResponseHeader("Referrer-Policy","no-referrer");
 }
