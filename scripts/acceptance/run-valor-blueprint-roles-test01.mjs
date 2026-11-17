@@ -71,8 +71,8 @@ const ownerPool=new Pool({connectionString:ownerUrl,max:1,connectionTimeoutMilli
 let client;
 try {
   client=await appPool.connect();
-  for(const pool of [appPool,ownerPool]){
-    const [identity]=(await pool.query(
+  for(const executor of [client,ownerPool]){
+    const [identity]=(await executor.query(
       "SELECT current_setting('neon.project_id',true) AS project, current_setting('neon.branch_id',true) AS branch"
     )).rows;
     assert.equal(identity?.project,PROJECT,"Unexpected Neon project");
