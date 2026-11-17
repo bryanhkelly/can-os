@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { WorkspaceShell, RosterList } from "@/components/workspace";
@@ -26,6 +26,13 @@ import {
 } from "@/modules/classes/class-staff.functions";
 import { classViews, classTabs, type ClassView } from "@/domain/class-views";
 import { normalizeClientError } from "@/lib/client-error";
+
+/** Reuse the exact source-backed WS6 report inside the native Class,
+ * loading its heavier analytics module only for authorized report views. */
+const NativeClassReportPanel=lazy(async()=>{
+  const report=await import("@/components/reports/NativeClassReportPanel");
+  return {default:report.NativeClassReportPanel};
+});
 
 const uuid=z.string().uuid();
 const searchSchema=z.object({
@@ -546,10 +553,9 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             Inspect source-backed registrations, scheduled and delivered Sessions, facilitator-attested presence, assessments and recorded outcomes.
             Formal Class completion remains unavailable until independently governed decisions are verified.
           </p>
-          <Link to="/reports/classes/$classId" params={{classId:workspace.classId}}
-            className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
-            Open Class evidence report
-          </Link>
+          <Suspense fallback={<p role="status" className="mt-4 text-sm">Loading Class evidence…</p>}>
+            <NativeClassReportPanel classId={workspace.classId}/>
+          </Suspense>
         </>}
       </section>
       <aside className="border border-border bg-card p-5">
