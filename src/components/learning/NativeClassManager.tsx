@@ -563,7 +563,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                     site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)))setSiteId("");
               }}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-                {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(mode=>mode===mode))
+                {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))
                   .map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
               </select>
             </div>
