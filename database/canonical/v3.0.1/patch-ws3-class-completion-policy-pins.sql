@@ -52,9 +52,16 @@ BEGIN
    RAISE EXCEPTION 'Published Class completion policy is immutable'
      USING ERRCODE='23514';
  END IF;
- SELECT course_version_id,operating_organization_id INTO c
- FROM education_v30.classes WHERE id=NEW.class_id;
+ SELECT cls.course_version_id,cls.operating_organization_id,
+   course.lifecycle AS course_lifecycle,course.published_at AS course_published_at
+   INTO c
+ FROM education_v30.classes cls
+ JOIN education_v30.course_versions course ON course.id=cls.course_version_id
+ WHERE cls.id=NEW.class_id;
  IF c.course_version_id IS DISTINCT FROM NEW.course_version_id
+    OR c.course_lifecycle IS DISTINCT FROM 'published'
+    OR c.course_published_at IS NULL OR
+    c.course_published_at>NEW.published_at
     OR NEW.published_at>clock_timestamp() THEN
    RAISE EXCEPTION 'Class completion policy must pin one published Course version'
      USING ERRCODE='23514';
