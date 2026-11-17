@@ -8,6 +8,7 @@ import { useState } from "react";
 import { getNetworkSites, createNetworkSite } from "@/modules/networks/network-sites.functions";
 import { listNetworkAffiliations, reviewNetworkAffiliation } from "@/modules/networks/network-affiliations.functions";
 import {ScopedSiteDirectory} from "@/components/operations/ScopedSiteDirectory";
+import {ScopedWorkspaceSection} from "@/components/workspace/ScopedWorkspaceSection";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -131,10 +132,12 @@ function NetworkSites({ data }: { data: NetworkData }) {
       </form>
       <MutationFeedback state={mutation} className="mt-3" pendingMessage="Recording network change..."/>
     </section>
-    <section id="network-locations" className="mt-8 border bg-card p-5">
-      <h2 className="font-serif text-2xl">Directly operated locations</h2>
-      <div className="mt-4"><ScopedSiteDirectory sites={data.sites}
-        emptyMessage="No headquarters-operated sites yet."/></div>
-    </section>
+    <div className="mt-8">
+      <ScopedWorkspaceSection id="network-locations" title="Directly operated locations"
+        scopeDescription="Locations returned by your current network headquarters membership. Network affiliation does not grant Site management access.">
+        <ScopedSiteDirectory sites={data.sites}
+          emptyMessage="No headquarters-operated sites yet."/>
+      </ScopedWorkspaceSection>
+    </div>
   </DashboardHome>;
 }
