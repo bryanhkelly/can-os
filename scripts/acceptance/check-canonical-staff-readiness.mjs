@@ -17,16 +17,16 @@ let client;
 try {
   client = await pool.connect();
   await client.query("BEGIN READ ONLY");
-  const [{ staff_reader, person_link_table, site_link_table, native_grants_table, operators_table }] =
+  const [{ staff_reader, person_link_table, native_site_table, native_grants_table, operators_table }] =
     (await client.query(`
       SELECT
         to_regprocedure('education_v30.v301_can_staff_session_context(text)') IS NOT NULL AS staff_reader,
         to_regclass('public.access_account_canonical_principals') IS NOT NULL AS person_link_table,
-        to_regclass('public.site_canonical_identity_links') IS NOT NULL AS site_link_table,
+        to_regclass('education_v30.sites') IS NOT NULL AS native_site_table,
         to_regclass('education_v30.canonical_account_grants') IS NOT NULL AS native_grants_table,
         to_regclass('education_v30.site_organization_roles') IS NOT NULL AS operators_table
     `)).rows;
-  const checks = { staff_reader, person_link_table, site_link_table, native_grants_table, operators_table };
+  const checks = { staff_reader, person_link_table, native_site_table, native_grants_table, operators_table };
   const missing = Object.entries(checks).filter(([, present]) => !present).map(([name]) => name);
   if (missing.length) {
     await client.query("ROLLBACK");
@@ -111,11 +111,10 @@ try {
         ) AS verified_can_staff_grants,
         (SELECT count(*)::int FROM public.access_account_canonical_principals
           WHERE revoked_at IS NULL AND verified_at IS NOT NULL) AS verified_person_links,
-        (SELECT count(*)::int FROM public.site_canonical_identity_links
-          WHERE status = 'approved' AND confirmed_at IS NOT NULL
-            AND reviewed_at IS NOT NULL
-            AND requested_by_person_id <> reviewed_by_person_id
-        ) AS approved_site_links,
+        (SELECT count(*)::int FROM public.sites platform_site
+          JOIN education_v30.sites native_site
+            ON native_site.id=platform_site.id AND native_site.status IN ('planning','active')
+        ) AS matching_shared_sites,
         (SELECT count(*)::int FROM education_v30.canonical_account_grants
           WHERE active = true AND revoked_at IS NULL
             AND role_code IN ('site_admin','registrar')) AS active_staff_grants,
@@ -131,24 +130,19 @@ try {
             AND public_grant.site_id IS NOT NULL
            JOIN public.sites public_site ON public_site.id = public_grant.site_id
             AND public_site.organization_id = public_grant.organization_id
-           JOIN public.site_canonical_identity_links site_link
-             ON site_link.public_site_id = public_site.id
-            AND site_link.status = 'approved'
-            AND site_link.confirmed_at IS NOT NULL AND site_link.reviewed_at IS NOT NULL
-            AND site_link.requested_by_person_id <> site_link.reviewed_by_person_id
            JOIN public.access_account_canonical_principals person_link
              ON person_link.account_id = a.id
             AND person_link.revoked_at IS NULL AND person_link.verified_at IS NOT NULL
             AND person_link.verified_by_account_id <> a.id
            JOIN education_v30.canonical_account_grants native_grant
              ON native_grant.person_id = person_link.canonical_principal_id
-            AND native_grant.site_id = site_link.canonical_site_id
+            AND native_grant.site_id = public_site.id
             AND native_grant.role_code = public_grant.role
             AND native_grant.active AND native_grant.revoked_at IS NULL
            JOIN education_v30.canonical_accounts native_account
              ON native_account.id = native_grant.account_id
            JOIN education_v30.sites native_site
-             ON native_site.id = native_grant.site_id
+             ON native_site.id = public_site.id
            JOIN education_v30.organizations native_org
              ON native_org.id = native_grant.organization_id
            JOIN public.people can_person
@@ -213,8 +207,8 @@ try {
       console.error("Do not bypass approval, use shared demo credentials, or seed a privileged grant.");
     }
     if (!ready) {
-      console.error("FAIL: no end-to-end, independently approved, non-demo CAN staff path exists.");
-      console.error("Do not auto-create or approve identity links. Provision via authorized review.");
+      console.error("FAIL: no end-to-end, independently authorized, non-demo CAN staff path exists.");
+      console.error("Do not create duplicate Site identities or grant staff access automatically.");
       process.exitCode = 1;
     } else {
       console.log("PASS: at least one matched CAN/canonical staff identity path exists.");
