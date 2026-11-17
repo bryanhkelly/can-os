@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -279,8 +279,21 @@ export const getPendingCompletionEvidenceReviews=createServerFn({method:"GET"})
       throw new AuthorizationError("one current provider and Site");
     return db.transaction(async tx=>{
       await assertCurrentCanonicalStaffForMutation(tx,request,actor);
+      const allowedPurposes:ReviewIntent["purpose"][]=[];
+      if(actor.capabilities.has("class.manage"))
+        allowedPurposes.push("class_completion_decision");
+      if(actor.capabilities.has("noncredit.completion.decide"))
+        allowedPurposes.push("completion_correction");
+      // Credential issuer approval is separately reviewed and expiring.
+      // Ordinary Site Admin/Registrar role must not expose issuance requests.
+      try {
+        await assertCurrentCredentialIssuer(tx,request,actor);
+        allowedPurposes.push("award_revocation");
+      } catch { /* no independently approved issuer authority */ }
+      if(!allowedPurposes.length)return {pending:[]};
       const rows=await tx.select().from(learningCompletionEvidenceReviewRequests)
         .where(and(
+          inArray(learningCompletionEvidenceReviewRequests.purpose,allowedPurposes),
           eq(learningCompletionEvidenceReviewRequests.providerOrganizationId,
             actor.scope.organizationIds![0]!),
           eq(learningCompletionEvidenceReviewRequests.deliverySiteId,
