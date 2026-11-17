@@ -30,7 +30,14 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    One four-session pilot is one Class with four Sessions, not four copied Courses.
   </p>
   {identity.isPending&&<p role="status" className="mt-4 text-sm">Checking verified Site correspondence…</p>}
-  {identity.isError&&<p role="alert" className="mt-4 border p-4 text-sm">Site identity is unavailable. Classroom authority is not assumed.</p>}
+  {identity.isError&&<div role="alert" className="mt-4 border border-border bg-card p-4 text-sm">
+    <p>Site identity cannot be verified for this account. Sign in with an assigned Site
+      administrator or registrar account, or ask a platform administrator to review
+      the Site assignment. Class management remains unavailable until verified.</p>
+    <Link to="/access" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+      Sign in to manage this Site
+    </Link>
+  </div>}
   {!identity.isPending&&!identity.isError&&link.kind!=="approved"&&<>
    <p role="status" className="mt-4 border bg-muted p-4 text-sm">
     {link.kind==="pending"?"Site identity confirmation and independent review are pending."
