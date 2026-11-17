@@ -85,6 +85,8 @@ BEGIN
     AND pin.pinned_at=e.enrolled_at;
   IF p.id IS NULL OR p.authored_by_person_id=NEW.completion_decided_by_person_id OR
      p.approved_by_person_id=NEW.completion_decided_by_person_id OR
+     p.approved_by_person_id=e.learner_person_id OR
+     p.authored_by_person_id=e.learner_person_id OR
      p.published_at>e.enrolled_at OR p.effective_at>e.enrolled_at THEN
     RAISE EXCEPTION 'Class outcome must use independent original enrollment policy'
       USING ERRCODE='23514';
