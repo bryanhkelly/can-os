@@ -10,12 +10,11 @@ import {
   listScopedSites,
   setGrantActive,
 } from "@/modules/identity/admin.functions";
-import { CreateAction, WorkspaceShell, QueryState, secondaryActionClassName } from "@/components/workspace";
+import { CreateAction, DirectoryTable, WorkspaceShell, QueryState, secondaryActionClassName } from "@/components/workspace";
 import { localStaffInviteRoles } from "@/domain/staff-onboarding-policy";
 import { launchStaffInvitationDefaults } from "@/domain/launch-staff-invitation";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, useZodForm } from "@/components/ui/form";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {siteProgramSelectionSchema} from "@/lib/route-search";
 export const adminSearchSchema=siteProgramSelectionSchema.pick({siteId:true}).extend({
  inviteRole:z.enum(["registrar","site_website_editor"]).optional().catch(undefined),
@@ -240,48 +239,29 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
 
         {mode==="access"&&<section id="access-accounts" className="mt-8"><h2 className="font-serif text-2xl font-semibold">Staff access and readiness</h2>
           <p className="mt-1 text-sm text-muted-foreground">Acceptance and qualification are separate facts. Onsite directors, facilitators and staff submit screening and safeguarding-training evidence through their Profile; an independent reviewer must approve both.</p>
-          {accounts.length === 0 && <p className="mt-4 text-sm">No access accounts found in your organization scope.</p>}
-          {accounts.length > 0 && <div className="mt-4 overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="text-xs uppercase tracking-wide">
-                  <TableHead className="pr-4">Email</TableHead>
-                  <TableHead className="pr-4">Person</TableHead>
-                  <TableHead className="pr-4">Role</TableHead>
-                  <TableHead className="pr-4">Readiness</TableHead>
-                  <TableHead className="pr-4">Still needs action</TableHead>
-                  <TableHead>Access</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {accounts.flatMap(account => account.grants.map(grant =>
-                  <TableRow key={grant.grantId}>
-                    <TableCell className="pr-4">{account.email}{account.disabled ? " (disabled)" : ""}</TableCell>
-                    <TableCell className="pr-4">{grant.personName}</TableCell>
-                    <TableCell className="pr-4 capitalize">{grant.role}</TableCell>
-                    <TableCell className="pr-4">
-                      <span className="rounded-full border px-3 py-1 text-xs">{{
-                        invited: "Invitation sent", accepted: "Accepted", qualified: "Accepted · qualified",
-                        needs_action: "Accepted · needs qualifications", inactive: "Inactive",
-                      }[grant.onboarding.status]}</span>
-                    </TableCell>
-                    <TableCell className="pr-4 text-xs">{{
-                      accept_invitation: "Recipient accepts email link",
-                      submit_qualifications: "Staff submit screening and training",
-                      await_qualification_review: "Independent qualification review or current evidence",
-                      restore_access: "Access is disabled",
-                      none: "None for this onboarding check",
-                    }[grant.onboarding.nextAction]}</TableCell>
-                    <TableCell>
-                      {grant.onboarding.status !== "invited" && <button className="rounded-lg border px-3 py-1 text-xs font-semibold" type="button" onClick={() => toggleGrant(grant.grantId, grant.active)}>
-                        {grant.active ? "Deactivate" : "Activate"}
-                      </button>}
-                    </TableCell>
-                  </TableRow>,
-                ))}
-              </TableBody>
-            </Table>
-          </div>}
+          <DirectoryTable label="Staff access" caption="Account grants in your authorized organizational scope."
+            rows={accounts.flatMap(account=>account.grants.map(grant=>({account,grant})))}
+            rowKey={row=>row.grant.grantId}
+            empty={<p className="p-4 text-sm text-muted-foreground">No access accounts found in your organization scope.</p>}
+            columns={[
+              {id:"email",title:"Email",render:({account})=><>{account.email}{account.disabled?" (disabled)":""}</>},
+              {id:"person",title:"Person",render:({grant})=>grant.personName},
+              {id:"role",title:"Role",render:({grant})=>grant.role},
+              {id:"readiness",title:"Readiness",render:({grant})=>({
+                invited:"Invitation sent",accepted:"Accepted",qualified:"Accepted · qualified",
+                needs_action:"Accepted · needs qualifications",inactive:"Inactive",
+              }[grant.onboarding.status])},
+              {id:"next",title:"Still needs action",render:({grant})=>({
+                accept_invitation:"Recipient accepts email link",
+                submit_qualifications:"Staff submit screening and training",
+                await_qualification_review:"Independent qualification review or current evidence",
+                restore_access:"Access is disabled",
+                none:"None for this onboarding check",
+              }[grant.onboarding.nextAction])},
+            ]}
+            rowActions={[{id:"toggle-access",label:"Change access",
+              allowed:({grant})=>grant.onboarding.status!=="invited",
+              onClick:({grant})=>void toggleGrant(grant.grantId,grant.active)}]}/>
         </section>}
 
         {mode==="access"&&form.watch("siteId") && <RoomCoverageWorkspace key={form.watch("siteId")} siteId={form.watch("siteId")}/>}
@@ -291,20 +271,17 @@ export function ScopedAdminConsole({selection, mode="access", hubMode=false, onC
             Search
             <input className="mt-2 w-full rounded-lg border bg-background p-3" type="search" placeholder="Search by name" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
-          {people.length === 0 && <p className="mt-4 text-sm">No people found.</p>}
-          {people.length > 0 && <div className="mt-4 grid gap-4">
-            {people.map(person => <article key={person.personId} className="rounded-lg border p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <h3 className="font-semibold">{personDisplayName({ preferredName: person.preferredName, legalFirstName: person.firstName, legalLastName: person.lastName })}</h3>
-                <span className="rounded-full border px-3 py-1 text-xs">{person.active ? "Active" : "Inactive"}</span>
-              </div>
-              {person.grants.length > 0 && <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
-                {person.grants.map(grant =>
-                  <li key={grant.grantId} className="capitalize">{grant.role} · {grant.accountEmail} · {grant.active ? "active" : "inactive"}</li>,
-                )}
-              </ul>}
-            </article>)}
-          </div>}
+          <DirectoryTable label="People directory" caption="People in the authorized organizational scope."
+            rows={people} rowKey={person=>person.personId}
+            empty={<p className="p-4 text-sm text-muted-foreground">No people found.</p>}
+            columns={[
+              {id:"person",title:"Person",render:person=>personDisplayName({
+                preferredName:person.preferredName,legalFirstName:person.firstName,legalLastName:person.lastName})},
+              {id:"status",title:"Status",render:person=>person.active?"Active":"Inactive"},
+              {id:"grants",title:"Grants",render:person=><ul className="space-y-1 text-sm">
+                {person.grants.map(grant=><li key={grant.grantId}>{grant.role} · {grant.accountEmail} · {grant.active?"active":"inactive"}</li>)}
+              </ul>},
+            ]}/>
         </section>}
       </QueryState>
     </WorkspaceShell>
