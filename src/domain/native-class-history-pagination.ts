@@ -28,6 +28,13 @@ export async function readBoundedNativeClassHistory<T extends {classEnrollmentId
     // WS2 contracts a page of at most 50 source Enrollment rows.
     if (!Array.isArray(page.items) || page.items.length > 50)
       throw new Error("Invalid native Class history page");
+    // Detect a stuck WS2 cursor before processing duplicate rows, so the
+    // original invariant violation is visible in release diagnostics.
+    if (page.nextCursor && (page.items.length === 0 ||
+        (cursor !== null &&
+         cursor.classEnrollmentId === page.nextCursor.classEnrollmentId &&
+         cursor.enrolledAt === page.nextCursor.enrolledAt)))
+      throw new Error("Native Class history pagination did not advance");
     for (const row of page.items) {
       if (!row.classEnrollmentId || seen.has(row.classEnrollmentId))
         throw new Error("Duplicate or missing native Class Enrollment source ID");
@@ -35,11 +42,6 @@ export async function readBoundedNativeClassHistory<T extends {classEnrollmentId
       items.push(row);
     }
     if (!page.nextCursor) return {items, hasMore: false};
-    if (page.items.length === 0 ||
-        (cursor !== null &&
-         cursor.classEnrollmentId === page.nextCursor.classEnrollmentId &&
-         cursor.enrolledAt === page.nextCursor.enrolledAt))
-      throw new Error("Native Class history pagination did not advance");
     cursor = page.nextCursor;
   }
   return {items, hasMore: true};
