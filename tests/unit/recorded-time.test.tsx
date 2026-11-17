@@ -17,6 +17,9 @@ describe("V6.1 shared recorded-time presentation", () => {
 
   it("fails visibly for invalid instants or unknown display zones", () => {
     expect(formatRecordedTime("invalid")).toBeNull();
+    expect(formatRecordedTime("2026-11-17T19:00:00")).toBeNull();
+    expect(formatRecordedTime("2026-11-17")).toBeNull();
+    expect(formatRecordedTime("2026-11-17T19:00:00+00:00")).toContain("7:00 PM UTC");
     expect(formatRecordedTime(instant, "bad-zone")).toBeNull();
     const html = renderToStaticMarkup(<RecordedTime value="invalid" fallback="Time not verified"/>);
     expect(html).toContain("Time not verified");
