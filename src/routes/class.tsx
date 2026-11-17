@@ -38,13 +38,14 @@ function selectedClassUuid(value:unknown):string|undefined{
 }
 
 export const Route=createFileRoute("/class")({
-  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;view?:"manage"|"activities"}=>({
+  validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string;siteId?:string;offeringVersionId?:string;courseVersionId?:string;view?:"manage"|"activities"}=>({
     view:value.view==="manage"||value.view==="activities"?value.view:undefined,
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
     classId:selectedClassUuid(value.classId),
     siteId:selectedClassUuid(value.siteId),
     offeringVersionId:selectedClassUuid(value.offeringVersionId),
+    courseVersionId:selectedClassUuid(value.courseVersionId),
   }),
   component:ClassHome,
 });
@@ -398,7 +399,8 @@ function ClassHome(){
     title="Course activities" eyebrow="CAN OS" width="wide">
     <p role="status">Opening authorized publisher tools…</p>
   </WorkspaceShell>}>
-    <PublisherCourseActivityEditor navigation={navigation}/>
+    <PublisherCourseActivityEditor navigation={navigation}
+      preferredCourseVersionId={selected.courseVersionId}/>
   </Suspense>;
   return selected.view==="manage"
     ?<Suspense fallback={<WorkspaceShell title="Classes" eyebrow="CAN OS"
