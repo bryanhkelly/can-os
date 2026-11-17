@@ -1,5 +1,13 @@
 # CAN OS single sign-in for canonical Site staff
 
+> **Production status update, November 17, 2026:** Both additive CAN staff
+> migrations are now installed on Neon production `main`: the Person crosswalk
+> table and restricted staff-session function are present. No independently
+> approved Person/Site links or native canonical Sites/accounts have been
+> provisioned. Existing November 15 snapshots below are historical; see
+> `docs/runbooks/platform-admin-and-valor-blueprint-cutover.md` for current
+> release gates. The synthetic Valor demo login remains ineligible.
+
 **Source status:** Implemented in GitHub `main` for verified CAN Site Admin and
 Registrar accounts with explicitly reviewed canonical Person and Site links.
 **Deployment status:** Not yet accepted in a deployed browser session.
