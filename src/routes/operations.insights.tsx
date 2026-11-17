@@ -6,6 +6,8 @@ import {optionalSearchString,siteProgramSelectionSchema} from "@/lib/route-searc
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {ActionDialog} from "@/components/workspace/action-dialog";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import {QueryState, WorkspaceShell } from "@/components/workspace";
 const insightsSearchSchema=siteProgramSelectionSchema.extend({insight:optionalSearchString});
 
@@ -172,10 +174,10 @@ function InsightsPage() {
      description="Explain why this insight is being dismissed (5-500 characters)."
      pending={mutation.pending} confirmDisabled={busy||dismissReason.trim().length<5}
      onClose={()=>setDismissTarget(null)} onConfirm={()=>void dismiss(dismissTarget)}>
-     <label className="block text-sm">Dismissal reason
-       <textarea required minLength={5} maxLength={500} value={dismissReason}
-         onChange={event=>setDismissReason(event.target.value)} className="mt-1 block w-full rounded border p-2"/>
-     </label>
+     <Field label="Dismissal reason" required>
+       <Textarea required minLength={5} maxLength={500} value={dismissReason}
+         onChange={event=>setDismissReason(event.target.value)}/>
+     </Field>
      <MutationFeedback state={mutation} pendingMessage="Saving insight decision..."/>
    </ActionDialog>}
  </WorkspaceShell>;
