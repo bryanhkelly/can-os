@@ -78,11 +78,15 @@ async function run(){
       AND evidence.subject_type='person'
       AND evidence.subject_id=review.access_person_id
       AND evidence.category='adult_identity_verification'
+      AND evidence.storage_provider='cloudflare_r2'
+      AND length(evidence.storage_key)>0
       AND evidence.sensitivity_tier IN ('restricted','sensitive','high')
       AND evidence.verified_at IS NOT NULL
       AND evidence.verified_at<=now()
       AND (evidence.expires_at IS NULL OR evidence.expires_at>now())
       AND evidence.metadata->>'verificationOutcome'='approved'
+      AND evidence.metadata->>'privateObjectVerified'='true'
+      AND evidence.metadata->>'revokedAt' IS NULL
       AND evidence.metadata->>'verifiedBirthDate'=review.verified_birth_date::text
       AND evidence.verified_by_person_id<>review.access_person_id
     JOIN education_v30.organizations o ON o.id=review.organization_id
