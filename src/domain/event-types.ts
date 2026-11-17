@@ -76,6 +76,7 @@ export const EventTypes = {
   AcademicCalendarChanged: "AcademicCalendarChanged",
   ScheduleTemplateChanged: "ScheduleTemplateChanged",
   SectionCreditConfigured: "SectionCreditConfigured",
+  NoncreditTrainingCompleted: "NoncreditTrainingCompleted",
   SectionCreationRequested: "SectionCreationRequested",
   SectionCreationRequestDeclined: "SectionCreationRequestDeclined",
   SectionCreationRequestFulfilled: "SectionCreationRequestFulfilled",
