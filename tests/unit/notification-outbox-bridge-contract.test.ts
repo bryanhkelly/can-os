@@ -29,6 +29,8 @@ describe("notification outbox source boundaries", () => {
     expect(school).toContain("guardianRelationshipPredicate");
     expect(school).toContain('access: "enrollment"');
     expect(school).toContain("smsOptedIn");
+    expect(school).toContain("select 1 from notifications source_notification");
+    expect(school).toContain("source_action.type = 'school_family_bulletin'");
     expect(school).toContain("nextAllowedDelivery");
     expect(shared).toContain("adapter.renew(active");
     expect(shared).toContain("adapter.send(prepared.message, active.id)");
