@@ -250,10 +250,19 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
                 SELECT 1 FROM pg_constraint
                 WHERE conrelid=to_regclass('education_v30.class_enrollment_approval_requests')
                   AND conname='ws2_approval_acceptance_only_after_review'
-              ) AS "approvalReady"
+              ) AS "approvalReady",
+            EXISTS(
+              SELECT 1 FROM pg_constraint
+              WHERE conrelid=to_regclass('education_v30.class_enrollments')
+                AND conname='canonical_class_enrollment_consent_ck'
+                AND pg_get_constraintdef(oid) LIKE '%invitation%'
+                AND pg_get_constraintdef(oid) LIKE '%approval%'
+            ) AS "consentReady"
         `);
         const tables=readiness.rows[0] as
-          {invitationReady:boolean;approvalReady:boolean}|undefined;
+          {invitationReady:boolean;approvalReady:boolean;consentReady:boolean}|undefined;
+        if(!tables?.consentReady)
+          throw new AuthorizationError("native Class consent-method migration is not deployed");
         if(terms.enrollmentMethods.includes("invitation")&&!tables?.invitationReady)
           throw new AuthorizationError("native Class invitation schema is not deployed");
         if(terms.enrollmentMethods.includes("approval")&&!tables?.approvalReady)
