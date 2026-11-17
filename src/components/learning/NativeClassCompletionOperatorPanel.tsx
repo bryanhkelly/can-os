@@ -139,7 +139,11 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
               <button key={person.classEnrollmentId} type="button"
                 className="flex w-full items-start justify-between gap-4 p-3 text-left hover:bg-muted"
                 aria-pressed={selectedId===person.classEnrollmentId}
-                onClick={()=>{setSelectedId(person.classEnrollmentId);setNotice("");}}>
+                onClick={()=>{
+                  setSelectedId(person.classEnrollmentId);
+                  setOutcome("completed");setEvidenceVersionId("");setReason("");
+                  setNotice("");
+                }}>
                 <span className="space-y-1">
                   <strong className="block text-sm">{person.displayName}</strong>
                   <span className="block text-xs text-muted-foreground">
