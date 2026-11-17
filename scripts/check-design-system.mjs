@@ -180,3 +180,18 @@ if (radiusUtility.test(rosterPattern)) {
   console.error("workspace/roster-list.tsx must retain V6.1 square corners");
   process.exitCode = 1;
 }
+
+// Shared workflow history must render through the V6.1 pattern while retaining
+// the domain's existing decisions, credentials and server authorization.
+const statusTimeline = readFileSync(join(root, "workflow/status-timeline.tsx"), "utf8");
+const completionReview = readFileSync(join(root, "learning/NoncreditCompletionReviewPanel.tsx"), "utf8");
+if (radiusUtility.test(statusTimeline) || !statusTimeline.includes("StatusBadge") ||
+    !statusTimeline.includes("<time") || !statusTimeline.includes('aria-label={label}')) {
+  console.error("StatusTimeline must preserve square geometry, semantic time and shared statuses");
+  process.exitCode = 1;
+}
+if (!completionReview.includes('from "@/components/workflow"') ||
+    (completionReview.match(/<StatusTimeline/g) ?? []).length !== 2) {
+  console.error("Completion review must use shared StatusTimeline for decision and issuance history");
+  process.exitCode = 1;
+}
