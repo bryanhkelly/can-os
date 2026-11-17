@@ -328,6 +328,8 @@ if (radiusUtility.test(rosterPattern)) {
 const statusConsumers = {
   "workflow/WorkflowPrerequisites.tsx": "PrerequisiteChecklist",
   "evidence/EvidenceHistory.tsx": "EvidenceStatus",
+  "operations/AttentionQueue.tsx": "StatusBadge",
+  "learning/CredentialDeliveryHistory.tsx": "StatusTimeline",
 };
 for (const [path, component] of Object.entries(statusConsumers)) {
   const source = readFileSync(join(root, path), "utf8");
@@ -335,6 +337,26 @@ for (const [path, component] of Object.entries(statusConsumers)) {
     console.error(`${path} must reuse canonical status component ${component}`);
     process.exitCode = 1;
   }
+}
+
+// Domain status and transport history are rendered through canonical visual
+// components, while route-owned commands and timestamps remain authoritative.
+const governedStatusRoutes = {
+  "routes/operations.field-trips.tsx": ["<StatusBadge", "Guardian declined — NOT authorized to board"],
+  "routes/admissions.credential-delivery.tsx": ["<CredentialDeliveryHistory records={history}/>"],
+};
+for (const [file, fragments] of Object.entries(governedStatusRoutes)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(`${file} must preserve status visualization and authoritative safety copy: ${fragment}`);
+    process.exitCode = 1;
+  }
+}
+const transportStatus = readFileSync(join(root, "learning/CredentialDeliveryHistory.tsx"), "utf8");
+if (!transportStatus.includes('"Accepted by provider"') ||
+    transportStatus.includes('"Delivered to recipient"') || radiusUtility.test(transportStatus)) {
+  console.error("Credential history may show provider acceptance, never unverified delivery");
+  process.exitCode = 1;
 }
 
 // Domain telemetry composes the shared metric and status patterns.
