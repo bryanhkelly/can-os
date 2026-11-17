@@ -8,7 +8,7 @@ import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { getCommandContext } from "@/modules/identity/command-context.server";
-import { readSessionGrants } from "@/modules/identity/session-grants.server";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 
 type VerifiedSelfEnrollmentActor = {
   accountId: string; personId: string; email: string;
@@ -27,12 +27,7 @@ export async function requireVerifiedAdultAccount(): Promise<VerifiedSelfEnrollm
   }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
   if (!account || account.disabled || !account.verified || isDemoAccountEmail(account.email))
     throw new AuthorizationError("verified independent CAN account");
-  const { grants, demoAccountSwitching } =
-    await readSessionGrants(actor.accountId,account.email);
-  if(demoAccountSwitching || new Set(grants.map(g=>g.personId)).size!==1 ||
-     !grants.some(g=>g.id===actor.grantId&&g.personId===actor.actorPersonId) ||
-     grants.some(g=>g.role==="student"))
-    throw new AuthorizationError("unambiguous adult account");
+  await assertUnambiguousAdultAccount(actor.accountId, actor.actorPersonId);
   const [person] = await db.select({
     id:people.id,active:people.active,
     preferredName:people.preferredName,firstName:people.legalFirstName,
