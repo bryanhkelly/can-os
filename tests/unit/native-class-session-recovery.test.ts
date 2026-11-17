@@ -76,6 +76,7 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
   it("does not claim a first-time identity can be forged from an email match",()=>{
     const recovery=read("src/modules/classes/native-class-session-recovery.functions.ts");
     expect(recovery).toContain("verifiedAdultOn(native.birthDate,now)");
+    expect(recovery).toContain('new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED")');
     expect(recovery).toContain("links.length!==1");
     expect(recovery).toContain("grants.length!==1");
     expect(recovery).not.toContain("tx.update(canonicalPersons)");
@@ -91,6 +92,9 @@ describe("native learner session recovery error contract",()=>{
     expect(missing.code).toBe("CANONICAL_LEARNER_SESSION_REQUIRED");
     expect(missing.kind).toBe("authentication");
     expect(normalizeClientError(new DomainError("FORBIDDEN")).code).toBe("FORBIDDEN");
+    const onboarding=normalizeClientError(new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED"));
+    expect(onboarding.code).toBe("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
+    expect(onboarding.kind).toBe("authorization");
     expect(normalizeClientError(new DomainError("UNAVAILABLE")).code).toBe("UNAVAILABLE");
   });
 });
