@@ -1,7 +1,7 @@
 -- Security boundary for one CAN login, canonical staff authorization.
--- Requires patch-can-staff-single-login.sql, approved Site identity link
--- tables and native canonical auth reader role. No user or grant creation.
--- Review and apply to an isolated test environment before production.
+-- Requires patch-can-staff-single-login.sql and current native canonical
+-- auth reader role. The SAME public Site UUID is required. No bridge table,
+-- user or grant creation. Independent Person verification remains mandatory.
 BEGIN;
 
 -- The definer owns identity tables. The caller is always the NOLOGIN,
@@ -69,14 +69,9 @@ AS $can_staff_auth$
       AND person_link.revoked_at IS NULL
       AND person_link.verified_at IS NOT NULL
       AND person_link.verified_by_account_id <> source.can_account_id
-  JOIN public.site_canonical_identity_links site_link
-    ON site_link.public_site_id = source.can_site_id
-      AND site_link.status = 'approved'
-      AND site_link.confirmed_at IS NOT NULL
-      AND site_link.reviewed_at IS NOT NULL
   JOIN education_v30.canonical_account_grants native_grant
     ON native_grant.person_id = person_link.canonical_principal_id
-      AND native_grant.site_id = site_link.canonical_site_id
+      AND native_grant.site_id = source.can_site_id
       AND native_grant.role_code = source.can_role
       AND native_grant.active = true
       AND native_grant.revoked_at IS NULL
@@ -88,7 +83,7 @@ AS $can_staff_auth$
     ON native_org.id = native_grant.organization_id
       AND native_org.status = 'active'
   JOIN education_v30.sites native_site
-    ON native_site.id = native_grant.site_id
+    ON native_site.id = source.can_site_id
       AND native_site.status IN ('planning', 'active')
   WHERE EXISTS (
     SELECT 1 FROM education_v30.site_organization_roles operator_role
@@ -120,6 +115,6 @@ GRANT EXECUTE ON FUNCTION
   TO can_v30_canonical_auth_reader;
 
 COMMENT ON FUNCTION education_v30.v301_can_staff_session_context(text) IS
-  'Restricted CAN-session staff projection. Rechecks verified one-login session, exact Person and Site links, current native staff grant and operator relationship. No raw identity SELECT is granted.';
+  'Restricted CAN-session staff projection. Rechecks verified one-login session, reviewed Person link, exact shared Site UUID, current native staff grant and operator relationship. No raw identity SELECT is granted.';
 
 COMMIT;
