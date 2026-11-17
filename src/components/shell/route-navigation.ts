@@ -7,7 +7,7 @@ export type RouteNavigationMetadata = {
   owner: keyof FileRoutesByTo | Partial<Record<WorkspaceRole, keyof FileRoutesByTo>>;
 } | { visibility: "hidden" | "non-navigable"; personas: readonly WorkspaceRole[]; reason: string };
 
-const all = ["account_holder", "site_website_editor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead", "student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor", "network_admin", "can_network_steward", "can_credential_reviewer", "can_jurisdiction_reviewer"] as const;
+const all = ["app_admin", "account_holder", "site_website_editor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead", "student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor", "network_admin", "can_network_steward", "can_credential_reviewer", "can_jurisdiction_reviewer"] as const;
 const messagingRoles = (Object.keys(roleCapabilities) as WorkspaceRole[])
   .filter(role => roleCapabilities[role]?.includes("communication.send"));
 const admins = ["registrar", "site_admin"] as const;
@@ -36,7 +36,7 @@ export const routeNavigation = {
   "/brand-preview": hidden("Authenticated Site brand preview", ["site_website_editor", "site_admin"]),
   "/calendar": page({ registrar: "/home", site_admin: "/home", student: "/calendar", guardian: "/calendar", teacher: "/calendar", room_facilitator: "/calendar", site_staff: "/calendar", site_leader: "/calendar", specialist: "/calendar", counselor: "/calendar" }, [...staff, "student", "guardian", "room_facilitator"]),
   "/calendar-export": endpoint,
-  "/canonical/blueprints": hidden("Native v3.0.1 Site-scoped Blueprint planning; requires a canonical session", []),
+  "/canonical/blueprints": page("/canonical/blueprints", admins),
   "/canonical/blueprint-reviews": hidden("Native v3.0.1 independent Blueprint reviewer; requires a canonical session", []),
   "/canonical/program-operations": page("/canonical/program-operations", ["site_admin","registrar"]),
   "/canonical/content": hidden("Verified provider content creator workspace on canonical course records", []),
@@ -205,7 +205,7 @@ export const routeNavigation = {
   "/canonical/classes/completion": hidden("Governed Class completion review", []),
   "/canonical/completion-evidence-reviews": hidden("Independent completion evidence review", []),
   "/canonical/course-activities": hidden("Approved Course activity authoring", []),
-  "/canonical": hidden("Canonical workspace index", []),
+  "/canonical": page("/canonical", ["app_admin"]),
   "/canonical/lab/facilitated": hidden("Temporary facilitated classroom operations", []),
   "/canonical/lab/impact": hidden("Temporary authorized impact inspection", []),
   "/canonical/noncredit/completion": hidden("Canonical noncredit completion corrections", []),
