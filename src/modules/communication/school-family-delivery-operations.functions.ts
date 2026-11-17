@@ -5,6 +5,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { hasRegistrarAuthority } from "@/domain/school-roles";
+import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, canRecoverTerminalDelivery } from "@/domain/outbound-sms-safety";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -86,8 +87,7 @@ export const getSchoolFamilyDeliveryAttempts=createServerFn({method:"GET"})
           state:r.status==="accepted"?"provider_accepted":
             r.lastError==="sms_provider_outcome_unconfirmed"?"requires_provider_reconciliation":
             r.status==="failed"&&r.nextAttemptAt?"retry_scheduled":r.status,
-          canRetry:r.status==="failed"&&!r.nextAttemptAt&&!r.acceptedAt&&
-            r.lastError!=="sms_provider_outcome_unconfirmed",
+          canRetry:canRecoverTerminalDelivery(r),
           createdAt:r.createdAt.toISOString(),
           acceptedAt:r.acceptedAt?.toISOString()??null,
           nextAttemptAt:r.nextAttemptAt?.toISOString()??null,
@@ -118,8 +118,7 @@ export const retrySchoolFamilyDelivery=createServerFn({method:"POST"})
         .limit(1).for("update");
       if(!current)throw new AuthorizationError("scoped failed receipt");
       const r=current.receipt;
-      if(r.status!=="failed"||r.nextAttemptAt||r.acceptedAt||r.leaseUntil||
-        r.lastError==="sms_provider_outcome_unconfirmed")
+      if(!canRecoverTerminalDelivery(r))
         throw new AuthorizationError("terminal failed receipt eligible for recovery");
       const now=new Date();
       const [updated]=await tx.update(s.notificationOutboundDeliveries).set({
@@ -131,7 +130,7 @@ export const retrySchoolFamilyDelivery=createServerFn({method:"POST"})
         isNull(s.notificationOutboundDeliveries.nextAttemptAt),
         isNull(s.notificationOutboundDeliveries.acceptedAt),
         isNull(s.notificationOutboundDeliveries.leaseUntil),
-        sql`${s.notificationOutboundDeliveries.lastError} IS DISTINCT FROM 'sms_provider_outcome_unconfirmed'`,
+        sql`${s.notificationOutboundDeliveries.lastError} IS DISTINCT FROM ${SMS_PROVIDER_OUTCOME_UNCONFIRMED}`,
       )).returning({id:s.notificationOutboundDeliveries.id});
       if(!updated)throw new AuthorizationError("delivery was already recovered");
       await writeAudit(tx,actor,{
