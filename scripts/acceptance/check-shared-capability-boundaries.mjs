@@ -48,6 +48,38 @@ const governed = [
     requiredImports: ["@/domain/outbound-retry-policy"],
   },
   {
+    path: "src/modules/identity/unambiguous-adult-account.server.ts",
+    layer: "capability",
+    forbiddenImports: [
+      /^@\/routes(?:\/|$)/,
+      /^@\/components(?:\/|$)/,
+      /^@\/modules\/enrollment(?:\/|$)/,
+    ],
+    requiredImports: ["@/db/schema", "@/domain/command-context"],
+  },
+  {
+    path: "src/modules/enrollment/noncredit-self-enrollment-identity.server.ts",
+    layer: "adapter",
+    forbiddenImports: [
+      /^@\/routes(?:\/|$)/,
+      /^@\/components(?:\/|$)/,
+    ],
+    requiredImports: [
+      "@/modules/identity/command-context.server",
+      "@/modules/identity/unambiguous-adult-account.server",
+    ],
+  },
+  {
+    path: "src/modules/communication/school-family-alert-delivery.server.ts",
+    layer: "adapter",
+    forbiddenImports: [
+      /^@\/routes(?:\/|$)/,
+      /^@\/components(?:\/|$)/,
+      /^@\/modules\/enrollment(?:\/|$)/,
+    ],
+    requiredImports: ["./outbound-dispatcher.server"],
+  },
+  {
     path: "src/modules/enrollment/noncredit-waitlist-delivery.server.ts",
     layer: "adapter",
     forbiddenImports: [
