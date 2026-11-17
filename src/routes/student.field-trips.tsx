@@ -3,7 +3,7 @@ import { z } from "zod";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { WorkspaceShell } from "@/components/workspace";
-import { formatTimestamp } from "@/modules/calendar/timezone";
+import { FieldTripFacts } from "@/components/field-trips/FieldTripFacts";
 import { listStudentFieldTrips } from "@/modules/field-trips/student-field-trips.functions";
 
 const searchSchema = z.object({ trip: z.string().uuid().optional() });
@@ -30,9 +30,6 @@ function StudentFieldTrips() {
   const search = Route.useSearch();
   if (!outcome.ok) return <LoaderFailure eyebrow="Learning" title="My field trips" outcome={outcome} />;
   const items = outcome.data;
-  const money = (cents: number) => new Intl.NumberFormat("en-US", {
-    style: "currency", currency: "USD",
-  }).format(cents / 100);
   return (
     <WorkspaceShell
       eyebrow="Learning"
@@ -45,16 +42,7 @@ function StudentFieldTrips() {
           className={`rounded-xl border bg-card p-5 ${search.trip === item.tripId ? "border-primary ring-1 ring-primary" : ""}`}>
           <h2 className="text-xl font-semibold">{item.title}</h2>
           <p className="mt-2 text-sm">{item.destination}</p>
-          <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-muted-foreground">Departure</dt>
-              <dd>{formatTimestamp(item.departsAt, item.timezone)} ({item.timezone})</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Return</dt>
-              <dd>{formatTimestamp(item.returnsAt, item.timezone)} ({item.timezone})</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Permission deadline</dt>
-              <dd>{item.deadline ? formatTimestamp(item.deadline, item.timezone) : "Before departure"}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Fee</dt>
-              <dd>{item.feeAmountCents ? money(item.feeAmountCents) : "No fee"}</dd></div>
-          </dl>
+          <FieldTripFacts trip={item}/>
           <p className="mt-4 rounded-lg border p-3 text-sm">{statusCopy(item)}</p>
         </article>)}
         {items.length === 0 && <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
