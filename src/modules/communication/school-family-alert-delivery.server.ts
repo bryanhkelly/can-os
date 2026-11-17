@@ -1,209 +1,221 @@
-import { and, asc, eq, gt, notInArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, eq, gt, isNotNull, isNull, lte, notInArray, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { OUTBOUND_LEASE_MS, OUTBOUND_MAX_ATTEMPTS, outboundRetryDelayMs } from "@/domain/outbound-retry-policy";
 import * as s from "@/db/schema";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
-import { sendNotificationEmail } from "./notification-email.server";
-import { getNotificationPreferences, nextAllowedDelivery, sendOptedInSms } from "@/platform/subscriptions/preferences";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
+import {
+  dispatchOutboundMessages, type OutboundClaim, type OutboundPreparation,
+} from "./outbound-dispatcher.server";
+import {
+  sendNotificationEmail, type NotificationEmailMessage,
+} from "./notification-email.server";
+import {
+  getNotificationPreferences, nextAllowedDelivery, sendOptedInSms,
+} from "@/platform/subscriptions/preferences";
 
-const LEASE_MS=OUTBOUND_LEASE_MS;
-const MAX_ATTEMPTS=OUTBOUND_MAX_ATTEMPTS;
-const RETRY_MS=outboundRetryDelayMs;
+type OutboundMessage =
+  | { channel: "email"; email: NotificationEmailMessage }
+  | { channel: "sms"; phone: string; organizationId: string };
 
-/** A scheduled transport worker; never send from inside the publication
- * transaction. Notification and original school Action remain authoritative.
- * Claim only the next concurrent batch; lease timestamps fence stale writes.
- * Each retry verifies current enrollment and verified guardian grant.
+const delivery = s.notificationOutboundDeliveries;
+function owned(claim: OutboundClaim) {
+  return and(eq(delivery.id, claim.id),
+    eq(delivery.status, "processing"),
+    eq(delivery.leaseUntil, claim.leaseUntil));
+}
+
+/**
+ * School-family alerts use the same leased transport coordination as
+ * noncredit invitations, but retain their own current-guardian authorization,
+ * notification preferences, SMS consent and safe content policy.
+ * Original school Action and in-app Notification remain authoritative.
  */
-export async function processSchoolFamilyOutboundDeliveries(now=new Date(),limit=120){
- const startedAt=Date.now();
- const clock=()=>new Date(now.getTime()+Math.max(0,Date.now()-startedAt));
- const processed:string[]=[];
- let accepted=0;
- while(processed.length<limit){
- const claimTime=clock();
- const claimedUntil=new Date(claimTime.getTime()+LEASE_MS);
- const ids=await db.transaction(async tx=>{
-   const due=await tx.select({id:s.notificationOutboundDeliveries.id})
-     .from(s.notificationOutboundDeliveries)
-     .where(and(
-       ...(processed.length?[notInArray(s.notificationOutboundDeliveries.id,processed)]:[]),
-       or(
-       and(eq(s.notificationOutboundDeliveries.status,"pending"),
-         or(isNull(s.notificationOutboundDeliveries.nextAttemptAt),
-            lte(s.notificationOutboundDeliveries.nextAttemptAt,claimTime))),
-       and(eq(s.notificationOutboundDeliveries.status,"failed"),
-         lte(s.notificationOutboundDeliveries.nextAttemptAt,claimTime)),
-       and(eq(s.notificationOutboundDeliveries.status,"processing"),
-         lte(s.notificationOutboundDeliveries.leaseUntil,claimTime)),
-     ))).orderBy(asc(s.notificationOutboundDeliveries.createdAt))
-     .limit(Math.min(6,limit-processed.length)).for("update",{skipLocked:true});
-   for(const row of due)await tx.update(s.notificationOutboundDeliveries)
-     .set({status:"processing",leaseUntil:claimedUntil,updatedAt:claimTime})
-     .where(eq(s.notificationOutboundDeliveries.id,row.id));
-   return due.map(row=>row.id);
- });
- if(!ids.length)break;
- processed.push(...ids);
- const processOne=async(id:string)=>{
-   let leaseUntil=claimedUntil;
-   const owned=()=>and(eq(s.notificationOutboundDeliveries.id,id),
-     eq(s.notificationOutboundDeliveries.status,"processing"),
-     eq(s.notificationOutboundDeliveries.leaseUntil,leaseUntil));
-   try{
-     const [record]=await db.select({
-       delivery:s.notificationOutboundDeliveries,
-       recipientPersonId:s.notifications.recipientPersonId,
-       notificationType:s.notifications.type,
-       resourceType:s.notifications.resourceType,
-       actionId:s.actions.id,actionType:s.actions.type,
-       title:s.notifications.title,message:s.notifications.body,
-       programId:s.actions.programId,siteId:s.actions.siteId,
-       organizationId:s.actions.organizationId,
-     }).from(s.notificationOutboundDeliveries)
-       .innerJoin(s.notifications,eq(s.notifications.id,s.notificationOutboundDeliveries.notificationId))
-       .innerJoin(s.actions,eq(s.actions.id,s.notifications.resourceId))
-       .where(owned()).limit(1);
-     if(!record||record.delivery.status!=="processing"||
-        record.delivery.leaseUntil?.getTime()!==leaseUntil.getTime()){
-       return;
-     }
-     const suppress=async(reason:string)=>{
-       await db.update(s.notificationOutboundDeliveries).set({
-         status:"suppressed",lastError:reason,leaseUntil:null,nextAttemptAt:null,updatedAt:new Date(),
-       }).where(owned());
-     };
-     if(record.notificationType!=="school_family_alert"||
-        record.resourceType!=="action"||record.actionType!=="school_family_bulletin"||
-        !record.programId||!record.siteId||!record.organizationId){
-       await suppress("invalid_school_alert");return;
-     }
-     if(await isDemoTenantOrganization(record.organizationId)){
-       await suppress("demo_tenant_external_delivery");return;
-     }
-     // Never use a cached recipient list as ongoing permission. A guardian
-     // whose child transferred or lost verified enrollment rights is excluded.
-     const [current]=await db.select({id:s.guardianRelationships.id})
-       .from(s.guardianRelationships)
-       .innerJoin(s.studentProfiles,eq(s.studentProfiles.personId,s.guardianRelationships.studentPersonId))
-       .innerJoin(s.enrollments,and(
-         eq(s.enrollments.studentProfileId,s.studentProfiles.id),
-         eq(s.enrollments.kind,"program"),eq(s.enrollments.status,"active"),
-         eq(s.enrollments.programId,record.programId),
-       ))
-       .innerJoin(s.programs,and(
-         eq(s.programs.id,s.enrollments.programId),
-         eq(s.programs.siteId,record.siteId),
-         eq(s.programs.organizationId,record.organizationId),
-         eq(s.programs.status,"active"),
-       ))
-       .innerJoin(s.accountPersonGrants,and(
-         eq(s.accountPersonGrants.personId,s.guardianRelationships.guardianPersonId),
-         eq(s.accountPersonGrants.role,"guardian"),eq(s.accountPersonGrants.active,true),
-         eq(s.accountPersonGrants.organizationId,record.organizationId),
-         or(isNull(s.accountPersonGrants.siteId),
-           eq(s.accountPersonGrants.siteId,record.siteId)),
-       ))
-       .innerJoin(s.accessAccounts,and(
-         eq(s.accessAccounts.id,s.accountPersonGrants.accountId),
-         eq(s.accessAccounts.disabled,false),
-       ))
-       .innerJoin(s.people,and(
-         eq(s.people.id,s.guardianRelationships.guardianPersonId),eq(s.people.active,true),
-       ))
-       .where(guardianRelationshipPredicate({
-         guardianPersonId:record.recipientPersonId,access:"enrollment",
-       })).limit(1);
-     if(!current){await suppress("guardian_enrollment_access_revoked");return;}
-     const prefs=await getNotificationPreferences(record.recipientPersonId);
-     if(record.delivery.channel==="sms"&&
-        (!prefs?.smsOptedIn||!prefs.smsVerifiedPhone||!prefs.smsVerifiedAt)){
-       await suppress("sms_opt_in_or_verified_phone_missing");return;
-     }
-     const quietUntil=prefs?nextAllowedDelivery(clock(),prefs.timezone,prefs.quietStart,prefs.quietEnd):null;
-     if(quietUntil){
-       await db.update(s.notificationOutboundDeliveries).set({
-         status:"pending",leaseUntil:null,nextAttemptAt:quietUntil,updatedAt:new Date(),
-       }).where(owned());
-       return;
-     }
-     const renewLease=async()=>{
-       const sendTime=clock();
-       const renewedUntil=new Date(sendTime.getTime()+LEASE_MS);
-       const rows=await db.update(s.notificationOutboundDeliveries).set({
-         leaseUntil:renewedUntil,updatedAt:sendTime,
-       }).where(and(owned(),gt(s.notificationOutboundDeliveries.leaseUntil,sendTime)))
-         .returning({id:s.notificationOutboundDeliveries.id});
-       if(!rows.length)return false;
-       leaseUntil=renewedUntil;
-       return true;
-     };
-     let ok=false;
-     let terminal=false;
-     let failure="provider_not_accepted";
-     if(record.delivery.channel==="email"){
-       const [mail]=await db.select({email:s.accessAccounts.emailNormalized})
-         .from(s.accountPersonGrants)
-         .innerJoin(s.accessAccounts,eq(s.accessAccounts.id,s.accountPersonGrants.accountId))
-         .where(and(
-           eq(s.accountPersonGrants.personId,record.recipientPersonId),
-           eq(s.accountPersonGrants.role,"guardian"),
-           eq(s.accountPersonGrants.organizationId,record.organizationId),
-           or(isNull(s.accountPersonGrants.siteId),
-             eq(s.accountPersonGrants.siteId,record.siteId)),
-           eq(s.accountPersonGrants.active,true),
-           eq(s.accessAccounts.disabled,false),
-           isNotNull(s.accessAccounts.emailVerifiedAt),
-         )).limit(1);
-       if(!mail?.email){terminal=true;failure="no_active_school_email";}
-       else {
-         if(!await renewLease())return;
-         ok=await sendNotificationEmail({
-         to:mail.email,subject:record.title,
-         text:record.message??record.title,
-         siteId:record.siteId,
-         },id);
-       }
-     }else if(record.delivery.channel==="sms"){
-       // SMS text deliberately excludes the arbitrary school-authored body.
-       // An opted-in guardian opens CAN for full, current authorized details.
-       if(!await renewLease())return;
-       ok=await sendOptedInSms(prefs!.smsVerifiedPhone!,
-         "CAN OS: Your school has issued an urgent family update. Sign in to review current instructions.",record.organizationId);
-     }else{
-       terminal=true;failure="unsupported_channel";
-     }
-     const attempts=record.delivery.attempts+1;
-     const updated=await db.update(s.notificationOutboundDeliveries).set({
-       status:ok?"accepted":"failed",attempts,
-       acceptedAt:ok?new Date():null,
-       lastError:ok?null:failure,
-       nextAttemptAt:ok||terminal||attempts>=MAX_ATTEMPTS
-         ?null:new Date(clock().getTime()+RETRY_MS(attempts)),
-       leaseUntil:null,updatedAt:new Date(),
-     }).where(owned())
-       .returning({id:s.notificationOutboundDeliveries.id});
-     if(ok&&updated.length)accepted++;
-   }catch{
-     // Delivery errors are retried independently; never lose the published
-     // in-app notice or leak recipient/contact details to error messages.
-     const [row]=await db.select({attempts:s.notificationOutboundDeliveries.attempts})
-       .from(s.notificationOutboundDeliveries)
-       .where(owned()).limit(1);
-     if(!row)return;
-     const attempts=row.attempts+1;
-     await db.update(s.notificationOutboundDeliveries).set({
-       status:"failed",attempts,lastError:"delivery_worker_error",
-       leaseUntil:null,
-       nextAttemptAt:attempts>=MAX_ATTEMPTS?null:new Date(clock().getTime()+RETRY_MS(attempts)),
-       updatedAt:new Date(),
-     }).where(owned());
-   }
- };
- // Bounded parallelism gives school notices prompt delivery without
- // saturating email/SMS providers.
- await Promise.all(ids.map(processOne));
- }
- return accepted;
+const schoolFamilyAdapter = {
+  async claim(now: Date, seenIds: readonly string[], leaseMs: number):
+    Promise<OutboundClaim | null> {
+    return db.transaction(async tx => {
+      const [row] = await tx.select({
+        id: delivery.id, attempts: delivery.attempts,
+      }).from(delivery).where(and(
+        ...(seenIds.length ? [notInArray(delivery.id, [...seenIds])] : []),
+        or(
+          and(eq(delivery.status, "pending"),
+            or(isNull(delivery.nextAttemptAt), lte(delivery.nextAttemptAt, now))),
+          and(eq(delivery.status, "failed"), lte(delivery.nextAttemptAt, now)),
+          and(eq(delivery.status, "processing"), lte(delivery.leaseUntil, now)),
+        ),
+      )).orderBy(asc(delivery.createdAt)).limit(1)
+        .for("update", { skipLocked: true });
+      if (!row) return null;
+      const leaseUntil = new Date(now.getTime() + leaseMs);
+      await tx.update(delivery).set({
+        status: "processing", leaseUntil, updatedAt: now,
+      }).where(eq(delivery.id, row.id));
+      return { id: row.id, attempts: row.attempts, leaseUntil };
+    });
+  },
+  async prepare(claim: OutboundClaim, now: Date):
+    Promise<OutboundPreparation<OutboundMessage>> {
+    const [record] = await db.select({
+      outbound: delivery,
+      recipientPersonId: s.notifications.recipientPersonId,
+      notificationType: s.notifications.type,
+      resourceType: s.notifications.resourceType,
+      actionId: s.actions.id,
+      actionType: s.actions.type,
+      title: s.notifications.title,
+      message: s.notifications.body,
+      programId: s.actions.programId,
+      siteId: s.actions.siteId,
+      organizationId: s.actions.organizationId,
+    }).from(delivery)
+      .innerJoin(s.notifications, eq(s.notifications.id, delivery.notificationId))
+      .innerJoin(s.actions, eq(s.actions.id, s.notifications.resourceId))
+      .where(owned(claim)).limit(1);
+    if (!record) return { kind: "suppress", reason: "source_receipt_unavailable" };
+    if (record.notificationType !== "school_family_alert" ||
+        record.resourceType !== "action" ||
+        record.actionType !== "school_family_bulletin" ||
+        !record.programId || !record.siteId || !record.organizationId)
+      return { kind: "suppress", reason: "invalid_school_alert" };
+    if (await isDemoTenantOrganization(record.organizationId))
+      return { kind: "suppress", reason: "demo_tenant_external_delivery" };
+
+    // Re-evaluate custody, school enrollment, active account and scoped
+    // guardian grant on every attempt, not from publication-time recipients.
+    const [guardian] = await db.select({ id: s.guardianRelationships.id })
+      .from(s.guardianRelationships)
+      .innerJoin(s.studentProfiles, eq(
+        s.studentProfiles.personId, s.guardianRelationships.studentPersonId))
+      .innerJoin(s.enrollments, and(
+        eq(s.enrollments.studentProfileId, s.studentProfiles.id),
+        eq(s.enrollments.kind, "program"),
+        eq(s.enrollments.status, "active"),
+        eq(s.enrollments.programId, record.programId),
+      ))
+      .innerJoin(s.programs, and(
+        eq(s.programs.id, s.enrollments.programId),
+        eq(s.programs.siteId, record.siteId),
+        eq(s.programs.organizationId, record.organizationId),
+        eq(s.programs.status, "active"),
+      ))
+      .innerJoin(s.accountPersonGrants, and(
+        eq(s.accountPersonGrants.personId, s.guardianRelationships.guardianPersonId),
+        eq(s.accountPersonGrants.role, "guardian"),
+        eq(s.accountPersonGrants.active, true),
+        eq(s.accountPersonGrants.organizationId, record.organizationId),
+        or(isNull(s.accountPersonGrants.siteId),
+          eq(s.accountPersonGrants.siteId, record.siteId)),
+      ))
+      .innerJoin(s.accessAccounts, and(
+        eq(s.accessAccounts.id, s.accountPersonGrants.accountId),
+        eq(s.accessAccounts.disabled, false),
+      ))
+      .innerJoin(s.people, and(
+        eq(s.people.id, s.guardianRelationships.guardianPersonId),
+        eq(s.people.active, true),
+      ))
+      .where(guardianRelationshipPredicate({
+        guardianPersonId: record.recipientPersonId, access: "enrollment",
+      })).limit(1);
+    if (!guardian)
+      return { kind: "suppress", reason: "guardian_enrollment_access_revoked" };
+    const preferences = await getNotificationPreferences(record.recipientPersonId);
+    if (record.outbound.channel === "sms" &&
+      (!preferences?.smsOptedIn || !preferences.smsVerifiedPhone || !preferences.smsVerifiedAt))
+      return { kind: "suppress", reason: "sms_opt_in_or_verified_phone_missing" };
+
+    const quietUntil = preferences
+      ? nextAllowedDelivery(now, preferences.timezone, preferences.quietStart, preferences.quietEnd)
+      : null;
+    if (quietUntil) return { kind: "defer", nextAttemptAt: quietUntil };
+
+    if (record.outbound.channel === "email") {
+      const [mail] = await db.select({ email: s.accessAccounts.emailNormalized })
+        .from(s.accountPersonGrants)
+        .innerJoin(s.accessAccounts,
+          eq(s.accessAccounts.id, s.accountPersonGrants.accountId))
+        .where(and(
+          eq(s.accountPersonGrants.personId, record.recipientPersonId),
+          eq(s.accountPersonGrants.role, "guardian"),
+          eq(s.accountPersonGrants.organizationId, record.organizationId),
+          or(isNull(s.accountPersonGrants.siteId),
+            eq(s.accountPersonGrants.siteId, record.siteId)),
+          eq(s.accountPersonGrants.active, true),
+          eq(s.accessAccounts.disabled, false),
+          isNotNull(s.accessAccounts.emailVerifiedAt),
+        )).limit(1);
+      if (!mail?.email) return { kind: "fail", reason: "no_active_school_email" };
+      return { kind: "ready", message: {
+        channel: "email",
+        email: {
+          to: mail.email, subject: record.title,
+          text: record.message ?? record.title, siteId: record.siteId,
+        },
+      }};
+    }
+    if (record.outbound.channel === "sms") {
+      return { kind: "ready", message: {
+        channel: "sms", phone: preferences!.smsVerifiedPhone!,
+        organizationId: record.organizationId,
+      }};
+    }
+    return { kind: "fail", reason: "unsupported_channel" };
+  },
+  async renew(claim: OutboundClaim, now: Date, leaseMs: number):
+    Promise<OutboundClaim | null> {
+    const leaseUntil = new Date(now.getTime() + leaseMs);
+    const rows = await db.update(delivery).set({
+      leaseUntil, updatedAt: now,
+    }).where(and(owned(claim), gt(delivery.leaseUntil, now)))
+      .returning({ id: delivery.id });
+    return rows.length ? { ...claim, leaseUntil } : null;
+  },
+  async defer(claim: OutboundClaim, until: Date, now: Date): Promise<boolean> {
+    const rows = await db.update(delivery).set({
+      status: "pending", leaseUntil: null,
+      nextAttemptAt: until, updatedAt: now,
+    }).where(owned(claim)).returning({ id: delivery.id });
+    return rows.length > 0;
+  },
+  async send(message: OutboundMessage, key: string): Promise<boolean> {
+    if (message.channel === "email")
+      return sendNotificationEmail(message.email, key);
+    // SMS never includes free-form publisher content.
+    return sendOptedInSms(
+      message.phone,
+      "CAN OS: Your school has issued an urgent family update. Sign in to review current instructions.",
+      message.organizationId,
+    );
+  },
+  async settle(claim: OutboundClaim, result: {
+    kind: "accepted" | "failed" | "suppressed";
+    now: Date; attempts: number; nextAttemptAt: Date | null; reason: string | null;
+  }): Promise<boolean> {
+    const rows = await db.update(delivery).set({
+      status: result.kind, attempts: result.attempts,
+      acceptedAt: result.kind === "accepted" ? result.now : null,
+      lastError: result.reason, nextAttemptAt: result.nextAttemptAt,
+      leaseUntil: null, updatedAt: result.now,
+    }).where(owned(claim)).returning({ id: delivery.id });
+    return rows.length > 0;
+  },
+  async attemptsAfterError(claim: OutboundClaim): Promise<number | null> {
+    const [row] = await db.select({ attempts: delivery.attempts })
+      .from(delivery).where(owned(claim)).limit(1);
+    return row ? row.attempts + 1 : null;
+  },
+};
+
+/** Retain the original scheduled job contract and bounded concurrency. */
+export async function processSchoolFamilyOutboundDeliveries(now = new Date(), limit = 120) {
+  const bounded = Math.max(0, Math.trunc(limit));
+  const workers = Math.min(6, bounded);
+  if (!workers) return 0;
+  const counts = await Promise.all(Array.from({ length: workers }, (_, i) =>
+    dispatchOutboundMessages(schoolFamilyAdapter, {
+      now, limit: Math.floor(bounded / workers) + (i < bounded % workers ? 1 : 0),
+    }),
+  ));
+  return counts.reduce((sum, row) => sum + row.accepted, 0);
 }
