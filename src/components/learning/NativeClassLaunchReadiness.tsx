@@ -38,11 +38,11 @@ export function NativeClassLaunchReadiness({state}:{state:ClassLaunchReadState})
     {steps.some(step=>step.status!=="visible")&&<div className="mt-4 space-y-2">
       <p className="text-sm font-semibold">Resolve prerequisites through existing workspaces</p>
       <div className="flex flex-wrap gap-4 text-sm">
-        <Link to="/operations/curriculum" search={{}} className="font-semibold underline underline-offset-4">
-          Publisher curriculum
+        <Link to="/class" search={{view:"content"}} className="font-semibold underline underline-offset-4">
+          Native Course drafts (authorized creator)
         </Link>
-        <Link to="/canonical/lab/deployments" className="font-semibold underline underline-offset-4">
-          Deployment and adoption inspection (staging)
+        <Link to="/canonical/program-operations" className="font-semibold underline underline-offset-4">
+          Program Operations and adoption inspection (staging)
         </Link>
       </div>
       <p className="text-xs text-muted-foreground">
