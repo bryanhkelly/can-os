@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { readEligibleSelfEnrollmentReleases } from "@/modules/enrollment/noncredit-self-enrollment-catalog.server";
 import type { SiteNoncreditListing } from "@/domain/site-noncredit-public";
-import {siteCatalogReaderAccessible,type SiteNoncreditPreflight} from "@/domain/site-noncredit-bridge";
+import {siteCatalogReaderAccessible,type SiteNoncreditPreflight} from "@/domain/site-noncredit-catalog-readiness";
 
 type Reader=Pick<typeof db,"select"|"execute">;
 const uuid=z.string().uuid();
