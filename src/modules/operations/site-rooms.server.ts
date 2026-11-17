@@ -68,12 +68,21 @@ export async function createSchoolRoom(actor: AccessContext, value: z.infer<type
 }
 
 export async function createRoomAtSite(actor: AccessContext, value: z.infer<typeof createRoomAtSiteSchema>) {
-  const input = createRoomAtSiteSchema.parse(value);
-  return db.transaction(async tx => {
-    const [site] = await tx.select().from(sites).where(eq(sites.id, input.siteId)).limit(1);
-    if (!site) throw new AuthorizationError("existing school Site");
-    assertRoomCoverageManager(actor, site);
-    return createRoomRecord(tx, actor, { siteId: site.id, organizationId: site.organizationId }, input);
+  return executeCommand(value, {
+    authenticate: async () => actor,
+    capability: "admin.manage",
+    validate: input => createRoomAtSiteSchema.parse(input),
+    transaction: work => db.transaction(work),
+    auditOwnedByExecute: true,
+    execute: async (tx, context, input) => {
+      const verifiedActor = context as AccessContext;
+      const [site] = await tx.select().from(sites).where(eq(sites.id, input.siteId)).limit(1);
+      if (!site) throw new AuthorizationError("existing school Site");
+      assertRoomCoverageManager(verifiedActor, site);
+      return createRoomRecord(tx, verifiedActor, {
+        siteId: site.id, organizationId: site.organizationId,
+      }, input);
+    },
   });
 }
 
