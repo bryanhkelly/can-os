@@ -18,7 +18,7 @@ function DemoCenterPage() {
   const result=Route.useLoaderData();
   if (!result.ok) return <LoaderFailure eyebrow="Community learning" title="Center" outcome={result}/>;
   if (!result.data) return <PageFrame width="wide"><p role="status">Center not found.</p></PageFrame>;
-  const {site,plans,nativeCourse,nativeCourseLessons}=result.data;
+  const {site,plans,nativeCourse,nativeCourseLessons,nativeRollout}=result.data;
   const totalPlannedMinutes=nativeCourseLessons.reduce(
     (sum,lesson)=>sum+(lesson.estimatedMinutes??0),0);
   return <PageFrame width="wide">
@@ -92,7 +92,26 @@ function DemoCenterPage() {
           </Link>
         </div>}
       </WorkspacePanel>
-            <SiteNativeClassHandoff publicSiteId={site.id}/>
+            <WorkspacePanel title="Course rollout and local adoption"
+        description="The native publication and deployment chain for this center. Planning records do not grant classroom authority.">
+        {!nativeRollout?<p role="status" className="text-sm">
+          No native Course rollout is linked to this center.
+        </p>:<>
+          <RecordFacts columns={2} variant="tiles" label="Rollout status"
+            items={[
+              {label:"Learning center Operation",value:nativeRollout.operationStatus},
+              {label:"Publisher Offering version",value:nativeRollout.offeringLifecycle},
+              {label:"Local Deployment",value:nativeRollout.deploymentStatus},
+              {label:"Course adoption",value:nativeRollout.adoptionStatus},
+            ]}/>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Independent Course and Offering publication, Site readiness,
+            operator authorization, and adoption approval must be complete
+            before a Class can be created. A proposed adoption is not approval.
+          </p>
+        </>}
+      </WorkspacePanel>
+      <SiteNativeClassHandoff publicSiteId={site.id}/>
       <div className="grid gap-4 md:grid-cols-2">
         {plans.map(plan=><WorkspacePanel key={plan.seasonId}
           title={plan.activityName} description={plan.programName}>
