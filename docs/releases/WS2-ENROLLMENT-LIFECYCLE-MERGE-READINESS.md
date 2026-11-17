@@ -14,6 +14,7 @@
 - Withdrawal and cancellation preserve historic Class Enrollment, Course Attempts, attribution, assessment/outcome/award evidence. Active attempts close before their source Class Enrollment, within one transaction; terminal retries emit no duplicate event.
 - A verified learner uses their original home-Organization grant even when joining a public Class operated by another Organization.
 - Source Class history can be read in 50-item keyset pages by the exact authenticated Person; WS1 must own the final multi-source My Activity projection. Existing `getMyNativeClassEnrollments` is retained for compatibility.
+  The cursor serializes PostgreSQL's exact six-digit UTC fractional timestamp and compares it as a timestamptz in SQL; JS Date millisecond conversion is forbidden at the keyset boundary.
 - Published self/invitation/approval/academic-credit advertising is fail-closed until an executable authority exists. Public remaining-seat values are informational, never a reservation.
 
 ## Verified read-only test01 evidence
