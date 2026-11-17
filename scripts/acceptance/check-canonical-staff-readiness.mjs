@@ -44,6 +44,29 @@ try {
             AND a.person_id = p.id AND p.active = true
             AND a.disabled = false AND a.email_verified_at IS NOT NULL
             AND a.email_normalized NOT LIKE '%.demo'
+            AND NOT EXISTS (
+              SELECT 1 FROM public.account_person_grants conflicting
+              WHERE conflicting.account_id = a.id AND conflicting.active = true
+                AND conflicting.person_id <> a.person_id
+            )
+            AND (
+              SELECT count(*) FROM public.account_person_grants authorized
+              LEFT JOIN public.organizations authority_org
+                ON authority_org.id = authorized.organization_id
+              WHERE authorized.account_id = a.id
+                AND authorized.person_id = a.person_id
+                AND authorized.active = true
+                AND (
+                  (authorized.role = 'app_admin'
+                    AND authorized.organization_id IS NULL
+                    AND authorized.site_id IS NULL)
+                  OR
+                  (authorized.role = 'can_network_steward'
+                    AND authorized.organization_id IS NOT NULL
+                    AND authorized.site_id IS NULL
+                    AND authority_org.type = 'can_network')
+                )
+            ) = 1
         ) AS eligible_app_admin_grants,
         (SELECT count(*)::int FROM public.account_person_grants g
            JOIN public.access_accounts a ON a.id = g.account_id
@@ -54,6 +77,29 @@ try {
             AND a.person_id = p.id AND p.active = true
             AND a.disabled = false AND a.email_verified_at IS NOT NULL
             AND a.email_normalized NOT LIKE '%.demo'
+            AND NOT EXISTS (
+              SELECT 1 FROM public.account_person_grants conflicting
+              WHERE conflicting.account_id = a.id AND conflicting.active = true
+                AND conflicting.person_id <> a.person_id
+            )
+            AND (
+              SELECT count(*) FROM public.account_person_grants authorized
+              LEFT JOIN public.organizations authority_org
+                ON authority_org.id = authorized.organization_id
+              WHERE authorized.account_id = a.id
+                AND authorized.person_id = a.person_id
+                AND authorized.active = true
+                AND (
+                  (authorized.role = 'app_admin'
+                    AND authorized.organization_id IS NULL
+                    AND authorized.site_id IS NULL)
+                  OR
+                  (authorized.role = 'can_network_steward'
+                    AND authorized.organization_id IS NOT NULL
+                    AND authorized.site_id IS NULL
+                    AND authority_org.type = 'can_network')
+                )
+            ) = 1
         ) AS eligible_institutional_approver_grants,
         (SELECT count(*)::int FROM public.access_accounts a
            JOIN public.account_person_grants g ON g.account_id = a.id
@@ -150,6 +196,8 @@ try {
     // Independent positive counters are NOT sufficient: they may belong to
     // different schools, people and grants. Require a complete joined path.
     const ready = Number(counts.eligible_staff_paths) > 0;
+    // Only count approvers that pass the provisioner's exact-one-authority
+    // requirement, including current Person ownership and conflicting grants.
     const firstAdminProvisioningBlocked = Number(counts.eligible_app_admin_grants) === 0
       && Number(counts.eligible_institutional_approver_grants) === 0;
     console.log(JSON.stringify({
