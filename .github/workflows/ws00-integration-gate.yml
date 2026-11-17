@@ -1,0 +1,71 @@
+name: WS00 Programs Courses Classes integration gate
+
+on:
+  push:
+    branches: [integration/programs-courses-classes]
+  pull_request:
+    branches: [integration/programs-courses-classes, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ws00-integration-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-and-build:
+    name: Contract, Cloudflare, TypeScript and regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+          cache: npm
+      - name: Print source and toolchain evidence
+        run: |
+          git rev-parse HEAD
+          node --version
+          npm --version
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Cross-workstream integration guard
+        run: npm run test:ws00:contracts
+      - name: Generate Cloudflare production bundle and routes
+        run: npm run build:cloudflare
+      - name: TypeScript source and generated route types
+        run: npm run typecheck
+      - name: ESLint and design-system 6.1
+        run: npm run lint
+      - name: Cross-stream acceptance contracts
+        run: |
+          npx vitest run \
+            tests/unit/participation-read-model.test.ts \
+            src/domain/native-class-lifecycle.test.ts \
+            tests/unit/ws3-completion-command-contract.test.ts \
+            tests/unit/native-class-session-agenda.test.ts \
+            tests/unit/ws5-publisher-rollout-migration-contract.test.ts \
+            tests/unit/participation-reporting-two-site-pilot.test.ts
+      - name: Native Class and Site regression suites
+        run: |
+          npm run test:classes:unit
+          npm run test:site:channels
+      - name: Application build
+        run: npm run build
+      - name: Full unit regression
+        run: npm run test
+      - name: Verification scope disclosure
+        if: always()
+        run: |
+          {
+            echo "## WS00 verification"
+            echo "Commit: \`$GITHUB_SHA\`"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo "Passing this workflow does NOT establish migration/RLS, concurrent DB transactions, authenticated browser journeys, or production deployment readiness."
+            echo "Require separate isolated QA and signed-in pilot acceptance before merging to main."
+          } >> "$GITHUB_STEP_SUMMARY"
