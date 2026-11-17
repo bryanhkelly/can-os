@@ -61,7 +61,7 @@ export function projectSchoolSections(
 export interface NativeClassActivity {
   classEnrollmentId: string; classId: string; title: string; status: string;
   courseAttemptId: string | null; deliveryMode: string;
-  enrolledAt: DateValue; siteId: string | null;
+  enrolledAt: DateValue; siteId: string | null;siteName?:string|null;
   officialOutcome?: {label:string;referenceId:string}|null;
 }
 export function projectNativeClasses(
@@ -71,7 +71,7 @@ export function projectNativeClasses(
   return rows.map(item => {
     const status = state(item.status);
     const hasLearningAccess = status === "active" && !!item.courseAttemptId;
-    const siteName = siteChoices.find(site => site.id === item.siteId)?.name ?? null;
+    const siteName=item.siteName??siteChoices.find(site=>site.id===item.siteId)?.name??null;
     return base({
       key: "native_class:" + item.classEnrollmentId, source: "native_class",
       sourceId: item.classEnrollmentId,
@@ -94,6 +94,7 @@ export function projectNativeClasses(
 export interface NoncreditCourseActivity {
   registrationId: string; releaseId: string; courseAttemptId: string;
   trainingTitle: string; deliveryMode: string; siteName: string | null;
+  siteId?:string|null;organizationId?:string|null;organizationName?:string|null;
   registrationStatus: string; attemptStatus: string; registeredAt: DateValue;
   upcomingSessions: readonly {startsAt: string; endsAt: string}[];
   officialOutcome?: {label:string;referenceId:string}|null;
@@ -122,8 +123,8 @@ export function projectNoncreditCourses(
       sourceStatus: row.registrationStatus + " / " + row.attemptStatus,
       title: row.trainingTitle,
       detail: row.deliveryMode === "facilitated" ? "Facilitated training" : "Independent online training",
-      organizationId: null, organizationName: null, siteId: null,
-      siteName: row.siteName,
+      organizationId:row.organizationId??null,organizationName:row.organizationName??null,
+      siteId:row.siteId??null,siteName:row.siteName,
       subject: {kind: "self", displayName: null},
       startAt: null, endAt: null, nextAt: next,
       progress: null,
