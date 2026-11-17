@@ -783,7 +783,13 @@ export async function readSelectedInstructionalTrack(
         title: eligible.track.title,
         presenterPersonId: eligible.track.presenterPersonId,
       },
-      lessons: recordedLessons,
+      lessons: recordedLessons.map(lesson=>({
+        ...lesson,
+        presentations: lesson.presentations.map(presentation=>({
+          ...presentation,
+          accessibilityNotes: presentation.accessibilityNotes as JsonValue,
+        })),
+      })),
       materials: eligible.materials
         .filter((material) => canAccessStudentTrackMaterial(
           material.materialKind,
