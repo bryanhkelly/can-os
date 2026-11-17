@@ -14,7 +14,7 @@ Updated: 2026-11-17
 
 ## What actually exists on Neon main
 
-Current Neon main snapshot, 2026-11-17 (after 54 guarded table moves and four Site FK rebindings):
+Current Neon main snapshot, 2026-11-17 (54 table relocations; all Site and Organization foreign keys converged):
 
 | Metric | public | education_v30 |
 | --- | ---: | ---: |
@@ -31,7 +31,7 @@ Additional: `education_v30_secure` contains 7 particularly sensitive tables, whi
 
 The 9 collisions are `admission_offers`, `audit_events`, `domain_events`, `enrollments`, `graduation_decisions`, `organizations`, `qualification_definitions`, `sites`, `transcript_issuances`. They have different column definitions. Never overwrite a public table using `ALTER TABLE ... SET SCHEMA` before resolving its actual semantics. Keep ONE core entity; where concepts really differ, choose descriptive domain names rather than a `canonical_` duplicate.
 
-The `education_v30.sites` table now has 40 inbound FK constraints; `public.sites` has 54. Four operational FKs have been rebound to the authoritative platform Site. The duplicate canonical Site and Organization tables now each have one demo row on main and are referenced by code, SQL functions, constraints and policies. Dropping them before rewiring consumers is not a valid migration.
+The `education_v30.sites` table now has **zero** inbound foreign keys; `public.sites` has 94. The `education_v30.organizations` table also has **zero** inbound foreign keys; `public.organizations` has 229. Both duplicate core tables remain physically present until runtime consumers and security policies are safely cut over. The duplicate canonical Site and Organization tables now each have one demo row on main and are referenced by code, SQL functions, constraints and policies. Dropping them before rewiring consumers is not a valid migration.
 
 **Security blocker:** `education_v30.sites` enforces RLS (including FORCE); `public.sites` currently does not. First build tested purpose-scoped RLS and authorization for the single platform Site. The goal does not license weakening learner privacy or cross-Site permissions.
 
@@ -60,6 +60,12 @@ The `education_v30.sites` table now has 40 inbound FK constraints; `public.sites
 16. Rebound **26 Organization FKs across 23 empty public operational tables** from `education_v30.organizations(id)` to `public.organizations(id)`. Preserved their names and validation; isolated the active adult-learning identity-review FK for later authorization migration. SQL: `database/production/2026-11-17-rebind-public-operational-organization-fks.sql`.
 17. Rebound **7 operational Person FKs** from `education_v30.persons(id)` to `public.people(id)`. The three Person/account correspondence and review tables were not touched. Read-only source inspection verified that the native Person and Account tables are empty on main, while the platform retains 142 People and 15 login Accounts. SQL: `database/production/2026-11-17-rebind-public-operational-person-fks.sql`.
 18. Extended main-only `verify:site:main-consolidation` to check 4 direct Site FKs, 26 direct Organization FKs, 7 direct Person FKs, 10 representative relocated table locations, and the retired Site bridge. This is a **milestone gate**, not full typecheck, migration rollback acceptance or browser release.
+
+19. Rebound **all 40 native Site foreign keys** directly to `public.sites(id)`, in reviewed batches of 11 and 29. Preserved existing `ON DELETE RESTRICT` behavior and every child table's RLS/permissions. The Site UUID did not change and no correspondence service or table was introduced. Migration files: `2026-11-17-rebind-11-core-native-site-fks.sql`, `2026-11-17-rebind-remaining-29-native-site-fks.sql`. **Verified: 0 FKs still reference `education_v30.sites`.**
+20. Preserved the one matched native demo Site's education-only fields (`site_kind`, `status`, `code`, capacity, geography) on its **same** `public.sites` row. Verified exact ID, name and timezone agreement. The unverified synthetic address was intentionally not copied. SQL: `2026-11-17-consolidate-native-site-attributes.sql`.
+21. Rebound **all 154 native Organization foreign keys** to `public.organizations(id)`, preserving constraint names, validation, and delete behaviors, including two actual published/draft Course/Offering reference rows. Completed in core 23-FK and subsequent 30-FK batches plus the final adult review FK. **Verified: 0 FKs still reference `education_v30.organizations`.** The actual Organization record remains to be retired after its readers have migrated.
+22. Preserved the one matching canonical demo Organization's `prospective` status, external reference, and explicitly synthetic legal name on its **same** public Organization row; no new Organization was created. SQL: `2026-11-17-consolidate-native-organization-attributes.sql`.
+23. Added `verify:identity:main-core-fks`, a **read-only main-only verification milestone** for zero native Site/Organization FKs, exact UUID/attribute agreement, and absent Site identity bridge. This is **not** production acceptance. The separate native Person, native Account, and duplicate Site/Organization **tables** plus native SQL and application consumers remain; `public.sites` forced RLS and full browser acceptance are not yet verified.
 
 ## Production cutover (dependency order; not yet executed)
 
