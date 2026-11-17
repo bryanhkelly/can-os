@@ -495,7 +495,7 @@ export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
       const names=await tx.select({
         id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
       }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,permittedSites));
-      const siteNames=new Map(names.map(site=>[site.id,site.name]));
+      const siteNames=new Map(names.map(site=>[site.id,site.name] as const));
       const siteByOperation=new Map<string,Set<string>>();
       for(const site of sites){
         const ids=siteByOperation.get(site.operationId)??new Set<string>();
