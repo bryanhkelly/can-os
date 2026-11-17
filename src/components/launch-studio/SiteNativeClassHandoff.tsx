@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarDays, Users } from "lucide-react";
 import { getSiteIdentityLinkStatus } from "@/modules/sites/site-identity-links.functions";
-import { getMyUnifiedClassDrafts } from "@/modules/classes/unified-class.functions";
+import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions } from "@/modules/classes/unified-class.functions";
 import { resolveSiteClassLink } from "@/domain/site-class-launch-handoff";
 
 /** Site-first to native-Class handoff: a public Site ID is never used as a
@@ -15,6 +15,9 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
  const canonicalSiteId=link.kind==="approved"?link.canonicalSiteId:null;
  const classesRead=useQuery({queryKey:["launch-native-classes",canonicalSiteId],
    queryFn:()=>getMyUnifiedClassDrafts(),enabled:Boolean(canonicalSiteId),retry:false});
+ const adoptedCourses=useQuery({queryKey:["launch-class-course-adoptions",canonicalSiteId],
+   queryFn:()=>getUnifiedClassCourseOptions({data:{siteId:canonicalSiteId!,search:"",cursor:0}}),
+   enabled:Boolean(canonicalSiteId),retry:false});
  const classes=canonicalSiteId
    ?(classesRead.data??[]).filter(item=>item.siteId===canonicalSiteId):[];
  return <section className="mt-6 border p-5" aria-label="Unified Classroom handoff">
@@ -45,6 +48,22 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
     No Class absence or release readiness is assumed.
    </p>}
    {classesRead.isSuccess&&<>
+    <div className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Class activation progression">
+      <div className="border border-border p-3 text-xs"><strong className="block text-sm">1. Approved Courses</strong>
+        <p className="mt-2">{adoptedCourses.isError?"Unable to verify local Course adoption"
+          :adoptedCourses.isPending?"Checking adopted Courses"
+          :adoptedCourses.data.items.length>0?"Authorized Course options available":"No eligible adopted Courses are visible"}</p>
+      </div>
+      <div className="border border-border p-3 text-xs"><strong className="block text-sm">2. Classes</strong>
+        <p className="mt-2">{classes.length} visible at this Site. {classes.some(item=>item.state==="active")
+          ?"An active Class exists.":"Activate a draft Class after Course adoption."}</p>
+      </div>
+      <div className="border border-border p-3 text-xs"><strong className="block text-sm">3. Registration and Sessions</strong>
+        <p className="mt-2">{classes.some(item=>item.offeringState==="published")
+          ?"A Class Offering is published; Sessions have separate scheduling."
+          :"Publishing a Class Offering is optional. Facilitation and Session scheduling have separate permissions."}</p>
+      </div>
+    </div>
     <div className="mt-4 flex flex-wrap gap-3">
      <Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
       className="inline-flex min-h-11 items-center gap-2 border bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
@@ -55,6 +74,11 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
       Review Course adoption <ArrowRight className="size-4"/>
      </Link>
     </div>
+    {adoptedCourses.isSuccess&&adoptedCourses.data.items.length===0&&
+      <p role="status" className="mt-4 border border-border p-4 text-sm">
+        There is no currently authorized adopted Course available for Class creation at this Site.
+        Review the governed Blueprint, Offering and Deployment adoption before creating a Class.
+      </p>}
     {classes.length===0?<p className="mt-4 text-sm text-muted-foreground">
      No native Classes are visible for this exact Site. This does not certify Site readiness.
     </p>:<ul className="mt-4 grid gap-3 md:grid-cols-2">{classes.map(item=><li key={item.classId} className="border bg-card p-4">
