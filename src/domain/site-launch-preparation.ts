@@ -18,7 +18,7 @@ function gradeNumber(value:string):number|null{
   const numeric=match?Number(match[1]):NaN;
   return Number.isInteger(numeric)&&numeric<=12?numeric:null;
 }
-function preparesSchoolYear(program:SiteLaunchProgramSummary):boolean{
+export function preparesSchoolYear(program:SiteLaunchProgramSummary):boolean{
   if(!schoolYearModels.has(program.type)||
      !["draft","launching","ready","active"].includes(program.status)||
      !program.gradeRange)return false;
