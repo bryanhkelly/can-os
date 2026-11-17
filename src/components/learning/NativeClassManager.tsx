@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { useState, type FormEvent, type ReactNode } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
+import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
 import { Button } from "@/components/ui/button";
 import { normalizeClientError } from "@/lib/client-error";
@@ -668,18 +669,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         {classes.isPending&&<p role="status" className="mt-4 text-sm">Loading Classes…</p>}
         {classes.isError&&<p role="alert" className="mt-4 text-sm">Class records are unavailable or the release is not enabled.</p>}
         <div className="mt-4 space-y-3">
-          {(classes.data??[]).map(item=><article key={item.classOfferingVersionId??item.classId} className="border border-border p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {item.classOfferingVersionId
-                ?`${item.visibility} · ${item.offeringState} · version ${item.versionNo}`
-                :"No Class Offering · internal Class"}
-            </p>
-            <h3 className="mt-1 text-base font-semibold"><Link to="/class/$classId"
-              params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
-              className="underline-offset-2 hover:underline">{item.title}</Link></h3>
-            <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {(item.enrollmentMethods??[]).join(", ")||"No registration publication"}</p>
-            <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
-              className="mt-2 inline-block text-sm font-semibold underline">Open Class workspace</Link>
+          {(classes.data??[]).map(item=><NativeClassSummary key={item.classOfferingVersionId??item.classId} item={item}>
             <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"reports"}}
               aria-label={`Class evidence for ${item.title}`}
               className="mt-2 ml-3 inline-block text-sm font-semibold underline">Class evidence</Link>
@@ -695,7 +685,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               disabled={busy||methods.length===0||creditModes.length===0}
               className="mt-3 ml-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Draft new Offering terms</Button>}
-          </article>)}
+          </NativeClassSummary>)}
           {classes.data?.length===0&&<p className="text-sm text-muted-foreground">No Classes created yet.</p>}
         </div>
       </section>
