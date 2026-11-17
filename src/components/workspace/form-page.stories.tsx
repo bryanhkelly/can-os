@@ -54,6 +54,9 @@ export const GroupedFieldsAndActions: Story = {
 export const Pending: Story = {
   args: { pending: true },
   play: async ({ canvasElement }) => {
-    await expect(within(canvasElement).getByRole("button", { name: "Creating school year…" })).toBeDisabled();
+    const action = within(canvasElement).getByRole("button", { name: "Creating school year…" });
+    await expect(action).toBeDisabled();
+    await expect(action).toHaveAttribute("aria-busy", "true");
+    await expect(canvasElement.querySelector("[data-action-footer=form]")).toBeInTheDocument();
   },
 };
