@@ -79,8 +79,17 @@ SELECT
    WHERE a.person_id IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM public.people p WHERE p.id=a.person_id
    )
-  ) AS missing_people
+  ) AS missing_people,
+  (SELECT count(*)::int
+   FROM public.access_accounts a
+   WHERE a.person_id IS NULL AND EXISTS (
+     SELECT 1 FROM public.account_person_grants g
+     WHERE g.account_id=a.id
+   )
+  ) AS unanchored_historical_accounts
 `;
+assert.equal(integrity?.unanchored_historical_accounts,0,
+  "BLOCKED: historical CAN accounts lack an authoritative Person; migration 0085 required");
 assert.equal(integrity?.mismatched_active_grants,0,
   "BLOCKED: active CAN grant Person differs from account anchor");
 assert.equal(integrity?.missing_people,0,
