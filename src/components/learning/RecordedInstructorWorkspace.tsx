@@ -247,7 +247,7 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
     {notice && <p role="status" className="border p-3 text-sm">{notice}</p>}
 
     {instruction && <>
-      {instruction.sectionId && <RecordedOfficialCourseLinks sectionId={instruction.sectionId}/>}
+      {mode==="training" && instruction.sectionId && <RecordedOfficialCourseLinks sectionId={instruction.sectionId}/>}
       <div id="course-recorded-lessons" className="border bg-card p-4">
         <h3 className="font-semibold">Course lessons</h3>
         <div className="mt-3">

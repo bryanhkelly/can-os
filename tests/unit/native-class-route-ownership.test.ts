@@ -27,6 +27,7 @@ describe("native Class route ownership", () => {
     }
     expect(read("src/domain/site-enrollment-opportunities.ts")).toContain('"/class?classId="');
     expect(read("src/domain/participation-projections.ts")).toContain('href: "/class/" + hrefId(item.classId)');
+    expect(read("src/components/learning/RecordedInstructorWorkspace.tsx")).toContain('mode==="training" && instruction.sectionId');
   });
   it("filters public discovery on the server before pagination, not by hiding result cards", () => {
     const catalog=read("src/modules/classes/native-class-enrollment.functions.ts");
