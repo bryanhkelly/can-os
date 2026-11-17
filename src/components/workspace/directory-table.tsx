@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { QueryState } from "./query-state";
 import { FilterBar } from "./filter-bar";
+import { DirectoryBulkActions, type DirectoryBulkAction } from "./directory-bulk-actions";
 import { WorkspaceShell, type WorkspaceShellProps } from "./workspace-shell";
 
 export function DirectoryPage({ query, onQueryChange, searchLabel = "Search", searchPlaceholder, filters, views, view, onViewChange, children, ...shell }: Omit<WorkspaceShellProps, "children"> & {
@@ -42,7 +43,7 @@ export type DirectoryRowAction<T> = {
 };
 
 export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort, onSort,
-  loading, error, onRetry, empty, pagination, selectedKeys, onSelectionChange, rowActions }: {
+  loading, error, onRetry, empty, pagination, selectedKeys, onSelectionChange, rowActions, bulkActions, bulkPending }: {
   label: string;
   caption: string;
   rows: readonly T[];
@@ -58,6 +59,8 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
   selectedKeys?: ReadonlySet<string>;
   onSelectionChange?: (keys: ReadonlySet<string>) => void;
   rowActions?: readonly DirectoryRowAction<T>[];
+  bulkActions?: readonly DirectoryBulkAction[];
+  bulkPending?: boolean;
 }) {
   const selectable = !!selectedKeys && !!onSelectionChange;
   const keysOnPage = rows.map(rowKey);
@@ -73,6 +76,9 @@ export function DirectoryTable<T>({ label, caption, rows, columns, rowKey, sort,
   }
   return <QueryState loading={loading} error={error} onRetry={onRetry} isEmpty={rows.length === 0} empty={empty}>
     <div className="mt-6 min-w-0 border bg-card">
+      {selectable && bulkActions && bulkActions.length > 0 && <DirectoryBulkActions label={label}
+        selectedKeys={selectedKeys!} actions={bulkActions} pending={bulkPending}
+        onClear={() => onSelectionChange!(new Set())} />}
       <Table aria-label={label} scrollLabel={`${label} scroll area`}>
         <TableCaption className="px-4 pb-4 text-left">{caption}</TableCaption>
         <TableHeader><TableRow>
