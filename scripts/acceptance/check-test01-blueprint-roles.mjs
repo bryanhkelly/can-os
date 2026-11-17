@@ -3,11 +3,11 @@
  * Read-only restricted-role Blueprint acceptance preflight for an isolated
  * canonical test database. Does not create sessions, users, links or drafts.
  *
- * APP_ENV=test TEST_DATABASE_URL=<owner-url> DATABASE_URL=<production-url>
+ * APP_ENV=test CAN_TEST_DB_WRITES_ENABLED=true\n * TEST_DATABASE_URL=<owner-url> DATABASE_URL=<production-url>
  * CAN_CANONICAL_TEST_APP_DATABASE_URL=<restricted-url>
  * node scripts/acceptance/check-test01-blueprint-roles.mjs
  *
- * The test isolation guard must pass before opening the restricted URL.
+ * CAN_TEST_DB_WRITES_ENABLED is required by the shared isolation guard,\n * although this script itself opens only a read-only transaction.\n * The test isolation guard must pass before opening the restricted URL.
  * Full draft/review/execution acceptance remains a separate rollback test.
  */
 import { Pool } from "@neondatabase/serverless";
