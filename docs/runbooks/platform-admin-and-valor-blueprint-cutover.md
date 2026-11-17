@@ -44,13 +44,18 @@ Run with current database evidence; do not assume these observations remain true
    and distinct approver. Obtain an auditable operator approval ticket. Do not use
    the Valor demo identity, the published six-digit test code or an unverified
    email account.
-2. On an authorized operator machine, target the desired database using a
+2. Confirm the distinct approver currently holds an authorized, active
+   organization-scoped `can_network_steward` grant or an existing account-wide
+   `app_admin` grant. A verified email without one of these grants is **not**
+   sufficient. The initial institutional reviewer must be appointed through a
+   separately governed organizational process before this script can be used.
+3. On an authorized operator machine, target the desired database using a
    controlled connection. Set `PLATFORM_ADMIN_EMAIL`,
    `PLATFORM_ADMIN_APPROVER_EMAIL`, `PLATFORM_ADMIN_TICKET`, and `DATABASE_URL`.
-3. Run `npm run admin:provision` first (rollback-only preflight). On
+4. Run `npm run admin:provision` first (rollback-only preflight). On
    independently approved evidence, run
    `npm run admin:provision -- --execute`.
-4. Have the new App Admin sign in through the normal verified email flow and
+5. Have the new App Admin sign in through the normal verified email flow and
    visit `/platform`. Confirm an active grant is visible and Site/learner
    destinations remain forbidden. Test deactivation/revocation independently.
 
