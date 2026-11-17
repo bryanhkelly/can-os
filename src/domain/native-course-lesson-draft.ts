@@ -9,21 +9,23 @@ export const nativeLessonSegmentsSchema=z.array(z.object({
   minutes:z.number().int().min(1).max(90),
 }).strict()).min(1).max(18);
 
-export const nativeCourseLessonEditableSchema=z.object({
+const editableLesson=z.object({
   title:z.string().trim().min(3).max(200),
   objectives:z.array(z.string().trim().min(3).max(250)).min(1).max(10),
   segments:nativeLessonSegmentsSchema,
-}).strict().superRefine((value,ctx)=>{
+}).strict();
+const validateDuration=(value:{segments:readonly {minutes:number}[]},
+  ctx:z.RefinementCtx)=>{
   const minutes=value.segments.reduce((sum,segment)=>sum+segment.minutes,0);
   if(minutes>180)ctx.addIssue({code:"custom",path:["segments"],
     message:"A draft lesson must fit within 180 minutes."});
-});
-
-export const saveNativeCourseLessonDraftSchema=nativeCourseLessonEditableSchema.extend({
+};
+export const nativeCourseLessonEditableSchema=editableLesson.superRefine(validateDuration);
+export const saveNativeCourseLessonDraftSchema=editableLesson.extend({
   courseVersionId:z.string().uuid(),
   lessonId:z.string().uuid(),
   expectedRevision:z.string().regex(/^[a-f0-9]{64}$/),
-}).strict();
+}).superRefine(validateDuration);
 
 export type NativeCourseLessonEditable=z.infer<typeof nativeCourseLessonEditableSchema>;
 
