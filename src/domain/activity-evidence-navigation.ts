@@ -17,9 +17,12 @@ export function activityEvidenceLinks(
       href:"/student/assignments?section="+encodeURIComponent(section)});
    links.push({label:"Academic grades & transcript",href:"/student/report-card"});
   }else if(viewerRole==="guardian"&&record.subject.kind==="dependent"){
+   const child=record.refs.studentPersonId;
    if(section)links.push({label:"Authorized dependent's work",
-      href:"/guardian/students?section="+encodeURIComponent(section)});
-   links.push({label:"Attendance & excuses",href:"/guardian/attendance"});
+      href:"/guardian/students?"+(child?"student="+encodeURIComponent(child)+"&":"")+
+        "section="+encodeURIComponent(section)});
+   links.push({label:"Attendance & excuses",
+      href:child?"/guardian/attendance?student="+encodeURIComponent(child):"/guardian/attendance"});
   }
  }
  if(record.source==="native_class"&&record.status==="active"&&
