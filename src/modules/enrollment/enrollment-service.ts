@@ -637,18 +637,14 @@ export async function acceptApplication(
       },
     });
 
-    await writeAudit(tx, {
-      actorPersonId: context.actorPersonId,
+    await writeAudit(tx, context, {
       action: "application.accept",
-      resourceType: "application",
-      resourceId: applicationId,
+      entityType: "application",
+      entityId: applicationId,
       scope: { programId: current.programId },
       before: { stage: current.stage },
       after: { stage: "accepted" },
-      context: {
-        requestId: context.requestId ?? null,
-        decisionNote: decisionNote ?? null,
-      },
+      contextExtras: { decisionNote: decisionNote ?? null },
     });
   });
 }
