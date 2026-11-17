@@ -92,8 +92,15 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain('withSensitiveApprovalWriter(\n        tx,"request",can.accountId');
     expect(service).toContain('withSensitiveApprovalWriter(tx,"review",reviewer.accountId');
     expect(service).toContain('withSensitiveApprovalWriter(tx,"revoke",reviewer.accountId');
-    expect(service).toContain('grant_row.role=\'can_credential_reviewer\'');
-    expect(service).toContain("FOR SHARE OF s,account,grant_row,organization,person");
+    expect(service).toContain('roles:["can_credential_reviewer"]');
+    expect(service).toContain('organizationType:"can_network"');
+    expect(service).toContain("assertCurrentCANGrantForMutation");
+    const shared=file("src/modules/identity/current-can-grant-transaction.server.ts");
+    expect(shared).toContain("current_grant.role=");
+    expect(shared).toContain("current_grant.active=true");
+    expect(shared).toContain("account.person_id=");
+    expect(shared).toContain("verified_org.type=");
+    expect(shared).toContain("FOR SHARE OF session,account,current_grant,person,verified_org");
     expect(service).toContain("reviewEvidenceReference:data.evidenceReference");
     expect(service).toContain("expiresAt.getTime()>now.getTime()+366");
   });
