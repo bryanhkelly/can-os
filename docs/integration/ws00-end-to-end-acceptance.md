@@ -138,17 +138,23 @@ creates a learner, and writes a CAN audit row without the date of birth.
 revokes the resulting native learner grants and active sessions, preserving
 Class history and evidence. The original reviewed evidence is immutable.
 
-The independent evidence collection and verification policy, actual controlled
-evidence storage integration, App Admin review UI, operator signoff, and tested
-DB permissions still require acceptance. A matching email, self-declared age,
+The review and revocation controls now appear in the existing `/platform`
+App Admin workspace, and are hidden until the evidence ledger exists with FORCE
+RLS. The independent evidence collection and verification policy, actual
+controlled evidence storage integration, App Admin reviewer acceptance,
+operator signoff, and tested DB permissions still require acceptance. A matching email, self-declared age,
 learner click, Site favorite or synthetic QA fixture cannot substitute for
 independent identity verification. Do not apply this migration to production
 until reviewer governance, actual QA role/RLS tests, revocation, rollback and
 reconciliation are approved.
 
-**Required QA acceptance:** start with a truly new verified CAN account and no
+**Required QA acceptance:** set `CAN_WS00_QA_FRESH_LEARNER_CAN_ACCOUNT_ID`
+for the unused verified fixture. The read-only readiness script requires the
+approved unconsumed independent review, the matching CAN Person, an active home
+Organization, a verified separate reviewer and the new table's FORCE RLS.
+Start with a truly new verified CAN account and no
 native cookie or existing canonical account; arrange an independently approved
-review under disposable QA controls; then enroll in the published one-hour
+review under disposable QA controls using the App Admin review command; then enroll in the published one-hour
 Class, open its content, see the original Class Enrollment in My Activity,
 withdraw and retain one original historical enrollment. Repeat the same request
 concurrently; ensure exactly one Person, one link, one learner grant, one consumed
