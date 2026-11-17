@@ -70,6 +70,8 @@ export default tseslint.config(
       "src/components/learning/ClassCreationRequestForm.tsx",
       "src/components/workspace/{site-program-fields,local-datetime-field}.tsx",
       "src/components/evidence/FileSelectionField.tsx",
+      "src/components/evidence/EvidencePicker.tsx",
+      "src/components/learning/GradebookSectionSelector.tsx",
       "src/components/shell/WorkspaceContextSwitcher.tsx",
       "src/components/shell/{CommandPalette,WorkspaceSearchDialog}.tsx",
       "src/components/operations/{OpeningHandoffs,ObsoleteExcuseClosure,SectionLifecycleManager}.tsx",
