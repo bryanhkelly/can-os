@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery,useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { DirectoryTable, DirectoryWindowPagination } from "@/components/workspace";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -81,42 +82,33 @@ export function CompletionEvidenceReviewQueuePanel(){
     </div>}
     {queue.data&&<section className="space-y-3" aria-label="Independent approvals awaiting decision">
       <h3 className="font-serif text-xl">Pending independent review</h3>
-      {queue.data.pending.length===0&&
-        <p className="text-sm text-muted-foreground">No pending approvals in your authorized Site and capability scope.</p>}
-      <ol className="divide-y divide-border border border-border">
-        {queue.data.pending.map(entry=><li key={entry.requestId}
-          className="space-y-2 p-3 text-sm">
-          <strong>{entry.purpose.replaceAll("_"," ")}</strong>
-          <p className="text-xs text-muted-foreground">
-            Exact canonical source: {entry.sourceId}
-            {entry.proposedOutcome?" · Decision: "+entry.proposedOutcome:""}
-          </p>
-          <p>{entry.reviewReason}</p>
-          <p className="break-all font-mono text-xs text-muted-foreground">
-            Verified evidence version: {entry.evidenceVersionId}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <Button disabled={decide.isPending}
-              onClick={()=>decide.mutate({requestId:entry.requestId,decision:"approve"})}>
-              Approve independent evidence
-            </Button>
-            <Button variant="outline" disabled={decide.isPending}
-              onClick={()=>decide.mutate({requestId:entry.requestId,decision:"reject"})}>
-              Reject
-            </Button>
-          </div>
-        </li>)}
-      </ol>
+      <DirectoryTable label="Pending independent approvals"
+        caption="Requests within your authorized Site and capability scope; decisions are server-authorized."
+        rows={queue.data.pending} rowKey={entry=>entry.requestId}
+        empty={<p className="p-4 text-sm text-muted-foreground">No pending approvals in your authorized Site and capability scope.</p>}
+        columns={[
+          {id:"purpose",title:"Purpose",render:entry=>entry.purpose.replaceAll("_"," ")},
+          {id:"source",title:"Canonical source",render:entry=><>
+            <span className="break-all font-mono text-xs">{entry.sourceId}</span>
+            {entry.proposedOutcome&&<p className="mt-1 text-xs">Proposed: {entry.proposedOutcome}</p>}
+          </>},
+          {id:"reason",title:"Reason",render:entry=>entry.reviewReason},
+          {id:"evidence",title:"Verified evidence",render:entry=><span className="break-all font-mono text-xs">{entry.evidenceVersionId}</span>},
+        ]}
+        rowActions={[
+          {id:"approve",label:"Approve evidence",allowed:()=>true,
+            disabled:()=>decide.isPending,
+            onClick:entry=>decide.mutate({requestId:entry.requestId,decision:"approve"})},
+          {id:"reject",label:"Reject",allowed:()=>true,
+            disabled:()=>decide.isPending,
+            onClick:entry=>decide.mutate({requestId:entry.requestId,decision:"reject"})},
+        ]}
+        pagination={<DirectoryWindowPagination label="Independent evidence approvals"
+          pageIndex={page} hasMore={queue.data.hasMore}
+          disabled={queue.isFetching||decide.isPending} onPageChange={setPage}/>}/>
       {decide.isError&&<p role="alert" className="text-sm">
         Approval was denied, modified or already reviewed. Refresh and verify authorization.
       </p>}
-      <div className="flex items-center gap-3">
-        <Button variant="outline" disabled={page===0}
-          onClick={()=>setPage(x=>Math.max(0,x-1))}>Previous</Button>
-        <span className="text-xs text-muted-foreground">Page {page+1}</span>
-        <Button variant="outline" disabled={!queue.data.hasMore}
-          onClick={()=>setPage(x=>x+1)}>Next</Button>
-      </div>
     </section>}
     <section aria-label="Credential revocation" className="space-y-3 border-t border-border pt-5">
       <h3 className="font-serif text-xl">Governed credential revocation</h3>
