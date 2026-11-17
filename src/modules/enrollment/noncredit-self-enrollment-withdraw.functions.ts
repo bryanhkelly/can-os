@@ -5,12 +5,13 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import {
-  auditEvents as canonicalAuditEvents, canonicalAccounts, domainEvents as canonicalDomainEvents,
+  canonicalAccounts,
   facilitatedLearningParticipants, learnerCourseAttempts, noncreditRegistrations,
   noncreditCompletionDecisions,
   noncreditSelfEnrollmentClaims,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { noncreditSelfWithdrawalDecision } from "@/domain/noncredit-self-enrollment";
 
 /**
@@ -96,7 +97,7 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
       }
       await tx.update(noncreditRegistrations).set({status:"withdrawn"})
         .where(eq(noncreditRegistrations.id,registration.id));
-      await tx.insert(canonicalAuditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:bridge.canonicalPersonId,
         owningOrganizationId:registration.organizationId,
         eventCode:"noncredit.self_enrollment.withdrawn",
@@ -104,7 +105,7 @@ export const withdrawMyNoncreditRegistration = createServerFn({method:"POST"})
         payload:{source:"self_service",attemptsWithdrawn:ids.length,
           seatReleased:false,historyErased:false},
       });
-      await tx.insert(canonicalDomainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"NoncreditSelfEnrollmentWithdrawn",
         aggregateType:"noncredit_registration",aggregateId:registration.id,
         actorPersonId:bridge.canonicalPersonId,
