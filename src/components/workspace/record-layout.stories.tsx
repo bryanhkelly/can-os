@@ -84,3 +84,24 @@ export const CompactRecordFacts: Story = {
     await expect(canvas.getByLabelText("Action metadata")).toHaveClass("sm:grid-cols-3");
   },
 };
+
+export const SchoolDayEvidenceTiles: Story = {
+  render: () => <div className="max-w-3xl bg-background p-5 sm:p-8">
+    <h2 className="text-lg font-semibold">First-day verification preview</h2>
+    <p className="mt-2 text-sm text-muted-foreground">
+      These example values are not attendance, supervised presence, opening approval or custody release.
+    </p>
+    <RecordFacts label="School-day verification evidence" variant="tiles" columns={3}
+      className="mt-4 gap-2" items={[
+        {id:"expected",label:"Expected onsite",value:"Yes"},
+        {id:"staffing",label:"Reviewed staffing plan",value:"Ready"},
+        {id:"attendance",label:"Observed attendance",value:"Not yet observable"},
+      ]}/>
+  </div>,
+  play: async ({ canvas }) => {
+    const facts = canvas.getByLabelText("School-day verification evidence");
+    await expect(facts).toHaveClass("sm:grid-cols-3");
+    await expect(canvas.getByText("Not yet observable")).toBeVisible();
+    await expect(canvas.getByText(/These example values are not attendance/)).toBeVisible();
+  },
+};
