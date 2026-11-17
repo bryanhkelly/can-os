@@ -106,7 +106,8 @@
     "db:canonical:main-schema": "node scripts/acceptance/check-main-extended-schema.mjs",
     "db:canonical:drift-audit": "node scripts/acceptance/check-main-qa-db-drift.mjs",
     "verify:site-identity:preflight": "node scripts/acceptance/check-unified-site-identity.mjs",
-    "verify:site:noncredit-catalog": "tsx scripts/acceptance/check-site-noncredit-catalog.ts"
+    "verify:site:noncredit-catalog": "tsx scripts/acceptance/check-site-noncredit-catalog.ts",
+    "verify:schema:consolidation": "node scripts/acceptance/check-public-schema-consolidation.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
