@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { DirectoryTable, WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
@@ -28,60 +28,24 @@ function DeploymentLabPage() {
         Blueprint execution evidence is shown only when produced by this organization.
       </p>
     </section>
-    <div className="mt-5 overflow-x-auto border border-border bg-card">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-          <tr>
-            <th scope="col" className="p-3 font-semibold">Deployment</th>
-            <th scope="col" className="p-3 font-semibold">Operation</th>
-            <th scope="col" className="p-3 font-semibold">Offering</th>
-            <th scope="col" className="p-3 font-semibold">Adoption</th>
-            <th scope="col" className="p-3 font-semibold">Participation</th>
-            <th scope="col" className="p-3 font-semibold">Blueprint evidence</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.deployments.map(row => <tr key={row.id} className="border-b border-border align-top last:border-0">
-            <th scope="row" className="p-3 font-medium">{row.name}
-              <p className="mt-1 font-mono text-xs font-normal text-muted-foreground">{row.code}</p>
-              <p className="mt-1 text-xs font-normal text-muted-foreground">Status: {row.status}</p>
-              <p className="mt-1 break-all font-mono text-xs font-normal text-muted-foreground">{row.id}</p>
-            </th>
-            <td className="p-3">{row.operationName}
-              <p className="mt-1 text-xs text-muted-foreground">{row.operationStatus}</p>
-            </td>
-            <td className="p-3">{row.offeringTitle}
-              <p className="mt-1 text-xs text-muted-foreground">{row.offeringCode} · {row.offeringStatus}</p>
-            </td>
-            <td className="p-3">
-              <span className={"font-medium " + (row.hasCurrentApprovedAdoption ? "text-foreground" : "text-muted-foreground")}>
-                {row.hasCurrentApprovedAdoption
-                  ? "Approved · version " + row.currentVersionNo
-                  : "No current approved adoption"}
-              </span>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {row.adoptionCount} adoption record(s)
-                {row.latestVersionNo !== null ? " · latest v" + row.latestVersionNo : ""}
-                {row.latestAdoptionStatus ? " · " + row.latestAdoptionStatus : ""}
-              </p>
-            </td>
-            <td className="p-3 tabular-nums">
-              {row.enrollmentCount} enrollment(s)
-              <p className="mt-1 text-xs text-muted-foreground">
-                {row.noncreditRegistrationCount} noncredit registration(s)
-              </p>
-            </td>
-            <td className="p-3">{row.executionBatchId
-              ? <><span>Executed batch</span><p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.executionBatchId}</p></>
-              : <span className="text-muted-foreground">No provider-visible execution record</span>}
-            </td>
-          </tr>)}
-          {data.deployments.length === 0 && <tr><td colSpan={6} role="status"
-            className="p-5 text-muted-foreground">
-            No deployments match your current organization, operator role and authorized Site.
-          </td></tr>}
-        </tbody>
-      </table>
-    </div>
+    <DirectoryTable label="Deployments" caption="Authorized deployments and adoption evidence; participation counts do not prove attendance."
+      rows={data.deployments} rowKey={row=>row.id}
+      empty={<p className="p-4 text-sm text-muted-foreground">No deployments match your organization, operator role and authorized Site.</p>}
+      columns={[
+        {id:"deployment",title:"Deployment",render:row=><>{row.name}
+          <p className="mt-1 font-mono text-xs text-muted-foreground">{row.code}</p>
+          <p className="mt-1 text-xs text-muted-foreground">Status: {row.status}</p>
+          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.id}</p></>},
+        {id:"operation",title:"Operation",render:row=><>{row.operationName}<p className="mt-1 text-xs text-muted-foreground">{row.operationStatus}</p></>},
+        {id:"offering",title:"Offering",render:row=><>{row.offeringTitle}<p className="mt-1 text-xs text-muted-foreground">{row.offeringCode} · {row.offeringStatus}</p></>},
+        {id:"adoption",title:"Adoption",render:row=><>
+          <span className={row.hasCurrentApprovedAdoption?"font-medium":"text-muted-foreground"}>{row.hasCurrentApprovedAdoption?"Approved · version "+row.currentVersionNo:"No current approved adoption"}</span>
+          <p className="mt-1 text-xs text-muted-foreground">{row.adoptionCount} adoption record(s){row.latestVersionNo!==null?" · latest v"+row.latestVersionNo:""}{row.latestAdoptionStatus?" · "+row.latestAdoptionStatus:""}</p>
+        </>},
+        {id:"participation",title:"Participation",render:row=><>{row.enrollmentCount} enrollment(s)
+          <p className="mt-1 text-xs text-muted-foreground">{row.noncreditRegistrationCount} noncredit registration(s)</p></>},
+        {id:"evidence",title:"Blueprint evidence",render:row=>row.executionBatchId?<><span>Executed batch</span>
+          <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{row.executionBatchId}</p></>:<span className="text-muted-foreground">No provider-visible execution record</span>},
+      ]}/>
   </WorkspaceShell>;
 }
