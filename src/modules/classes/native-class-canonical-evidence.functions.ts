@@ -37,7 +37,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
     return db.transaction(async tx=>{
       const [enrollment]=await tx.select().from(canonicalClassEnrollments)
         .where(and(eq(canonicalClassEnrollments.id,data.classEnrollmentId),
-          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId))).limit(1);
+          eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId!))).limit(1);
       if(!enrollment?.courseAttemptId)
         throw new AuthorizationError("own Class Course Attempt");
       const access=await authorizeCanonicalCourseAttempt(tx,actor,enrollment.courseAttemptId,true);
@@ -67,7 +67,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       // Only this Person's existing canonical assessment grants can be read;
       // no questionnaire answers, grading keys, or private survey data leave.
       const [learner]=await tx.select({id:learnerProfiles.id})
-        .from(learnerProfiles).where(eq(learnerProfiles.personId,actor.actorPersonId))
+        .from(learnerProfiles).where(eq(learnerProfiles.personId,actor.actorPersonId!))
         .limit(1);
       const now=new Date();
       const grants=learner?await tx.select({
