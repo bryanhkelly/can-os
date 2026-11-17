@@ -42,9 +42,29 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
            AND organization_id IS NULL AND site_id IS NULL) AS active_platform_admins
     `);
     const row = summary.rows[0];
+    // Platform-only operational diagnostic. No people, access tokens or
+    // learner records are included. A missing link is not auto-approved.
+    const siteRows = await db.execute(sql`
+      SELECT s.id AS "siteId", s.name AS "siteName",
+        COALESCE(link.status, 'not_requested') AS "linkStatus",
+        CASE WHEN native.id IS NOT NULL THEN true ELSE false END AS "canonicalSiteExists"
+      FROM public.sites s
+      LEFT JOIN public.site_canonical_identity_links link
+        ON link.public_site_id = s.id
+      LEFT JOIN education_v30.sites native
+        ON native.id = link.canonical_site_id
+      ORDER BY s.name, s.id
+      LIMIT 100
+    `);
     return {
       organizations: Number(row?.organizations ?? 0),
       sites: Number(row?.sites ?? 0),
       activePlatformAdmins: Number(row?.active_platform_admins ?? 0),
+      siteReadiness: siteRows.rows.map(item => ({
+        siteId: String(item.siteId),
+        siteName: String(item.siteName),
+        linkStatus: String(item.linkStatus),
+        canonicalSiteExists: item.canonicalSiteExists === true,
+      })),
     };
   });
