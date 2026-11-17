@@ -86,6 +86,12 @@ describe("WS2 shared Class capacity and lifecycle reason policy",()=>{
       method:"assignment",activeOrPending:9,classCapacity:10,offeringCapacity:8,
     })).not.toThrow();
     expect(()=>assertNativeClassSeatAvailable({
+      method:"invitation",activeOrPending:7,classCapacity:10,offeringCapacity:8,
+    })).not.toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
+      method:"invitation",activeOrPending:8,classCapacity:10,offeringCapacity:8,
+    })).toThrow();
+    expect(()=>assertNativeClassSeatAvailable({
       method:"self",activeOrPending:8,classCapacity:10,offeringCapacity:8,
     })).toThrow();
     expect(()=>assertNativeClassSeatAvailable({
