@@ -1,3 +1,5 @@
+> **Integration plan update, November 16, 2026:** `main` was non-destructively synchronized into the integration branch at `ffbe2a48a9e7e418d11693cc8c0b805a31132d0a` (main parent `5f0f09a59d0d14eb0d1cc8a16f2b09d32dd160aa`). WS1–WS6 have now submitted draft PRs (#308, #309, #311, #313, #312, #314). Their implementation work remains **unmerged** pending contract/security/CI evidence. Adopt [WS1 PRM v1.1.0 preview integration decision](./ws00-contract-decision-v1.1.md) and enforce the new [cross-stream source guard](../../scripts/acceptance/check-ws00-cross-stream-guards.mjs). Prioritize WS2+WS5 publisher publication guard and WS2+WS3 lock order; neither is yet resolved. Production is NO-GO.
+
 # WS00 Integration Plan and Dependency Matrix
 
 **Integration base:** `5e50d26c197330b3f01403c221f6646f8cbef823` on 2026-11-16.  
