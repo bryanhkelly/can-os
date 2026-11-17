@@ -186,7 +186,7 @@ function MyActivityPage() {
   }
   const opportunities = bucket === "upcoming" && kind === "all" ? activity.data?.opportunities ?? [] : [];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
-  const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial") ?? [];
+  const partialSources = activity.data?.sources.filter(item => item.state === "ready" && item.coverage === "partial" && (item.source==="noncredit_waitlist" || Boolean(nextCursors[item.source as ParticipationSource]))) ?? [];
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Activity"
     subtitle="Your learning, programs, and participation in one place. Each provider keeps authority over its own records."
     actions={<Link to="/explore" className="text-sm font-semibold text-primary underline underline-offset-4">
@@ -237,8 +237,8 @@ function MyActivityPage() {
 
     {activity.data && <>
       {partialSources.length > 0 && <div role="note" className="mt-5 border border-border bg-card p-4 text-sm">
-        <p className="font-semibold">Available records, not a complete lifetime history</p>
-        <p className="mt-1 text-muted-foreground">The following sources have limited or current-workspace-only coverage: {partialSources.map(item => item.source.replaceAll("_", " ")).join(", ")}. This view does not certify missing records as nonexistent.</p>
+        <p className="font-semibold">Some sources have more history or limited coverage</p>
+        <p className="mt-1 text-muted-foreground">These sources still have additional pages or source-managed limits: {partialSources.map(item => item.source.replaceAll("_", " ")).join(", ")}. This view does not certify missing records as nonexistent.</p>
         {partialSources.filter(item => item.message).map(item =>
           <p key={item.source} className="mt-2 text-muted-foreground">{item.message}</p>)}
         {partialSources.some(item => item.source === "native_class" && item.message) &&
