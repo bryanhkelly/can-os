@@ -23,8 +23,8 @@ describe("WS3 completion read and operator controls",()=>{
     expect(noncreditRoute).toContain('createFileRoute("/canonical_/noncredit-review-queue")');
   });
 
-  it("keeps operator history view behind a current grant, exact Site and disabled flag",()=>{
-    expect(operatorRead).toContain("CAN_WS3_OPERATOR_REVIEW_ENABLED");
+  it("keeps operator history view behind a current grant and exact Site",()=>{
+    expect(operatorRead).not.toContain("CAN_WS3_OPERATOR_REVIEW_ENABLED");
     expect(operatorRead).toContain('assertCapability(actor,"noncredit.completion.decide")');
     expect(operatorRead).toContain("assertNoncreditCompletionSiteScope");
     expect(operatorRead).toContain("projectCurrentNoncreditCompletion");
@@ -38,7 +38,7 @@ describe("WS3 completion read and operator controls",()=>{
     expect(operatorPanel).toContain("reason.trim()");
   });
   it("never marks Class outcomes as policy-verified without the missing authority",()=>{
-    expect(canonicalClassRead).toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
+    expect(canonicalClassRead).not.toContain("CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED");
     expect(canonicalClassRead).toContain("classCompletionAuthorityVerified=validity.rows[0]?.valid===true");
     expect(canonicalClassPanel).toContain('?"Verified":"Not verified"');
     expect(canonicalClassPanel).toContain("no current independently verified completion decision is available");
