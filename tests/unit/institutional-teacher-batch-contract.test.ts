@@ -67,7 +67,7 @@ describe("batched teacher scope preserves strict individual agreement policy", (
     const context = readFileSync(resolve(process.cwd(),
       "src/modules/identity/command-context.server.ts"), "utf8");
     const batch = readFileSync(resolve(process.cwd(),
-      "src/modules/programs/program-site-authorization.server.ts"), "utf8");
+      "src/modules/programs/institutional-academic-authority-read.server.ts"), "utf8");
     expect(context).toContain("listInstitutionallyAuthorizedAcademicProgramIds(");
     expect(context).not.toContain("await requireInstitutionalAcademicProgramAuthority(");
     expect(batch).toContain("assertCurrentOperatingAuthorization(authorization, identity");
