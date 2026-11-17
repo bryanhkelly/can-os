@@ -35,14 +35,12 @@ export function canonicalSessionDigestFromRequest(request: Request): string {
     .update(pepper).update(":").update(raw).digest("hex");
 }
 
-const canonicalSessionReads = new WeakMap<Request, Promise<CanonicalSessionRow>>();
-
+/** Always revalidate against the restricted reader. Pool reuse amortizes
+ * connections; caching the authorization decision across mutation boundaries
+ * could preserve a revoked grant on a long-running request.
+ */
 export function getCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
-  const existing = canonicalSessionReads.get(request);
-  if (existing) return existing;
-  const pending = readCanonicalSessionRow(request);
-  canonicalSessionReads.set(request, pending);
-  return pending;
+  return readCanonicalSessionRow(request);
 }
 
 async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
