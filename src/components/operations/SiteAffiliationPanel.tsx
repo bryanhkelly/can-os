@@ -75,12 +75,12 @@ export function SiteAffiliationPanel({ siteId }: { siteId: string }) {
     );
   }
 
-  return <section className="mt-3 rounded-xl border bg-card p-5" aria-label="Denomination affiliation">
+  return <section className="mt-3 border border-border bg-card p-5" aria-label="Denomination affiliation">
     <h3 className="text-base font-semibold">Denomination affiliation</h3>
     <p className="mt-1 text-sm text-muted-foreground">Request a relationship with a denomination. Your school retains ownership, and approval does not share student, family or academic records.</p>
     {loading ? <p className="mt-3 text-sm" role="status">Loading network affiliations…</p> : <>
       {entries.length > 0 && <ul className="mt-4 space-y-2">
-        {entries.map(entry => <li key={entry.id} className="rounded-lg border p-3 text-sm">
+        {entries.map(entry => <li key={entry.id} className="border border-border p-3 text-sm">
           <span className="font-semibold">{entry.denominationName}</span> · {entry.status}
           {entry.decisionReason && <p className="mt-1 text-muted-foreground">HQ decision: {entry.decisionReason}</p>}
           {(entry.status === "pending" || entry.status === "approved") &&
