@@ -11,7 +11,7 @@
  * Both accounts must already exist, be verified, non-demo and represent
  * different real Persons. An account-wide role has NULL organization/site.
  * The approver must have an independently active can_network_steward
- * organization grant or an existing app_admin grant. This script cannot
+ * institutional can_network organization grant or an existing app_admin grant. This script cannot
  * bootstrap an unapproved reviewer and cannot replace external approval.
  */
 import { Pool } from "@neondatabase/serverless";
@@ -55,12 +55,14 @@ try {
   // reviewer or existing platform administrator membership.
   const authority = await client.query(`
     SELECT count(*)::int AS count
-    FROM public.account_person_grants
-    WHERE account_id = $1 AND person_id = $2 AND active = true
+    FROM public.account_person_grants g
+    LEFT JOIN public.organizations o ON o.id = g.organization_id
+    WHERE g.account_id = $1 AND g.person_id = $2 AND g.active = true
       AND (
-        (role = 'can_network_steward' AND organization_id IS NOT NULL AND site_id IS NULL)
+        (g.role = 'can_network_steward' AND g.organization_id IS NOT NULL
+          AND g.site_id IS NULL AND o.type = 'can_network')
         OR
-        (role = 'app_admin' AND organization_id IS NULL AND site_id IS NULL)
+        (g.role = 'app_admin' AND g.organization_id IS NULL AND g.site_id IS NULL)
       )
   `, [approver.id, approver.person_id]);
   if (Number(authority.rows[0]?.count) !== 1) {
