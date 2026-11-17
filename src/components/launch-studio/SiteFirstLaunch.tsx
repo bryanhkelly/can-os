@@ -295,8 +295,8 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
             <summary className="cursor-pointer font-semibold text-primary">Advanced setup and approvals</summary>
             <div className="mt-3 space-y-3">
               <p className="text-muted-foreground">For operators managing existing canonical education records, these governed workspaces are available without changing your initial Site plans.</p>
-              {siteId&&<Link to="/site-identity" search={{mode:"request",siteId}}
-                className="block font-semibold text-primary underline">Verify existing Site identity connection</Link>}
+              {siteId&&<Link to="/class" search={{view:"manage",siteId}}
+                className="block font-semibold text-primary underline">Review Classroom readiness</Link>}
               <Link to="/canonical/blueprints" search={{}}
                 className="block font-semibold text-primary underline">Manage approved educational blueprints</Link>
               {siteId&&preparation.showSchoolOpeningPreparation&&
