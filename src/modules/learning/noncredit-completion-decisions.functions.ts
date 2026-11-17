@@ -4,6 +4,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { EventTypes } from "@/domain/event-types";
+import { domainEvents as canNotificationEvents } from "@/db/schema";
 import { auditEvents, domainEvents, learnerCourseAttempts, noncreditRegistrations,
   noncreditTrainingVersions, noncreditCompletionPolicies,
   noncreditCompletionDecisions } from "@/db/canonical-v301";
@@ -89,6 +90,17 @@ export const decideNoncreditCompletion=createServerFn({method:"POST"})
       await tx.insert(domainEvents).values({eventType:EventTypes.NoncreditTrainingCompleted,
         aggregateType:"noncredit_completion_decision",aggregateId:created.id,
         actorPersonId:actor.actorPersonId!,payload});
+      // The native source journal lives in education_v30. CAN's notification
+      // worker consumes public.domain_events instead. Publish an explicit
+      // cross-schema projection in the SAME transaction so rollback cannot
+      // leave a completion notice without an authoritative decision.
+      // Never write a native Person UUID into the public actor FK.
+      await tx.insert(canNotificationEvents).values({
+        eventType:EventTypes.NoncreditTrainingCompleted,
+        aggregateType:"noncredit_completion_decision",aggregateId:created.id,
+        actorPersonId:null,
+        payload:{canonicalDecisionId:created.id},
+      });
       return {decisionId:created.id,alreadyCompleted:false};
     });
   });
