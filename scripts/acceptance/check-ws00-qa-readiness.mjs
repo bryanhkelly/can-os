@@ -22,6 +22,13 @@ async function run(){
   const url=required("TEST_DATABASE_URL");
   if(env.DATABASE_URL!==url)
     throw new Error("WS00 QA application and tests must target the same isolated database");
+  for(const flag of ["CAN_UNIFIED_CLASS_COMMANDS_ENABLED",
+    "CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED",
+    "CAN_WS3_EVIDENCE_REVIEW_ENABLED",
+    "CAN_WS4_SESSION_AGENDAS_ENABLED"]){
+    if(env[flag]!=="true")
+      throw new Error("QA application must enable the isolated-test-only capability "+flag);
+  }
   const expectedBranch=required("CAN_E2E_TEST_BRANCH_ID");
   await verifyAdmissionsNeonBranch({
     ...env, CAN_ADMISSIONS_TEST_BRANCH_ID:expectedBranch,
@@ -47,7 +54,7 @@ async function run(){
     SELECT id::text AS id,site_id::text AS site_id,
            course_version_id::text AS course_version_id,state
     FROM education_v30.classes
-    WHERE id=ANY(${ids}::uuid[])
+    WHERE id IN (${ids[0]}::uuid,${ids[1]}::uuid,${ids[2]}::uuid)
   `;
   if(rows.length!==3||rows.some(row=>!row.site_id||!row.course_version_id||row.state!=="active"))
     throw new Error("WS00 QA requires three active, Site-bound, Course-version-pinned Classes");
@@ -59,7 +66,7 @@ async function run(){
   const counts=await sql`
     SELECT class_id::text AS class_id,count(*)::integer AS sessions
     FROM education_v30.class_sessions
-    WHERE class_id=ANY(${[ids[1],ids[2]]}::uuid[])
+    WHERE class_id IN (${ids[1]}::uuid,${ids[2]}::uuid)
     GROUP BY class_id
   `;
   for(const id of ids.slice(1)){
