@@ -28,7 +28,7 @@ describe("native Class enrollment method exposure",()=>{
   });
 
   it("does not turn an invitation into a seat or bypass consent",()=>{
-    expect(enrollment).toContain('enrollmentMethod:invitation?"invitation":"self"');
+    expect(enrollment).toContain('enrollmentMethod:invitation?"invitation":approval?"approval":"self"');
     expect(enrollment).toContain('invitation.learnerPersonId!==learnerPersonId');
     expect(enrollment).toContain('invitation.expiresAt<=now');
     expect(enrollment).toContain("assertNativeClassSeatAvailable");
