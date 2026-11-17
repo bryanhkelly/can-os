@@ -17,12 +17,23 @@ describe("workspace design primitives", () => {
     expect(error).not.toContain("<button");
   });
 
+  it("announces attention as a warning without styling it as a failure", () => {
+    const html = renderToStaticMarkup(<WorkspaceNotice tone="attention">
+      A saved command needs its display refreshed.
+    </WorkspaceNotice>);
+    expect(html).toContain('role="alert"');
+    expect(html).toContain("border-warning/50");
+    expect(html).not.toContain("border-danger/50");
+    expect(html).toContain("A saved command needs its display refreshed.");
+  });
+
   it("supports block content in accessible notices without nested paragraphs", () => {
     const html = renderToStaticMarkup(<WorkspaceNotice tone="success">
       <p>Saved successfully</p><p>Refresh may still be pending</p>
     </WorkspaceNotice>);
     expect(html).toMatch(/^<div\\b/);
-    expect(html).toContain("<p>Saved successfully</p>");
+    expect(html).toContain("<div class=\"min-w-0 flex-1\"><p>Saved successfully</p>");
+    expect(html).not.toContain("<span class=\"min-w-0 flex-1\"><p>");
     expect(html).toContain("<p>Refresh may still be pending</p>");
   });
 
