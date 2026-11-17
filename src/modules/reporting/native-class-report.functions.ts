@@ -124,9 +124,12 @@ export const getNativeClassReport=createServerFn({method:"GET"})
           )))
           throw new Error("Class reporting Session authority does not reconcile");
       }
-      const attemptIds=[...new Set(enrollments.map(e=>e.courseAttemptId)
-        .filter((id):id is string=>id!==null))];
-      const courseAttempts=attemptIds.length?bounded(await tx.select({
+      // Retakes share the same canonical Class Enrollment. The selected
+      // courseAttemptId is only a pointer to the current attempt, not the
+      // historical source boundary for attendance or assessments.
+      const enrollmentIds=enrollments.map(e=>e.id);
+      const enrollmentById=new Map(enrollments.map(e=>[e.id,e] as const));
+      const courseAttempts=enrollmentIds.length?bounded(await tx.select({
         id:learnerCourseAttempts.id,
         classEnrollmentId:learnerCourseAttempts.classEnrollmentId,
         enrollmentId:learnerCourseAttempts.enrollmentId,
@@ -135,23 +138,29 @@ export const getNativeClassReport=createServerFn({method:"GET"})
         deploymentId:learnerCourseAttempts.deploymentId,
         courseVersionId:learnerCourseAttempts.courseVersionId,
       }).from(learnerCourseAttempts)
-        .where(inArray(learnerCourseAttempts.id,attemptIds)).limit(5001),
-        5000,"Canonical Course Attempts"):[];
-      if(courseAttempts.length!==attemptIds.length)
-        throw new Error("Class Enrollment Course Attempt references are incomplete");
+        .where(inArray(learnerCourseAttempts.classEnrollmentId,enrollmentIds))
+        .limit(10001),10000,"Canonical Class-owned Course Attempts"):[];
       const authoritativeAttemptById=new Map(courseAttempts.map(a=>[a.id,a] as const));
-      const uniqueAttemptEnrollment=new Set<string>();
-      for(const entry of enrollments){
-        if(!entry.courseAttemptId)continue;
-        const attempt=authoritativeAttemptById.get(entry.courseAttemptId);
-        if(!attempt||attempt.classEnrollmentId!==entry.id||
-          attempt.enrollmentId||attempt.noncreditRegistrationId||attempt.sectionId||
-          attempt.deploymentId!==cls.deploymentId||
-          attempt.courseVersionId!==cls.courseVersionId||
-          uniqueAttemptEnrollment.has(attempt.id))
+      const attemptsByEnrollment=new Map<string,string[]>();
+      for(const attempt of courseAttempts){
+        const owner=attempt.classEnrollmentId
+          ?enrollmentById.get(attempt.classEnrollmentId):null;
+        if(!owner||attempt.enrollmentId||attempt.noncreditRegistrationId||
+          attempt.sectionId||attempt.deploymentId!==cls.deploymentId||
+          attempt.courseVersionId!==cls.courseVersionId)
           throw new Error("Course Attempt does not belong to this exact Class Enrollment");
-        uniqueAttemptEnrollment.add(attempt.id);
+        const current=attemptsByEnrollment.get(owner.id)??[];
+        current.push(attempt.id);
+        attemptsByEnrollment.set(owner.id,current);
       }
+      for(const entry of enrollments){
+        if(entry.courseAttemptId&&!authoritativeAttemptById.has(entry.courseAttemptId))
+          throw new Error("Selected Class Course Attempt reference is missing");
+        if(entry.courseAttemptId&&
+          !attemptsByEnrollment.get(entry.id)?.includes(entry.courseAttemptId))
+          throw new Error("Selected Course Attempt is not linked to exact Class Enrollment");
+      }
+      const attemptIds=courseAttempts.map(attempt=>attempt.id);
       const roomIds=[...new Set(sessions.map(s=>s.roomId)
         .filter((id):id is string=>id!==null))];
       const attendance=attemptIds.length&&roomIds.length?bounded(await tx.select({
@@ -201,7 +210,6 @@ export const getNativeClassReport=createServerFn({method:"GET"})
       }).from(assessmentExecutionResults)
         .where(inArray(assessmentExecutionResults.attemptId,assessmentIds))
         .limit(20001),20000,"Assessment results"):[];
-      const enrollmentIds=enrollments.map(e=>e.id);
       const outcomes=enrollmentIds.length?bounded(await tx.select({
         id:canonicalClassOutcomes.id,
         enrollmentId:canonicalClassOutcomes.classEnrollmentId,
@@ -223,7 +231,10 @@ export const getNativeClassReport=createServerFn({method:"GET"})
       const report=aggregateClassEvidence({
         classId:cls.id,asOf:iso(asOf),from:iso(from),to:iso(to),
         offerings:offerings.map(o=>({...o,publishedAt:o.publishedAt?iso(o.publishedAt):null})),
-        enrollments:enrollments.map(e=>({...e,enrolledAt:iso(e.enrolledAt)})),
+        enrollments:enrollments.map(e=>({...e,
+          enrolledAt:iso(e.enrolledAt),
+          courseAttemptIds:attemptsByEnrollment.get(e.id)??[],
+        })),
         sessions:sessions.map(s=>({...s,scheduledAt:iso(s.scheduledAt),
           roomEndedAt:s.roomEndedAt?iso(s.roomEndedAt):null})),
         attendance:attendance.map(a=>({...a,assertedAt:iso(a.assertedAt)})),
