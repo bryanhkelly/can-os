@@ -136,9 +136,9 @@ function NativeClasses(){
     const available=combinedOptions.find(row=>
       row.offeringVersionId===recipePlan.offeringVersionId &&
       row.courseVersionId===course.courseVersionId &&
-      row.localClassPolicy.allowedDeliveryModes.includes(course.deliveryMode) &&
+      row.localClassPolicy.allowedDeliveryModes.some(mode=>mode===course.deliveryMode) &&
       row.siteOptions.some(site=>site.id===rolloutSiteId &&
-        site.allowedDeliveryModes.includes(course.deliveryMode)));
+        site.allowedDeliveryModes.some(mode=>mode===course.deliveryMode)));
     if(!available){setError("This Site cannot launch the selected Course and delivery mode.");return;}
     setRecipeCourseId(course.courseVersionId);
     setChoice(optionKey(available));setSiteId(rolloutSiteId);
@@ -376,11 +376,11 @@ function NativeClasses(){
                   setChoice(optionKey(row));setTitle(row.courseTitle);
                   setClassCapacity(row.localClassPolicy.maxClassCapacity===null
                     ?"":String(row.localClassPolicy.maxClassCapacity));
-                  const mode=row.localClassPolicy.allowedDeliveryModes.includes(deliveryMode)
+                  const mode=row.localClassPolicy.allowedDeliveryModes.some(mode=>mode===deliveryMode)
                     ?deliveryMode:row.localClassPolicy.allowedDeliveryModes[0]!;
                   setDeliveryMode(mode);
                   setSiteId(preferredSiteId&&row.siteOptions.some(site=>site.id===preferredSiteId&&
-                    site.allowedDeliveryModes.includes(mode))?preferredSiteId:"");
+                    site.allowedDeliveryModes.some(mode=>mode===mode))?preferredSiteId:"");
                   setNotice("Approved Course selected. Review local delivery configuration before creating a Class.");
                 }}>Configure Class</Button>
             </li>)}
@@ -500,12 +500,12 @@ function NativeClasses(){
                   ?selectedOption.courseTitle:title||selectedOption.courseTitle);
                 setClassCapacity(selectedOption.localClassPolicy.maxClassCapacity===null
                   ?classCapacity:String(selectedOption.localClassPolicy.maxClassCapacity));
-                if(!selectedOption.localClassPolicy.allowedDeliveryModes.includes(deliveryMode)){
+                if(!selectedOption.localClassPolicy.allowedDeliveryModes.some(mode=>mode===deliveryMode)){
                   setDeliveryMode(selectedOption.localClassPolicy.allowedDeliveryModes[0]!);
                   setSiteId("");
                 }else{
                   setSiteId(selectedOption.siteOptions.some(site=>site.id===preferredSiteId&&
-                    site.allowedDeliveryModes.includes(deliveryMode))?preferredSiteId??"":"");
+                    site.allowedDeliveryModes.some(mode=>mode===deliveryMode))?preferredSiteId??"":"");
                 }
               }else setSiteId("");
             }}
@@ -564,10 +564,10 @@ function NativeClasses(){
                 const mode=e.target.value as typeof deliveryMode;
                 setDeliveryMode(mode);
                 if(!selected?.siteOptions.some(site=>site.id===siteId&&
-                    site.allowedDeliveryModes.includes(mode)))setSiteId("");
+                    site.allowedDeliveryModes.some(mode=>mode===mode)))setSiteId("");
               }}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
-                {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.includes(mode))
+                {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(mode=>mode===mode))
                   .map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
               </select>
             </div>
@@ -576,7 +576,7 @@ function NativeClasses(){
                 onChange={e=>setSiteId(e.target.value)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 <option value="">Select an approved physical or virtual Site</option>
-                {(selected?.siteOptions??[]).filter(site=>site.allowedDeliveryModes.includes(deliveryMode))
+                {(selected?.siteOptions??[]).filter(site=>site.allowedDeliveryModes.some(mode=>mode===deliveryMode))
                   .map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
               </select>
             </div>
@@ -672,9 +672,9 @@ function NativeClasses(){
             {!item.classOfferingVersionId&&<Button disabled={busy||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Create draft Offering from form terms</Button>}
             {item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3"
-              onClick={()=>void action(item.classId,item.classOfferingVersionId,"publish")}>Publish Class Offering</Button>}
+              onClick={()=>void action(item.classId,item.classOfferingVersionId!,"publish")}>Publish Class Offering</Button>}
             {item.offeringState==="published"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3" variant="outline"
-              onClick={()=>void action(item.classId,item.classOfferingVersionId,"close")}>Close enrollment</Button>}
+              onClick={()=>void action(item.classId,item.classOfferingVersionId!,"close")}>Close enrollment</Button>}
             {item.offeringState==="closed"&&item.classOfferingVersionId&&<Button
               disabled={busy||methods.length===0||creditModes.length===0}
               className="mt-3 ml-2" variant="outline"
