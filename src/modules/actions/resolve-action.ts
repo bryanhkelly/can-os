@@ -29,6 +29,7 @@ export async function resolveAction(
       resolutionNote: value.resolutionNote.trim(),
     }),
     transaction: work => db.transaction(work),
+    auditOwnedByExecute: true,
     // The domain service owns row locking, resource authorization, event and
     // audit writes. All remain in the same transaction.
     execute: (tx, actor, parsed) => resolveActionInTransaction(tx, actor, parsed),
