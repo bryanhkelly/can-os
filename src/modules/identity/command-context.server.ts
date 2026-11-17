@@ -5,7 +5,7 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
 import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
-import { listInstitutionallyAuthorizedAcademicProgramIds } from "@/modules/programs/program-site-authorization.server";
+import { listInstitutionallyAuthorizedAcademicProgramIds } from "@/modules/programs/institutional-academic-authority-read.server";
 import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 
