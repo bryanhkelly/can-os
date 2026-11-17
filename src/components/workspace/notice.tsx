@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 const icons = { info: Info, success: CircleCheck, danger: CircleAlert };
 
-export const WorkspaceNotice = React.forwardRef<HTMLParagraphElement, {
+export const WorkspaceNotice = React.forwardRef<HTMLDivElement, {
   children: React.ReactNode;
   tone?: "info" | "success" | "danger";
   className?: string;
@@ -13,7 +13,7 @@ export const WorkspaceNotice = React.forwardRef<HTMLParagraphElement, {
   dismissLabel?: string;
 }>(({ children, tone = "info", className, onDismiss, dismissLabel = "Dismiss notice" }, ref) => {
   const Icon = icons[tone];
-  return <p ref={ref} tabIndex={-1} role={tone === "danger" ? "alert" : "status"}
+  return <div ref={ref} tabIndex={-1} role={tone === "danger" ? "alert" : "status"}
     aria-live={tone === "danger" ? "assertive" : "polite"}
     className={cn("flex items-start gap-3 border p-4 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring",
       tone === "info" && "border-info/40 bg-info/10",
@@ -26,6 +26,6 @@ export const WorkspaceNotice = React.forwardRef<HTMLParagraphElement, {
       aria-label={dismissLabel} onClick={onDismiss} className="-my-1 shrink-0">
       <X aria-hidden="true" />
     </Button>}
-  </p>;
+  </div>;
 });
 WorkspaceNotice.displayName = "WorkspaceNotice";
