@@ -31,11 +31,19 @@ function DemoCenterPage() {
           a Course and an operator must establish a Class and its required approvals.
           The teacher then opens the actual Class, not a separate demo classroom.
         </p>
+        <Link to="/launch/site" search={{siteId:site.id,step:"site"}}
+          className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
+          Continue Site setup (authorized operator)
+        </Link>
         <Link to="/class" search={{}} className="mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
           Explore available Classes
         </Link>
-        <Link to="/class" search={{view:"manage"}} className="ml-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
+        <Link to="/class" search={{view:"manage"}} className="mr-3 mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
           Manage Classes (authorized staff)
+        </Link>
+        <Link to="/class" search={{view:"content"}}
+          className="mt-4 inline-flex min-h-11 items-center border border-border px-4 py-3 text-sm font-semibold">
+          Instructional content (authorized creator)
         </Link>
       </WorkspacePanel>
       <WorkspaceNotice tone="info">
