@@ -129,7 +129,7 @@ function CourseActivityPublisher(){
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Publisher workspace"
     title="Course activities"
     subtitle="Prepare one reusable knowledge check and feedback experience for every authorized Class. Content is governed once, delivered locally."
-    actions={<Link to="/canonical/classes" className="text-sm font-semibold underline underline-offset-4">
+    actions={<Link to="/class" search={{view:"manage"}} className="text-sm font-semibold underline underline-offset-4">
       Class management
     </Link>}>
     <section className="mt-5 border border-border bg-card p-5" aria-label="Publisher Course selection">
