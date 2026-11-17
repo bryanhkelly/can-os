@@ -188,7 +188,8 @@ const sharedPatternContracts = {
   "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
   "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions', '"inline"'],
   "workspace/record-layout.tsx": ['export function RecordHeader', 'export function RecordLayout', 'export function RecordFacts', 'export function EntityCard', 'aria-label="Record actions"'],
-  "workflow/status-timeline.tsx": ['<StatusBadge', 'timeZone = "UTC"', 'timeZoneName: "short"', 'dateTime={entry.occurredAt}'],
+  "workflow/status-timeline.tsx": ['<StatusBadge', 'timeZone = "UTC"', '<RecordedTime value={entry.occurredAt}'],
+  "workflow/recorded-time.tsx": ['export function RecordedTime', 'export function formatRecordedTime', 'timeZoneName: "short"', 'dateTime={value}'],
   "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
     'aria-describedby={description ? descriptionId : undefined}', 'columns === 1'],
   "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
@@ -342,6 +343,19 @@ for (const [path, component] of Object.entries(statusConsumers)) {
 
 // Domain status and transport history are rendered through canonical visual
 // components, while route-owned commands and timestamps remain authoritative.
+const governedReceiptConsumers = {
+  "components/communication/NotificationFeed.tsx": ['<RecordedTime', '<EmptyState', '<StatusBadge'],
+  "components/communication/DeliveryHistory.tsx": ['<RecordedTime', '<StatusTimeline', '<WorkspaceNotice'],
+  "components/enrollment/NoncreditDeliveryRecoveryPanel.tsx": ['<DeliveryReceiptFacts', '<StatusBadge', '<Field', '<Textarea'],
+  "components/operations/SchoolFamilyDeliveryRecoveryPanel.tsx": ['<DeliveryReceiptFacts', '<StatusBadge', '<Field', '<Textarea'],
+};
+for (const [file, fragments] of Object.entries(governedReceiptConsumers)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(`${file} must use V6.1 receipt and notification presentation: ${fragment}`);
+    process.exitCode = 1;
+  }
+}
 const governedStatusRoutes = {
   "routes/operations.field-trips.tsx": ["<StatusBadge", "Guardian declined — NOT authorized to board"],
   "routes/admissions.credential-delivery.tsx": ["<CredentialDeliveryHistory records={history}/>"],
