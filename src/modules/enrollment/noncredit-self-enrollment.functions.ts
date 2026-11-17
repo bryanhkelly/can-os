@@ -15,9 +15,9 @@ import {
   participationAttributions,networkMemberships,
   noncreditEnrollmentWaitlist,
   noncreditCompletionPolicies, noncreditCompletionDecisions, noncreditTrainingVersions,
-  auditEvents as canonicalAuditEvents, domainEvents as canonicalDomainEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { noncreditEnrollCommand } from "@/domain/noncredit-self-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 import { getCommandContext } from "@/modules/identity/command-context.server";
@@ -106,7 +106,7 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
     canonicalAccountId:nativeAccount.id,canonicalPersonId:nativePerson.id,
     linkageMethod:"verified_existing_can_session",
   });
-  await tx.insert(canonicalAuditEvents).values({
+  await writeCanonicalAudit(tx,{
     actorPersonId:nativePerson.id,
     eventCode:"noncredit.self_enrollment.identity_linked",
     entityKind:"canonical_account",entityId:nativeAccount.id,
@@ -294,7 +294,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
             updatedAt:now,
           }).where(eq(noncreditEnrollmentWaitlist.id,reservation.id));
         }
-        await tx.insert(canonicalAuditEvents).values({
+        await writeCanonicalAudit(tx,{
           actorPersonId:native.personId,owningOrganizationId:release.registeringOrganizationId,
           eventCode:"noncredit.self_enrolled",entityKind:"noncredit_registration",
           entityId:registrationId,payload:{
@@ -304,7 +304,7 @@ export const enrollMyselfInNoncredit = createServerFn({method:"POST"})
             adultAttested:true,
           },
         });
-        await tx.insert(canonicalDomainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           eventType:"NoncreditSelfEnrollmentCompleted",
           aggregateType:"noncredit_registration",aggregateId:registrationId,
           actorPersonId:native.personId,payload:{
