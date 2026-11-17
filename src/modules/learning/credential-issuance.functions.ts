@@ -29,8 +29,6 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
   .validator((value: unknown) => inputSchema.parse(value))
   .handler(async ({ data }) => {
     setResponseHeader("Cache-Control", "private, no-store");
-    if (process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true")
-      throw new AuthorizationError("credential issuance is not enabled");
     const actor = await getCanonicalCommandContext(getRequest());
     if (!actor.actorPersonId || !["registrar", "site_admin"].includes(actor.role ?? ""))
       throw new AuthorizationError("authorized credential issuer");
