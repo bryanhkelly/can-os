@@ -11,7 +11,9 @@ import {join, relative, resolve, extname} from "node:path";
 import ts from "typescript";
 
 const root=resolve(process.cwd());
-const roots=["src","scripts","tests"];
+// Only runtime and build-tool source blocks a production build. Test suites
+// are parsed by their own test/CI commands, not production asset generation.
+const roots=["src","scripts"];
 const sourceExts=new Map([
   [".ts",ts.ScriptKind.TS], [".tsx",ts.ScriptKind.TSX],
   [".mts",ts.ScriptKind.TS], [".cts",ts.ScriptKind.TS],
