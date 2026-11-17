@@ -86,8 +86,8 @@ export interface WorkspaceNavigationItem {
 export const workspaceHome = {
   account_holder: "/account/",
   app_admin: "/platform",
-  academic_content_creator: "/canonical/content",
-  academic_content_reviewer: "/canonical/content-reviews",
+  academic_content_creator: "/class?view=content",
+  academic_content_reviewer: "/class?view=reviews",
   site_website_editor: "/home",
   room_facilitator: "/home",
   site_staff: "/home",
@@ -111,7 +111,7 @@ export const workspaceHome = {
 export type WorkspaceRole = keyof typeof workspaceHome;
 
 const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readonly string[]>>> = {
-  academic_content_creator: { "/canonical/content": ["/canonical/content/*"] },
+  academic_content_creator: { "/class?view=content": [] },
   student: { "/student/courses": ["/student/courses/*"] },
   teacher: { "/teacher/gradebook": ["/teacher/gradebook/*"] },
 };
@@ -250,7 +250,7 @@ export function getActiveWorkspacePath(
   pathname: string,
 ): string | undefined {
   const segments = pathname.replace(/\/$/, "").split("/");
-  const exact = links.find(item => item.path === segments.join("/"));
+  const exact = links.find(item => item.path.split("?")[0] === segments.join("/"));
   if (exact) return exact.path;
   // Wildcards are reserved for intentionally nested journeys; core operations
   // destinations are enumerated explicitly above.
