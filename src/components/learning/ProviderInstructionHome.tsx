@@ -61,7 +61,7 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
   }
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Content production"
     title="My instructional content"
-    subtitle="Build recorded teacher tracks for your assigned published Courses. Your organization-wide role alone does not grant a Course appointment. All drafts stay private until independent review and publication.">
+    subtitle="Edit assigned native Course lessons before release, and build recorded teacher tracks for published Courses. A verified Course-specific appointment is required. Drafts remain private until independently reviewed and published.">
     {navigation}
     {assignmentsLimited && <p role="alert" className="mt-5 border border-warning p-4 text-sm">The provider inventory reached its safety limit. Ask the academic administrator to narrow or review appointments before relying on this queue.</p>}
     <section className="mt-6 border border-border bg-card p-5" aria-labelledby="create-track-title">
