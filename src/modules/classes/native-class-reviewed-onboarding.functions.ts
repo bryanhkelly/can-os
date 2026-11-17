@@ -11,6 +11,7 @@ import {
   canonicalEnrollmentOrganizations, auditEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import { DomainError } from "@/domain/errors";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
