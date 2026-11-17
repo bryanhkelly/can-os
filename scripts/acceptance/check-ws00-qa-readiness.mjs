@@ -73,10 +73,32 @@ async function run(){
     JOIN public.access_adult_learning_reviews review ON
       review.access_account_id=a.id AND review.access_person_id=a.person_id
     JOIN public.access_accounts reviewer ON reviewer.id=review.reviewed_by_account_id
+    JOIN public.documents evidence ON
+      review.evidence_reference='document:'||evidence.id::text
+      AND evidence.subject_type='person'
+      AND evidence.subject_id=review.access_person_id
+      AND evidence.category='adult_identity_verification'
+      AND evidence.sensitivity_tier IN ('restricted','sensitive','high')
+      AND evidence.verified_at IS NOT NULL
+      AND evidence.verified_at<=now()
+      AND (evidence.expires_at IS NULL OR evidence.expires_at>now())
+      AND evidence.metadata->>'verificationOutcome'='approved'
+      AND evidence.metadata->>'verifiedBirthDate'=review.verified_birth_date::text
+      AND evidence.verified_by_person_id<>review.access_person_id
     JOIN education_v30.organizations o ON o.id=review.organization_id
     WHERE a.id=${freshAccountId}::uuid
       AND a.email_verified_at IS NOT NULL AND a.disabled=false
       AND reviewer.id<>a.id
+      AND EXISTS (SELECT 1
+        FROM public.account_person_grants verifier_grant
+        JOIN public.access_accounts verifier ON verifier.id=verifier_grant.account_id
+        WHERE verifier_grant.person_id=evidence.verified_by_person_id
+          AND verifier_grant.role='app_admin'
+          AND verifier_grant.active=true
+          AND verifier_grant.organization_id IS NULL
+          AND verifier_grant.site_id IS NULL
+          AND verifier.email_verified_at IS NOT NULL
+          AND verifier.disabled=false)
       AND review.reviewed_at <= now()
       AND review.reviewed_at > now() - interval '365 days'
       AND review.verified_birth_date <= current_date - interval '18 years'
