@@ -8,7 +8,7 @@ import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-
 import { normalizeClientError } from "@/lib/client-error";
 import {getMyNoncreditWaitlist,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
-export function NoncreditEnrollmentManagement(){
+export function NoncreditEnrollmentManagement({registrationId,releaseId}:{registrationId?:string;releaseId?:string}={}){
   const navigate=useNavigate();
   const client=useQueryClient();
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
@@ -54,19 +54,21 @@ export function NoncreditEnrollmentManagement(){
       setWithdrawBusy(null);
     }
   }
+  const visibleCourses=registrationId ? query.data?.filter(course=>course.registrationId===registrationId) : query.data;
+  const visibleWaitlist=releaseId ? waiting.data?.filter(item=>item.releaseId===releaseId) : waiting.data;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
-    <div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>
+    {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
     {query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
     {query.isError && <p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
       Your course records are temporarily unavailable. <button type="button" onClick={()=>void query.refetch()} className="font-semibold text-primary underline">Try again</button>
     </p>}
     {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
     {notice && <p role="status" className="mt-4 border border-border bg-card p-4 text-sm">{notice}</p>}
-    {waiting.isSuccess&&waiting.data.length>0&&<section className="mt-6 border border-border bg-card p-5" aria-label="My training waiting lists">
+    {waiting.isSuccess&&Boolean(visibleWaitlist?.length)&&<section className="mt-6 border border-border bg-card p-5" aria-label="My training waiting lists">
       <h2 className="font-serif text-2xl">Waiting lists and reserved invitations</h2>
       <p className="mt-2 text-sm text-muted-foreground">A waiting place is not enrollment. Reserved invitations expire and require you to confirm your registration personally.</p>
       <div className="mt-3 divide-y divide-border">
-        {waiting.data.map(item=><article key={item.releaseId} className="py-4">
+        {visibleWaitlist?.map(item=><article key={item.releaseId} className="py-4">
           <h3 className="font-semibold text-sm">{item.title}</h3>
           <p className="mt-2 text-sm">{item.invitationActive?"A seat is reserved for you":item.status==="expired"?"Invitation expired":"Waiting for an available place"}</p>
           {item.invitationActive&&<p className="mt-1 text-xs text-muted-foreground">Claim before {item.inviteExpiresAt?new Date(item.inviteExpiresAt).toLocaleString():"the invitation expires"}</p>}
@@ -96,8 +98,8 @@ export function NoncreditEnrollmentManagement(){
         </article>)}
       </div>
     </section>}
-    {query.data && <div className="mt-6 space-y-3">
-      {query.data.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className="border border-border bg-card p-5">
+    {visibleCourses && <div className="mt-6 space-y-3">
+      {visibleCourses.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className="border border-border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -148,7 +150,7 @@ export function NoncreditEnrollmentManagement(){
           </div>
         </div>
       </article>)}
-      {!query.data.length&&<div className="border border-border bg-card p-6">
+      {!visibleCourses.length&&!registrationId&&!releaseId&&<div className="border border-border bg-card p-6">
         <h2 className="font-serif text-2xl">Your learning starts here</h2>
         <p className="mt-3 text-sm text-muted-foreground">You have no noncredit registrations yet. Find a published training and enroll when it opens.</p>
         <Link to="/learn/enroll" search={{}} className="mt-4 inline-block font-semibold text-primary underline underline-offset-4">Explore courses</Link>
