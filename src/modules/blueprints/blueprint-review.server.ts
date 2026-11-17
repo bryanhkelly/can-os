@@ -145,6 +145,7 @@ export async function getBlueprintReviewHistory(
       reviewerPersonId: configurationReviews.reviewerPersonId,
       decidedAt: configurationReviews.decidedAt,
       evidenceVersionId: configurationReviews.evidenceVersionId,
+      conditions: configurationReviews.conditions,
     }).from(configurationReviews)
       .where(eq(configurationReviews.configurationVersionId, version.id))
       .orderBy(desc(configurationReviews.decidedAt), desc(configurationReviews.id))
@@ -159,6 +160,10 @@ export async function getBlueprintReviewHistory(
         reviewerPersonId: row.reviewerPersonId,
         decidedAt: row.decidedAt.toISOString(),
         evidenceVersionId: row.evidenceVersionId,
+        rationale: row.conditions && typeof row.conditions === "object" &&
+          !Array.isArray(row.conditions) && "rationale" in row.conditions &&
+          typeof row.conditions.rationale === "string"
+            ? row.conditions.rationale : null,
       })),
     };
   });
