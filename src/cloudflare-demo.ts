@@ -1,6 +1,7 @@
 import handler from "@tanstack/react-start/server-entry";
 import type {PhotoWorkerEnv} from "./platform/photography/cloudflare-production.server";
 import { withRequestDatabase } from "./db/client";
+import { securityHeaders } from "./domain/security-headers";
 import { classifyPublicSiteRequest } from "./domain/public-site-host-routing";
 import { publicSiteDomain } from "./domain/public-site-address";
 import {withTrustedCloudflareIngress} from "./modules/identity/trusted-session-device.server";
@@ -17,15 +18,6 @@ interface DemoEnvironment extends PhotoWorkerEnv {
   DATABASE_URL?: string;
   CAN_SESSION_IP_COLLECTION_ENABLED?: string;
 }
-
-const securityHeaders = {
-  "X-Content-Type-Options": "nosniff",
-  "X-Frame-Options": "DENY",
-  "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-  "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.r2.cloudflarestorage.com; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
-};
 
 export default {
   async fetch(request: Request, env: DemoEnvironment): Promise<Response> {
