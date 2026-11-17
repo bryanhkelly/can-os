@@ -1,21 +1,13 @@
-import {createFileRoute,Link} from "@tanstack/react-router";
-import {WorkspaceShell} from "@/components/workspace";
-import {NativeClassReportPanel} from "@/components/reports/NativeClassReportPanel";
+import { createFileRoute, Navigate } from "@tanstack/react-router";
 
+/** Historical Class reporting URL retained for bookmarks.
+ * Source-backed Class evidence now renders in /class/:id, never a parallel
+ * manager/report workspace. Existing report access checks remain server-side. */
 export const Route=createFileRoute("/reports/classes_/$classId")({
-  component:ClassReportPage,
+  component: LegacyClassReportLocation,
 });
-function ClassReportPage(){
+function LegacyClassReportLocation(){
   const {classId}=Route.useParams();
-  return <WorkspaceShell eyebrow="CAN OS · Reporting" title="Class evidence"
-    width="wide" subtitle="Verified registrations, delivery, attendance, assessments and awards, without deriving results from content playback.">
-    <div className="mt-4 mb-6">
-      <Link to="/class/$classId" params={{classId}}
-        search={{view:"manage",tab:"reports",lesson:undefined,session:undefined}}
-        className="text-sm font-semibold underline">
-        Return to Class workspace
-      </Link>
-    </div>
-    <NativeClassReportPanel classId={classId}/>
-  </WorkspaceShell>;
+  return <Navigate to="/class/$classId" params={{classId}}
+    search={{view:"manage",tab:"reports"}} replace/>;
 }
