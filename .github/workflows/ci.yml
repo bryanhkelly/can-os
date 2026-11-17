@@ -60,6 +60,9 @@ jobs:
       - name: Enforce shared mutation evidence writers
         run: node scripts/check-mutation-hygiene.mjs
 
+      - name: Enforce shared application capability boundaries
+        run: node scripts/acceptance/check-shared-capability-boundaries.mjs
+
       - name: Check canonical route ownership contracts
         run: node scripts/check-platform-route-contracts.mjs --check
 
