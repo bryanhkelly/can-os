@@ -17,3 +17,54 @@ Status: **IN PROGRESS**. Native application routing cut over on November 17, 202
 7. **Acceptance**: verify a single signed-in Person with adult + academic roles, an independently authorized guardian, teacher/facilitator and manager, and two separate Sites. Run build/typecheck, focused unit tests, migration fixtures, restricted-principal SQL tests and authenticated browser journeys.
 
 No Section DDL or existing academic records were deleted during the native route change. This is intentionally **not** a declaration of completed Section retirement.
+
+## November 17 architecture isolation and retirement gates
+
+**Governing decision:** Sections and CAN-to-canonical Person/account translations are
+retiring implementation details, not the product's long-term model. No new
+Section, identity crosswalk, or additional learner bearer credential should
+be introduced as a feature implementation.
+
+**Code changes on main:**
+- `getIdentityContext(request)` establishes one CAN identity and verified
+  organization/Site roles without looking up school Sections.
+- Native Class authentication, guardian checks, credential-issuer approval,
+  and the general workspace session now use that Section-free identity path.
+- `getCommandContext(request)` continues to project Section authority ONLY for
+  unmigrated legacy academic workflows. That compatibility entrypoint is
+  explicitly quarantined in
+  `src/modules/identity/retiring-school-section-scope.server.ts` and must
+  be deleted after the migration. It is NOT a native Class service or new
+  identity system.
+- `npm run check:class-architecture` blocks legacy Section/identity
+  dependencies in authoritative Class owners and prevents the canonical Class
+  resolver from reverting to Section-projected identity. Both deployment
+  builds run the check.
+
+**Before deleting legacy schema or authorization code**, run:
+`CAN_RETIREMENT_QA=1 CAN_RETIREMENT_QA_DATABASE_URL=<isolated test01 URL> npm run db:test01:retirement-readiness`
+
+The read-only test01 preflight inventories legacy Sections, Section teachers,
+Section enrollments, assessments, submissions, native Classes, native Class
+Enrollments and outstanding account-identity crosswalks. A nonzero legacy
+count or a remaining crosswalk blocks retirement. This is necessary, not
+sufficient: a separate reversible, independently reviewed migration must
+preserve every academic record's exact Person, Course version, Class,
+Enrollment, teaching authority, attendance, guardian visibility, grades,
+reports, audit trail and retention obligations. No legacy `section_id` should
+be replaced with a guessed Class ID and no Person identity should be joined
+on email or name.
+
+**Identity cutover sequence:** select one authoritative Account and Person
+identity, reconcile every existing canonical learner and staff identity under
+verified evidence, rekey authoritative Class-related foreign keys, replace
+native-only session validation with an independently scoped CAN session
+projection, prove transactional revocation and access isolation, then
+retire crosswalks and the second bearer cookie. Do not delete canonical
+records or bypass native SQL policy guards until the replacement is proven
+on test01. Crosswalk tables are historical cutover inputs, never the
+new primary authorization scheme.
+
+**Status:** build gates and read-only preflight are source commits. No
+record-level migration, production deletion, full test pass or browser
+acceptance has been established by these commits.
