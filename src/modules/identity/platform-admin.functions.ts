@@ -56,7 +56,17 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
       ORDER BY s.name, s.id
       LIMIT 100
     `);
+    // Keep the sensitive review UI unavailable until the approved QA/prod
+    // migration has been applied with forced RLS.
+    const reviewReadiness=await db.execute(sql`
+      SELECT EXISTS(
+        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+        WHERE n.nspname='public' AND c.relname='access_adult_learning_reviews'
+          AND c.relrowsecurity AND c.relforcerowsecurity
+      ) AS ready
+    `);
     return {
+      reviewedAdultIdentityReady: reviewReadiness.rows[0]?.ready===true,
       organizations: Number(row?.organizations ?? 0),
       sites: Number(row?.sites ?? 0),
       activePlatformAdmins: Number(row?.active_platform_admins ?? 0),
