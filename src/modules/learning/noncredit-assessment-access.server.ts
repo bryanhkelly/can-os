@@ -81,13 +81,13 @@ export async function provisionNoncreditAssessmentAccess(
     }
     const [granted]=await tx.insert(assessmentAccess).values({
       administrationId:administration.id,learnerId:learner.id,
-      courseAttemptId:attempt.id,grantedByPersonId:context.actorPersonId,
+      courseAttemptId:attempt.id,grantedByPersonId:context.actorPersonId!,
     }).returning({id:assessmentAccess.id});
     if(!granted)throw new Error("Could not provision assessment access");
     const payload={courseAttemptId:attempt.id,registrationId:registration.id,
       administrationId:administration.id,accessGrantId:granted.id};
     await tx.insert(auditEvents).values({
-      actorPersonId:context.actorPersonId,
+      actorPersonId:context.actorPersonId!,
       owningOrganizationId:training.providerOrganizationId,
       eventCode:"noncredit.assessment.access_granted",
       entityKind:"assessment_access_grant",entityId:granted.id,payload,
@@ -95,7 +95,7 @@ export async function provisionNoncreditAssessmentAccess(
     await tx.insert(domainEvents).values({
       eventType:"NoncreditAssessmentAccessGranted",
       aggregateType:"assessment_access_grant",aggregateId:granted.id,
-      actorPersonId:context.actorPersonId,payload,
+      actorPersonId:context.actorPersonId!,payload,
     });
     return {accessGrantId:granted.id,courseAttemptId:attempt.id,created:true};
   });
