@@ -56,7 +56,7 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
   });
   it("offers recoverable UX without claiming a new user's identity is already verified",()=>{
     const ui=read("src/routes/class.tsx");
-    expect(read("src/modules/classes/native-class-entry.functions.ts")).toContain("resumeLinkedNativeClassLearner()");
+    expect(read("src/modules/classes/native-class-entry.client.ts")).toContain("resumeLinkedNativeClassLearner()");
     expect(ui).toContain("Restore verified Class access");
     expect(ui).toContain("New learner identities and age");
     expect(ui).toContain("independent identity review");
@@ -66,13 +66,13 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
 
 describe("native Class enrollment with one interactive CAN sign-in",()=>{
  const uiPath="src/routes/class.tsx";
- const commandPath="src/modules/classes/native-class-entry.functions.ts";
+ const commandPath="src/modules/classes/native-class-entry.client.ts";
  it("keeps recovery and enrollment in one server application command",()=>{
    const service=read(commandPath);
-   const first=service.indexOf("return await enrollInNativeClass({data});");
+   const first=service.indexOf("return await enrollInNativeClass(input);");
    const recovery=service.indexOf("await resumeLinkedNativeClassLearner();",first);
    const activation=service.indexOf("await activateReviewedNativeClassLearner();",recovery);
-   const retry=service.indexOf("return enrollInNativeClass({data});",activation);
+   const retry=service.indexOf("return enrollInNativeClass(input);",activation);
    expect(first).toBeGreaterThan(-1);
    expect(recovery).toBeGreaterThan(first);
    expect(activation).toBeGreaterThan(recovery);
@@ -84,7 +84,7 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
    const ui=read(uiPath);
    expect(ui.match(/await enrollCurrentPersonInClass\\(\\{data:\\{/g)??[]).toHaveLength(3);
    expect(ui).not.toContain("async function enrollWithLinkedCanRecovery");
-   expect(read(commandPath)).toContain("nativeClassEnrollmentInput.parse(raw)");
+   expect(read(commandPath)).toContain("Each createServerFn call is its own HTTP round trip");
    const auth=read("src/modules/identity/canonical-command-context.server.ts");
    expect(auth).toContain('throw new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED")');
    expect(auth).toContain('native.role_code !== "learner"');
