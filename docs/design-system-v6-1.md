@@ -170,6 +170,14 @@ are synthesized from the latest status. School Section enrollment transitions
 remain owned by the Section lifecycle service and retain their independent
 reason, transfer, capacity and audit checks.
 
+**Native Class learner lifecycle (November 2026):** The native enrollment
+card composes the shared `StatusBadge`, `Select` and `Checkbox` primitives
+for its current participation state and transfer form. Withdrawal, transfer,
+attestations, seat release and learning history remain owned by the native
+Class enrollment service. The existing learner enrollment-history feed is a
+list of source participation records, not an audit trail of every transition;
+do not present it as event history without a distinct authorized source.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
