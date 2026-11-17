@@ -9,7 +9,7 @@ import { readCanonicalBlueprintHome } from "@/modules/blueprints/blueprint-studi
 
 /** Native v3.0.1 memberships, isolated from public-schema Launch identities. */
 export const Route = createFileRoute("/canonical/blueprints")({
-  validateSearch: (value) => z.object({ siteId: z.string().optional() }).parse(value),
+  validateSearch: (value) => z.object({ siteId: z.string().uuid().optional() }).parse(value),
   loader: () => safeLoader(() => readCanonicalBlueprintHome())(),
   component: CanonicalBlueprintPage,
 });
@@ -20,6 +20,9 @@ function CanonicalBlueprintPage() {
   if (!outcome.ok) return <CanonicalBlueprintLoadError title="Canonical Blueprint Studio" message={outcome.message} />;
 
   const { role, siteIds, referencesEnabled } = outcome.data;
+  // A staff member assigned to exactly one canonical Site opens its Studio
+  // immediately. Explicit URLs never fall back to a different Site.
+  const selectedSiteId = siteId ?? (siteIds.length === 1 ? siteIds[0] : undefined);
   if (role === "blueprint_reviewer") {
     return <WorkspaceShell
       eyebrow="CAN OS v3.0.1"
@@ -32,7 +35,7 @@ function CanonicalBlueprintPage() {
       </p>
     </WorkspaceShell>;
   }
-  if (!siteId || !siteIds.includes(siteId)) {
+  if (!selectedSiteId || !siteIds.includes(selectedSiteId)) {
     return <WorkspaceShell
       eyebrow="CAN OS v3.0.1"
       title="Choose an authorized Site"
@@ -58,10 +61,10 @@ function CanonicalBlueprintPage() {
     eyebrow="CAN OS v3.0.1"
     title="Plan your learning Site"
     subtitle="Plan a school or a community learning center. Your Organization and Site come from your canonical authenticated membership.">
-    <div className="mt-4 text-sm"><Link to="/canonical/blueprints" search={{}} className="underline">
+    {siteIds.length > 1 && <div className="mt-4 text-sm"><Link to="/canonical/blueprints" search={{}} className="underline">
       Choose a different Site
-    </Link></div>
-    <CanonicalBlueprintWorkspace key={siteId} siteId={siteId} enableReferences={referencesEnabled} />
-    {referencesEnabled && <BlueprintReferenceCatalogPanel key={siteId} siteId={siteId} />}
+    </Link></div>}
+    <CanonicalBlueprintWorkspace key={selectedSiteId} siteId={selectedSiteId} enableReferences={referencesEnabled} />
+    {referencesEnabled && <BlueprintReferenceCatalogPanel key={selectedSiteId} siteId={selectedSiteId} />}
   </WorkspaceShell>;
 }
