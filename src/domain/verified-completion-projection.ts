@@ -108,3 +108,72 @@ export function countCurrentNoncreditCompletions(
   }
   return { verifiedCompletions, undeterminedRegistrations };
 }
+
+
+/**
+ * WS1 v1 native Class outcome extension. The authoritative boolean is computed
+ * by the canonical SQL function v301_ws3_class_completion_is_current, which
+ * rechecks original policy and current lesson/Session/assessment evidence.
+ * Never interpret raw Class Outcome result_code as verified completion.
+ */
+export type NativeClassGovernedOutcomeRef={
+  id:string;
+  classEnrollmentId:string;
+  resultCode:"completed"|"not_yet_completed"|"voided";
+  sourceKind:string;
+  completionPolicyVersionId:string|null;
+  supersedesOutcomeId:string|null;
+  /** SQL authority, never a browser-supplied flag. */
+  currentValidity:boolean;
+};
+export type NativeClassCompletionProjection=
+  | {state:"not_decided";outcome:null;decisionId:null;verifiedCompletion:false}
+  | {state:"unavailable";outcome:null;decisionId:null;verifiedCompletion:false}
+  | {state:"completed"|"not_yet_completed"|"voided"|"source_invalid";
+      outcome:{label:string;referenceId:string};
+      decisionId:string;verifiedCompletion:boolean};
+
+export function projectCurrentNativeClassCompletion(
+  classEnrollmentId:string,
+  rows:readonly NativeClassGovernedOutcomeRef[],
+):NativeClassCompletionProjection{
+  if(!classEnrollmentId||rows.some(row=>
+      row.classEnrollmentId!==classEnrollmentId||
+      row.sourceKind!=="ws3_governed"||!row.id||
+      !row.completionPolicyVersionId))
+    return {state:"unavailable",outcome:null,decisionId:null,verifiedCompletion:false};
+  if(!rows.length)return {state:"not_decided",outcome:null,
+    decisionId:null,verifiedCompletion:false};
+  const byId=new Map(rows.map(row=>[row.id,row]));
+  if(byId.size!==rows.length)
+    return {state:"unavailable",outcome:null,decisionId:null,verifiedCompletion:false};
+  const superseded=new Set(rows.flatMap(row=>row.supersedesOutcomeId?
+    [row.supersedesOutcomeId]:[]));
+  const heads=rows.filter(row=>!superseded.has(row.id));
+  const roots=rows.filter(row=>row.supersedesOutcomeId===null);
+  if(heads.length!==1||roots.length!==1||
+     rows.some(row=>row.supersedesOutcomeId &&
+       (!byId.has(row.supersedesOutcomeId)||
+        row.supersedesOutcomeId===row.id)))
+    return {state:"unavailable",outcome:null,decisionId:null,verifiedCompletion:false};
+  const seen=new Set<string>();
+  let next:NativeClassGovernedOutcomeRef|undefined=heads[0]!;
+  while(next){
+    if(seen.has(next.id))
+      return {state:"unavailable",outcome:null,decisionId:null,verifiedCompletion:false};
+    seen.add(next.id);
+    next=next.supersedesOutcomeId?byId.get(next.supersedesOutcomeId):undefined;
+  }
+  if(seen.size!==rows.length)
+    return {state:"unavailable",outcome:null,decisionId:null,verifiedCompletion:false};
+  const head=heads[0]!;
+  const verified=head.resultCode==="completed"&&head.currentValidity===true;
+  const state=head.resultCode==="completed"&&!verified?
+    "source_invalid":head.resultCode;
+  const label=state==="completed"?"Verified Class completion":
+    state==="voided"?"Class completion voided":
+    state==="not_yet_completed"?"Requirements not yet completed":
+    "Completion requires independent revalidation";
+  return {state,decisionId:head.id,
+    outcome:{label,referenceId:head.id},verifiedCompletion:verified};
+}
