@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray,lt,or,sql,type SQL} from "drizzle-orm";
+import {and,desc,eq,inArray,isNotNull,lt,or,sql,type SQL} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import * as s from "@/db/schema";
@@ -74,8 +74,8 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     // authorizes that subject. A guardian grant must never broaden the
     // account owner's student profile, or vice versa.
     const scoped=(kind:"student"|"guardian",
-      org:typeof s.programs.organizationId|typeof s.sites.organizationId,
-      site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId):SQL|undefined=>{
+      org:typeof s.programs.organizationId|typeof s.sites.organizationId|typeof s.calendarEvents.organizationId,
+      site:typeof s.programs.siteId|typeof s.sections.siteId|typeof s.activities.siteId|typeof s.calendarEvents.siteId):SQL|undefined=>{
       const permitted=(kind==="student"?student:guardians).map(g=>
         g.organizationId?
           and(eq(org,g.organizationId),g.siteId?eq(site,g.siteId):undefined):undefined)
@@ -154,6 +154,28 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
           schoolScope,
           before(s.enrollments.createdAt,s.enrollments.id,data.cursor),
         )).orderBy(desc(s.enrollments.createdAt),desc(s.enrollments.id)).limit(pageSize+1);
+      // A final grading-period record is authoritative; enrollment.completed
+      // is not. Do not expose draft or unverified grades, or infer credit.
+      const grades=rows.length?await db.select({
+        id:s.sectionGrades.id,sectionId:s.sectionGrades.sectionId,
+        studentProfileId:s.sectionGrades.studentProfileId,
+        periodName:s.gradingPeriods.name,letterGrade:s.sectionGrades.letterGrade,
+      }).from(s.sectionGrades)
+        .innerJoin(s.gradingPeriods,
+          eq(s.gradingPeriods.id,s.sectionGrades.gradingPeriodId))
+        .where(and(
+          inArray(s.sectionGrades.sectionId,rows.map(row=>row.sectionId)),
+          inArray(s.sectionGrades.studentProfileId,rows.map(row=>row.studentProfileId)),
+          eq(s.sectionGrades.status,"finalized"),
+          isNotNull(s.sectionGrades.finalizedByPersonId),
+          isNotNull(s.sectionGrades.finalizedAt),
+        )).orderBy(desc(s.sectionGrades.finalizedAt),
+          desc(s.sectionGrades.id)):[];
+      const currentGrade=new Map<string,(typeof grades)[number]>();
+      for(const grade of grades){
+        const key=grade.sectionId+":"+grade.studentProfileId;
+        if(!currentGrade.has(key))currentGrade.set(key,grade);
+      }
       return finish(rows,items=>projectSchoolSections(items.map(row=>({
         id:row.sectionId,title:row.title,code:row.code,
         enrollmentId:row.enrollmentId,enrollmentStatus:row.enrollmentStatus,
@@ -162,6 +184,11 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
         startsAt:row.startsAt,endsAt:row.endsAt,
         subject:{kind:profiles.get(row.studentProfileId)!.kind,
           displayName:profiles.get(row.studentProfileId)!.name},
+        officialOutcome:(()=>{
+          const grade=currentGrade.get(row.sectionId+":"+row.studentProfileId);
+          return grade?{referenceId:grade.id,
+            label:"Finalized "+grade.periodName+" grade: "+(grade.letterGrade??"recorded")}:null;
+        })(),
       })),now));
     }
     if(data.source==="school_program"){
@@ -230,6 +257,25 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     // A specific accepted Person invitation is source authority in its own
     // right, including network-wide Events not tied to a Program. Guardian
     // access to someone else's Event must never derive from Site staff roles.
+    const eventDependents=guardians.length?await getProfiles("enrollment"):new Map();
+    const dependentProfileIds=[...eventDependents]
+      .filter(([,profile])=>profile.kind==="dependent").map(([id])=>id);
+    const childPeople=dependentProfileIds.length?await db.select({
+      personId:s.studentProfiles.personId,
+      studentProfileId:s.studentProfiles.id,
+    }).from(s.studentProfiles)
+      .where(inArray(s.studentProfiles.id,dependentProfileIds)):[];
+    const childByPerson=new Map(childPeople.map(row=>[
+      row.personId,eventDependents.get(row.studentProfileId)!,
+    ]));
+    const eventParticipantAccess=or(
+      eq(s.calendarEventParticipants.participantId,actor.actorPersonId),
+      childPeople.length?and(
+        inArray(s.calendarEventParticipants.participantId,
+          childPeople.map(row=>row.personId)),
+        scoped("guardian",s.calendarEvents.organizationId,s.calendarEvents.siteId),
+      ):undefined,
+    );
     const rows=await db.select({
       id:s.calendarEventParticipants.id,
       createdAtCursor:cursorText(s.calendarEventParticipants.createdAt),
@@ -248,7 +294,7 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
       .leftJoin(s.sites,eq(s.sites.id,s.calendarEvents.siteId))
       .where(and(
         eq(s.calendarEventParticipants.participantType,"person"),
-        eq(s.calendarEventParticipants.participantId,actor.actorPersonId),
+        eventParticipantAccess,
         eq(s.calendarEventParticipants.responseStatus,"accepted"),
         sql`${s.calendarEvents.type} <> 'personal'`,
         before(s.calendarEventParticipants.createdAt,s.calendarEventParticipants.id,data.cursor),
@@ -257,5 +303,9 @@ export const getMyAccountSchoolParticipationPage=createServerFn({method:"GET"})
     return finish(rows,items=>projectAcceptedCalendarEvents(items.map(({metadata,
       createdAtCursor,id,participantPersonId,...row})=>({
         ...row,cancelled:metadata.cancelled===true,
+        subject:participantPersonId===actor.actorPersonId
+          ?{kind:"self" as const,displayName:null}
+          :{kind:"dependent" as const,
+            displayName:childByPerson.get(participantPersonId)?.name??null},
       })),now));
   });
