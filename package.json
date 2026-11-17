@@ -37,6 +37,8 @@
     "test:family:p0:integration": "node scripts/run-integration-tests.mjs family-p0",
     "test:family:p0:site-day": "node scripts/run-integration-tests.mjs journey-c",
     "test:family:p0:browser": "playwright test --config playwright.authenticated-routes.config.ts",
+    "test:ws00:contracts": "node scripts/acceptance/check-ws00-cross-stream-guards.mjs",
+    "verify:ws00": "node scripts/acceptance/run-ws00-local-gate.mjs",
     "typecheck": "tsc --noEmit",
     "docs:check": "node scripts/check-documentation-links.mjs",
     "test:integration:study-groups": "node scripts/run-integration-tests.mjs study-groups",

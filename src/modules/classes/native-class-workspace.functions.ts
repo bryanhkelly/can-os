@@ -18,6 +18,8 @@ import { currentClassAuthority } from "./native-class-authority.server";
 import { validateClassAuthority } from "./unified-class-authority.server";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { assertCurrentNativeTeachingGrant } from "./native-class-room-boundary.server";
+import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
+import { requiresClassSessionAgenda } from "@/domain/native-class-session-agenda";
 
 const uuid = z.string().uuid();
 const scope = z.object({
@@ -367,6 +369,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
       }
       const scheduleRows=await tx.select({
         id:canonicalClassSessions.id,
+        createdAt:canonicalClassSessions.createdAt,
         planId:facilitatedClassroomPlans.id,
         state:facilitatedClassroomPlans.state,
         roomId:facilitatedClassroomPlans.facilitatedSessionId,
@@ -393,6 +396,17 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         ))
         .where(eq(canonicalClassSessions.classId,instance.id))
         .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
+      const sessionAgendasEnabled=process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"&&
+        process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true";
+      // Only query the additive WS4 table when both release gates are on.
+      // Every Session in this bounded result already belongs to the
+      // independently authorized Class workspace.
+      const planRows=sessionAgendasEnabled&&scheduleRows.length?
+        await tx.select({classSessionId:classSessionAgendaRevisions.classSessionId})
+          .from(classSessionAgendaRevisions)
+          .where(inArray(classSessionAgendaRevisions.classSessionId,
+            scheduleRows.map(row=>row.id))):[];
+      const plansReady=new Set(planRows.map(row=>row.classSessionId));
       const sessions=scheduleRows.slice(0,100).map(row=>({
         id:row.id,
         planId:view==="learn"?null:row.planId,
@@ -402,6 +416,12 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         startsAt:row.startsAt.toISOString(),
         endsAt:row.endsAt.toISOString(),
         isMySession:row.facilitatorPersonId===actor.actorPersonId,
+        agendaRequired:requiresClassSessionAgenda({
+          featureEnabled:sessionAgendasEnabled,
+          mandatoryFrom:process.env.CAN_WS4_AGENDA_REQUIRED_FROM,
+          sessionCreatedAt:row.createdAt,
+        }),
+        agendaReady:plansReady.has(row.id),
       }));
       return {
         classId:instance.id,title:instance.title,
@@ -414,6 +434,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         rosterCount,roster,rosterTruncated:rosterAllowed&&rosterCount>roster.length,
         offering,lessons,staffCandidates,staffAssignments,learnerCandidates,
         sessions,sessionsTruncated:scheduleRows.length>100,
+        sessionAgendasEnabled,
         selectedLessonId:data.lesson??null,
         selectedSessionId:data.session??null,
       };

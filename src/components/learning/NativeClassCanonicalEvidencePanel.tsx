@@ -83,13 +83,15 @@ export function NativeClassCanonicalEvidencePanel({classEnrollmentId}:{
             <div>
               <p className="font-semibold">Course completion decision</p>
               <p className="text-sm text-muted-foreground">
-                {query.data.classCompletionOutcomeRecorded
-                  ?"An authorized Class completion outcome has been recorded."
-                  :"No authorized Class completion outcome has been recorded yet."}
+                {query.data.classCompletionAuthorityVerified
+                  ?"An independently approved, policy-backed Class completion decision is currently verified."
+                  :query.data.classCompletionOutcomeRecorded
+                    ?"Class completion-related evidence is recorded, but no current independently verified completion decision is available."
+                    :"No policy-verified Class completion decision is available."}
               </p>
             </div>
             <span className="text-xs font-semibold text-muted-foreground">
-              {query.data.classCompletionOutcomeRecorded?"Recorded":"Pending"}
+              {query.data.classCompletionAuthorityVerified?"Verified":"Not verified"}
             </span>
           </li>
         </ol>

@@ -49,6 +49,7 @@ const groups = [
     links: [
       { title: "Site qualification", detail: "Facility and operational evidence", path: "/canonical/lab/site-qualification" },
       { title: "Deployments", detail: "Local delivery and offering adoption", path: "/canonical/lab/deployments" },
+      { title: "Program operations", detail: "Published Programs, adopted Courses and local Class rollout", path: "/canonical/program-operations" },
       { title: "Devices", detail: "Device readiness and inventory testing", path: "/canonical/lab/devices" },
       { title: "Assessment readiness", detail: "Diagnostic and mastery assessment inventory", path: "/canonical/lab/readiness" },
     ],

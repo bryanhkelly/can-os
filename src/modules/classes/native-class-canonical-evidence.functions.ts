@@ -1,4 +1,4 @@
-import { and, eq, inArray, desc } from "drizzle-orm";
+import { and, eq, inArray, desc, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -12,6 +12,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
+import { latestCanonicalAssessmentRevisions } from "@/domain/canonical-assessment-revisions";
 
 const input=z.object({classEnrollmentId:z.string().uuid()}).strict();
 
@@ -103,6 +104,7 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
       const attemptIds=attempts.map(a=>a.id);
       const results=attemptIds.length?await tx.select({
         attemptId:assessmentExecutionResults.attemptId,
+        resultRevision:assessmentExecutionResults.resultRevision,
         resultStatus:assessmentExecutionResults.resultStatus,
         outcome:assessmentExecutionResults.outcome,
         supersedesId:assessmentExecutionResults.supersedesId,
@@ -111,22 +113,63 @@ export const getNativeClassCanonicalEvidence=createServerFn({method:"GET"})
         .where(inArray(assessmentExecutionResults.attemptId,attemptIds))
         .orderBy(desc(assessmentExecutionResults.resultRevision)).limit(501):[];
       if(results.length>500)throw new AuthorizationError("Assessment results require pagination");
-      const superseded=new Set(results.flatMap(row=>row.supersedesId?[row.supersedesId]:[]));
-      const valid=results.filter(row=>!superseded.has(row.id)&&
+      const projected=latestCanonicalAssessmentRevisions(results);
+      if(projected.ambiguousAttemptIds.length)
+        throw new AuthorizationError("ambiguous canonical assessment revisions");
+      const valid=projected.current.filter(row=>
         row.resultStatus==="finalized"&&
         attempts.some(a=>a.id===row.attemptId&&a.state==="finalized"));
-      const [completion]=await tx.select({id:canonicalClassOutcomes.id})
-        .from(canonicalClassOutcomes)
+      const completionRecords=await tx.select({
+        id:canonicalClassOutcomes.id,
+        resultCode:canonicalClassOutcomes.resultCode,
+        sourceKind:canonicalClassOutcomes.sourceKind,
+      }).from(canonicalClassOutcomes)
         .where(and(eq(canonicalClassOutcomes.classEnrollmentId,enrollment.id),
-          eq(canonicalClassOutcomes.outcomeKind,"completion"))).limit(1);
+          eq(canonicalClassOutcomes.outcomeKind,"completion"))).limit(101);
+      if(completionRecords.length>100)
+        throw new AuthorizationError("Class completion history needs pagination");
+      // WS3-protected lookup is unavailable until the authoritative SQL patch,
+      // independent source binding and feature are deployed. Earlier generic
+      // Class Outcomes are never promoted to verified completion.
+      let classCompletionAuthorityVerified=false;
+      if(process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED==="true"){
+        const governed=await tx.select({
+          id:canonicalClassOutcomes.id,
+          resultCode:canonicalClassOutcomes.resultCode,
+          supersedesOutcomeId:canonicalClassOutcomes.supersedesOutcomeId,
+        }).from(canonicalClassOutcomes)
+          .where(and(
+            eq(canonicalClassOutcomes.classEnrollmentId,enrollment.id),
+            eq(canonicalClassOutcomes.outcomeKind,"completion"),
+            eq(canonicalClassOutcomes.sourceKind,"ws3_governed"),
+          )).limit(501);
+        if(governed.length>500)
+          throw new AuthorizationError("Governed completion history needs pagination");
+        const superseded=new Set(governed.flatMap(row=>row.supersedesOutcomeId?
+          [row.supersedesOutcomeId]:[]));
+        const current=governed.filter(row=>!superseded.has(row.id));
+        if(governed.length && current.length!==1)
+          throw new AuthorizationError("Conflicting governed Class completion");
+        if(current.length===1 && current[0]!.resultCode==="completed"){
+          const validity=await tx.execute(sql`
+            SELECT education_v30.v301_ws3_class_completion_is_current(
+              ${current[0]!.id}::uuid) AS valid
+          `);
+          classCompletionAuthorityVerified=validity.rows[0]?.valid===true;
+        }
+      }
       return {
         courseAttemptId:access.courseAttemptId,
         completedLessons,totalLessons:lessons.length,
         currentAssessmentGrants:currentGrants.length,
         finalizedAssessments:valid.length,
         finalizedPassed:valid.filter(row=>row.outcome==="pass").length,
-        classCompletionOutcomeRecorded:!!completion,
-        note:"Canonical assessment results and Class outcomes are separate from lesson ticks, room playback, attendance and award issuance. Native Class assessment submission requires a published exact-Course administration and provider-issued grant; scores still require independent confirmation.",
+        classCompletionOutcomeRecorded:completionRecords.length>0,
+        classCompletionAuthorityVerified,
+        classCompletionEvidenceCount:completionRecords.length,
+        note:classCompletionAuthorityVerified
+          ?"This Class completion currently meets its independently approved original policy and authoritative evidence. Academic credit, grades and award issuance remain separately governed."
+          :"Recorded Class outcome evidence alone is not a verified completion decision until an independently approved participant-pinned policy and authorized decision are current. Finalized assessments, lesson ticks, room playback and attendance cannot issue an academic award.",
       };
     });
   });

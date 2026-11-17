@@ -5,6 +5,7 @@ import {
   educationOperations, educationOperationOrganizationRoles, educationOperationSites, siteOrganizationRoles, catalogSites, classroomDeploymentSites,
 } from "@/db/canonical-v301";
 import { classDefinitionSchema } from "@/domain/unified-class";
+import { publisherClassVariationPolicy, assertPublisherClassVariationAllowed } from "@/domain/publisher-class-variation";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -26,6 +27,7 @@ export async function validateClassAuthority(tx: Tx, operator: ClassOperator, in
   const [catalog] = await tx.select({
     courseVersionId: courseVersions.id,
     courseTitle: courses.title,
+    productDefinition: offeringVersions.productDefinition,
     operationId: programDeployments.operationId,
   }).from(programDeployments)
     .innerJoin(educationOperations, eq(educationOperations.id,programDeployments.operationId))
@@ -55,6 +57,11 @@ export async function validateClassAuthority(tx: Tx, operator: ClassOperator, in
       or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
     )).limit(1);
   if (!catalog) throw new AuthorizationError("currently published Course under approved Deployment/adoption");
+  // A local operator never modifies publisher-owned content. Any explicitly
+  // published delivery constraints must hold again at Class create/activation.
+  assertPublisherClassVariationAllowed(
+    publisherClassVariationPolicy(catalog.productDefinition),catalog.courseTitle,input,
+  );
 
   const [operatorRole] = await tx.select({id:educationOperationOrganizationRoles.id})
     .from(educationOperationOrganizationRoles).where(and(

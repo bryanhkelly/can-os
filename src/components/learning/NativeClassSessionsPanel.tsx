@@ -3,8 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
 import { buildSiteClassMeetings, displaySiteClassTime, siteWallWeek, type LocalMeeting } from "@/domain/class-session-local-time";
-import { scheduleNativeClassSessions, openNativeClassSession, revokeNativeClassSession } from "@/modules/classes/native-class-sessions.functions";
+import { scheduleNativeClassSessions, openNativeClassSession, revokeNativeClassSession, changeNativeClassSessionSchedule } from "@/modules/classes/native-class-sessions.functions";
 import { NativeClassroomHostPanel } from "@/components/learning/NativeClassroomHostPanel";
+import { NativeClassSessionAgenda } from "@/components/learning/NativeClassSessionAgenda";
+import { nativeClassSessionDisplayStatus } from "@/domain/native-class-sessions";
 import type { getNativeClassWorkspace } from "@/modules/classes/native-class-workspace.functions";
 
 type ClassWorkspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
@@ -26,14 +28,21 @@ export function NativeClassSessionsPanel({
   const [customRows,setCustomRows]=useState<CustomRow[]>([newCustomRow()]);
   const [requestIds,setRequestIds]=useState<string[]>([]);
   const [scheduled,setScheduled]=useState(false);
-  const [prepared,setPrepared]=useState({media:false,display:false,room:false});
+  const [prepared,setPrepared]=useState({media:false,display:false,room:false,captions:false,backup:false});
   const siteTimeZone=workspace.siteTimeZone;
   const [busy,setBusy]=useState(false);
   const [opened,setOpened]=useState<{roomId:string;pairingCode:string|null;expiresAt:string|null}|null>(null);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const [revoking,setRevoking]=useState<string|null>(null);
+  const [agendaSession,setAgendaSession]=useState<string|null>(null);
   const [revocationReason,setRevocationReason]=useState("");
+  const [changeSessionId,setChangeSessionId]=useState<string|null>(null);
+  const [changeMode,setChangeMode]=useState<"replace"|"cancel">("replace");
+  const [changeLocalStart,setChangeLocalStart]=useState("");
+  const [changeDuration,setChangeDuration]=useState(60);
+  const [changeReason,setChangeReason]=useState("");
+  const [changeRequestId,setChangeRequestId]=useState(()=>crypto.randomUUID());
   const activeSession=workspace.sessions.find(session=>
     session.id===workspace.selectedSessionId &&
     session.isMySession && session.roomState==="live") ??
@@ -107,6 +116,33 @@ export function NativeClassSessionsPanel({
     }catch(e){setError(normalizeClientError(e,"Room revocation denied.").message)}
     finally{setBusy(false)}
   }
+  async function changeSchedule(sessionId:string){
+    if(busy||!canSchedule||changeSessionId!==sessionId||changeReason.trim().length<15)return;
+    setBusy(true);setError("");setNotice("");
+    try{
+      const meeting=changeMode==="replace"?
+        buildSiteClassMeetings([{
+          requestId:changeRequestId,localStart:changeLocalStart,
+          durationMinutes:changeDuration,
+        }],siteTimeZone)[0]:null;
+      const result=await changeNativeClassSessionSchedule({data:{
+        classId:workspace.classId,classSessionId:sessionId,
+        requestId:changeRequestId,reason:changeReason.trim(),
+        replacement:meeting?{startsAt:meeting.startsAt,endsAt:meeting.endsAt}:null,
+      }});
+      // The transaction may have committed even if cache invalidation fails.
+      // Never misreport a successful cancellation as a failed write.
+      const [refresh]=await Promise.allSettled([onChanged?.()??Promise.resolve()]);
+      setChangeSessionId(null);setChangeReason("");
+      setChangeLocalStart("");setChangeRequestId(crypto.randomUUID());
+      setNotice(result.replacementSessionId?
+        "The original Session is cancelled and its new dated Session is linked in the audit history. Review the replacement study plan.":
+        "The unopened Session was cancelled. Existing Class enrollment and learning history were not changed.");
+      if(refresh?.status==="rejected")setNotice("Session changed successfully. Refresh the Class page to see the latest schedule.");
+    }catch(e){
+      setError(normalizeClientError(e,"Unable to change this Class Session.").message);
+    }finally{setBusy(false);}
+  }
   return <section className="border border-border bg-card p-5">
     <h2 className="font-serif text-2xl">Class Sessions</h2>
     <p className="mt-2 text-sm text-muted-foreground">
@@ -125,6 +161,8 @@ export function NativeClassSessionsPanel({
           ["media","Approved lesson and captions checked"],
           ["display","TV, audio and projected text checked"],
           ["room","Participant joining instructions ready"],
+          ["captions","Captions/transcript and readable slides checked"],
+          ["backup","Bandwidth and facilitator recovery plan checked"],
         ] as const).map(([key,label])=><label key={key}
           className="flex min-h-11 items-start gap-2 border border-border p-3 text-sm">
           <input type="checkbox" checked={prepared[key]}
@@ -134,7 +172,7 @@ export function NativeClassSessionsPanel({
         </label>)}
       </div>
       {!Object.values(prepared).every(Boolean)&&<p className="mt-2 text-xs text-muted-foreground">
-        {Object.values(prepared).filter(Boolean).length} of 3 preparation checks acknowledged.
+        {Object.values(prepared).filter(Boolean).length} of {Object.values(prepared).length} preparation checks acknowledged.
         You can still open a classroom if you need to.
       </p>}
     </section>}
@@ -146,10 +184,36 @@ export function NativeClassSessionsPanel({
           <p className="mt-1 text-sm">{displaySiteClassTime(session.startsAt,siteTimeZone)}
             {" to "}{displaySiteClassTime(session.endsAt,siteTimeZone)}</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            Status: {session.roomState==="ended"?"After Class · Ended":
-              session.state==="scheduled"?"Scheduled":
-              session.state==="started"?"Started":"Cancelled"}
+            Status: {({
+              scheduled:"Scheduled",
+              live:"Live classroom",
+              ended:"After Class · Ended",
+              started:"Started",
+              cancelled:"Cancelled",
+              elapsed_unverified:"Session window elapsed · Delivery not verified",
+            } as const)[nativeClassSessionDisplayStatus({
+              state:session.state,roomState:session.roomState,
+              endsAt:session.endsAt,now:new Date(),
+            })]}
           </p>
+          {workspace.sessionAgendasEnabled&&session.state==="scheduled"&&
+            <p className="mt-2 text-xs text-muted-foreground">
+              {session.agendaReady
+                ?"Study plan published for this Session."
+                :session.agendaRequired
+                  ?"Study plan required before opening this newly scheduled Session."
+                  :"Study plan optional for this pre-activation Session."}
+            </p>}
+          {workspace.sessionAgendasEnabled&&<Button type="button" variant="outline"
+            size="sm" className="mt-2"
+            onClick={()=>setAgendaSession(current=>current===session.id?null:session.id)}>
+            {agendaSession===session.id?"Hide study plan":"View study plan"}
+          </Button>}
+          {workspace.sessionAgendasEnabled&&agendaSession===session.id&&
+            <NativeClassSessionAgenda key={session.id}
+              classId={workspace.classId} classSessionId={session.id}
+              view={workspace.view} onPublished={onChanged}
+              canEdit={canSchedule&&session.isMySession&&session.state==="scheduled"}/>}
         </div>
         {canRevoke&&session.roomId&&session.roomState==="live"&&
           <div className="space-y-2">
@@ -172,13 +236,74 @@ export function NativeClassSessionsPanel({
               </div>
             </>}
           </div>}
+        {canSchedule&&session.isMySession&&session.state==="scheduled"&&
+          <div className="space-y-3 sm:col-span-2">
+            {changeSessionId!==session.id?
+              <Button type="button" size="sm" variant="outline" disabled={busy}
+                onClick={()=>{setChangeSessionId(session.id);setChangeMode("replace");
+                  setChangeReason("");setChangeLocalStart("");setChangeRequestId(crypto.randomUUID());}}>
+                Cancel or reschedule Session
+              </Button>:
+              <div className="border border-border bg-muted/20 p-3 space-y-3"
+                aria-label="Change future Class Session">
+                <h4 className="text-sm font-semibold">Change this unopened Session</h4>
+                <p className="text-xs text-muted-foreground">
+                  The original Session, timetable and audit history are preserved.
+                  Rescheduling creates a new Session at the same authorized Site.
+                </p>
+                <fieldset className="flex flex-wrap gap-4 text-sm">
+                  <legend className="font-semibold">Change type</legend>
+                  {([["replace","Reschedule"],["cancel","Cancel without replacement"]] as const)
+                    .map(([value,label])=><label key={value} className="flex items-center gap-2">
+                      <input type="radio" checked={changeMode===value}
+                        name={"change-"+session.id} onChange={()=>{setChangeMode(value);
+                          setChangeRequestId(crypto.randomUUID());}}/>
+                      {label}
+                    </label>)}
+                </fieldset>
+                {changeMode==="replace"&&<div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-xs font-semibold">
+                    New date and time ({siteTimeZone})
+                    <input type="datetime-local" value={changeLocalStart} required
+                      className="mt-1 min-h-11 w-full border border-border bg-background px-2"
+                      onChange={e=>{setChangeLocalStart(e.target.value);
+                        setChangeRequestId(crypto.randomUUID());}}/>
+                  </label>
+                  <label className="text-xs font-semibold">
+                    Length (minutes)
+                    <input type="number" min={15} max={480} step={15}
+                      value={changeDuration}
+                      className="mt-1 min-h-11 w-full border border-border bg-background px-2"
+                      onChange={e=>{setChangeDuration(Number(e.target.value));
+                        setChangeRequestId(crypto.randomUUID());}}/>
+                  </label>
+                </div>}
+                <label className="block text-xs font-semibold">
+                  Reason (audited, at least 15 characters)
+                  <textarea value={changeReason} rows={2} maxLength={500}
+                    className="mt-1 w-full border border-border bg-background p-2"
+                    onChange={e=>{setChangeReason(e.target.value);
+                      setChangeRequestId(crypto.randomUUID());}}/>
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" disabled={busy||
+                    changeReason.trim().length<15||
+                    (changeMode==="replace"&&!changeLocalStart)}
+                    onClick={()=>void changeSchedule(session.id)}>
+                    {busy?"Saving…":changeMode==="replace"?"Confirm reschedule":"Confirm cancellation"}
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" disabled={busy}
+                    onClick={()=>setChangeSessionId(null)}>Keep original Session</Button>
+                </div>
+              </div>}
+          </div>}
         {canSchedule&&session.isMySession&&<div className="flex flex-wrap items-center gap-2">
           {session.state==="scheduled"&&<Button size="sm" variant="outline" disabled={busy}
             onClick={()=>void start(session.id)}>Open room</Button>}
           {session.roomId&&session.roomState==="live"&&<Link
             to="/classes/$classId" params={{classId:workspace.classId}}
             search={{view:"teach",tab:"classroom",session:session.id,lesson:undefined}}
-            className="text-sm font-semibold underline">Private class controls</Link>}
+            className="text-sm font-semibold underline">Resume authorized live controls</Link>}
           {session.roomId&&session.roomState==="live"&&<Link to="/classroom/$sessionId/presentation"
             params={{sessionId:session.roomId}}
             className="text-sm font-semibold underline">Audience display</Link>}
@@ -186,7 +311,9 @@ export function NativeClassSessionsPanel({
         </div>}
       </li>)}
     </ol>:<p className="mt-4 text-sm text-muted-foreground">
-      No dated Sessions are scheduled for this Class.
+      {workspace.deliveryMode==="self_paced"
+        ?"This Class is self-paced. Open Lessons to study and practice in your own Course Attempt."
+        :"No dated Sessions are scheduled for this Class."}
     </p>}
     {opened&&<div className="mt-4 border border-border bg-muted/30 p-4">
       <p className="text-sm font-semibold">Classroom started</p>
@@ -207,7 +334,8 @@ export function NativeClassSessionsPanel({
     </div>}
     {showConsole&&canSchedule&&activeSession?.roomId&&
       <NativeClassroomHostPanel key={activeSession.roomId}
-        roomId={activeSession.roomId}
+        roomId={activeSession.roomId} classId={workspace.classId}
+        classSessionId={activeSession.id} agendasEnabled={workspace.sessionAgendasEnabled}
         canReviewAttendance={workspace.canVerifyAttendance}
         initialCode={opened?.roomId===activeSession.roomId?opened.pairingCode:null}
         initialExpiry={opened?.roomId===activeSession.roomId?opened.expiresAt:null}

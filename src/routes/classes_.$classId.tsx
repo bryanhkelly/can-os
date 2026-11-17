@@ -12,6 +12,7 @@ import { NativeClassSessionsPanel } from "@/components/learning/NativeClassSessi
 import { NativeClassroomCompanion } from "@/components/learning/NativeClassroomCompanion";
 import { NativeClassCanonicalEvidencePanel } from "@/components/learning/NativeClassCanonicalEvidencePanel";
 import { NativeClassAssessmentReviewPanel } from "@/components/learning/NativeClassAssessmentReviewPanel";
+import { NativeClassRosterLifecycleAction } from "@/components/learning/NativeClassRosterLifecycleAction";
 import { NativeClassSurveyCampaignPanel } from "@/components/learning/NativeClassSurveyCampaignPanel";
 import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/classes/native-class-workspace.functions";
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
@@ -227,6 +228,7 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
   const [grantBusy,setGrantBusy]=useState<string|null>(null);
   const [grantMessage,setGrantMessage]=useState("");
   const [grantError,setGrantError]=useState("");
+  const [lifecycleNotice,setLifecycleNotice]=useState("");
   const isOperator=workspace.view==="manage"&&namesAllowed;
   async function grantKnowledgeCheck(classEnrollmentId:string){
     if(grantBusy)return;
@@ -273,9 +275,21 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
               onClick={()=>void grantKnowledgeCheck(row.enrollmentId)}>
               {grantBusy===row.enrollmentId?"Granting…":"Grant Course knowledge check"}
             </Button>}
+          {isOperator&&(row.status==="active"||row.status==="pending")&&
+            <NativeClassRosterLifecycleAction
+              classEnrollmentId={row.enrollmentId} status={row.status}
+              onCompleted={setLifecycleNotice}
+              onChanged={async()=>{
+                await Promise.all([
+                  client.invalidateQueries({queryKey:["native-class-roster",workspace.classId]}),
+                  client.invalidateQueries({queryKey:["native-unified-class",workspace.classId]}),
+                ]);
+              }}/>}
+
         </div>
       </li>)}
     </ul>}
+    {lifecycleNotice&&<p role="status" className="mt-3 text-sm">{lifecycleNotice}</p>}
     {grantMessage&&<p role="status" className="mt-3 text-sm">{grantMessage}</p>}
     {grantError&&<p role="alert" className="mt-3 text-sm text-destructive">{grantError}</p>}
     {isOperator&&pages.hasNextPage&&<Button className="mt-4" variant="outline"
@@ -402,8 +416,13 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         {workspace.tab==="reports"&&<>
           <h2 className="font-serif text-2xl">Reporting</h2>
           <p className="mt-3 text-sm text-muted-foreground">
-            Authoritative Class outcomes, attendance and awards will contribute to authorized reporting after native assessment and Session evidence are connected.
+            Inspect source-backed registrations, scheduled and delivered Sessions, facilitator-attested presence, assessments and recorded outcomes.
+            Formal Class completion remains unavailable until independently governed decisions are verified.
           </p>
+          <Link to="/reports/classes/$classId" params={{classId:workspace.classId}}
+            className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
+            Open Class evidence report
+          </Link>
         </>}
       </section>
       <aside className="border border-border bg-card p-5">

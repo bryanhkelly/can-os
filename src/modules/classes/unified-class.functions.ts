@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -11,6 +11,9 @@ import {
   siteOrganizationRoles, catalogSites, canonicalEnrollmentSites, classroomDeploymentSites,
 } from "@/db/canonical-v301";
 import { classDefinitionSchema, classOfferingTermsSchema } from "@/domain/unified-class";
+import { assertOperationalClassOfferingTerms } from "@/domain/native-class-lifecycle";
+import { publishedOfferingKind } from "@/domain/network-program-rollout";
+import { publisherClassVariationPolicy } from "@/domain/publisher-class-variation";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -165,6 +168,7 @@ export const getMyUnifiedClassDrafts = createServerFn({method:"GET"})
       classId:canonicalClasses.id,title:canonicalClasses.title,
       capacity:canonicalClasses.capacity,
       courseVersionId:canonicalClasses.courseVersionId,
+      offeringVersionId:canonicalClasses.offeringVersionId,
       deploymentId:canonicalClasses.deploymentId,siteId:canonicalClasses.siteId,
       deliveryMode:canonicalClasses.deliveryMode,state:canonicalClasses.state,
       classOfferingId:canonicalClassOfferings.id,
@@ -220,6 +224,8 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       });
       const [terms]=await tx.select({
         id:canonicalClassOfferingVersions.id,state:canonicalClassOfferingVersions.state,
+        enrollmentMethods:canonicalClassOfferingVersions.enrollmentMethods,
+        allowedCreditModes:canonicalClassOfferingVersions.allowedCreditModes,
       }).from(canonicalClassOfferingVersions)
         .innerJoin(canonicalClassOfferings,and(
           eq(canonicalClassOfferings.id,canonicalClassOfferingVersions.classOfferingId),
@@ -229,6 +235,10 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
           eq(canonicalClassOfferingVersions.classId,instance.id)))
         .for("update").limit(1);
       if(!terms || terms.state!=="draft") throw new AuthorizationError("draft Class Offering version");
+      // WS2/WS5 integration: only working and independently authorized enrollment
+      // methods/credit modes may be published, even when the UI is bypassed.
+      // This is a locked, authoritative server check before any publication write.
+      assertOperationalClassOfferingTerms(terms);
       const now=new Date();
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClassOfferingVersions)
@@ -350,67 +360,213 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
   });
 
 
-/** Populate the native Class composer from actual published, adopted Courses.
- * The creation command independently repeats every authorization check. */
-export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
+/** List current operator Sites independently of Course page 1. An Organization
+ * grant, network affiliation or stale account Site ID alone does not expose a
+ * delivery Site. The exact Course/Site permission is still checked separately.
+ */
+export const getNativeClassOperatorSites=createServerFn({method:"GET"})
   .handler(async()=>{
     requireClassFeature();
     const operator=await requireClassOperator();
+    if(!operator.siteIds.length)return [];
     const now=new Date();
-    const available=await db.select({
-      deploymentId:programDeployments.id,
-      deploymentName:programDeployments.name,
-      adoptionId:deploymentOfferingAdoptions.id,
-      offeringVersionId:offeringVersions.id,
-      courseVersionId:courseVersions.id,
-      courseTitle:courses.title,
-    }).from(programDeployments)
-      .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
-      .innerJoin(deploymentOfferingAdoptions,eq(deploymentOfferingAdoptions.deploymentId,programDeployments.id))
-      .innerJoin(offeringVersions,and(
-        eq(offeringVersions.id,deploymentOfferingAdoptions.offeringVersionId),
-        eq(offeringVersions.offeringId,programDeployments.offeringId),
+    const rows=await db.selectDistinct({
+      id:catalogSites.id,name:canonicalEnrollmentSites.name,
+    }).from(catalogSites)
+      .leftJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,catalogSites.id))
+      .innerJoin(siteOrganizationRoles,and(
+        eq(siteOrganizationRoles.siteId,catalogSites.id),
+        eq(siteOrganizationRoles.organizationId,operator.organizationId),
+        inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+        lte(siteOrganizationRoles.validFrom,now),
+        or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
       ))
-      .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
-      .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
-      .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
-      .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+      .innerJoin(educationOperationSites,and(
+        eq(educationOperationSites.siteId,catalogSites.id),
+        lte(educationOperationSites.validFrom,now),
+        or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+      ))
+      .innerJoin(educationOperations,and(
+        eq(educationOperations.id,educationOperationSites.operationId),
+        eq(educationOperations.status,"active"),
+      ))
+      .innerJoin(educationOperationOrganizationRoles,and(
+        eq(educationOperationOrganizationRoles.operationId,educationOperationSites.operationId),
+        eq(educationOperationOrganizationRoles.organizationId,operator.organizationId),
+        eq(educationOperationOrganizationRoles.roleCode,"operator"),
+        eq(educationOperationOrganizationRoles.status,"approved"),
+        lte(educationOperationOrganizationRoles.validFrom,now),
+        or(isNull(educationOperationOrganizationRoles.validThrough),
+          gt(educationOperationOrganizationRoles.validThrough,now)),
+      ))
       .where(and(
-        eq(programDeployments.status,"active"),eq(educationOperations.status,"active"),
-        eq(offeringVersions.lifecycle,"published"),isNotNull(offeringVersions.publishedAt),
-        eq(offerings.status,"active"),
-        eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
-        eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
-        lte(deploymentOfferingAdoptions.validFrom,now),
-        or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
-      )).orderBy(asc(courses.title)).limit(100);
-    const names=operator.siteIds.length?await db.select({
-      id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
-    }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,operator.siteIds)):[];
-    const options=[];
-    for(const row of available){
-      const instance={
-        deploymentId:row.deploymentId,adoptionId:row.adoptionId,
-        offeringVersionId:row.offeringVersionId,courseVersionId:row.courseVersionId,
-        operatingOrganizationId:operator.organizationId,
-        title:row.courseTitle,deliveryMode:"self_paced" as const,siteId:null,
-      };
-      try{
-        await db.transaction(tx=>validateClassAuthority(tx,operator,instance));
-      }catch(e){if(e instanceof AuthorizationError)continue;throw e;}
-      const authorizedSites=[];
-      for(const siteId of operator.siteIds){
-        try {
-          await db.transaction(tx=>validateClassAuthority(tx,operator,{
-            ...instance,siteId,deliveryMode:"facilitated",
-          }));
-          authorizedSites.push(siteId);
-        }catch(e){if(!(e instanceof AuthorizationError))throw e;}
+        inArray(catalogSites.id,operator.siteIds),
+        eq(catalogSites.status,"active"),
+      )).orderBy(asc(canonicalEnrollmentSites.name),asc(catalogSites.id));
+    return rows.map(site=>({id:site.id,name:site.name??"Authorized Site"}));
+  });
+
+/** One bounded, stable page of publisher Offerings and their authorized Courses.
+ * Scope BOTH the operating Organization and its Sites before limiting results.
+ * The list is an advisory read; commands revalidate all rights at mutation time.
+ */
+export const getUnifiedClassCourseOptions=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    search:z.string().trim().max(100).default(""),
+    cursor:z.number().int().min(0).max(100000).default(0),
+    offeringVersionId:z.string().uuid().optional(),
+    courseVersionIds:z.array(z.string().uuid()).min(1).max(50).optional(),
+    siteId:z.string().uuid().optional(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    if(data.siteId&&!operator.siteIds.includes(data.siteId))
+      throw new AuthorizationError("current Site scope for Course discovery");
+    const permittedSites=data.siteId?[data.siteId]:operator.siteIds;
+    if(!permittedSites.length)return {items:[],nextCursor:null as number|null};
+    const now=new Date();
+    const pageSize=50;
+    const needle=data.search.replace(/[\\%_]/g,"\\$&");
+    const pattern="%"+needle+"%";
+    // Set-based authorization avoids one transaction *per Course and per
+    // Site*, and prevents other operators' national catalogue rows from
+    // consuming the first page.
+    return db.transaction(async tx=>{
+      const available=await tx.select({
+        deploymentId:programDeployments.id,
+        operationId:programDeployments.operationId,
+        deploymentName:programDeployments.name,
+        adoptionId:deploymentOfferingAdoptions.id,
+        offeringId:offerings.id,
+        offeringTitle:offerings.title,
+        offeringPublisherOrganizationId:offerings.publisherOrganizationId,
+        offeringVersionId:offeringVersions.id,
+        offeringVersionNo:offeringVersions.versionNo,
+        productDefinition:offeringVersions.productDefinition,
+        courseId:courses.id,
+        courseVersionId:courseVersions.id,
+        courseVersionNo:courseVersions.versionNo,
+        courseCode:courses.courseCode,
+        courseTitle:courses.title,
+        isRequired:canonicalOfferingCourses.isRequired,
+        sequenceNo:canonicalOfferingCourses.sequenceNo,
+      }).from(programDeployments)
+        .innerJoin(educationOperations,eq(educationOperations.id,programDeployments.operationId))
+        .innerJoin(deploymentOfferingAdoptions,eq(deploymentOfferingAdoptions.deploymentId,programDeployments.id))
+        .innerJoin(offeringVersions,and(
+          eq(offeringVersions.id,deploymentOfferingAdoptions.offeringVersionId),
+          eq(offeringVersions.offeringId,programDeployments.offeringId),
+        ))
+        .innerJoin(offerings,eq(offerings.id,offeringVersions.offeringId))
+        .innerJoin(canonicalOfferingCourses,eq(canonicalOfferingCourses.offeringVersionId,offeringVersions.id))
+        .innerJoin(courseVersions,eq(courseVersions.id,canonicalOfferingCourses.courseVersionId))
+        .innerJoin(courses,eq(courses.id,courseVersions.courseId))
+        .where(and(
+          eq(programDeployments.status,"active"),eq(educationOperations.status,"active"),
+          eq(offeringVersions.lifecycle,"published"),isNotNull(offeringVersions.publishedAt),
+          eq(offerings.status,"active"),
+          eq(courseVersions.lifecycle,"published"),isNotNull(courseVersions.publishedAt),
+          eq(deploymentOfferingAdoptions.approvalStatus,"approved"),
+          data.offeringVersionId?eq(offeringVersions.id,data.offeringVersionId):undefined,
+          data.courseVersionIds?inArray(courseVersions.id,data.courseVersionIds):undefined,
+          lte(deploymentOfferingAdoptions.validFrom,now),
+          or(isNull(deploymentOfferingAdoptions.validThrough),gt(deploymentOfferingAdoptions.validThrough,now)),
+          data.search?or(
+            ilike(offerings.title,pattern),ilike(courses.title,pattern),
+            ilike(courses.courseCode,pattern),ilike(programDeployments.name,pattern),
+          ):undefined,
+          exists(tx.select({id:educationOperationOrganizationRoles.id})
+            .from(educationOperationOrganizationRoles).where(and(
+              eq(educationOperationOrganizationRoles.operationId,programDeployments.operationId),
+              eq(educationOperationOrganizationRoles.organizationId,operator.organizationId),
+              eq(educationOperationOrganizationRoles.roleCode,"operator"),
+              eq(educationOperationOrganizationRoles.status,"approved"),
+              lte(educationOperationOrganizationRoles.validFrom,now),
+              or(isNull(educationOperationOrganizationRoles.validThrough),
+                gt(educationOperationOrganizationRoles.validThrough,now)),
+            ))),
+          exists(tx.select({id:educationOperationSites.id})
+            .from(educationOperationSites)
+            .innerJoin(catalogSites,and(
+              eq(catalogSites.id,educationOperationSites.siteId),
+              eq(catalogSites.status,"active"),
+            ))
+            .innerJoin(siteOrganizationRoles,and(
+              eq(siteOrganizationRoles.siteId,catalogSites.id),
+              eq(siteOrganizationRoles.organizationId,operator.organizationId),
+              inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+              lte(siteOrganizationRoles.validFrom,now),
+              or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+            ))
+            .where(and(
+              eq(educationOperationSites.operationId,programDeployments.operationId),
+              inArray(educationOperationSites.siteId,permittedSites),
+              lte(educationOperationSites.validFrom,now),
+              or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+            ))),
+        ))
+        .orderBy(
+          asc(offerings.title),asc(courses.title),
+          asc(programDeployments.id),asc(deploymentOfferingAdoptions.id),
+          asc(offeringVersions.id),asc(courseVersions.id),
+        )
+        .limit(pageSize+1).offset(data.cursor);
+      const more=available.length>pageSize;
+      const page=available.slice(0,pageSize);
+      if(!page.length)return {items:[],nextCursor:null as number|null};
+      const operationIds=[...new Set(page.map(row=>row.operationId))];
+      const deploymentIds=[...new Set(page.map(row=>row.deploymentId))];
+      const sites=await tx.select({
+        operationId:educationOperationSites.operationId,
+        id:catalogSites.id,
+      }).from(educationOperationSites)
+        .innerJoin(catalogSites,and(
+          eq(catalogSites.id,educationOperationSites.siteId),
+          eq(catalogSites.status,"active"),
+        ))
+        .innerJoin(siteOrganizationRoles,and(
+          eq(siteOrganizationRoles.siteId,catalogSites.id),
+          eq(siteOrganizationRoles.organizationId,operator.organizationId),
+          inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+          lte(siteOrganizationRoles.validFrom,now),
+          or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+        ))
+        .where(and(
+          inArray(educationOperationSites.operationId,operationIds),
+          inArray(educationOperationSites.siteId,permittedSites),
+          lte(educationOperationSites.validFrom,now),
+          or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+        ));
+      const placements=await tx.select({
+        deploymentId:classroomDeploymentSites.deploymentId,
+        siteId:classroomDeploymentSites.siteId,
+      }).from(classroomDeploymentSites).where(and(
+        inArray(classroomDeploymentSites.deploymentId,deploymentIds),
+        inArray(classroomDeploymentSites.siteId,permittedSites),
+      ));
+      const names=await tx.select({
+        id:canonicalEnrollmentSites.id,name:canonicalEnrollmentSites.name,
+      }).from(canonicalEnrollmentSites).where(inArray(canonicalEnrollmentSites.id,permittedSites));
+      const siteNames=new Map(names.map(site=>[site.id,site.name] as const));
+      const siteByOperation=new Map<string,Set<string>>();
+      for(const site of sites){
+        const ids=siteByOperation.get(site.operationId)??new Set<string>();
+        ids.add(site.id);siteByOperation.set(site.operationId,ids);
       }
-      options.push({...row,operatingOrganizationId:operator.organizationId,
-        siteOptions:authorizedSites.map(id=>({
-          id,name:names.find(site=>site.id===id)?.name??"Authorized Site",
-        }))});
-    }
-    return options;
+      const placementKeys=new Set(placements.map(row=>row.deploymentId+":"+row.siteId));
+      const items=page.map(row=>{
+        const {productDefinition,operationId,...publicRow}=row;
+        const siteOptions=[...(siteByOperation.get(operationId)??new Set<string>())].map(id=>({
+          id,name:siteNames.get(id)??"Authorized Site",
+          allowedDeliveryModes:placementKeys.has(row.deploymentId+":"+id)
+            ?(["self_paced","scheduled","facilitated","hybrid"] as const)
+            :(["self_paced"] as const),
+        }));
+        return {...publicRow,offeringKind:publishedOfferingKind(productDefinition),
+          localClassPolicy:publisherClassVariationPolicy(productDefinition),
+          operatingOrganizationId:operator.organizationId,siteOptions};
+      });
+      return {items,nextCursor:more?data.cursor+pageSize:null as number|null};
+    });
   });

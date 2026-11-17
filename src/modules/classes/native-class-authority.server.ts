@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, lte, or, gt, inArray } from "drizzle-orm";
+import { and, eq, isNotNull, isNull, lte, or, gt, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import {
   canonicalClasses, programDeployments, educationOperations, deploymentOfferingAdoptions, offeringVersions, offerings, canonicalOfferingCourses,
