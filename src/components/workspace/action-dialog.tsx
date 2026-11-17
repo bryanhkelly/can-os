@@ -27,7 +27,7 @@ export function ActionDialog({ open, title, description, confirmLabel, pending =
       <fieldset disabled={pending} className="mt-4 space-y-3">{children}</fieldset>
       <div className="mt-5 flex justify-end gap-3">
         <Button ref={cancel} type="button" variant="outline" disabled={pending} onClick={onClose}>Cancel</Button>
-        <Button type="submit" variant={destructive ? "destructive" : "default"}
+        <Button type="submit" variant={destructive ? "destructive" : "default"} loading={pending}
           disabled={pending || confirmDisabled}>{pending ? "Saving..." : confirmLabel}</Button>
       </div>
     </form>
