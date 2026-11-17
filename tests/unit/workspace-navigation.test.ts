@@ -153,6 +153,12 @@ describe("canonical workspace navigation",()=>{
   expect(isFocusedClassroomRoute("/student/courses","?section=section-id","student")).toBe(true);
   expect(isFocusedClassroomRoute("/student/courses","?section=section-id&view=catalog","student")).toBe(false);
   expect(isFocusedClassroomRoute("/classes","?tab=overview","teacher")).toBe(false);
+  const classId="9c9023ef-4b60-4f51-9431-dacdc3940c2f";
+  expect(isFocusedClassroomRoute("/class/"+classId,"?view=teach&tab=classroom","teacher")).toBe(true);
+  expect(isFocusedClassroomRoute("/class/"+classId,"?view=learn&tab=lessons","student")).toBe(true);
+  expect(isFocusedClassroomRoute("/class/"+classId,"?view=manage&tab=roster","site_admin")).toBe(false);
+  expect(isFocusedClassroomRoute("/class/"+classId,"?view=teach&tab=classroom","student")).toBe(false);
+  expect(isFocusedClassroomRoute("/class","?view=manage","teacher")).toBe(false);
  });
  it("marks only the selected destination and preserves its concrete route",async()=>{
   const root=createRootRoute({component:()=>createElement(SidebarLinks,{links:workspaceLinks.student,activePath:"/student/my-school"})});
