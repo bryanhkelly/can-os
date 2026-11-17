@@ -32,6 +32,12 @@ test("one verified CAN account completes native Class enroll, learn, Activity an
     // separately approved evidence. Never seed or forge a native cookie here.
     await expect(page.getByText("Enrollment confirmed. Your Course Attempt is ready.")).toBeVisible();
     await expect(page.getByRole("link",{name:"Open Class"})).toBeVisible();
+    const after=await context.cookies(baseURL);
+    expect(after.filter(cookie=>cookie.name==="__Host-can_os_v3_session")).toHaveLength(1);
+    await page.getByRole("link",{name:"Open Class"}).click();
+    // The actual learner workspace must authorize, not merely render a link.
+    await expect(page.getByText(/Your authorized Class workspace/i)).toBeVisible();
+    await expect(page.getByRole("heading",{name:"Class unavailable"})).toHaveCount(0);
 
     await page.goto("/learn/my-activity");
     await expect(page.getByRole("heading",{name:"My Activity"})).toBeVisible();
