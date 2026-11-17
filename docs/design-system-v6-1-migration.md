@@ -186,6 +186,23 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 - Component tests, Storybook states and lint/checker rules cover these adapters.
   They are source-level changes, **not live-site or production acceptance**.
 
+### Component-first adoption increment: institutional decisions and grading
+
+- `SchoolOpeningReviewPanel` now composes V6.1 `Button`, `Field`, `Input`
+  and `StatusBadge` for the authorized opening review, while preserving
+  its independent institutional approval/suspension rules, configuration version,
+  server verification and refresh recovery. The action handler additionally
+  mirrors disabled conditions without treating client-side guards as authority.
+- `SectionGradeFinalization` now composes `Button`, `Field`, `Input`,
+  `Select`, `Textarea` and `WorkspaceNotice`, preserving distinct
+  grading period selection, immutable finalization, per-student correction reasons,
+  append-only correction history and the existing server command boundaries.
+- Both components are in the source-level design-system checker and native-control
+  ESLint manifest. Their existing test suites now target canonical controls,
+  and the field catalog demonstrates controlled review/grade input states.
+- A commit on `main` is **not** a passed build or live acceptance.
+  Review/version/evidence tests must pass for the exact commit before release.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
