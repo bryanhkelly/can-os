@@ -544,6 +544,14 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "<StatusBadge", "<EmptyState", "<WorkspaceNotice",
     "<ActionDialog", "<QueryState",
   ],
+  "routes/admissions.families.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/choice", "@/components/ui/label", "<EmptyState",
+    "<StatCard", "<WorkspaceNotice",
+  ],
+  "routes/operations.course-requests.tsx": [
+    "@/components/ui/button", "<StatusBadge", "<EmptyState",
+  ],
   "routes/platform.tsx": [
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
     "<StatCard", "<WorkspaceNotice",
