@@ -85,7 +85,7 @@ export interface WorkspaceNavigationItem {
 
 export const workspaceHome = {
   account_holder: "/account/",
-  app_admin: "/canonical",
+  app_admin: "/platform",
   academic_content_creator: "/canonical/content",
   academic_content_reviewer: "/canonical/content-reviews",
   site_website_editor: "/home",
