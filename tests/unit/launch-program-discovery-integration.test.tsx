@@ -110,7 +110,7 @@ describe("canonical discovery in Launch Studio academics", () => {
         ...base, options:{...base.options,sites:[]}, selectionError: "Site unavailable", launches: [{ id: programId, name: "Program" }],
       } as never} />,
     );
-    expect(html).toContain("Site unavailable");
+    expect(html).toContain("This Site is not available in your authorized workspace");
     expect(html).not.toContain("canonical-discovery");
   });
 });
