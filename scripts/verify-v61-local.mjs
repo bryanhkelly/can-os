@@ -78,7 +78,7 @@ function preflight() {
     (name === ".env" || name.startsWith(".env.") || name === ".dev.vars" ||
       name.startsWith(".dev.vars.")) &&
     name !== ".env.example" && name !== ".dev.vars.example");
-  const dangerousKey = /^\\s*(?:export\\s+)?(?:DATABASE_URL(?:_UNPOOLED)?|DIRECT_URL|NEON_DATABASE_URL|NEON_API_KEY|PGHOST|PGPASSWORD)\\s*=/m;
+  const dangerousKey = /^\s*(?:export\s+)?(?:DATABASE_URL(?:_UNPOOLED)?|DIRECT_URL|NEON_DATABASE_URL|NEON_API_KEY|PGHOST|PGPASSWORD)\s*=/m;
   for (const name of credentialFiles) {
     const contents = readFileSync(join(root, name), "utf8");
     if (dangerousKey.test(contents)) {
