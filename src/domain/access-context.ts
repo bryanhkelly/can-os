@@ -28,6 +28,9 @@ export type AccessContext = CommandContext & {
 const baseRoleCapabilities = {
  // Account-wide identity only: zero Site, enrollment, student, staff or admin capabilities.
  account_holder: [],
+ // Explicit platform-only membership: no implicit Site/organization access.
+ // Platform operations must independently enforce platform.admin and audit changes.
+ app_admin: ["platform.admin"],
  // Course-content roles are provider scoped and receive no learner-record powers.
  academic_content_creator: ["instructional_track.author"],
  academic_content_reviewer: ["instructional_track.review", "instructional_track.publish", "instructional_track.withdraw"],
@@ -90,7 +93,8 @@ export function resolveAccessContext(principal: SessionPrincipal, grants: readon
  if (!grant || !Object.hasOwn(roleCapabilities,grant.role)) throw new AuthorizationError("active membership");
  // A personal login must never be reinterpreted as site-wide access even if
  // a malformed database row is later introduced.
- if (grant.role === "account_holder" && (grant.organizationId !== null || grant.siteId !== null))
+ if ((grant.role === "account_holder" || grant.role === "app_admin") &&
+     (grant.organizationId !== null || grant.siteId !== null))
   throw new AuthorizationError("account-only scope");
  return {
   accountId: principal.accountId,
