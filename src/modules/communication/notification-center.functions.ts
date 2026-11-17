@@ -659,7 +659,9 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    "Your parent-teacher conference is scheduled for "+conferenceWhen+"."
    :n.body??"",
   status:n.status,
-  date:n.createdAt.toISOString(),href:conference?"/guardian/experiences?tab=conferences":n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
+  date:n.createdAt.toISOString(),href:n.type==="noncredit_training_completed"&&
+   n.resourceType==="noncredit_completion_decision"?"/learn/my-activity":
+   conference?"/guardian/experiences?tab=conferences":n.resourceType==="safeguarding_concern"&&n.resourceId&&permittedSafeguardingIds.has(n.resourceId)?
    `/safeguarding?case=${encodeURIComponent(n.resourceId)}`:
   n.type==="calendar_event_invitation"&&n.resourceType==="calendar_event"&&n.resourceId&&calendarInvitationById.has(n.resourceId)?
    `/calendar?date=${encodeURIComponent(calendarInvitationById.get(n.resourceId)!)}&event=${encodeURIComponent(n.resourceId)}`:
