@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { RosterList } from "@/components/workspace/roster-list";
 import { WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace/workspace-panel";
 import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { RecordHeader, RecordLayout, EntityCard } from "@/components/workspace/record-layout";
@@ -20,6 +21,22 @@ describe("V6.1 reusable design system", () => {
     expect(panel).toContain('aria-label="Class roster"');
     expect(status).toContain("Verified");
     expect(person).toContain("JL");
+  });
+
+  it("renders roster rows without owning enrollment or authorization rules", () => {
+    const rows = [{ id: "enrollment-1", name: "Jordan Lee", status: "active" }];
+    const html = renderToStaticMarkup(<RosterList rows={rows} rowKey={row => row.id}
+      primary={row => row.name} detail={row => row.status}
+      actions={row => <a href={`/learn/${row.id}`}>Open activity</a>}/>);
+    expect(html).toContain('aria-label="Class roster"');
+    expect(html).toContain("Jordan Lee");
+    expect(html).toContain("active");
+    expect(html).toContain('href="/learn/enrollment-1"');
+    expect(html).not.toContain("rounded");
+    const empty = renderToStaticMarkup(<RosterList rows={[]} rowKey={() => ""}
+      primary={() => null} emptyMessage="No authorized enrollments."/>);
+    expect(empty).toContain("No authorized enrollments.");
+    expect(empty).not.toContain("<ul");
   });
 
   it("loads the same V6.1 fonts in the app and Storybook", () => {
