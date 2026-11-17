@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { organizations, siteAffiliations, sitePublications, sites } from "@/db/schema";
-import { schoolPlanningLocationSchema } from "@/domain/site-setup-configuration";
+import { schoolPlanningLocationSchema } from "@/domain/school-stub";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { AuthorizationError } from "@/domain/command-context";

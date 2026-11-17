@@ -14,7 +14,8 @@ import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/do
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
-import { schoolPlanningLocationSchema, siteInformationSchema } from "@/domain/site-setup-configuration";
+import { schoolPlanningLocationSchema } from "@/domain/school-stub";
+import { siteInformationSchema } from "@/domain/site-setup-configuration";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
