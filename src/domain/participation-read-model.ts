@@ -83,6 +83,8 @@ export interface ParticipationReadModel {
   opportunities: ParticipationOpportunity[];
   /** Server-issued per-source keyset positions for explicitly requested older pages. */
   nextCursors?: Partial<Record<ParticipationSource,string>>;
+  /** Opportunity history remains separate from actual participation. */
+  nextOpportunityCursor?: string|null;
   sources: Array<{
     source: ActivitySource;
     state: ActivitySourceState;
@@ -169,6 +171,12 @@ export function assertParticipationReadModel(model: ParticipationReadModel): voi
   if (model.version !== PARTICIPATION_READ_MODEL_VERSION)
     throw new Error("Unsupported participation contract version");
   assertUniqueParticipationKeys(model.records);
+  if(model.nextOpportunityCursor!==null &&
+     model.nextOpportunityCursor!==undefined &&
+     (typeof model.nextOpportunityCursor!=="string"||
+      model.nextOpportunityCursor.length>500||
+      model.nextOpportunityCursor.length<2))
+    throw new Error("Invalid opportunity history cursor");
   for(const [source,cursor] of Object.entries(model.nextCursors??{})){
     if(!["school_section","school_program","calendar_event",
       "family_enrichment","native_class","noncredit_course"].includes(source) ||
