@@ -34,8 +34,8 @@ describe("WS3 guarded completion mutation integration contracts", () => {
     expect(corrections).toContain("NoncreditCompletionCorrected");
   });
   it("makes award revocation independent of Site role and appends issuer events", () => {
-    expect(revocation).toContain("CAN_CREDENTIAL_ISSUANCE_ENABLED");
-    expect(revocation).toContain("CAN_WS3_AWARD_REVOCATION_ENABLED");
+    expect(revocation).not.toContain("CAN_CREDENTIAL_ISSUANCE_ENABLED");
+    expect(revocation).not.toContain("CAN_WS3_AWARD_REVOCATION_ENABLED");
     expect(revocation).toContain("assertCurrentCredentialIssuer");
     expect(revocation).toContain("evidence.owningOrganizationId !== issuance.issuerOrganizationId");
     expect(revocation).toContain("learningAwardIssuanceEvents");
