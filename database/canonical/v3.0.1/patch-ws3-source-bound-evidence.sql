@@ -104,7 +104,8 @@ BEGIN
     FROM education_v30.class_enrollments e
     JOIN education_v30.classes c ON c.id=e.class_id
     JOIN education_v30.participation_attributions a
-      ON a.class_enrollment_id=e.id AND a.delivery_site_id=c.site_id
+      ON a.class_enrollment_id=e.id
+        AND (c.site_id IS NULL OR a.delivery_site_id=c.site_id)
     WHERE e.id=NEW.class_enrollment_id
       AND (NEW.expected_class_outcome_id IS NULL OR EXISTS(
         SELECT 1 FROM education_v30.class_outcomes prior
