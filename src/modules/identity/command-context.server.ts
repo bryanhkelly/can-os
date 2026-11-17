@@ -5,6 +5,7 @@ import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {assertSingleAccountPerson,resolveAccessContext,authorizedProgramIds,type AccessContext} from "@/domain/access-context";
 import {accessSessionCookie,hashAccessSecret,sessionIdleCutoff} from "@/domain/access-tokens";
 import {programTeacherDelegationPredicate} from "./teaching-eligibility.server";
+import { requireInstitutionalAcademicProgramAuthority } from "@/modules/programs/program-site-authorization.server";
 import {readSessionGrants} from "./session-grants.server";
 import { readCookie } from "@/domain/session-cookies";
 
@@ -113,8 +114,6 @@ export async function getCommandContext(request: Request): Promise<AccessContext
       inArray(programs.academicProviderOrganizationId,organizations),
       not(inArray(programs.organizationId,organizations))));
   if(assignments.length){
-   const {requireInstitutionalAcademicProgramAuthority}=await import(
-     "@/modules/programs/program-site-authorization.server");
    const authorizedPrograms=new Set<string>();
    const deniedPrograms=new Set<string>();
    for(const assignment of assignments){
