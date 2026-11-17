@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatusBadge, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -46,17 +47,17 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
       title="Course change approvals"
       subtitle="Approve or decline pending student course changes. Enrollment guards and any required guardian permission are verified again when you approve."
       actions={<div className="flex flex-wrap gap-2">
-        <Link to="/operations/course-policies" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">
+        <Link to="/operations/course-policies" search={{siteId:selection.siteId,programId:selection.programId}} className=" border px-3 py-2 text-sm">
           Registration policies
         </Link>
-        <Link to="/operations/field-trips" search={{siteId:undefined,programId:undefined}} className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
-        <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+        <Link to="/operations/field-trips" search={{siteId:undefined,programId:undefined}} className=" border px-3 py-2 text-sm">Field trips</Link>
+        <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className=" border px-3 py-2 text-sm">Operations</Link>
       </div>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving course decision..."/>
       <div className="mt-7 space-y-4">
         {visibleRequests.map(request => (
-          <article key={request.id} className="rounded-xl border bg-card p-5">
+          <article key={request.id} className=" border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
@@ -69,11 +70,11 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
                   {" · "}Deadline {request.deadline}
                 </p>
               </div>
-              <span className="rounded-full border px-3 py-1 text-xs">
+              <StatusBadge tone={request.guardianState === "declined" ? "danger" : request.guardianState === "pending" ? "attention" : request.guardianState === "approved" ? "success" : "neutral"}>
                 {request.guardianState === "approved" ? "Guardian approved" :
                   request.guardianState === "declined" ? "Guardian declined" :
                   request.guardianState === "pending" ? "Awaiting guardian approval" : "No guardian approval required"}
-              </span>
+              </StatusBadge>
             </div>
             {!request.programActive && (
               <p className="mt-3 text-sm text-amber-700">The student's program enrollment is no longer active.</p>
@@ -81,7 +82,7 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
             {request.deadlinePassed && (
               <p className="mt-3 text-sm text-amber-700">The registration deadline has passed.</p>
             )}
-            {request.operation === "add" && !request.contentReady && <div className="mt-3 rounded-lg border p-3 text-sm">
+            {request.operation === "add" && !request.contentReady && <div className="mt-3  border p-3 text-sm">
               <p className="font-semibold">Next: school curriculum setup</p>
               <p>The school's authorized curriculum publisher must provide a published release with at least one student-accessible lesson.
                 The registrar must then use that release for this class. Publishing a newer release alone does not update the class's pinned version.</p>
@@ -99,23 +100,19 @@ function CourseRequestList({ requests }: { requests: CourseRequest[] }) {
                 "Next: registrar reviews this request. Approval rechecks staffing, capacity, prerequisites, credits and schedule; this is not a readiness certificate."}
             </p>
             <div className="mt-4 flex gap-3">
-              <button type="button" disabled={busy}
-                onClick={() => void decide(request.id, false)}
-                className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+              <Button type="button" variant="outline" disabled={busy}
+                onClick={() => void decide(request.id, false)}>
                 Decline
-              </button>
-              <button type="button" disabled={busy || !request.canApprove}
-                onClick={() => void decide(request.id, true)}
-                className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+              </Button>
+              <Button type="button" disabled={busy || !request.canApprove}
+                onClick={() => void decide(request.id, true)}>
                 Approve change
-              </button>
+              </Button>
             </div>
           </article>
         ))}
-        {visibleRequests.length === 0 &&
-          <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
-            No pending course change requests in your authorized schools and programs.
-          </p>}
+        {visibleRequests.length === 0 && <EmptyState title="No pending course requests"
+          description="No pending course change requests in your authorized schools and programs."/>}
       </div>
     </WorkspaceShell>
   );
