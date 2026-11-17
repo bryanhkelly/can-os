@@ -14,11 +14,11 @@ Updated: 2026-11-17
 
 ## What actually exists on Neon main
 
-Current Neon main snapshot, 2026-11-17 (after 43 guarded table moves):
+Current Neon main snapshot, 2026-11-17 (after 51 guarded table moves):
 
 | Metric | public | education_v30 |
 | --- | ---: | ---: |
-| Base tables | 234 | 441 |
+| Base tables | 242 | 433 |
 | Views | 0 | 6 |
 | SQL functions/procedures | 258 | 245 |
 | Sites | 9 | 1 (same Site UUID as its public record) |
@@ -45,9 +45,11 @@ The `education_v30.sites` table has 45 inbound FK constraints; `public.sites` ha
 6. Deployed the revised restricted CAN staff SQL function on Neon main: it requires `native_grant.site_id = source.can_site_id` without a Site crosswalk. Verified that an invalid synthetic session returns no grants; the function's restricted role execute grant remains intact. **CAN Person aliasing is not yet consolidated**.
 7. Moved the existing `feedback_categories` and six noncolliding static reference tables from `education_v30` to `public`. All **140** rows were preserved, no copy or bridge was created, and PostgreSQL retained their foreign-key relationships. SQL migrations: `2026-11-17-consolidate-feedback-categories.sql` and `2026-11-17-consolidate-static-reference-tables.sql`. Reviewed for source-code mapping, direct SQL routine, view, trigger and ACL risks before executing.
 8. Retired obsolete Site-identity helper and noncredit bridge test code paths. The legacy `site_canonical_identity_links` table and several canonical identity aliases **still physically exist** until all remaining service/auth endpoints are removed; removing it prematurely would break those endpoints.
-9. Moved an additional **36 empty, noncolliding canonical tables** into `public` on Neon main in one guarded transaction after verifying no direct SQL routine/view use, no table-level policies, no custom triggers, no data, and no identifiable runtime table mappings for the selected tables. Preserved table OIDs and inbound/outbound foreign keys. Source: `database/production/2026-11-17-consolidate-36-empty-legacy-tables.sql`. Current count: **234 public / 441 education_v30** base tables.
-10. Added `verify:schema:consolidation` to reconcile all **43** committed table moves on actual main without changing data. This check intentionally does not claim full schema unification while canonical objects remain.
+9. Moved an additional **36 empty, noncolliding canonical tables** into `public` on Neon main in one guarded transaction after verifying no direct SQL routine/view use, no table-level policies, no custom triggers, no data, and no identifiable runtime table mappings for the selected tables. Preserved table OIDs and inbound/outbound foreign keys. Source: `database/production/2026-11-17-consolidate-36-empty-legacy-tables.sql`. At that stage: **234 public / 441 education_v30** base tables.
+10. Added `verify:schema:consolidation` to reconcile all **51** committed table moves on actual main without changing data. This check intentionally does not claim full schema unification while canonical objects remain.
 
+
+11. Relocated **eight further empty, noncolliding operational tables** in a checked main-only transaction, including `organization_relationships`, `organization_classifications`, `provider_authorizations`, `provider_eligibility_reviews`, `institutional_approvals`, `curriculum_rights_grants`, `production_opportunities`, and `session_staff`. Each retained its table identity and FK targets; none had existing business records. Source: `database/production/2026-11-17-consolidate-8-empty-operational-tables.sql`. **Current: 242 public tables, 433 canonical tables, 51 total tables relocated.**
 
 ## Production cutover (dependency order; not yet executed)
 
