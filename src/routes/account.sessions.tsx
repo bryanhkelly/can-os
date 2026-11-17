@@ -1,4 +1,7 @@
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute } from "@tanstack/react-router";
@@ -88,8 +91,8 @@ function AccountSessionsPage() {
    Browser and operating system descriptions are approximate. These do not establish physical device identity.
    Network addresses and device identifiers are not displayed.
   </p>
-  <label className="mt-5 flex items-center gap-3 border border-border p-4 text-sm">
-   <input type="checkbox" checked={shared} onChange={async event=>{
+  <Label className="mt-5 flex items-center gap-3 border border-border p-4 text-sm">
+   <Checkbox checked={shared} onChange={async event=>{
     const enabled=event.target.checked;
     setSharedDeviceMode(enabled);setShared(enabled);
     try{
@@ -103,13 +106,13 @@ function AccountSessionsPage() {
     }
    }}/>
    Shared learning-center device (five-minute inactivity sign-out)
-  </label>
-  {error && <p className="mt-5 rounded-lg border p-3 text-sm" role="alert">{error}</p>}
+  </Label>
+  {error && <WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Revoking account sessions..."/>
   <section className="mt-7 space-y-3" aria-label="Active sessions">
    {loading && <p role="status">Checking active sessions…</p>}
-   {!loading && sessions.length === 0 && <p>No active sessions were found for this account.</p>}
-   {sessions.map(session => <article key={session.id} className="rounded-xl border bg-card p-4">
+   {!loading && sessions.length === 0 && <EmptyState title="No active sessions" description="No active sessions were found for this account."/>}
+   {sessions.map(session => <article key={session.id} className="border bg-card p-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
      <div>
       <p className="font-semibold">{session.current ? "This session" : "Another active session"}</p>
@@ -118,11 +121,10 @@ function AccountSessionsPage() {
       <p className="text-xs text-muted-foreground">Last interaction: {new Date(session.lastActivityAt).toLocaleString()}</p>
       <p className="text-xs text-muted-foreground">Absolute expiration: {new Date(session.expiresAt).toLocaleString()}</p>
      </div>
-     <button type="button" disabled={busy}
-      onClick={() => void revoke({ kind:"one", sessionId:session.id })}
-      className="rounded-lg border px-3 py-2 text-sm font-medium disabled:opacity-50">
+     <Button variant="outline" type="button" disabled={busy}
+      onClick={() => void revoke({ kind:"one", sessionId:session.id })}>
       {session.current ? "Sign out this session" : "Revoke session"}
-     </button>
+     </Button>
     </div>
    </article>)}
   </section>
@@ -134,11 +136,10 @@ function AccountSessionsPage() {
    </p>)}
   </section>}
   <div className="mt-8 border-t pt-5">
-   <button type="button" disabled={busy||loading}
-    onClick={() => void revoke({kind:"all"})}
-    className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+   <Button variant="outline" type="button" disabled={busy||loading}
+    onClick={() => void revoke({kind:"all"})}>
     Sign out everywhere
-   </button>
+   </Button>
    <p className="mt-2 text-xs text-muted-foreground">
     This revokes every server session for your account, including this session.
    </p>
