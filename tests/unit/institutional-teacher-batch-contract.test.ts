@@ -19,7 +19,7 @@ const identity: OperatingProgramIdentity = {
 const agreement = {
   status: "approved", programId: "program-1", siteId: "site-1",
   hostOrganizationId: "church-1", institutionOrganizationId: "can-1",
-  services: ["academic_instruction", "curriculum"] as const,
+  services: ["academic_instruction", "curriculum"] as ("academic_instruction" | "curriculum")[],
   effectiveFrom: new Date("2026-11-01T00:00:00Z"),
   effectiveThrough: new Date("2026-12-01T00:00:00Z"),
   reviewedAt: new Date("2026-11-02T00:00:00Z"),
