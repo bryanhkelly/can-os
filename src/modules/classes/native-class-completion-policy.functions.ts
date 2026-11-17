@@ -53,7 +53,7 @@ export const publishNativeClassCompletionPolicy=createServerFn({method:"POST"})
       const [cls]=await tx.select().from(canonicalClasses)
         .where(eq(canonicalClasses.id,data.classId))
         .for("update").limit(1);
-      if(!cls || !cls.siteId || cls.siteId!==actor.scope.siteIds?.[0] ||
+      if(!cls || !cls.siteId || !cls.createdByPersonId || cls.siteId!==actor.scope.siteIds?.[0] ||
          cls.operatingOrganizationId!==actor.scope.organizationIds?.[0] ||
          cls.createdByPersonId===actor.actorPersonId ||
          !["approved","active"].includes(cls.state))
