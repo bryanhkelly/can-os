@@ -34,6 +34,13 @@ const NativeClassReportPanel=lazy(async()=>{
   return {default:report.NativeClassReportPanel};
 });
 
+/** Governed completion review is Class-scoped, not a second admin page.
+ * Service checks current reviewer, Site, independent evidence and policy. */
+const NativeClassCompletionOperatorPanel=lazy(async()=>{
+  const completion=await import("@/components/learning/NativeClassCompletionOperatorPanel");
+  return {default:completion.NativeClassCompletionOperatorPanel};
+});
+
 const uuid=z.string().uuid();
 const searchSchema=z.object({
   view:z.enum(classViews).optional(),
@@ -51,7 +58,7 @@ type Workspace=Awaited<ReturnType<typeof getNativeClassWorkspace>>;
 const tabLabels:Record<string,string>={
   overview:"Overview",lessons:"Lessons",assignments:"Assignments",
   progress:"My progress",sessions:"Sessions",roster:"Roster",
-  classroom:"Classroom",offering:"Class Offering",reports:"Reports",
+  classroom:"Classroom",offering:"Class Offering",reports:"Reports",completion:"Completion",
 };
 const viewLabels:Record<ClassView,string>={
   learn:"Student",teach:"Teacher / Facilitator",manage:"Administration",
@@ -547,6 +554,18 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         </>}
         {workspace.tab==="sessions"&&<NativeClassSessionsPanel workspace={workspace}
           canRevoke onChanged={refresh}/>}
+        {workspace.tab==="completion"&&<>
+          <h2 className="font-serif text-2xl">Completion governance</h2>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Review the original Class completion policy and verified evidence.
+            An independent, currently authorized reviewer must approve source
+            evidence before a provider can record a formal outcome.
+            This does not grant academic credit or create an award.
+          </p>
+          <Suspense fallback={<p role="status" className="mt-4 text-sm">Loading completion review…</p>}>
+            <NativeClassCompletionOperatorPanel classId={workspace.classId}/>
+          </Suspense>
+        </>}
         {workspace.tab==="reports"&&<>
           <h2 className="font-serif text-2xl">Reporting</h2>
           <p className="mt-3 text-sm text-muted-foreground">
