@@ -15,8 +15,7 @@ function PublicEnrichment() {
   const items = outcome.data;
   return <WorkspaceShell eyebrow="Enrichment"
     title="Summer camps and after-school programs"
-    subtitle="Browse open enrollment programs at CAN partner sites. School-year enrollment is not required."
-    actions={<Link to="/guardian/enrichment" className="rounded-lg border px-3 py-2 text-sm">Register your child</Link>}>
+    subtitle="Browse open enrollment programs at CAN partner sites. School-year enrollment is not required.">
     <div className="mt-8 grid gap-4 sm:grid-cols-2">
       {items.length === 0 && <p className="text-sm text-muted-foreground">No programs are currently open for registration.</p>}
       {items.map(item => <article key={item.seasonId} className="rounded-xl border bg-card p-5">

@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { extendedRegistrationOpeningReadiness, unavailableExtendedSeasonApprovals } from "./registration-policy";
@@ -46,6 +47,7 @@ const draftInput = z.object({
 
 /** Only Programs under the verified registrar's organization, site and program scopes. */
 export const listExtendedSeasonPlanning = createServerFn({ method: "GET" }).handler(async () => {
+  setResponseHeader("Cache-Control", "private, no-store");
   // Keep server-only DB and identity imports out of UI component/module evaluation.
   const [{ db }, { actions, activities, activitySeasons, calendarEvents, programs }, { requireActor },
     { listOpeningOperators }, { extendedLearningReadinessActionType },
