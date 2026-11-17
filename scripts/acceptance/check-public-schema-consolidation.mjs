@@ -105,7 +105,7 @@ async function run(){
        WHERE table_schema='public' AND table_type='BASE TABLE') AS public_tables,
       (SELECT count(*)::int FROM information_schema.tables
        WHERE table_schema='education_v30' AND table_type='BASE TABLE') AS canonical_tables,
-      (SELECT count(*)::int FROM public.site_canonical_identity_links) AS remaining_identity_bridge_rows
+      to_regclass('public.site_canonical_identity_links') IS NULL AS site_identity_bridge_retired
   `;
   console.log(JSON.stringify({branch:target.branch,readOnly:true,verifiedMoves:names.length,
     referencesRetained:counts.reduce((n,row)=>n+Number(row.total_rows),0),
