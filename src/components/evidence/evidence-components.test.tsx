@@ -39,6 +39,8 @@ describe("shared evidence presentation", () => {
     expect(html).toContain("Needs signature");
     expect(html).toContain("superseded");
     expect(html).toContain("current");
+    expect(html).toContain("border-danger");
+    expect(html).toContain("border-warning");
   });
 
   it("disables review until a sufficiently long rationale is provided", () => {
