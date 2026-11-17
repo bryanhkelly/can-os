@@ -62,6 +62,28 @@ END $check_anchor$;
 CREATE UNIQUE INDEX IF NOT EXISTS access_accounts_person_id_uq
   ON public.access_accounts(person_id) WHERE person_id IS NOT NULL;
 
+-- A direct account update must not swap a human identity after first bind.
+-- Grant revocation affects authorization, never ownership or history.
+CREATE OR REPLACE FUNCTION public.can_preserve_account_person()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path=pg_catalog,pg_temp
+AS $preserve_person$
+BEGIN
+  IF OLD.person_id IS NOT NULL AND NEW.person_id IS DISTINCT FROM OLD.person_id THEN
+    RAISE EXCEPTION 'CAN account Person identity cannot be reassigned'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $preserve_person$;
+
+DROP TRIGGER IF EXISTS can_account_person_immutable
+  ON public.access_accounts;
+CREATE TRIGGER can_account_person_immutable
+  BEFORE UPDATE OF person_id ON public.access_accounts
+  FOR EACH ROW
+  EXECUTE FUNCTION public.can_preserve_account_person();
+
 CREATE OR REPLACE FUNCTION public.can_enforce_one_person_per_account()
 RETURNS trigger
 LANGUAGE plpgsql
