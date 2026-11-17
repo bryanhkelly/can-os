@@ -6,24 +6,25 @@ import type { SiteNoncreditListing } from "@/domain/site-noncredit-public";
 import {siteCatalogReaderAccessible,type SiteNoncreditPreflight} from "@/domain/site-noncredit-bridge";
 
 type Reader=Pick<typeof db,"select"|"execute">;
-const linkedSiteSchema=z.object({canonicalSiteId:z.string().uuid()}).strict();
+const uuid=z.string().uuid();
 
-/** Probe actual runtime connection privileges, never credential-string shape.
- * The restricted native-session reader is deliberately not the public Site
- * catalog reader. Approved mapping and CAN's full eligibility rules still
- * restrict the fields that the public HTML can receive.
- */
+/** Permission checks use the actual active connection, not a guessed role.
+ * A Site has the SAME UUID everywhere, with no Site identity crosswalk. */
 export async function probeSiteNoncreditCatalogReader(
   executor:Reader=db,
 ):Promise<SiteNoncreditPreflight>{
   const result=await executor.execute(sql`
-    SELECT to_regclass('public.site_canonical_identity_links') IS NOT NULL AS "mappingReady",
+    SELECT to_regclass('public.sites') IS NOT NULL
+             AND to_regclass('education_v30.sites') IS NOT NULL AS "sitesReady",
       to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS "releasesReady",
       has_schema_privilege(current_user,'public','USAGE') AS "publicSchema",
       has_schema_privilege(current_user,'education_v30','USAGE') AS "nativeSchema",
-      CASE WHEN to_regclass('public.site_canonical_identity_links') IS NOT NULL
-        THEN has_table_privilege(current_user,'public.site_canonical_identity_links','SELECT')
-        ELSE false END AS "mappingRead",
+      CASE WHEN to_regclass('public.sites') IS NOT NULL
+        THEN has_table_privilege(current_user,'public.sites','SELECT')
+        ELSE false END AS "siteRead",
+      CASE WHEN to_regclass('education_v30.sites') IS NOT NULL
+        THEN has_table_privilege(current_user,'education_v30.sites','SELECT')
+        ELSE false END AS "nativeSiteRead",
       CASE WHEN to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL
         THEN has_table_privilege(current_user,'education_v30.noncredit_self_enrollment_releases','SELECT')
         ELSE false END AS "releaseRead"
@@ -32,60 +33,45 @@ export async function probeSiteNoncreditCatalogReader(
   if(!row)throw new Error("Site enrollment reader readiness unavailable");
   return row;
 }
-/**
- * Website-safe, opt-in cross-schema projection.
- *
- * The independent public Site ↔ canonical Site correspondence must have
- * reviewer-approved evidence. The existing enrollment release reader performs
- * all current authorization, consent, seat, adoption, deployment and timing
- * checks. Neither names nor caller-provided canonical IDs establish a link.
- */
+
+/** Read publicly released noncredit training under the one Site UUID.
+ * The owning enrollment service rechecks current approval, adoption,
+ * consent, capacity and timing. No direct writes or permission inference. */
 export async function readLinkedSiteNoncreditReleases(
-  publicSiteId:string,
-  executor:Reader=db,
-):Promise<SiteNoncreditListing[]> {
+  publicSiteId:string,executor:Reader=db,
+):Promise<SiteNoncreditListing[]>{
+  if(!uuid.safeParse(publicSiteId).success)return [];
   const preflight=await probeSiteNoncreditCatalogReader(executor);
   if(!siteCatalogReaderAccessible(preflight))return [];
-  // These empty reads prove this connection can actually SELECT both
-  // relations rather than relying only on PostgreSQL permission metadata.
-  await executor.execute(sql`SELECT 1 FROM public.site_canonical_identity_links LIMIT 0`);
-  await executor.execute(sql`SELECT 1 FROM education_v30.noncredit_self_enrollment_releases LIMIT 0`);
 
-  const links=await executor.execute(sql`
-    SELECT canonical_site_id AS "canonicalSiteId"
-    FROM public.site_canonical_identity_links
-    WHERE public_site_id=${publicSiteId}::uuid AND status='approved'
+  // A native service is not provisioned merely because the platform Site
+  // exists. Exact-ID matching replaces the old independently approved bridge.
+  const matching=await executor.execute(sql`
+    SELECT 1 FROM public.sites platform_site
+    JOIN education_v30.sites native_site
+      ON native_site.id=platform_site.id
+       AND native_site.status='active'
+    WHERE platform_site.id=${publicSiteId}::uuid
+    LIMIT 1
   `);
-  if(links.rows.length!==1)return [];
-  const link=linkedSiteSchema.parse(links.rows[0]);
-
-  // The existing eligibility reader already composes every approval,
-  // effective-date, Site relationship, consent and capacity gate. Fetch
-  // the exact canonical Site once and aggregate seats/waitlists in four
-  // bounded queries rather than re-running the entire reader for 40 IDs.
-  // The Site ID predicate is applied INSIDE the database eligibility query.
+  if(matching.rows.length!==1)return [];
   const releases=await readEligibleSelfEnrollmentReleases(executor,undefined,{
-    siteId:link.canonicalSiteId,limit:40,
+    siteId:publicSiteId,limit:40,
   });
-  const eligible:SiteNoncreditListing[]=releases
-    .filter(release=>release.siteId===link.canonicalSiteId)
-    .map(release=>({
-      releaseId:release.id,
-      title:release.title,
-      siteName:release.siteName??"",
-      seatsRemaining:release.seatsRemaining,
-      waitlistAvailable:release.seatsRemaining<=0 || release.hasWaitingQueue,
-    }));
-  return eligible;
+  return releases.filter(release=>release.siteId===publicSiteId).map(release=>({
+    releaseId:release.id,
+    title:release.title,
+    siteName:release.siteName??"",
+    seatsRemaining:release.seatsRemaining,
+    waitlistAvailable:release.seatsRemaining<=0 || release.hasWaitingQueue,
+  }));
 }
 
-/** Optional content must never take down an otherwise approved Site website
- * if a restricted canonical reader loses permissions or its connection fails.
- * The registration endpoint remains independently fail-closed.
- */
+/** Optional public content never takes down an approved website.
+ * Actual registration independently checks enrollment authorization. */
 export async function readOptionalSiteNoncreditReleases(
   publicSiteId:string,executor:Reader=db,
-):Promise<SiteNoncreditListing[]> {
+):Promise<SiteNoncreditListing[]>{
   try{return await readLinkedSiteNoncreditReleases(publicSiteId,executor);}
   catch(error){
     console.error("Optional Site noncredit catalog unavailable",{
@@ -96,30 +82,29 @@ export async function readOptionalSiteNoncreditReleases(
 }
 
 export type SiteNoncreditReadiness={
-  status:"migration_missing"|"reader_permission_missing"|"link_not_approved"|
+  status:"migration_missing"|"reader_permission_missing"|"site_not_provisioned"|
     "no_enrollable_release"|"ready"|"reader_unavailable";
   eligibleReleaseCount:number;
 };
 
-/** One verification result for launch readiness. Publishing and actual
- * enrollment remain independently authorized; a Site link is not a grant.
- */
 export async function inspectSiteNoncreditReadiness(
   publicSiteId:string,executor:Reader=db,
 ):Promise<SiteNoncreditReadiness>{
   const no=(status:SiteNoncreditReadiness["status"]):SiteNoncreditReadiness=>
     ({status,eligibleReleaseCount:0});
+  if(!uuid.safeParse(publicSiteId).success)return no("site_not_provisioned");
   try{
     const state=await probeSiteNoncreditCatalogReader(executor);
-    if(!state.mappingReady||!state.releasesReady)return no("migration_missing");
+    if(!state.sitesReady||!state.releasesReady)return no("migration_missing");
     if(!siteCatalogReaderAccessible(state))return no("reader_permission_missing");
-    await executor.execute(sql`SELECT 1 FROM public.site_canonical_identity_links LIMIT 0`);
-    await executor.execute(sql`SELECT 1 FROM education_v30.noncredit_self_enrollment_releases LIMIT 0`);
-    const link=await executor.execute(sql`
-      SELECT 1 FROM public.site_canonical_identity_links
-      WHERE public_site_id=${publicSiteId}::uuid AND status='approved' LIMIT 1
+    const matching=await executor.execute(sql`
+      SELECT 1 FROM public.sites platform_site
+      JOIN education_v30.sites native_site
+        ON native_site.id=platform_site.id
+          AND native_site.status='active'
+      WHERE platform_site.id=${publicSiteId}::uuid LIMIT 1
     `);
-    if(!link.rows.length)return no("link_not_approved");
+    if(matching.rows.length!==1)return no("site_not_provisioned");
     const eligible=await readLinkedSiteNoncreditReleases(publicSiteId,executor);
     return {status:eligible.length?"ready":"no_enrollable_release",
       eligibleReleaseCount:eligible.length};
