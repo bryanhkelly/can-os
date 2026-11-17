@@ -28,6 +28,17 @@ describe("WS5 scalable and independent Program Operations",()=>{
     expect(route).toContain('courseVersionIds:recipePlan?.courses.map');
     expect(route).toContain('getNextPageParam:last=>last.nextCursor??undefined');
   });
+  it("lists receiving Sites separately from bounded Course search",()=>{
+    const service=text("src/modules/classes/unified-class.functions.ts");
+    const route=text("src/routes/canonical.classes.tsx");
+    expect(service).toContain('getNativeClassOperatorSites=createServerFn({method:"GET"})');
+    expect(service).toContain('eq(educationOperations.status,"active")');
+    expect(service).toContain('eq(educationOperationOrganizationRoles.status,"approved")');
+    expect(service).toContain('inArray(catalogSites.id,operator.siteIds)');
+    expect(route).toContain('queryFn:()=>getNativeClassOperatorSites()');
+    expect(route).toContain('const rolloutSiteOptions=operatorSites.data??[]');
+    expect(route).toContain('disabled={operatorSites.isPending||operatorSites.isError}');
+  });
   it("keeps unfinished enrollment and credit methods out of the WS5 UI",()=>{
     const page=text("src/routes/canonical.classes.tsx");
     const optionSection=page.split('const methodOptions:')[1]?.split('const deliveryOptions=')[0]??"";
