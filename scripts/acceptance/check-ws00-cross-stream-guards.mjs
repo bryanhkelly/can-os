@@ -92,20 +92,28 @@ check("WS1 activity distinguishes participation from waitlist and remains source
   required(c.includes('PARTICIPATION_READ_MODEL_VERSION = "1.1.0"'),
     "PRM v1.1.0 contract mismatch; requires explicit WS00 re-ratification");
   required(c.includes("opportunities: ParticipationOpportunity[]") &&
-           service.includes("assertParticipationReadModel(projection)"),
+           service.includes("assertParticipationReadModel(result)"),
     "Waitlist opportunity separation/identity guard missing");
   required(read("src/routes/learn.activity.tsx").includes("/learn/my-activity") &&
            read("src/routes/learn.my-activity.tsx").includes("MyActivity"),
     "My Activity canonical URL/compatibility broken");
-  const paging=read("src/domain/native-class-history-pagination.ts");
-  required(service.includes("getMyNativeClassEnrollmentHistoryPage") &&
-           service.includes("readBoundedNativeClassHistory") &&
-           !service.includes("getMyNativeClassEnrollments()") &&
-           paging.includes("n < maxPages") &&
-           paging.includes("maxPages > 10") &&
-           paging.includes("seen.has(row.classEnrollmentId)") &&
-           paging.includes("pagination did not advance"),
-    "WS1 must reuse WS2 native Class history with bounded deduplicated pages");
+  const view=read("src/routes/learn.my-activity.tsx");
+  const school=read("src/modules/learning/account-school-participation.functions.ts");
+  const native=read("src/modules/classes/native-class-enrollment.functions.ts");
+  const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
+  required(service.includes("getMyNativeClassHistoryForCanAccountPage") &&
+           service.includes("getMyNoncreditSelfEnrollmentHistoryPage") &&
+           service.includes("getMyAccountSchoolParticipationPage") &&
+           service.includes("getMyActivitySourcePage") &&
+           service.includes("nextCursors") &&
+           !service.includes("readBoundedNativeClassHistory") &&
+           view.includes("Load older activity") &&
+           view.includes("getMyActivitySourcePage") &&
+           school.includes("profileScope(") &&
+           school.includes("guardianRelationshipPredicate") &&
+           native.includes("readNativeClassHistoryPage(") &&
+           noncredit.includes("personalNoncreditCursor"),
+    "WS1 must support source-authorized unlimited pagination across verified memberships");
 });
 check("WS6 maintains evidence metrics without fabricated formal Class completions",()=>{
   const s=read("src/domain/participation-reporting.ts");
