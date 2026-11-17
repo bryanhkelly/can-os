@@ -8,9 +8,17 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 const routeRoot = join(root, "routes");
 const nativePattern = /<(?:button|input|select|textarea|label)\b/g;
+function visibleNativeCount(source) {
+  // Hidden authentication POST fields are native by design, never styled controls.
+  const withoutHidden = source.replace(/<input\\s+type=["']hidden["'][^>]*\\/>/g, "");
+  return [...withoutHidden.matchAll(nativePattern)].length;
+}
 const radiusPattern = /(?:^|[\s"'\x60])(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=[\s"'\x60])/g;
 const importPattern = /(?:from\s*|import\s*\()\s*["']([^"']+)["']/g;
 const sourceGuarded = new Set([
+  "access.index.tsx",
+  "access.register.tsx",
+  "access.verify.tsx",
   "account.index.tsx",
   "account.sessions.tsx",
   "explore.index.tsx",
@@ -41,7 +49,7 @@ function inspect(file) {
         !relative(root, dependency).startsWith("components/ui/")) deps.add(dependency);
   }
   const result = {
-    raw: [...source.matchAll(nativePattern)].length,
+    raw: visibleNativeCount(source),
     radius: [...source.matchAll(radiusPattern)].length,
     dependencies: [...deps],
   };
