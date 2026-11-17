@@ -109,8 +109,7 @@ function SectionFacilitatorForm({ programId }: { programId: string }) {
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <Field label="Verified local facilitator">
                 <Select disabled={busy} value={personId}
-                  onChange={e => setSelected(old => ({ ...old, [key]: e.target.value }))}
-                  >
+                  onChange={e => setSelected(old => ({ ...old, [key]: e.target.value }))}>
                   <option value="">Choose a person</option>
                   {data.staff.map(person =>
                     <option key={person.personId} value={person.personId}>
