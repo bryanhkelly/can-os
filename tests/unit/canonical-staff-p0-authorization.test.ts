@@ -40,9 +40,12 @@ describe("canonical single-login P0 authorization boundaries", () => {
     const preview = source("src/modules/learning/credential-preview.functions.ts");
     const issuance = source("src/modules/learning/credential-issuance.functions.ts");
     expect(preview).toContain('assertCapability(actor, "credential.preview")');
-    expect(issuance).toContain("assertCurrentCredentialIssuer(tx,getRequest(),actor)");
+    expect(issuance).toContain("assertCurrentCredentialIssuer(tx, getRequest(), actor)");
+    expect(issuance).toContain("assertNoncreditCompletionSiteScope(tx, actor, registration)");
+    expect(issuance).toContain('process.env.CAN_CREDENTIAL_ISSUANCE_ENABLED !== "true"');
     expect(issuance).not.toContain('assertCapability(actor, "credential.issue")');
-    expect(issuance).toContain("assertCurrentCanonicalStaffForMutation");
+    expect(source("src/modules/identity/canonical-sensitive-authorization.server.ts"))
+      .toContain("assertCurrentCanonicalStaffForMutation");
   });
 
   it("retains strict learner and independent reviewer separation", () => {
