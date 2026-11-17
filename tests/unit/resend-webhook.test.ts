@@ -63,9 +63,12 @@ describe("signed Resend source receipt callbacks", () => {
       })).toMatchObject({ type, receiptId, providerMessageId });
     }
   });
-  it("ignores other product emails and missing or malformed correlation tags", () => {
+  it("accepts canonical noncredit receipts and rejects unrelated products", () => {
     expect(parseResendReceiptEvent({ type: "email.delivered", data: {
       email_id: providerMessageId, tags: { can_source: "noncredit_waitlist", can_receipt: receiptId },
+    } })).toMatchObject({source:"noncredit_waitlist",receiptId,providerMessageId});
+    expect(parseResendReceiptEvent({ type: "email.delivered", data: {
+      email_id: providerMessageId, tags: { can_source: "unknown_source", can_receipt: receiptId },
     } })).toBeNull();
     expect(parseResendReceiptEvent({ type: "email.delivered", data: {
       email_id: providerMessageId, tags: { can_source: "school_family", can_receipt: "not-uuid" },
