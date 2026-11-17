@@ -15,7 +15,7 @@ describe("shared authentication and deployment security contracts", () => {
     const duplicate = new Request("https://example.org", {
       headers: { cookie: "session=first; session=second" },
     });
-    expect(readCookie(duplicate, "session")).toBeUndefined();
+    expect(() => readCookie(duplicate, "session")).toThrow();
   });
 
   it("issues host-only secure cookies from one reviewed policy", () => {
