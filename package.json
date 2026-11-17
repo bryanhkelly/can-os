@@ -51,6 +51,7 @@
     "verify:ws00": "node scripts/acceptance/run-ws00-local-gate.mjs",
     "check:build-source-syntax": "node scripts/acceptance/check-build-source-syntax.mjs",
     "check:class-architecture": "node scripts/check-native-class-architecture.mjs",
+    "db:test01:retirement-readiness": "node scripts/acceptance/check-legacy-retirement-readiness.mjs",
     "typecheck": "tsc --noEmit",
     "docs:check": "node scripts/check-documentation-links.mjs",
     "test:integration:study-groups": "node scripts/run-integration-tests.mjs study-groups",
