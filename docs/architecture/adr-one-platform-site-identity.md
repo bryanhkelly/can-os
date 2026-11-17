@@ -14,11 +14,11 @@ Updated: 2026-11-17
 
 ## What actually exists on Neon main
 
-Current Neon main snapshot, 2026-11-17 (after 51 guarded table moves):
+Current Neon main snapshot, 2026-11-17 (after 54 guarded table moves and four Site FK rebindings):
 
 | Metric | public | education_v30 |
 | --- | ---: | ---: |
-| Base tables | 241 | 433 |
+| Base tables | 244 | 430 |
 | Views | 0 | 6 |
 | SQL functions/procedures | 258 | 245 |
 | Sites | 9 | 1 (same Site UUID as its public record) |
@@ -31,7 +31,7 @@ Additional: `education_v30_secure` contains 7 particularly sensitive tables, whi
 
 The 9 collisions are `admission_offers`, `audit_events`, `domain_events`, `enrollments`, `graduation_decisions`, `organizations`, `qualification_definitions`, `sites`, `transcript_issuances`. They have different column definitions. Never overwrite a public table using `ALTER TABLE ... SET SCHEMA` before resolving its actual semantics. Keep ONE core entity; where concepts really differ, choose descriptive domain names rather than a `canonical_` duplicate.
 
-The `education_v30.sites` table has 45 inbound FK constraints; `public.sites` has 51. The duplicate canonical Site and Organization tables now each have one demo row on main and are referenced by code, SQL functions, constraints and policies. Dropping them before rewiring consumers is not a valid migration.
+The `education_v30.sites` table now has 40 inbound FK constraints; `public.sites` has 54. Four operational FKs have been rebound to the authoritative platform Site. The duplicate canonical Site and Organization tables now each have one demo row on main and are referenced by code, SQL functions, constraints and policies. Dropping them before rewiring consumers is not a valid migration.
 
 **Security blocker:** `education_v30.sites` enforces RLS (including FORCE); `public.sites` currently does not. First build tested purpose-scoped RLS and authorization for the single platform Site. The goal does not license weakening learner privacy or cross-Site permissions.
 
@@ -44,7 +44,7 @@ The `education_v30.sites` table has 45 inbound FK constraints; `public.sites` ha
 5. Replaced Site link lookups in Launch Studio discovery, native Class handoff, public Class listings, provider noncredit release UI and publicly eligible noncredit catalog reads with **exact platform Site UUID checks**. Existing Site-specific publisher and operator permissions remain authoritative.
 6. Deployed the revised restricted CAN staff SQL function on Neon main: it requires `native_grant.site_id = source.can_site_id` without a Site crosswalk. Verified that an invalid synthetic session returns no grants; the function's restricted role execute grant remains intact. **CAN Person aliasing is not yet consolidated**.
 7. Moved the existing `feedback_categories` and six noncolliding static reference tables from `education_v30` to `public`. All **140** rows were preserved, no copy or bridge was created, and PostgreSQL retained their foreign-key relationships. SQL migrations: `2026-11-17-consolidate-feedback-categories.sql` and `2026-11-17-consolidate-static-reference-tables.sql`. Reviewed for source-code mapping, direct SQL routine, view, trigger and ACL risks before executing.
-8. Retired obsolete Site-identity helper and noncredit bridge test code paths. The legacy `site_canonical_identity_links` table and several canonical identity aliases **still physically exist** until all remaining service/auth endpoints are removed; removing it prematurely would break those endpoints.
+8. Retired obsolete Site identity-link service, noncredit bridge tests, and the empty Site correspondence table. Separate canonical Person/account aliasing still exists and must only be retired once its active authorization consumers are replaced.
 9. Moved an additional **36 empty, noncolliding canonical tables** into `public` on Neon main in one guarded transaction after verifying no direct SQL routine/view use, no table-level policies, no custom triggers, no data, and no identifiable runtime table mappings for the selected tables. Preserved table OIDs and inbound/outbound foreign keys. Source: `database/production/2026-11-17-consolidate-36-empty-legacy-tables.sql`. At that stage: **234 public / 441 education_v30** base tables.
 10. Added `verify:schema:consolidation` to reconcile all **51** committed table moves on actual main without changing data. This check intentionally does not claim full schema unification while canonical objects remain.
 
@@ -53,9 +53,13 @@ The `education_v30.sites` table has 45 inbound FK constraints; `public.sites` ha
 
 12. **Retired the empty Site identity bridge on Neon main:** `public.site_canonical_identity_links` was dropped with `RESTRICT` after confirming zero records, incoming FKs, dependent routines/views, or user triggers. Source: `database/production/2026-11-17-retire-empty-site-identity-bridge.sql`. Staff reviewer authorization now uses the same Site ID rather than a Site mapping; the old Site link request/confirm/review service was deleted, and the bookmarked `/site-identity` route is limited to independent staff Person verification. Current post-retirement count: **241 public / 433 education_v30** base tables. **The separate Person alias table still exists pending a one-Person model cutover**, as do the canonical identity tables. These are not yet unified.
 
+13. Moved three native tables with active Drizzle mappings (`content_assets`, `deployment_organization_roles`, and `enrollment_site_placements`) into `public` in a guarded main-only transaction, changing the corresponding models to `pgTable`. Table OIDs and all inbound and outbound FKs remained intact. SQL: `database/production/2026-11-17-consolidate-drizzle-native-support-tables.sql`.
+14. Rebound four reviewed, empty `public` operational tables' Site foreign keys from `education_v30.sites(id)` to the authoritative `public.sites(id)`, preserving constraint names and validation. SQL: `database/production/2026-11-17-rebind-public-operational-site-fks.sql`. Exact Site UUIDs were already the same; no mapping or backfill was introduced.
+15. Added `verify:site:main-consolidation` to assert directly on Neon main that moved tables remain in `public`, four reviewed Site constraints target `public.sites`, and the Site identity bridge remains absent. This check does not certify the remaining 430 native tables, browser flows or release readiness.
+
 ## Production cutover (dependency order; not yet executed)
 
-1. Inventory every schema object and real record, including colliding names, 477 remaining canonical tables, 245 routines, 7 sensitive tables, sequences, views, non-FK UUIDs, triggers, migrations, role grants, RLS policies, published URLs and identity-related consumers.
+1. Inventory every schema object and real record, including colliding names, 430 remaining canonical tables, 245 routines, 7 sensitive tables, sequences, views, non-FK UUIDs, triggers, migrations, role grants, RLS policies, published URLs and identity-related consumers.
 2. Review a semantic collision plan: merge or retire duplicate `sites` and `organizations` only after rekeying inbound FKs; evaluate near-equivalent event/audit/learner tables field by field. No guessed identity matches.
 3. Enforce tested RLS on the authoritative `public.sites` model (and related identity/Organization data) before exposing native Class records through it. Avoid blanket `PUBLIC` grants.
 4. Move non-colliding canonical tables, sequences, types, views and routines into `public` with dependency ordering and verified rollback, keeping the existing object identities where supported. Move sensitive tables with dedicated least-privilege policies. Preserve canonical reference data.
