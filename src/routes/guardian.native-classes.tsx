@@ -66,7 +66,7 @@ function GuardianNativeClasses(){
  }
  return <WorkspaceShell width="wide" eyebrow="CAN OS · Family" title="Classes for my family"
   subtitle="Apply for verified learners with one guardian account. A Class approval is separate from parental consent and enrollment."
-  actions={<Link to="/guardian" className="text-sm font-semibold underline">Family dashboard</Link>}>
+  actions={<Link to="/home" className="text-sm font-semibold underline">Family dashboard</Link>}>
   <section className="mt-6 border border-border bg-card p-5">
    <h2 className="font-serif text-xl">Request a Class place</h2>
    <p className="mt-2 text-sm text-muted-foreground">
