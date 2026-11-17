@@ -52,9 +52,10 @@ try{
     "INSERT INTO public.access_accounts(id,email_normalized) VALUES ($1,$3),($2,$4)",
     [accountA,accountB,accountMailA,accountMailB],
   );
+  const firstGrantId=randomUUID();
   await client.query(
     "INSERT INTO public.account_person_grants(id,account_id,person_id,role,active) VALUES ($1,$2,$3,'account_holder',true)",
-    [randomUUID(),accountA,personA],
+    [firstGrantId,accountA,personA],
   );
   const anchored=await client.query(
     "SELECT person_id FROM public.access_accounts WHERE id=$1",[accountA]);
@@ -77,6 +78,14 @@ try{
   await mustDeny(
     "UPDATE public.access_accounts SET person_id=$1 WHERE id=$2",
     [null,accountA],"23514",
+  );
+  await mustDeny(
+    "UPDATE public.account_person_grants SET person_id=$1 WHERE id=$2",
+    [personB,firstGrantId],"23514",
+  );
+  await mustDeny(
+    "UPDATE public.account_person_grants SET account_id=$1 WHERE id=$2",
+    [accountB,firstGrantId],"23514",
   );
   await mustDeny(
     "UPDATE public.access_accounts SET person_id=$1 WHERE id=$2",
