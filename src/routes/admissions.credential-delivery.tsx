@@ -3,6 +3,7 @@ import { downloadBase64 } from "@/lib/download";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { CredentialDeliveryHistory } from "@/components/learning/CredentialDeliveryHistory";
 import { useRef, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
@@ -100,8 +101,7 @@ function CredentialDeliveryPage(){
    </section>
    <section className="space-y-3 rounded-xl border p-4">
     <h2 className="font-semibold">Delivery history</h2>
-    {history.map(row=><article key={row.id} className="rounded-lg border p-3 text-sm"><strong>{row.recipientName}</strong> · {row.recipientEmail}<p>Status: {row.status} · Requested: {new Date(row.createdAt).toLocaleString()}</p>{row.providerMessageId&&<p>Provider receipt: {row.providerMessageId}</p>}{row.lastError&&<p role="alert">{row.lastError}</p>}</article>)}
-    {!history.length&&<p className="text-sm text-muted-foreground">No delivery receipts loaded.</p>}
+    <CredentialDeliveryHistory records={history}/>
    </section>
    <Link to="/admissions/graduation" className="underline">Return to graduation closeout</Link>
   </div>
