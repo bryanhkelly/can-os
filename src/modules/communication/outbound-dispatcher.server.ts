@@ -15,6 +15,8 @@ import {
 export type OutboundClaim = { id: string; leaseUntil: Date; attempts: number };
 export type OutboundPreparation<Message> =
   | { kind: "suppress"; reason: string }
+  | { kind: "defer"; nextAttemptAt: Date }
+  | { kind: "fail"; reason: string }
   | { kind: "ready"; message: Message };
 
 export type OutboundAdapter<Message> = {
@@ -22,6 +24,8 @@ export type OutboundAdapter<Message> = {
   prepare(claim: OutboundClaim, now: Date): Promise<OutboundPreparation<Message>>;
   /** CAS on the old lease. Return null if another worker owns this claim. */
   renew(claim: OutboundClaim, now: Date, leaseMs: number): Promise<OutboundClaim | null>;
+  /** Return the claimed receipt to pending without consuming an attempt. */
+  defer?(claim: OutboundClaim, until: Date, now: Date): Promise<boolean>;
   /** Transport must reuse claim.id as its idempotency key. */
   send(message: Message, idempotencyKey: string): Promise<boolean>;
   /**
@@ -82,6 +86,18 @@ export async function dispatchOutboundMessages<Message>(
           kind: "suppressed", reason: prepared.reason,
           attempts: active.attempts, nextAttemptAt: null, now: clock(),
         })) totals.suppressed++;
+        continue;
+      }
+      if (prepared.kind === "defer") {
+        if (!adapter.defer) throw new Error("Outbound adapter does not support deferral");
+        await adapter.defer(active, prepared.nextAttemptAt, clock());
+        continue;
+      }
+      if (prepared.kind === "fail") {
+        if (await adapter.settle(active, {
+          kind: "failed", reason: prepared.reason,
+          attempts: active.attempts + 1, nextAttemptAt: null, now: clock(),
+        })) totals.failed++;
         continue;
       }
       const renewed = await adapter.renew(active, clock(), leaseMs);
