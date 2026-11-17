@@ -12,7 +12,13 @@ import {
  * Never send within the source command transaction. A provider's acceptance
  * is not proof of inbox delivery.
  */
-export type OutboundClaim = { id: string; leaseUntil: Date; attempts: number };
+export type OutboundClaim = {
+  id: string;
+  leaseUntil: Date;
+  attempts: number;
+  /** Optional source-owned channel metadata for transport-specific recovery. */
+  sourceChannel?: string;
+};
 export type OutboundPreparation<Message> =
   | { kind: "suppress"; reason: string }
   | { kind: "defer"; nextAttemptAt: Date }
