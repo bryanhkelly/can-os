@@ -269,7 +269,7 @@ export function isFocusedClassroomRoute(pathname: string, searchStr: string, rol
   // The canonical native Class route uses an exact Class ID, not the retired
   // Section query param. Focus only learning and teaching work, never roster
   // or manager views. Server-side Class permissions remain authoritative.
-  if (/^\\/class\\/[0-9a-f-]{36}\\/?$/i.test(pathname)) {
+  if (/^\/class\/[0-9a-f-]{36}\/?$/i.test(pathname)) {
     const view = search.get("view");
     const tab = search.get("tab");
     const learner = ["student", "guardian", "learner"].includes(role ?? "");
