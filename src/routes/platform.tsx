@@ -152,13 +152,13 @@ function AdultLearnerReviewSection({ready}:{ready:boolean}){
         </label>
         <label className="grid gap-1 text-sm font-medium">Secure evidence reference
           <Input required value={evidenceReference} onChange={e=>setEvidenceReference(e.target.value)}
-            placeholder="secure-case:opaque_reference_id"/>
+            placeholder="document:xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx"/>
         </label>
         <label className="flex items-start gap-3 text-sm leading-6">
           <input type="checkbox" required checked={evidenceChecked}
             onChange={e=>setEvidenceChecked(e.target.checked)} className="mt-1"/>
           I independently checked identity and adult eligibility, and the secure evidence
-          reference identifies retained, authorized evidence for this exact CAN account.
+          reference identifies an independently approved, restricted document for this exact CAN Person.
         </label>
         <Button type="submit" disabled={!evidenceChecked||busy}>
           {busy?"Recording review…":"Approve adult learner identity"}
