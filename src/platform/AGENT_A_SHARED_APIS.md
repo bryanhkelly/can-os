@@ -30,30 +30,24 @@ The input format is `YYYY-MM-DDTHH:mm`. The ambiguity policy defaults to `reject
 
 Agent C can replace launch-specific time conversions after validating the desired overlap policy.
 
-## Verified server functions
+## Production server authorization
 
-Import from `@/platform/server-functions`:
+The previously proposed generic `authenticatedQuery`, `authenticatedCommand`,
+`scopedQuery`, and `institutionalDecision` factories had no production
+callers and have been retired. They are **not** an authorization boundary.
 
-- `authenticatedQuery(schema, async (context, input) => result)`
-- `authenticatedCommand(schema, async (context, input) => result)`
-- `scopedQuery(schema, capability, resourceGuard, handler)`
-- `institutionalDecision(schema, capability, resourceGuard, decide)`
+Production modules use TanStack `createServerFn` directly, obtain identity
+from verified server-side session context (`getCommandContext(getRequest())`
+or `requireActor`), check the required capability, then enforce concrete
+Site/Program/Section/resource scope before reading or writing. Institutional
+decisions continue through their domain services and audit trail. Do not trust
+client-provided identity, role, or authorization claims. Sensitive reads should
+return `Cache-Control: private, no-store`.
 
-These use the existing verified `getCommandContext(getRequest())` / `withAuth` infrastructure, parse input with Zod, and set `Cache-Control: private, no-store`. The context and resource authorization are never derived from browser roles or scope. A resource guard must perform the existing domain-specific checks, and institutional decisions must continue using existing decision/audit services.
-
-Example:
-
-```ts
-const input = z.object({ siteId: z.string().uuid() });
-export const getSiteSummary = scopedQuery(
-  input,
-  "site:read",
-  async (actor, data) => assertSiteScope(actor, data.siteId),
-  async (actor, data) => readAuthorizedSiteSummary(actor, data.siteId),
-);
-```
-
-Do not replace a specialized institutional authorization check with `assertSiteScope` alone. Coordinate migrations with the relevant feature owner.
+The independent `@/platform/scope` registry **is active**: operations
+insights register and invoke `readScope("insights", ...)`. Keep it until its
+production consumer is explicitly migrated and covered by authorization tests.
+The registry is resource-specific, not a universal authorization layer.
 
 ## Loader failures
 
@@ -63,7 +57,7 @@ Unexpected errors can be reported through `onUnexpectedError`; user-facing messa
 
 ## Validation and remaining adoption
 
-Unit tests added for timezone, loader classification, server-function factories, and the shared mutation hook. No feature routes were modified. Full repository TypeScript, Vitest, and lint commands require a checked-out workspace with dependencies; they have **not** been executed by the GitHub connector. Run `npm run typecheck`, `npx vitest run src/lib/safe-loader.test.ts src/modules/calendar/site-local-time.test.ts`, and focused ESLint before merging. Feature-agent adoption remains outstanding. The mutation-hook tests exercise the submit guard and invalidation callbacks; a browser-mounted integration test is still recommended.
+Unit tests added for timezone, loader classification, server-function authorization patterns, and the shared mutation hook. No feature routes were modified. Full repository TypeScript, Vitest, and lint commands require a checked-out workspace with dependencies; they have **not** been executed by the GitHub connector. Run `npm run typecheck`, `npx vitest run src/lib/safe-loader.test.ts src/modules/calendar/site-local-time.test.ts`, and focused ESLint before merging. Feature-agent adoption remains outstanding. The mutation-hook tests exercise the submit guard and invalidation callbacks; a browser-mounted integration test is still recommended.
 
 ## Final integration checklist
 
@@ -90,9 +84,5 @@ GitHub connector commits are not proof of successful compilation or tests. No va
 - `LoaderFailure` from `@/lib/loader-failure` remains the page-level adapter that composes `WorkspaceShell` with `LoaderErrorState`. Existing page consumers retain their interface.
 - Retry is offered only when `outcome.retryable` is true; authentication failures retain the sign-in link and authorization denials do not imply missing login.
 - Agents C, D, E: use the shell-free component inside an existing workspace page; use `LoaderFailure` only when the route needs the complete page shell. Do not duplicate the classification or sign-in logic.
-
-## TanStack Start generic handler compatibility
-
-The four generic server-function factories use `createServerFn({ method, strict: false })` because TanStack Start's conditional `ValidateSerializable` return type cannot prove that an unresolved generic `TResult` is serializable. This is a **type-checking escape hatch**, not a change to runtime transport behavior. The factories continue to require `TResult extends SerializableResult` (JSON primitives, arrays and plain objects), parse inputs with Zod, and obtain identity and authorization on the server. Do not use the factories for Date, Map, Set, Error, Response, class instances or functions. Add concrete direct `createServerFn` wrappers where richer serialization is required. See the TanStack Start server-functions documentation on `strict`.
 
 Agent C: preserve the discriminated `submit` result. A completed mutation with `refreshError` must be treated as saved, not retried. Use `invalidateRouter` for route loader updates and show refresh errors separately from command errors.
