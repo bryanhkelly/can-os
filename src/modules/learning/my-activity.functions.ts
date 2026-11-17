@@ -107,8 +107,8 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
       registerOpportunities("noncredit_waitlist", async () =>
         projectNoncreditOpportunities(await getMyNoncreditWaitlist()));
     }
-    // Native Class service requires its own canonical learner grant and active
-    // Class feature gate. Do not use a CAN student/guardian role as a substitute.
+    // Native Class participation still requires the verified canonical learner
+    // grant. A student or guardian display role never substitutes for it.
     if (["account_holder", "student", "guardian"].includes(session.role)) {
       register("native_class", async () => {
         // Reuse WS2's authoritative, Person-scoped Class history pagination.
