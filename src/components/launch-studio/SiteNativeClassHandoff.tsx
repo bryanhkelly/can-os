@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowRight, CalendarDays, Users } from "lucide-react";
+import { ArrowRight, CalendarDays } from "lucide-react";
+import { WorkspacePanel } from "@/components/workspace";
 import { getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions, getNativeClassOperatorSites } from "@/modules/classes/unified-class.functions";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
@@ -25,14 +26,9 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    enabled:Boolean(canonicalSiteId),retry:false,
  });
  const classes=classesRead.data??[];
- return <section className="mt-6 border p-5" aria-label="Unified Classroom handoff">
-  <p className="text-xs font-bold uppercase tracking-wide text-primary">Classes and delivery</p>
-  <h3 className="mt-2 flex items-center gap-2 font-serif text-2xl"><Users className="size-5"/> Turn an approved Course into a Class</h3>
-  <p className="mt-2 text-sm leading-6 text-muted-foreground">
-   The Site hosts approved learning. Classroom manages Classes, optional registration Offerings,
-   facilitator permissions, dated Sessions, participant enrollment and recorded playback.
-   One four-session pilot is one Class with four Sessions, not four copied Courses.
-  </p>
+ return <WorkspacePanel title="Turn an approved Course into a Class"
+    className="mt-6"
+    description="One four-session pilot uses one Class with four dated Sessions. Course adoption, enrollment and facilitator access remain separately authorized.">
   {scope.isPending&&<p role="status" className="mt-4 text-sm">
    Checking this Site's current Class permissions…
   </p>}
@@ -113,5 +109,5 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    Sessions from the Class teaching view. A Class Offering is optional for private
    assignment. Portable network Class recipes contain no learner, grant or Course-content rights.
   </p>
- </section>;
+ </WorkspacePanel>;
 }
