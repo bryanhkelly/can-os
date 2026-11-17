@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gt, ilike, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -236,6 +236,29 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
       // methods/credit modes may be published, even when the UI is bypassed.
       // This is a locked, authoritative server check before any publication write.
       assertOperationalClassOfferingTerms(terms);
+      // A method is not operational merely because the enum and UI list it.
+      // In particular, test01 may lack the purpose-restricted intent tables.
+      // Fail closed before publishing an unfulfillable Class Offering.
+      if(terms.enrollmentMethods.includes("invitation")||
+         terms.enrollmentMethods.includes("approval")){
+        const readiness=await tx.execute(sql`
+          SELECT
+            to_regclass('education_v30.class_enrollment_invitations') IS NOT NULL
+              AS "invitationReady",
+            to_regclass('education_v30.class_enrollment_approval_requests') IS NOT NULL
+              AND EXISTS(
+                SELECT 1 FROM pg_constraint
+                WHERE conrelid=to_regclass('education_v30.class_enrollment_approval_requests')
+                  AND conname='ws2_approval_acceptance_only_after_review'
+              ) AS "approvalReady"
+        `);
+        const tables=readiness.rows[0] as
+          {invitationReady:boolean;approvalReady:boolean}|undefined;
+        if(terms.enrollmentMethods.includes("invitation")&&!tables?.invitationReady)
+          throw new AuthorizationError("native Class invitation schema is not deployed");
+        if(terms.enrollmentMethods.includes("approval")&&!tables?.approvalReady)
+          throw new AuthorizationError("native Class approval schema and review migration are not deployed");
+      }
       const now=new Date();
       await assertCurrentCanonicalStaffForMutation(tx,getRequest(),operator.actor);
       await tx.update(canonicalClassOfferingVersions)
