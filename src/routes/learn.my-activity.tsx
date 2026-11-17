@@ -2,7 +2,7 @@ import {createFileRoute, Link, redirect} from "@tanstack/react-router";
 import {useQuery} from "@tanstack/react-query";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw, Users} from "lucide-react";
-import {WorkspaceShell} from "@/components/workspace";
+import {WorkspaceShell, StatusBadge} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {NoncreditEnrollmentManagement} from "@/components/learning/NoncreditEnrollmentManagement";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
@@ -59,9 +59,7 @@ function ActivityCard({item,viewerRole,managing,onManage}: {item: ParticipationR
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span className="font-semibold uppercase tracking-wider">{item.kind}</span>
           <span aria-hidden="true">·</span>
-          <span className="border border-border bg-muted/40 px-2 py-1 text-foreground">
-            {activityStatusLabel(item.status)}
-          </span>
+          <StatusBadge tone="neutral">{activityStatusLabel(item.status)}</StatusBadge>
         </div>
         <h2 className="mt-3 font-serif text-xl leading-snug sm:text-2xl">{item.title}</h2>
         {item.detail && <p className="mt-1 text-sm text-muted-foreground">{item.detail}</p>}
@@ -94,10 +92,10 @@ function ActivityCard({item,viewerRole,managing,onManage}: {item: ParticipationR
           </a>)}
         </nav>}
       </div>
-      {canManageTraining ? <button type="button" onClick={onManage} aria-expanded={managing}
+      {canManageTraining ? <Button type="button" variant="outline" onClick={onManage} aria-expanded={managing}
         className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {managing?"Close registration controls":"Manage registration"}
-      </button> : item.action && <a href={item.action.href}
+      </Button> : item.action && <a href={item.action.href}
         className="inline-flex min-h-10 shrink-0 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
         {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
       </a>}
@@ -126,10 +124,10 @@ function OpportunityCard({item,managing,onManage}: {item: ParticipationOpportuni
           className="inline-flex min-h-10 items-center gap-2 border border-primary px-3 py-2 text-sm font-semibold text-primary">
           {item.action.label}<ArrowUpRight className="size-4" aria-hidden="true"/>
         </a>}
-        {(item.state==="waiting"||item.state==="invited")&&<button type="button" onClick={onManage} aria-expanded={managing}
+        {(item.state==="waiting"||item.state==="invited")&&<Button type="button" variant="outline" onClick={onManage} aria-expanded={managing}
           className="inline-flex min-h-10 items-center border border-border px-3 py-2 text-sm font-semibold text-primary">
           {managing?"Close waitlist controls":"Manage waiting list"}
-        </button>}
+        </Button>}
       </div>
     </div>
     {managing&&<div className="mt-5 border-t border-border pt-4"><NoncreditEnrollmentManagement releaseId={item.releaseId}/></div>}
@@ -266,7 +264,7 @@ function MyActivityPage() {
       <Link to="/explore" className="text-primary underline underline-offset-4">Explore opportunities</Link>
     </div>}>
     <section className="mt-6 grid gap-3 sm:grid-cols-3" aria-label="Participation summary">
-      {views.map(view => <button type="button" key={view.id}
+      {views.map(view => <Button type="button" variant="outline" key={view.id}
         onClick={() => setBucket(view.id)} aria-pressed={bucket === view.id}
         className={"flex items-center gap-4 border p-4 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring " +
           (bucket === view.id ? "border-primary bg-muted/40" : "border-border bg-card hover:bg-muted/30")}>
@@ -281,17 +279,17 @@ function MyActivityPage() {
               +{activity.data.opportunities.length} enrollment opportunities
             </span>}
         </span>
-      </button>)}
+      </Button>)}
     </section>
 
     <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter participation type">
         {filters.map(filter => <Button key={filter.id} size="sm" type="button"
           variant={kind === filter.id ? "default" : "outline"}
-          className="rounded-none" aria-pressed={kind === filter.id}
+           aria-pressed={kind === filter.id}
           onClick={() => setKind(filter.id)}>{filter.title}</Button>)}
       </div>
-      <Button type="button" variant="outline" size="sm" className="rounded-none"
+      <Button type="button" variant="outline" size="sm" 
         disabled={activity.isFetching} onClick={() => void activity.refetch()}>
         <RefreshCw className="mr-2 size-4" aria-hidden="true"/>
         {activity.isFetching ? "Refreshing" : "Refresh"}
@@ -304,7 +302,7 @@ function MyActivityPage() {
     {activity.isError && <div role="alert" className="mt-5 border border-border bg-card p-6">
       <h2 className="font-semibold">My Activity is unavailable</h2>
       <p className="mt-2 text-sm text-muted-foreground">The combined participation summary could not be loaded. Your registrations remain source-authoritative. Use Manage training to access your registrations and waiting lists.</p>
-      <Button type="button" variant="outline" className="mt-4 rounded-none"
+      <Button type="button" variant="outline" className="mt-4"
         onClick={() => void activity.refetch()}>Try again</Button>
     </div>}
 
@@ -341,14 +339,14 @@ function MyActivityPage() {
               "No verified participation matches these filters in the active workspace."}
           </p>
           <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <button type="button" className="font-semibold text-primary underline"
-              onClick={() => {setBucket("current"); setKind("all");}}>Clear filters</button>
+            <Button type="button" variant="ghost" className="font-semibold text-primary underline"
+              onClick={() => {setBucket("current"); setKind("all");}}>Clear filters</Button>
             <Link to="/explore" className="font-semibold text-primary underline">Explore opportunities</Link>
           </div>
         </div> : null}
       </section>
       {canLoadOlder&&<div className="mt-5 flex flex-wrap items-center gap-3">
-        <Button type="button" variant="outline" className="rounded-none"
+        <Button type="button" variant="outline" 
           disabled={loadingOlder} onClick={()=>void loadOlder()}>
           {loadingOlder?"Loading older records…":"Load older activity"}
         </Button>
@@ -382,11 +380,11 @@ function MyActivityPage() {
     {/* Training controls use separate source-authorized readers and remain
         available even when the assembled participation read model fails. */}
       <section className="mt-8 border-t border-border pt-6" id="noncredit-management" aria-label="Noncredit enrollment management">
-         <button type="button" aria-expanded={showAllTraining}
+         <Button type="button" variant="outline" aria-expanded={showAllTraining}
            className="min-h-11 text-sm font-semibold text-primary underline underline-offset-4"
            onClick={()=>{setManagingKey(null);setShowAllTraining(value=>!value);}}>
            {showAllTraining?"Hide all training controls":"Manage all training registrations and waiting lists"}
-         </button>
+         </Button>
          {showAllTraining&&<NoncreditEnrollmentManagement/>}
        </section>
   </WorkspaceShell>;
