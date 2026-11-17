@@ -15,6 +15,7 @@ import {
 import {
   decideBlueprintReviewInputSchema,
   blueprintReviewReadInputSchema,
+  blueprintReviewHistoryInputSchema,
 } from "@/domain/blueprint-review";
 import { assertCapability, AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -118,6 +119,47 @@ export async function getBlueprintReview(
           componentId: item.componentId,
           decision: latestByComponent.get(item.componentId) ?? "not_reviewed",
         })),
+    };
+  });
+}
+
+/**
+ * Read actual append-only decisions for one Blueprint version. This is
+ * intentionally distinct from the latest-decision authorization check and
+ * does not infer operating approval or manufacture revision transitions.
+ */
+export async function getBlueprintReviewHistory(
+  context: CommandContext,
+  rawInput: unknown,
+) {
+  if (!context.actorPersonId) throw new AuthorizationError("authenticated session");
+  assertCapability(context, "blueprint.read");
+  const { configurationVersionId, page } = blueprintReviewHistoryInputSchema.parse(rawInput);
+  const databaseRole = blueprintReadDatabaseRole(context);
+  return db.transaction(async tx => {
+    await tx.execute(sql.raw(`SET LOCAL ROLE ${databaseRole}`));
+    const version = await requireReviewVersion(tx, context, configurationVersionId);
+    const rows = await tx.select({
+      id: configurationReviews.id,
+      decision: configurationReviews.decision,
+      reviewerPersonId: configurationReviews.reviewerPersonId,
+      decidedAt: configurationReviews.decidedAt,
+      evidenceVersionId: configurationReviews.evidenceVersionId,
+    }).from(configurationReviews)
+      .where(eq(configurationReviews.configurationVersionId, version.id))
+      .orderBy(desc(configurationReviews.decidedAt), desc(configurationReviews.id))
+      .limit(21).offset(page * 20);
+    return {
+      configurationVersionId: version.id,
+      page,
+      hasMore: rows.length > 20,
+      items: rows.slice(0, 20).map(row => ({
+        id: row.id,
+        decision: row.decision,
+        reviewerPersonId: row.reviewerPersonId,
+        decidedAt: row.decidedAt.toISOString(),
+        evidenceVersionId: row.evidenceVersionId,
+      })),
     };
   });
 }
