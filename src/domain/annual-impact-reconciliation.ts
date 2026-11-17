@@ -52,7 +52,7 @@ export type ImpactTotals = {
   verifiedAttendees: number;
   verifiedCompletions: number;
   awardsIssued: number;
-  awardsCurrentlyValid: number;
+  awardsIssuedInPeriodStillValid: number;
   awardsRevoked: number;
 };
 export type ImpactSnapshot = {
@@ -136,7 +136,7 @@ export function reconcileAnnualImpact(
   }
   const validCompletion = [...latestCompletion.values()].filter(d =>
     d.verified && d.status === "completed");
-  const completionById = new Map(validCompletion.map(d => [d.id, d]));
+  const validCompletionByParticipation = new Set(validCompletion.map(d => key(d.participation)));
 
   const eligibleAwards = evidence.awards.filter(a => {
     requireSource(a.participation, a.issuedAt);
@@ -152,8 +152,8 @@ export function reconcileAnnualImpact(
   });
   const issued = eligibleAwards.filter(a => inPeriod(a.issuedAt));
   const validAwards = issued.filter(a => {
-    const decision = completionById.get(a.completionDecisionId);
-    return !!decision && (!a.revokedAt || !throughAsOf(a.revokedAt));
+    return validCompletionByParticipation.has(key(a.participation)) &&
+      (!a.revokedAt || !throughAsOf(a.revokedAt));
   });
   const snapshot: ImpactSnapshot = {
     period: {...period},
@@ -165,7 +165,7 @@ export function reconcileAnnualImpact(
       verifiedAttendees: attendees.size,
       verifiedCompletions: validCompletion.filter(d => inPeriod(d.decidedAt)).length,
       awardsIssued: issued.length,
-      awardsCurrentlyValid: validAwards.length,
+      awardsIssuedInPeriodStillValid: validAwards.length,
       awardsRevoked: eligibleAwards.filter(a => a.revokedAt && inPeriod(a.revokedAt)).length,
     },
     bySite: source.sites.map(s => ({
