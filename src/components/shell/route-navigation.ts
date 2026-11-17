@@ -57,6 +57,7 @@ export const routeNavigation = {
   "/canonical/lab/devices": hidden("Site-scoped device inventory and policy management; canonical admin session required", []),
   "/canonical/my-credentials": hidden("Temporary native learner noncredit credential reader pending placement in production learner navigation", []),
   "/class": page("/class", all),
+  "/centers/demo": hidden("Synthetic center planning preview; Classes use /class", []),
   "/classes": hidden("Section-only academic route pending migration", []),
   "/enrichment": hidden("Contextual extended-learning registration"),
   "/explore": publicPage,
