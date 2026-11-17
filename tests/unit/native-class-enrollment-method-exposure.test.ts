@@ -14,7 +14,7 @@ describe("native Class enrollment method exposure",()=>{
     expect(publisher).toContain('{value:"self",label:"Self-enrollment"}');
     expect(publisher).toContain('{value:"assignment",label:"Assignment"}');
     expect(publisher).toContain('{value:"invitation",label:"Invitation (verified adults)"}');
-    expect(publisher).not.toContain('{value:"approval",');
+    expect(publisher).toContain('{value:"approval",label:"Approval required (verified adults)"}');
     expect(policy).toContain('method !== "invitation"');
   });
 
