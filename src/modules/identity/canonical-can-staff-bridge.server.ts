@@ -14,8 +14,8 @@ import { AuthorizationError, type CommandContext } from "@/domain/command-contex
  * established by getCommandContext before entering this service.
  *
  * The restricted SQL function independently revalidates the SAME hashed
- * session, the original active CAN grant and Person, the reviewed Person and
- * Site mappings, canonical staff grant and effective Site relationship.
+ * session, the original active CAN grant and Person, the independently reviewed Person mapping, exact shared Site UUID,
+ * canonical staff grant and effective operating relationship.
  *
  * This service MUST NOT read canonical identities with the general/owner
  * DATABASE_URL, infer authorization from email or issue a second login.
@@ -39,7 +39,7 @@ export async function resolveCanonicalSiteStaffFromCan(
   const rows = await readRestrictedCanonicalSession("can_staff", digest);
 
   if (rows.length !== 1) {
-    throw new AuthorizationError("current verified Site staff mapping");
+    throw new AuthorizationError("current verified Site staff authority");
   }
   const native = canonicalSessionRowSchema.parse(rows[0]);
   // The restricted projection must describe this exact verified CAN session.
