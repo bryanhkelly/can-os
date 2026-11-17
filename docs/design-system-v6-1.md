@@ -145,6 +145,16 @@ infer transitions, manufacture audit history or expose additional records.
 `DashboardTimeline` remains the simpler scheduled-event widget and is not
 a substitute for an authoritative workflow history.
 
+**Additional adopted surfaces (November 2026):** The independent assessment
+review workspace now composes shared Select, Textarea, Checkbox and Button
+primitives instead of styling native controls in its route. The watch delivery
+history view composes `StatusTimeline` with source-owned queued timestamps,
+provider acceptance, retry information and authorized recovery links.
+It does not infer delivery from provider acceptance and never presents a
+receipt as an enrollment or completion decision. Storybook documents
+populated/empty workflow histories; no new persistence or lifecycle
+service was introduced.
+
 **Reuse before invention:** For any new feature surface, look for an existing pattern
 before creating a new table, filter row, status display, stepper, form layout or header.
 Extend a shared pattern only when the behavior is genuinely reusable across multiple
