@@ -36,6 +36,8 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
   const pending = useIsMutating({ mutationKey: siteStaffingKeys.program(programId) });
   const fetching = useIsFetching({ queryKey: siteStaffingKeys.program(programId) });
   const busy = pending > 0 || fetching > 0;
+  // A successful write with a failed refresh must not be repeated.
+  const writesBlocked = busy || Boolean(mutation.data?.refreshWarning);
   function retry() {
     if (client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
     mutation.reset();
@@ -52,7 +54,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
     : "";
 
   async function change(key: LocalResponsibility, action: "appoint" | "revoke") {
-    if (!data || query.isError ||
+    if (!data || query.isError || mutation.data?.refreshWarning ||
         client.isFetching({ queryKey: siteStaffingKeys.program(programId) }) ||
         client.isMutating({ mutationKey: siteStaffingKeys.program(programId) })) return;
     const current = data.responsibilities.find(row => row.key === key);
@@ -114,7 +116,7 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
               </span>}
             </p>
             <Field label="Verified Site staff" className="mt-4">
-              <Select disabled={busy} value={selections[item.key] ?? ""}
+              <Select disabled={writesBlocked} value={selections[item.key] ?? ""}
                 onChange={e => setSelections(old => ({ ...old, [item.key]: e.target.value }))}>
                 <option value="">Choose staff member</option>
                 {candidates.map(person => <option key={person.personId} value={person.personId}>
@@ -122,15 +124,15 @@ function LocalSiteDelegationForm({ programId }: { programId: string }) {
                 </option>)}
               </Select>
             </Field>
-            <div className="mt-3"><AppointmentExpiryField label="Responsibility expires" disabled={busy}
+            <div className="mt-3"><AppointmentExpiryField label="Responsibility expires" disabled={writesBlocked}
               value={expirations[item.key] ?? ""}
               onChange={value => setExpirations(old => ({ ...old, [item.key]: value }))}/></div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button type="button" variant="outline" disabled={busy || !selections[item.key] || !expirations[item.key]}
+              <Button type="button" variant="outline" disabled={writesBlocked || !selections[item.key] || !expirations[item.key]}
                 onClick={() => void change(item.key, "appoint")}>
                 {effective ? "Replace appointment" : "Appoint"}
               </Button>
-              <Button type="button" variant="outline" disabled={busy || !effective}
+              <Button type="button" variant="outline" disabled={writesBlocked || !effective}
                 onClick={() => void change(item.key, "revoke")}>
                 Revoke
               </Button>
