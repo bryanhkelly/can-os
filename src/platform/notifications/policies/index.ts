@@ -7,6 +7,7 @@ import { sectionScheduleChangedPolicy } from "./section-schedule-changed";
 import { sectionEnrollmentWithdrawnPolicy } from "./section-enrollment-withdrawn";
 import { sectionWaitlistSeatOfferedPolicy } from "./section-waitlist-seat-offered";
 import { sectionCreationRequestDeclinedPolicy, sectionCreationRequestFulfilledPolicy } from "./section-creation-request-outcomes";
+import { noncreditTrainingCompletedPolicy } from "./noncredit-training-completed";
 
 /** Registry of all event-driven notification policies. Import for side effect. */
 registerNotificationPolicy(assignmentMissingPolicy);
@@ -18,6 +19,7 @@ registerNotificationPolicy(sectionEnrollmentWithdrawnPolicy);
 registerNotificationPolicy(sectionWaitlistSeatOfferedPolicy);
 registerNotificationPolicy(sectionCreationRequestDeclinedPolicy);
 registerNotificationPolicy(sectionCreationRequestFulfilledPolicy);
+registerNotificationPolicy(noncreditTrainingCompletedPolicy);
 
 export { admissionsStageChangedPolicy };
 export { assignmentMissingPolicy };
@@ -27,3 +29,4 @@ export { sectionScheduleChangedPolicy };
 export { sectionEnrollmentWithdrawnPolicy };
 export { sectionWaitlistSeatOfferedPolicy };
 export { sectionCreationRequestDeclinedPolicy, sectionCreationRequestFulfilledPolicy };
+export { noncreditTrainingCompletedPolicy };
