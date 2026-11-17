@@ -52,6 +52,7 @@
     "check:build-source-syntax": "node scripts/acceptance/check-build-source-syntax.mjs",
     "check:class-architecture": "node scripts/check-native-class-architecture.mjs",
     "db:test01:retirement-readiness": "node scripts/acceptance/check-legacy-retirement-readiness.mjs",
+    "db:test01:class-cutover-candidates": "node scripts/acceptance/report-class-cutover-candidates.mjs",
     "typecheck": "tsc --noEmit",
     "docs:check": "node scripts/check-documentation-links.mjs",
     "test:integration:study-groups": "node scripts/run-integration-tests.mjs study-groups",
