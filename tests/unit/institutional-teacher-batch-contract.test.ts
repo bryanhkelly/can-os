@@ -63,12 +63,16 @@ describe("batched teacher scope preserves strict individual agreement policy", (
     }, identity, ["academic_instruction", "curriculum"], "requester", "reviewer",
     agreement.effectiveThrough, at)).toThrow(AuthorizationError);
   });
-  it("does not reintroduce per-assignment authorization SQL in session context", () => {
+  it("quarantines the retiring Section batch outside the canonical identity resolver", () => {
     const context = readFileSync(resolve(process.cwd(),
-      "src/modules/identity/command-context.server.ts"), "utf8");
+      "src/modules/identity/retiring-school-section-scope.server.ts"), "utf8");
     const batch = readFileSync(resolve(process.cwd(),
       "src/modules/programs/institutional-academic-authority-read.server.ts"), "utf8");
     expect(context).toContain("listInstitutionallyAuthorizedAcademicProgramIds(");
+    const core = readFileSync(resolve(process.cwd(),
+      "src/modules/identity/command-context.server.ts"), "utf8");
+    expect(core).toContain("getIdentityContext(request: Request)");
+    expect(core).not.toContain("sectionTeachers");
     expect(context).not.toContain("await requireInstitutionalAcademicProgramAuthority(");
     expect(batch).toContain("assertCurrentOperatingAuthorization(authorization, identity");
     expect(batch).toContain("assertOperatingAgreementEvidence(evidence, identity");
