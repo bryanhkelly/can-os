@@ -4,17 +4,18 @@ import { assertCapability, type CommandContext } from "@/domain/command-context"
  * A server-only orchestration boundary. Adapters own the authoritative
  * transaction/idempotency store and audit schema. Never trust a client actor.
  *
- * Permission checks and validation run before any write. The idempotency
- * reservation, business command and audit append MUST share a transaction.
+ * Authentication and validation precede writes. Resource authorization,
+ * idempotency reservation, business writes, and audit share the transaction.
  */
 export type CommandAdapters<Input, Parsed, Result, Tx> = {
   authenticate: () => Promise<CommandContext>;
   capability: string;
   validate: (input: Input) => Parsed;
-  authorize?: (actor: CommandContext, input: Parsed) => Promise<void>;
+  authorize?: (tx: Tx, actor: CommandContext, input: Parsed) => Promise<void>;
   transaction: <T>(work: (tx: Tx) => Promise<T>) => Promise<T>;
   execute: (tx: Tx, actor: CommandContext, input: Parsed) => Promise<Result>;
-  audit: (tx: Tx, event: {
+  /** Omit only if execute already appends the authoritative audit within tx. */
+  audit?: (tx: Tx, event: {
     actor: CommandContext;
     input: Parsed;
     result: Result;
@@ -33,11 +34,11 @@ export async function executeCommand<Input, Parsed, Result, Tx>(
   const actor = await adapters.authenticate();
   assertCapability(actor, adapters.capability);
   const parsed = adapters.validate(input);
-  await adapters.authorize?.(actor, parsed);
   return adapters.transaction(async tx => {
+    await adapters.authorize?.(tx, actor, parsed);
     const perform = async () => {
       const result = await adapters.execute(tx, actor, parsed);
-      await adapters.audit(tx, { actor, input: parsed, result });
+      await adapters.audit?.(tx, { actor, input: parsed, result });
       return result;
     };
     const idem = adapters.idempotency;
