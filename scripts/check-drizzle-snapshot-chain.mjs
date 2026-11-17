@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8"));
 const entries = journal.entries;
 assert.ok(entries.length>0,"No committed Drizzle migration journal.");
-assert.ok(entries.at(-1).idx>=84,"Drizzle journal tip regressed behind the reviewed 0084 CAN Person cutover.");
+assert.ok(entries.at(-1).idx>=85,"Drizzle journal tip regressed behind the reviewed 0085 CAN Person cutover.");
 
 const expectedNewTables = new Map([
   [79,"public.access_session_signals"],
