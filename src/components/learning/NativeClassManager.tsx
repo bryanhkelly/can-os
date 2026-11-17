@@ -36,14 +36,15 @@ function toggle<T extends string>(list:T[],name:T):T[]{
 }
 function utc(value:string):string|null{return value?new Date(value).toISOString():null;}
 
-export function NativeClassManager({preferredSiteId}: {preferredSiteId?: string}) {
+export function NativeClassManager({preferredSiteId,preferredOfferingVersionId}: {preferredSiteId?: string;preferredOfferingVersionId?:string}) {
   const client=useQueryClient();
   const [searchDraft,setSearchDraft]=useState("");
   const [search,setSearch]=useState("");
   const options=useInfiniteQuery({
-    queryKey:["native-class-course-options",preferredSiteId??null,search],
+    queryKey:["native-class-course-options",preferredSiteId??null,preferredOfferingVersionId??null,search],
     initialPageParam:0,
-    queryFn:({pageParam})=>getUnifiedClassCourseOptions({data:{search,cursor:pageParam}}),
+    queryFn:({pageParam})=>getUnifiedClassCourseOptions({data:{search,cursor:pageParam,
+      siteId:preferredSiteId,offeringVersionId:preferredOfferingVersionId}}),
     getNextPageParam:last=>last.nextCursor??undefined,
     retry:false,
   });
@@ -98,7 +99,8 @@ export function NativeClassManager({preferredSiteId}: {preferredSiteId?: string}
   const visibleOptions=combinedOptions.filter(row=>
     (!recipeCourseId||row.courseVersionId===recipeCourseId) &&
     (!recipeOfferingVersionId||row.offeringVersionId===recipeOfferingVersionId) &&
-    (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)));
+    (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)) &&
+    (!preferredOfferingVersionId||row.offeringVersionId===preferredOfferingVersionId));
   const rolloutReadiness=recipePlan
     ?assessLocalRollout(recipePlan,exactRolloutData,rolloutSiteId||null):[];
   const rolloutSiteOptions=operatorSites.data??[];
@@ -106,7 +108,8 @@ export function NativeClassManager({preferredSiteId}: {preferredSiteId?: string}
   // adoption may support many Course components and local Classes; no extra
   // Program records are synthesized for standalone Courses.
   const localOfferingOptions=optionsData.filter(row=>
-    !preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId));
+    (!preferredSiteId||row.siteOptions.some(site=>site.id===preferredSiteId)) &&
+    (!preferredOfferingVersionId||row.offeringVersionId===preferredOfferingVersionId));
   const groupKey=(row:{deploymentId:string;adoptionId:string;offeringVersionId:string})=>
     [row.deploymentId,row.adoptionId,row.offeringVersionId].join(":");
   const offeringGroups=Array.from(new Set(localOfferingOptions.map(groupKey)))
