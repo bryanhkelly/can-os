@@ -122,6 +122,25 @@ describe("one native Class route and reusable manager",()=>{
     expect(reader).not.toContain("getDemoTeacherRehearsal");
   });
 
+  it("shows the persisted native Course without granting release or enrollment",()=>{
+    const center=read("src/routes/centers.demo.tsx");
+    const reader=read("src/modules/activities/demo-center.functions.ts");
+    const seed=read("database/seeds/2026-11-clc-native-course-planning.sql");
+    expect(center).toContain("nativeCourse");
+    expect(center).toContain("Course version: {nativeCourse.lifecycle}");
+    expect(center).toContain('to="/site-identity" search={{mode:"request",siteId:site.id}}');
+    expect(center).not.toContain('Create and publish Course content');
+    expect(reader).toContain('import("@/db/canonical-v301")');
+    expect(reader).toContain('desc(native.courseVersions.versionNo)');
+    expect(reader).toContain('asc(native.courseLessons.lessonOrder)');
+    expect(reader).not.toContain("siteIdentityConfirmationSchema");
+    expect(seed).toContain("AI and Digital Skills");
+    expect(seed).toContain("'prospective'");
+    expect(seed).toContain("'planning'");
+    expect(seed).toContain("'draft',NULL");
+    expect(seed).not.toContain("class_enrollments");
+  });
+
   it("does not mistake enrollment plans for native Classes",()=>{
     const center=read("src/routes/centers.demo.tsx");
     expect(center).toContain("These saved program plans are not native Classes");
