@@ -83,6 +83,24 @@ describe("one native Class route and reusable manager",()=>{
     expect(manager).toContain("Open newly created Class");
   });
 
+  it("promotes publisher-owned quiz and survey authoring through the same Class route",()=>{
+    const home=read("src/routes/class.tsx");
+    const tabs=read("src/components/learning/NativeClassHomeNavigation.tsx");
+    const editor=read("src/components/learning/PublisherCourseActivityEditor.tsx");
+    const staging=read("src/routes/canonical.course-activities.tsx");
+    const manager=read("src/components/learning/NativeClassManager.tsx");
+    expect(home).toContain('value.view==="activities"');
+    expect(home).toContain("<PublisherCourseActivityEditor navigation={navigation}/>");
+    expect(tabs).toContain('search={{view:"activities"}}');
+    expect(editor).toContain("export function PublisherCourseActivityEditor");
+    expect(editor).toContain("getPublisherCourseActivityOptions()");
+    expect(editor).toContain("createCanonicalObjectiveDraft");
+    expect(editor).toContain("createCanonicalSurveyDraft");
+    expect(editor).not.toContain("createFileRoute");
+    expect(staging).toContain('<Navigate to="/class" search={{view:"activities"}}');
+    expect(manager).not.toContain('to="/canonical/course-activities"');
+  });
+
   it("does not open a fake teacher classroom for the synthetic center",()=>{
     const center=read("src/routes/centers.demo.tsx");
     expect(center).toContain('to="/class"');
