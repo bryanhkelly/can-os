@@ -2,6 +2,8 @@ import { type EffectCallback, type ReactElement, type ReactNode, type SetStateAc
 import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SchoolOpeningReviewPanel } from "@/components/operations/SchoolOpeningReviewPanel";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const state=vi.hoisted(()=>({
   slots:[] as unknown[],cursor:0,effects:[] as EffectCallback[],
@@ -51,13 +53,13 @@ function words(node:ReactNode):string{
 }
 function findButton(label:string){
   const tree=render();
-  const button=controls(tree).find(node=>node.type==="button"&&words(node.props.children).includes(label));
+  const button=controls(tree).find(node=>node.type===Button&&words(node.props.children).includes(label));
   if(button||label!=="Reload review")return button;
   const retry=controls(tree).find(node=>node.props.onRetry);
   return retry?{props:{onClick:retry.props.onRetry}}:undefined;
 }
 function reason(value:string){
-  const input=controls(render()).find(node=>node.type==="input");
+  const input=controls(render()).find(node=>node.type===Input);
   if(!input?.props.onChange)throw new Error("Reason field unavailable");
   input.props.onChange({target:{value}});
 }
@@ -98,6 +100,25 @@ describe("version-bound school-opening review",()=>{
       reason:"Independently reviewed this exact configuration.",
     }});
     await vi.waitFor(()=>expect(state.read).toHaveBeenCalledTimes(2));
+  });
+  it("uses shared controls, labels review rationale and shows server-owned draft status",async()=>{
+    await loaded();
+    const html=renderToStaticMarkup(render());
+    expect(html).toContain("Reason for decision");
+    expect(html).toContain("Provide at least 10 characters");
+    expect(html).toContain('required=""');
+    expect(html).toContain("Configuration v1");
+    expect(html).toContain("bg-muted");
+    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
+  });
+  it("distinguishes independent suspension as a destructive action",async()=>{
+    state.read.mockResolvedValue({...review,status:"approved",approvalReady:false});
+    mount();
+    await vi.waitFor(()=>expect(findButton("Suspend school")).toBeDefined());
+    const html=renderToStaticMarkup(render());
+    expect(html).toContain("bg-destructive");
+    expect(html).toContain("border-success/50");
+    expect(html).not.toContain("Approve independently reviewed opening");
   });
   it("does not expose decision buttons before a review has loaded",()=>{
     state.read.mockReturnValue(new Promise(()=>{}));mount();
