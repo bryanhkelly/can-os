@@ -50,6 +50,19 @@ describe("Launch catalog, Class and persistence contracts",()=>{
     expect(ui).toContain("<Checkbox ");
     expect(launch).toContain("<Radio ");
   });
+  it("preserves native Course discovery independently of legacy school preparation reads",()=>{
+    const ui=source("src/components/launch-studio/SchoolHubWorkflow.tsx");
+    expect(ui).toContain("const catalogDiscovery=module");
+    expect(ui).toContain("if(!data.launches)return <>{catalogDiscovery}");
+    expect(ui).toContain("if(data.selectionError || (data.launches.length && !current))return <>{catalogDiscovery}");
+    expect(ui).toContain("if(data.draftFailed)return <>{catalogDiscovery}");
+    expect(ui).toContain("if(!site)return");
+  });
+  it("hides school opening actions for enrichment-only Site previews",()=>{
+    const ui=source("src/components/launch-studio/SiteFirstLaunch.tsx");
+    expect(ui).toContain("siteLaunchPreparation(sitePrograms,chosen)");
+    expect(ui).toContain("siteId&&preparation.showSchoolOpeningPreparation");
+  });
   it("uses the v6.1 rectilinear affiliation card",()=>{
     const ui=source("src/components/operations/SiteAffiliationPanel.tsx");
     expect(ui).toContain('className="mt-3 border border-border bg-card p-5"');
