@@ -2,6 +2,20 @@
 -- Database: primary main only, no bridges, no production approval.
 -- These are draft lessons, NOT Class Sessions, enrollment or permission to teach.
 -- Course version ca270000-0000-4000-8000-000000000042 (draft).
+-- Run in one transaction; lock the Course version against concurrent publication.
+-- Do not alter an already published immutable curriculum version.
+DO $
+BEGIN
+  PERFORM 1 FROM education_v30.course_versions
+  WHERE id='ca270000-0000-4000-8000-000000000042'
+    AND course_id='ca270000-0000-4000-8000-000000000041'
+    AND lifecycle='draft'
+  FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Expected unpublished AI and Digital Skills Course version';
+  END IF;
+END $;
+
 INSERT INTO education_v30.course_units
 (id,course_version_id,unit_key,title,sequence_no,content) VALUES
 ('ca270000-0000-4000-8000-000000000045','ca270000-0000-4000-8000-000000000042','applied-digital-skills','Apply digital skills safely',2,'{"synthetic":true,"instruction":"Recorded teacher plus facilitated practice","requiresIndependentReview":true}'::jsonb)
