@@ -2,6 +2,10 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { WorkspaceShell } from "@/components/workspace";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import {
@@ -116,15 +120,15 @@ function PublicSelfEnrollment() {
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Only current, provider-approved noncredit releases appear. Courses can be independent or hosted at an authorized community learning location.
           </p>
-          <label htmlFor="noncredit-search" className="mt-4 block text-sm font-semibold">
+          <Label htmlFor="noncredit-search" className="mt-4 block text-sm font-semibold">
             Search training, provider, or hosting Site
-            <input id="noncredit-search" type="search" value={searchTerm} maxLength={100}
+            <Input id="noncredit-search" type="search" value={searchTerm} maxLength={100}
               onChange={event=>{setSearchTerm(event.target.value);setCursor(null);setHistory([]);}}
               placeholder="Digital skills, church, city…"
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-          </label>
+              className="mt-2 min-h-11"/>
+          </Label>
           {catalog.isPending && <p role="status" className="mt-5 text-sm">Loading published enrollment opportunities…</p>}
-          {catalog.isError && <p role="alert" className="mt-5 text-sm">Enrollment availability is temporarily unavailable. <button type="button" onClick={()=>void catalog.refetch()} className="font-semibold text-primary underline">Try again</button></p>}
+          {catalog.isError && <p role="alert" className="mt-5 text-sm">Enrollment availability is temporarily unavailable. <Button type="button" variant="ghost" size="sm" onClick={()=>void catalog.refetch()} className="font-semibold text-primary underline">Try again</Button></p>}
           {catalog.data && catalog.data.items.length===0 && <p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
             {catalog.data.nextCursor
               ? "No available training was found in this segment. Select More training to continue browsing approved opportunities."
@@ -133,23 +137,23 @@ function PublicSelfEnrollment() {
                 : "No noncredit programs are accepting self-registration right now. Providers must publish their courses and enrollment releases before registration can open."}
           </p>}
           {catalog.data && catalog.data.items.length>0 && <div className="mt-4">
-            <label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</label>
-            <select id="noncredit-release" value={search.release??""}
+            <Label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</Label>
+            <Select id="noncredit-release" value={search.release??""}
               onChange={event=>void router.navigate({to:"/learn/enroll",search:{release:event.target.value||undefined,ref:search.ref}})}
-              className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+              className="mt-2 min-h-11">
               <option value="">Choose a training</option>
               {catalog.data.items.map(item=><option key={item.id} value={item.id}>
                 {item.title} · {item.provider}
               </option>)}
-            </select>
+            </Select>
             {!selected && <div className="mt-4 grid gap-2">
-              {catalog.data.items.map(item=><button type="button" key={item.id}
+              {catalog.data.items.map(item=><Button variant="outline" type="button" key={item.id}
                 onClick={()=>void router.navigate({to:"/learn/enroll",search:{release:item.id,ref:search.ref}})}
-                className="border border-border bg-background p-4 text-left focus-visible:outline-2 focus-visible:outline-primary">
+                className="h-auto w-full flex-col items-start gap-1 p-4 text-left">
                 <strong className="block text-sm">{item.title}</strong>
                 <span className="mt-2 block text-xs text-muted-foreground">{item.provider} · {item.deliveryMode==="facilitated"?"Facilitated at "+(item.siteName??"approved Site"):"Learn independently"}</span>
                 <span className="mt-1 block text-xs text-muted-foreground">{item.seatsRemaining>0?item.seatsRemaining+" seats remaining":"Registration is full"}</span>
-              </button>)}
+              </Button>)}
             </div>}
           </div>}
           {catalog.data&&<nav aria-label="Training discovery pages" className="mt-4 flex flex-wrap gap-3">
@@ -230,16 +234,16 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     <div className="mt-5 border-t border-border pt-5">
       <h3 className="text-sm font-semibold">Participation and data-use terms · {release.consentVersion}</h3>
       <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{release.consentText}</p>
-      <label className="mt-5 flex items-start gap-3 text-sm leading-6">
-        <input type="checkbox" checked={accepted} onChange={event=>onAccepted(event.target.checked)}
-          className="mt-1 size-4 accent-primary"/>
+      <Label className="mt-5 flex items-start gap-3 text-sm leading-6">
+        <Checkbox checked={accepted} onChange={event=>onAccepted(event.target.checked)}
+          className="mt-1"/>
         I have read and accept the participation and data-use terms for this specific training.
-      </label>
-      <label className="mt-3 flex items-start gap-3 text-sm leading-6">
-        <input type="checkbox" checked={adult} onChange={event=>onAdult(event.target.checked)}
-          className="mt-1 size-4 accent-primary"/>
+      </Label>
+      <Label className="mt-3 flex items-start gap-3 text-sm leading-6">
+        <Checkbox checked={adult} onChange={event=>onAdult(event.target.checked)}
+          className="mt-1"/>
         I confirm I am 18 or older and am registering myself, not another person.
-      </label>
+      </Label>
     </div>
     {!signedIn && <div className="mt-5 space-y-3 border-t border-border pt-4">
       <p className="text-sm">Verify your CAN account to finish. Your course selection will be preserved after signing in.</p>
@@ -291,25 +295,25 @@ function AffiliateAttributionSelector({releaseId,onMembershipChange}:{
       course online. This is your own statement, not proof of individual membership.
       Leave this blank to record your participation at the provider's Site.
     </p>
-    <label htmlFor="affiliate-search" className="mt-3 block text-sm font-medium">
+    <Label htmlFor="affiliate-search" className="mt-3 block text-sm font-medium">
       Search approved participating organizations
-    </label>
-    <input id="affiliate-search" type="search" value={term}
+    </Label>
+    <Input id="affiliate-search" type="search" value={term}
       onChange={event=>{setTerm(event.target.value);setChoice("");onMembershipChange("");}}
       placeholder="Organization or church name" maxLength={80}
-      className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+      className="mt-1 min-h-11"/>
     {results.isError&&term.trim().length>=2&&
       <p className="mt-2 text-xs" role="alert">The affiliate directory is unavailable. You can register without local attribution.</p>}
-    {results.data&&<label htmlFor="affiliate-choice" className="mt-3 block text-sm font-medium">
+    {results.data&&<Label htmlFor="affiliate-choice" className="mt-3 block text-sm font-medium">
       Select your organization
-      <select id="affiliate-choice" value={choice} className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+      <Select id="affiliate-choice" value={choice} className="mt-1 min-h-11"
         onChange={event=>{setChoice(event.target.value);onMembershipChange(event.target.value);}}>
         <option value="">National / provider Site (no local affiliation)</option>
         {results.data.items.map(item=><option key={item.id} value={item.id}>
           {item.organizationName} · {item.reportingUnitName}
         </option>)}
-      </select>
-    </label>}
+      </Select>
+    </Label>}
     {results.data?.hasMore&&<p className="mt-2 text-xs text-muted-foreground">
       Refine the organization search to see more matches.
     </p>}
