@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -365,9 +365,12 @@ export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"}
   .handler(async({data})=>{
     guard();
     const {learnerPersonId}=await requireLearner();
+    // Date objects truncate PostgreSQL microseconds to milliseconds. Using
+    // them for a keyset cursor can skip same-millisecond history rows.
+    // Cast the validated ISO cursor directly in PostgreSQL instead.
     const older=data.cursor?or(
-      lt(canonicalClassEnrollments.enrolledAt,new Date(data.cursor.enrolledAt)),
-      and(eq(canonicalClassEnrollments.enrolledAt,new Date(data.cursor.enrolledAt)),
+      sql`${canonicalClassEnrollments.enrolledAt} < ${data.cursor.enrolledAt}::timestamptz`,
+      and(sql`${canonicalClassEnrollments.enrolledAt} = ${data.cursor.enrolledAt}::timestamptz`,
         lt(canonicalClassEnrollments.id,data.cursor.classEnrollmentId)),
     ):undefined;
     const rows=await db.select({
@@ -379,6 +382,8 @@ export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"}
       status:canonicalClassEnrollments.status,
       courseAttemptId:canonicalClassEnrollments.courseAttemptId,
       enrolledAt:canonicalClassEnrollments.enrolledAt,
+      // Exact UTC microsecond cursor is kept separate from display Date.
+      enrolledAtCursor:sql<string>`to_char(${canonicalClassEnrollments.enrolledAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
       siteId:canonicalClasses.siteId,
       enrollmentMethod:canonicalClassEnrollments.enrollmentMethod,
       classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId,
@@ -391,7 +396,7 @@ export const getMyNativeClassEnrollmentHistoryPage=createServerFn({method:"GET"}
     const items=rows.slice(0,50);
     const last=items[items.length-1];
     return {items,nextCursor:rows.length>50&&last?{
-      enrolledAt:last.enrolledAt.toISOString(),
+      enrolledAt:last.enrolledAtCursor,
       classEnrollmentId:last.classEnrollmentId,
     }:null};
   });
