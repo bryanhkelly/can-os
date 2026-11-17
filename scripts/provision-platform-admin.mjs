@@ -20,6 +20,8 @@ const email = (process.env.PLATFORM_ADMIN_EMAIL ?? "").trim().toLowerCase();
 const approverEmail = (process.env.PLATFORM_ADMIN_APPROVER_EMAIL ?? "").trim().toLowerCase();
 const ticket = (process.env.PLATFORM_ADMIN_TICKET ?? "").trim();
 const execute = process.argv.includes("--execute");
+const PRODUCTION_PROJECT_ID = "sweet-hall-62441909";
+const PRODUCTION_BRANCH_ID = "br-restless-sea-ar9ooo55";
 if (!process.env.DATABASE_URL) throw Error("DATABASE_URL required");
 if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ||
     !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(approverEmail) ||
@@ -34,6 +36,20 @@ let client;
 try {
   client = await pool.connect();
   await client.query(execute ? "BEGIN" : "BEGIN READ ONLY");
+  // Privileged provisioning must never silently target a preview, fork,
+  // recovery branch, or another project. Fail closed before any row locks
+  // or writes, even for a dry run. This is the exact deployed main target.
+  const targetDatabase = await client.query(`
+    SELECT current_setting('neon.project_id', true) AS project_id,
+           current_setting('neon.branch_id', true) AS branch_id,
+           current_database() AS database_name
+  `);
+  const deployed = targetDatabase.rows[0];
+  if (deployed?.project_id !== PRODUCTION_PROJECT_ID ||
+      deployed?.branch_id !== PRODUCTION_BRANCH_ID ||
+      deployed?.database_name !== "neondb") {
+    throw Error("BLOCKED: App Admin provisioning must target CAN OS Neon production main");
+  }
   const result = await client.query(`
     SELECT a.id, a.person_id, a.email_normalized, a.email_verified_at,
       a.disabled, p.active AS person_active
