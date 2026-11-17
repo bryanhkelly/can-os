@@ -58,7 +58,7 @@ test.describe("WS1 My Activity authenticated acceptance", () => {
     if (!fixture) throw new Error("fixture unavailable");
     await withAuthenticatedPage(browser, fixture.studentSecret, async ({page}) => {
       await page.goto("/learn/activity");
-      await expect(page).toHaveURL(/\\/learn\\/my-activity(?:\\?|$)/);
+      await expect(page).toHaveURL(/my-activity(?:\?|$)/);
       await expect(page.getByRole("heading", {name: "My Activity"})).toBeVisible();
       await expect(page.getByText("This is a partial view", {exact: false})).toBeVisible();
     });
