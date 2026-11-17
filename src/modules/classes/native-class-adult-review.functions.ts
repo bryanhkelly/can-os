@@ -75,7 +75,7 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
      }).from(accessAccounts)
        .where(eq(accessAccounts.id,data.accessAccountId)).limit(1);
      if(!account?.verified||account.disabled||!account.personId||
-        isDemoAccountEmail(account.email))
+        account.personId===actor.actorPersonId||isDemoAccountEmail(account.email))
        throw new AuthorizationError("current verified CAN applicant");
      const [person]=await tx.select({active:people.active})
        .from(people).where(eq(people.id,account.personId)).limit(1);
