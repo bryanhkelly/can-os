@@ -11,7 +11,7 @@ describe("V6.1 shared recorded-time presentation", () => {
       timeZone="America/Los_Angeles"/>);
     expect(utc).toContain("Nov 17, 2026, 7:00 PM UTC");
     expect(site).toContain("Nov 17, 2026, 11:00 AM PST");
-    for (const html of [utc, site]) expect(html).toContain(`datetime="${instant}"`);
+    for (const html of [utc, site]) expect(html).toContain(`dateTime="${instant}"`);
     expect(utc).not.toContain("Delivered to recipient");
   });
 
