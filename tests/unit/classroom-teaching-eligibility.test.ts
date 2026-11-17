@@ -57,3 +57,18 @@ it("uses the caller transaction for direct-access eligibility",async()=>{
   queue(false);await authorizeClass(actor(false),"section",undefined,transaction as never);
   expect(state.require.mock.calls[0]?.[2]).toBe(transaction);
 });
+
+it("reuses only directory agreement checks for sibling Sections of one delegated Program",async()=>{
+  const second={...section,id:"section-two",title:"Another Class"};
+  state.rows=[
+    [section,second],
+    [{hostId:"school",ownerId:"school",academicProviderId:"can"}],
+    [{type:"church"}],
+  ];
+  const classes=await accessibleClasses(actor(true));
+  expect(classes).toHaveLength(2);
+  expect(state.authority).toHaveBeenCalledTimes(1);
+  expect(state.delegation).toHaveBeenCalledTimes(1);
+  // Teacher qualification remains independently current for each Section.
+  expect(state.require).toHaveBeenCalledTimes(2);
+});
