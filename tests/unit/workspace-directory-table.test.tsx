@@ -38,4 +38,26 @@ describe("DirectoryTable reusable workspace pattern", () => {
     const html = renderToStaticMarkup(<DirectoryTable {...base} selectedKeys={new Set(["one"])} />);
     expect(html).not.toContain('aria-label="Select page"');
   });
+  it("keeps pagination available when a server window is empty", () => {
+    const html = renderToStaticMarkup(<DirectoryTable {...base} rows={[]}
+      empty={<p>No results on this page</p>}
+      pagination={<nav aria-label="Server pages"><button>Previous page</button></nav>} />);
+    expect(html).toContain("No results on this page");
+    expect(html).toContain("Previous page");
+    expect(html).not.toContain("<table");
+  });
+
+  it("shows a controlled bulk action only when rows are selected", () => {
+    const props = {
+      ...base,
+      bulkActions: [{ id: "export", label: "Export permitted rows", onClick: () => undefined }],
+      onSelectionChange: () => undefined,
+    };
+    const empty = renderToStaticMarkup(<DirectoryTable {...props} selectedKeys={new Set<string>()} />);
+    const selected = renderToStaticMarkup(<DirectoryTable {...props} selectedKeys={new Set(["one"])} />);
+    expect(empty).not.toContain("Export permitted rows");
+    expect(selected).toContain("Export permitted rows");
+    expect(selected).toContain("1 record selected");
+  });
+
 });
