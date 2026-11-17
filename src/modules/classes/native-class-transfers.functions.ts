@@ -15,6 +15,7 @@ import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-c
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
 import {currentClassAuthority} from "./native-class-authority.server";
 import {verifiedAdultOn,assertNativeSelfEnrollmentEligible} from "@/domain/native-class-enrollment";
+import {NATIVE_SELF_TRANSFER_CREDIT_MODES} from "@/domain/native-class-transfer-choices";
 import {
  assertNativeClassSeatAvailable,assertNativeClassAttemptForExit,
  assertOperationalClassOfferingTerms,assertNativeClassRepeatEligible,
@@ -24,7 +25,7 @@ const uuid=z.string().uuid();
 const input=z.object({
  sourceClassEnrollmentId:uuid,
  targetClassOfferingVersionId:uuid,
- creditMode:z.enum(["audit","not_applicable"]),
+ creditMode:z.enum(NATIVE_SELF_TRANSFER_CREDIT_MODES),
  adultAttested:z.literal(true),
  consentAccepted:z.literal(true),
  requestId:uuid,
