@@ -343,6 +343,35 @@ record lifecycles and audit commands remain unchanged by presentation migration.
 - Changes are source-committed to `main`, **not** independently accepted
   by production CI until the existing runner failures are resolved.
 
+### Component-first adoption increment: notification and delivery receipts
+
+- `RecordedTime` is now the single timestamp display primitive used by
+  `StatusTimeline`, account notifications, watch-delivery history and
+  provider receipt records. All instants must include an explicit `Z` or
+  numeric UTC offset; ambiguous local times and invalid zones are marked
+  **Recorded time unavailable** rather than silently using the viewer's clock.
+  UTC is the display default, and callers may specify a Site time zone.
+- `DeliveryReceiptFacts` composes `RecordFacts` and `RecordedTime` for
+  the original receipt ID, attempt count, created-at time and *optional*
+  provider acceptance or scheduled retry time. These facts are shared by
+  noncredit invitation recovery and school-family alert recovery. Provider
+  acceptance is not evidence of mailbox or handset delivery.
+- `NotificationFeed` now composes the shared empty-state and timestamp
+  patterns while retaining its signed-in account's unread, dismissed, read
+  and related-record actions.
+- Both recovery panels compose `DeliveryReceiptFacts`, `Field`,
+  `Textarea`, `StatusBadge` and `WorkspaceNotice` instead of locally
+  duplicating receipt evidence, controls and messages. A successful retry
+  command with a failed read refresh uses an **attention** notice rather
+  than claiming the command itself failed.
+- All retry, consent, status, authority, queue eligibility, external provider
+  communication and idempotency rules remain server-owned. Components render
+  the state returned by authorized readers and preserve existing recovery
+  commands. Receipt evidence does not assert successful delivery.
+- Source contracts, unit tests, interactive Storybook samples and the V6.1
+  adoption inventory cover these components. Source-level verification does
+  **not** replace CI, a real typecheck or authenticated live acceptance.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
