@@ -85,7 +85,6 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
           id:assessmentAttemptResults.id,
           attemptId:assessmentAttemptResults.attemptId,
           resultStatus:assessmentAttemptResults.resultStatus,
-          attemptState:assessmentAttempts.state,
           learnerId:assessmentAttempts.learnerId,
           assessmentVersionId:assessmentAdministrations.assessmentVersionId,
           administrationDeploymentId:assessmentAdministrations.deploymentId,
@@ -107,7 +106,7 @@ export const getNoncreditCompletionReadiness=createServerFn({method:"GET"})
           .orderBy(desc(assessmentAttemptResults.resultRevision));
         const superseded=new Set(results.flatMap(r=>r.supersedesId?[r.supersedesId]:[]));
         const current=results.filter(r=>!superseded.has(r.id)&&r.resultStatus==="finalized"&&
-          r.attemptState==="finalized"&&r.administrationDeploymentId===authorized.deploymentId&&
+          r.administrationDeploymentId===authorized.deploymentId&&
           r.administrationCourseVersionId===authorized.courseVersionId)
           .sort((a,b)=>Number(b.pointsEarned)/Number(b.pointsPossible)-
                         Number(a.pointsEarned)/Number(a.pointsPossible))[0];
