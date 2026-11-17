@@ -2,6 +2,15 @@
 command = "vite build"
 publish = "dist/client"
 
+# WS00 development-only main consolidation safeguard.
+# Netlify interprets ignore command exit 0 as SKIP build.
+# Remove this block only after exact-SHA CI, DB authorization and pilot
+# acceptance pass, and an explicitly approved production promotion.
+# This only governs Netlify's Git-triggered production builds.
+# It does NOT disable Netlify build hooks/manual deploys or Cloudflare.
+[context.production]
+  ignore = "exit 0"
+
 [dev]
 command = "npm run dev"
 port = 3000
