@@ -82,6 +82,10 @@ describe("P0 independent credential issuer authorization",()=>{
     expect(service).toContain("assertCANCredentialIssuerReviewer(reviewer,organization)");
     expect(service).toContain("approval.requestedByCanAccountId===reviewer.accountId");
     expect(service).toContain("requesterMembership[0]?.personId===reviewer.actorPersonId");
+    expect(service).toContain("eq(accountPersonGrants.siteId,grant.siteId)");
+    expect(service).toContain("eq(accountPersonGrants.organizationId,grant.organizationId)");
+    expect(service).toContain("eq(sites.id,accountPersonGrants.siteId)");
+    expect(service).not.toContain("site_canonical_identity_links");
     expect(service).toContain("assertCurrentReviewerInTransaction(tx,reviewer)");
     expect(service).toContain("withSensitiveApprovalWriter");
     expect(service).toContain("SET LOCAL ROLE can_v30_sensitive_approval_writer");
