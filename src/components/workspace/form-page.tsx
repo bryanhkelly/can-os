@@ -6,17 +6,21 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** A titled group of related fields on a dedicated create/edit page. */
-export function FormSection({ title, description, children, className }: {
+export function FormSection({ title, description, children, className, columns = 2 }: {
   title: ReactNode;
   description?: ReactNode;
   children: ReactNode;
   className?: string;
+  /** Use one column for lengthy evidence, consent or free-form review fields. */
+  columns?: 1 | 2;
 }) {
   const id = useId();
-  return <section aria-labelledby={id} data-form-section="" className={cn("border-t border-border/60 pt-6 first:border-t-0 first:pt-0", className)}>
+  const descriptionId = useId();
+  return <section aria-labelledby={id} aria-describedby={description ? descriptionId : undefined}
+    data-form-section="" className={cn("border-t border-border/60 pt-6 first:border-t-0 first:pt-0", className)}>
     <h2 id={id} className="text-lg font-semibold">{title}</h2>
-    {description && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</p>}
-    <div className="mt-4 grid gap-5 sm:grid-cols-2">{children}</div>
+    {description && <div id={descriptionId} className="mt-1 max-w-2xl text-sm text-muted-foreground">{description}</div>}
+    <div className={cn("mt-4 grid gap-5", columns === 1 ? "grid-cols-1" : "sm:grid-cols-2")}>{children}</div>
   </section>;
 }
 
