@@ -115,6 +115,8 @@ const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readon
 };
 
 const schoolAdministrationLinks = [
+  { title: "Classes", path: "/class", icon: "book" },
+  { title: "Class management", path: "/canonical/classes", icon: "book" },
   { title: "Launch", path: "/launch/site", icon: "building" },
   { title: "Admissions", path: "/admissions", icon: "clipboard" },
   { title: "Students", path: "/staff/students", icon: "users" },
@@ -137,7 +139,7 @@ const roleLinks = {
   account_holder: [{ title: "Classes", path: "/class", icon: "book" }, { title: "My Activity", path: "/learn/my-activity", icon: "book" }],
   academic_content_creator: [],
   academic_content_reviewer: [],
-  site_admin: [...schoolAdministrationLinks, { title: "Classes", path: "/class", icon: "book" }, siteAdminProfileLink],
+  site_admin: [...schoolAdministrationLinks, siteAdminProfileLink],
   site_website_editor: [{ title: "Website", path: "/site-website", icon: "globe" }],
   room_facilitator: [
     { title: "Classes", path: "/class", icon: "book" },
@@ -146,11 +148,13 @@ const roleLinks = {
     { title: "Calendar", path: "/calendar", icon: "calendar" },
   ],
   site_staff: [
+    { title: "Classes", path: "/class", icon: "book" },
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },
     { title: "Students", path: "/staff/students", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
   ],
   site_leader: [
+    { title: "Classes", path: "/class", icon: "book" },
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },
     { title: "Students", path: "/staff/students", icon: "users" },
     { title: "Staff", path: "/staff/teachers", icon: "users" },

@@ -16,7 +16,7 @@ const page = (owner: keyof FileRoutesByTo | Partial<Record<WorkspaceRole, keyof 
 const hidden = (reason: string, personas: readonly WorkspaceRole[] = all): RouteNavigationMetadata => ({ visibility: "hidden", personas, reason });
 const endpoint: RouteNavigationMetadata = { visibility: "non-navigable", personas: [], reason: "Transport endpoint" };
 const publicPage = hidden("Public or authentication flow outside workspace navigation", []);
-const learn = { student: "/student/courses", teacher: "/classes", guardian: "/guardian/students" } as const;
+const learn = { student: "/student/courses", teacher: "/class", guardian: "/guardian/students" } as const;
 const schoolProfile = { site_admin: "/sites", registrar: "/home" } as const;
 // Every school member opens the same school profile; site admins reach it through their directory.
 const schoolMembers = ["site_website_editor", "room_facilitator", "site_staff", "site_leader", "paraeducator", "safeguarding_responder", "safeguarding_lead", "student", "guardian", "teacher", "registrar", "site_admin", "specialist", "counselor"] as const;
@@ -180,7 +180,7 @@ export const routeNavigation = {
   "/student/report-card": page("/student/my-school", ["student"]),
   "/student/settings": page("/home", ["student"]),
   "/student/support": page({student:"/student/support",teacher:"/student/support"}, ["student", "teacher"]),
-  "/teacher/discussions": page("/classes", ["teacher"]),
+  "/teacher/discussions": page("/class", ["teacher"]),
   "/teacher/gradebook": page("/teacher/gradebook", ["teacher"]),
   "/teacher/missing-work": page("/teacher/gradebook", ["teacher"]),
   "/teacher/notices": page("/home", ["teacher"]),
