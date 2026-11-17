@@ -378,7 +378,7 @@ export const verifyCANStaffCanonicalPrincipal = createServerFn({ method: "POST" 
       if (matchingSchoolRoles.length !== 1) {
         throw new AuthorizationError("one current school administrator role");
       }
-      const sourceRole = matchingSchoolRoles[0].role;
+      const sourceRole = matchingSchoolRoles[0]!.role;
 
       const now = new Date();
       const nativeGrants = await tx.select({
