@@ -3,6 +3,7 @@ import { db } from "@/db/client";
 import { notificationOutboundDeliveries } from "@/db/schema";
 import {
   parseResendReceiptEvent,
+  readBoundedResendWebhookBody,
   verifyResendWebhookSignature,
 } from "@/domain/resend-webhook";
 
@@ -16,7 +17,8 @@ export async function handleResendDeliveryWebhook(request: Request): Promise<Res
   if (!signingSecret) return Response.json({ error: "Unavailable" }, { status: 503 });
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
   if (declaredLength > 64 * 1024) return new Response(null, { status: 413 });
-  const body = await request.text();
+  const body = await readBoundedResendWebhookBody(request);
+  if (body === null) return new Response(null, { status: 413 });
   if (!verifyResendWebhookSignature(body, request.headers, signingSecret))
     return new Response(null, { status: 401 });
   let parsed: unknown;
