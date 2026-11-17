@@ -15,7 +15,7 @@ export const WorkspaceNotice = React.forwardRef<HTMLParagraphElement, {
   const Icon = icons[tone];
   return <p ref={ref} tabIndex={-1} role={tone === "danger" ? "alert" : "status"}
     aria-live={tone === "danger" ? "assertive" : "polite"}
-    className={cn("flex items-start gap-3 rounded-xl border p-4 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    className={cn("flex items-start gap-3 border p-4 text-sm leading-6 outline-none focus-visible:ring-2 focus-visible:ring-ring",
       tone === "info" && "border-info/40 bg-info/10",
       tone === "success" && "border-success/50 bg-success/10",
       tone === "danger" && "border-danger/50 bg-danger/10",
