@@ -151,7 +151,7 @@ export async function processNoncreditWaitlistEmailDeliveries(
       let actionUrl: string | undefined;
       try{
         if(origin && new URL(origin).protocol==="https:")
-          actionUrl=new URL("/learn/my-courses",origin).toString();
+          actionUrl=new URL("/learn/my-activity#noncredit-management",origin).toString();
       }catch{ /* The email remains useful without a URL. */ }
       const sent=await sendNotificationEmail({
         to:recipient.email,
