@@ -89,12 +89,13 @@ export const getMyActivity = createServerFn({method: "GET"}).handler(
         return projectFamilyEnrichment(result.registrations, result.children, now);
       });
     }
-    if(session.role==="student"||session.role==="guardian"){
-      // One source-verified read serves Program and accepted-Event projections.
-      // Neither a calendar invite nor a Program catalog entry is enrollment.
+    if(["student","guardian","account_holder"].includes(session.role)){
+      // Each accepted Event belongs to this verified Person. Academic Program
+      // enrollment remains bounded to verified student/guardian relationships.
       const programEvents=getMyProgramEventParticipation();
-      register("school_program",async()=>
-        projectSchoolPrograms((await programEvents).programs,now));
+      if(session.role==="student"||session.role==="guardian")
+        register("school_program",async()=>
+          projectSchoolPrograms((await programEvents).programs,now));
       register("calendar_event",async()=>
         projectAcceptedCalendarEvents((await programEvents).events,now));
     }
