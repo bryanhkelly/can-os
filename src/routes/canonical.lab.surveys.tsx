@@ -1,3 +1,4 @@
+import { DirectoryTable } from "@/components/workspace";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { WorkspaceShell } from "@/components/workspace";
 import { CapabilityLabNav } from "@/components/capability-lab/CapabilityLabNav";
@@ -43,37 +44,21 @@ function SurveysLabPage() {
     <section className="mt-7" aria-label="Owned survey definitions">
       <h2 className="font-serif text-2xl">Survey definitions</h2>
       <p className="mt-2 text-sm text-muted-foreground">Owned by your canonical provider organization. Draft definitions appear even without an operating campaign.</p>
-      <div className="mt-3 overflow-x-auto border border-border bg-card">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-border bg-muted/40 text-xs text-muted-foreground">
-            <tr>
-              <th scope="col" className="p-3 font-semibold">Definition</th>
-              <th scope="col" className="p-3 font-semibold">Purpose / audience</th>
-              <th scope="col" className="p-3 font-semibold">Status</th>
-              <th scope="col" className="p-3 font-semibold">Versions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {definitions.map(definition => <tr key={definition.id} className="border-b border-border last:border-0">
-              <th scope="row" className="p-3 font-medium">{definition.title}
-                <p className="mt-1 text-xs font-normal text-muted-foreground">{definition.code}</p>
-                <p className="mt-1 break-all font-mono text-xs font-normal text-muted-foreground">{definition.id}</p>
-              </th>
-              <td className="p-3">{definition.purposeCode} · {definition.intendedAudience}</td>
-              <td className="p-3">{definition.status}</td>
-              <td className="p-3 tabular-nums">{definition.versionCount}
-                <p className="mt-1 text-xs text-muted-foreground">{definition.latestVersion
-                  ? "Latest in loaded inventory: v" + definition.latestVersion.versionNo + " · " + definition.latestVersion.lifecycle
-                  : "No loaded version"}
-                </p>
-                {!definition.versionInventoryComplete && <p className="text-xs text-muted-foreground">Version inspection limited</p>}
-              </td>
-            </tr>)}
-            {definitions.length === 0 && <tr><td colSpan={4} className="p-5 text-muted-foreground">
-              No organization-owned survey definitions found.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+      <DirectoryTable label="Survey definitions" caption="Organization-owned survey definitions in this authorized scope."
+        rows={definitions} rowKey={definition=>definition.id}
+        empty={<p className="p-4 text-sm text-muted-foreground">No organization-owned survey definitions found.</p>}
+        columns={[
+          {id:"definition",title:"Definition",render:definition=><>{definition.title}
+            <p className="mt-1 text-xs text-muted-foreground">{definition.code}</p>
+            <p className="mt-1 break-all font-mono text-xs text-muted-foreground">{definition.id}</p></>},
+          {id:"audience",title:"Purpose / audience",render:definition=><>{definition.purposeCode} · {definition.intendedAudience}</>},
+          {id:"status",title:"Status",render:definition=>definition.status},
+          {id:"versions",title:"Versions",render:definition=><>{definition.versionCount}
+            <p className="mt-1 text-xs text-muted-foreground">{definition.latestVersion
+              ? "Latest in loaded inventory: v" + definition.latestVersion.versionNo + " · " + definition.latestVersion.lifecycle
+              : "No loaded version"}</p>
+            {!definition.versionInventoryComplete&&<p className="text-xs text-muted-foreground">Version inspection limited</p>}</>},
+        ]}/>
     </section>
 
     <section className="mt-7" aria-label="Operating survey campaigns">
