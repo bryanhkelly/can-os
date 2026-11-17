@@ -1,19 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, CalendarDays, Users } from "lucide-react";
-import { getSiteIdentityLinkStatus } from "@/modules/sites/site-identity-links.functions";
+import { getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions } from "@/modules/classes/unified-class.functions";
-import { resolveSiteClassLink } from "@/domain/site-class-launch-handoff";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 
-/** Site-first to native-Class handoff: a public Site ID is never used as a
- * canonical Site ID or an authorization credential. Native reads independently
- * validate the current canonical session and exact Site privileges. */
+/** One Site UUID across Launch Studio and Class. This scope read checks the
+ * current Site and canonical operator rights; it never consults an identity
+ * crosswalk or grants authority through the URL. */
 export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
- const identity=useQuery({queryKey:["launch-native-class-link",publicSiteId],
-   queryFn:()=>getSiteIdentityLinkStatus({data:{publicSiteId}}),retry:false});
- const link=resolveSiteClassLink(identity.data??null);
- const canonicalSiteId=link.kind==="approved"?link.canonicalSiteId:null;
+ const scope=useQuery({queryKey:["launch-native-class-scope",publicSiteId],
+   queryFn:()=>getLaunchSiteClassScope({data:{siteId:publicSiteId}}),retry:false});
+ const canonicalSiteId=scope.data?.kind==="ready"?publicSiteId:null;
  const classesRead=useQuery({queryKey:["launch-native-classes",canonicalSiteId],
    queryFn:()=>getMyUnifiedClassDrafts(),enabled:Boolean(canonicalSiteId),retry:false});
  const adoptedCourses=useQuery({queryKey:["launch-class-course-adoptions",canonicalSiteId],
@@ -29,24 +27,27 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    facilitator permissions, dated Sessions, participant enrollment and recorded playback.
    One four-session pilot is one Class with four Sessions, not four copied Courses.
   </p>
-  {identity.isPending&&<p role="status" className="mt-4 text-sm">Checking verified Site correspondence…</p>}
-  {identity.isError&&<div role="alert" className="mt-4 border border-border bg-card p-4 text-sm">
-    <p>Site identity cannot be verified for this account. Sign in with an assigned Site
-      administrator or registrar account, or ask a platform administrator to review
-      the Site assignment. Class management remains unavailable until verified.</p>
-    <Link to="/access" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline">
+  {scope.isPending&&<p role="status" className="mt-4 text-sm">
+   Checking this Site's current Class permissions…
+  </p>}
+  {scope.isError&&<div role="alert" className="mt-4 border border-border bg-card p-4 text-sm">
+    <p>Unable to verify your Site permissions. A verified Site administrator
+      or registrar session is required to manage Classes.</p>
+    <Link to="/access" className="mt-3 inline-flex min-h-11 items-center font-semibold text-primary underline">
       Sign in to manage this Site
     </Link>
   </div>}
-  {!identity.isPending&&!identity.isError&&link.kind!=="approved"&&<>
-   <p role="status" className="mt-4 border bg-muted p-4 text-sm">
-    {link.kind==="pending"?"Site identity confirmation and independent review are pending."
-     :link.kind==="blocked"?"This Site's native identity relationship is not approved.":"No approved canonical Site relationship exists yet."}
-    {" "}Class creation requires a verified canonical operator and an approved Course adoption.
+  {!scope.isPending&&!scope.isError&&scope.data?.kind!=="ready"&&<>
+   <p role="status" className="mt-4 border border-border bg-muted p-4 text-sm">
+    {scope.data?.kind==="unlinked"
+      ?"This Site does not yet have native Class operations provisioned under its existing Site ID."
+      :"The current account does not have an active native Class administration grant for this Site."}
+    {" "}Creating a Class requires a published adopted Course and current operating authority.
+    No additional Site or identity correspondence is created.
    </p>
-   <Link to="/site-identity" search={{mode:"request",siteId:publicSiteId}}
+   <Link to="/class" search={{view:"manage",siteId:publicSiteId}}
     className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
-    Review Site identity <ArrowRight className="size-4"/>
+    Open Class management <ArrowRight className="size-4"/>
    </Link>
   </>}
   {canonicalSiteId&&<>
