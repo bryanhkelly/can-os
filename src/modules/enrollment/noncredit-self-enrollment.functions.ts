@@ -405,6 +405,7 @@ const personalNoncreditCursor=z.object({
 }).strict();
 async function readMyNoncreditHistoryPage(
   cursor:z.infer<typeof personalNoncreditCursor>|null,
+  registrationId?:string,
 ){
     setResponseHeader("Cache-Control","private, no-store");
     // Read-only personal history follows the original explicitly bound CAN
@@ -473,6 +474,7 @@ async function readMyNoncreditHistoryPage(
         eq(noncreditSelfEnrollmentClaims.canonicalAccountId,link.canonicalAccountId),
         eq(noncreditSelfEnrollmentClaims.participantPersonId,link.canonicalPersonId),
         eq(noncreditRegistrations.participantPersonId,link.canonicalPersonId),
+        registrationId?eq(noncreditRegistrations.id,registrationId):undefined,
         cursor?or(
           sql`${noncreditRegistrations.registeredAt} < ${cursor.registeredAt}::timestamptz`,
           and(sql`${noncreditRegistrations.registeredAt} = ${cursor.registeredAt}::timestamptz`,
@@ -536,6 +538,15 @@ export const getMyNoncreditSelfEnrollmentHistoryPage=createServerFn({method:"GET
     cursor:personalNoncreditCursor.nullable().default(null),
   }).strict().parse(raw))
   .handler(async({data})=>readMyNoncreditHistoryPage(data.cursor));
+
+/** Single source-authorized registration, resolved inside the database.
+ * Never accept a caller-selected Person, account, Site or organization scope. */
+export const getMyNoncreditRegistrationById=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({registrationId:z.string().uuid()}).strict().parse(raw))
+  .handler(async({data})=>{
+    const page=await readMyNoncreditHistoryPage(null,data.registrationId);
+    return page.items[0]??null;
+  });
 
 /** Existing bounded view; My Activity advances through source-owned pages. */
 export const getMyNoncreditSelfEnrollments=createServerFn({method:"GET"})
