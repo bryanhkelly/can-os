@@ -16,7 +16,7 @@ import {getMyNativeClassHistoryForCanAccountPage} from
   "@/modules/classes/native-class-enrollment.functions";
 import {getMyNoncreditSelfEnrollmentHistoryPage} from
   "@/modules/enrollment/noncredit-self-enrollment.functions";
-import {getMyNoncreditWaitlist} from
+import {getMyNoncreditWaitlistPage} from
   "@/modules/enrollment/noncredit-waitlist.functions";
 import {getMyAccountSchoolParticipationPage} from
   "./account-school-participation.functions";
@@ -91,6 +91,24 @@ export const getMyActivitySourcePage=createServerFn({method:"GET"})
     return {...result,source:data.source};
   });
 
+/** Opportunity continuation follows the verified CAN Person and never
+ * creates an Enrollment, releases a seat or implies completed learning. */
+export const getMyActivityOpportunityPage=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    cursor:z.string().min(2).max(500),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    privateRead();
+    const session=await readWorkspaceSession(getRequest());
+    if(!session.authenticated)throw new AuthorizationError("verified CAN account");
+    const cursor=parseCursor(data.cursor) as {joinedAt:string;waitlistId:string};
+    const page=await getMyNoncreditWaitlistPage({data:{cursor}});
+    return {
+      items:projectNoncreditOpportunities(page.items),
+      nextCursor:outputCursor(page.nextCursor),
+    };
+  });
+
 /** Initial page from every source. A bounded response is not represented as
  * a complete history when more source pages exist; older records remain
  * reachable through getMyActivitySourcePage, without a new ledger. */
@@ -103,6 +121,7 @@ export const getMyActivity=createServerFn({method:"GET"})
     const records:ParticipationRecord[]=[];
     const opportunities:ParticipationOpportunity[]=[];
     const nextCursors:Partial<Record<ParticipationSource,string>>={};
+    let nextOpportunityCursor:string|null=null;
     const sources:ParticipationReadModel["sources"]=[];
     const tasks:Array<Promise<void>>=[];
     for(const source of firstPageSources){
@@ -125,11 +144,12 @@ export const getMyActivity=createServerFn({method:"GET"})
     }
     tasks.push((async()=>{
       try{
-        opportunities.push(...projectNoncreditOpportunities(await getMyNoncreditWaitlist()));
-        // Waitlist is not participation. Its personal source may still be
-        // bounded, so it is intentionally not certified as complete.
+        const page=await getMyNoncreditWaitlistPage({data:{cursor:null}});
+        opportunities.push(...projectNoncreditOpportunities(page.items));
+        nextOpportunityCursor=outputCursor(page.nextCursor);
         sources.push({source:"noncredit_waitlist",state:"ready",
-          coverage:"partial",message:"Waiting-list history is source-managed."});
+          coverage:page.nextCursor?"partial":"complete",
+          message:page.nextCursor?"Older invitation records are available.":null});
       }catch{
         sources.push({source:"noncredit_waitlist",state:"unavailable",
           coverage:"unknown",message:"Waiting-list source could not be verified."});
@@ -142,6 +162,7 @@ export const getMyActivity=createServerFn({method:"GET"})
       version:PARTICIPATION_READ_MODEL_VERSION,generatedAt:now.toISOString(),
       viewerRole:session.role,activeGrantId:session.activeGrantId,
       records:assembleParticipation(records),opportunities,sources,nextCursors,
+      nextOpportunityCursor,
     };
     assertParticipationReadModel(result);
     return result;
