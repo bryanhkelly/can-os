@@ -141,7 +141,7 @@ BEGIN
      NOT EXISTS(
        SELECT 1 FROM education_v30.learning_completion_evidence_bindings binding
        JOIN education_v30.participation_attributions attr
-         ON attr.class_enrollment_id=e.id
+         ON attr.class_enrollment_id=e.id AND attr.delivery_site_id=e.site_id
        WHERE binding.purpose='class_completion_decision'
          AND binding.class_enrollment_id=e.id
          AND binding.expected_class_outcome_id
