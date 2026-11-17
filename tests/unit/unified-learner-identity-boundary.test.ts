@@ -74,6 +74,16 @@ describe("one canonical learning Person across Courses and Classes",()=>{
      expect(src).not.toContain('setResponseHeader("Set-Cookie",');
    }
  });
+ it("rechecks live adult evidence and reviewer revocation for native bearer sessions",()=>{
+   const evidence=read("src/modules/identity/reviewed-learning-evidence.server.ts");
+   const reader=read("src/modules/identity/canonical-command-context.server.ts");
+   expect(evidence).toContain('review.status!=="approved"');
+   expect(evidence).toContain("source.metadata.revokedAt!=null");
+   expect(evidence).toContain("source.metadata.privateObjectVerified!==true");
+   expect(evidence).toContain("source.expiresAt!==null&&source.expiresAt<=now");
+   expect(evidence).toContain("person?.birthDate!==review.verifiedBirthDate");
+   expect(reader).toContain("await assertCurrentReviewedNativeLearner(native.account_id,native.person_id)");
+ });
  it("keeps review statuses redacted in platform operational reconciliation",()=>{
    const overview=read("src/modules/identity/platform-admin.functions.ts");
    expect(overview).toContain("reviewCases:reviewCases.map");
