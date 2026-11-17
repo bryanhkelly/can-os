@@ -45,7 +45,7 @@ function EnrichmentOfferingDetailPage() {
         status={<StatusBadge tone={offering.registrationOpen ? "success" : "neutral"}>
           {offering.registrationOpen ? "Registration open" : "Registration closed"}
         </StatusBadge>}
-        actions={<Link to="/guardian/enrichment" className={secondaryActionClassName}>Register your child</Link>} />}
+        actions={offering.registrationOpen && <Link to="/guardian/enrichment" search={{ seasonId }} className={secondaryActionClassName}>Register your child</Link>} />}
       main={<>
         <div className="grid gap-4 sm:grid-cols-3">
           <StatCard label={offering.packages.length ? "Starting price" : "Program fee"}
@@ -89,14 +89,14 @@ function EnrichmentOfferingDetailPage() {
       </>}
       rail={<WorkspacePanel title="How registration works">
         <ol className="list-decimal space-y-2 pl-4 text-sm text-muted-foreground">
-          <li>Sign in as a guardian, or create a family account.</li>
+          <li>Sign in with a verified guardian account. If you don’t have guardian access, contact the host site.</li>
           <li>Choose your child and acknowledge the participation permission.</li>
           <li>Submit the registration; the school confirms placement or waitlist.</li>
         </ol>
-        <Link to="/guardian/enrichment"
+        {offering.registrationOpen && <Link to="/guardian/enrichment" search={{ seasonId }}
           className="mt-4 inline-block rounded-lg border px-3 py-2 text-sm font-semibold">
-          View details and register
-        </Link>
+          Continue to registration
+        </Link>}
       </WorkspacePanel>} />
   </PageFrame>;
 }
