@@ -3,6 +3,7 @@ import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../src/components/", import.meta.url));
+const srcRoot = fileURLToPath(new URL("../src/", import.meta.url));
 const files = [];
 function walk(directory) {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -224,7 +225,8 @@ for (const path of [
 // ActionDialog callers retain their feature-owned authorization and mutation logic,
 // while their confirmation forms must compose the canonical Field and input primitives.
 for (const file of ["routes/operations.insights.tsx", "operations/OperationsWorkspace.tsx"]) {
-  const source = readFileSync(join(root, file), "utf8");
+  const sourceFile = file.startsWith("routes/") ? join(srcRoot, file) : join(root, file);
+  const source = readFileSync(sourceFile, "utf8");
   const opening = source.indexOf("<ActionDialog");
   const closing = source.indexOf("</ActionDialog>", opening);
   if (opening < 0 || closing < opening) {
@@ -268,11 +270,10 @@ if (!governedCompletionReview.includes('from "@/components/ui/select"') ||
 // Both remain presentation-only. Source authorization and enrollment stay server-owned.
 const rosterConsumers = {
   // A tabular roster uses DirectoryTable; compact classroom lists use RosterList.
-  "learning/ClassRosterPanel.tsx": ["DirectoryTable", 'from "@/components/workspace"'],
+  "components/learning/ClassRosterPanel.tsx": ["DirectoryTable", 'from "@/components/workspace"'],
   "routes/classes.tsx": ["RosterList", 'from "@/components/workspace"'],
   "routes/class_.$classId.tsx": ["RosterList", 'from "@/components/workspace"'],
 };
-const srcRoot = fileURLToPath(new URL("../src/", import.meta.url));
 for (const [file, required] of Object.entries(rosterConsumers)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
   for (const fragment of required) {
