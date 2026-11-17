@@ -38,7 +38,7 @@ import { getTeacherClassRequestOptions } from "@/modules/programs/section-creati
 import { getClassroomMeetings, scheduleClassroomMeeting, setClassroomMeetingLink } from "@/modules/learning/classroom-meetings.functions";
 import { addClassSupplement, manageClassSupplement } from "@/modules/learning/class-supplements.functions";
 import { publishClassAnnouncement } from "@/modules/learning/class-communication.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, MutationFeedback } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, MutationFeedback, RosterList } from "@/components/workspace";
 import { safeLoader, type LoadOutcome } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -100,13 +100,10 @@ function ClassesPage() {
       {roster && <WorkspacePanel title={roster.section.title}
         description={`${roster.section.code} · ${roster.students.length} actively enrolled students`}>
         <Link to="/classes" search={{}} className="text-sm underline">Back to all classes</Link>
-        <ul className="mt-4 divide-y" aria-label="Class roster">
-          {roster.students.map(student => <li key={student.personId} className="py-3 text-sm">
-            <Link to="/staff/students/$personId" params={{personId:student.personId}}
-              className="font-semibold underline">{student.name}</Link>
-          </li>)}
-        </ul>
-        {!roster.students.length && <p className="mt-4 text-sm text-muted-foreground">No active enrollments in this class.</p>}
+        <RosterList rows={roster.students} rowKey={student => student.personId}
+          primary={student => <Link to="/staff/students/$personId" params={{personId:student.personId}}
+            className="font-semibold underline">{student.name}</Link>}
+          emptyMessage="No active enrollments in this class."/>
       </WorkspacePanel>}
       {!roster && <div className="mt-7 grid gap-4 md:grid-cols-2">
         {directory.classes.map(section => <WorkspacePanel key={section.id} title={section.title}
