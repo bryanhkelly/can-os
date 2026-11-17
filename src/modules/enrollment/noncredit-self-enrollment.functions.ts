@@ -396,6 +396,8 @@ async function readMyNoncreditHistoryPage(
       courseAttemptId:learnerCourseAttempts.id,
       trainingTitle:noncreditTrainingVersions.title,
       deliveryMode:noncreditSelfEnrollmentReleases.deliveryMode,
+      siteId:noncreditSelfEnrollmentReleases.siteId,
+      organizationId:noncreditSelfEnrollmentReleases.registeringOrganizationId,
       siteName:canonicalEnrollmentSites.name,
       registrationStatus:noncreditRegistrations.status,
       attemptStatus:learnerCourseAttempts.status,
