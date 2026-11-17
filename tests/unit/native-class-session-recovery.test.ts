@@ -64,7 +64,12 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
     const ui=read(uiPath);
     const occurrences=ui.match(/await enrollWithLinkedCanRecovery\(\{data:\{/g)??[];
     expect(occurrences).toHaveLength(3); // self, approved, invitation
-    expect(ui).toContain("catch { throw originalError; }");
+    expect(ui).toContain('normalizeClientError(originalError).code!=="CANONICAL_LEARNER_SESSION_REQUIRED"');
+    expect(ui).toContain("throw originalError;");
+    const auth=read("src/modules/identity/canonical-command-context.server.ts");
+    expect(auth).toContain('throw new DomainError("CANONICAL_LEARNER_SESSION_REQUIRED")');
+    expect(auth).toContain('if (!hasNative)');
+    expect(auth).toContain('native.role_code !== "learner"');
   });
   it("does not claim a first-time identity can be forged from an email match",()=>{
     const recovery=read("src/modules/classes/native-class-session-recovery.functions.ts");
