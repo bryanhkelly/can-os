@@ -78,6 +78,11 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(self).toContain("desc(canonicalClassEnrollments.id)).limit(51)");
     expect(self).toContain("const items=rows.slice(0,50)");
     expect(self).toContain("classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId");
+    const client=read("src/routes/learn.classes.tsx");
+    expect(client).toContain("getMyNativeClassEnrollmentHistoryPage({");
+    expect(client).toContain("enrolled.data?.pages.flatMap(page=>page.items)");
+    expect(client).toContain("Load older Classes");
+    expect(client).not.toContain("getMyNativeClassEnrollments()");
   });
 
   it("preserves Course Attempt authority when a Class ends",()=>{
