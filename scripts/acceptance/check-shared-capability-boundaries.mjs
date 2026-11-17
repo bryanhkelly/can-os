@@ -35,8 +35,27 @@ const governed = [
       /^@\/components(?:\/|$)/,
     ],
     requiredImports: ["@/platform/mutation", "@/domain/command-context"],
-    forbiddenPatterns: [/\\bwriteAudit\\s*\\(\\s*tx\\s*,\\s*\\{/],
+    forbiddenPatterns: [/\bwriteAudit\s*\(\s*tx\s*,\s*\{/],
   },
+  {
+    path: "src/platform/canonical-mutation.server.ts",
+    layer: "platform",
+    forbiddenImports: [/^@\/routes(?:\/|$)/, /^@\/components(?:\/|$)/, /^@\/modules(?:\/|$)/],
+    requiredImports: ["@/db/canonical-v301"],
+  },
+  ...[
+    "src/modules/classes/native-class-enrollment.functions.ts",
+    "src/modules/enrollment/noncredit-self-enrollment.functions.ts",
+    "src/modules/enrollment/noncredit-self-enrollment-withdraw.functions.ts",
+  ].map(path => ({
+    path,
+    layer: "canonical-enrollment-adapter",
+    forbiddenImports: [/^@\/routes(?:\/|$)/, /^@\/components(?:\/|$)/],
+    requiredImports: ["@/platform/canonical-mutation.server"],
+    forbiddenPatterns: [
+      /\btx\.insert\s*\(\s*(?:auditEvents|canonicalAuditEvents|domainEvents|canonicalDomainEvents)\s*\)/,
+    ],
+  })),
   {
     path: "src/modules/communication/outbound-dispatcher.server.ts",
     layer: "capability",
