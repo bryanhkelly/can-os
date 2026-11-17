@@ -73,6 +73,34 @@ try {
       missing.push(name);
     }
   }
+  // Enumerate every FK referencing legacy Sections. Hardcoded counts above
+  // are only the known core records; future features must not bypass cutover
+  // simply because they added a new Section relationship.
+  const { rows: dependencies } = await client.query(`
+    SELECT n.nspname AS schema_name, c.relname AS table_name,
+           a.attname AS column_name
+    FROM pg_constraint fk
+    JOIN pg_class c ON c.oid=fk.conrelid
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    JOIN unnest(fk.conkey) AS cols(column_number) ON TRUE
+    JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum=cols.column_number
+    WHERE fk.contype='f'
+      AND fk.confrelid='public.sections'::regclass
+    ORDER BY 1,2,3
+  `);
+  const dependentRows = [];
+  for (const row of dependencies) {
+    const parts = [row.schema_name, row.table_name, row.column_name];
+    if (parts.some(part => !/^[a-z_][a-z0-9_]*$/.test(part)))
+      throw new Error("Unsafe database identifier in retirement evidence");
+    const [schema, table, column] = parts;
+    const { rows } = await client.query(
+      `SELECT count(*)::bigint AS n FROM "${schema}"."${table}" WHERE "${column}" IS NOT NULL`);
+    dependentRows.push({
+      table: schema+"."+table, column, linkedRecords: Number(rows[0]?.n ?? 0),
+    });
+  }
+  const blockingDependents = dependentRows.filter(row => row.linkedRecords > 0);
   const blockingLegacy = [
     "legacy_sections", "legacy_section_teachers",
     "legacy_section_enrollments", "legacy_section_assessments",
@@ -82,13 +110,16 @@ try {
     .filter(name => counts[name] !== null && counts[name] !== 0);
   const result = {
     target: "test01", counts, missing, blockingLegacy, dualIdentity,
-    sectionRetirementReady: blockingLegacy.length === 0 && missing.length === 0,
+    dependentRows, blockingDependents,
+    sectionRetirementReady: blockingLegacy.length === 0 && blockingDependents.length === 0 && missing.length === 0,
     singleIdentityConsolidationReady: dualIdentity.length === 0 && missing.length === 0,
     note: "Aggregate preflight only. It does not prove record-level migration, retention, RLS, or functional parity.",
   };
   console.log(JSON.stringify(result, null, 2));
   assert.equal(blockingLegacy.length, 0,
     "BLOCKED: Section records still need evidence-preserving migration");
+  assert.equal(blockingDependents.length, 0,
+    "BLOCKED: dependent Section foreign-key records require migration");
   assert.equal(dualIdentity.length, 0,
     "BLOCKED: dual-identity links still need reviewed consolidation");
   assert.equal(missing.length, 0, "BLOCKED: incomplete schema inspection");
