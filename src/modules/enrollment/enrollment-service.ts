@@ -29,6 +29,7 @@ import { lockAttendanceConfigurationAtSite } from "@/domain/attendance-configura
 import {
 assertCapability,
 assertExplicitProgramScope,
+assertProgramCommandAccess,
 AuthorizationError,
 type CommandContext,
 } from "@/domain/command-context";
@@ -74,10 +75,8 @@ export async function startFamilyApplication(
   studentProfileId: string;
   journeyId: string;
 }> {
-  assertCapability(context, "enrollment.apply");
-  // Check current program authorization even on an idempotency retry. A prior
-  // submission does not preserve access after the guardian grant is revoked.
-  assertExplicitProgramScope(context, input.programId);
+  // Recheck capability and current exact Program grant on every submission and retry.
+  assertProgramCommandAccess(context, "enrollment.apply", input.programId);
   if (!context.actorPersonId) throw new Error("Guardian identity is required");
   if ((input.existingStudentProfileId || input.familyStartRequestId || input.originTransferActionId) && !input.parentSelfService) {
     throw new AuthorizationError("verified guardian application handoff");
@@ -605,7 +604,7 @@ export async function acceptApplication(
       .limit(1);
 
     if (!current) throw new Error("Application not found");
-    assertExplicitProgramScope(context, current.programId);
+    assertProgramCommandAccess(context, "enrollment.decide", current.programId);
     // Admission acceptance under CAN's school-of-record authority requires
     // live, independently verified church/CAN services; an inquiry does not.
     await requireChurchHostedOperatingServices(tx,current.programId,[
@@ -673,7 +672,7 @@ export async function activateEnrollmentFromApplication(
       .limit(1);
 
     if (!application) throw new Error("Application not found");
-    assertExplicitProgramScope(context, application.programId);
+    assertProgramCommandAccess(context, "enrollment.activate", application.programId);
     const hostedAgreement=await requireChurchHostedOperatingServices(tx,application.programId,[
       "admissions","school_of_record",
     ]);
