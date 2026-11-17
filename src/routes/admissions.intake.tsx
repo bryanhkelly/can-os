@@ -8,7 +8,7 @@ import {createFileRoute,Link,redirect,useRouter} from "@tanstack/react-router";
 import {getAdmissionsStageCounts,listAdmissionsIntake,provisionInquiryGuardianAccount,sendAdmissionsGuardianInvitation,verifyAdmissionsGuardianRelationship,transitionAdmissionsStage} from "@/modules/enrollment/admissions-intake.functions";
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
-import {CreateAction, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceShell} from "@/components/workspace";
+import {CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, RecordLayout, StatusBadge, WorkspaceShell} from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -62,7 +62,6 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
    </Field>
    <Button type="submit" variant="outline">Search</Button>
   </form>
-  <AdmissionsPageNavigation selection={selected} hasMore={data.records.hasMore} kind="applications"/>
  </div>;
 
  const mutation=useMutationFeedback(()=>router.invalidate());
@@ -114,12 +113,17 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
     siteId={selected.siteId} programId={selected.programId}/>
   <AdmissionsPipelineSummary counts={data.stageCounts}/>
   <section className="mt-8 space-y-3"><h2 className="font-serif text-2xl">Applicants and next actions</h2>
-   {selected.application&&<Link to="/admissions/intake" search={{application:undefined,siteId:selected.siteId,programId:selected.programId}} className="inline-block text-sm underline">Show all applicants</Link>}
-  {records.map(r=><AdmissionsApplicantCard key={r.id} r={r} busy={busy}
-   onVerify={onVerify} onProvision={onProvision} onInvite={onInvite} onDecision={onDecision}/>)}
-   {pageNavigation}
-   {!records.length&&<p role="status" className="rounded-lg border p-5 text-sm text-muted-foreground">{selected.application?
-    "This application is unavailable in your authorized programs.":"No applications recorded in your authorized programs."}</p>}
+   <DirectoryTable label="Admissions applicants" caption="Authorized applications for the selected Site and Program."
+    rows={records} rowKey={record=>record.id}
+    columns={[
+     {id:"student",title:"Student",render:record=><Link to="/admissions/intake" search={{...selected,application:record.id}} className="font-medium underline">{record.studentFirst} {record.studentLast}</Link>},
+     {id:"program",title:"Program",render:record=>record.programName},
+     {id:"stage",title:"Stage",render:record=><StatusBadge>{record.disposition??record.stage}</StatusBadge>},
+     {id:"updated",title:"Last updated",render:record=>new Date(record.updatedAt).toLocaleDateString()},
+    ]}
+    rowActions={[{id:"review",label:"Review application",allowed:()=>true,onClick:record=>{void router.navigate({to:"/admissions/intake",search:{...selected,application:record.id}});}}]}
+    pagination={<AdmissionsPageNavigation selection={selected} hasMore={data.records.hasMore} kind="applications"/>}
+    empty={<span>No applications recorded in your authorized programs.</span>}/>
   </section>
  </WorkspaceShell>;
 }
