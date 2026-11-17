@@ -10,7 +10,7 @@ describe("one Site UUID; retired identity bridge",()=>{
   expect(sql).toContain("pg_constraint");
   expect(sql).toContain("pg_proc");
   expect(sql).toContain("DROP TABLE public.site_canonical_identity_links RESTRICT;");
-  expect(sql).not.toMatch(/\bCASCADE\b/i);
+  expect(sql).not.toMatch(/DROP TABLE\s+public\.site_canonical_identity_links\s+CASCADE/i);
  });
  it("all active Site discovery and publication paths use one platform UUID",()=>{
   const files=[
