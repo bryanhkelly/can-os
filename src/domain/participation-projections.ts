@@ -210,6 +210,7 @@ export interface SchoolProgramActivity {
   siteId:string|null;
   siteName:string|null;
   subjectName:string|null;
+  subjectKind:"self"|"dependent";
   startsAt:DateValue;
   endsAt:DateValue;
 }
@@ -226,12 +227,11 @@ export function projectSchoolPrograms(rows:readonly SchoolProgramActivity[],now:
       title:row.title,detail:"School Program enrollment",
       organizationId:row.organizationId,organizationName:row.organizationName,
       siteId:row.siteId,siteName:row.siteName,
-      subject:row.subjectName?{kind:"dependent",displayName:row.subjectName}
-        :{kind:"self",displayName:null},
+      subject:{kind:row.subjectKind,displayName:row.subjectName},
       startAt:iso(row.startsAt),endAt:iso(row.endsAt),nextAt:null,
       progress:null,outcome:null,
       action:status==="active"||status==="scheduled"
-        ?{label:"View school program",href:row.subjectName?"/guardian/students":"/student/my-school"}
+        ?{label:"View school program",href:row.subjectKind==="dependent"?"/guardian/students":"/student/my-school"}
         :null,
     },now);
   });
