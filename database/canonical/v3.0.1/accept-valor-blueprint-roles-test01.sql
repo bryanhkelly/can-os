@@ -2,20 +2,19 @@
 -- -> proposed Deployment acceptance with actual purpose-bound PostgreSQL roles.
 -- Does not create a login, grant, published Deployment, or production record.
 -- Run with can_v301_blueprint_acceptance_app in an isolated test01 transaction.
+-- Assert all three returned *_pass booleans true. Check cleanup separately.
 BEGIN;
 SAVEPOINT valor_blueprint_acceptance;
 
 SET LOCAL ROLE can_v30_blueprint_author_11110000000040008000000000000001;
-DO $scope$
-BEGIN
- IF (SELECT count(*) FROM education_v30.sites
-     WHERE id='22220000-0000-4000-8000-000000000001')<>1
-   OR EXISTS(SELECT 1 FROM education_v30.sites
+SELECT (
+ (SELECT count(*) FROM education_v30.sites
+     WHERE id='22220000-0000-4000-8000-000000000001')=1
+ AND NOT EXISTS(SELECT 1 FROM education_v30.sites
      WHERE id='22220000-0000-4000-8000-000000000002')
-   OR NOT has_table_privilege(current_user,'education_v30.blueprint_configurations','INSERT')
-   OR has_table_privilege(current_user,'education_v30.configuration_reviews','INSERT')
- THEN RAISE EXCEPTION 'Blueprint author permissions or Site isolation failed'; END IF;
-END $scope$;
+ AND has_table_privilege(current_user,'education_v30.blueprint_configurations','INSERT')
+ AND NOT has_table_privilege(current_user,'education_v30.configuration_reviews','INSERT')
+) AS author_scope_pass;
 
 INSERT INTO education_v30.blueprint_configurations
  (id,blueprint_id,owning_organization_id,name)
@@ -67,16 +66,14 @@ UPDATE education_v30.blueprint_configuration_versions
  WHERE id='fbab0000-0000-4000-8000-000000000002';
 
 SET LOCAL ROLE can_v30_blueprint_reviewer_11110000000040008000000000000001;
-DO $review_scope$
-BEGIN
- IF has_table_privilege(current_user,'education_v30.blueprint_configurations','INSERT')
-    OR NOT has_table_privilege(current_user,'education_v30.configuration_reviews','INSERT')
-    OR EXISTS(SELECT 1 FROM education_v30.evidence_documents
+SELECT (
+ NOT has_table_privilege(current_user,'education_v30.blueprint_configurations','INSERT')
+ AND has_table_privilege(current_user,'education_v30.configuration_reviews','INSERT')
+ AND NOT EXISTS(SELECT 1 FROM education_v30.evidence_documents
        WHERE owning_organization_id='11110000-0000-4000-8000-000000000002')
-    OR (SELECT count(*) FROM education_v30.evidence_document_versions
-       WHERE id='bbbb0000-0000-4000-8000-000000000001')<>1
- THEN RAISE EXCEPTION 'Independent reviewer privilege or evidence scope failed'; END IF;
-END $review_scope$;
+ AND (SELECT count(*) FROM education_v30.evidence_document_versions
+       WHERE id='bbbb0000-0000-4000-8000-000000000001')=1
+) AS reviewer_scope_pass;
 
 INSERT INTO education_v30.blueprint_component_approval_decisions
  (configuration_version_id,component_id,decision,reviewer_person_id,
@@ -131,29 +128,19 @@ VALUES('fbab0000-0000-4000-8000-000000000005',
  'cccc0000-0000-4000-8000-000000000002',
  clock_timestamp(),'proposed');
 
-DO $assert$
-BEGIN
- IF (SELECT count(*) FROM education_v30.configuration_reviews
+SELECT (
+ (SELECT count(*) FROM education_v30.configuration_reviews
      WHERE id='fbab0000-0000-4000-8000-000000000003'
-       AND reviewer_person_id='44440000-0000-4000-8000-000000000003')<>1
- THEN RAISE EXCEPTION 'Independent Blueprint review did not persist in transaction'; END IF;
- IF (SELECT count(*) FROM education_v30.program_deployments
+       AND reviewer_person_id='44440000-0000-4000-8000-000000000003')=1
+ AND (SELECT count(*) FROM education_v30.program_deployments
      WHERE id='fbab0000-0000-4000-8000-000000000005'
-       AND status='planning')<>1
- THEN RAISE EXCEPTION 'Blueprint execution escaped planning-only state'; END IF;
- IF (SELECT count(*) FROM education_v30.deployment_offering_adoptions
+       AND status='planning')=1
+ AND (SELECT count(*) FROM education_v30.deployment_offering_adoptions
      WHERE deployment_id='fbab0000-0000-4000-8000-000000000005'
-       AND approval_status='proposed')<>1
- THEN RAISE EXCEPTION 'Offering adoption was activated without authorization'; END IF;
-END $assert$;
+       AND approval_status='proposed')=1
+) AS blueprint_planning_pass;
 
 ROLLBACK TO SAVEPOINT valor_blueprint_acceptance;
-DO $clean$
-BEGIN
- IF EXISTS(SELECT 1 FROM education_v30.blueprint_configurations
-    WHERE id='fbab0000-0000-4000-8000-000000000001')
- OR EXISTS(SELECT 1 FROM education_v30.program_deployments
-    WHERE id='fbab0000-0000-4000-8000-000000000005')
- THEN RAISE EXCEPTION 'Rollback failed to remove synthetic Blueprint records'; END IF;
-END $clean$;
+-- The runner must independently assert zero fixture rows after rollback
+-- using the isolated owner connection, not broaden restricted-role reads.
 ROLLBACK;
