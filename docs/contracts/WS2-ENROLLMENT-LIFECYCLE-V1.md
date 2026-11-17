@@ -36,8 +36,8 @@ grant, and Site context is not nullable merely to make a report roll up.
 | Self | `enrollInNativeClass` | Allowed for verified adults under published consent and current Site/Course authority |
 | Assignment | `assignAdultToNativeClass` | Allowed for already-affiliated verified adults with current exact-Site registrar authority; may omit Class Offering |
 | Invitation | `issueNativeClassInvitation`, `getMyNativeClassInvitations`, `declineNativeClassInvitation`, and `enrollInNativeClass` acceptance | Available for verified adults with current exact-Site invitation authority, fresh consent, 48-hour expiry and admission-time capacity checks; no seat hold |
-| Approval | `requestNativeClassApproval`, `getNativeClassApprovalQueue`, `decideNativeClassApproval`, and approval-bound `enrollInNativeClass` | Available for verified adults with independent exact-Site review and consent on acceptance; native youth/guardian approval remains out of scope |
-| Youth/guardian | existing school and enrichment registration services only | **No native youth Class endpoint** until existing verified relationships/consents are integrated |
+| Approval | `requestNativeClassApproval`, `requestNativeGuardianClassApproval`, `getNativeClassApprovalQueue`, `decideNativeClassApproval`, and independent adult or guardian acceptance | Verified adult or linked minor request; independent exact-Site staff decision and fresh learner/guardian consent before Enrollment and Course Attempt creation |
+| Youth/guardian | `getMyNativeGuardianLearners`, `requestNativeGuardianClassApproval`, `acceptNativeGuardianClassApproval`, `withdrawMyGuardianNativeClassEnrollment` | Current verified CAN account-to-canonical guardian Person mapping and canonical guardian authority are required; school Section placement remains independently governed |
 
 `publishUnifiedClassOffering` rejects unsupported youth/guardian authority and native
 `for_credit` participation while independent academic eligibility is not
@@ -45,8 +45,10 @@ implemented. Both Class catalogs suppress already-published versions
 advertising unimplemented methods or for-credit access; the write command
 rechecks the same policy. The composer exposes self, assignment, verified-adult invitation and independently reviewed adult approval.
 The approval flow requires `patch-native-class-adult-approval-lifecycle.sql` after the base WS2 authority migration;
-it cannot be marked operational until the deployed schema, RLS, and authenticated QA acceptance are confirmed.
-Native guardian/youth enrollment, transfer and completed-repeat commands are not production-complete.
+all learner-accepted methods also require `patch-native-class-consent-methods.sql`.
+These migrations are installed on test01, but runtime role-scoped end-to-end QA is still pending.
+Adult self-transfer and one-time independently authorized repeats are implemented in source;
+more complex guardian/staff-directed cross-Class transfers and outbound notifications remain unfinished.
 The current Class management roster exposes invitation issuance only for published invitation terms;
 recipient acceptance is independent and does not reserve seats.
 
@@ -58,13 +60,14 @@ recipient acceptance is independent and does not reserve seats.
 | Active | exact-Site registrar cancellation | Cancelled | Active → Withdrawn | Released |
 | Active | WS3 adjudicated completion | Completed | WS3 owns transition | WS3 owns release semantics |
 | Withdrawn/Cancelled | authenticated new enrollment, full checks, no earlier completed record | New enrollment ID, Active | New Course Attempt ID | Capacity checked again |
-| Completed | repeat | **Denied** without separately published/approved repeat policy | Never restart old attempt | N/A |
+| Completed | independently authorized one-time repeat | New Enrollment ID and new Course Attempt, previous completion preserved | New Course Attempt | Current capacity checked |
 | Completed/Withdrawn/Cancelled | conflicting transition | **Denied** | Preserved | None |
 
-Both learner withdrawal and exact-Site registrar cancellation require a
-verified-adult Class participant. Youth or unknown-age Class exits are
-deliberately denied rather than bypassing the independent guardian/school
-authorization model.
+Adult learner withdrawal requires the verified native learner session. A minor may be withdrawn
+by their currently verified canonical guardian through an independently authorized
+child-specific endpoint. Exact-Site staff cancellation of a minor requires the
+original approved guardian placement evidence. Unknown-age or unverified child
+participation remains denied.
 
 The original `class_enrollments` row is never resurrected. Repeated same
 terminal command returns `alreadyClosed=true`, makes no second event and
@@ -256,11 +259,12 @@ Class commands and revert the application commit(s) after institutional
 review; preserve all inserted audit/domain events and historical enrollments.
 Do not delete data to roll back. **No live migration is necessary.**
 
-### Known incomplete work requiring integration-owner schema approval
+### Release-gated work
 
-Native invitation/acceptance/expiry, queue-based approval (including youth),
-transfer between independently published Classes and completion-based repeat
-policies need authoritative persisted intent, consent/review, expiration and
-exact Site/Version binding. None is silently approximated by `pending` rows,
-assignment, unverified contact emails or adult self-enrollment. Keep these
-methods unavailable until design and migrations are approved.
+The native Class source commands for adult self, assignment, invitation, approval,
+current guardian-authorized minor approval, adult self-transfer, and independently
+authorized completed repeats are in `main`. Intent and consent-method migrations were
+applied to nonproduction `test01` on 2026-11-17. Authenticated test01 journeys,
+negative authorization, build/typecheck, concurrent last-seat testing, and a
+canonical-to-CAN outbound notification adapter remain release requirements.
+Do not claim production feature completeness until these are verified.
