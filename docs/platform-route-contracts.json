@@ -1376,9 +1376,9 @@
       "route": "/reports/classes/$classId",
       "owner": "reporting",
       "verification": "pending",
-      "roleJourney": "Current exact-Site Class manager inspects source-backed and disclosure-safe Class evidence",
-      "readBoundary": "Role and capability checked by reporting service; exact canonical Class and current operator/Site grant, read-only repeatable-read query",
-      "writeBoundary": "None; CSV internal only and formal completion remains unavailable until verified WS3 source"
+      "roleJourney": "Legacy bookmarked Class evidence URL redirects to native /class/:classId?view=manage&tab=reports",
+      "readBoundary": "Redirect only; native Class Reports tab renders the shared WS6 report panel with source-scoped authorization",
+      "writeBoundary": "None on redirect; report UI is read-only"
     },
     {
       "file": "src/routes/safeguarding.tsx",
@@ -1763,7 +1763,7 @@
       "route": "/class_/$classId",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Current Class Enrollment or staff assignment authorizes role-scoped native Class workspace",
+      "roleJourney": "Canonical native Class learner, teacher/facilitator and manager workspace, including embedded source-backed Class reports",
       "readBoundary": "pending",
       "writeBoundary": "pending"
     },
