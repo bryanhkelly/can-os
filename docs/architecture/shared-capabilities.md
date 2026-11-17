@@ -77,6 +77,12 @@ The common canonical mutation writers are also used by noncredit Course resume, 
 
 This consolidation standardizes *how evidence is recorded*, not whether each business command is eligible. Event schemas and authoritative enrollment tables remain unchanged. Database parity, builds and integration tests must still be verified independently.
 
+## Classroom and enrollment evidence consolidation
+
+Native Class approval decisions, repeat approvals, guardian-linked Class enrollment and session scheduling now use the canonical audit and domain-event writers. The same is true of noncredit cohort scheduling. Each command retains its own row locks, scope/consent decisions and source-of-truth records, with evidence appended in the same SQL transaction.
+
+The canonical writer migration now covers 14 explicitly governed canonical mutation adapters. Existing routes and products do not gain alternative enrollment authority; the refactor is code reuse over the existing `education_v30` schema. CI must still pass before treating this work as production-verified.
+
 ## Review standard
 
 Any new capability must identify its authoritative write owner, public interface, authorization model, audit/event behavior, source-to-display status mapping and contract tests. Any proposal for a duplicate capability must explain why an adapter cannot satisfy the requirement. Shared UI follows CAN OS design system v6.1.
