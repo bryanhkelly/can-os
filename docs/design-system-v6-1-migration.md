@@ -257,6 +257,30 @@ record lifecycles and audit commands remain unchanged by presentation migration.
   its current consumers. In-flight duplicate confirmation prevention remains
   in `ActionDialog`, while inline mutation idempotency remains feature-owned.
 
+### Component-first adoption increment: records and entity metadata
+
+- `RecordHeader` is the single title, breadcrumb, status and action-header
+  presentation. Record actions now have an accessible named group.
+- `RecordLayout` is the canonical record page composition, with optional
+  explicit labels for its related-context rail and historical activity region.
+  `/centers/demo` now composes it while retaining synthetic planning-only
+  status and the real `/class` navigation.
+- `RecordFacts` provides a read-only, semantic `dl/dt/dd` contract for
+  feature-owned record attributes, with responsive one-, two- and three-column
+  variants. It replaces duplicate fact markup in Action details and
+  enrichment offerings; it does **not** create metrics or infer missing values.
+- `EntityCard` retains its full-card link or router-link adapter behavior.
+  Its metadata container now supports semantic paragraphs and other block
+  content without invalid nested spans.
+- Storybook covers compact and three-column fact layouts and named
+  record actions/context. Unit tests assert semantics, empty-result behavior,
+  source adoption and rich-card HTML. The V6.1 checker guards applicable
+  record consumers and was corrected to resolve source-root paths for existing
+  route/dialog and class-roster manifests.
+- Route loaders, entity permissions, enrollment status, site attribution,
+  audit records and persistence are unchanged. Remaining legacy record facts
+  should be migrated only where the semantics match this family.
+
 ### Enforcement now applied
 
 - `scripts/check-design-system.mjs` checks geometry automatically for **all**
