@@ -79,6 +79,10 @@ describe("account-wide participation source authority and pagination",()=>{
   expect(activity).toContain("getMyNoncreditSelfEnrollmentHistoryPage");
   expect(activity).not.toContain("readBoundedNativeClassHistory");
   expect(activity).toContain("nextCursors");
+  expect(activity).toContain("getMyActivityOpportunityPage");
+  expect(activity).toContain("getMyNoncreditWaitlistPage");
+  expect(ui).toContain("nextOpportunityCursor");
+  expect(ui).toContain("getMyActivityOpportunityPage");
   expect(ui).toContain("Load older activity");
   expect(ui).toContain("assertParticipationHistoryPage");
   expect(ui).toContain("Promise.allSettled");
