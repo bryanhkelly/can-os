@@ -73,6 +73,7 @@ export default tseslint.config(
       "src/components/evidence/EvidencePicker.tsx",
       "src/components/learning/GradebookSectionSelector.tsx",
       "src/components/operations/{SectionFacilitatorPanel,LocalSiteDelegationPanel,SiteStaffingFeedback}.tsx",
+      "src/components/operations/OutboxHealthPanel.tsx",
       "src/components/shell/WorkspaceContextSwitcher.tsx",
       "src/components/shell/{CommandPalette,WorkspaceSearchDialog}.tsx",
       "src/components/operations/{OpeningHandoffs,ObsoleteExcuseClosure,SectionLifecycleManager}.tsx",
