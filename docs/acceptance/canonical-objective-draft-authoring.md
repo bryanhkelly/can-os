@@ -44,7 +44,7 @@ Organization-bound NOLOGIN writer role.
 
 1. Sign in as a verified publisher registrar with `curriculum.publish`
    and a single active canonical Organization scope.
-2. Open `/canonical/course-activities`. Select a published Course owned
+2. Open `/class?view=activities` (the former `/canonical/course-activities` URL redirects here). Select a published Course owned
    by this Organization. Do not allow another publisher's Course to appear.
 3. Enter an original, reviewed five-question multiple-choice check with
    correct choices, a 0.8 passing threshold and three maximum attempts.
