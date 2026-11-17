@@ -36,15 +36,17 @@ grant, and Site context is not nullable merely to make a report roll up.
 | Self | `enrollInNativeClass` | Allowed for verified adults under published consent and current Site/Course authority |
 | Assignment | `assignAdultToNativeClass` | Allowed for already-affiliated verified adults with current exact-Site registrar authority; may omit Class Offering |
 | Invitation | `issueNativeClassInvitation`, `getMyNativeClassInvitations`, `declineNativeClassInvitation`, and `enrollInNativeClass` acceptance | Available for verified adults with current exact-Site invitation authority, fresh consent, 48-hour expiry and admission-time capacity checks; no seat hold |
-| Approval | no Class approval queue with verified guardian/eligibility decisions yet | **Blocked** at publish |
+| Approval | `requestNativeClassApproval`, `getNativeClassApprovalQueue`, `decideNativeClassApproval`, and approval-bound `enrollInNativeClass` | Available for verified adults with independent exact-Site review and consent on acceptance; native youth/guardian approval remains out of scope |
 | Youth/guardian | existing school and enrichment registration services only | **No native youth Class endpoint** until existing verified relationships/consents are integrated |
 
-`publishUnifiedClassOffering` rejects unsupported approval methods and native
+`publishUnifiedClassOffering` rejects unsupported youth/guardian authority and native
 `for_credit` participation while independent academic eligibility is not
 implemented. Both Class catalogs suppress already-published versions
 advertising unimplemented methods or for-credit access; the write command
-rechecks the same policy. The composer exposes self, assignment and verified-adult invitation.
-Native guardian/youth, approval, transfer and completed-repeat commands are not production-complete.
+rechecks the same policy. The composer exposes self, assignment, verified-adult invitation and independently reviewed adult approval.
+The approval flow requires `patch-native-class-adult-approval-lifecycle.sql` after the base WS2 authority migration;
+it cannot be marked operational until the deployed schema, RLS, and authenticated QA acceptance are confirmed.
+Native guardian/youth enrollment, transfer and completed-repeat commands are not production-complete.
 The current Class management roster exposes invitation issuance only for published invitation terms;
 recipient acceptance is independent and does not reserve seats.
 
