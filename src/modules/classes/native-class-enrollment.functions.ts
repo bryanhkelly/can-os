@@ -456,8 +456,12 @@ async function readNativeClassHistoryPage(
       isNotNull(canonicalClassOutcomes.completionPolicyVersionId),
       isNotNull(canonicalClassOutcomes.completionEvidenceVersionId),
       isNotNull(canonicalClassOutcomes.completionDecidedByPersonId),
-    )).orderBy(desc(canonicalClassOutcomes.recordedAt),desc(canonicalClassOutcomes.id))
-      .limit(1000):[];
+      sql`NOT EXISTS(
+        SELECT 1 FROM education_v30.class_outcomes superseding
+        WHERE superseding.supersedes_outcome_id=${canonicalClassOutcomes.id}
+      )`,
+    )).orderBy(desc(canonicalClassOutcomes.recordedAt),
+      desc(canonicalClassOutcomes.id)):[];
     const superseded=new Set(decisions.flatMap(row=>
       row.supersedesOutcomeId?[row.supersedesOutcomeId]:[]));
     const current=new Map<string,(typeof decisions)[number]>();
@@ -472,7 +476,7 @@ async function readNativeClassHistoryPage(
     }).from(canonicalClassAwards).where(and(
       inArray(canonicalClassAwards.classOutcomeId,currentIds),
       isNull(canonicalClassAwards.revokedAt),
-    )).orderBy(desc(canonicalClassAwards.issuedAt)).limit(1000):[];
+    )).orderBy(desc(canonicalClassAwards.issuedAt)):[];
     const awardByOutcome=new Map<string,(typeof awards)[number]>();
     for(const award of awards)if(!awardByOutcome.has(award.classOutcomeId))
       awardByOutcome.set(award.classOutcomeId,award);
