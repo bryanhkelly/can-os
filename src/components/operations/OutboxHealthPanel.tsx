@@ -37,19 +37,19 @@ export function OutboxHealthPanel() {
   }, [refresh]);
 
   const stats: Array<[string, number]> = health
-    ? [["Pending", health.pending], ["Unhandled", health.pendingUnhandled], ["Failed", health.failed]]
+    ? [["Pending", health.pending], ["Processing", health.processing], ["Unhandled", health.pendingUnhandled], ["Failed", health.failed]]
     : [];
 
   return <section aria-label="Event outbox health" className="mt-7 rounded-xl border bg-card p-5">
     <h2 className="font-serif text-2xl">Event outbox</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Domain events move through a transactional outbox before consumers run. A growing pending
-      backlog means the worker is behind; unhandled events have no registered consumer; failed
+      backlog means the worker is behind; processing events have been claimed by a worker; unhandled events have no registered consumer; failed
       events exhausted their retries and each raised an ops Action.
     </p>
     <QueryState loading={loading ? "Loading outbox health…" : undefined}
       error={readError || undefined} onRetry={() => void refresh()} retrying={loading}>
-      {health && <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      {health && <div className="mt-4 grid gap-3 sm:grid-cols-4">
         {stats.map(([label, value]) => <div key={label} className="rounded-lg border p-3">
           <p className="text-xs text-muted-foreground">{label}</p>
           <p className="mt-2 text-2xl font-semibold">{value}</p>
