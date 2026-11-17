@@ -27,7 +27,7 @@ describe("reviewed adult Class activation: one sign-in, never self-verification"
     expect(activation).toContain("accessAccountCanonicalPrincipals");
     expect(activation).toContain('if(operator||linked&&linked.accessPersonId!==owner.personId)');
     expect(activation).toContain('if(Boolean(sameEmail)!==Boolean(linked)');
-    expect(activation).toContain('row.role==="student"');
+    expect(activation).toContain('assertUnambiguousAdultAccount(owner.accountId,owner.personId,tx)');
     expect(activation).toContain('can.personId!==owner.personId');
   });
   it("provisions one native Person and one learner grant inside one audited transaction",()=>{
