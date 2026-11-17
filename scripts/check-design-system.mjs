@@ -214,6 +214,7 @@ const governedRecordConsumers = {
   "routes/actions.$actionId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Action metadata"'],
   "routes/enrichment_.$seasonId.tsx": ["<RecordHeader", "<RecordLayout", "<RecordFacts", 'label="Program details"'],
   "routes/centers.demo.tsx": ["<RecordHeader", "<RecordLayout"],
+  "routes/enrichment.tsx": ["<EntityCard", "renderLink=", 'openLabel="View details and register"'],
   "components/field-trips/FieldTripFacts.tsx": ["<RecordFacts", 'label="Field trip schedule and fee"'],
   "routes/student.field-trips.tsx": ["<FieldTripFacts trip={item}/>"],
   "routes/guardian.field-trips.tsx": ["<FieldTripFacts trip={item}/>"],
