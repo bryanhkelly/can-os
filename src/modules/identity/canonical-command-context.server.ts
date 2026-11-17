@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq } from "drizzle-orm";
-import { db, getRequestScopedResource } from "@/db/client";
+import { db } from "@/db/client";
+import { readRestrictedCanonicalSession } from "./restricted-canonical-session-reader.server";
 import { accessAccounts, accessAccountNoncreditPrincipals } from "@/db/schema";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connection";
@@ -46,44 +47,9 @@ export function getCanonicalSessionRow(request: Request): Promise<CanonicalSessi
   return pending;
 }
 
-let nodeCanonicalAuthPool: Pool | undefined;
-
 async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessionRow> {
   const digest = canonicalSessionDigestFromRequest(request);
-  // Dedicated restricted login: never switch roles from the app's broad
-  // DATABASE_URL connection. This connection has no raw identity-table reads.
-  const connectionString = process.env.CAN_CANONICAL_AUTH_DATABASE_URL;
-  if (!canonicalRestrictedAuthUrlValid(connectionString, process.env.DATABASE_URL))
-    throw new AuthorizationError("dedicated restricted canonical session reader configuration");
-  // Workers: scoped pool closed with the request. Node: reuse one restricted
-  // pool across requests; never reuse an individual WebSocket client in Workers.
-  const pool = getRequestScopedResource("canonical-auth-pool", () => {
-    const instance = new Pool({ connectionString, max: 1 });
-    return { pool: instance, close: () => instance.end() };
-  })?.pool ?? (nodeCanonicalAuthPool ??= new Pool({ connectionString, max: 4 }));
-  let client: PoolClient | undefined;
-  let records: Array<Record<string, unknown>> = [];
-  try {
-    client = await pool.connect();
-    await client.query("BEGIN READ ONLY");
-    await client.query(`SET LOCAL ROLE ${canonicalAuthReaderDatabaseRole}`);
-    const result = await client.query(
-      `SELECT account_id, session_id, grant_id, person_id,
-              role_code, organization_id, site_id
-         FROM education_v30.v301_canonical_session_context($1::text)`,
-      [digest],
-    );
-    records = result.rows;
-    await client.query("COMMIT");
-  } catch (error) {
-    logCanonicalReaderFailure("session_read", error);
-    if (client) {
-      try { await client.query("ROLLBACK"); } catch { /* Preserve original denial. */ }
-    }
-    throw new AuthorizationError("canonical session reader unavailable");
-  } finally {
-    client?.release();
-  }
+  const records = await readRestrictedCanonicalSession("native", digest);
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
   return canonicalSessionRowSchema.parse(records[0]);
