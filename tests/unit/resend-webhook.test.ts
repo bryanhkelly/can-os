@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   parseResendReceiptEvent,
+  readBoundedResendWebhookBody,
   verifyResendWebhookSignature,
 } from "@/domain/resend-webhook";
 
@@ -37,6 +38,17 @@ describe("signed Resend source receipt callbacks", () => {
     expect(verifyResendWebhookSignature(body, headers(), undefined, now)).toBe(false);
     const wrong = headers(); wrong.set("svix-signature", "v1,ZmFrZQ==");
     expect(verifyResendWebhookSignature(body, wrong, secret, now)).toBe(false);
+  });
+  it("bounds raw request body bytes independently of Content-Length", async () => {
+    const small = new Request("https://example.test/api/webhooks/resend", {
+      method: "POST", body,
+    });
+    expect(await readBoundedResendWebhookBody(small)).toBe(body);
+    const oversized = new Request("https://example.test/api/webhooks/resend", {
+      method: "POST", body: "x".repeat(65 * 1024),
+    });
+    oversized.headers.delete("content-length");
+    expect(await readBoundedResendWebhookBody(oversized)).toBeNull();
   });
   it("only correlates signed delivery outcomes to opaque school family receipts", () => {
     const parsed = parseResendReceiptEvent(JSON.parse(body));
