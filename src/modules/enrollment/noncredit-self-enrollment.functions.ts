@@ -38,15 +38,22 @@ async function bindNativeLearnerIdentity(tx:Tx, owner:VerifiedSelfEnrollmentActo
   const [link]=await tx.select().from(accessAccountNoncreditPrincipals)
     .where(eq(accessAccountNoncreditPrincipals.accessAccountId,owner.accountId))
     .for("update").limit(1);
-  const [adultReview]=await tx.select({
-    status:accessAdultLearningReviews.status,
-    consumedAt:accessAdultLearningReviews.consumedAt,
-    accessPersonId:accessAdultLearningReviews.accessPersonId,
-    canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
-    canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
-  }).from(accessAdultLearningReviews).where(
-    eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
-  ).limit(1);
+  // Existing noncredit enrollment must continue before the additive review
+  // ledger migration. Absence means no review could have been recorded;
+  // once present, a revoked/mismatched review always fails closed.
+  const reviewSchema=await tx.execute(sql`
+    SELECT to_regclass('public.access_adult_learning_reviews') IS NOT NULL AS present
+  `);
+  const [adultReview]=reviewSchema.rows[0]?.present===true
+    ?await tx.select({
+      status:accessAdultLearningReviews.status,
+      consumedAt:accessAdultLearningReviews.consumedAt,
+      accessPersonId:accessAdultLearningReviews.accessPersonId,
+      canonicalAccountId:accessAdultLearningReviews.canonicalAccountId,
+      canonicalPersonId:accessAdultLearningReviews.canonicalPersonId,
+    }).from(accessAdultLearningReviews).where(
+      eq(accessAdultLearningReviews.accessAccountId,owner.accountId),
+    ).limit(1):[];
   if(adultReview&&(adultReview.status!=="approved"||
      adultReview.accessPersonId!==owner.personId))
     throw new AuthorizationError("revoked or mismatched adult learner review");
