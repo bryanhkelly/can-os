@@ -332,7 +332,7 @@
       "route": "/canonical/classes",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Legacy bookmarked provider Class management location redirects to /class?view=manage; no local management UI",
+      "roleJourney": "Former /canonical Class UI staging page redirects to production /class?view=manage; no independent Class implementation",
       "readBoundary": "Redirect only; the native /class manager separately checks current operator and Site scope",
       "writeBoundary": "None on this route; all mutations require separately authorized native Class commands"
     },
@@ -341,9 +341,9 @@
       "route": "/canonical/classes/completion",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Exact Class Site registrar independently reviews pinned completion policy and authoritative evidence; no automatic certificate or grade",
-      "readBoundary": "Current canonical staff grant, exact Class and Site scope, governance schema feature gate, evidence ownership",
-      "writeBoundary": "Independent reviewer with verified source-bound evidence only; guarded by CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED"
+      "roleJourney": "Former /canonical staging page redirects Class completion reviews to /class/:classId?view=manage&tab=completion",
+      "readBoundary": "Route validation and redirect only; /class must authorize exact Class, staff, Site and review purpose",
+      "writeBoundary": "No writes at the staging route; governed completion commands remain separately authenticated"
     },
     {
       "file": "src/routes/canonical.completion-evidence-reviews.tsx",
@@ -1763,9 +1763,9 @@
       "route": "/class_/$classId",
       "owner": "learning",
       "verification": "pending",
-      "roleJourney": "Canonical native Class learner, teacher/facilitator and manager workspace, including embedded source-backed Class reports",
-      "readBoundary": "pending",
-      "writeBoundary": "pending"
+      "roleJourney": "One native Class workspace for learner, teacher, facilitator and manager, including governed completion and evidence reporting",
+      "readBoundary": "Native Class workspace validates current relationship, active staff authorization and current Site scope independently of URL view",
+      "writeBoundary": "Each existing Class command separately checks actor, Site, Course adoption, session and independent review requirements"
     },
     {
       "file": "src/routes/class.tsx",
