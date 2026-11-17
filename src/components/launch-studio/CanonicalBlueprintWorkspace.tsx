@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/workspace";
+import { BlueprintReviewHistoryPanel } from "./BlueprintReviewHistoryPanel";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   createCanonicalBlueprintConfiguration,
@@ -539,6 +540,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                   ? <StatusBadge tone={review.latestReview.decision === "approved" ? "success" : review.latestReview.decision === "rejected" ? "danger" : "attention"}>{readable(review.latestReview.decision)}</StatusBadge>
                   : <StatusBadge>Pending or unavailable</StatusBadge>}
               </p>
+              <BlueprintReviewHistoryPanel key={detail.versionId}
+                configurationVersionId={detail.versionId}/>
               <Button type="button" variant="outline" disabled={busy}
                 onClick={() => void openConfiguration(detail.configurationId)}>
                 Refresh review status
