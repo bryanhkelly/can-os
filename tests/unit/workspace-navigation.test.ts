@@ -39,6 +39,19 @@ describe("canonical workspace navigation",()=>{
    expect(links.some(item=>item.title==="Notifications"),role).toBe(false);
   }
  });
+ it("exposes Site Blueprint Studio without granting independent review",()=>{
+  expect(workspaceLinks.site_admin.some(item=>item.path==="/canonical/blueprints")).toBe(true);
+  expect(workspaceLinks.registrar.some(item=>item.path==="/canonical/blueprints")).toBe(true);
+  expect(getActiveWorkspacePath(workspaceLinks.site_admin,"/canonical/blueprints")).toBe("/canonical/blueprints");
+  expect(workspaceLinks.student.some(item=>item.path==="/canonical/blueprints")).toBe(false);
+  expect(roleCapabilities.site_admin).not.toContain("blueprint.review");
+ });
+ it("keeps the platform administrator separate from school operations",()=>{
+  expect(getWorkspaceHome("app_admin")).toBe("/canonical");
+  expect(roleCapabilities.app_admin).toEqual(["platform.admin"]);
+  expect(workspaceLinks.app_admin.some(item=>item.path==="/admin")).toBe(false);
+  expect(workspaceLinks.app_admin.some(item=>item.path==="/canonical/blueprints")).toBe(false);
+ });
  it("has a landing page for each recognized member role",()=>{
   for(const role of ["student","teacher","guardian","registrar","specialist","counselor"]){
    const home=getWorkspaceHome(role);
