@@ -175,6 +175,9 @@ function NativeLearnerClasses(){
     await Promise.all([
       client.invalidateQueries({queryKey:["native-public-class-catalog",search,filteredClassId]}),
       client.invalidateQueries({queryKey:["native-my-class-enrollment-history"]}),
+      // WS1 projects this source independently. Enrollment and withdrawal must
+      // invalidate the unified view without writing a second participation row.
+      client.invalidateQueries({queryKey:["my-activity"]}),
     ]);
   }
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Classes"
