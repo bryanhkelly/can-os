@@ -129,7 +129,7 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
       }
       const [created]=await tx.insert(assessmentAccess).values({
         administrationId:administration.id,learnerId:learner.id,
-        courseAttemptId:attempt.id,grantedByPersonId:actor.actorPersonId,
+        courseAttemptId:attempt.id,grantedByPersonId:actor.actorPersonId!,
       }).returning({id:assessmentAccess.id});
       if(!created)throw new Error("Canonical Class assessment grant could not be recorded");
       const payload={
@@ -137,14 +137,14 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
         courseAttemptId:attempt.id,assessmentAdministrationId:administration.id,
       };
       await tx.insert(auditEvents).values({
-        actorPersonId:actor.actorPersonId,owningOrganizationId:organizationId,
+        actorPersonId:actor.actorPersonId!,owningOrganizationId:organizationId,
         eventCode:"class.assessment.access_granted",
         entityKind:"assessment_access_grant",entityId:created.id,payload,
       });
       await tx.insert(domainEvents).values({
         eventType:"ClassAssessmentAccessGranted",
         aggregateType:"assessment_access_grant",aggregateId:created.id,
-        actorPersonId:actor.actorPersonId,payload,
+        actorPersonId:actor.actorPersonId!,payload,
       });
       return {accessGrantId:created.id,courseAttemptId:attempt.id,alreadyGranted:false};
     });
