@@ -108,10 +108,10 @@ describe("one native Class route and reusable manager",()=>{
     expect(center).toContain('to="/class"');
     expect(center).toContain('<SiteNativeClassHandoff publicSiteId={site.id}/>');
     const handoff=read("src/components/launch-studio/SiteNativeClassHandoff.tsx");
-    expect(handoff).toContain('getSiteIdentityLinkStatus({data:{publicSiteId}})');
-    expect(handoff).toContain('link.kind==="approved"?link.canonicalSiteId:null');
+    expect(handoff).toContain('getLaunchSiteClassScope({data:{siteId:publicSiteId}})');
+    expect(handoff).toContain('scope.data?.kind==="ready"?publicSiteId:null');
     expect(handoff).toContain('to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}');
-    expect(handoff).toContain('to="/site-identity"');
+    expect(handoff).toContain('<NativeClassLaunchReadiness state={{');
 
     expect(center).not.toContain("/centers/demo/classroom");
     expect(center).not.toContain('to="/enrichment/$seasonId"');
@@ -128,7 +128,8 @@ describe("one native Class route and reusable manager",()=>{
     const seed=read("database/seeds/2026-11-clc-native-course-planning.sql");
     expect(center).toContain("nativeCourse");
     expect(center).toContain("Course version: {nativeCourse.lifecycle}");
-    expect(center).toContain('to="/site-identity" search={{mode:"request",siteId:site.id}}');
+    expect(center).toContain('to="/class" search={{view:"manage",siteId:site.id}}');
+    expect(center).toContain('RecordFacts variant="tiles"');
     expect(center).not.toContain('Create and publish Course content');
     expect(reader).toContain('import("@/db/canonical-v301")');
     expect(reader).toContain('desc(native.courseVersions.versionNo)');
