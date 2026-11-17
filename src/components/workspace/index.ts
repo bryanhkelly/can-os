@@ -23,7 +23,7 @@ export { RosterList } from "./roster-list";
 
 export { DashboardLayout, DashboardPanel, DashboardShortcut } from "./dashboard-layout";
 export { DashboardHome, DashboardHero } from "./dashboard-home";
-export { RecordHeader, RecordLayout, EntityCard } from "./record-layout";
+export { RecordHeader, RecordLayout, RecordFacts, EntityCard, type RecordFact } from "./record-layout";
 
 export { MasterDetailWorkspace, MasterDetailListItem } from "./master-detail-workspace";
 export { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMediaTile } from "./dashboard-widgets";
