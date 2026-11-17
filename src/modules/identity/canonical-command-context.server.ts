@@ -59,13 +59,6 @@ async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessi
  * A brief cache avoids opening a new connection for every page visit.
  * No credentials, SQL errors or account information enter the response.
  */
-function logCanonicalReaderFailure(phase: "session_read" | "probe", error: unknown): void {
-  // Fixed category only. Do not log exception text, database URLs, or SQL.
-  const category = error instanceof Error && error.name === "AbortError"
-    ? "timeout" : "connection_or_query";
-  console.warn("Canonical restricted reader unavailable", { phase, category });
-}
-
 let readerProbeCache: { until: number; ready: boolean } = { until: 0, ready: false };
 let pendingReaderProbe: Promise<boolean> | null = null;
 
