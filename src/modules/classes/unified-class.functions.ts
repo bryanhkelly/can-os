@@ -353,6 +353,51 @@ export const createNextUnifiedClassOfferingVersion = createServerFn({method:"POS
   });
 
 
+/** List current operator Sites independently of Course page 1. An Organization
+ * grant, network affiliation or stale account Site ID alone does not expose a
+ * delivery Site. The exact Course/Site permission is still checked separately.
+ */
+export const getNativeClassOperatorSites=createServerFn({method:"GET"})
+  .handler(async()=>{
+    requireClassFeature();
+    const operator=await requireClassOperator();
+    if(!operator.siteIds.length)return [];
+    const now=new Date();
+    return db.selectDistinct({
+      id:catalogSites.id,name:canonicalEnrollmentSites.name,
+    }).from(catalogSites)
+      .innerJoin(canonicalEnrollmentSites,eq(canonicalEnrollmentSites.id,catalogSites.id))
+      .innerJoin(siteOrganizationRoles,and(
+        eq(siteOrganizationRoles.siteId,catalogSites.id),
+        eq(siteOrganizationRoles.organizationId,operator.organizationId),
+        inArray(siteOrganizationRoles.roleCode,["operator","host"]),
+        lte(siteOrganizationRoles.validFrom,now),
+        or(isNull(siteOrganizationRoles.validThrough),gt(siteOrganizationRoles.validThrough,now)),
+      ))
+      .innerJoin(educationOperationSites,and(
+        eq(educationOperationSites.siteId,catalogSites.id),
+        lte(educationOperationSites.validFrom,now),
+        or(isNull(educationOperationSites.validThrough),gt(educationOperationSites.validThrough,now)),
+      ))
+      .innerJoin(educationOperations,and(
+        eq(educationOperations.id,educationOperationSites.operationId),
+        eq(educationOperations.status,"active"),
+      ))
+      .innerJoin(educationOperationOrganizationRoles,and(
+        eq(educationOperationOrganizationRoles.operationId,educationOperationSites.operationId),
+        eq(educationOperationOrganizationRoles.organizationId,operator.organizationId),
+        eq(educationOperationOrganizationRoles.roleCode,"operator"),
+        eq(educationOperationOrganizationRoles.status,"approved"),
+        lte(educationOperationOrganizationRoles.validFrom,now),
+        or(isNull(educationOperationOrganizationRoles.validThrough),
+          gt(educationOperationOrganizationRoles.validThrough,now)),
+      ))
+      .where(and(
+        inArray(catalogSites.id,operator.siteIds),
+        eq(catalogSites.status,"active"),
+      )).orderBy(asc(canonicalEnrollmentSites.name),asc(catalogSites.id));
+  });
+
 /** One bounded, stable page of publisher Offerings and their authorized Courses.
  * Scope BOTH the operating Organization and its Sites before limiting results.
  * The list is an advisory read; commands revalidate all rights at mutation time.
