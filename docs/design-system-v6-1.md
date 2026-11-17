@@ -163,8 +163,8 @@ latest-decision reader remains authoritative for current approval; the separate
 `readCanonicalBlueprintReviewHistory` endpoint reads real append-only
 configuration review decisions, original rationale, evidence references and
 timestamps for one exact Blueprint version. It applies the same Blueprint
-read capability and database role, limits pages to 20 records and caps page
-indices. Launch Studio composes the resulting history with `StatusTimeline`,
+read capability and database role, verifies the Blueprint's current Site scope,
+limits pages to 20 records and caps page indices. Launch Studio composes the resulting history with `StatusTimeline`,
 explicit loading/errors and previous/next controls. No historical decisions
 are synthesized from the latest status. School Section enrollment transitions
 remain owned by the Section lifecycle service and retain their independent
