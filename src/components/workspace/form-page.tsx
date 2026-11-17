@@ -33,7 +33,9 @@ export function FormActions({ submitLabel, pendingLabel, pending, disabled, canc
 }) {
   return <ActionFooter layout="form">
     <Button type="submit" size="lg" loading={pending} loadingLabel={pendingLabel} disabled={pending || disabled}>{submitLabel}</Button>
-    <Slot className={buttonVariants({ variant: "ghost", size: "lg" })}>{cancel}</Slot>
+    <Slot className={cn(buttonVariants({ variant: "ghost", size: "lg" }), pending && "pointer-events-none opacity-50")}
+      aria-disabled={pending || undefined} tabIndex={pending ? -1 : undefined}
+      onClickCapture={event => { if (pending) { event.preventDefault(); event.stopPropagation(); } }}>{cancel}</Slot>
   </ActionFooter>;
 }
 
