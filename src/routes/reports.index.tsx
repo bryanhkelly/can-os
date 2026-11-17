@@ -20,7 +20,7 @@ function ReportingHome(){
           Choose Class evidence from the native Class directory to review its dated
           sessions, registrations, host-attested attendance, assessments and recorded awards.
         </p>
-        <Link to="/canonical/classes" className="mt-4 inline-block text-sm font-semibold text-primary underline">
+        <Link to="/class" search={{view:"manage"}} className="mt-4 inline-block text-sm font-semibold text-primary underline">
           Browse native Classes
         </Link>
       </section>
