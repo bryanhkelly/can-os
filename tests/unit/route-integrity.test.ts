@@ -225,3 +225,33 @@ describe("navigation link targets", () => {
     ).toEqual([]);
   });
 });
+
+
+describe("canonical in-app navigation", () => {
+  it("does not link users through retired route aliases", () => {
+    const aliases = new Set([
+      "/learn/my-programs", "/learn/activity",
+      "/teacher/notices", "/student/notifications",
+      "/guardian/study-group-consent", "/launch/hub/school/new",
+    ]);
+    const offenders: string[] = [];
+    for (const file of sourceFiles(join(repoRoot, "src"))) {
+      if (file.endsWith("routeTree.gen.ts")) continue;
+      const source = ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true,
+        file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+      const visit = (node: ts.Node): void => {
+        if (ts.isJsxAttribute(node) && ["to", "href"].includes(node.name.getText(source)) && node.initializer) {
+          const expression = ts.isJsxExpression(node.initializer) ? node.initializer.expression : node.initializer;
+          if (expression) for (const value of literalTargets(expression)) {
+            if (aliases.has(linkPath(value))) offenders.push(
+              `${file.slice(repoRoot.length + 1)}:${source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1} -> ${value}`,
+            );
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(source);
+    }
+    expect(offenders).toEqual([]);
+  });
+});
