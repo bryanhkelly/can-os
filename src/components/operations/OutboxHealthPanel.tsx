@@ -1,6 +1,6 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { QueryState } from "@/components/workspace";
+import { QueryState, StatCard, WorkspaceNotice } from "@/components/workspace";
 import { getOutboxHealthSummary } from "@/modules/operations/outbox-health.functions";
 import { SchoolFamilyDeliveryRecoveryPanel } from "./SchoolFamilyDeliveryRecoveryPanel";
 
@@ -41,7 +41,7 @@ export function OutboxHealthPanel() {
     ? [["Pending", health.pending], ["Processing", health.processing], ["Unhandled", health.pendingUnhandled], ["Failed", health.failed]]
     : [];
 
-  return <section aria-label="Event outbox health" className="mt-7 rounded-xl border bg-card p-5">
+  return <section aria-label="Event outbox health" className="mt-7 border bg-card p-5">
     <h2 className="font-serif text-2xl">Event outbox</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Domain events move through a transactional outbox before consumers run. A growing pending
@@ -51,10 +51,7 @@ export function OutboxHealthPanel() {
     <QueryState loading={loading ? "Loading outbox health…" : undefined}
       error={readError || undefined} onRetry={() => void refresh()} retrying={loading}>
       {health && <div className="mt-4 grid gap-3 sm:grid-cols-4">
-        {stats.map(([label, value]) => <div key={label} className="rounded-lg border p-3">
-          <p className="text-xs text-muted-foreground">{label}</p>
-          <p className="mt-2 text-2xl font-semibold">{value}</p>
-        </div>)}
+        {stats.map(([label, value]) => <StatCard key={label} label={label} value={value}/>)}
       </div>}
       {health?.schoolFamilyDelivery && <div className="mt-6 border-t pt-4">
         <h3 className="font-semibold">School-family outbound delivery</h3>
@@ -75,17 +72,14 @@ export function OutboxHealthPanel() {
             ["Spam complaints", health.schoolFamilyDelivery.complained],
             ["Suppressed", health.schoolFamilyDelivery.suppressed],
           ] as Array<[string, number]>).map(([label, value]) =>
-            <div key={label} className="border p-3">
-              <p className="text-xs text-muted-foreground">{label}</p>
-              <p className="mt-2 text-2xl font-semibold">{value}</p>
-            </div>)}
+            <StatCard key={label} label={label} value={value}/>)}
         </div>
       </div>}
       {health && <SchoolFamilyDeliveryRecoveryPanel onRecovered={refresh} />}
-      {health && health.pendingUnhandled > 0 && <p role="status" className="mt-4 rounded-lg border border-dashed p-3 text-sm">
+      {health && health.pendingUnhandled > 0 && <WorkspaceNotice tone="attention" className="mt-4">
         {health.pendingUnhandled} pending event{health.pendingUnhandled === 1 ? "" : "s"} have no registered
         consumer and will not drain until a handler is registered.
-      </p>}
+      </WorkspaceNotice>}
     </QueryState>
   </section>;
 }
