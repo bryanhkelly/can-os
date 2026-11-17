@@ -42,6 +42,8 @@ import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBad
 import { safeLoader, type LoadOutcome } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { getOrCreateAnnouncementAttempt, wasAnnouncementAccepted, type ClassAnnouncementAttempt } from "@/domain/class-announcement-attempt";
+import { openClassDownload } from "@/lib/class-download";
 import { LearningActivityTracker } from "@/components/learning/LearningActivityTracker";
 import { deriveClassNextSteps } from "@/domain/student-success";
 
@@ -57,17 +59,25 @@ export const Route = createFileRoute("/classes")({
   loader: ({ deps }) => safeLoader(async () => {
     const viewer = await getClassesViewerRole();
     if (viewer.role === "site_admin") {
-      const directory = await getSiteAdminClasses();
-      const roster = deps.section
-        ? await getSiteAdminClassRoster({ data: { sectionId: deps.section } })
-        : null;
+      const [directory, roster] = await Promise.all([
+        getSiteAdminClasses(),
+        deps.section ? getSiteAdminClassRoster({ data: { sectionId: deps.section } }) : Promise.resolve(null),
+      ]);
       return { mode: "site_admin" as const, directory, roster };
     }
-    const directory = await getClassDirectory();
-    const workspace = deps.section ? await getClassWorkspace({ data: { sectionId: deps.section, studentPersonId: deps.student } }) : null;
-    const meetings = workspace ? await safeLoader(() => getClassroomMeetings({ data: {
-      sectionId: workspace.section.id, studentPersonId: deps.student,
-    } }))() : undefined;
+    // The viewer role gates which API surface is called. Within that surface,
+    // directory, selected workspace, and optional meetings are independent reads.
+    const [directory, workspace, meetings] = await Promise.all([
+      getClassDirectory(),
+      deps.section
+        ? getClassWorkspace({ data: { sectionId: deps.section, studentPersonId: deps.student } })
+        : Promise.resolve(null),
+      deps.section
+        ? safeLoader(() => getClassroomMeetings({ data: {
+            sectionId: deps.section!, studentPersonId: deps.student,
+          } }))()
+        : Promise.resolve(undefined),
+    ]);
     const classRequestOptions = !workspace && directory.role === "teacher"
       ? await getTeacherClassRequestOptions()
       : null;
@@ -143,7 +153,10 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
   const [resourceEditAttempted,setResourceEditAttempted]=useState(false);
   const [resourceEditKind,setResourceEditKind]=useState<"link"|"video"|"pdf"|"image"|"audio"|"document">("link");
   const [retireCandidate,setRetireCandidate]=useState<string|null>(null);
-  const announcementId = useRef<string | null>(null);
+  const announcementAttempt = useRef<ClassAnnouncementAttempt | null>(null);
+  const downloadInFlight = useRef(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
   const search = { section: data.section.id, student: data.role === "guardian" ? data.studentPersonId ?? undefined : undefined };
   const supplements = data.supplements ?? [];
   const teacherGuides = data.role === "teacher" ? data.teacherGuides : null;
@@ -176,25 +189,38 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       commandErrorMessage: "Unable to complete this class operation.",
     });
   }
-  async function download(resourceId: string) {
-    await run(async () => {
-      const result = await getClassResourceDownload({ data: { sectionId: data.section.id, studentPersonId: search.student, resourceId } });
-      window.location.assign(result.downloadUrl);
-    }, "");
+  // Downloads are reads, not mutations: do not invalidate the route or navigate
+  // the class SPA just to retrieve a signed resource URL.
+  async function openDownload(loadUrl: () => Promise<{ downloadUrl: string }>) {
+    if (downloadInFlight.current) return;
+    downloadInFlight.current = true;
+    setDownloading(true);
+    setDownloadError("");
+    try {
+      const result = await loadUrl();
+      openClassDownload(result.downloadUrl);
+    } catch {
+      setDownloadError("Unable to open this class resource. Please try again.");
+    } finally {
+      downloadInFlight.current = false;
+      setDownloading(false);
+    }
   }
-  async function downloadSupplement(supplementId:string) {
-    await run(async()=>{
-      const result=await getClassSupplementDownload({data:{
-        sectionId:data.section.id,studentPersonId:search.student,supplementId,
-      }});
-      window.location.assign(result.downloadUrl);
-    },"");
+  async function download(resourceId: string) {
+    await openDownload(() => getClassResourceDownload({ data: {
+      sectionId: data.section.id, studentPersonId: search.student, resourceId,
+    } }));
+  }
+  async function downloadSupplement(supplementId: string) {
+    await openDownload(() => getClassSupplementDownload({ data: {
+      sectionId: data.section.id, studentPersonId: search.student, supplementId,
+    } }));
   }
   function resources(items: ClassContent["resources"]) {
     return <ul className="space-y-3">{items.map(item => <li key={item.id} className="rounded-lg border p-3 text-sm">
       {item.url && resolveClassVideo(item.url) ? <ClassVideoPlayer title={item.title} url={item.url} resourceId={item.id} declaredVideo={false}/> :
         item.url ? <SafeClassExternalLink url={item.url} title={item.title} kind="external" resourceId={item.id}/> :
-        <button type="button" data-learning-resource-id={item.id} disabled={busy} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</button>}
+        <button type="button" data-learning-resource-id={item.id} disabled={busy || downloading} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</button>}
     </li>)}</ul>;
   }
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
@@ -210,7 +236,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     if (item.url) return <SafeClassExternalLink url={item.url} title={item.title} kind={item.kind}/>;
     if (item.kind === "html" && item.resourceId) return <CommonCartridgeStaticLesson
       programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>;
-    if (item.kind === "pdf") return <button type="button" disabled={busy}
+    if (item.kind === "pdf") return <button type="button" disabled={busy || downloading}
       onClick={() => void downloadSupplement(item.id)} className="underline disabled:opacity-50">{item.title} (private PDF)</button>;
     return <span>{item.title} (unavailable document)</span>;
   }
@@ -324,6 +350,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     <DetailNavigation label="Class sections">{tabs.filter(value => !["people","teacher-guide","planning"].includes(value) || data.role === "teacher").map(value =>
       <SectionTab key={value} current={tab === value} className="capitalize" link={{ to: "/classes", search: { ...search, tab: value } }}>{value === "people" ? "Roster" : value === "teacher-guide" ? "Teacher guide" : value}</SectionTab>)}</DetailNavigation>
     <MutationFeedback state={mutation} className="mb-5" pendingMessage="Saving class change..."/>
+    {downloadError && <p role="alert" className="mb-5 text-sm text-destructive">{downloadError}</p>}
     {tab === "overview" && <div className="grid grid-cols-1 gap-5">
       <ClassroomMediaStage sectionId={data.section.id} timezone={data.section.timezone} role={data.role} meetings={meetings} studentPersonId={search.student} commands={meetingCommands}
         recorded={<section><h2 className="font-serif text-2xl font-semibold">About this class</h2>
@@ -526,14 +553,30 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     ) : <p role="alert" className="rounded-lg border p-4 text-sm">Teacher-only materials are unavailable to this account.</p>)}
     {tab === "announcements" && <div className="grid gap-5">
       {data.role === "teacher" && <ClassAnnouncementComposer title={title} body={body} busy={busy}
-        onTitleChange={value=>{setTitle(value);announcementId.current=null;}}
-        onBodyChange={value=>{setBody(value);announcementId.current=null;}}
-        onSubmit={()=>{announcementId.current??=crypto.randomUUID();
-          void run(async()=>{
-            await publishClassAnnouncement({data:{id:announcementId.current!,sectionId:data.section.id,title,body}});
-            setTitle("");setBody("");announcementId.current=null;
-          },"Class announcement published.");
+        onTitleChange={setTitle}
+        onBodyChange={setBody}
+        onSubmit={() => {
+          // A timeout leaves the outcome uncertain. Reuse both the ID and the
+          // original payload until the server acknowledges this submission.
+          const attempt = getOrCreateAnnouncementAttempt(announcementAttempt.current, { title, body }, () => crypto.randomUUID());
+          announcementAttempt.current = attempt;
+          void mutation.run(() => publishClassAnnouncement({ data: {
+            id: attempt.id, sectionId: data.section.id, title: attempt.title, body: attempt.body,
+          } }), {
+            successMessage: "Class announcement published.",
+            commandErrorMessage: "Unable to publish this class announcement.",
+          }).then(result => {
+            if (!wasAnnouncementAccepted(result.status)) return;
+            announcementAttempt.current = null;
+            // Preserve any edits made after the original submission began.
+            setTitle(previous => previous.trim() === attempt.title ? "" : previous);
+            setBody(previous => previous.trim() === attempt.body ? "" : previous);
+          });
         }} />}
+      {announcementAttempt.current && mutation.error && <p role="status" className="text-sm text-muted-foreground">
+        The previous announcement may have been published. Retry confirms its original text;
+        any newer edits will remain in the composer for the next announcement.
+      </p>}
       <ClassAnnouncementFeed announcements={data.announcements} timezone={data.section.timezone} />
     </div>}
   </UnifiedCoursePlayer>;
