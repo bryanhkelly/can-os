@@ -106,6 +106,13 @@ describe("one native Class route and reusable manager",()=>{
   it("does not open a fake teacher classroom for the synthetic center",()=>{
     const center=read("src/routes/centers.demo.tsx");
     expect(center).toContain('to="/class"');
+    expect(center).toContain('<SiteNativeClassHandoff publicSiteId={site.id}/>');
+    const handoff=read("src/components/launch-studio/SiteNativeClassHandoff.tsx");
+    expect(handoff).toContain('getSiteIdentityLinkStatus({data:{publicSiteId}})');
+    expect(handoff).toContain('link.kind==="approved"?link.canonicalSiteId:null');
+    expect(handoff).toContain('to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}');
+    expect(handoff).toContain('to="/site-identity"');
+
     expect(center).not.toContain("/centers/demo/classroom");
     expect(center).not.toContain('to="/enrichment/$seasonId"');
     expect(existsSync("src/routes/centers.demo.classroom.tsx")).toBe(false);
