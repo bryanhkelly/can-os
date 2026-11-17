@@ -13,6 +13,8 @@ describe("first-class My Activity resilience and source-scoped enrollment",()=>{
     expect(management).toBeGreaterThan(endOfProjection);
     expect(activity).toContain("showAllTraining&&<NoncreditEnrollmentManagement/>");
     expect(activity).toContain("activity.isError");
+    expect(activity).toContain('href="#noncredit-management"');
+    expect(activity).toContain("Your registrations remain source-authoritative.");
   });
 
   it("queries only the owning CAN Person's exact registration at the database",()=>{
