@@ -140,6 +140,12 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
       {courses.isError&&<p role="alert" className="mt-3 text-sm">
         Publisher Courses are unavailable to this signed-in role or environment.
       </p>}
+      {preferredCourseVersionId&&courses.isSuccess&&
+        !courses.data.courses.some(row=>row.courseVersionId===preferredCourseVersionId)&&
+        <p role="status" className="mt-3 border border-border p-3 text-sm">
+          The requested Course is not available under your current publisher
+          authorization. Choose a Course from the verified list.
+        </p>}
       {courses.data&&<>
         <label className="mt-4 block text-sm font-semibold" htmlFor="course-activity-course">
           Course version
