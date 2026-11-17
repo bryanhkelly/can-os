@@ -99,6 +99,39 @@ export const PendingDialog: Story = {
   },
 };
 
+function RepeatedConfirmExample() {
+  const [open, setOpen] = useState(false);
+  const [confirmed, setConfirmed] = useState(0);
+  return <>
+    <Button onClick={() => setOpen(true)}>Open review confirmation</Button>
+    <output aria-label="Confirmations recorded">Confirmations: {confirmed}</output>
+    <ActionDialog open={open} title="Record reviewed decision?"
+      description="Submitting twice must never dispatch the same command twice."
+      confirmLabel="Record reviewed decision"
+      onConfirm={() => setConfirmed(value => value + 1)}
+      onClose={() => setOpen(false)}/>
+  </>;
+}
+export const DuplicateConfirmProtection: Story = {
+  render: () => <RepeatedConfirmExample/>,
+  play: async ({canvasElement}) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", {name:"Open review confirmation"});
+    await userEvent.click(trigger);
+    const dialog = canvas.getByRole("dialog", {name:"Record reviewed decision?"});
+    const confirm = within(dialog).getByRole("button", {name:"Record reviewed decision"});
+    await userEvent.dblClick(confirm);
+    await expect(canvas.getByText("Confirmations: 1")).toBeInTheDocument();
+    await userEvent.click(confirm);
+    await expect(canvas.getByText("Confirmations: 1")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", {name:"Cancel"}));
+    await userEvent.click(trigger);
+    const reopened = canvas.getByRole("dialog", {name:"Record reviewed decision?"});
+    await userEvent.click(within(reopened).getByRole("button", {name:"Record reviewed decision"}));
+    await expect(canvas.getByText("Confirmations: 2")).toBeInTheDocument();
+  },
+};
+
 function DeclineExample() {
   const [open, setOpen] = useState(false);
   const [declined, setDeclined] = useState(false);
