@@ -172,13 +172,13 @@ function ReviewEditor({item}:{item:Item}){
   </div>
   <ActionDialog open={verifyDialogOpen} title="Verify jurisdiction profile?"
    description="Confirm that you independently reviewed every current official source listed on this profile. Your identity, note, and the reviewed source snapshot will be recorded."
-   confirmLabel="Record verification" pending={mutation.pending} confirmDisabled={mutation.refreshFailed||verificationNote.trim().length<25}
+   confirmLabel="Record verification" pending={mutation.pending} pendingLabel="Recording verification…" confirmDisabled={mutation.refreshFailed||verificationNote.trim().length<25}
    onConfirm={()=>void verify()} onClose={()=>setVerifyDialogOpen(false)}>
    <Field label="Independent review note"><Textarea rows={4} value={verificationNote} onChange={event=>setVerificationNote(event.target.value)} placeholder="Describe what you verified in the official sources."/></Field>
   </ActionDialog>
   <ActionDialog open={publishDialogOpen} title="Publish jurisdiction profile?"
    description="Publish the current profile only after a separate reviewer has verified its evidence. Published guidance does not authorize a school to open."
-   confirmLabel="Publish profile" pending={mutation.pending} confirmDisabled={mutation.refreshFailed}
+   confirmLabel="Publish profile" pending={mutation.pending} pendingLabel="Publishing profile…" confirmDisabled={mutation.refreshFailed}
    onConfirm={()=>void publish()} onClose={()=>setPublishDialogOpen(false)}/>
  </details>;
 }
