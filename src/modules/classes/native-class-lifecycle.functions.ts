@@ -1,11 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassEnrollments,
-  canonicalPersons, learnerCourseAttempts,
+  canonicalPersons, learnerCourseAttempts,canonicalClassEnrollmentApprovalRequests,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
@@ -14,6 +14,7 @@ import {
   assertVerifiedAdultNativeClassExit, assertNativeClassExitReason,
 } from "@/domain/native-class-lifecycle";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import {verifiedAdultOn} from "@/domain/native-class-enrollment";
 import { assertCurrentNativeClassLearnerForMutation } from
   "./native-class-learner-session.server";
 import { assertCurrentCanonicalStaffForMutation } from
@@ -94,7 +95,25 @@ async function exitNativeClass(command:ExitRequest){
       .from(canonicalPersons)
       .where(eq(canonicalPersons.id,enrollment.learnerPersonId))
       .limit(1);
-    assertVerifiedAdultNativeClassExit(person?.birthDate,new Date());
+    // Verified minors must not use an adult learner exit. A legitimate
+    // exact-Site operator may cancel a minor only when the native Class
+    // enrollment is provably the result of independently approved guardian
+    // placement. Historical guardian approval is retained.
+    if(verifiedAdultOn(person?.birthDate,new Date())){
+      assertVerifiedAdultNativeClassExit(person?.birthDate,new Date());
+    }else{
+      if(command.action!=="cancel"||enrollment.enrollmentMethod!=="approval")
+        throw new AuthorizationError("guardian-authorized minor Class exit required");
+      const [placement]=await tx.select({id:canonicalClassEnrollmentApprovalRequests.id})
+        .from(canonicalClassEnrollmentApprovalRequests).where(and(
+          eq(canonicalClassEnrollmentApprovalRequests.acceptedEnrollmentId,enrollment.id),
+          eq(canonicalClassEnrollmentApprovalRequests.classId,cls.id),
+          eq(canonicalClassEnrollmentApprovalRequests.learnerPersonId,enrollment.learnerPersonId),
+          eq(canonicalClassEnrollmentApprovalRequests.state,"approved"),
+          isNotNull(canonicalClassEnrollmentApprovalRequests.guardianPersonId),
+        )).limit(1);
+      if(!placement)throw new AuthorizationError("verified minor guardian placement");
+    }
 
     const decision=planNativeClassExit(enrollment.status,command.action);
     if(decision.alreadyClosed)return {
