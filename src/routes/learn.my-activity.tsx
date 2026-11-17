@@ -7,6 +7,7 @@ import {Button} from "@/components/ui/button";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
 import {getMyActivity,getMyActivitySourcePage} from "@/modules/learning/my-activity.functions";
 import {assembleParticipation} from "@/domain/participation-projections";
+import {assertParticipationHistoryPage} from "@/domain/participation-history-pages";
 import {
   activityStatusLabel,resolveActivityFilters,
   type ParticipationBucket,type ParticipationKind,type ParticipationSource,
@@ -153,12 +154,23 @@ function MyActivityPage() {
       if(pageKeyRef.current!==key)return;
       const next={...nextCursors};
       const added:ParticipationRecord[]=[];
+      const previouslyDisplayed=[
+        ...activity.data.records,
+        ...(extraPages.key===key?extraPages.records:[]),
+      ];
       let failed=false;
       for(const [i,response] of result.entries()){
-        const source=requests[i]![0];
+        const [source,previousCursor]=requests[i]!;
         if(response.status==="rejected"){failed=true;continue;}
         const value=response.value;
-        if(value.source!==source){failed=true;continue;}
+        try{
+          if(value.source!==source)throw new Error("Mismatched source page");
+          assertParticipationHistoryPage({
+            source,previousCursor,nextCursor:value.nextCursor,
+            items:value.items,
+            alreadyDisplayed:[...previouslyDisplayed,...added],
+          });
+        }catch{failed=true;continue;}
         added.push(...value.items);
         if(value.nextCursor)next[source]=value.nextCursor;
         else delete next[source];
@@ -170,7 +182,7 @@ function MyActivityPage() {
       }));
       if(failed)setOlderError(
         "Some history sources could not be verified. Retry to continue those sources.");
-    }finally{if(pageKeyRef.current===key)setLoadingOlder(false);}
+    }finally{setLoadingOlder(false);}
   }
   const opportunities = bucket === "upcoming" && kind === "all" ? activity.data?.opportunities ?? [] : [];
   const unavailable = activity.data?.sources.filter(item => item.state === "unavailable") ?? [];
