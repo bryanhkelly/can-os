@@ -24,19 +24,10 @@ const securityHeaders = {
   "Referrer-Policy": "strict-origin-when-cross-origin",
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
   "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
-  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://*.r2.cloudflarestorage.com; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+  "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://*.r2.cloudflarestorage.com; media-src 'self' https:; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
 };
 
 export default {
-  scheduled(_event: unknown,env:DemoEnvironment,ctx:{waitUntil(task:Promise<unknown>):void}) {
-    ctx.waitUntil(import("./platform/photography/cloudflare-production.server")
-      .then(({runBoundTemplatePhotoProduction})=>runBoundTemplatePhotoProduction(env))
-      .then(result=>console.info("CAN template photography tick",result))
-      .catch(error=>console.error("CAN template photography tick failed",{
-        errorType:error instanceof Error?error.name:"unknown",
-        message:error instanceof Error?error.message.slice(0,140):"unknown",
-      })));
-  },
   async fetch(request: Request, env: DemoEnvironment): Promise<Response> {
     const url = new URL(request.url);
     const host = request.headers.get("host");
