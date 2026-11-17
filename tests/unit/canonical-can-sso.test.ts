@@ -130,6 +130,14 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(bridge).not.toContain("insert(canonicalAccountGrants)");
   });
 
+  it("never allows dual-cookie learning persistence to bypass CAN Person verification", () => {
+    const sourceCode = source("src/modules/identity/learning-command-context.server.ts");
+    expect(sourceCode).toContain("accessSessionCookie");
+    expect(sourceCode).toContain("const context = await getCanonicalCommandContext(request)");
+    expect(sourceCode).toContain("context.actorPersonId !== row.person_id");
+    expect(sourceCode).toContain("one verified learning Person");
+  });
+
   it("only an independent institutional reviewer can link or revoke principals", () => {
     const ops = source("src/modules/sites/site-identity-links.functions.ts");
     const ui = source("src/routes/site-identity.tsx");
