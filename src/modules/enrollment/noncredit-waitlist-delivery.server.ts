@@ -83,14 +83,16 @@ const waitlistAdapter = {
         eq(noncreditSelfEnrollmentReleases.id, noncreditEnrollmentWaitlist.releaseId))
       .where(owned(claim)).limit(1);
     if (!record) return { kind: "suppress", reason: "source_receipt_unavailable" };
-    if (!currentWaitlistEmailOpportunity({
+    const opportunity = {
       waitlistStatus: record.waitlistStatus,
       invitationExpiresAt: record.actualExpiry,
       deliveryInvitationExpiresAt: record.delivery.invitationExpiresAt,
       releaseStatus: record.releaseStatus,
       releaseClosesAt: record.releaseClosesAt,
       now,
-    })) return { kind: "suppress", reason: "invitation_no_longer_active" };
+    };
+    if (!currentWaitlistEmailOpportunity(opportunity))
+      return { kind: "suppress", reason: "invitation_no_longer_active" };
 
     // A published release alone does not confer authorization.
     const [eligibleRelease] = await readEligibleSelfEnrollmentReleases(db, record.releaseId);
@@ -138,7 +140,7 @@ const waitlistAdapter = {
         subject: "CAN learning: a place is available",
         text: "A place is available in a CAN learning program you joined the waitlist for. " +
           "Sign in to your own CAN account to review and accept the invitation before " +
-          record.actualExpiry!.toISOString() + ". An invitation is not an enrollment.",
+          opportunity.invitationExpiresAt.toISOString() + ". An invitation is not an enrollment.",
         ...(actionUrl ? { actionUrl } : {}),
       },
     };
