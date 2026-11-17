@@ -24,4 +24,5 @@ export const notificationOutboundDeliveries=pgTable("notification_outbound_deliv
 },t=>[
  uniqueIndex("notification_outbound_recipient_channel_uq").on(t.notificationId,t.channel),
  index("notification_outbound_status_retry_idx").on(t.status,t.nextAttemptAt),
+ uniqueIndex("notification_outbound_provider_message_uq").on(t.providerMessageId),
 ]);
