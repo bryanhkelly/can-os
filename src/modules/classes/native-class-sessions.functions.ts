@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, isNull } from "drizzle-orm";
+import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
+import { requiresClassSessionAgenda } from "@/domain/native-class-session-agenda";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
@@ -9,7 +11,7 @@ import {
   facilitatedClassroomPlans, facilitatedLearningSessions, auditEvents, domainEvents,
 } from "@/db/canonical-v301";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
-import { assertNativeClassSessionSeries } from "@/domain/native-class-sessions";
+import { assertNativeClassSessionSeries, canChangeUnopenedClassSession } from "@/domain/native-class-sessions";
 import { requireNativeClassSessionHost } from "./native-class-session-host.server";
 import { assertCurrentNativeClassFacilitatorSession } from "./native-class-facilitator-session.server";
 import { requireCanonicalFacilitator } from "@/modules/learning/canonical-facilitator-access.server";
@@ -127,6 +129,148 @@ export const scheduleNativeClassSessions=createServerFn({method:"POST"})
   });
 
 
+/** Cancel only an unopened native Class plan. Optionally create one fully
+ * authorized replacement Session in the SAME transaction. The original
+ * immutable Class Session and canonical delivery time are never retargeted.
+ *
+ * The new Class Session and Class schedule use the existing native Class and
+ * facilitated plan writers. No separate scheduling, attendance or seat ledger.
+ */
+export const nativeClassSessionChangeSchema=z.object({
+  classId:uuid,classSessionId:uuid,requestId:uuid,
+  reason:z.string().trim().min(15).max(500),
+  replacement:z.object({startsAt:datetime,endsAt:datetime}).strict().nullable(),
+}).strict();
+
+export const changeNativeClassSessionSchedule=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>nativeClassSessionChangeSchema.parse(raw))
+  .handler(async({data})=>{
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
+      throw new AuthorizationError("native Class release not activated");
+    requireFacilitatedLearningEnabled();
+    setResponseHeader("Cache-Control","private, no-store");
+    const host=await requireCanonicalFacilitator();
+    return db.transaction(async tx=>{
+      const now=new Date();
+      // Lock the parent Class to serialize against both schedule/create
+      // operations and other Session change commands.
+      const cls=await requireNativeClassSessionHost(tx,host,data.classId,now,true);
+      await assertCurrentNativeClassFacilitatorSession(tx,host.actor);
+      const [original]=await tx.select().from(canonicalClassSessions)
+        .where(and(eq(canonicalClassSessions.id,data.classSessionId),
+          eq(canonicalClassSessions.classId,cls.id))).limit(1);
+      if(!original||original.facilitatorPersonId!==host.actor.actorPersonId)
+        throw new AuthorizationError("own currently authorized native Class Session");
+      const [plan]=await tx.select().from(facilitatedClassroomPlans).where(and(
+        eq(facilitatedClassroomPlans.id,original.classroomPlanId),
+        eq(facilitatedClassroomPlans.deliverySessionId,original.deliverySessionId),
+        eq(facilitatedClassroomPlans.deploymentId,cls.deploymentId),
+        eq(facilitatedClassroomPlans.courseVersionId,cls.courseVersionId),
+        eq(facilitatedClassroomPlans.hostOrganizationId,cls.operatingOrganizationId),
+        eq(facilitatedClassroomPlans.siteId,cls.siteId!),
+        eq(facilitatedClassroomPlans.facilitatorPersonId,host.actor.actorPersonId!),
+      )).for("update").limit(1);
+      const [delivery]=await tx.select().from(canonicalDeliverySessions).where(and(
+        eq(canonicalDeliverySessions.id,original.deliverySessionId),
+        eq(canonicalDeliverySessions.deploymentId,cls.deploymentId),
+        eq(canonicalDeliverySessions.siteId,cls.siteId!),
+      )).limit(1);
+      if(!plan||!delivery||plan.enrollmentReleaseId!==null)
+        throw new AuthorizationError("unaltered native Session scheduling authority");
+
+      // One terminal event per original Session. A replay must have the exact
+      // same idempotency key AND same requested replacement details.
+      const [prior]=await tx.select({payload:domainEvents.payload}).from(domainEvents)
+        .where(and(
+          eq(domainEvents.aggregateType,"class_session"),
+          eq(domainEvents.aggregateId,original.id),
+          eq(domainEvents.eventType,"ClassSessionScheduleChanged"),
+        )).limit(1);
+      if(prior){
+        const payload=prior.payload;
+        if(plan.state!=="cancelled"||
+          payload.requestId!==data.requestId||payload.reason!==data.reason||
+          payload.replacementStartsAt!==(data.replacement?.startsAt??null)||
+          payload.replacementEndsAt!==(data.replacement?.endsAt??null))
+          throw new AuthorizationError("Conflicting native Session change retry");
+        return {
+          changed:true,duplicate:true,cancelledSessionId:original.id,
+          replacementSessionId:typeof payload.replacementSessionId==="string"
+            ?payload.replacementSessionId:null,
+        };
+      }
+      if(!canChangeUnopenedClassSession({
+        planState:plan.state,facilitatedSessionId:plan.facilitatedSessionId,
+        scheduledStartsAt:delivery.startsAt,now,
+      }))throw new AuthorizationError(
+        "only future unopened Class Sessions may be cancelled or replaced",
+      );
+
+      let replacementSessionId:string|null=null;
+      if(data.replacement){
+        validateClassroomTimes(new Date(data.replacement.startsAt),
+          new Date(data.replacement.endsAt),now);
+        const booked=await scheduleOneClassroom(tx,host,{
+          deploymentId:cls.deploymentId,courseVersionId:cls.courseVersionId,
+          siteId:cls.siteId!,requestId:data.requestId,
+          startsAt:data.replacement.startsAt,endsAt:data.replacement.endsAt,
+        },now);
+        // We own this request ID only when the replacement was created here.
+        // Prior existing classroom plans are not adopted by unrelated Classes.
+        if(booked.duplicate)throw new AuthorizationError(
+          "replacement request ID already belongs to another Session",
+        );
+        const [newPlan]=await tx.select().from(facilitatedClassroomPlans)
+          .where(eq(facilitatedClassroomPlans.id,booked.planId)).limit(1);
+        if(!newPlan||newPlan.state!=="scheduled"||
+           newPlan.facilitatedSessionId!==null||
+           newPlan.enrollmentReleaseId!==null||
+           newPlan.facilitatorPersonId!==host.actor.actorPersonId||
+           newPlan.deploymentId!==cls.deploymentId||
+           newPlan.courseVersionId!==cls.courseVersionId||
+           newPlan.siteId!==cls.siteId)
+          throw new AuthorizationError("replacement Session publication integrity");
+        const [created]=await tx.insert(canonicalClassSessions).values({
+          classId:cls.id,classroomPlanId:newPlan.id,
+          deliverySessionId:newPlan.deliverySessionId,
+          facilitatorPersonId:host.actor.actorPersonId!,
+          requestId:data.requestId,
+        }).returning({id:canonicalClassSessions.id});
+        if(!created)throw new Error("Replacement native Class Session was not linked");
+        replacementSessionId=created.id;
+      }
+      // The original canonical delivery Session remains immutable. The
+      // tombstoned plan is still bound to its Class and cannot be resurrected.
+      await tx.update(facilitatedClassroomPlans).set({
+        state:"cancelled",updatedAt:now,
+      }).where(eq(facilitatedClassroomPlans.id,plan.id));
+      const payload={
+        classId:cls.id,requestId:data.requestId,
+        cancelledSessionId:original.id,
+        replacementSessionId,
+        reason:data.reason,
+        replacementStartsAt:data.replacement?.startsAt??null,
+        replacementEndsAt:data.replacement?.endsAt??null,
+        changedAt:now.toISOString(),
+      };
+      await tx.insert(auditEvents).values({
+        actorPersonId:host.actor.actorPersonId!,
+        owningOrganizationId:cls.operatingOrganizationId,
+        eventCode:"class.session.schedule.changed",
+        entityKind:"class_session",entityId:original.id,payload,
+      });
+      await tx.insert(domainEvents).values({
+        actorPersonId:host.actor.actorPersonId!,
+        eventType:"ClassSessionScheduleChanged",
+        aggregateType:"class_session",aggregateId:original.id,payload,
+      });
+      return {
+        changed:true,duplicate:false,cancelledSessionId:original.id,
+        replacementSessionId,
+      };
+    });
+  });
+
 const openInput=z.object({classId:uuid,classSessionId:uuid}).strict();
 
 /** Opens only a precisely bound Class Session near its scheduled start.
@@ -188,6 +332,18 @@ export const openNativeClassSession=createServerFn({method:"POST"})
         return {classSessionId:link.id,facilitatedSessionId:room.id,
           pairingCode:null as string|null,pairingExpiresAt:null as string|null,
           alreadyStarted:true};
+      }
+      if(requiresClassSessionAgenda({
+        featureEnabled:process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true",
+        mandatoryFrom:process.env.CAN_WS4_AGENDA_REQUIRED_FROM,
+        sessionCreatedAt:link.createdAt,
+      })){
+        const [agenda]=await tx.select({id:classSessionAgendaRevisions.id})
+          .from(classSessionAgendaRevisions).where(and(
+            eq(classSessionAgendaRevisions.classSessionId,link.id),
+            eq(classSessionAgendaRevisions.courseVersionId,instance.courseVersionId),
+          )).limit(1);
+        if(!agenda)throw new AuthorizationError("publish a Course-linked Class Session study plan before opening");
       }
       if(plan.state!=="scheduled"||plan.facilitatedSessionId!==null||
          !canOpenScheduledClassroom(delivery.startsAt,delivery.endsAt,now))

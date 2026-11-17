@@ -1,0 +1,138 @@
+import { describe, expect, it } from "vitest";
+import { nativeClassSessionDisplayStatus, canChangeUnopenedClassSession } from "../../src/domain/native-class-sessions";
+import {
+  assertClassSessionAgendaReferences, assertClassSessionAgendaExpectedRevision,
+  canPublishClassSessionAgenda,requiresClassSessionAgenda,
+  classSessionAgendaItemsSchema, nextClassSessionAgendaRevision,
+} from "../../src/domain/native-class-session-agenda";
+
+const lesson = "11111111-1111-4111-8111-111111111111";
+const other = "22222222-2222-4222-8222-222222222222";
+const assessment = "33333333-3333-4333-8333-333333333333";
+const items = [{kind:"watch" as const, referenceId:lesson},
+  {kind:"practice" as const, referenceId:lesson},
+  {kind:"assessment" as const, referenceId:assessment}];
+
+describe("WS4 immutable Course-linked Session agenda", () => {
+  it("keeps study/watch/practice separate without pinning a recorded teacher", () => {
+    expect(classSessionAgendaItemsSchema.parse(items)).toEqual(items);
+    expect(items.every(item=>!("trackVersionId" in item))).toBe(true);
+    expect(()=>assertClassSessionAgendaReferences(items, {
+      lessons:new Set([lesson]),assignments:new Set(),assessments:new Set([assessment]),
+    })).not.toThrow();
+  });
+  it("denies a different Course lesson, assignment or unpublished assessment", () => {
+    expect(()=>assertClassSessionAgendaReferences(
+      [{kind:"watch",referenceId:other}],{
+        lessons:new Set([lesson]),assignments:new Set(),assessments:new Set([assessment]),
+      })).toThrow();
+    expect(()=>assertClassSessionAgendaReferences(
+      [{kind:"assessment",referenceId:other}],{
+        lessons:new Set([lesson]),assignments:new Set(),assessments:new Set([assessment]),
+      })).toThrow();
+  });
+  it("rejects duplicate activities, fabricated fields and empty agenda", () => {
+    expect(classSessionAgendaItemsSchema.safeParse([items[0],items[0]]).success).toBe(false);
+    expect(classSessionAgendaItemsSchema.safeParse([]).success).toBe(false);
+    expect(classSessionAgendaItemsSchema.safeParse([{...items[0],grade:"A"}]).success).toBe(false);
+    expect(classSessionAgendaItemsSchema.safeParse(Array.from({length:25},()=>items[0])).success).toBe(false);
+  });
+  it("blocks revision after start, cancellation, and at/after the scheduled time", () => {
+    const startsAt = new Date("2026-12-01T19:00:00Z");
+    const before = new Date("2026-12-01T18:59:59Z");
+    expect(canPublishClassSessionAgenda({planState:"scheduled",startsAt,now:before})).toBe(true);
+    for (const state of ["started","cancelled"] as const)
+      expect(canPublishClassSessionAgenda({planState:state,startsAt,now:before})).toBe(false);
+    expect(canPublishClassSessionAgenda({planState:"scheduled",startsAt,now:startsAt})).toBe(false);
+  });
+  it("only allows cancellation of future unopened Sessions", () => {
+    const now=new Date("2026-11-16T20:00:00Z");
+    const initial={
+      planState:"scheduled" as const,facilitatedSessionId:null,
+      scheduledStartsAt:new Date("2026-11-16T21:00:00Z"),now,
+    };
+    expect(canChangeUnopenedClassSession(initial)).toBe(true);
+    expect(canChangeUnopenedClassSession({
+      ...initial,planState:"cancelled",
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,planState:"started",
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,facilitatedSessionId:"11111111-1111-4111-8111-111111111111",
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,scheduledStartsAt:now,
+    })).toBe(false);
+    expect(canChangeUnopenedClassSession({
+      ...initial,scheduledStartsAt:new Date("invalid"),
+    })).toBe(false);
+  });
+  it("does not treat a missed Session as verified absence or completion", () => {
+    const window={state:"scheduled" as const,roomState:null,endsAt:"2026-11-02T20:00:00Z"};
+    expect(nativeClassSessionDisplayStatus({
+      ...window,now:new Date("2026-11-02T20:00:01Z"),
+    })).toBe("elapsed_unverified");
+    expect(nativeClassSessionDisplayStatus({
+      ...window,now:new Date("2026-11-02T19:59:59Z"),
+    })).toBe("scheduled");
+    expect(nativeClassSessionDisplayStatus({
+      ...window,state:"started",roomState:"live",
+      now:new Date("2026-11-02T20:00:01Z"),
+    })).toBe("live");
+    expect(nativeClassSessionDisplayStatus({
+      ...window,state:"started",roomState:"ended",
+      now:new Date("2026-11-02T20:00:01Z"),
+    })).toBe("ended");
+  });
+  it("requires the observed revision; concurrent stale edits are rejected", () => {
+    expect(()=>assertClassSessionAgendaExpectedRevision(0,0)).not.toThrow();
+    expect(()=>assertClassSessionAgendaExpectedRevision(1,1)).not.toThrow();
+    expect(()=>assertClassSessionAgendaExpectedRevision(1,2)).toThrow(/Reload/);
+    expect(()=>assertClassSessionAgendaExpectedRevision(0,1)).toThrow(/Reload/);
+    expect(()=>assertClassSessionAgendaExpectedRevision(-1,0)).toThrow();
+  });
+  it("can expose optional planning without retroactively blocking old Sessions", () => {
+    const cutoff="2026-11-16T22:00:00Z";
+    const old=new Date("2026-11-16T21:59:59Z");
+    const newSession=new Date("2026-11-16T22:00:00Z");
+    expect(requiresClassSessionAgenda({
+      featureEnabled:false,mandatoryFrom:cutoff,sessionCreatedAt:newSession,
+    })).toBe(false);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:undefined,sessionCreatedAt:newSession,
+    })).toBe(false);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:cutoff,sessionCreatedAt:old,
+    })).toBe(false);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:cutoff,sessionCreatedAt:newSession,
+    })).toBe(true);
+    expect(requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-11-16T22:00:00.000Z",
+      sessionCreatedAt:newSession,
+    })).toBe(true);
+    expect(()=>requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-02-30T22:00:00Z",
+      sessionCreatedAt:newSession,
+    })).toThrow(/UTC/);
+    expect(()=>requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-11-16",sessionCreatedAt:newSession,
+    })).toThrow(/UTC/);
+    expect(()=>requiresClassSessionAgenda({
+      featureEnabled:true,mandatoryFrom:"2026-11-16T22:00:00+00:00",sessionCreatedAt:newSession,
+    })).toThrow(/UTC/);
+  });
+  it("allows append-only revision but denies a conflicting idempotency replay", () => {
+    const first = nextClassSessionAgendaRevision(null,"req-1",items);
+    expect(first).toEqual({revisionNo:1,duplicate:false});
+    const previous = {revisionNo:1,requestId:"req-1",items};
+    expect(nextClassSessionAgendaRevision(previous,"req-1",items)).toEqual({
+      revisionNo:1,duplicate:true,
+    });
+    expect(()=>nextClassSessionAgendaRevision(previous,"req-1",[items[0]])).toThrow();
+    expect(nextClassSessionAgendaRevision(previous,"req-2",[items[0]])).toEqual({
+      revisionNo:2,duplicate:false,
+    });
+  });
+});

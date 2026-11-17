@@ -6,7 +6,7 @@ import { issueClassroomProjectorCommand } from "@/modules/learning/classroom-pro
 
 type Catalog=Awaited<ReturnType<typeof getFacilitatedRoomMedia>>;
 /** Private command surface; no media playback or learner response data is projected. */
-export function ClassroomPlaybackControls({facilitatedSessionId}:{facilitatedSessionId:string}){
+export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonIds=[]}:{facilitatedSessionId:string;preferredLessonIds?:readonly string[]}){
   const [selected,setSelected]=useState("");
   const [position,setPosition]=useState(0);
   const [busy,setBusy]=useState(false);
@@ -18,8 +18,14 @@ export function ClassroomPlaybackControls({facilitatedSessionId}:{facilitatedSes
     staleTime:60000,retry:false,
   });
   const media:Catalog["media"]=catalog.data?.media??[];
-  const current=media.find(item=>item.lessonId+":"+item.assetVersionId===selected)
-    ??media[0];
+  // Order only media already authorized by getFacilitatedRoomMedia.
+  // An agenda is NOT a playback right and never bypasses room checks.
+  const priority=new Map(preferredLessonIds.map((id,index)=>[id,index] as const));
+  const orderedMedia=[...media].sort((left,right)=>
+    (priority.get(left.lessonId)??Number.MAX_SAFE_INTEGER)-
+    (priority.get(right.lessonId)??Number.MAX_SAFE_INTEGER));
+  const current=orderedMedia.find(item=>item.lessonId+":"+item.assetVersionId===selected)
+    ??orderedMedia[0];
   async function send(kind:"load"|"play"|"pause"|"seek"|"stop"){
     if(!current||busy)return;
     setBusy(true);setError("");setMessage("");
@@ -54,7 +60,7 @@ export function ClassroomPlaybackControls({facilitatedSessionId}:{facilitatedSes
         <select className="mt-1 w-full border border-border bg-background p-2"
           value={current?current.lessonId+":"+current.assetVersionId:""}
           onChange={event=>setSelected(event.target.value)}>
-          {media.map(item=><option key={item.lessonId+":"+item.assetVersionId}
+          {orderedMedia.map(item=><option key={item.lessonId+":"+item.assetVersionId}
             value={item.lessonId+":"+item.assetVersionId}>{item.lessonTitle}</option>)}
         </select>
       </label>

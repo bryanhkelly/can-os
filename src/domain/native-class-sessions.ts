@@ -45,3 +45,37 @@ export function assertNativeClassSessionSeries(
     }
   }
 }
+
+/** Read-only display classification. Elapsed Sessions are NOT attendance
+ * absences, academic failures or completed learning, and never write status. */
+export function nativeClassSessionDisplayStatus(input: {
+  state:"scheduled"|"started"|"cancelled";
+  roomState:"live"|"ended"|null;
+  endsAt:string;
+  now:Date;
+}):"scheduled"|"live"|"ended"|"cancelled"|"elapsed_unverified"|"started" {
+  if(input.state==="cancelled")return "cancelled";
+  if(input.roomState==="ended")return "ended";
+  if(input.roomState==="live")return "live";
+  if(input.state==="started")return "started";
+  const endsAt=new Date(input.endsAt).getTime();
+  if(Number.isFinite(endsAt)&&Number.isFinite(input.now.getTime())&&
+     endsAt<=input.now.getTime())return "elapsed_unverified";
+  return "scheduled";
+}
+
+/** Scheduled meetings are cancellable only before their start and before
+ * any live facilitated room is attached. No attendance or Class Enrollment
+ * state is inferred from a cancellation. */
+export function canChangeUnopenedClassSession(input:{
+  planState:"scheduled"|"started"|"cancelled";
+  facilitatedSessionId:string|null;
+  scheduledStartsAt:Date;
+  now:Date;
+}):boolean{
+  return input.planState==="scheduled"&&
+    input.facilitatedSessionId===null&&
+    Number.isFinite(input.scheduledStartsAt.getTime())&&
+    Number.isFinite(input.now.getTime())&&
+    input.scheduledStartsAt.getTime()>input.now.getTime();
+}
