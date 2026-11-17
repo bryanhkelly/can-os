@@ -4,6 +4,7 @@ import { ArrowRight, CalendarDays, Users } from "lucide-react";
 import { getLaunchSiteClassScope } from "@/modules/programs/program-discovery.functions";
 import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions, getNativeClassOperatorSites } from "@/modules/classes/unified-class.functions";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
+import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 
 /** One Site UUID across Launch Studio and Class. This scope read checks the
@@ -84,28 +85,27 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
       Review Course adoption <ArrowRight className="size-4"/>
      </Link>
     </div>
-    {classes.length>0&&<ul className="mt-4 grid gap-3 md:grid-cols-2">{classes.map(item=><li key={item.classId} className="border bg-card p-4">
-     <p className="font-semibold">{item.title}</p>
-     <p className="mt-1 text-xs text-muted-foreground">
-      {item.state.replaceAll("_"," ")} · {item.deliveryMode.replaceAll("_"," ")}
-      {item.offeringState?" · Offering: "+item.offeringState:" · No Class Offering required"}
-     </p>
-     {item.state==="active"?<div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-      <Link to="/class/$classId" params={{classId:item.classId}}
-       search={{view:"manage",tab:"overview",lesson:undefined,session:undefined}}
-       className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
-       Assign a Class facilitator <ArrowRight className="size-4"/>
-      </Link>
-      <Link to="/class/$classId" params={{classId:item.classId}}
-       search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}
-       className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
-       <CalendarDays className="size-4"/> Review Sessions <ArrowRight className="size-4"/>
-      </Link>
-     </div>:<Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
-       className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
-       Activate draft Class <ArrowRight className="size-4"/>
-     </Link>}
-    </li>)}</ul>}
+    {classes.length>0&&<ul className="mt-4 grid gap-3 md:grid-cols-2">
+      {classes.map(item=><li key={item.classId}>
+        <NativeClassSummary item={item}>
+          {item.state==="active"?<>
+            <Link to="/class/$classId" params={{classId:item.classId}}
+              search={{view:"manage",tab:"overview"}}
+              className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-primary">
+              Assign a Class facilitator <ArrowRight className="size-4"/>
+            </Link>
+            <Link to="/class/$classId" params={{classId:item.classId}}
+              search={{view:"manage",tab:"sessions"}}
+              className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-primary">
+              <CalendarDays className="size-4"/> Review Sessions <ArrowRight className="size-4"/>
+            </Link>
+          </>:<Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
+            className="inline-flex min-h-10 items-center gap-2 text-sm font-semibold text-primary">
+            Activate draft Class <ArrowRight className="size-4"/>
+          </Link>}
+        </NativeClassSummary>
+      </li>)}
+    </ul>}
    </>}
   </>}
   <p className="mt-4 text-xs leading-5 text-muted-foreground">
