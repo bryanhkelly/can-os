@@ -195,3 +195,20 @@ reviewer non-self authority, positive and negative review/activation/revocation,
 source-backed Class enrollment, access and historical activity, transactional
 retries/concurrency, restricted role RLS, typecheck/build, and a passing
 Playwright trace against the exact deployed SHA. Issue #320 remains P0 open.
+
+
+### Isolated P0 single-login test scope
+
+`npm run test:e2e:ws00:single-login` sets
+`CAN_WS00_QA_SCOPE=single_login_class` for its read-only preflight. It requires
+one real, active, Site-bound one-hour canonical Class and a fresh, exact CAN
+adult account with an independently approved, unconsumed review. It **does not**
+require the two unrelated four-session pilot Classes to exist before Issue #320
+can be validated. The full WS00 readiness command retains all three real Class
+and two-Site/four-session requirements when the scope is not set.
+
+The two-site/four-session fixture contract is unchanged; this is a test scope
+separation, not a bypass of published authority, CAN/native authorization,
+restricted reader, reviewed adulthood, row-level security, participation
+history or withdrawal. With zero Classes on test01, the isolated P0 test still
+cannot pass until one authorized, published QA one-hour Class is provisioned.
