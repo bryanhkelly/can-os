@@ -26,6 +26,13 @@ describe("CAN Site Admin canonical production readiness", () => {
     expect(source).toContain("rel.valid_through > now()");
   });
 
+  it("blocks unauthorised roles before returning Blueprint Studio entry metadata", () => {
+    const home = readFileSync("src/modules/blueprints/blueprint-studio.functions.ts", "utf8");
+    const entry = home.slice(home.indexOf("export const readCanonicalBlueprintHome"), home.indexOf("export const exploreCanonicalBlueprintReferences"));
+    expect(entry).toContain('assertCapability(context, "blueprint.read")');
+    expect(entry.indexOf('assertCapability(context, "blueprint.read")')).toBeLessThan(entry.indexOf("return {"));
+  });
+
   it("cannot create identities or alter authority while checking readiness", () => {
     expect(source).toContain('client.query("BEGIN READ ONLY")');
     expect(source).toContain('client.query("ROLLBACK")');
