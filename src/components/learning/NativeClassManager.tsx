@@ -299,8 +299,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       <Link to="/canonical/program-operations" className="underline underline-offset-4">
         Program setup (staging)
       </Link>
-      <Link to="/canonical/course-activities" className="underline underline-offset-4">
-        Publisher activity tools (staging)
+      <Link to="/class" search={{view:"activities"}} className="underline underline-offset-4">
+        Publisher activities
       </Link>
     </div>}>
     {navigation}
@@ -317,7 +317,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         <div className="flex flex-wrap gap-4 text-sm font-semibold">
           <Link to="/canonical/blueprints" className="underline">Approved Blueprints</Link>
           <Link to="/canonical/lab/deployments" className="underline">Deployments and adoptions</Link>
-          <Link to="/canonical/course-activities" className="underline">Learning activities</Link>
+          <Link to="/class" search={{view:"activities"}} className="underline">Learning activities</Link>
         </div>
       </div>
       {options.isSuccess&&offeringGroups.length===0&&<p className="mt-4 text-sm text-muted-foreground">
@@ -526,7 +526,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <p className="mt-2 flex flex-wrap gap-4 text-xs font-semibold">
               <Link to="/canonical/lab/deployments" className="underline">Deployment and adoption</Link>
               <Link to="/operations/curriculum" className="underline">Curriculum</Link>
-              <Link to="/canonical/course-activities" className="underline">Course activities</Link>
+              <Link to="/class" search={{view:"activities"}} className="underline">Course activities</Link>
             </p>
           </aside>}
           <div><label className="block text-sm font-semibold" htmlFor="native-class-title">Class name</label>
