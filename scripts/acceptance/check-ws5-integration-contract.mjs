@@ -20,7 +20,7 @@ const mustNot = (source, phrase, area) =>
   assert.ok(!source.includes(phrase), area + ": forbidden " + phrase);
 
 const readModel = read("src/modules/classes/unified-class.functions.ts");
-const composer = read("src/routes/canonical.classes.tsx");
+const composer = read("src/components/learning/NativeClassManager.tsx");
 const exporter = read("src/modules/programs/publisher-rollout.functions.ts");
 const versionImpact = read("src/modules/programs/publisher-version-impact.functions.ts");
 const authority = read("src/modules/classes/unified-class-authority.server.ts");
