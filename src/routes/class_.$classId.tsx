@@ -18,6 +18,7 @@ import { getNativeClassWorkspace, getNativeClassRosterPage } from "@/modules/cla
 import { getNativeClassLearning } from "@/modules/classes/native-class-learning.functions";
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
 import { issueNativeClassInvitation } from "@/modules/classes/native-class-invitations.functions";
+import {getNativeClassApprovalQueue,decideNativeClassApproval} from "@/modules/classes/native-class-approvals.functions";
 import { provisionNativeClassKnowledgeCheckAccess } from "@/modules/classes/native-class-assessment-provision.functions";
 import {
   assignNativeClassStaff, endNativeClassStaffAssignment,
@@ -307,6 +308,11 @@ function Roster({workspace,namesAllowed}:{workspace:Workspace;namesAllowed:boole
 }
 function ManagingClass({workspace}:{workspace:Workspace}){
   const client=useQueryClient();
+  const approvals=useQuery({
+    queryKey:["native-class-approval-queue",workspace.classId],
+    queryFn:()=>getNativeClassApprovalQueue({data:{classId:workspace.classId}}),
+    enabled:workspace.tab==="roster",retry:false,
+  });
   const [learnerPersonId,setLearnerPersonId]=useState("");
   const [learnerCreditMode,setLearnerCreditMode]=useState<"audit"|"not_applicable">("not_applicable");
   const [staffPersonId,setStaffPersonId]=useState("");
@@ -329,6 +335,19 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         "Learner already belongs to this Class.":
         "Verified adult learner assigned to the Class without a Class Offering.");
     }catch(e){setError(normalizeClientError(e,"Could not assign Class learner.").message)}
+    finally{setPending(false)}
+  }
+  async function decideApproval(approvalRequestId:string,decision:"approved"|"rejected"){
+    if(pending)return;
+    setPending(true);setError("");setNotice("");
+    try{
+      await decideNativeClassApproval({data:{approvalRequestId,decision,reason:
+        decision==="approved"?"Verified adult eligibility reviewed by Class staff":"Class eligibility denied"}});
+      await client.invalidateQueries({queryKey:["native-class-approval-queue",workspace.classId]});
+      setNotice(decision==="approved"?
+        "Approved. Learner must independently accept current terms and claim an available seat.":
+        "Request rejected with an auditable decision.");
+    }catch(e){setError(normalizeClientError(e,"Could not decide Class approval.").message)}
     finally{setPending(false)}
   }
   async function inviteLearner(){
@@ -394,6 +413,29 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         </>}
         {workspace.tab==="roster"&&<>
           <Roster workspace={workspace} namesAllowed={true}/>
+          <section className="mt-5 border border-border p-4" aria-label="Class approval requests">
+            <h3 className="font-semibold">Approval requests</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Only authorized Site staff can review verified adult applicants.
+              Approval neither enrolls nor reserves a seat.
+            </p>
+            {approvals.isError&&<p role="alert" className="mt-2 text-sm">Approval queue unavailable.</p>}
+            {approvals.data?.length===0&&<p className="mt-2 text-sm">No pending requests.</p>}
+            <ul className="mt-3 space-y-2">
+              {approvals.data?.map(item=><li key={item.approvalRequestId}
+                className="border border-border p-3 text-sm">
+                <p>Applicant: {item.learnerPersonId}</p>
+                <p>Requested: {new Date(item.requestedAt).toLocaleString()}</p>
+                <p>Expires: {new Date(item.expiresAt).toLocaleString()}</p>
+                <div className="mt-3 flex gap-2">
+                  <Button disabled={pending}
+                    onClick={()=>void decideApproval(item.approvalRequestId,"approved")}>Approve</Button>
+                  <Button variant="outline" disabled={pending}
+                    onClick={()=>void decideApproval(item.approvalRequestId,"rejected")}>Reject</Button>
+                </div>
+              </li>)}
+            </ul>
+          </section>
           <NativeClassAssessmentReviewPanel classId={workspace.classId}/>
           <NativeClassSurveyCampaignPanel classId={workspace.classId}/>
           <div className="mt-6 border-t border-border pt-5">
