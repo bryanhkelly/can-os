@@ -33,6 +33,8 @@ const sourceGuarded = new Set([
   "operations.insights.tsx",
   "admissions.families.tsx",
   "operations.course-requests.tsx",
+  "guardian.field-trips.tsx",
+  "teacher.discussions.tsx",
   "platform.tsx",
 ]);
 
