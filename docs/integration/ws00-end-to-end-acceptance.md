@@ -81,3 +81,32 @@ sessions and a disposable isolated QA database. A skipped test is **not a pass**
   and fixture provisioning remain release work.
 
 **Owner: WS00 integration/release. Release status: NO-GO.**
+
+
+## Added executable fail-closed QA gates
+
+- `npm run verify:ws00:qa-readiness`: read-only, checks exact Neon project/branch
+  identity through the restricted test-branch attestation, test-only capability
+  flags, 3 approved active canonical Classes (one one-hour and two four-Session
+  Classes), two distinct Sites, four canonical Sessions per local pilot Class,
+  WS3/WS4 governance relations and 5 forced-RLS tables. The gate cannot
+  currently pass against the unmodified empty `test01` branch and it is
+  **not proof of browser acceptance**.
+- `npm run test:e2e:ws00:single-login`: disposable localhost-only Playwright
+  acceptance. An unused, verified CAN-only adult with no native-v3 cookie must
+  enroll in the one-hour Class after consent, open the Class, see the original
+  source in My Activity, withdraw, and retain exactly one historical source
+  record. A skipped required test is not a pass. This test deliberately
+  captures the unresolved **P0 one-login gap** described in
+  https://github.com/bryanhkelly/can-os/issues/320.
+- Current source `getCanonicalCommandContext` requires a native canonical
+  learner session for CAN account roles other than Site Admin/Registrar.
+  Noncredit enrollment can create one after identity binding, but fresh
+  CAN-only native Class self-enrollment currently has no equivalent onboarding
+  path. This must be fixed using reviewed CAN/Person/Organization mappings and
+  an authorized native learning session, **not by weakening auth or inferring
+  ownership from email**.
+
+These added checks have been committed but **have not passed in a running QA
+environment**. They do not replace one-hour/four-Session delivery, independently
+reviewed governed outcomes, two-Site reporting, or concurrent seat acceptance.
