@@ -64,12 +64,12 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
       {item.offeringState?" · Offering: "+item.offeringState:" · No Class Offering required"}
      </p>
      {item.state==="active"?<div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-      <Link to="/classes/$classId" params={{classId:item.classId}}
+      <Link to="/class/$classId" params={{classId:item.classId}}
        search={{view:"manage",tab:"overview",lesson:undefined,session:undefined}}
        className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
        Assign a Class facilitator <ArrowRight className="size-4"/>
       </Link>
-      <Link to="/classes/$classId" params={{classId:item.classId}}
+      <Link to="/class/$classId" params={{classId:item.classId}}
        search={{view:"manage",tab:"sessions",lesson:undefined,session:undefined}}
        className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
        <CalendarDays className="size-4"/> Review Sessions <ArrowRight className="size-4"/>

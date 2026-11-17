@@ -287,7 +287,7 @@ function MyActivityPage() {
         {partialSources.filter(item => item.message).map(item =>
           <p key={item.source} className="mt-2 text-muted-foreground">{item.message}</p>)}
         {partialSources.some(item => item.source === "native_class" && item.message) &&
-          <Link to="/learn/classes" className="mt-2 inline-block font-semibold text-primary underline underline-offset-4">
+          <Link to="/class" className="mt-2 inline-block font-semibold text-primary underline underline-offset-4">
             Open paginated Class history
           </Link>}
       </div>}

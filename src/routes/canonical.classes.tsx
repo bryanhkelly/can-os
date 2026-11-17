@@ -364,7 +364,7 @@ function NativeClasses(){
                 {(classes.data??[]).filter(item=>item.deploymentId===row.deploymentId&&
                   item.courseVersionId===row.courseVersionId&&
                   item.offeringVersionId===row.offeringVersionId).map(cls=>
-                    <Link key={cls.classId} to="/classes/$classId"
+                    <Link key={cls.classId} to="/class/$classId"
                       params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
                       className="mt-2 block text-xs font-semibold underline">
                       {cls.title} · {cls.state} · Sessions
@@ -661,11 +661,11 @@ function NativeClasses(){
                 ?`${item.visibility} · ${item.offeringState} · version ${item.versionNo}`
                 :"No Class Offering · internal Class"}
             </p>
-            <h3 className="mt-1 text-base font-semibold"><Link to="/classes/$classId"
+            <h3 className="mt-1 text-base font-semibold"><Link to="/class/$classId"
               params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
               className="underline-offset-2 hover:underline">{item.title}</Link></h3>
             <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {(item.enrollmentMethods??[]).join(", ")||"No registration publication"}</p>
-            <Link to="/classes/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
+            <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
               className="mt-2 inline-block text-sm font-semibold underline">Open Class workspace</Link>
             <Link to="/reports/classes/$classId" params={{classId:item.classId}}
               aria-label={`Class evidence for ${item.title}`}

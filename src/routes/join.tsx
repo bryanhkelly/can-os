@@ -68,7 +68,7 @@ function ClassroomJoinPage() {
       if(chosen?.classId){
         // A native Class stays in the one shared Class workspace. The QR
         // code is only a pairing pointer, never an alternate learner route.
-        void navigate({to:"/classes/$classId",params:{classId:chosen.classId},
+        void navigate({to:"/class/$classId",params:{classId:chosen.classId},
           search:{view:"learn",tab:"sessions"},replace:true});
       }else{
         // Older school/noncredit courses retain their existing companion
@@ -110,7 +110,7 @@ function ClassroomJoinPage() {
             Private Classes require an invitation, approval, or an assignment
             from your organization. Scanning a QR code never enrolls you.
           </p>
-          <Link to="/learn/classes" className="inline-block font-semibold underline">
+          <Link to="/class" className="inline-block font-semibold underline">
             Explore available Classes
           </Link>
           <p className="text-xs text-muted-foreground">

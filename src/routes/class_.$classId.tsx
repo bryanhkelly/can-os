@@ -32,7 +32,7 @@ const searchSchema=z.object({
   session:uuid.optional(),
 }).strip();
 
-export const Route=createFileRoute("/classes_/$classId")({
+export const Route=createFileRoute("/class_/$classId")({
   validateSearch:(raw:Record<string,unknown>)=>searchSchema.parse(raw),
   component:OneClassWorkspace,
 });
@@ -50,7 +50,7 @@ const viewLabels:Record<ClassView,string>={
 function ClassNavigation({workspace}:{workspace:Workspace}){
   return <nav aria-label="Class navigation" className="border-b border-border bg-card">
     <div className="flex flex-wrap gap-1 border-b border-border p-2">
-      {workspace.availableViews.map(view=><Link key={view} to="/classes/$classId"
+      {workspace.availableViews.map(view=><Link key={view} to="/class/$classId"
         params={{classId:workspace.classId}}
         search={{view,tab:undefined,lesson:undefined,session:undefined}}
         aria-current={view===workspace.view?"page":undefined}
@@ -60,7 +60,7 @@ function ClassNavigation({workspace}:{workspace:Workspace}){
       </Link>)}
     </div>
     <div className="flex flex-wrap gap-1 p-2">
-      {workspace.availableTabs.map(tab=><Link key={tab} to="/classes/$classId"
+      {workspace.availableTabs.map(tab=><Link key={tab} to="/class/$classId"
         params={{classId:workspace.classId}}
         search={{view:workspace.view,tab,lesson:undefined,session:undefined}}
         aria-current={workspace.tab===tab?"page":undefined}
@@ -87,7 +87,7 @@ function OneClassWorkspace(){
     <p role="alert" className="mt-5 border border-border bg-card p-5 text-sm">
       You cannot open this Class view with your current verified relationship. Select an authorized Class or sign in with the appropriate grant.
     </p>
-    <Link to="/classes" search={{}} className="mt-4 inline-block text-sm font-semibold underline">
+    <Link to="/class" search={{}} className="mt-4 inline-block text-sm font-semibold underline">
       Return to Classes
     </Link>
   </WorkspaceShell>;
@@ -111,7 +111,7 @@ function LearnerClass({workspace}:{workspace:Workspace}){
     x.progressStatus==="completed"||x.progressStatus==="waived").length??0;
   return <UnifiedCoursePlayer context="native" title={workspace.title}
     subtitle="Your authorized Class workspace. Recorded teacher selection and progress belong to your own Course Attempt."
-    actions={<Link to="/classes" search={{}} className="text-sm font-semibold underline">All Classes</Link>}
+    actions={<Link to="/class" search={{}} className="text-sm font-semibold underline">All Classes</Link>}
     metadata={<>
       <span><strong>Enrollment:</strong> {learner.status}</span>
       <span><strong>Academic credit:</strong> {learner.creditMode.replaceAll("_"," ")}</span>
@@ -137,7 +137,7 @@ function LearnerClass({workspace}:{workspace:Workspace}){
               id:lesson.lessonId,title:lesson.lessonTitle,
               group:lesson.unitTitle,status:lesson.progressStatus,
             }))}
-            renderAction={lesson=><Link to="/classes/$classId"
+            renderAction={lesson=><Link to="/class/$classId"
               params={{classId:workspace.classId}}
               search={{view:"learn",tab:"lessons",lesson:lesson.id,session:undefined}}
               className="underline-offset-2 hover:underline">{lesson.title}</Link>}/>
@@ -176,7 +176,7 @@ function TeachingClass({workspace}:{workspace:Workspace}){
   const canSeeNames=workspace.canViewRoster;
   return <UnifiedCoursePlayer context="native" title={workspace.title}
     subtitle="Class delivery and instructional preparation. This view never exposes a learner's personal Course Attempt or official awarding authority."
-    actions={<Link to="/classes" search={{}} className="text-sm font-semibold underline">All Classes</Link>}
+    actions={<Link to="/class" search={{}} className="text-sm font-semibold underline">All Classes</Link>}
     metadata={<>
       <span><strong>Assignment:</strong> {workspace.staffRole??"Facilitator"}</span>
       <span><strong>Current roster:</strong> {workspace.rosterCount}</span>
@@ -191,7 +191,7 @@ function TeachingClass({workspace}:{workspace:Workspace}){
             lessons={workspace.lessons.map(item=>({
               id:item.id,title:item.title,group:item.unitTitle,
             }))}
-            renderAction={item=><Link to="/classes/$classId"
+            renderAction={item=><Link to="/class/$classId"
               params={{classId:workspace.classId}}
               search={{view:"teach",tab:"lessons",lesson:item.id,session:undefined}}
               className="underline-offset-2 hover:underline">{item.title}</Link>}/>
@@ -349,7 +349,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
   }
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Class management" title={workspace.title}
     subtitle="Manage the authorized Class and its enrollment contract. Marketing visibility does not change instructional governance."
-    actions={<Link to="/classes" search={{}} className="text-sm font-semibold underline">All Classes</Link>}>
+    actions={<Link to="/class" search={{}} className="text-sm font-semibold underline">All Classes</Link>}>
     <div className="mt-5"><ClassNavigation workspace={workspace}/></div>
     <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(18rem,.65fr)]">
       <section className="border border-border bg-card p-5">

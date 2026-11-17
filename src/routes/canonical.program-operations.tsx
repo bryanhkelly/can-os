@@ -238,7 +238,7 @@ function ProgramOperations(){
       {impactData&&impactData.affectedClasses.length===0&&
         <p className="mt-2 text-sm text-muted-foreground">No currently authorized local Classes found for this Offering.</p>}
       {impactData&&<div className="mt-3 grid gap-2 md:grid-cols-2">
-        {impactData.affectedClasses.map(cls=><Link key={cls.classId} to="/classes/$classId"
+        {impactData.affectedClasses.map(cls=><Link key={cls.classId} to="/class/$classId"
           params={{classId:cls.classId}} search={{view:"manage",tab:"sessions"}}
           className="block border border-border p-3 text-sm underline underline-offset-4">
           <strong>{cls.title}</strong>

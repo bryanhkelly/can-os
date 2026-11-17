@@ -134,12 +134,13 @@ const siteAdminProfileLink = {
  * Role-specific destinations. Home and Messages are generated once below.
  */
 const roleLinks = {
-  account_holder: [{ title: "My Activity", path: "/learn/my-activity", icon: "book" }],
+  account_holder: [{ title: "Classes", path: "/class", icon: "book" }, { title: "My Activity", path: "/learn/my-activity", icon: "book" }],
   academic_content_creator: [],
   academic_content_reviewer: [],
-  site_admin: [...schoolAdministrationLinks, { title: "Classes", path: "/classes", icon: "book" }, siteAdminProfileLink],
+  site_admin: [...schoolAdministrationLinks, { title: "Classes", path: "/class", icon: "book" }, siteAdminProfileLink],
   site_website_editor: [{ title: "Website", path: "/site-website", icon: "globe" }],
   room_facilitator: [
+    { title: "Classes", path: "/class", icon: "book" },
     { title: "Report a safety concern", path: "/safeguarding", icon: "safety" },
     { title: "Attendance", path: "/staff/attendance", icon: "clipboard" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
@@ -170,6 +171,7 @@ const roleLinks = {
   can_jurisdiction_reviewer: [],
   student: [
     { title: "My Activity", path: "/learn/my-activity", icon: "book" },
+    { title: "Classes", path: "/class", icon: "book" },
     { title: "Learn", path: "/student/courses", icon: "book" },
     { title: "School profile", path: "/student/my-school", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
@@ -177,12 +179,13 @@ const roleLinks = {
   ],
   guardian: [
     { title: "My Activity", path: "/learn/my-activity", icon: "book" },
+    { title: "Classes", path: "/class", icon: "book" },
     { title: "Students", path: "/guardian/students", icon: "book" },
     { title: "School profile", path: "/guardian/experiences", icon: "users" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },
   ],
   teacher: [
-    { title: "Classes", path: "/classes", icon: "book" },
+    { title: "Classes", path: "/class", icon: "book" },
     { title: "Students", path: "/staff/students", icon: "users" },
     { title: "Gradebook", path: "/teacher/gradebook", icon: "clipboard" },
     { title: "Calendar", path: "/calendar", icon: "calendar" },

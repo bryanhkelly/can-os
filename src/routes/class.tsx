@@ -12,7 +12,7 @@ import { getMyNativeClassInvitations, declineNativeClassInvitation } from
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 
-export const Route=createFileRoute("/learn/classes")({
+export const Route=createFileRoute("/class")({
   validateSearch:(value:Record<string,unknown>):{search?:string;classId?:string}=>({
     search:typeof value.search==="string"&&value.search.trim().length<=100
       ?value.search.trim():undefined,
@@ -194,7 +194,7 @@ function EnrolledClassCard({item,onChanged}:{item:EnrolledClass;onChanged:()=>Pr
     <h3 className="mt-2 font-serif text-xl">{item.title}</h3>
     <p className="mt-2 text-sm text-muted-foreground">{item.deliveryMode.replace("_"," ")}</p>
     {item.courseAttemptId&&["active","completed"].includes(item.status)&&
-      <Link to="/classes/$classId" params={{classId:item.classId}}
+      <Link to="/class/$classId" params={{classId:item.classId}}
         search={{view:"learn",tab:"lessons"}}
         className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
         Open Class

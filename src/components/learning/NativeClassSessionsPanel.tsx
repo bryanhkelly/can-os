@@ -301,7 +301,7 @@ export function NativeClassSessionsPanel({
           {session.state==="scheduled"&&<Button size="sm" variant="outline" disabled={busy}
             onClick={()=>void start(session.id)}>Open room</Button>}
           {session.roomId&&session.roomState==="live"&&<Link
-            to="/classes/$classId" params={{classId:workspace.classId}}
+            to="/class/$classId" params={{classId:workspace.classId}}
             search={{view:"teach",tab:"classroom",session:session.id,lesson:undefined}}
             className="text-sm font-semibold underline">Resume authorized live controls</Link>}
           {session.roomId&&session.roomState==="live"&&<Link to="/classroom/$sessionId/presentation"

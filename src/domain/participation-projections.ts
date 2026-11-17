@@ -88,7 +88,7 @@ export function projectNativeClasses(
       progress: null,
       outcome: item.officialOutcome ?? null,
       action: hasLearningAccess ? {
-        label: "Open class", href: "/classes/" + hrefId(item.classId) + "?view=learn&tab=lessons",
+        label: "Open class", href: "/class/" + hrefId(item.classId) + "?view=learn&tab=lessons",
       } : null,
     }, now);
   });
