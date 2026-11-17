@@ -65,6 +65,23 @@ describe("one public-schema Site and Organization model",()=>{
     expect(gate).not.toMatch(/sql\`\s*(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b/i);
   });
 
+  it("rebinds empty operating tables directly to the authoritative Organization and Person",()=>{
+    const organizations=read("database/production/2026-11-17-rebind-public-operational-organization-fks.sql");
+    const people=read("database/production/2026-11-17-rebind-public-operational-person-fks.sql");
+    const gate=read("scripts/acceptance/check-main-site-schema-consolidation.mjs");
+    expect(organizations).toContain("REFERENCES public.organizations(id)");
+    expect(organizations).toContain("Operational table now populated");
+    expect(organizations).toContain("c.convalidated");
+    expect(people).toContain("REFERENCES public.people(id)");
+    expect(people).toContain("Operational table populated");
+    expect(people).toContain("access_account_canonical_principals");
+    expect(gate).toContain("direct_operational_organization_fks");
+    expect(gate).toContain("direct_operational_person_fks");
+    expect(gate).toContain("!==26");
+    expect(gate).toContain("!==7");
+    expect(gate).not.toMatch(/sql\`\s*(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b/i);
+  });
+
   it("documents schema consolidation and removal of duplicate identities",()=>{
     const adr=read("docs/architecture/adr-one-platform-site-identity.md");
     expect(adr).toContain("one public application schema");
