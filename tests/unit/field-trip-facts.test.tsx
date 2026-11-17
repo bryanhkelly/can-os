@@ -39,6 +39,17 @@ describe("V6.1 shared FieldTripFacts", () => {
     expect(html).not.toContain("Authorized to board");
   });
 
+  it("keeps trip approval and the guardian's boarding permission as distinct badges", () => {
+    const source = readFileSync(new URL("../../src/routes/operations.field-trips.tsx", import.meta.url), "utf8");
+    expect(source).toContain("<StatusBadge");
+    expect(source).toContain("Trip: {trip.status}");
+    expect(source).toContain("Guardian declined — NOT authorized to board");
+    expect(source).toContain("participant.status === \"permission_complete\"");
+    expect(source).toContain("participant.status === \"declined\"");
+    expect(source).toContain('status: "boarded"');
+    expect(source).not.toContain("rounded-full border px-3 py-1 text-xs");
+  });
+
   it("uses the same presentation in student and guardian routes", () => {
     for (const path of ["src/routes/student.field-trips.tsx", "src/routes/guardian.field-trips.tsx"]) {
       const source = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
