@@ -44,9 +44,11 @@ async function main(){
        WHERE table_schema='education_v30' AND table_type='BASE TABLE') AS canonical_tables,
       to_regclass('public.site_canonical_identity_links') IS NULL AS site_bridge_absent,
       (SELECT count(*)::int FROM pg_constraint c WHERE c.contype='f'
-        AND c.confrelid='education_v30.sites'::regclass) AS remaining_native_site_fks,
+        AND c.confrelid=to_regclass('education_v30.sites')) AS remaining_native_site_fks,
       (SELECT count(*)::int FROM pg_constraint c WHERE c.contype='f'
         AND c.confrelid='public.sites'::regclass) AS public_site_fks,
+      to_regclass('education_v30.sites') IS NULL AS duplicate_site_retired,
+      (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid='public.sites'::regclass) AS platform_site_rls_forced,
       (SELECT count(*)::int FROM public.people) AS platform_people,
       (SELECT count(*)::int FROM education_v30.persons) AS native_people,
       (SELECT count(*)::int FROM public.access_accounts) AS platform_accounts,
@@ -121,7 +123,8 @@ async function main(){
       ) AS direct_operational_person_fks
   `;
 
-  if(!summary.site_bridge_absent ||
+  if(!summary.site_bridge_absent || !summary.duplicate_site_retired ||
+    !summary.platform_site_rls_forced || summary.remaining_native_site_fks!==0 ||
     relocated.length!==movedTables.length||old.length!==0 ||
     fks.length!==repointedFks.length ||
     fks.some(row=>!row.points_to_public||!row.validated) ||

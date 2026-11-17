@@ -29,7 +29,7 @@ async function main(){
   const [summary]=await sql`
     SELECT
       (SELECT count(*)::int FROM public.sites) AS platform_sites,
-      (SELECT count(*)::int FROM education_v30.sites) AS duplicate_canonical_sites,
+      to_regclass('education_v30.sites') IS NULL AS duplicate_canonical_sites_retired,
       (SELECT count(*)::int FROM public.organizations) AS platform_organizations,
       (SELECT count(*)::int FROM education_v30.organizations) AS duplicate_canonical_organizations,
       to_regclass('public.site_canonical_identity_links') IS NULL AS site_identity_bridge_retired,
@@ -59,13 +59,13 @@ async function main(){
       JOIN pg_class dst ON dst.oid=c.confrelid
       JOIN pg_namespace dst_ns ON dst_ns.oid=dst.relnamespace
     WHERE c.contype='f'
-      AND c.confrelid IN ('public.sites'::regclass,'education_v30.sites'::regclass,
+      AND c.confrelid IN ('public.sites'::regclass,to_regclass('education_v30.sites'),
         'public.organizations'::regclass,'education_v30.organizations'::regclass)
     ORDER BY from_table,c.conname
   `;
   const [rls]=await sql`
     SELECT
-      (SELECT relforcerowsecurity FROM pg_class WHERE oid='education_v30.sites'::regclass) AS canonical_site_rls_forced,
+      to_regclass('education_v30.sites') IS NOT NULL AS canonical_site_still_exists,
       (SELECT relforcerowsecurity FROM pg_class WHERE oid='public.sites'::regclass) AS public_site_rls_forced
   `;
   const [routineSummary]=await sql`

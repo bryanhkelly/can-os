@@ -22,7 +22,7 @@ async function main(){
     throw new Error("Application and QA must share one explicitly isolated test database");
   const branch=required("CAN_E2E_TEST_BRANCH_ID");
   const siteId=required("CAN_CLASS_OPERATOR_QA_SITE_ID");
-  if(!uuid.test(siteId))throw new Error("A real canonical QA Site UUID is required");
+  if(!uuid.test(siteId))throw new Error("A real platform QA Site UUID is required");
   required("CAN_CLASS_OPERATOR_QA_SECRET");
   await verifyAdmissionsNeonBranch({
     ...env,CAN_ADMISSIONS_TEST_BRANCH_ID:branch,
@@ -34,11 +34,11 @@ async function main(){
         WHERE lifecycle='published' AND published_at IS NOT NULL) AS published_course,
       EXISTS(SELECT 1 FROM education_v30.deployment_offering_adoptions
         WHERE approval_status='approved') AS approved_adoption,
-      EXISTS(SELECT 1 FROM education_v30.sites WHERE id=${siteId}::uuid)
+      EXISTS(SELECT 1 FROM public.sites WHERE id=${siteId}::uuid)
         AS has_site
   `;
   if(!row?.published_course||!row.approved_adoption||!row.has_site)
-    throw new Error("QA missing a real published Course, approved adoption, or canonical Site");
+    throw new Error("QA missing a real published Course, approved adoption, or platform Site");
   console.log(JSON.stringify({
     readOnly:true,branchId:branch,
     publishedCourseAvailable:true,approvedAdoptionAvailable:true,

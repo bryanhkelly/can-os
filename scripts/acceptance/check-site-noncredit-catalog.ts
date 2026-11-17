@@ -30,8 +30,7 @@ async function main(){
     "The current application DB connection lacks read access to Site/catalog relations");
   const sites=await db.execute(sql`
     SELECT p.id AS "siteId" FROM public.sites p
-      INNER JOIN education_v30.sites native
-        ON native.id=p.id AND native.status='active'
+    WHERE p.lifecycle_status='active'
     ORDER BY p.id LIMIT 26
   `);
   assert(sites.rows.length>0&&sites.rows.length<=25,

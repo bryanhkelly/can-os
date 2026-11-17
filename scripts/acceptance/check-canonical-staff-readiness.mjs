@@ -17,16 +17,16 @@ let client;
 try {
   client = await pool.connect();
   await client.query("BEGIN READ ONLY");
-  const [{ staff_reader, person_link_table, native_site_table, native_grants_table, operators_table }] =
+  const [{ staff_reader, person_link_table, platform_site_table, native_grants_table, operators_table }] =
     (await client.query(`
       SELECT
         to_regprocedure('education_v30.v301_can_staff_session_context(text)') IS NOT NULL AS staff_reader,
         to_regclass('public.access_account_canonical_principals') IS NOT NULL AS person_link_table,
-        to_regclass('education_v30.sites') IS NOT NULL AS native_site_table,
+        to_regclass('public.sites') IS NOT NULL AS platform_site_table,
         to_regclass('education_v30.canonical_account_grants') IS NOT NULL AS native_grants_table,
         to_regclass('education_v30.site_organization_roles') IS NOT NULL AS operators_table
     `)).rows;
-  const checks = { staff_reader, person_link_table, native_site_table, native_grants_table, operators_table };
+  const checks = { staff_reader, person_link_table, platform_site_table, native_grants_table, operators_table };
   const missing = Object.entries(checks).filter(([, present]) => !present).map(([name]) => name);
   if (missing.length) {
     await client.query("ROLLBACK");
@@ -112,8 +112,7 @@ try {
         (SELECT count(*)::int FROM public.access_account_canonical_principals
           WHERE revoked_at IS NULL AND verified_at IS NOT NULL) AS verified_person_links,
         (SELECT count(*)::int FROM public.sites platform_site
-          JOIN education_v30.sites native_site
-            ON native_site.id=platform_site.id AND native_site.status IN ('planning','active')
+          WHERE platform_site.lifecycle_status IN ('planning','active')
         ) AS matching_shared_sites,
         (SELECT count(*)::int FROM education_v30.canonical_account_grants
           WHERE active = true AND revoked_at IS NULL
@@ -141,8 +140,6 @@ try {
             AND native_grant.active AND native_grant.revoked_at IS NULL
            JOIN education_v30.canonical_accounts native_account
              ON native_account.id = native_grant.account_id
-           JOIN education_v30.sites native_site
-             ON native_site.id = public_site.id
            JOIN education_v30.organizations native_org
              ON native_org.id = native_grant.organization_id
            JOIN public.people can_person
@@ -154,7 +151,7 @@ try {
             AND native_account.email_verified_at IS NOT NULL
             AND native_org.status = 'active'
             AND can_person.active = true
-            AND native_site.status IN ('planning','active')
+            AND public_site.lifecycle_status IN ('planning','active')
             AND NOT EXISTS (
               SELECT 1 FROM public.account_person_grants other_grant
               WHERE other_grant.account_id = a.id AND other_grant.active = true
