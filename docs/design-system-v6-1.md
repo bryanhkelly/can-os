@@ -124,7 +124,7 @@ CAN OS V6.1 uses three layers of **one** design system, not three competing libr
 | Layer | Ownership | Existing examples | Rules |
 | --- | --- | --- | --- |
 | 1. Primitives | `src/components/ui/`, theme tokens and layout foundations | Button, Input, Select, Modal, Table, Field, PageFrame | Own geometry, focus, semantics and shared style. Feature UI must use these rather than styling equivalent native form controls. |
-| 2. Application patterns | `src/components/workspace/`, `src/components/workflow/`, shared form and directory composition | DirectoryTable, PageHeader, FormSection, FormActions, WorkflowProgress, RecordHeader, StatusBadge | Own responsive composition, empty/error/loading states and reusable interactions. Remain domain-neutral; do not query databases or implement permissions. |
+| 2. Application patterns | `src/components/workspace/`, `src/components/workflow/`, shared form and directory composition | DirectoryTable, FilterBar, PageHeader, FormSection, FormActions, WorkflowProgress, RecordHeader, StatusBadge | Own responsive composition, empty/error/loading states and reusable interactions. Remain domain-neutral; do not query databases or implement permissions. |
 | 3. Feature components | Feature-specific folders and modules | EvidenceUploader, class roster, enrollment forms, blueprint workflows | Own domain-specific fields, presentation and commands; compose Layers 1 and 2. Authorization and business transitions remain server-owned. |
 
 **Reuse before invention:** For any new feature surface, look for an existing pattern
@@ -138,7 +138,7 @@ patterns depend on primitives. Shared components must not import feature compone
 Server-side authorization, data ownership, audits and lifecycle transitions must
 never migrate into presentation components merely to enable reuse.
 
-**Design enforcement:** `scripts/check-design-system.mjs` already checks
+**Design enforcement:** `scripts/check-design-system.mjs` now enforces shared FilterBar composition and square geometry in the directory patterns. `DirectoryPage` delegates search, supplemental filters and view toggles to `FilterBar` while preserving its public API. Directory sort and pagination remain controlled by feature owners. The checker also checks
 canonical primitives, shared shell geometry and evidence ownership. A governed
 feature-control manifest additionally checks migrated evidence upload controls for
 shared Button/Input/Label imports, prohibited raw native controls and rounded
