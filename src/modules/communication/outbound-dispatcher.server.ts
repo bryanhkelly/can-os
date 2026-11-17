@@ -1,0 +1,113 @@
+import {
+  OUTBOUND_LEASE_MS,
+  OUTBOUND_MAX_ATTEMPTS,
+  outboundRetryDelayMs,
+} from "@/domain/outbound-retry-policy";
+
+/**
+ * Transport-only orchestration for source-owned, durable outbound queues.
+ *
+ * The source adapter owns SQL row locking, lease fencing, eligibility,
+ * message construction, recipient authorization and final state writes.
+ * Never send within the source command transaction. A provider's acceptance
+ * is not proof of inbox delivery.
+ */
+export type OutboundClaim = { id: string; leaseUntil: Date; attempts: number };
+export type OutboundPreparation<Message> =
+  | { kind: "suppress"; reason: string }
+  | { kind: "ready"; message: Message };
+
+export type OutboundAdapter<Message> = {
+  claim(now: Date, seenIds: readonly string[], leaseMs: number): Promise<OutboundClaim | null>;
+  prepare(claim: OutboundClaim, now: Date): Promise<OutboundPreparation<Message>>;
+  /** CAS on the old lease. Return null if another worker owns this claim. */
+  renew(claim: OutboundClaim, now: Date, leaseMs: number): Promise<OutboundClaim | null>;
+  /** Transport must reuse claim.id as its idempotency key. */
+  send(message: Message, idempotencyKey: string): Promise<boolean>;
+  /**
+   * Every write is fenced by the claim's renewed lease and processing state.
+   * Return false when ownership has changed; do not count unowned results.
+   */
+  settle(
+    claim: OutboundClaim,
+    result: {
+      kind: "accepted" | "failed" | "suppressed";
+      now: Date;
+      attempts: number;
+      nextAttemptAt: Date | null;
+      reason: string | null;
+    },
+  ): Promise<boolean>;
+  /** A crash during preparation/transport also consumes one attempt. */
+  attemptsAfterError(claim: OutboundClaim): Promise<number | null>;
+};
+
+export type OutboundDispatchSummary = {
+  accepted: number;
+  suppressed: number;
+  failed: number;
+};
+
+export async function dispatchOutboundMessages<Message>(
+  adapter: OutboundAdapter<Message>,
+  options: {
+    now?: Date;
+    limit?: number;
+    leaseMs?: number;
+    maxAttempts?: number;
+    retryDelayMs?: (attempt: number) => number;
+    clock?: () => Date;
+  } = {},
+): Promise<OutboundDispatchSummary> {
+  const started = options.now ?? new Date();
+  const clock = options.clock ?? (() => new Date(Math.max(Date.now(), started.getTime())));
+  const leaseMs = options.leaseMs ?? OUTBOUND_LEASE_MS;
+  const maxAttempts = options.maxAttempts ?? OUTBOUND_MAX_ATTEMPTS;
+  const retryDelayMs = options.retryDelayMs ?? outboundRetryDelayMs;
+  const limit = Math.min(100, Math.max(0, Math.trunc(options.limit ?? 30)));
+  const seen: string[] = [];
+  const totals = { accepted: 0, suppressed: 0, failed: 0 };
+  while (seen.length < limit) {
+    const claimed = await adapter.claim(clock(), seen, leaseMs);
+    if (!claimed) break;
+    if (seen.includes(claimed.id)) {
+      throw new Error("Outbound adapter reclaimed the same receipt within a dispatch run");
+    }
+    seen.push(claimed.id);
+    let active = claimed;
+    try {
+      const prepared = await adapter.prepare(active, clock());
+      if (prepared.kind === "suppress") {
+        if (await adapter.settle(active, {
+          kind: "suppressed", reason: prepared.reason,
+          attempts: active.attempts, nextAttemptAt: null, now: clock(),
+        })) totals.suppressed++;
+        continue;
+      }
+      const renewed = await adapter.renew(active, clock(), leaseMs);
+      if (!renewed) continue;
+      active = renewed;
+      const providerAccepted = await adapter.send(prepared.message, active.id);
+      const attempts = active.attempts + 1;
+      const at = clock();
+      const kind = providerAccepted ? "accepted" : "failed";
+      if (await adapter.settle(active, {
+        kind, now: at, attempts,
+        reason: providerAccepted ? null : "provider_not_accepted",
+        nextAttemptAt: providerAccepted || attempts >= maxAttempts
+          ? null : new Date(at.getTime() + retryDelayMs(attempts)),
+      })) totals[kind]++;
+    } catch {
+      const attempts = await adapter.attemptsAfterError(active);
+      if (attempts === null) continue; // Lost ownership: do not mutate.
+      const at = clock();
+      if (await adapter.settle(active, {
+        kind: "failed", attempts, now: at,
+        reason: "delivery_worker_error",
+        nextAttemptAt: attempts >= maxAttempts
+          ? null : new Date(at.getTime() + retryDelayMs(attempts)),
+      })) totals.failed++;
+    }
+  }
+  return totals;
+}
