@@ -94,7 +94,12 @@ function MyNoncreditCourses(){
                     setBusy(item.releaseId);
                     try{
                       await cancelMyNoncreditWaitlist({data:{releaseId:item.releaseId}});
-                      await client.invalidateQueries({queryKey:["my-noncredit-waitlist"]});
+                      await Promise.all([
+                        client.invalidateQueries({queryKey:["my-noncredit-waitlist"]}),
+                        // Waitlist invitations are opportunities in My Activity,
+                        // never registrations; refresh them after cancellation.
+                        client.invalidateQueries({queryKey:["my-activity"]}),
+                      ]);
                       setCancelWaitlist(null);
                     }catch(e){setError(normalizeClientError(e,"Unable to cancel your waitlist entry.").message);}
                     finally{setBusy(null);}
