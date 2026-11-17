@@ -32,6 +32,7 @@ import { currentClassAuthority } from "./native-class-authority.server";
 import { requireNativeRepeatAuthorization } from "./native-class-repeats.functions";
 import { classCreditModeSchema } from "@/domain/unified-class";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
+import { resolveAuthorizedLearningPerson } from "@/modules/identity/authorized-learning-person.server";
 import { assertCurrentNativeClassLearnerForMutation } from "./native-class-learner-session.server";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -50,12 +51,10 @@ function guard(){
   setResponseHeader("Referrer-Policy","no-referrer");
 }
 async function requireLearner(){
-  const request=getRequest();
-  const actor=await getCanonicalCommandContext(request);
-  if(!actor.actorPersonId || actor.role!=="learner")
-    throw new AuthorizationError("verified canonical learner Person");
-  assertCapability(actor,"learning.participate");
-  return {learnerPersonId:actor.actorPersonId,actor,request};
+  const {actor,personId,request}=await resolveAuthorizedLearningPerson(
+    getRequest(),"learning.participate",
+  );
+  return {learnerPersonId:personId,actor,request};
 }
 
 /** A live Class is permitted only while publisher/adoption/deployment and
