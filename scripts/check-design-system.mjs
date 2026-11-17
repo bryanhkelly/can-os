@@ -152,6 +152,17 @@ for (const [file, contract] of Object.entries(canonicalControlConsumers)) {
   }
 }
 
+// Layer 2 design geometry is universal, including patterns introduced later.
+// The component library must remain rectangular without relying on global CSS.
+for (const file of files) {
+  const component = relative(root, file).replaceAll("\\\\", "/");
+  if (!component.startsWith("workspace/") && !component.startsWith("workflow/")) continue;
+  if (radiusUtility.test(readFileSync(file, "utf8"))) {
+    console.error(`${component} must use V6.1 square-corner geometry`);
+    process.exitCode = 1;
+  }
+}
+
 // Layer 2 ownership: every directory uses the shared FilterBar composition,
 // and neither the pattern nor its table may reintroduce rounded surfaces.
 const sharedPatternContracts = {
