@@ -33,7 +33,7 @@ const tableQueries = {
   identity_links_noncredit: "SELECT count(*)::bigint AS n FROM public.access_account_noncredit_principals",
   identity_links_staff: "SELECT count(*)::bigint AS n FROM public.access_account_canonical_principals",
   can_accounts: "SELECT count(*)::bigint AS n FROM public.access_accounts",
-  native_accounts: "SELECT count(*)::bigint AS n FROM education_v30.accounts",
+  native_accounts: "SELECT count(*)::bigint AS n FROM education_v30.canonical_accounts",
 };
 const client = await pool.connect();
 try {
