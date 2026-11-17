@@ -19,6 +19,7 @@ import { getNativeClassLearning } from "@/modules/classes/native-class-learning.
 import { assignAdultToNativeClass } from "@/modules/classes/native-class-assignment.functions";
 import { issueNativeClassInvitation } from "@/modules/classes/native-class-invitations.functions";
 import {getNativeClassApprovalQueue,decideNativeClassApproval} from "@/modules/classes/native-class-approvals.functions";
+import {listNativeClassRepeatCandidates,authorizeNativeClassRepeat} from "@/modules/classes/native-class-repeats.functions";
 import { provisionNativeClassKnowledgeCheckAccess } from "@/modules/classes/native-class-assessment-provision.functions";
 import {
   assignNativeClassStaff, endNativeClassStaffAssignment,
@@ -313,6 +314,12 @@ function ManagingClass({workspace}:{workspace:Workspace}){
     queryFn:()=>getNativeClassApprovalQueue({data:{classId:workspace.classId}}),
     enabled:workspace.tab==="roster",retry:false,
   });
+  const repeats=useQuery({
+    queryKey:["native-class-repeat-candidates",workspace.classId],
+    queryFn:()=>listNativeClassRepeatCandidates({data:{classId:workspace.classId}}),
+    enabled:workspace.tab==="roster",retry:false,
+  });
+  const [repeatReason,setRepeatReason]=useState("");
   const [reviewReason,setReviewReason]=useState("");
   const [learnerPersonId,setLearnerPersonId]=useState("");
   const [learnerCreditMode,setLearnerCreditMode]=useState<"audit"|"not_applicable">("not_applicable");
@@ -336,6 +343,26 @@ function ManagingClass({workspace}:{workspace:Workspace}){
         "Learner already belongs to this Class.":
         "Verified adult learner assigned to the Class without a Class Offering.");
     }catch(e){setError(normalizeClientError(e,"Could not assign Class learner.").message)}
+    finally{setPending(false)}
+  }
+  async function approveRepeat(candidate:{
+    priorEnrollmentId:string;completionOutcomeId:string;evidenceVersionId:string|null;
+  }){
+    if(pending||!candidate.evidenceVersionId||repeatReason.trim().length<10)return;
+    setPending(true);setError("");setNotice("");
+    try{
+      const result=await authorizeNativeClassRepeat({data:{
+        priorEnrollmentId:candidate.priorEnrollmentId,
+        completionOutcomeId:candidate.completionOutcomeId,
+        evidenceVersionId:candidate.evidenceVersionId,
+        reason:repeatReason.trim(),
+      }});
+      setNotice(result.duplicate?
+        "An unused repeat authorization already exists.":
+        "A 30-day repeat authorization was recorded. A new enrollment and Course Attempt require fresh admission.");
+      setRepeatReason("");
+      await client.invalidateQueries({queryKey:["native-class-repeat-candidates",workspace.classId]});
+    }catch(e){setError(normalizeClientError(e,"Could not authorize Class repeat.").message)}
     finally{setPending(false)}
   }
   async function decideApproval(approvalRequestId:string,decision:"approved"|"rejected"){
@@ -441,6 +468,33 @@ function ManagingClass({workspace}:{workspace:Workspace}){
                   <Button variant="outline" disabled={pending||reviewReason.trim().length<3}
                     onClick={()=>void decideApproval(item.approvalRequestId,"rejected")}>Reject</Button>
                 </div>
+              </li>)}
+            </ul>
+          </section>
+          <section className="mt-5 border border-border p-4" aria-label="Completed Class repeat authorization">
+            <h3 className="font-semibold">Authorize completed learner repeats</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              A completed Class is historical evidence. Only an independent Site reviewer
+              may grant a one-time repeat from the verified completion outcome.
+              Authorization never reserves a seat or reopens the old attempt.
+            </p>
+            {repeats.isError&&<p role="alert" className="mt-2 text-sm">Repeat evidence is unavailable.</p>}
+            {repeats.data?.length===0&&<p className="mt-2 text-sm">No independently reviewable completed learners.</p>}
+            <label className="mt-3 block text-sm font-semibold" htmlFor="class-repeat-reason">
+              Independent review rationale
+            </label>
+            <textarea id="class-repeat-reason" maxLength={1000} value={repeatReason}
+              onChange={e=>setRepeatReason(e.target.value)}
+              placeholder="Document the independent reason for allowing the learner to repeat this completed Class"
+              className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
+            <ul className="mt-3 space-y-2">
+              {repeats.data?.map(item=><li key={item.completionOutcomeId}
+                className="border border-border p-3 text-sm">
+                <p>Completed learner: {item.learnerPersonId}</p>
+                <p>Completion evidence: {item.completionOutcomeId}</p>
+                <Button className="mt-3" variant="outline"
+                  disabled={pending||repeatReason.trim().length<10||!item.evidenceVersionId}
+                  onClick={()=>void approveRepeat(item)}>Authorize one-time repeat</Button>
               </li>)}
             </ul>
           </section>
