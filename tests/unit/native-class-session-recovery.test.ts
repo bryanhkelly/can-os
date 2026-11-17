@@ -34,6 +34,18 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
     expect(source).not.toContain("tx.insert(canonicalAccountGrants)");
     expect(source).not.toContain("tx.insert(canonicalClassEnrollments)");
   });
+  it("does not let noncredit enrollment resurrect a revoked reviewed identity",()=>{
+    const noncredit=read("src/modules/enrollment/noncredit-self-enrollment.functions.ts");
+    expect(noncredit).toContain("accessAdultLearningReviews");
+    expect(noncredit).toContain('adultReview.status!=="approved"');
+    expect(noncredit).toContain("adultReview.canonicalAccountId!==link.canonicalAccountId");
+    expect(noncredit).toContain("person?.birthDate!==adultReview.verifiedBirthDate");
+    expect(noncredit).toContain("to_regclass('public.access_adult_learning_reviews')");
+    const recovery=read(path);
+    expect(recovery).toContain('review.status!=="approved"');
+    expect(recovery).toContain("review.verifiedBirthDate!==native.birthDate");
+    expect(recovery).toContain("reviewedSchema.rows[0]?.forced!==true");
+  });
   it("issues only after a serialized, audited transaction and proper restricted reader",()=>{
     const source=read(path);
     expect(source).toContain('pg_advisory_xact_lock(hashtext(');
