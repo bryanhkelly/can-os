@@ -18,6 +18,11 @@ import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
 import { enrollCurrentPersonInClass } from "@/modules/classes/native-class-entry.client";
+import {
+  canNativeSelfTransferTo,
+  nativeSelfTransferCreditModes,
+  type NativeSelfTransferCreditMode,
+} from "@/domain/native-class-transfer-choices";
 
 /** Load privileged Class management composition only when requested,
  * keeping the public Class directory and enrollment entry lightweight. */
@@ -287,13 +292,15 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   const [transferVersion,setTransferVersion]=useState("");
-  const [transferCredit,setTransferCredit]=useState<"audit"|"not_applicable">("not_applicable");
+  const [transferCredit,setTransferCredit]=useState<NativeSelfTransferCreditMode|"">("");
   const [transferAdult,setTransferAdult]=useState(false);
   const [transferConsent,setTransferConsent]=useState(false);
-  const target=destinations.find(row=>row.classOfferingVersionId===transferVersion);
+  const eligibleDestinations=destinations.filter(row=>canNativeSelfTransferTo(item.classId,row));
+  const target=eligibleDestinations.find(row=>row.classOfferingVersionId===transferVersion);
+  const allowedTransferModes=target?nativeSelfTransferCreditModes(target.allowedCreditModes):[];
   async function transfer(){
     if(item.status!=="active"||!target||!transferAdult||!transferConsent||
-       !target.allowedCreditModes.includes(transferCredit)||busy)return;
+       !transferCredit||!allowedTransferModes.includes(transferCredit)||busy)return;
     setBusy(true);setNotice("");setError("");
     try{
       await transferMyNativeClassEnrollment({data:{
@@ -303,7 +310,7 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
         requestId:crypto.randomUUID(),
       }});
       setNotice("Transfer completed. Old Class history was preserved.");
-      setTransferVersion("");setTransferAdult(false);setTransferConsent(false);
+      setTransferVersion("");setTransferCredit("");setTransferAdult(false);setTransferConsent(false);
       await onChanged();
     }catch(e){setError(normalizeClientError(e,"Class transfer was not completed.").message)}
     finally{setBusy(false)}
@@ -332,8 +339,7 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
         className="mt-4 inline-block text-sm font-semibold text-primary underline underline-offset-4">
         Open Class
       </Link>}
-    {item.status==="active"&&destinations.some(row=>row.classId!==item.classId&&
-      row.enrollmentMethods.includes("self"))&&
+    {item.status==="active"&&eligibleDestinations.length>0&&
       <details className="mt-4 border border-border p-3">
         <summary className="cursor-pointer text-sm font-semibold">Transfer to another Class</summary>
         <p className="mt-2 text-sm text-muted-foreground">
@@ -344,11 +350,16 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
           Destination Class
         </label>
         <Select id={"transfer-"+item.classEnrollmentId} value={transferVersion}
-          onChange={e=>{setTransferVersion(e.target.value);setTransferConsent(false);}}
+          onChange={e=>{
+            const next=eligibleDestinations.find(row=>row.classOfferingVersionId===e.target.value);
+            setTransferVersion(e.target.value);
+            setTransferCredit(next?nativeSelfTransferCreditModes(next.allowedCreditModes)[0]??"":"");
+            setTransferAdult(false);
+            setTransferConsent(false);
+          }}
           className="mt-2">
           <option value="">Select a destination</option>
-          {destinations.filter(row=>row.classId!==item.classId&&
-            row.enrollmentMethods.includes("self")).map(row=>
+          {eligibleDestinations.map(row=>
             <option key={row.classOfferingVersionId} value={row.classOfferingVersionId}>
               {row.classTitle}
             </option>)}
@@ -356,9 +367,9 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
         {target&&<>
           <label className="mt-3 block text-sm font-semibold">Participation
             <Select value={transferCredit}
-              onChange={e=>setTransferCredit(e.target.value as typeof transferCredit)}
+              onChange={e=>setTransferCredit(e.target.value as NativeSelfTransferCreditMode)}
               className="mt-2">
-              {target.allowedCreditModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
+              {allowedTransferModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
             </Select>
           </label>
           <p className="mt-3 whitespace-pre-wrap border border-border bg-muted/20 p-3 text-sm">
@@ -375,7 +386,7 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
             I accept the destination Class terms and understand my current Class access ends.
           </label>
           <Button size="sm" className="mt-3" disabled={busy||!transferAdult||!transferConsent||
-            !target.allowedCreditModes.includes(transferCredit)}
+            !transferCredit||!allowedTransferModes.includes(transferCredit)}
             onClick={()=>void transfer()}>{busy?"Transferring…":"Confirm transfer"}</Button>
         </>}
       </details>}
