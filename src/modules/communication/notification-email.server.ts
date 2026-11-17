@@ -18,6 +18,8 @@ export type NotificationEmailMessage = {
   html?: string;
   actionUrl?: string;
   siteId?: string;
+  /** Server-owned receipt tags for authenticated provider callbacks. */
+  providerReceipt?: { source: "school_family"; receiptId: string };
   attachments?: { filename: string; content: string; contentType: string }[];
 };
 
@@ -109,6 +111,10 @@ async function sendNotificationEmailCore(
         text,
         html: message.html ?? renderSchoolEmail({ brand, text, actionUrl }),
         ...(attachments.length ? { attachments } : {}),
+        ...(message.providerReceipt ? { tags: [
+          { name: "can_source", value: message.providerReceipt.source },
+          { name: "can_receipt", value: message.providerReceipt.receiptId },
+        ] } : {}),
       }),
     });
     if (!response.ok) {
