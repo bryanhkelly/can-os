@@ -96,7 +96,7 @@ CREATE TRIGGER ws3_class_completion_policy_guard_trg
 -- receive an independently validated official completion decision.
 CREATE OR REPLACE FUNCTION education_v30.ws3_pin_class_policy_on_enrollment()
 RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
-SET search_path=education_v30,pg_catalog,pg_temp AS $
+SET search_path=education_v30,pg_catalog,pg_temp AS $$
 DECLARE selected record;
 BEGIN
  SELECT p.id,p.course_version_id INTO selected
