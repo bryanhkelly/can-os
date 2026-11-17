@@ -36,13 +36,37 @@ function resolveActionUrl(actionUrl: string | undefined): string | undefined {
   }
 }
 
+export type NotificationEmailSendReceipt = {
+  accepted: boolean;
+  providerMessageId?: string;
+};
+
+/**
+ * Outbox-only API. Resend's HTTP 2xx means accepted for processing, NOT
+ * delivered to the recipient's server or opened by a person.
+ */
+export async function sendNotificationEmailWithReceipt(
+  message: NotificationEmailMessage,
+  idempotencyKey?: string,
+): Promise<NotificationEmailSendReceipt> {
+  return sendNotificationEmailCore(message, idempotencyKey);
+}
+
+/** Compatibility API for callers that only need provider acceptance. */
 export async function sendNotificationEmail(
   message: NotificationEmailMessage,
   idempotencyKey?: string,
 ): Promise<boolean> {
+  return (await sendNotificationEmailCore(message, idempotencyKey)).accepted;
+}
+
+async function sendNotificationEmailCore(
+  message: NotificationEmailMessage,
+  idempotencyKey?: string,
+): Promise<NotificationEmailSendReceipt> {
   if(isDemoAccountEmail(message.to)){
     console.log("[notification-email] Demo account delivery suppressed");
-    return false;
+    return { accepted: false };
   }
   const apiKey = process.env.RESEND_API_KEY;
   const from =
@@ -50,7 +74,7 @@ export async function sendNotificationEmail(
     process.env.CAN_ACCESS_FROM_EMAIL;
   if (!apiKey || !from) {
     console.log("[notification-email] Resend not configured; skipping email");
-    return false;
+    return { accepted: false };
   }
 
   const actionUrl = resolveActionUrl(message.actionUrl);
@@ -91,14 +115,16 @@ export async function sendNotificationEmail(
       console.log(
         `[notification-email] Resend delivery failed with status ${response.status}`,
       );
-      return false;
+      return { accepted: false };
     }
-    return true;
+    const responseBody = await response.json().catch(() => null) as { id?: unknown } | null;
+    const providerMessageId = typeof responseBody?.id === "string" ? responseBody.id : undefined;
+    return { accepted: true, ...(providerMessageId ? { providerMessageId } : {}) };
   } catch (error) {
     console.log(
       `[notification-email] Delivery error: ${error instanceof Error ? error.message : "unknown"}`,
     );
-    return false;
+    return { accepted: false };
   }
 }
 
