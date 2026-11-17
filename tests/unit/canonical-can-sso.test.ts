@@ -170,6 +170,15 @@ describe("one CAN login for authorized canonical Site staff", () => {
     const provision = source("scripts/provision-platform-admin.mjs");
     expect(provision).toContain("Number(authority.rows[0]?.count) !== 1");
     expect(provision).toContain("person_id <> $2");
+    expect(provision).toContain('PRODUCTION_PROJECT_ID = "sweet-hall-62441909"');
+    expect(provision).toContain('PRODUCTION_BRANCH_ID = "br-restless-sea-ar9ooo55"');
+    expect(provision).toContain("current_setting('neon.project_id', true)");
+    expect(provision).toContain("current_setting('neon.branch_id', true)");
+    expect(provision).toContain("current_database() AS database_name");
+    expect(provision).toContain("BLOCKED: App Admin provisioning must target CAN OS Neon production main");
+    expect(provision.indexOf("targetDatabase.rows[0]")).toBeLessThan(
+      provision.indexOf("FOR UPDATE OF a"),
+    );
     expect(readiness).toContain("An initial institutional reviewer needs a separately governed, audited appointment.");
     expect(readiness).not.toContain("INSERT INTO");
     expect(readiness).not.toContain("UPDATE public.");
