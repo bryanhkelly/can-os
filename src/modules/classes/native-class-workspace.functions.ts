@@ -42,8 +42,6 @@ const rosterPageInput=z.object({
 export const getNativeClassRosterPage=createServerFn({method:"GET"})
   .validator((raw:unknown)=>rosterPageInput.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     const actor=await getCanonicalCommandContext(getRequest());
     if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
@@ -109,8 +107,6 @@ export const getNativeClassRosterPage=createServerFn({method:"GET"})
 export const getNativeClassWorkspace = createServerFn({method:"GET"})
   .validator((raw:unknown)=>scope.parse(raw))
   .handler(async({data})=>{
-    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true")
-      throw new AuthorizationError("native Class release not activated");
     setResponseHeader("Cache-Control","private, no-store");
     setResponseHeader("Referrer-Policy","no-referrer");
     const actor=await getCanonicalCommandContext(getRequest());
@@ -396,8 +392,7 @@ export const getNativeClassWorkspace = createServerFn({method:"GET"})
         ))
         .where(eq(canonicalClassSessions.classId,instance.id))
         .orderBy(asc(canonicalDeliverySessions.startsAt)).limit(101);
-      const sessionAgendasEnabled=process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED==="true"&&
-        process.env.CAN_WS4_SESSION_AGENDAS_ENABLED==="true";
+      const sessionAgendasEnabled=true;
       // Only query the additive WS4 table when both release gates are on.
       // Every Session in this bounded result already belongs to the
       // independently authorized Class workspace.
