@@ -17,8 +17,7 @@ const candidate=z.object({
 export async function readLinkedSitePublishedClasses(
   publicSiteId:string,executor:Reader=db,
 ):Promise<SitePublishedClassListing[]> {
-  if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
-     !uuid.safeParse(publicSiteId).success)return [];
+  if(!uuid.safeParse(publicSiteId).success)return [];
   const links=await executor.execute(sql`
     SELECT canonical_site_id AS "canonicalSiteId"
     FROM public.site_canonical_identity_links
