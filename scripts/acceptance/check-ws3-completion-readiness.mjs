@@ -17,6 +17,7 @@ const proposed = [
   "learning_completion_evidence_bindings",
   "class_completion_policy_versions",
   "class_enrollment_completion_pins",
+  "learning_completion_evidence_review_requests",
 ];
 const requireProposed = process.env.CAN_WS3_REQUIRE_PROPOSED_SCHEMA==="1";
 const critical = [
@@ -55,7 +56,9 @@ try {
         to_regprocedure('education_v30.v301_credential_is_current(uuid)') IS NOT NULL
           AS checks_award_current,
         to_regprocedure('education_v30.v301_can_sensitive_capability(text,text)') IS NOT NULL
-          AS checks_issuer_access`,
+          AS checks_issuer_access,
+        to_regprocedure('education_v30.v301_ws3_class_completion_is_current(uuid)') IS NOT NULL
+          AS checks_class_completion_current`,
     );
     const {rows:triggers}=await client.query(
       `SELECT c.relname AS name,count(t.oid)::integer AS triggers
@@ -71,6 +74,8 @@ try {
       "ws3_class_completion_policy_guard_trg",
       "ws3_class_enrollment_completion_pin_trg",
       "ws3_class_completion_pin_guard_trg",
+      "ws3_class_completion_decision_insert_guard",
+      "ws3_review_request_mutation_guard",
     ];
     const {rows:proposedTriggerRows}=requireProposed
       ?await client.query(
@@ -81,6 +86,22 @@ try {
       :{rows:[]};
     const missingProposedTriggers=requireProposed
       ?proposedTriggers.filter(name=>!proposedTriggerRows.some(row=>row.tgname===name))
+      :[];
+    const proposedOutcomeColumns=[
+      "completion_policy_version_id",
+      "completion_evidence_version_id",
+      "completion_decided_by_person_id",
+      "supersedes_outcome_id",
+      "completion_reason",
+    ];
+    const {rows:columnRows}=requireProposed?await client.query(
+      `SELECT attname FROM pg_attribute
+       WHERE attrelid='education_v30.class_outcomes'::regclass
+         AND attnum>0 AND NOT attisdropped AND attname=ANY($1::text[])`,
+      [proposedOutcomeColumns],
+    ):{rows:[]};
+    const missingProposedColumns=requireProposed
+      ?proposedOutcomeColumns.filter(name=>!columnRows.some(row=>row.attname===name))
       :[];
     const {rows:counts}=await client.query(
       `SELECT
@@ -95,12 +116,14 @@ try {
     const noTriggers=["class_outcomes","noncredit_completion_decisions",
       "learning_award_issuance_events"].filter(name=>!(triggerMap.get(name)>0));
     const okay=missing.length===0&&unsafe.length===0&&noTriggers.length===0&&
-      missingProposedTriggers.length===0&&
-      f.validates_noncredit&&f.checks_award_current&&f.checks_issuer_access;
+      missingProposedTriggers.length===0&&missingProposedColumns.length===0&&
+      f.validates_noncredit&&f.checks_award_current&&f.checks_issuer_access&&
+      (!requireProposed||f.checks_class_completion_current);
     console.log(JSON.stringify({
       preflight:"WS3 read-only canonical completion authority",pass:!!okay,
       requireProposed,
-      missing,unsafe,noTriggers,missingProposedTriggers,functionPresence:f,
+      missing,unsafe,noTriggers,missingProposedTriggers,
+      missingProposedColumns,functionPresence:f,
       counts:counts[0],rowLevelSecurity:objects,
       warning:"Schema readiness only; does not test a real learner, operator, approved policy, award grant, or authenticated UI.",
     },null,2));
