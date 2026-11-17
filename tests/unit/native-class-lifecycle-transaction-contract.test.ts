@@ -64,7 +64,7 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(self).toContain("await currentClassAuthority(tx,row.classId,now)");
     expect(self).toContain("remainingSeats:");
     expect(self).toContain("Math.max(0,capacity-");
-    const ui=read("src/routes/learn.classes.tsx");
+    const ui=read("src/routes/class.tsx");
     expect(ui).toContain("item.remainingSeats===0");
     expect(ui).toContain("disabled={!adult||!consent||busy||full}");
   });
@@ -82,7 +82,7 @@ describe("WS2 native Class transaction and integration invariants",()=>{
     expect(self).toContain("desc(canonicalClassEnrollments.id)).limit(51)");
     expect(self).toContain("const items=rows.slice(0,50)");
     expect(self).toContain("classOfferingVersionId:canonicalClassEnrollments.classOfferingVersionId");
-    const client=read("src/routes/learn.classes.tsx");
+    const client=read("src/routes/class.tsx");
     expect(client).toContain("getMyNativeClassEnrollmentHistoryPage({");
     expect(client).toContain("enrolled.data?.pages.flatMap(page=>page.items)");
     expect(client).toContain("Load older Classes");

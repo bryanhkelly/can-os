@@ -5,7 +5,7 @@ const command=read("src/modules/classes/native-class-invitations.functions.ts");
 const enroll=read("src/modules/classes/native-class-enrollment.functions.ts");
 const ddl=read("database/canonical/v3.0.1/patch-native-class-enrollment-authority-ws2.sql");
 const policy=read("src/domain/native-class-lifecycle.ts");
-const ui=read("src/routes/learn.classes.tsx");
+const ui=read("src/routes/class.tsx");
 
 describe("WS2 native Class invitation authority",()=>{
  it("never confuses an invitation with an Enrollment or a held seat",()=>{

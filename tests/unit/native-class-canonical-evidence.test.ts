@@ -26,7 +26,7 @@ describe("native Class evidence consolidates on existing canonical engines",()=>
     expect(source).not.toMatch(/tx\.(?:insert|update|delete)\(/);
   });
   it("routes learner Assignments to the canonical adapter and removes parallel activity handlers",()=>{
-    const page=read("src/routes/classes_.$classId.tsx");
+    const page=read("src/routes/class_.$classId.tsx");
     const model=read("src/db/canonical-v301/classes.ts");
     const packageJson=read("package.json");
     expect(page).toContain("NativeClassCanonicalEvidencePanel");

@@ -114,9 +114,9 @@ unmodified on main until a separately approved replacement deployment.
   Native credit/assessment issuance remains disabled. Class-specific scheduled
   room pairing and projector services have branch implementations but are unverified.
 - Global Class creation and Class Offering publishing: /canonical/classes.
-- Native catalog/self-enrollment entry: /learn/classes (directory cutover pending).
+- Native catalog/self-enrollment entry: /class (canonical native directory).
 - Shared Class workspace for learner, teacher/facilitator, and manager:
-  /classes/:classId (role-gated view and tab query modifiers).
+  /class/:classId (role-gated view and tab query modifiers).
 - Unit contracts: tests/unit/unified-class.test.ts,
   tests/unit/native-class-enrollment.test.ts,
   tests/unit/unified-classroom-player.test.tsx and
@@ -132,13 +132,13 @@ but setting this alone is NOT a release approval.
 
 ## One classroom player across delivery modes
 
-The **canonical native Class workspace is now one address: `/classes/:classId`**,
-implemented at `src/routes/classes_.$classId.tsx` (TanStack non-nested route).
+The **canonical native Class workspace is now one address: `/class/:classId`**,
+implemented at `src/routes/class_.$classId.tsx` (TanStack non-nested route).
 It supports server-verified views with query modifiers:
 
-- `/classes/:classId?view=learn&tab=lessons&lesson=:lessonId`
-- `/classes/:classId?view=teach&tab=classroom`
-- `/classes/:classId?view=manage&tab=offering`
+- `/class/:classId?view=learn&tab=lessons&lesson=:lessonId`
+- `/class/:classId?view=teach&tab=classroom`
+- `/class/:classId?view=manage&tab=offering`
 
 The `view`, `tab`, `lesson` and `session` parameters select navigation state,
 **never Person identity, rights, course progress or teaching authorization**.
@@ -151,7 +151,7 @@ relationships support more than one.
 native Class route and the previously implemented legacy academic and training
 surfaces. Only one native Class detail route remains: the redundant
 `/learn/class/:classEnrollmentId` route was deleted. Native learner and
-operator entry-point links now address `/classes/:classId`.
+operator entry-point links now address `/class/:classId`.
 
 **Not a backwards-compatibility plan:** The original `/classes?section=...`
 school route and `/learn/course/:courseAttemptId` training route still exist
@@ -532,4 +532,4 @@ to an approved disposable QA branch before any database-first staging cutover.
 
 ## November 17 canonical route cutover
 
-The application has a canonical native Class directory at `/class` and scoped workspace at `/class/:classId`; its former `/learn/classes` and `/classes/:classId` route files were deleted without redirect aliases. The native public catalog is paginated and can filter by exact Site and delivery format at the SQL level before disclosure-safe authority checks. **The Section-backed academic `/classes` route, service and schema are NOT retired yet**, and must not be described as complete or used as the native Class directory. Official school grading, guardianship, transcripts and attendance must be migrated before destructive DDL.
+The application has a canonical native Class directory at `/class` and scoped workspace at `/class/:classId`; its former `/learn/classes` and `/class/:classId` route files were deleted without redirect aliases. The native public catalog is paginated and can filter by exact Site and delivery format at the SQL level before disclosure-safe authority checks. **The Section-backed academic `/classes` route, service and schema are NOT retired yet**, and must not be described as complete or used as the native Class directory. Official school grading, guardianship, transcripts and attendance must be migrated before destructive DDL.
