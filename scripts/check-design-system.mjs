@@ -156,3 +156,27 @@ if (!governedCompletionReview.includes('from "@/components/ui/select"') ||
   console.error("Noncredit completion review must use the shared Select and V6.1 geometry");
   process.exitCode = 1;
 }
+
+
+// Shared roster presentation applies to Section, Site Admin and native Class
+// workflows. Only row layout is centralized; feature authority stays server-owned.
+const rosterConsumers = {
+  "learning/ClassRosterPanel.tsx": ["RosterList", 'from "@/components/workspace"'],
+  "routes/classes.tsx": ["RosterList", 'from "@/components/workspace"'],
+  "routes/class_.$classId.tsx": ["RosterList", 'from "@/components/workspace"'],
+};
+const srcRoot = fileURLToPath(new URL("../src/", import.meta.url));
+for (const [file, required] of Object.entries(rosterConsumers)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of required) {
+    if (!source.includes(fragment)) {
+      console.error(`${file} must compose the canonical RosterList pattern: missing ${fragment}`);
+      process.exitCode = 1;
+    }
+  }
+}
+const rosterPattern = readFileSync(join(root, "workspace/roster-list.tsx"), "utf8");
+if (radiusUtility.test(rosterPattern)) {
+  console.error("workspace/roster-list.tsx must retain V6.1 square corners");
+  process.exitCode = 1;
+}
