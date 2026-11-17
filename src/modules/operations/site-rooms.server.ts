@@ -7,6 +7,7 @@ import { EventTypes } from "@/domain/event-types";
 import { DomainError } from "@/domain/errors";
 import { assertSiteRoomReader, assertSiteRoomManager, assignSectionRoomSchema, createSiteRoomSchema, retireSiteRoomSchema, siteRoomsScopeSchema, updateSiteRoomSchema } from "@/domain/site-rooms";
 import { emitEvent, writeAudit } from "@/platform/mutation";
+import { executeCommand } from "@/platform/execute-command";
 import type { z } from "zod";
 import { assertRoomCoverageManager, createRoomAtSiteSchema } from "@/domain/room-coverage";
 
@@ -50,10 +51,18 @@ export async function getSchoolRooms(actor: AccessContext, value: z.infer<typeof
 }
 
 export async function createSchoolRoom(actor: AccessContext, value: z.infer<typeof createSiteRoomSchema>) {
-  const input = createSiteRoomSchema.parse(value);
-  return db.transaction(async tx => {
-    const school = await roomSchool(tx, actor, input.programId);
-    return createRoomRecord(tx, actor, school, input);
+  return executeCommand(value, {
+    // AccessContext was resolved from the server session by the route adapter.
+    // Retain the domain's exact Site + Program guard inside the transaction.
+    authenticate: async () => actor,
+    capability: "program.launch.start",
+    validate: input => createSiteRoomSchema.parse(input),
+    transaction: work => db.transaction(work),
+    execute: async (tx, context, input) => {
+      const school = await roomSchool(tx, context as AccessContext, input.programId);
+      // createRoomRecord owns stable room-ID replay, event and audit writes.
+      return createRoomRecord(tx, context as AccessContext, school, input);
+    },
   });
 }
 
