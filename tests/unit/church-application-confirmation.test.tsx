@@ -9,6 +9,11 @@ describe("church application next steps", () => {
     expect(html).toContain("leader@example.test");
     expect(html).toContain("Fixture Church");
     expect(html).toContain("Fixture Site");
+    expect(html).toContain('<dl aria-label="Submitted church application details"');
+    expect((html.match(/<dt\\b/g) ?? []).length).toBe(3);
+    expect((html.match(/<dd\\b/g) ?? []).length).toBe(3);
+    expect(html).not.toContain("sm:grid-cols-2");
+    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
     expect(html).toContain('href="https://can-academy.netlify.app/contact"');
     expect(html).toContain("No school-setup invitation is issued at this step");
     expect(html).toContain("does not approve the church");
