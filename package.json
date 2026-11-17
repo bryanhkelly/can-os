@@ -111,7 +111,8 @@
     "verify:schema:consolidation": "node scripts/acceptance/check-public-schema-consolidation.mjs",
     "verify:site:main-consolidation": "node scripts/acceptance/check-main-site-schema-consolidation.mjs",
     "verify:person:main-cutover": "node scripts/acceptance/check-main-person-cutover.mjs",
-    "verify:person:main-fk-inventory": "node scripts/acceptance/check-main-person-fk-inventory.mjs"
+    "verify:person:main-fk-inventory": "node scripts/acceptance/check-main-person-fk-inventory.mjs",
+    "verify:identity:main-core-fks": "node scripts/acceptance/check-main-core-identity-fks.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
