@@ -42,17 +42,14 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
            AND organization_id IS NULL AND site_id IS NULL) AS active_platform_admins
     `);
     const row = summary.rows[0];
-    // Platform-only operational diagnostic. No people, access tokens or
-    // learner records are included. A missing link is not auto-approved.
+    // Diagnostic only: one platform Site UUID. Native Class provisioning
+    // does not create another identity and never grants operator authority.
     const siteRows = await db.execute(sql`
       SELECT s.id AS "siteId", s.name AS "siteName",
-        COALESCE(link.status, 'not_requested') AS "linkStatus",
-        CASE WHEN native.id IS NOT NULL THEN true ELSE false END AS "canonicalSiteExists"
+        CASE WHEN native.id IS NOT NULL THEN true ELSE false END AS "nativeSiteProvisioned",
+        COALESCE(native.status, 'not_provisioned') AS "nativeLifecycle"
       FROM public.sites s
-      LEFT JOIN public.site_canonical_identity_links link
-        ON link.public_site_id = s.id
-      LEFT JOIN education_v30.sites native
-        ON native.id = link.canonical_site_id
+      LEFT JOIN education_v30.sites native ON native.id=s.id
       ORDER BY s.name, s.id
       LIMIT 100
     `);
@@ -93,8 +90,8 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
       siteReadiness: siteRows.rows.map(item => ({
         siteId: String(item.siteId),
         siteName: String(item.siteName),
-        linkStatus: String(item.linkStatus),
-        canonicalSiteExists: item.canonicalSiteExists === true,
+        nativeSiteProvisioned: item.nativeSiteProvisioned === true,
+        nativeLifecycle: String(item.nativeLifecycle),
       })),
     };
   });
