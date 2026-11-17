@@ -7,6 +7,7 @@ import {
 } from "@/domain/command-context";
 import { EventTypes } from "@/domain/event-types";
 import { emitEvent, notify, writeAudit } from "@/platform/mutation";
+import { executeCommand } from "@/platform/execute-command";
 import { gradeResponseActionType } from "@/domain/grade-response-policy";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { assertAcademicActionAuthority } from "./academic-action-policy.server";
@@ -18,7 +19,20 @@ export async function resolveAction(
   context: CommandContext,
   input: ResolutionInput,
 ): Promise<void> {
-  await db.transaction(tx => resolveActionInTransaction(tx, context, input));
+  await executeCommand(input, {
+    // The caller supplies its verified command context; do not resolve a
+    // second identity or accept a client-provided actor for this operation.
+    authenticate: async () => context,
+    capability: "action.resolve",
+    validate: value => ({
+      actionId: value.actionId,
+      resolutionNote: value.resolutionNote.trim(),
+    }),
+    transaction: work => db.transaction(work),
+    // The domain service owns row locking, resource authorization, event and
+    // audit writes. All remain in the same transaction.
+    execute: (tx, actor, parsed) => resolveActionInTransaction(tx, actor, parsed),
+  });
 }
 
 export async function resolveActionInTransaction(
