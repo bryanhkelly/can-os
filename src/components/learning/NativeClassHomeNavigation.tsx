@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { DetailNavigation } from "@/components/workspace";
 import { useActiveWorkspaceMember } from "@/components/shell/workspace-session-context";
-import { roleCapabilities } from "@/domain/access-context";
+import { canonicalRoleCapabilities } from "@/domain/canonical-access";
 
 type Props = {
   mode: "explore" | "manage";
@@ -17,7 +17,8 @@ export function NativeClassHomeNavigation({
   mode, siteId, search, classId, offeringVersionId,
 }: Props) {
   const grant = useActiveWorkspaceMember();
-  const canManage = Boolean(grant && roleCapabilities[grant.role]?.includes("class.manage"));
+  const canManage = Boolean(grant && Object.hasOwn(canonicalRoleCapabilities, grant.role) &&
+    canonicalRoleCapabilities[grant.role as keyof typeof canonicalRoleCapabilities].includes("class.manage"));
   return <DetailNavigation label="Class workspace sections" variant="record">
     <Link to="/class" search={{siteId,search,classId,view:undefined}}
       aria-current={mode==="explore"?"page":undefined}>
