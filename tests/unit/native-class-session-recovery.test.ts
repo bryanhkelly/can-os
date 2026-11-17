@@ -45,3 +45,33 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
     expect(ui).toContain("independent identity review");
   });
 });
+
+
+describe("native Class enrollment with one interactive CAN sign-in",()=>{
+  const uiPath="src/routes/class.tsx";
+  it("tries direct enrollment before a linked CAN learner session recovery",()=>{
+    const ui=read(uiPath);
+    const first=ui.indexOf("result=await submit();");
+    const recovery=ui.indexOf("await resumeLinkedNativeClassLearner();",first);
+    const retry=ui.indexOf("result=await submit();",recovery);
+    expect(first).toBeGreaterThan(-1);
+    expect(recovery).toBeGreaterThan(first);
+    expect(retry).toBeGreaterThan(recovery);
+    // Normal native learners must never be forced through a CAN-only bridge.
+    expect(ui.slice(first,recovery)).not.toContain("await resumeLinkedNativeClassLearner()");
+  });
+  it("does not replace the original enrollment error with a recovery error",()=>{
+    const ui=read(uiPath);
+    expect(ui).toContain("catch(originalError)");
+    expect(ui).toContain("catch { throw originalError; }");
+  });
+  it("does not claim a first-time identity can be forged from an email match",()=>{
+    const recovery=read("src/modules/classes/native-class-session-recovery.functions.ts");
+    expect(recovery).toContain("verifiedAdultOn(native.birthDate,now)");
+    expect(recovery).toContain("links.length!==1");
+    expect(recovery).toContain("grants.length!==1");
+    expect(recovery).not.toContain("tx.update(canonicalPersons)");
+    expect(recovery).not.toContain("tx.insert(canonicalPersons)");
+    expect(recovery).not.toContain("tx.insert(canonicalAccounts)");
+  });
+});
