@@ -46,7 +46,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
    </p>}
    {classesRead.isSuccess&&<>
     <div className="mt-4 flex flex-wrap gap-3">
-     <Link to="/class" search={{view:"manage",siteId:canonicalSiteId}}
+     <Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
       className="inline-flex min-h-11 items-center gap-2 border bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground">
       Create Class from approved Course <ArrowRight className="size-4"/>
      </Link>
@@ -74,7 +74,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
        className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
        <CalendarDays className="size-4"/> Review Sessions <ArrowRight className="size-4"/>
       </Link>
-     </div>:<Link to="/class" search={{view:"manage",siteId:canonicalSiteId}}
+     </div>:<Link to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}
        className="mt-3 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary">
        Activate draft Class <ArrowRight className="size-4"/>
      </Link>}
