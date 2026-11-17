@@ -152,6 +152,10 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(restricted).toContain("other_link.canonical_principal_id");
     expect(readiness).toContain("BEGIN READ ONLY");
     expect(readiness).toContain("eligible_staff_paths");
+    expect(readiness).toContain("GROUP BY a.id, public_grant.id");
+    expect(readiness).toContain("HAVING count(*) = 1");
+    expect(readiness).toContain("uniquely_authorized_staff");
+    expect(readiness).toContain("acceptance_ready: ready");
     expect(readiness).toContain("eligible_app_admin_grants");
     expect(readiness).toContain("eligible_institutional_approver_grants");
     expect(readiness).toContain("first_admin_provisioning_blocked");
