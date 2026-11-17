@@ -90,7 +90,6 @@
     "test:e2e:noncredit": "playwright test --config=playwright.noncredit-self-enrollment.config.ts",
     "db:check:main": "node scripts/acceptance/check-production-drizzle-parity.mjs",
     "db:check:journal": "node scripts/check-drizzle-snapshot-chain.mjs",
-    "test:site:enrollment-bridge": "tsx scripts/acceptance/check-site-noncredit-bridge.ts",
     "test:site:channels": "node scripts/run-unit-suite.mjs site",
     "db:canonical:classes": "node scripts/acceptance/check-native-class-schema.mjs",
     "test:classes:unit": "node scripts/run-unit-suite.mjs classes",
@@ -106,7 +105,8 @@
     "verify:deploy:identity-schema": "node scripts/acceptance/check-one-person-deploy-schema.mjs",
     "db:canonical:main-schema": "node scripts/acceptance/check-main-extended-schema.mjs",
     "db:canonical:drift-audit": "node scripts/acceptance/check-main-qa-db-drift.mjs",
-    "verify:site-identity:preflight": "node scripts/acceptance/check-unified-site-identity.mjs"
+    "verify:site-identity:preflight": "node scripts/acceptance/check-unified-site-identity.mjs",
+    "verify:site:noncredit-catalog": "tsx scripts/acceptance/check-site-noncredit-catalog.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
