@@ -163,7 +163,7 @@ for (const [file, contract] of Object.entries(canonicalControlConsumers)) {
 // V6.1 geometry is universal across shared workspace, workflow, and evidence components.
 // Every new component in these families is checked automatically, not via a page allowlist.
 for (const file of files) {
-  const component = relative(root, file).replaceAll("\\\\", "/");
+  const component = relative(root, file).replaceAll("\\", "/");
   if (!["workspace/", "workflow/", "evidence/"].some(prefix => component.startsWith(prefix))) continue;
   if (radiusUtility.test(readFileSync(file, "utf8"))) {
     console.error(`${component} must use V6.1 square-corner geometry`);
