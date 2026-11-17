@@ -4,6 +4,7 @@ import { db } from "@/db/client";
 import { accessAccounts, people } from "@/db/schema";
 import { canonicalSessions } from "@/db/canonical-v301";
 import { canonicalSessionCookie } from "@/domain/canonical-access";
+import { secureSessionCookieHeader } from "@/domain/session-cookies";
 import { hashAccessSecret, issueOpaqueSecret } from "@/domain/access-tokens";
 import { AuthorizationError } from "@/domain/command-context";
 import { isDemoAccountEmail } from "@/domain/local-demo-access";
@@ -55,5 +56,5 @@ export async function issueNativeLearnerSession(tx:Tx, accountId:string, grantId
     lastActivityAt:now,
   }).returning({id:canonicalSessions.id});
   if(!session)throw new Error("Could not start verified learning session");
-  return `${canonicalSessionCookie}=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${NATIVE_SESSION_SECONDS}`;
+  return secureSessionCookieHeader(canonicalSessionCookie, token, NATIVE_SESSION_SECONDS);
 }
