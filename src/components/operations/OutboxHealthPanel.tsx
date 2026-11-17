@@ -60,7 +60,7 @@ export function OutboxHealthPanel() {
         <h3 className="font-semibold">School-family outbound delivery</h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Counts for your authorized Sites and Organizations only. Provider accepted
-          does not confirm inbox delivery, reading, or a guardian taking action.
+          does not confirm mail-server delivery, reading, or a guardian taking action.
           Failed excludes deliveries already scheduled for automatic retry.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -70,6 +70,9 @@ export function OutboxHealthPanel() {
             ["Retry scheduled", health.schoolFamilyDelivery.retryScheduled],
             ["Failed", health.schoolFamilyDelivery.failed],
             ["Provider accepted", health.schoolFamilyDelivery.providerAccepted],
+            ["Mail server delivered", health.schoolFamilyDelivery.providerDelivered],
+            ["Provider failed", health.schoolFamilyDelivery.providerFailed],
+            ["Spam complaints", health.schoolFamilyDelivery.complained],
             ["Suppressed", health.schoolFamilyDelivery.suppressed],
           ] as Array<[string, number]>).map(([label, value]) =>
             <div key={label} className="border p-3">
