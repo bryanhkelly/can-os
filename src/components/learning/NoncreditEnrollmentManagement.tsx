@@ -1,4 +1,4 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import {getMyNoncreditWaitlist,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
 export function NoncreditEnrollmentManagement(){
+  const navigate=useNavigate();
   const client=useQueryClient();
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
   const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
@@ -24,7 +25,7 @@ export function NoncreditEnrollmentManagement(){
     setBusy(courseAttemptId);setError("");
     try{
       await openMyNoncreditCourse({data:{courseAttemptId}});
-      window.location.assign("/learn/course/"+encodeURIComponent(courseAttemptId));
+      await navigate({to:"/learn/course/$courseAttemptId",params:{courseAttemptId}});
     }catch(e){
       setError(normalizeClientError(e,"Could not open the current learner course.").message);
       setBusy(null);
