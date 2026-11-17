@@ -19,6 +19,7 @@ import {
  */
 export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
   const [page,setPage]=useState(0);
+  const [approvalPage,setApprovalPage]=useState(0);
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [outcome,setOutcome]=useState<"completed"|"not_yet_completed"|"voided">("completed");
   const [evidenceVersionId,setEvidenceVersionId]=useState("");
@@ -38,8 +39,8 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
     enabled:!!selectedId,retry:false,
   });
   const approvals=useQuery({
-    queryKey:["ws3-source-evidence-review-queue"],
-    queryFn:()=>getPendingCompletionEvidenceReviews(),
+    queryKey:["ws3-source-evidence-review-queue",approvalPage],
+    queryFn:()=>getPendingCompletionEvidenceReviews({data:{page:approvalPage}}),
     enabled:view==="approvals",retry:false,
   });
   const request=useMutation({
@@ -125,6 +126,15 @@ export function NativeClassCompletionOperatorPanel({classId}:{classId:string}){
               </Button>
             </div>
           </article>)}
+        <div className="flex items-center gap-3">
+          <Button variant="outline" disabled={approvalPage===0}
+            onClick={()=>setApprovalPage(p=>Math.max(0,p-1))}>Previous</Button>
+          <span className="text-xs text-muted-foreground">
+            Approval page {approvalPage+1}
+          </span>
+          <Button variant="outline" disabled={!approvals.data?.hasMore}
+            onClick={()=>setApprovalPage(p=>p+1)}>Next</Button>
+        </div>
         {review.isError&&<p role="alert">This evidence approval was denied or could not be saved.</p>}
       </div>:
       <div className="space-y-5">
