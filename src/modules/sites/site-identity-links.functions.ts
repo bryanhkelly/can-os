@@ -155,7 +155,7 @@ export const confirmCanonicalSiteIdentityLink=createServerFn({method:"POST"})
         WHERE public_site_id=${data.publicSiteId}::uuid AND status='pending'
       `);
       await tx.insert(canonicalAuditEvents).values({
-        actorPersonId:actor.actorPersonId,owningOrganizationId:orgId,
+        actorPersonId:actor.actorPersonId!,owningOrganizationId:orgId,
         eventCode:"site.identity.native_confirmed",
         entityKind:"site",entityId:String(link.canonicalSiteId),
         payload:{publicSiteId:data.publicSiteId,siteId:link.canonicalSiteId,
