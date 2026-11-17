@@ -21,7 +21,7 @@ import {
   educationOperationOrganizationRoles,
   canonicalOfferingCourses, participationAttributions, networkMemberships,
 } from "@/db/canonical-v301";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { AuthorizationError } from "@/domain/command-context";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { assertNativeSelfEnrollmentEligible, verifiedAdultOn } from "@/domain/native-class-enrollment";
 import {
