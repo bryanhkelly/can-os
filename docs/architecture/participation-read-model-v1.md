@@ -55,6 +55,7 @@ inaccessible. History being stored is not proof of current viewing authority.
 | Event | Accepted original calendar Event participant | 40, timestamp + participant ID cursor |
 | Native Class | Original `class_enrollments`, latest source-owned decision and unrevoked award | 50, exact timestamp + Enrollment ID cursor |
 | Noncredit | Original noncredit Registration and latest Course Attempt | 50, exact timestamp + Registration ID cursor |
+| Waitlist opportunity | Original account/Person-bound invitation or waiting-list intent, distinct from participation | 50, exact joined timestamp + waitlist ID cursor |
 
 The initial `getMyActivity()` response returns the first page of each source.
 `nextCursors` indicates where more history exists. My Activity's **Load older
@@ -66,7 +67,7 @@ records without creating another ledger. It can page beyond the old 100 and
 A source is `ready/complete` only after its current authorized source query
 reaches the end. A reader with remaining pages is `ready/partial`, and failed
 authorization/schema queries are `unavailable/unknown`, not an empty history.
-The waitlist opportunity reader remains bounded and is **not** certified complete.
+Waitlist opportunities have their own independently paginated 50-row Person-scoped reader and `nextOpportunityCursor`. They are **never** added to `records[]`, and completed or cancelled waitlist intents are not represented as active enrollment opportunities.
 
 ## Official outcomes without invented completion
 
