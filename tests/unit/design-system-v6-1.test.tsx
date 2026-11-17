@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { WorkspacePanel, StatusBadge, PersonMark } from "@/components/workspace/workspace-panel";
 import { DashboardLayout, DashboardPanel, DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { RecordHeader, RecordLayout, EntityCard } from "@/components/workspace/record-layout";
 import { WorkflowWorkspace, WorkflowProgress } from "@/components/workflow/workflow-workspace";
@@ -9,6 +10,18 @@ import { MasterDetailWorkspace, MasterDetailListItem } from "@/components/worksp
 import { DashboardProgress, DashboardTimeline, DashboardPreviewList, DashboardMediaTile } from "@/components/workspace/dashboard-widgets";
 
 describe("V6.1 reusable design system", () => {
+  it("renders shared workspace presentation without rounded geometry", () => {
+    const panel = renderToStaticMarkup(<WorkspacePanel title="Class roster"><p>Current participants</p></WorkspacePanel>);
+    const status = renderToStaticMarkup(<StatusBadge tone="success">Verified</StatusBadge>);
+    const person = renderToStaticMarkup(<PersonMark name="Jordan Lee"/>);
+    for (const html of [panel, status, person]) {
+      expect(html).not.toMatch(/rounded(?:-|\\s|")/);
+    }
+    expect(panel).toContain('aria-label="Class roster"');
+    expect(status).toContain("Verified");
+    expect(person).toContain("JL");
+  });
+
   it("loads the same V6.1 fonts in the app and Storybook", () => {
     const root = readFileSync(new URL("../../src/routes/__root.tsx", import.meta.url), "utf8");
     const preview = readFileSync(new URL("../../.storybook/preview-head.html", import.meta.url), "utf8");
