@@ -16,7 +16,7 @@ if(process.env.APP_ENV!=="test"||process.env.NODE_ENV!=="test"||
 if(!process.env.CAN_WS00_QA_FRESH_LEARNER_CAN_SECRET)
   throw new Error("A new verified CAN-only adult learner fixture is mandatory");
 execFileSync(process.execPath,["scripts/acceptance/check-ws00-qa-readiness.mjs"],{
-  stdio:"inherit",env:process.env,
+  stdio:"inherit",env:{...process.env,CAN_WS00_QA_SCOPE:"single_login_class"},
 });
 export default defineConfig({
   testDir:"./tests/e2e/qa",
@@ -29,7 +29,7 @@ export default defineConfig({
     url:baseURL,reuseExistingServer:false,timeout:180_000,
     env:{
       ...process.env,
-      APP_ENV:"test",NODE_ENV:"test",
+      APP_ENV:"test",NODE_ENV:"test",CAN_WS00_QA_SCOPE:"single_login_class",
     },
   },
 });
