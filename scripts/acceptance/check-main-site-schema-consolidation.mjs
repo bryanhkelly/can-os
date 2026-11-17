@@ -54,19 +54,19 @@ async function main(){
        WHERE f.contype='f' AND (f.confrelid=c.oid OR f.conrelid=c.oid)) AS fk_relationships
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname='public' AND c.relkind IN ('r','p')
-      AND c.relname=ANY(${movedTables})
+      AND c.relname IN ('content_assets','deployment_organization_roles','enrollment_site_placements','feedback_categories','workforce_families','workforce_delivery_modes','vocabularies','vocabulary_terms','facility_capability_types','capability_delivery_modes')
     ORDER BY c.relname
   `;
   const old=await sql`
     SELECT c.relname AS name FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='education_v30' AND c.relname=ANY(${movedTables})
+    WHERE n.nspname='education_v30' AND c.relname IN ('content_assets','deployment_organization_roles','enrollment_site_placements','feedback_categories','workforce_families','workforce_delivery_modes','vocabularies','vocabulary_terms','facility_capability_types','capability_delivery_modes')
   `;
   const fks=await sql`
     SELECT c.conname AS name,
       c.confrelid='public.sites'::regclass AS points_to_public,
       c.convalidated AS validated
     FROM pg_constraint c
-    WHERE c.contype='f' AND c.conname=ANY(${repointedFks})
+    WHERE c.contype='f' AND c.conname IN ('deployment_organization_roles_site_id_fkey','institutional_approvals_site_id_fkey','operation_calendar_days_site_id_fkey','operation_safety_requirements_site_id_fkey')
     ORDER BY c.conname
   `;
   if(!summary.site_bridge_absent ||
