@@ -136,7 +136,7 @@ export function projectNoncreditCourses(
       outcome: row.officialOutcome ?? null,
       // Resume command enforces current native entitlement before a course opens.
       action: status === "active" ? {
-        label: "Manage training", href: "/learn/my-courses",
+        label: "Manage training", href: "/learn/my-activity#noncredit-management",
       } : null,
     }, now);
   });
@@ -208,7 +208,7 @@ export function projectNoncreditOpportunities(
       action: state === "invited" ? {
         label: "Claim invitation", href: "/learn/enroll?release=" + hrefId(item.releaseId),
       } : {
-        label: "Manage waiting list", href: "/learn/my-courses",
+        label: "Manage waiting list", href: "/learn/my-activity#noncredit-management",
       },
     }];
   }).sort((a, b) => {
