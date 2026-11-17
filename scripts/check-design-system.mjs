@@ -129,20 +129,20 @@ const canonicalControlConsumers = {
   },
   "operations/SectionFacilitatorPanel.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/select', './SiteStaffingFeedback'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
   "operations/LocalSiteDelegationPanel.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/select', './SiteStaffingFeedback'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
   "operations/SchoolOpeningReviewPanel.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/input'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
   "learning/SectionGradeFinalization.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/field', '@/components/ui/input',
       '@/components/ui/select', '@/components/ui/textarea'],
-    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+    forbidden: [/<(?:input|select|textarea|button|label)\b/],
   },
   "operations/LaunchOpeningTask.tsx": {
     imports: ['@/components/ui/button', '@/components/ui/select', '@/components/ui/label'],
@@ -185,6 +185,10 @@ for (const file of files) {
 const sharedPatternContracts = {
   "workspace/filter-bar.tsx": ['from "@/components/ui/input"', 'from "@/components/ui/button"', 'from "@/components/ui/field"'],
   "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
+  "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions'],
+  "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}'],
+  "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}'],
+
 };
 for (const [file, required] of Object.entries(sharedPatternContracts)) {
   const source = readFileSync(join(root, file), "utf8");
@@ -200,6 +204,25 @@ for (const [file, required] of Object.entries(sharedPatternContracts)) {
   }
 }
 
+
+// ActionDialog callers retain their feature-owned authorization and mutation logic,
+// while their confirmation forms must compose the canonical Field and input primitives.
+for (const file of ["routes/operations.insights.tsx", "operations/OperationsWorkspace.tsx"]) {
+  const source = readFileSync(join(root, file), "utf8");
+  const opening = source.indexOf("<ActionDialog");
+  const closing = source.indexOf("</ActionDialog>", opening);
+  if (opening < 0 || closing < opening) {
+    console.error(`${file} must retain an ActionDialog`);
+    process.exitCode = 1;
+    continue;
+  }
+  const dialog = source.slice(opening, closing);
+  if (!dialog.includes("<Field") || !dialog.includes("<Textarea") ||
+      /<(?:input|textarea|label|select|button)\b/.test(dialog)) {
+    console.error(`${file} must use V6.1 controls inside the ActionDialog`);
+    process.exitCode = 1;
+  }
+}
 
 // Layer 2 shared workspace surfaces and migrated feature forms must remain
 // square and compose canonical controls, not rebuild browser widgets.
