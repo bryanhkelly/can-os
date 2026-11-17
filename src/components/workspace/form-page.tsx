@@ -31,7 +31,7 @@ export function FormActions({ submitLabel, pendingLabel, pending, disabled, canc
   cancel: ReactElement;
 }) {
   return <div data-form-actions="" className="mt-8 flex flex-wrap items-center gap-3 border-t border-border/60 pt-6">
-    <Button type="submit" size="lg" disabled={pending || disabled}>{pending ? pendingLabel : submitLabel}</Button>
+    <Button type="submit" size="lg" loading={pending} disabled={pending || disabled}>{pending ? pendingLabel : submitLabel}</Button>
     <Slot className={buttonVariants({ variant: "ghost", size: "lg" })}>{cancel}</Slot>
   </div>;
 }
