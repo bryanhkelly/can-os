@@ -1,4 +1,5 @@
 import { Slot } from "@radix-ui/react-slot";
+import { ActionFooter } from "./action-footer";
 import { useBlocker } from "@tanstack/react-router";
 import { useCallback, useEffect, useId, useRef, type ReactElement, type ReactNode } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -30,10 +31,10 @@ export function FormActions({ submitLabel, pendingLabel, pending, disabled, canc
   disabled?: boolean;
   cancel: ReactElement;
 }) {
-  return <div data-form-actions="" className="mt-8 flex flex-wrap items-center gap-3 border-t border-border/60 pt-6">
-    <Button type="submit" size="lg" loading={pending} disabled={pending || disabled}>{pending ? pendingLabel : submitLabel}</Button>
+  return <ActionFooter layout="form">
+    <Button type="submit" size="lg" loading={pending} loadingLabel={pendingLabel} disabled={pending || disabled}>{submitLabel}</Button>
     <Slot className={buttonVariants({ variant: "ghost", size: "lg" })}>{cancel}</Slot>
-  </div>;
+  </ActionFooter>;
 }
 
 /**
