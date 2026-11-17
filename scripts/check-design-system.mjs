@@ -185,7 +185,7 @@ for (const file of files) {
 const sharedPatternContracts = {
   "workspace/filter-bar.tsx": ['from "@/components/ui/input"', 'from "@/components/ui/button"', 'from "@/components/ui/field"'],
   "workspace/directory-table.tsx": ['from "./filter-bar"', '<FilterBar'],
-  "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions'],
+  "workspace/action-footer.tsx": ['data-action-footer', 'data-form-actions', 'data-dialog-actions', '"inline"'],
   "workspace/form-page.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
     'aria-describedby={description ? descriptionId : undefined}', 'columns === 1'],
   "workspace/action-dialog.tsx": ['from "./action-footer"', '<ActionFooter', 'loadingLabel={pendingLabel}',
@@ -206,6 +206,20 @@ for (const [file, required] of Object.entries(sharedPatternContracts)) {
   }
 }
 
+
+// Inline record actions share the same spacing and wrapping contract without
+// turning record decisions into additional forms or changing server commands.
+for (const path of [
+  "operations/SchoolOpeningReviewPanel.tsx",
+  "learning/SectionGradeFinalization.tsx",
+  "operations/LocalSiteDelegationPanel.tsx",
+]) {
+  const source = readFileSync(join(root, path), "utf8");
+  if (!source.includes('<ActionFooter layout="inline"') || radiusUtility.test(source)) {
+    console.error(`${path} must compose a square V6.1 inline ActionFooter`);
+    process.exitCode = 1;
+  }
+}
 
 // ActionDialog callers retain their feature-owned authorization and mutation logic,
 // while their confirmation forms must compose the canonical Field and input primitives.
