@@ -7,10 +7,11 @@ import {
   accessAccountNoncreditPrincipals,accessAccounts,
 } from "@/db/schema";
 import {
-  auditEvents,domainEvents,noncreditEnrollmentWaitlist,
+  noncreditEnrollmentWaitlist,
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
   noncreditTrainingVersions,noncreditWaitlistEmailDeliveries,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError} from "@/domain/command-context";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {isDemoAccountEmail} from "@/domain/local-demo-access";
@@ -87,12 +88,12 @@ export const joinNoncreditWaitlist=createServerFn({method:"POST"})
         entryId=created.id;
       }
       const payload={releaseId:release.id,accessAccountId:owner.accountId};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:null,owningOrganizationId:release.registeringOrganizationId,
         eventCode:"noncredit.waitlist.joined",
         entityKind:"noncredit_enrollment_waitlist",entityId:entryId,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"NoncreditWaitlistJoined",aggregateType:"noncredit_enrollment_waitlist",
         aggregateId:entryId,actorPersonId:null,payload,
       });
@@ -222,12 +223,12 @@ export const cancelMyNoncreditWaitlist=createServerFn({method:"POST"})
         status:"cancelled",updatedAt:new Date(),
       }).where(eq(noncreditEnrollmentWaitlist.id,entry.id));
       const payload={releaseId:data.releaseId,accessAccountId:owner.accountId};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:null,
         eventCode:"noncredit.waitlist.cancelled",
         entityKind:"noncredit_enrollment_waitlist",entityId:entry.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"NoncreditWaitlistCancelled",
         aggregateType:"noncredit_enrollment_waitlist",aggregateId:entry.id,
         actorPersonId:null,payload,
