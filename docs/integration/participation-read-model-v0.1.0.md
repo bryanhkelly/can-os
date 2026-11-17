@@ -1,3 +1,5 @@
+> **WS00 revision notice (2026-11-16):** This draft defines the **future audit-grade target** and is NOT the currently implemented UI DTO. WS1 proposes a display-only `ParticipationReadModel v1.1.0` with `records[]` and separate `opportunities[]`. WS00 provisionally accepts that smaller integration surface subject to the [v1.1 decision and release gates](./ws00-contract-decision-v1.1.md). Do not require currently unavailable Person/Site/decision fields to be fabricated, and do not count UI display records as audited metrics.
+
 # Participation Read Model Contract (PRM) v0.1.0
 
 **Status:** PROVISIONAL, for WS1 ratification before dependent implementations.  
