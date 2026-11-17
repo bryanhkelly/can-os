@@ -399,8 +399,8 @@ function ClassHome(){
     title="Course activities" eyebrow="CAN OS" width="wide">
     <p role="status">Opening authorized publisher tools…</p>
   </WorkspaceShell>}>
-    <PublisherCourseActivityEditor navigation={navigation}
-      preferredCourseVersionId={selected.courseVersionId}/>
+    <PublisherCourseActivityEditor key={selected.courseVersionId??"new"}
+      navigation={navigation} preferredCourseVersionId={selected.courseVersionId}/>
   </Suspense>;
   return selected.view==="manage"
     ?<Suspense fallback={<WorkspaceShell title="Classes" eyebrow="CAN OS"
