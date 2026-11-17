@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { db } from "@/db/client";
 import { accessSessionCookie, hashAccessSecret } from "@/domain/access-tokens";
+import { readCookie } from "@/domain/session-cookies";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { assertCurrentCanonicalStaffForMutation } from "./canonical-transaction-authorization.server";
 
@@ -21,10 +22,7 @@ export async function assertCurrentCredentialIssuer(
 ): Promise<void> {
   await assertCurrentCanonicalStaffForMutation(tx, request, actor);
 
-  const raw = (request.headers.get("cookie") ?? "").split(";")
-    .map(piece => piece.trim())
-    .find(piece => piece.startsWith(accessSessionCookie + "="))
-    ?.slice(accessSessionCookie.length + 1);
+  const raw = readCookie(request, accessSessionCookie);
   const pepper = process.env.CAN_ACCESS_TOKEN_PEPPER;
   if (!raw || !/^[A-Za-z0-9_-]{40,}$/.test(raw) ||
       !pepper || pepper.length < 32) {
