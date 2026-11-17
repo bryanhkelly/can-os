@@ -31,7 +31,8 @@ CREATE OR REPLACE FUNCTION education_v30.ws3_guard_class_completion_decision()
 RETURNS trigger LANGUAGE plpgsql
 SET search_path=education_v30,pg_catalog AS $ws3$
 DECLARE e record; p record; ev record; prior record;
-        today date;
+        today date; total_lessons integer; completed_lessons integer;
+        verified_sessions integer; assessment_passed boolean;
 BEGIN
   IF NEW.outcome_kind<>'completion' THEN RETURN NEW; END IF;
   -- Do not allow new completion-like evidence to bypass the governed source
@@ -48,6 +49,7 @@ BEGIN
   END IF;
 
   SELECT enrollment.*,cls.course_version_id AS class_course,
+    cls.deployment_id AS class_deployment,
     cls.operating_organization_id,cls.site_id,cls.state AS class_state,
     attempt.status AS attempt_state,attempt.class_enrollment_id AS attempt_class,
     attempt.course_version_id AS attempt_course,
@@ -156,6 +158,104 @@ BEGIN
      ) THEN
     RAISE EXCEPTION 'Class completion requires independently bound current evidence'
       USING ERRCODE='23514';
+  END IF;
+
+  -- Database validation is authoritative even if application-side readiness
+  -- projections contain a bug. A completed result must satisfy the originally
+  -- pinned policy with actual canonical Course/Room/Assessment sources.
+  IF NEW.result_code='completed' THEN
+    IF e.status<>'active' OR e.attempt_state<>'active' THEN
+      RAISE EXCEPTION 'Only an active Class Enrollment and Attempt may complete'
+        USING ERRCODE='23514';
+    END IF;
+    IF p.require_all_lessons THEN
+      SELECT count(*)::integer,
+             count(progress.id) FILTER(
+               WHERE progress.status IN ('completed','waived'))::integer
+        INTO total_lessons,completed_lessons
+      FROM education_v30.course_lessons lesson
+      LEFT JOIN education_v30.learner_lesson_progress progress
+        ON progress.lesson_id=lesson.id
+        AND progress.course_attempt_id=e.course_attempt_id
+        AND progress.course_version_id=e.class_course
+      WHERE lesson.course_version_id=e.class_course;
+      IF total_lessons=0 OR total_lessons<>completed_lessons THEN
+        RAISE EXCEPTION 'Incomplete canonical Course lessons'
+          USING ERRCODE='23514';
+      END IF;
+    END IF;
+
+    IF p.required_verified_sessions>0 THEN
+      SELECT count(*)::integer INTO verified_sessions
+      FROM (
+        SELECT DISTINCT ON (cs.id) cs.id,assertion.status
+        FROM education_v30.class_sessions cs
+        JOIN education_v30.facilitated_classroom_plans plan
+          ON plan.id=cs.classroom_plan_id
+        JOIN education_v30.facilitated_learning_sessions room
+          ON room.id=plan.facilitated_session_id
+        JOIN education_v30.facilitated_room_attendance_assertions assertion
+          ON assertion.facilitated_session_id=room.id
+          AND assertion.course_attempt_id=e.course_attempt_id
+        WHERE cs.class_id=e.class_id
+          AND cs.delivery_session_id=plan.delivery_session_id
+          AND cs.facilitator_person_id=plan.facilitator_person_id
+          AND assertion.facilitator_person_id=cs.facilitator_person_id
+          AND assertion.facilitator_person_id<>e.learner_person_id
+          AND plan.state='started'
+          AND plan.site_id=e.site_id
+          AND plan.host_organization_id=e.operating_organization_id
+          AND plan.course_version_id=e.class_course
+          AND room.state='ended' AND room.ended_at IS NOT NULL
+          AND room.ended_at<=clock_timestamp()
+          AND room.site_id=e.site_id
+          AND room.host_organization_id=e.operating_organization_id
+          AND room.course_version_id=e.class_course
+          AND room.deployment_id=e.class_deployment
+          AND assertion.asserted_at<=clock_timestamp()
+        ORDER BY cs.id,assertion.asserted_at DESC,assertion.id DESC
+      ) latest
+      WHERE latest.status='present';
+      IF verified_sessions<p.required_verified_sessions THEN
+        RAISE EXCEPTION 'Insufficient current canonical verified Class Sessions'
+          USING ERRCODE='23514';
+      END IF;
+    END IF;
+
+    IF p.require_passing_assessment THEN
+      SELECT EXISTS(
+        SELECT 1
+        FROM education_v30.assessment_attempt_results r
+        JOIN education_v30.assessment_attempts attempt
+          ON attempt.id=r.attempt_id AND attempt.state='finalized'
+        JOIN education_v30.assessment_access_grants grant_row
+          ON grant_row.id=attempt.access_grant_id
+          AND grant_row.administration_id=attempt.administration_id
+          AND grant_row.learner_id=attempt.learner_id
+        JOIN education_v30.assessment_administrations administration
+          ON administration.id=attempt.administration_id
+        JOIN education_v30.learner_profiles learner
+          ON learner.id=grant_row.learner_id
+        WHERE grant_row.course_attempt_id=e.course_attempt_id
+          AND grant_row.access_status='approved'
+          AND learner.person_id=e.learner_person_id
+          AND administration.course_version_id=e.class_course
+          AND administration.deployment_id=e.class_deployment
+          AND administration.administering_organization_id=e.operating_organization_id
+          AND r.result_status='finalized' AND r.outcome='pass'
+          AND r.reviewed_by_person_id IS NOT NULL
+          AND r.reviewed_by_person_id<>e.learner_person_id
+          AND NOT EXISTS(
+            SELECT 1 FROM education_v30.assessment_attempt_results newer
+            WHERE newer.attempt_id=r.attempt_id
+              AND newer.result_revision>r.result_revision
+          )
+      ) INTO assessment_passed;
+      IF NOT assessment_passed THEN
+        RAISE EXCEPTION 'No current independently finalized passing assessment'
+          USING ERRCODE='23514';
+      END IF;
+    END IF;
   END IF;
   RETURN NEW;
 END $ws3$;
