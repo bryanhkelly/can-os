@@ -1,6 +1,6 @@
 import {createServerFn} from "@tanstack/react-start";
 import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
-import {and,desc,eq,inArray} from "drizzle-orm";
+import {and,desc,eq,gt,inArray,lte} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
@@ -71,6 +71,26 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
     if(replay.classOfferingVersionId!==terms.id||replay.learnerPersonId!==actor.actorPersonId)
      throw new AuthorizationError("conflicting approval request replay");
     return {approvalRequestId:replay.id,state:replay.state,duplicate:true};
+   }
+   // Lazily expire old pending requests before checking the unique pending
+   // learner constraint. A stale request must never permanently lock enrollment.
+   const expired=await tx.update(canonicalClassEnrollmentApprovalRequests)
+    .set({state:"expired",reviewedAt:now,
+      decisionReason:"Approval request expired before independent review"})
+    .where(and(
+      eq(canonicalClassEnrollmentApprovalRequests.classId,cls.id),
+      eq(canonicalClassEnrollmentApprovalRequests.learnerPersonId,actor.actorPersonId),
+      eq(canonicalClassEnrollmentApprovalRequests.state,"pending"),
+      lte(canonicalClassEnrollmentApprovalRequests.expiresAt,now),
+    )).returning({id:canonicalClassEnrollmentApprovalRequests.id});
+   for(const item of expired){
+    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+     owningOrganizationId:current.operatingOrganizationId,
+     eventCode:"class.approval.expired",entityKind:"class_approval_request",entityId:item.id,
+     payload:{classId:cls.id,siteId:current.siteId,reason:"expired_before_reapply"}});
+    await tx.insert(domainEvents).values({eventType:"ClassApprovalExpired",
+     aggregateType:"class_approval_request",aggregateId:item.id,
+     actorPersonId:actor.actorPersonId,payload:{classId:cls.id,siteId:current.siteId}});
    }
    const [pending]=await tx.select({id:canonicalClassEnrollmentApprovalRequests.id})
     .from(canonicalClassEnrollmentApprovalRequests).where(and(
@@ -173,7 +193,7 @@ export const getMyNativeClassApprovals=createServerFn({method:"GET"}).handler(as
   .orderBy(desc(canonicalClassEnrollmentApprovalRequests.requestedAt)).limit(100);
  const now=new Date();
  return items.map(item=>({...item,state:
-  item.state==="approved"&&item.expiresAt<=now?"expired" as const:item.state}));
+  ["pending","approved"].includes(item.state)&&item.expiresAt<=now?"expired" as const:item.state}));
 });
 
 export const getNativeClassApprovalQueue=createServerFn({method:"GET"})
@@ -198,7 +218,8 @@ export const getNativeClassApprovalQueue=createServerFn({method:"GET"})
     expiresAt:canonicalClassEnrollmentApprovalRequests.expiresAt,
    }).from(canonicalClassEnrollmentApprovalRequests)
     .where(and(eq(canonicalClassEnrollmentApprovalRequests.classId,cls.id),
-     eq(canonicalClassEnrollmentApprovalRequests.state,"pending")))
+     eq(canonicalClassEnrollmentApprovalRequests.state,"pending"),
+     gt(canonicalClassEnrollmentApprovalRequests.expiresAt,new Date())))
     .orderBy(desc(canonicalClassEnrollmentApprovalRequests.requestedAt)).limit(100);
   });
  });
