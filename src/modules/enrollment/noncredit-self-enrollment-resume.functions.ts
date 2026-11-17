@@ -5,12 +5,13 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { accessAccountNoncreditPrincipals } from "@/db/schema";
 import {
-  auditEvents as canonicalAuditEvents, canonicalAccountGrants,canonicalAccounts,
+  canonicalAccountGrants,canonicalAccounts,
   canonicalEnrollmentOrganizations,courseVersions,deploymentOfferingAdoptions,
   educationOperations,learnerCourseAttempts,noncreditRegistrations,
   noncreditSelfEnrollmentClaims,noncreditTrainingVersions,offeringVersions,programDeployments,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
 
 /** Native session renewal is only for this verified Person's existing live
@@ -101,7 +102,7 @@ export const openMyNoncreditCourse = createServerFn({method:"POST"})
          record.personId!==bridge.canonicalPersonId)
         throw new AuthorizationError("current active course participation");
       const cookie=await issueNativeLearnerSession(tx,record.accountId,record.grantId,now);
-      await tx.insert(canonicalAuditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:record.personId,
         owningOrganizationId:record.organizationId,
         eventCode:"noncredit.self_enrollment.session_resumed",
