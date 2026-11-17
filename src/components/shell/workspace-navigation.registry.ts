@@ -118,7 +118,6 @@ const nestedRouteExceptions: Partial<Record<WorkspaceRole, Record<string, readon
 
 const schoolAdministrationLinks = [
   { title: "Classes", path: "/class", icon: "book" },
-  { title: "Class management", path: "/canonical/classes", icon: "book" },
   { title: "Launch", path: "/launch/site", icon: "building" },
   { title: "Admissions", path: "/admissions", icon: "clipboard" },
   { title: "Students", path: "/staff/students", icon: "users" },
