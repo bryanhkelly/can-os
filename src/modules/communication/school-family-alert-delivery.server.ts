@@ -35,7 +35,7 @@ const schoolFamilyAdapter = {
     Promise<OutboundClaim | null> {
     return db.transaction(async tx => {
       const [row] = await tx.select({
-        id: delivery.id, attempts: delivery.attempts,
+        id: delivery.id, attempts: delivery.attempts, channel: delivery.channel,
       }).from(delivery).where(and(
         // Only claim this feature's receipts. A correlated EXISTS avoids
         // locking a shared school bulletin Action during SKIP LOCKED claims.
@@ -61,7 +61,7 @@ const schoolFamilyAdapter = {
       await tx.update(delivery).set({
         status: "processing", leaseUntil, updatedAt: now,
       }).where(eq(delivery.id, row.id));
-      return { id: row.id, attempts: row.attempts, leaseUntil };
+      return { id: row.id, attempts: row.attempts, leaseUntil, sourceChannel: row.channel };
     });
   },
   async prepare(claim: OutboundClaim, now: Date):
@@ -202,10 +202,15 @@ const schoolFamilyAdapter = {
     kind: "accepted" | "failed" | "suppressed";
     now: Date; attempts: number; nextAttemptAt: Date | null; reason: string | null;
   }): Promise<boolean> {
+    // Twilio's current sender does not provide a durable idempotent receipt.
+    // A timeout or worker exception can follow provider acceptance, so SMS
+    // failures are deliberately terminal until provider-side reconciliation.
+    const uncertainSms = claim.sourceChannel === "sms" && result.kind === "failed";
     const rows = await db.update(delivery).set({
       status: result.kind, attempts: result.attempts,
       acceptedAt: result.kind === "accepted" ? result.now : null,
-      lastError: result.reason, nextAttemptAt: result.nextAttemptAt,
+      lastError: uncertainSms ? "sms_provider_outcome_unconfirmed" : result.reason,
+      nextAttemptAt: uncertainSms ? null : result.nextAttemptAt,
       leaseUntil: null, updatedAt: result.now,
     }).where(owned(claim)).returning({ id: delivery.id });
     return rows.length > 0;
@@ -219,6 +224,18 @@ const schoolFamilyAdapter = {
 
 /** Retain the original scheduled job contract and bounded concurrency. */
 export async function processSchoolFamilyOutboundDeliveries(now = new Date(), limit = 120) {
+  // An expired SMS processing lease may mean the provider accepted the send
+  // before the worker died. Never automatically re-send such SMS receipts.
+  // Email retains its stable idempotency-key recovery behavior.
+  const clock = new Date(Math.max(Date.now(), now.getTime()));
+  await db.update(delivery).set({
+    status: "failed", nextAttemptAt: null, leaseUntil: null,
+    lastError: "sms_provider_outcome_unconfirmed", updatedAt: clock,
+  }).where(and(
+    eq(delivery.channel, "sms"),
+    eq(delivery.status, "processing"),
+    lte(delivery.leaseUntil, clock),
+  ));
   const bounded = Math.max(0, Math.trunc(limit));
   const workers = Math.min(6, bounded);
   if (!workers) return 0;
