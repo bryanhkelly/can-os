@@ -4,9 +4,10 @@ import {and,desc,eq,gt,inArray,lte} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
 import {
- auditEvents,domainEvents,canonicalClasses,canonicalClassOfferingVersions,
+ canonicalClasses,canonicalClassOfferingVersions,
  canonicalClassEnrollmentApprovalRequests,canonicalClassEnrollments,canonicalPersons,
 } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {assertCurrentNativeClassLearnerForMutation} from "./native-class-learner-session.server";
@@ -85,11 +86,11 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
       lte(canonicalClassEnrollmentApprovalRequests.expiresAt,now),
     )).returning({id:canonicalClassEnrollmentApprovalRequests.id});
    for(const item of expired){
-    await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+    await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
      owningOrganizationId:current.operatingOrganizationId,
      eventCode:"class.approval.expired",entityKind:"class_approval_request",entityId:item.id,
      payload:{classId:cls.id,siteId:current.siteId,reason:"expired_before_reapply"}});
-    await tx.insert(domainEvents).values({eventType:"ClassApprovalExpired",
+    await emitCanonicalDomainEvent(tx,{eventType:"ClassApprovalExpired",
      aggregateType:"class_approval_request",aggregateId:item.id,
      actorPersonId:actor.actorPersonId,payload:{classId:cls.id,siteId:current.siteId}});
    }
@@ -106,11 +107,11 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
     requestId:data.requestId,expiresAt:new Date(now.getTime()+maxAgeMs),
    }).returning({id:canonicalClassEnrollmentApprovalRequests.id});
    if(!saved)throw new Error("Class approval request not saved");
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+   await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
     owningOrganizationId:current.operatingOrganizationId,
     eventCode:"class.approval.requested",entityKind:"class_approval_request",entityId:saved.id,
     payload:{classId:cls.id,siteId:current.siteId,seatReserved:false}});
-   await tx.insert(domainEvents).values({eventType:"ClassApprovalRequested",
+   await emitCanonicalDomainEvent(tx,{eventType:"ClassApprovalRequested",
     aggregateType:"class_approval_request",aggregateId:saved.id,
     actorPersonId:actor.actorPersonId,payload:{classId:cls.id,siteId:current.siteId}});
    return {approvalRequestId:saved.id,state:"pending" as const,duplicate:false};
@@ -167,12 +168,12 @@ export const decideNativeClassApproval=createServerFn({method:"POST"})
     state:data.decision,reviewedByPersonId:actor.actorPersonId,
     reviewedAt:now,decisionReason:data.reason,
    }).where(eq(canonicalClassEnrollmentApprovalRequests.id,approval.id));
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+   await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
     owningOrganizationId:cls.operatingOrganizationId,
     eventCode:"class.approval."+data.decision,
     entityKind:"class_approval_request",entityId:approval.id,
     payload:{classId:cls.id,siteId:approval.siteId,reason:data.reason}});
-   await tx.insert(domainEvents).values({eventType:"ClassApprovalDecided",
+   await emitCanonicalDomainEvent(tx,{eventType:"ClassApprovalDecided",
     aggregateType:"class_approval_request",aggregateId:approval.id,
     actorPersonId:actor.actorPersonId,
     payload:{classId:cls.id,siteId:approval.siteId,decision:data.decision}});
