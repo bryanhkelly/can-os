@@ -33,6 +33,8 @@ describe("single-Site native Class handoff",()=>{
     const manager=source("src/components/learning/NativeClassManager.tsx");
     const readiness=source("src/components/learning/NativeClassLaunchReadiness.tsx");
     expect(panel).toContain("<NativeClassLaunchReadiness state={{");
+    expect(panel).toContain('<WorkspacePanel title="Turn an approved Course into a Class"');
+    expect(panel).toContain("<NativeClassSummary item={item}>");
     expect(manager).toContain("<NativeClassLaunchReadiness state={{");
     expect(readiness).toContain("projectClassLaunchReadiness(state)");
     expect(panel).toContain('to="/class" search={{view:"manage",siteId:canonicalSiteId??undefined}}');
