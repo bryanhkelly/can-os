@@ -62,7 +62,6 @@ BEGIN
   WHERE enrollment.id=NEW.class_enrollment_id FOR SHARE OF enrollment;
   IF e.id IS NULL OR e.class_state NOT IN ('active','completed') OR
      e.course_attempt_id IS NULL OR
-     e.course_attempt_id IS DISTINCT FROM e.course_attempt_id OR
      e.attempt_class IS DISTINCT FROM e.id OR
      e.attempt_course IS DISTINCT FROM e.class_course OR
      e.school_enrollment IS NOT NULL OR
