@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import {
-  PageFrame, RecordHeader, RecordLayout, StatCard, StatusBadge,
+  PageFrame, RecordHeader, RecordLayout, RecordFacts, StatCard, StatusBadge,
   WorkspaceNotice, WorkspacePanel, secondaryActionClassName,
 } from "@/components/workspace";
 import { listEnrichmentCatalog } from "@/modules/activities/enrichment-family.functions";
@@ -75,16 +75,12 @@ function EnrichmentOfferingDetailPage() {
           </ul>
         </WorkspacePanel>}
         <WorkspacePanel title="Program" description="Offered through the hosting school's extended learning program.">
-          <dl className="grid gap-4 text-sm sm:grid-cols-2">
-            <div><dt className="text-xs text-muted-foreground">School</dt>
-              <dd className="mt-1">{offering.siteName}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Program</dt>
-              <dd className="mt-1">{offering.programName}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Season</dt>
-              <dd className="mt-1">{offering.seasonName}</dd></div>
-            <div><dt className="text-xs text-muted-foreground">Dates</dt>
-              <dd className="mt-1">{offering.startsOn} to {offering.endsOn}</dd></div>
-          </dl>
+          <RecordFacts label="Program details" items={[
+            { label: "School", value: offering.siteName },
+            { label: "Program", value: offering.programName },
+            { label: "Season", value: offering.seasonName },
+            { label: "Dates", value: `${offering.startsOn} to ${offering.endsOn}` },
+          ]}/>
         </WorkspacePanel>
       </>}
       rail={<WorkspacePanel title="How registration works">
