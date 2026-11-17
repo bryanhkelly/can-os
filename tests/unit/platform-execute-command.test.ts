@@ -21,7 +21,36 @@ describe("shared command execution boundary", () => {
       audit: async () => { events.push("audit"); },
     });
     expect(result).toBe(4);
-    expect(events).toEqual(["authenticate", "validate", "authorize", "begin", "execute", "audit", "commit"]);
+    expect(events).toEqual(["authenticate", "validate", "begin", "authorize", "execute", "audit", "commit"]);
+  });
+
+  it("resource authorization failure rolls back before business writes", async () => {
+    const events: string[] = [];
+    const execute = vi.fn(async () => "written");
+    await expect(executeCommand(1, {
+      authenticate: async () => actor,
+      capability: "records:update",
+      validate: input => input,
+      transaction: async work => {
+        events.push("begin");
+        try {
+          const result = await work({});
+          events.push("commit");
+          return result;
+        } catch (error) {
+          events.push("rollback");
+          throw error;
+        }
+      },
+      authorize: async () => {
+        events.push("authorize");
+        throw new Error("resource not authorized");
+      },
+      execute,
+      audit: async () => { events.push("audit"); },
+    })).rejects.toThrow("resource not authorized");
+    expect(events).toEqual(["begin", "authorize", "rollback"]);
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it("denies missing capability before validation and writes", async () => {
