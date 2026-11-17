@@ -116,6 +116,42 @@ for (const [file, contract] of Object.entries(governedFeatureControls)) {
 }
 
 
+// V6.1 canonical input/action adoption is checked component by component.
+// Only add a consumer after replacing its native controls and clearing radius drift.
+const canonicalControlConsumers = {
+  "evidence/EvidencePicker.tsx": {
+    imports: ['@/components/ui/field', '@/components/ui/select'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
+  "learning/GradebookSectionSelector.tsx": {
+    imports: ['@/components/ui/field', '@/components/ui/select'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
+  "operations/LaunchOpeningTask.tsx": {
+    imports: ['@/components/ui/button', '@/components/ui/select', '@/components/ui/label'],
+    forbidden: [/<(?:input|select|textarea|button|label)\\b/],
+  },
+};
+for (const [file, contract] of Object.entries(canonicalControlConsumers)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const name of contract.imports) {
+    if (!source.includes(name)) {
+      console.error(`${file} must compose ${name}`);
+      process.exitCode = 1;
+    }
+  }
+  for (const forbidden of contract.forbidden) {
+    if (forbidden.test(source)) {
+      console.error(`${file} reintroduced a native control instead of V6.1 components`);
+      process.exitCode = 1;
+    }
+  }
+  if (radiusUtility.test(source)) {
+    console.error(`${file} reintroduced legacy rounded geometry`);
+    process.exitCode = 1;
+  }
+}
+
 // Layer 2 ownership: every directory uses the shared FilterBar composition,
 // and neither the pattern nor its table may reintroduce rounded surfaces.
 const sharedPatternContracts = {
@@ -141,6 +177,9 @@ for (const [file, required] of Object.entries(sharedPatternContracts)) {
 // square and compose canonical controls, not rebuild browser widgets.
 const governedWorkspaceSurfaces = [
   "workspace/workspace-panel.tsx",
+  "workspace/notice.tsx",
+  "workspace/page-navigation.tsx",
+  "workspace/prerequisite-checklist.tsx",
 ];
 for (const file of governedWorkspaceSurfaces) {
   const source = readFileSync(join(root, file), "utf8");
