@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import {
-  PageFrame, RecordHeader, WorkspaceNotice, WorkspacePanel, StatusBadge,
+  PageFrame, RecordHeader, RecordLayout, WorkspaceNotice, WorkspacePanel, StatusBadge,
 } from "@/components/workspace";
 import { getDemoCenter } from "@/modules/activities/demo-center.functions";
 import { SiteNativeClassHandoff } from "@/components/launch-studio/SiteNativeClassHandoff";
@@ -20,9 +20,9 @@ function DemoCenterPage() {
   if (!result.data) return <PageFrame width="wide"><p role="status">Center not found.</p></PageFrame>;
   const {site,plans,nativeCourse}=result.data;
   return <PageFrame width="wide">
-    <RecordHeader eyebrow="Community Learning Center · Synthetic demonstration"
-      title={site.name} subtitle="After-school and summer program planning"/>
-    <div className="mt-6 space-y-5">
+    <RecordLayout header={<RecordHeader eyebrow="Community Learning Center · Synthetic demonstration"
+      title={site.name} subtitle="After-school and summer program planning"/>}
+      main={<div className="space-y-5">
       <WorkspacePanel title="Explore Classes and programs"
         description="One Class directory for enrollment, teaching, sessions and management.">
         <p className="text-sm leading-6 text-muted-foreground">
@@ -89,6 +89,6 @@ function DemoCenterPage() {
           </div>
         </WorkspacePanel>)}
       </div>
-    </div>
+    </div>}/>
   </PageFrame>;
 }
