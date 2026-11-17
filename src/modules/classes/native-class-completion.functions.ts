@@ -1,10 +1,10 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents, domainEvents,
+  auditEvents, domainEvents, canonicalPersons,
   canonicalClasses, canonicalClassEnrollments, canonicalClassOutcomes,
   canonicalClassSessions, canonicalClassStaffAssignments,
   classEnrollmentCompletionPins, classCompletionPolicyVersions,
@@ -432,5 +432,92 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
         aggregateType:"class_outcome",aggregateId:created.id,payload,
       });
       return {outcomeId:created.id,alreadyRecorded:false};
+    });
+  });
+
+
+const queueInput=z.object({
+  classId:uuid,
+  page:z.number().int().min(0).max(100).default(0),
+}).strict();
+
+/** Bounded per-Class operator review queue. Reuses the same exact-Site,
+ * original participant and latest verified source checks as the decision
+ * command; never copies a second completion/attendance ledger. The queue is
+ * deliberately capped to 10 participants per page pending WS00 pagination QA.
+ */
+export const getNativeClassCompletionQueue=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>queueInput.parse(raw))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private,no-store");
+    if(process.env.CAN_UNIFIED_CLASS_COMMANDS_ENABLED!=="true" ||
+       process.env.CAN_WS3_NATIVE_CLASS_COMPLETION_ENABLED!=="true")
+      throw new AuthorizationError("Class completion review queue not activated");
+    const request=getRequest();
+    const actor=await getCanonicalCommandContext(request);
+    if(!actor.actorPersonId || !["site_admin","registrar"].includes(actor.role??"") ||
+       actor.scope.organizationIds?.length!==1 ||
+       actor.scope.siteIds?.length!==1)
+      throw new AuthorizationError("one current provider and Site reviewer");
+    assertCapability(actor,"class.manage");
+    return db.transaction(async tx=>{
+      await assertCurrentCanonicalStaffForMutation(tx,request,actor);
+      const [cls]=await tx.select().from(canonicalClasses)
+        .where(eq(canonicalClasses.id,data.classId)).limit(1);
+      if(!cls||!cls.siteId || cls.siteId!==actor.scope.siteIds[0] ||
+         cls.operatingOrganizationId!==actor.scope.organizationIds[0])
+        throw new AuthorizationError("exact authorized Class");
+      await validateClassAuthority(tx,{
+        actor,organizationId:cls.operatingOrganizationId,
+        siteIds:[cls.siteId],
+      },{
+        deploymentId:cls.deploymentId,adoptionId:cls.adoptionId,
+        offeringVersionId:cls.offeringVersionId,
+        courseVersionId:cls.courseVersionId,
+        operatingOrganizationId:cls.operatingOrganizationId,
+        siteId:cls.siteId,title:cls.title,deliveryMode:cls.deliveryMode,
+      });
+      const rows=await tx.select({
+        id:canonicalClassEnrollments.id,
+        enrolledAt:canonicalClassEnrollments.enrolledAt,
+        status:canonicalClassEnrollments.status,
+        firstName:canonicalPersons.legalFirstName,
+        lastName:canonicalPersons.legalLastName,
+      }).from(canonicalClassEnrollments)
+        .innerJoin(canonicalPersons,
+          eq(canonicalPersons.id,canonicalClassEnrollments.learnerPersonId))
+        .where(and(
+          eq(canonicalClassEnrollments.classId,cls.id),
+          inArray(canonicalClassEnrollments.status,["active","completed"]),
+        )).orderBy(asc(canonicalClassEnrollments.enrolledAt),
+          asc(canonicalClassEnrollments.id))
+        .limit(11).offset(data.page*10);
+      const summaries=[];
+      for(const row of rows.slice(0,10)){
+        const source=await authorizeReview(tx,row.id,actor);
+        const readiness=await collectReadiness(tx,source);
+        const current=await currentGovernedOutcome(tx,row.id);
+        summaries.push({
+          classEnrollmentId:row.id,
+          displayName:[row.firstName,row.lastName].filter(Boolean).join(" ")||
+            "Class learner",
+          enrollmentStatus:row.status,
+          completedLessons:readiness.completedLessons,
+          totalLessons:readiness.totalLessons,
+          verifiedSessions:readiness.verifiedSessions,
+          finalizedPassingResults:readiness.passingResultIds.length,
+          readyForIndependentReview:readiness.readyForIndependentReview,
+          blockers:readiness.blockers,
+          currentOutcome:current?.resultCode??null,
+          currentOutcomeId:current?.id??null,
+          policyVersionId:source.policy?.id??null,
+        });
+      }
+      return {
+        classId:cls.id,classTitle:cls.title,
+        page:data.page,hasMore:rows.length>10,
+        participants:summaries,
+        note:"Current Enrollment status and independently verified completion decisions are distinct. Historical award and credit issuance are governed separately.",
+      };
     });
   });
