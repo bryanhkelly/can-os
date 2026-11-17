@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  */
 export function formatRecordedTime(value: string, timeZone = "UTC"): string | null {
   // A local timestamp without an offset is ambiguous between SSR and browser.
-  if (!/(?:Z|[+-]\\d{2}:\\d{2})$/i.test(value)) return null;
+  if (!/(?:Z|[+-]\d{2}:\d{2})$/i.test(value)) return null;
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return null;
   try {
