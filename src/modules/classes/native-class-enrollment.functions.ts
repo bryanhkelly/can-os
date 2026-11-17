@@ -4,7 +4,8 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, count, desc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { accessAccounts,accessAccountNoncreditPrincipals } from "@/db/schema";
+import { accessAccounts,accessAccountNoncreditPrincipals,
+  accessAccountCanonicalPrincipals } from "@/db/schema";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {
   auditEvents, domainEvents, canonicalClasses, canonicalClassOfferings,
@@ -529,7 +530,7 @@ export const getMyNativeClassHistoryForCanAccountPage=createServerFn({method:"GE
     if(!account||account.disabled||!account.verifiedAt||
        account.personId!==actor.actorPersonId)
       throw new AuthorizationError("current verified CAN Person");
-    const links=await db.select({
+    const noncreditLinks=await db.select({
       canPersonId:accessAccountNoncreditPrincipals.accessPersonId,
       canonicalAccountId:accessAccountNoncreditPrincipals.canonicalAccountId,
       canonicalPersonId:accessAccountNoncreditPrincipals.canonicalPersonId,
@@ -538,27 +539,60 @@ export const getMyNativeClassHistoryForCanAccountPage=createServerFn({method:"GE
         eq(accessAccountNoncreditPrincipals.accessAccountId,actor.accountId),
         eq(accessAccountNoncreditPrincipals.accessPersonId,actor.actorPersonId),
       )).limit(2);
-    if(links.length===0)return {items:[],nextCursor:null};
-    if(links.length!==1||links[0]!.canPersonId!==actor.actorPersonId)
-      throw new AuthorizationError("unique verified canonical bridge");
-    const link=links[0]!;
-    const [verified]=await db.select({id:canonicalAccounts.id})
-      .from(canonicalAccounts).where(and(
-        eq(canonicalAccounts.id,link.canonicalAccountId),
-        eq(canonicalAccounts.emailNormalized,account.email),
-        isNull(canonicalAccounts.disabledAt),
-        isNotNull(canonicalAccounts.emailVerifiedAt),
-      )).limit(1);
-    if(!verified)throw new AuthorizationError("current native account bridge");
-    const [grant]=await db.select({id:canonicalAccountGrants.id})
-      .from(canonicalAccountGrants).where(and(
-        eq(canonicalAccountGrants.accountId,link.canonicalAccountId),
-        eq(canonicalAccountGrants.personId,link.canonicalPersonId),
+    const operatorLinks=await db.select({
+      canonicalPersonId:accessAccountCanonicalPrincipals.canonicalPrincipalId,
+      verifiedAt:accessAccountCanonicalPrincipals.verifiedAt,
+      verifiedByAccountId:accessAccountCanonicalPrincipals.verifiedByAccountId,
+    }).from(accessAccountCanonicalPrincipals)
+      .where(and(
+        eq(accessAccountCanonicalPrincipals.accountId,actor.accountId),
+        isNull(accessAccountCanonicalPrincipals.revokedAt),
+      )).limit(2);
+    if(noncreditLinks.length>1||operatorLinks.length>1)
+      throw new AuthorizationError("unambiguous source-verified canonical Person");
+    const noncredit=noncreditLinks[0];
+    const independentlyVerified=operatorLinks[0];
+    if(noncredit&&noncredit.canPersonId!==actor.actorPersonId)
+      throw new AuthorizationError("matching CAN source Person");
+    if(independentlyVerified&&
+       (independentlyVerified.verifiedByAccountId===actor.accountId||
+        independentlyVerified.verifiedAt>new Date()))
+      throw new AuthorizationError("independently verified current canonical Person");
+    if(noncredit&&independentlyVerified&&
+       noncredit.canonicalPersonId!==independentlyVerified.canonicalPersonId)
+      throw new AuthorizationError("conflicting canonical Person links");
+    const learnerPersonId=noncredit?.canonicalPersonId??
+      independentlyVerified?.canonicalPersonId;
+    if(!learnerPersonId)return {items:[],nextCursor:null};
+
+    // For a noncredit self-enrollment bridge, preserve the original verified
+    // native Account and matching-email contract. An independently verified
+    // operator link is an alternative only after the independent verifier
+    // recorded the exact native Person; email alone never establishes it.
+    if(noncredit){
+      const [native]=await db.select({id:canonicalAccounts.id})
+        .from(canonicalAccounts).where(and(
+          eq(canonicalAccounts.id,noncredit.canonicalAccountId),
+          eq(canonicalAccounts.emailNormalized,account.email),
+          isNull(canonicalAccounts.disabledAt),
+          isNotNull(canonicalAccounts.emailVerifiedAt),
+        )).limit(1);
+      if(!native)throw new AuthorizationError("current noncredit native account link");
+    }
+    const grants=await db.select({id:canonicalAccountGrants.id})
+      .from(canonicalAccountGrants)
+      .innerJoin(canonicalAccounts,
+        eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+      .where(and(
+        eq(canonicalAccountGrants.personId,learnerPersonId),
         eq(canonicalAccountGrants.roleCode,"learner"),
         eq(canonicalAccountGrants.active,true),
         isNull(canonicalAccountGrants.revokedAt),
         isNull(canonicalAccountGrants.siteId),
+        isNull(canonicalAccounts.disabledAt),
+        isNotNull(canonicalAccounts.emailVerifiedAt),
       )).limit(1);
-    if(!grant)throw new AuthorizationError("current native learner identity");
-    return readNativeClassHistoryPage(link.canonicalPersonId,data.cursor);
+    if(!grants.length)
+      throw new AuthorizationError("current verified native learner Person grant");
+    return readNativeClassHistoryPage(learnerPersonId,data.cursor);
   });
