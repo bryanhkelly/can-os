@@ -127,7 +127,7 @@ describe("V6.1 reusable design system", () => {
     expect(html).toContain("sm:grid-cols-3");
     expect((html.match(/border border-border bg-card p-3/g) ?? []).length).toBe(3);
     expect(html).toContain("Not yet observable");
-    expect(html).not.toMatch(/\\brounded(?:-[\\w-]+)?\\b/);
+    expect(html).not.toMatch(/\brounded(?:-[\w-]+)?\b/);
   });
 
   it("supports a single-column record fact list and an empty safe result", () => {
