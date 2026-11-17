@@ -1712,6 +1712,60 @@
       "roleJourney": "pending",
       "writeBoundary": "pending",
       "readBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.assessment-publications.tsx",
+      "route": "/canonical/assessment-publications",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.assessment-reviews.tsx",
+      "route": "/canonical/assessment-reviews",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.course-activities.tsx",
+      "route": "/canonical/course-activities",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/canonical.issuer-access.tsx",
+      "route": "/canonical/issuer-access",
+      "owner": "credentials",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/classes_.$classId.tsx",
+      "route": "/classes_/$classId",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
+    },
+    {
+      "file": "src/routes/learn.classes.tsx",
+      "route": "/learn/classes",
+      "owner": "learning",
+      "verification": "pending",
+      "roleJourney": "pending",
+      "readBoundary": "pending",
+      "writeBoundary": "pending"
     }
   ],
   "generatedFromCommit": "94775e966ae9286ce562d1969628649d92663930"
