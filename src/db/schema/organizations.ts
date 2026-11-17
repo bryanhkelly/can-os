@@ -1,3 +1,4 @@
+import { isNotNull } from "drizzle-orm";
 import {
   index,
   integer,
@@ -48,7 +49,7 @@ export const organizations = pgTable(
     uniqueIndex("organization_slug_uq").on(table.slug),
     index("organization_parent_idx").on(table.parentOrganizationId),
     index("organization_type_idx").on(table.type),
-    uniqueIndex("organizations_shared_external_reference_uq").on(table.externalReference),
+    uniqueIndex("organizations_shared_external_reference_uq").on(table.externalReference).where(isNotNull(table.externalReference)),
   ],
 );
 
@@ -75,7 +76,7 @@ export const sites = pgTable(
   (table) => [
     uniqueIndex("site_org_slug_uq").on(table.organizationId, table.slug),
     index("site_org_idx").on(table.organizationId),
-    uniqueIndex("sites_shared_reference_code_uq").on(table.referenceCode),
+    uniqueIndex("sites_shared_reference_code_uq").on(table.referenceCode).where(isNotNull(table.referenceCode)),
   ],
 );
 
