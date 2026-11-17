@@ -656,7 +656,7 @@ export function NativeClassManager({preferredSiteId}: {preferredSiteId?: string}
             <p className="mt-2 text-xs text-muted-foreground">{item.deliveryMode.replace("_"," ")} · {(item.enrollmentMethods??[]).join(", ")||"No registration publication"}</p>
             <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"overview"}}
               className="mt-2 inline-block text-sm font-semibold underline">Open Class workspace</Link>
-            <Link to="/reports/classes/$classId" params={{classId:item.classId}}
+            <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"reports"}}
               aria-label={`Class evidence for ${item.title}`}
               className="mt-2 ml-3 inline-block text-sm font-semibold underline">Class evidence</Link>
             {item.state!=="active"&&<Button disabled={busy||!item.siteId} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
