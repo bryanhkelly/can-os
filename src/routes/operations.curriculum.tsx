@@ -58,7 +58,7 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
   actions={mode==="library"?<div className="flex flex-wrap gap-2">
    {studio&&<><CreateAction><Link to="/operations/curriculum/new" search={{programId:studio.programId}}>Create course</Link></CreateAction>
    <Link to="/operations/curriculum/publishing" search={{programId:studio.programId}} className={secondaryActionClassName}>Publishing</Link></>}
-   <Link to="/canonical/course-activities" className={secondaryActionClassName}>Course activities</Link>
+   <Link to="/class" search={{view:"activities"}} className={secondaryActionClassName}>Course activities</Link>
   </div>:undefined}>
   <div className="space-y-8 pt-6">
   {data.programs.length>1&&<nav aria-label="Curriculum program scope" className="flex flex-wrap gap-3">
