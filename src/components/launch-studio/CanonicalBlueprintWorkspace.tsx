@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { StatusBadge } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   createCanonicalBlueprintConfiguration,
@@ -533,8 +534,10 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
               ? "Submitted for independent review" : "Private planning draft"}</p>
             {detail.lifecycle === "frozen" && <>
               <p className="mt-1">
-                Latest independent review: {review?.latestReview
-                  ? readable(review.latestReview.decision) : "Pending or unavailable"}
+                Latest independent review:{" "}
+                {review?.latestReview
+                  ? <StatusBadge tone={review.latestReview.decision === "approved" ? "success" : review.latestReview.decision === "rejected" ? "danger" : "attention"}>{readable(review.latestReview.decision)}</StatusBadge>
+                  : <StatusBadge>Pending or unavailable</StatusBadge>}
               </p>
               <Button type="button" variant="outline" disabled={busy}
                 onClick={() => void openConfiguration(detail.configurationId)}>
