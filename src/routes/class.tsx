@@ -35,6 +35,20 @@ const creditName:Record<CreditMode,string>={
   audit:"Audit, no academic credit",not_applicable:"No academic credit",
 };
 
+/** A native learner can use the native session directly. A previously linked
+ * verified CAN learner can recover with the *same* interactive login without
+ * a staff-cookie fallback. All admission modes share the same retry boundary.
+ * Session recovery never creates a learner, grants a role or reserves a seat.
+ */
+async function enrollWithLinkedCanRecovery(data:Parameters<typeof enrollInNativeClass>[0]) {
+  try { return await enrollInNativeClass(data); }
+  catch(originalError){
+    try { await resumeLinkedNativeClassLearner(); }
+    catch { throw originalError; }
+    return enrollInNativeClass(data);
+  }
+}
+
 function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
   const [mode,setMode]=useState<CreditMode>((item.allowedCreditModes[0]??"not_applicable") as CreditMode);
   const [adult,setAdult]=useState(false);
@@ -67,21 +81,10 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       // The server independently validates the CAN account, native Person,
       // adulthood and current learner grant before issuing the cookie.
       // Never silently create or impersonate a native account here.
-      const submit=()=>enrollInNativeClass({data:{
+      const result=await enrollWithLinkedCanRecovery({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
       }});
-      // Preserve independently authenticated native-only learners. A CAN
-      // learner with a missing/expired native session can recover using the
-      // same interactive sign-in; the recovery endpoint independently checks
-      // exact account/Person linkage, adulthood and a live learner grant.
-      let result:Awaited<ReturnType<typeof enrollInNativeClass>>;
-      try { result=await submit(); }
-      catch(originalError){
-        try { await resumeLinkedNativeClassLearner(); }
-        catch { throw originalError; }
-        result=await submit();
-      }
       setMessage(result.alreadyEnrolled?"You are already enrolled.":"Enrollment confirmed. Your Course Attempt is ready.");
       await onJoined();
     }catch(e){setError(normalizeClientError(e,"Class enrollment was not completed.").message)}
@@ -148,7 +151,7 @@ function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>P
     if(!eligible||!adult||!consent||busy)return;
     setBusy(true);setNotice("");setError("");
     try{
-      await enrollInNativeClass({data:{
+      await enrollWithLinkedCanRecovery({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         approvalRequestId:item.approvalRequestId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
@@ -194,7 +197,7 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
     if(!pending||!adult||!consent||busy)return;
     setBusy(true);setError("");setNotice("");
     try{
-      await enrollInNativeClass({data:{
+      await enrollWithLinkedCanRecovery({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         invitationId:item.invitationId,
         creditMode:item.creditMode,adultAttested:true,consentAccepted:true,
