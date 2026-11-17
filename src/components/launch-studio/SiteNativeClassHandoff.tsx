@@ -84,14 +84,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
       Review Course adoption <ArrowRight className="size-4"/>
      </Link>
     </div>
-    {adoptedCourses.isSuccess&&adoptedCourses.data.items.length===0&&
-      <p role="status" className="mt-4 border border-border p-4 text-sm">
-        There is no currently authorized adopted Course available for Class creation at this Site.
-        Review the governed Blueprint, Offering and Deployment adoption before creating a Class.
-      </p>}
-    {classes.length===0?<p className="mt-4 text-sm text-muted-foreground">
-     No native Classes appear in the authorized Site result (up to 100). This does not certify Site readiness.
-    </p>:<ul className="mt-4 grid gap-3 md:grid-cols-2">{classes.map(item=><li key={item.classId} className="border bg-card p-4">
+    {classes.length>0&&<ul className="mt-4 grid gap-3 md:grid-cols-2">{classes.map(item=><li key={item.classId} className="border bg-card p-4">
      <p className="font-semibold">{item.title}</p>
      <p className="mt-1 text-xs text-muted-foreground">
       {item.state.replaceAll("_"," ")} · {item.deliveryMode.replaceAll("_"," ")}
