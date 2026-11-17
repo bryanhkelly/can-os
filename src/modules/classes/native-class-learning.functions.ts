@@ -8,7 +8,7 @@ import {
   courseLessons, courseUnits, learnerLessonProgress,
   canonicalClassOutcomes, canonicalClassAwards,
 } from "@/db/canonical-v301";
-import { AuthorizationError, assertCapability } from "@/domain/command-context";
+import { AuthorizationError } from "@/domain/command-context";
 import { authorizeCanonicalCourseAttempt } from "@/modules/learning/canonical-course-participation.server";
 import { resolveAuthorizedLearningPerson } from "@/modules/identity/authorized-learning-person.server";
 
