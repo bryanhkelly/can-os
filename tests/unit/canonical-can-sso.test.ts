@@ -104,16 +104,18 @@ describe("one CAN login for authorized canonical Site staff", () => {
     const auth = source("src/modules/identity/canonical-command-context.server.ts");
     const bridge = source("src/modules/identity/canonical-can-staff-bridge.server.ts");
     expect(auth).toContain("accessSessionCookie");
-    expect(auth).toContain("getCommandContext(request)");
+    expect(auth).toContain("getIdentityContext(request)");
     expect(auth).toContain("resolveCanonicalSiteStaffFromCan(actor, request)");
-    expect(auth.indexOf("getCommandContext(request)"))
+    expect(auth.indexOf("getIdentityContext(request)"))
       .toBeLessThan(auth.lastIndexOf("getCanonicalSessionRow(request)"));
     const restricted = source(
       "database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql",
     );
-    expect(bridge).toContain("CAN_CANONICAL_AUTH_DATABASE_URL");
-    expect(bridge).toContain("SET LOCAL ROLE");
-    expect(bridge).toContain("v301_can_staff_session_context($1::text)");
+    const reader = source("src/modules/identity/restricted-canonical-session-reader.server.ts");
+    expect(bridge).toContain('readRestrictedCanonicalSession("can_staff", digest)');
+    expect(reader).toContain("CAN_CANONICAL_AUTH_DATABASE_URL");
+    expect(reader).toContain("SET LOCAL ROLE");
+    expect(reader).toContain("v301_can_staff_session_context($1::text)");
     expect(bridge).not.toContain('from(accessAccountCanonicalPrincipals)');
     expect(bridge).not.toContain('from(canonicalAccountGrants)');
     expect(restricted).toContain("public.access_account_canonical_principals");
