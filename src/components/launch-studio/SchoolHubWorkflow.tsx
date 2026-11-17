@@ -25,6 +25,11 @@ function SchoolHubWorkflowContent({data,selection,module}:WorkflowProps) {
  const siteId=selection.siteId;
  const status=data.statuses?.[module];
  const site=data.options.sites.find(item=>item.id===siteId);
+ // Defense in depth: never mount independent canonical tools for a Site
+ // missing from this account's server-authorized selector.
+ if(!site)return <p role="alert" className="mt-6 border border-border bg-card p-5">
+   This Site is not available in your authorized workspace. Choose a Site you can manage.
+ </p>;
  if(module==="profile")return site?<SchoolProfileConfiguration site={site}/>:<p role="alert" className="mt-6 border p-5">This school profile is unavailable in the current selection.</p>;
  if(module==="information")return site?<SiteInformationConfiguration key={`information:${site.updatedAt}`} site={site}/>:<p role="alert" className="mt-6 border p-5">Site information is unavailable in the current selection.</p>;
  if(module==="website")return <section className="mt-6 border bg-card p-6"><h2 className="font-serif text-3xl">Your school website</h2>
