@@ -1,8 +1,9 @@
 import { isDeepStrictEqual } from "node:util";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
+  domainEvents,
+  auditEvents,
   blueprintComponents,
   blueprintConfigurationComponents,
   blueprintConfigurationComponentReferences,
@@ -361,7 +362,7 @@ async function recordMutation(
     lifecycle: input.lifecycle,
     requestId: context.requestId ?? null,
   };
-  await writeCanonicalAudit(tx,{
+  await tx.insert(auditEvents).values({
     actorPersonId: context.actorPersonId,
     owningOrganizationId: input.owningOrganizationId,
     eventCode: input.action,
@@ -369,7 +370,7 @@ async function recordMutation(
     entityId: input.configurationId,
     payload,
   });
-  await emitCanonicalDomainEvent(tx,{
+  await tx.insert(domainEvents).values({
     eventType: input.eventType,
     aggregateType: "blueprint_configuration",
     aggregateId: input.configurationId,
