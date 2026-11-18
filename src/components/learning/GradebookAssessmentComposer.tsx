@@ -105,7 +105,7 @@ export function GradebookAssessmentComposer({
           <Input value={content.formatNote} maxLength={2000} onChange={e=>updateContent({formatNote:e.target.value})}/>
         </Field>
       </fieldset>
-      <fieldset className="mt-4 rounded-lg border p-4">
+      <fieldset className="mt-4 border border-border p-4">
         <legend className="px-1 text-sm font-semibold">Scoring rubric (optional)</legend>
         <p className="mb-3 text-xs text-muted-foreground">Add criteria for graded projects, tests, discussions or other work. Criterion points must sum to the assignment's points possible.</p>
         {newRubric.map((criterion,index)=><div key={criterion.id} className="mb-3 grid gap-2 border border-border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
