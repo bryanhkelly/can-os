@@ -713,6 +713,20 @@ const migratedV61RouteControls = {
     "<LiveSchoolExperiences", "<SchoolProfile", "<WorkspaceShell",
   ],
 
+  "routes/operations.school-years.tsx": [
+    "<SchoolYearStudioWorkspace",
+  ],
+  "routes/operations.school-years_.$yearId.tsx": [
+    "<SchoolYearRecord", "<WorkspaceShell", "<EmptyState",
+  ],
+  "routes/operations.school-years_.new.tsx": [
+    "<SchoolYearCreateForm",
+  ],
+  "routes/launch.school.tsx": [
+    "<LaunchWizardPage",
+  ],
+
+
 
 
 
@@ -1011,6 +1025,34 @@ for (const [file, fragments] of Object.entries(migratedNativeClassComponents)) {
   if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
       radiusUtility.test(source)) {
     console.error(file + " reintroduced a native control or rounded presentation");
+    process.exitCode = 1;
+  }
+}
+
+
+// End-to-end setup views share these components with existing school records.
+// This is source adoption only, not school-opening/launch approval.
+const migratedSchoolYearAndLaunchComponents = {
+  "operations/SchoolYearStudioWorkspace.tsx": ["<WorkspaceShell", "<EmptyState", "<Select"],
+  "operations/SchoolYearCard.tsx": ["<StatusBadge", "schoolYearStatus"],
+  "operations/SchoolYearRecord.tsx": ["<WorkspaceShell", "<FormSection", "<Field", "<StatusBadge"],
+  "operations/SchoolYearCreateForm.tsx": ["<WorkspaceShell", "<FormSection", "<Field"],
+  "operations/SchoolYearScheduleEditor.tsx": ["<Field", "<Select", "<Button"],
+  "operations/SchoolYearScheduleSetup.tsx": ["<Field", "<Input", "<Button"],
+  "operations/LaunchConfigurationForm.tsx": ["<Button", "<LaunchSchoolModelPicker", "<LaunchProgramIdentityFields"],
+  "operations/LaunchProgramIdentityFields.tsx": ["@/components/ui/input", "<Input", "<Select"],
+  "operations/LaunchDeliveryModelFields.tsx": ["@/components/ui/choice", "<Checkbox", "<Label"],
+  "operations/LaunchHostAndProviderFields.tsx": ["<Field", "<Select", "<Input"],
+};
+for (const [file, fragments] of Object.entries(migratedSchoolYearAndLaunchComponents)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const f of fragments) if (!source.includes(f)) {
+    console.error(file + " lost its shared school-year or launch control: " + f);
+    process.exitCode = 1;
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " reintroduced legacy native controls or rounded geometry");
     process.exitCode = 1;
   }
 }
