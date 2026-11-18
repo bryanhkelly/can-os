@@ -160,6 +160,16 @@ The Website Studio review screen exposes a read-only source-mapping panel with
 source, saved/review status, public eligibility and configuration revisions,
 using the existing V6.1 workspace primitives.
 
+Website layout publication requires an actual saved Site layout revision:
+the first Save persists revision 1 even if the operator keeps all suggested
+defaults; repeat saves with unchanged blocks are idempotent. Publication
+rejects absent private drafts, and public Site readers interpret missing or
+invalid published channel snapshots as **no explicitly arranged blocks**,
+not the private starter layout. Standard approved catalog pages remain
+available through their independently governed projections. The V6.1
+source-mapping panel reports the published revision only when a saved
+published snapshot exists.
+
 The public Program and Course channel cards now take their availability
 labels and actions from the same `projectSiteEnrollmentOpportunities`
 read model as the unified directory. A positive seat count or open
