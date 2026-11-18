@@ -7,7 +7,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), "utf8"
 describe("canonical session security boundary", () => {
   it("uses one restricted reader for both native and CAN staff sessions", () => {
     const native = read("src/modules/identity/canonical-command-context.server.ts");
-    const staff = read("src/modules/identity/canonical-can-staff-bridge.server.ts");
+    const staff = read("src/modules/identity/can-site-staff-authority.server.ts");
     const reader = read("src/modules/identity/restricted-canonical-session-reader.server.ts");
     expect(native).toContain('readRestrictedCanonicalSession("native", digest)');
     expect(staff).toContain('readRestrictedCanonicalSession("can_staff", digest)');
@@ -29,7 +29,7 @@ describe("canonical session security boundary", () => {
       "src/modules/identity/canonical-sensitive-authorization.server.ts",
       "src/modules/identity/canonical-transaction-authorization.server.ts",
       "src/modules/identity/learning-command-context.server.ts",
-      "src/modules/identity/canonical-can-staff-bridge.server.ts",
+      "src/modules/identity/can-site-staff-authority.server.ts",
     ]) {
       expect(read(path)).toContain("readCookie(request,");
     }
