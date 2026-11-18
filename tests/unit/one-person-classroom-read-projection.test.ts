@@ -75,7 +75,7 @@ describe("one authoritative Person for classroom attendance",()=>{
     expect(publicDDL).toContain("REFERENCES public.people(id)");
     expect(publicDDL).toContain("remaining<>3");
     expect(publicDDL).toContain("Operational Person records need review");
-    expect(publicDDL).toContain("public.guardian_authorities");
+    expect(publicDDL).toContain("'guardian_authorities','guardian_authorities_guardian_person_id_fkey'");
     expect(secureDDL).toContain("REFERENCES public.people(id)");
     expect(secureDDL).toContain("relrowsecurity AND relforcerowsecurity");
     expect(secureDDL).toContain("Sensitive records require review");
