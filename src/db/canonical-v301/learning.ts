@@ -324,7 +324,7 @@ export const trackLessonPresentations = educationV30.table(
   ],
 );
 
-export const publishedAssetReviews = educationV30.table("published_asset_reviews", {
+export const publishedAssetReviews = pgTable("published_asset_reviews", {
   decisionOrder: bigint("decision_order", { mode: "bigint" }).generatedAlwaysAsIdentity().notNull(),
   id: id(),
   assetVersionId: uuid("asset_version_id").notNull(),
