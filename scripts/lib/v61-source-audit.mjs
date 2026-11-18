@@ -203,6 +203,23 @@ export function createInventory(projectRoot) {
   };
 }
 
+/**
+ * Stable architecture-layer rule, not a page inventory. New shared controls,
+ * workspace layouts, evidence and workflow components inherit the same
+ * rectangular V6.1 geometry without registering their filenames.
+ */
+export function findSharedLayerGeometryViolations(inventory) {
+  const layers = new Set(["ui", "workspace", "workflow", "evidence"]);
+  return inventory.inspected.flatMap(file => {
+    const segments = file.path.split("/");
+    if (segments[0] !== "src" || segments[1] !== "components" ||
+        !layers.has(segments[2])) return [];
+    return file.corners.map(corner => ({
+      file: file.path, ...corner,
+    }));
+  });
+}
+
 function git(root, args) {
   return execFileSync("git", args, { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
