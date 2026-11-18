@@ -88,3 +88,48 @@ At the last check there were **346 `education_v30` base tables**,
 Other work on main is concurrent, so inventory changes do not all belong to
 this migration. SQL transaction and metadata verification passed; the new
 automated check and Vitest suite have been committed but not executed.
+
+## Classroom Connect evidence and network grants
+
+This continued production-main pass migrated the following **original** empty
+tables into `public` using guarded `ALTER TABLE ... SET SCHEMA` operations:
+
+| Table | Preserved OID | Validated outgoing foreign keys |
+|---|---|---:|
+| `facilitated_rehearsal_events` | `483539` | 5 |
+| `facilitated_room_assisted_activity_evidence` | `516166` | 5 |
+| `network_reporting_grants` | `542349` | 4 |
+
+Both transactions committed on Neon project `sweet-hall-62441909`, branch
+`br-restless-sea-ar9ooo55`. Post-migration database queries confirmed all
+three tables exist in `public`, with all 14 foreign keys validated, original
+OIDs retained, no unvalidated foreign keys, forced RLS and one owner-only policy
+per table. Neither the `authenticated` nor `anonymous` role can directly
+SELECT these tables. Zero rows existed before migration, and no records were
+deleted, copied, or synthesized.
+
+Drizzle declarations in `classroom-rehearsal.ts`,
+`classroom-assisted-activity.ts`, and `network-attribution.ts` now use
+`pgTable`. The existing classroom schema acceptance check explicitly resolves
+the two migrated Classroom Connect tables from `public` while keeping its
+other expected native relations in `education_v30`; it does not relax forced
+RLS or policy-count requirements.
+
+Migrations:
+- `database/production/2026-11-17-consolidate-classroom-evidence-tables.sql`
+- `database/production/2026-11-17-consolidate-network-reporting-grants.sql`
+
+Acceptance and regression contracts:
+- `scripts/acceptance/check-main-classroom-network-consolidation.mjs`
+- `tests/unit/main-classroom-network-consolidation.test.ts`
+
+The **latest observed inventory** is 323 `education_v30` base tables and 347
+`public` base tables, plus seven tables in the untouched
+`education_v30_secure` schema. Concurrent work may account for part of that
+inventory movement. This pass performed database post-cutover checks but
+did **not** execute Vitest, browser, or full application workflows.
+
+The historical, test-branch-only network-attribution validator still assumes
+the legacy schema and includes a network membership forced-RLS requirement
+that predates the separate `network_memberships` consolidation. It should be
+reconciled independently without weakening the intended authorization posture.
