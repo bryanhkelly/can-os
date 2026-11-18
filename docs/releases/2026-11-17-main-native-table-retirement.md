@@ -133,3 +133,33 @@ The historical, test-branch-only network-attribution validator still assumes
 the legacy schema and includes a network membership forced-RLS requirement
 that predates the separate `network_memberships` consolidation. It should be
 reconciled independently without weakening the intended authorization posture.
+
+## Follow-on: shared Site publication binding cutover
+
+The original empty `education_v30.site_publication_bindings` table, already
+keyed by the authoritative `public.sites.id`, has been moved **in place** to
+`public.site_publication_bindings` on Neon production `main`. Its original
+OID (`402497`), validated Site FK, two indexes, one owner-only policy, forced
+RLS, and denial of direct client reads were retained.
+
+The preexisting `education_v30.v301_public_site_claims(text)` security-definer
+function was rewired **in the same SQL transaction** to read from
+`public.site_publication_bindings`. Verification confirmed the function
+remains a SECURITY DEFINER, references the public relation, and returns no
+projection for a nonexistent slug. The table has zero records, so this is
+a schema/negative-path verification, not full positive publication acceptance.
+
+- Migration: `database/production/2026-11-17-consolidate-site-publication-bindings.sql`
+- Application mapping: `src/db/canonical-v301/public-planning.ts`
+- Legacy canonical public-reader acceptance SQL updated in
+  `scripts/check-canonical-v301-ddl.mjs`
+- Main-only read-only production check:
+  `scripts/acceptance/check-main-classroom-network-consolidation.mjs`
+- Source regression contracts:
+  `tests/unit/main-classroom-network-consolidation.test.ts`
+
+At this cutover checkpoint: **322** tables in `education_v30` and **348** in
+`public` (plus seven untouched `education_v30_secure` tables). These are
+a current snapshot across concurrent main work, not an exclusive workstream
+attribution. The transaction and SQL metadata/negative-projection checks
+succeeded; full automated and browser acceptance have not been run.
