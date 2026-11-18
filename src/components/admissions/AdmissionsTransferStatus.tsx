@@ -9,7 +9,7 @@ type TransferProps={
 
 export function AdmissionsTransferStatus({applicationId,transferOriginStatus,transferNamedDestination,transferRecordsStatus,destinationTranscriptConsentRecorded}:TransferProps){
  return <>
-    {transferOriginStatus&&<div className="mt-3 rounded-lg border p-3 text-sm">
+    {transferOriginStatus&&<div className="mt-3  border p-3 text-sm">
       <strong>Linked transfer application</strong>
       <p className="mt-1">Origin school exit: {transferOriginStatus==="completed"?
         "Institutionally completed":transferOriginStatus==="pending"?
