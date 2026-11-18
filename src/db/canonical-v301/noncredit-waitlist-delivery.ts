@@ -1,12 +1,11 @@
-import { index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
+import { index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { noncreditEnrollmentWaitlist } from "./self-enrollment";
 
 /** Durable, per-invitation outbound receipt. Never store recipient email,
  * access links or send from inside the enrollment transaction.
  * A second invitation after expiry gets its own immutable receipt key.
  */
-export const noncreditWaitlistEmailDeliveries=educationV30.table(
+export const noncreditWaitlistEmailDeliveries=pgTable(
   "noncredit_waitlist_email_deliveries",{
     id:uuid("id").defaultRandom().primaryKey(),
     waitlistId:uuid("waitlist_id").notNull()
