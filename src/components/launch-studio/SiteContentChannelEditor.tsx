@@ -5,6 +5,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 import { Select } from "@/components/ui/select";
 import {
@@ -193,11 +194,11 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
               onChange={e=>editBlock(block.id,{description:e.target.value})}/>
           </Field>
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <label className="inline-flex min-h-11 items-center gap-3 text-sm">
+            <Label className="inline-flex min-h-11 items-center gap-3 text-sm">
               <Checkbox checked={block.enabled}
                 onChange={e=>editBlock(block.id,{enabled:e.target.checked})}/>
               Show this block when source records are available
-            </label>
+            </Label>
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" disabled={blocks[0]?.id===block.id}
                 onClick={()=>moveBlock(block.id,-1)}><ArrowUp/> Up</Button>
