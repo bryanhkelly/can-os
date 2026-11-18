@@ -6,6 +6,7 @@ import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLau
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
 import { nativeClassOperatorQueryKeys } from "@/domain/native-class-operator-query-keys";
+import { invalidateNativeClassAvailability, nativeClassAvailabilityQueryKeys } from "@/lib/native-class-availability-cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/choice";
@@ -50,7 +51,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const [searchDraft,setSearchDraft]=useState("");
   const [search,setSearch]=useState("");
   const options=useInfiniteQuery({
-    queryKey:["native-class-course-options",preferredSiteId??null,preferredOfferingVersionId??null,search],
+    queryKey:[...nativeClassAvailabilityQueryKeys.managerPages,preferredSiteId??null,preferredOfferingVersionId??null,search],
     initialPageParam:0,
     queryFn:({pageParam})=>getUnifiedClassCourseOptions({data:{search,cursor:pageParam,
       siteId:preferredSiteId,offeringVersionId:preferredOfferingVersionId}}),
@@ -70,7 +71,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const [recipePlan,setRecipePlan]=useState<ProgramRolloutRecipe|null>(null);
   const [rolloutSiteId,setRolloutSiteId]=useState(preferredSiteId??"");
   const exactRolloutOptions=useInfiniteQuery({
-    queryKey:["native-class-rollout-options",recipePlan?.offeringVersionId,rolloutSiteId,
+    queryKey:[...nativeClassAvailabilityQueryKeys.rolloutPages,recipePlan?.offeringVersionId,rolloutSiteId,
       recipePlan?.courses.map(course=>course.courseVersionId)],
     initialPageParam:0,
     enabled:!!recipePlan&&!!rolloutSiteId,
@@ -225,7 +226,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   }
   async function refresh(){
     await Promise.all([
-      client.invalidateQueries({queryKey:["native-class-course-options"]}),
+      invalidateNativeClassAvailability(client),
       client.invalidateQueries({queryKey:nativeClassOperatorQueryKeys.root}),
     ]);
   }
