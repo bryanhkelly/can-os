@@ -748,3 +748,31 @@ The design checker, the AST test suite, and the edited Class/assessment
 components are on `main`. Full local lint, TypeScript compilation, test
 execution and authenticated visual acceptance remain unverified in this
 session.
+
+
+### Native Class management and grading composition pass
+
+The native Class manager now uses shared Input, Select, Checkbox, Label and
+Textarea controls for authorized Program/Course discovery, Site and delivery
+selection, Class terms, consent and enrollment configuration. Existing
+server-owned activation, publisher/Offering scope and permissions were not
+replaced or bridged into a parallel system.
+
+In the grading and learning-support composition, the shared teacher grade
+response queue, student goal author/reviewer forms, assessment resource
+uploads, text-selection annotations, assignment conversations, completion
+evidence review, provider instructional draft, follow-up actions, recorded
+lesson navigation and noncredit completion review now use canonical 6.1
+actions and fields with rectangular surfaces. These edits reuse existing
+domain commands instead of rebuilding workflow logic.
+
+The dynamic checker now derives its enforcement from all discovered
+application source and shared component layers. It no longer contains
+per-page JSX fragment manifests or custom source-copy rules. The source
+audit test suite includes a generic shared-layer geometry fixture.
+
+**Source-only verification:** All 12 changed Native Class/assessment/teacher
+component TSX files were fetched from main and passed direct raw-control and
+rounded-utility scans. This is not a substitute for typecheck, accessibility,
+tests, visual comparison or role-based live acceptance. No production
+database records or schemas were modified by these UI changes.
