@@ -217,7 +217,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
     const current = analyzeSource(readFileSync(file, "utf8"), file);
     let previous;
     try { previous = analyzeSource(git(src, ["show", base + ":" + path]), file); }
-    catch { previous = { native: [], corners: [] }; }
+    catch { previous = { native: [], corners: [], syntaxErrors: [] }; }
     result.checked += 1;
     // Compare semantic control categories separately. Replacing one legacy
     // label with a new native button must not be mistaken for progress.
