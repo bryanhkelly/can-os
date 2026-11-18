@@ -11,6 +11,11 @@ import { WorkspaceShell, EmptyState, QueryState } from "@/components/workspace";
 import { NotificationPreferences } from "@/components/guardian/NotificationPreferences";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { StatusBadge } from "@/components/workspace";
 
 export const Route = createFileRoute("/guardian/watching")({
   component: WatchingPage,
@@ -62,7 +67,7 @@ function WatchingPage() {
         )}
         <div className="mt-6 grid gap-3">
           {watches.map((watch) => (
-            <article key={watch.id} className="rounded-xl border bg-card p-4">
+            <article key={watch.id} className=" border bg-card p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold">
@@ -80,51 +85,45 @@ function WatchingPage() {
                     {watch.createdVia === "conversation" ? " via Ask CAN" : ""}
                   </p>
                 </div>
-                <span
-                  className={`rounded-full border px-3 py-1 text-xs ${
-                    watch.status === "active"
-                      ? ""
-                      : "border-amber-500 text-amber-600"
-                  }`}
-                >
+                <StatusBadge tone={watch.status === "active" ? "success" : watch.status === "paused" ? "attention" : "neutral"}>
                   {watch.status}
-                </span>
+                </StatusBadge>
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                <button type="button" className="rounded-full border px-3 py-1"
+                <Button type="button" variant="outline" size="sm"
                   onClick={() => {
                     if (historyFor === watch.id) { setHistoryFor(""); return; }
                     setHistoryFor(watch.id);
-                  }}>Delivery history</button>
+                  }}>Delivery history</Button>
                 {watch.status === "active" && (
-                  <button
+                  <Button
                     type="button"
                     disabled={busy}
                     onClick={() => setStatus(watch.id, "paused")}
-                    className="rounded-full border px-3 py-1 hover:bg-muted disabled:opacity-50"
+                    variant="outline" size="sm"
                   >
                     Pause
-                  </button>
+                  </Button>
                 )}
                 {watch.status === "paused" && (
-                  <button
+                  <Button
                     type="button"
                     disabled={busy}
                     onClick={() => setStatus(watch.id, "active")}
-                    className="rounded-full border px-3 py-1 hover:bg-muted disabled:opacity-50"
+                    variant="outline" size="sm"
                   >
                     Resume
-                  </button>
+                  </Button>
                 )}
                 {(watch.status === "active" || watch.status === "paused") && (
-                  <button
+                  <Button
                     type="button"
                     disabled={busy}
                     onClick={() => setStatus(watch.id, "revoked")}
-                    className="rounded-full border border-amber-500 px-3 py-1 text-amber-600 hover:bg-muted disabled:opacity-50"
+                    variant="outline" size="sm"
                   >
                     Turn off
-                  </button>
+                  </Button>
                 )}
               </div>
               {watch.status === "active" && <WatchSettings watch={watch} onSaved={load} />}
@@ -142,13 +141,13 @@ function WatchDeliveryHistory({ subscriptionId }: { subscriptionId: string }) {
     queryFn: () => getMyWatchDeliveries({ data: { subscriptionId } }), retry: false });
   return <div className="mt-4 border-t pt-3 text-xs">
     <p className="mb-2 font-semibold">Recent reminder deliveries</p>
-    <button type="button" className="mb-2 underline" disabled={history.isFetching}
-      onClick={() => void history.refetch()}>{history.isFetching ? "Refreshing..." : "Refresh delivery status"}</button>
+    <Button type="button" variant="ghost" size="sm" className="mb-2 underline" disabled={history.isFetching}
+      onClick={() => void history.refetch()}>{history.isFetching ? "Refreshing..." : "Refresh delivery status"}</Button>
     <p className="mb-2">Refreshing only reads status; it never resends an update.</p>
     {history.isPending ? <p role="status">Loading delivery history...</p> :
       history.isError ? <p role="alert">{mutationErrorMessage(history.error, "Unable to load delivery history.")} Retry using refresh above.</p> :
       history.data.length === 0 ? <p>No history yet.</p> :
-      history.data.map(item => <div key={item.id} className="mb-2 rounded border p-2">
+      history.data.map(item => <div key={item.id} className="mb-2  border p-2">
         {item.kind} · {item.channel} · {item.label} · {new Date(item.createdAt).toLocaleString()}
         <p className="mt-1">{item.detail}</p>
         <p className="mt-1">Next: {item.nextStep}</p>
@@ -173,30 +172,30 @@ function WatchSettings({ watch, onSaved }: { watch: Watch; onSaved: () => Promis
       } }), { successMessage: "Saved.", commandErrorMessage: "Could not save reminder settings." });
   }
   return <div className="mt-4 grid gap-3 border-t pt-3 text-sm sm:grid-cols-2">
-    <label>Channel
-      <select value={channel} onChange={e => setChannel(e.target.value as "in_app" | "email" | "sms")}
-        className="mt-1 block w-full rounded-md border bg-background p-2">
+    <Label>Channel
+      <Select value={channel} onChange={e => setChannel(e.target.value as "in_app" | "email" | "sms")}
+        className="mt-1 block w-full  border bg-background p-2">
         <option value="in_app">In-app</option><option value="email">Email</option><option value="sms">Verified SMS</option>
-      </select>
-    </label>
-    <label>First reminder after (hours)
-      <input type="number" min={1} max={720} value={first}
+      </Select>
+    </Label>
+    <Label>First reminder after (hours)
+      <Input type="number" min={1} max={720} value={first}
         onChange={e => setFirst(Number(e.target.value))}
-        className="mt-1 block w-full rounded-md border bg-background p-2"/>
-    </label>
-    <label>Repeat every (hours)
-      <input type="number" min={1} max={720} value={repeat}
+        className="mt-1 block w-full  border bg-background p-2"/>
+    </Label>
+    <Label>Repeat every (hours)
+      <Input type="number" min={1} max={720} value={repeat}
         onChange={e => setRepeat(Number(e.target.value))}
-        className="mt-1 block w-full rounded-md border bg-background p-2"/>
-    </label>
-    <label>Maximum reminders
-      <input type="number" min={1} max={30} value={maximum}
+        className="mt-1 block w-full  border bg-background p-2"/>
+    </Label>
+    <Label>Maximum reminders
+      <Input type="number" min={1} max={30} value={maximum}
         onChange={e => setMaximum(Number(e.target.value))}
-        className="mt-1 block w-full rounded-md border bg-background p-2"/>
-    </label>
+        className="mt-1 block w-full  border bg-background p-2"/>
+    </Label>
     <div className="flex items-center gap-2">
-      <button type="button" disabled={saving} onClick={() => void save()}
-        className="rounded-full bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save</button>
+      <Button type="button" disabled={saving} onClick={() => void save()}
+        className=" bg-primary px-4 py-2 text-primary-foreground disabled:opacity-50">Save</Button>
       <MutationFeedback state={mutation} pendingMessage="Saving reminder settings..."/>
     </div>
   </div>;
