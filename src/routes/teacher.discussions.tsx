@@ -7,7 +7,7 @@ import { createCourseDiscussion, setCourseDiscussionLock, moderateDiscussionMess
 import { postDiscussionMessage } from "@/modules/learning/discussion-post.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { WorkspaceShell, WorkspacePanel, StatusBadge, EmptyState, WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, EmptyState, WorkspaceNotice, ActionDialog } from "@/components/workspace";
 import { z } from "zod";
 import { selectTeacherDiscussionThreads } from "@/domain/course-discussions";
 import { Button } from "@/components/ui/button";
@@ -42,12 +42,25 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [createAttempted, setCreateAttempted] = useState(false);
   const [replyAttempted, setReplyAttempted] = useState<Record<string, boolean>>({});
+  const [decision, setDecision] = useState<
+    | { type: "lock"; threadId: string; title: string }
+    | { type: "hide"; messageId: string; title: string }
+    | null
+  >(null);
   const mutation = useMutationFeedback(() => router.invalidate());
   const busy = mutation.pending || mutation.refreshFailed;
   const selectedLesson = sections.find(item=>item.id===section)?.curriculumLessons.find(item=>item.id===lesson);
   async function run(command: () => Promise<unknown>) {
-    await mutation.run(command, { successMessage: "Class discussion updated.",
+    return mutation.run(command, { successMessage: "Class discussion updated.",
       commandErrorMessage: "Unable to update class discussion." });
+  }
+  async function confirmDecision() {
+    if (!decision) return;
+    const selected = decision;
+    const outcome = await run(() => selected.type === "lock"
+      ? setCourseDiscussionLock({ data: { threadId: selected.threadId, locked: true } })
+      : moderateDiscussionMessage({ data: { messageId: selected.messageId, hidden: true } }));
+    if (outcome.status === "saved" || outcome.status === "refresh-failed") setDecision(null);
   }
   return <WorkspaceShell width="wide" eyebrow="Teacher" title="Class discussions"
     subtitle="Discuss classwork with enrolled students. The assigned teaching team can respond, lock discussions and moderate posts."
@@ -97,7 +110,9 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
       {thread.curriculumLessonId&&<p className="mb-2 text-xs text-muted-foreground">
         Publisher lesson: {data.sections.find(item=>item.id===thread.sectionId)?.curriculumLessons.find(item=>item.id===thread.curriculumLessonId)?.title??thread.curriculumLessonId}
       </p>}
-      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: !thread.locked } }))}
+      <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => thread.locked
+        ? void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: false } }))
+        : setDecision({ type: "lock", threadId: thread.id, title: thread.subject })}
         className="text-sm underline">{thread.locked ? "Unlock discussion" : "Lock discussion"}</Button>
       <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={"border border-border bg-card p-4 text-sm " + (message.parentMessageId ? "ml-4 border-l-2 border-l-primary/50" : "")}>
         <div className="flex flex-wrap items-center gap-2">
@@ -105,7 +120,9 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
           {message.hidden && <StatusBadge tone="attention">Hidden from students</StatusBadge>}
         </div>
         <p className="mt-2 whitespace-pre-wrap">{message.body}</p>
-        {message.canModerate && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: !message.hidden } }))}
+        {message.canModerate && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => message.hidden
+          ? void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: false } }))
+          : setDecision({ type: "hide", messageId: message.id, title: thread.subject })}
           className="mt-3 text-xs underline">{message.hidden ? "Restore post" : "Hide post"}</Button>}
       </article>)}</div>
       {!thread.locked && <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
@@ -135,5 +152,13 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
           lesson ? "No discussions are linked to this lesson yet." :
           "Create a discussion for one of your authorized classes to get started."}/>
     </div>}
+    <ActionDialog open={decision !== null}
+      title={decision?.type === "lock" ? "Lock this class discussion?" : "Hide this discussion post?"}
+      description={decision?.type === "lock"
+        ? `Locking "${decision.title}" prevents students from adding more responses. Existing posts remain available to authorized readers, and the thread can be unlocked.`
+        : `Hide this post in "${decision?.title ?? "the discussion"}" from students? The original post is retained for staff moderation and can be restored.`}
+      confirmLabel={decision?.type === "lock" ? "Lock discussion" : "Hide post"}
+      pending={mutation.pending} pendingLabel="Updating discussion…" confirmDisabled={busy}
+      onClose={() => setDecision(null)} onConfirm={() => void confirmDecision()}/>
   </WorkspaceShell>;
 }
