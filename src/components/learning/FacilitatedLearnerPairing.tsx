@@ -3,6 +3,7 @@ import { pairWithFacilitatedRoom, leaveFacilitatedRoom, getLearnerFacilitatedRoo
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { QueryState, WorkspaceNotice } from "@/components/workspace";
 
 type PairingStatus = Awaited<ReturnType<typeof getLearnerFacilitatedRoom>>;
 
@@ -15,17 +16,20 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
   const [status,setStatus] = useState<PairingStatus|null>(null);
   const [pending,setPending] = useState(false);
   const [message,setMessage] = useState("");
+  const [messageTone,setMessageTone] = useState<"success"|"danger">("success");
+  const [observationUnavailable,setObservationUnavailable] = useState(false);
   const [available,setAvailable] = useState(false);
   const [loadError,setLoadError] = useState(false);
   async function refresh() {
     const result = await getLearnerFacilitatedRoom({data:{courseAttemptId}});
-    setStatus(result);setAvailable(true);setLoadError(false);
+    setStatus(result);setAvailable(true);setLoadError(false);setObservationUnavailable(false);
   }
   useEffect(()=>{
     let live=true;
     setStatus(null);setAvailable(false);setLoadError(false);setMessage("");setCode("");
+    setMessageTone("success");setObservationUnavailable(false);
     void getLearnerFacilitatedRoom({data:{courseAttemptId}})
-      .then(result=>{if(live){setStatus(result);setAvailable(true);}})
+      .then(result=>{if(live){setStatus(result);setAvailable(true);setObservationUnavailable(false);}})
       .catch(()=>{if(live)setLoadError(true);});
     return ()=>{live=false;};
   },[courseAttemptId]);
@@ -34,8 +38,8 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
     let live=true;
     const timer=setInterval(()=>{
       void getLearnerFacilitatedRoom({data:{courseAttemptId}})
-        .then(result=>{if(live)setStatus(result);})
-        .catch(()=>{/* Observation refresh is nonblocking. */});
+        .then(result=>{if(live){setStatus(result);setObservationUnavailable(false);}})
+        .catch(()=>{if(live)setObservationUnavailable(true);});
     },15000);
     return ()=>{live=false;clearInterval(timer);};
   },[available,courseAttemptId,status?.rooms.length]);
@@ -47,8 +51,10 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       await pairWithFacilitatedRoom({data:{courseAttemptId,pairingCode:code.trim()}});
       setCode("");
       await refresh();
+      setMessageTone("success");
       setMessage("Your device is paired with the facilitator's room.");
     } catch {
+      setMessageTone("danger");
       setMessage("Unable to pair. Check the code, room expiry, or current course registration.");
     } finally {setPending(false);}
   }
@@ -58,18 +64,18 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
     try {
       await leaveFacilitatedRoom({data:{courseAttemptId,facilitatedSessionId:roomId}});
       await refresh();
+      setMessageTone("success");
       setMessage("You left the facilitator's room.");
     } catch {
+      setMessageTone("danger");
       setMessage("Unable to leave the room. Try again.");
     } finally {setPending(false);}
   }
   if(!available)return <section aria-label="Facilitator room pairing" className="border border-border bg-card p-4">
-    {loadError?<div role="alert" className="space-y-3">
-      <p className="text-sm">Facilitator room availability could not be verified. Your course enrollment has not changed.</p>
-      <Button type="button" size="sm" variant="outline" onClick={()=>void refresh().catch(()=>{
-        setLoadError(true);
-      })}>Retry room status</Button>
-    </div>:<p role="status" className="text-sm">Checking facilitator room availability…</p>}
+    <QueryState
+      loading={!loadError?"Checking facilitator room availability…":undefined}
+      error={loadError?"Facilitator room availability could not be verified. Your course enrollment has not changed.":undefined}
+      onRetry={()=>void refresh().catch(()=>setLoadError(true))}/>
   </section>;
   return <section aria-label="Facilitator room pairing" className="border border-border bg-card p-4">
     <h3 className="font-serif text-lg font-semibold">Join a facilitator-led session</h3>
@@ -83,11 +89,16 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
         autoComplete="off" maxLength={11} placeholder="XXXXX-XXXXX"
         className="min-h-10 max-w-xs uppercase"
         value={code} onChange={event=>setCode(event.target.value)}/>
-      <Button disabled={pending || !code.trim()} type="submit" size="sm">Pair device</Button>
+      <Button loading={pending} disabled={!code.trim()} type="submit" size="sm">Pair device</Button>
       <Button disabled={pending} type="button" variant="outline" size="sm"
-        onClick={()=>void refresh().catch(()=>setMessage("Unable to refresh session status."))}>Refresh</Button>
+        onClick={()=>void refresh().catch(()=>{setMessageTone("danger");setMessage("Unable to refresh session status.");})}>Refresh</Button>
     </form>
-    {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
+    {message&&<WorkspaceNotice tone={messageTone} className="mt-3">{message}</WorkspaceNotice>}
+    {observationUnavailable&&<WorkspaceNotice tone="attention" className="mt-3">
+      <span>The latest room state could not be verified. Previous pairing details may be outdated.</span>
+      <Button type="button" variant="outline" size="sm" className="ml-3"
+        onClick={()=>void refresh().catch(()=>setObservationUnavailable(true))}>Retry room status</Button>
+    </WorkspaceNotice>}
     {status?.rooms.map(room=><div key={room.facilitatedSessionId} className="mt-3 border-t border-border pt-3">
       <p className="font-medium text-sm">Connected to a facilitator's room</p>
       <p className="mt-1 text-xs text-muted-foreground">
