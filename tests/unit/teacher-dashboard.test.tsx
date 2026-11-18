@@ -61,6 +61,14 @@ describe("teacher dashboard migration", () => {
     expect(html.match(/<main\b/g)).toHaveLength(1);
   });
 
+  it("falls back to the gradebook when the queue count has no preview", () => {
+    const html = render({ ...today, ungradedCount: 5, ungraded: [] });
+    expect(html).toContain("5 submitted work items to review");
+    expect(html).toContain("Open grading queue");
+    expect(html).toContain('href="/teacher/gradebook"');
+    expect(html).not.toContain("Grade next submission");
+  });
+
   it("does not show a grading success or empty queue when the reader is disconnected", () => {
     const html = render({ ...today, connected: false });
     expect(html).toContain("Today&#x27;s snapshot cannot load.");
