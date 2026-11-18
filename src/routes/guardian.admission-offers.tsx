@@ -49,7 +49,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
  return <WorkspaceShell eyebrow="Family" title="Enrollment offers"
   subtitle="Review offers for students whose enrollment you are authorized to manage."
   breadcrumbs={<Link to="/home" className="underline">Family home</Link>}
-  actions={<Link to="/launch/family" className="inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
+  actions={<Link to="/launch/family" className="inline-flex min-h-11 items-center  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">View or start application</Link>}>
   <div className="space-y-6">
   {student&&<Link to="/guardian/admission-offers" className="inline-block text-xs font-semibold underline">View offers for all children →</Link>}
   {!declineTarget&&<MutationFeedback state={mutation} pendingMessage="Saving offer response..."/>}
@@ -73,7 +73,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
     </p>}
     {app.waitlisted&&!app.offers.some(o=>o.enrollmentActive||o.status==="accepted"||o.progress.canAccept)&&<p role="status" className="mt-2 text-sm">Application waitlisted. Contact admissions about availability and next steps.</p>}
     {(app.applicationStage==="withdrawn"||app.applicationStage==="declined")&&<p role="status" className="mt-2 text-sm">Application {app.applicationStage}. Contact admissions if your plans change.</p>}
-    <section aria-label="Your next enrollment step" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
+    <section aria-label="Your next enrollment step" className="mt-4  border border-primary/30 bg-muted/30 p-4">
      <p className="text-xs font-bold uppercase tracking-widest text-primary">Your next step</p>
      {app.offers.some(o=>o.enrollmentActive&&o.sectionCount>0)?<p className="mt-2 text-sm">School-year enrollment and instructional class placement are active. Review separate student sign-in authorization, attendance and pickup arrangements before the first onsite day. This is not confirmation of attendance.</p>:
       app.offers.some(o=>o.enrollmentActive)?<p className="mt-2 text-sm">Your child's school-year enrollment is active, but a staffed instructional class has not yet been assigned. The school must complete class placement before learning access or onsite attendance can begin.</p>:
@@ -107,12 +107,12 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
          applicationId={app.applicationId} role="guardian"/>}
        <div className="flex flex-wrap gap-3 text-sm">
         {o.sectionCount>0&&<Link to="/classes" search={{student:app.studentPersonId}}
-          className="rounded-lg border px-3 py-2 font-semibold">Open your child's classes →</Link>}
+          className=" border px-3 py-2 font-semibold">Open your child's classes →</Link>}
         <Link to="/guardian/attendance" search={{student:app.studentPersonId}}
-         className="rounded-lg border px-3 py-2">Attendance and excuses →</Link>
+         className=" border px-3 py-2">Attendance and excuses →</Link>
         <Link to="/guardian/attendance" search={{student:app.studentPersonId}} hash="pickup"
-         className="rounded-lg border px-3 py-2">Set up pickup and safety before the first school day →</Link>
-        <Link to="/home" className="rounded-lg border px-3 py-2">Family home →</Link>
+         className=" border px-3 py-2">Set up pickup and safety before the first school day →</Link>
+        <Link to="/home" className=" border px-3 py-2">Family home →</Link>
        </div>
      </div>}
     </div>)}{app.offers.length===0&&<div className="mt-3">
@@ -128,7 +128,7 @@ function GuardianAdmissionOffersView({applications}:{applications:Awaited<Return
   {applications.length===0&&<div>
     <EmptyState title="No verified enrollment applications or offers are available for this family membership."
      description="A new family application may still be pending independent guardian verification. You can review applications submitted with your verified email sign-in."/>
-    <Link to="/launch/family" className="mt-3 inline-block rounded border px-3 py-2 text-sm font-semibold">
+    <Link to="/launch/family" className="mt-3 inline-block  border px-3 py-2 text-sm font-semibold">
       View or start my application →
     </Link>
   </div>}
