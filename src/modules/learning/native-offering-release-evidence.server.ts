@@ -16,7 +16,7 @@ import { assertInstructionalTrackAssetsEligible } from
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 const uuid=z.string().uuid();
-const invalid=(message:string):never=>{throw new DomainError("VALIDATION_FAILED",message);};
+function invalid(message:string):never { throw new DomainError("VALIDATION_FAILED",message); }
 export const nativeReleaseAssetSchema=z.object({
   assetVersionId:uuid,
   usageKind:z.enum(["required_instruction","supporting","accessibility","assessment"]),
