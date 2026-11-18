@@ -18,7 +18,15 @@ async function context(){const [{db},s]=await Promise.all([import("@/db/client")
 
 /** Sites and programs in which this teacher actually has an active class assignment. */
 export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(async()=>{
- const actor=await groupActor("teacher");
+ const actor=await getCommandContext(getRequest());
+ if(actor.role!=="teacher"||!actor.actorPersonId)
+  throw new AuthorizationError("teacher study group access");
+ setResponseHeader("Cache-Control","private, no-store");
+ // Site-wide group choices are intentionally narrower than exact delegated
+ // Section options, which the shared teacher class directory supplies.
+ const sites=actor.scope.siteIds??[];
+ const programs=actor.scope.programIds??[];
+ if(!sites.length||!programs.length)return [];
  const {db,s}=await context();
  const rows=await db.selectDistinct({siteId:s.sections.siteId,programId:s.sections.programId,
   siteName:s.sites.name,programName:s.programs.name})
@@ -28,8 +36,8 @@ export const listFacilitatorGroupScopes=createServerFn({method:"GET"}).handler(a
   .innerJoin(s.sites,eq(s.sites.id,s.sections.siteId))
   .where(and(eq(s.sectionTeachers.personId,actor.actorPersonId!),
     eq(s.sections.active,true),
-    inArray(s.sections.siteId,actor.sites),
-    inArray(s.sections.programId,actor.scope.programIds??[])));
+    inArray(s.sections.siteId,sites),
+    inArray(s.sections.programId,programs)));
  return rows;
 });
 
