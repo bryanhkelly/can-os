@@ -49,11 +49,12 @@ describe("noncredit self-registration decision and refresh contract",()=>{
   });
 
   it("uses the current exact release for every form and does not trust stale discovery copies",()=>{
-    expect(source).toContain("const selected=search.release?linkedRelease.data??undefined:undefined");
+    expect(source).toContain("const selected=search.release&&linkedRelease.isSuccess?linkedRelease.data??undefined:undefined");
     expect(source).not.toContain("catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data");
     expect(source).toContain("linkedRelease.isPending");
     expect(source).toContain("linkedRelease.isSuccess&&!linkedRelease.data");
     expect(source).toContain("Browse available training");
+    expect(source).toContain("No unreserved places");
     expect(source).toContain("selected&&!catalog.data.items.some(item=>item.id===selected.id)");
   });
 
