@@ -3,6 +3,7 @@ import type { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
+import { authorizeClass } from "@/modules/learning/class-access.server";
 
 type Actor = Awaited<ReturnType<typeof requireActor>>;
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -54,15 +55,16 @@ export async function facilitatedGroup(tx: Tx, actor: Actor, groupId: string) {
       eq(s.studyGroups.facilitatorPersonId, actor.actorPersonId)))
     .for("update").limit(1);
   if (!group) throw new AuthorizationError("active facilitated group");
-  assertGroupScope(actor, group);
   if (group.sectionId) {
-    const [assignment] = await tx.select({ id: s.sectionTeachers.id })
-      .from(s.sectionTeachers)
-      .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
-      .where(and(eq(s.sectionTeachers.sectionId, group.sectionId),
-        eq(s.sectionTeachers.personId, actor.actorPersonId),
-        eq(s.sections.active, true))).limit(1);
-    if (!assignment) throw new AuthorizationError("current group teaching assignment");
+    // Exact delegated Section authority is sufficient for a course group,
+    // but a bare assignment is not: validate active qualification, academic
+    // provider agreement, and the Section's authoritative Site/Program.
+    const { section } = await authorizeClass(actor, group.sectionId, undefined, tx);
+    if (section.siteId !== group.siteId || section.programId !== group.programId)
+      throw new AuthorizationError("study group current section scope");
+  } else {
+    // Site-wide interest groups still require the local Site/Program grant.
+    assertGroupScope(actor, group);
   }
   return group;
 }
