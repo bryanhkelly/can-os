@@ -26,6 +26,7 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-survey-definitions.sql",
   "database/production/2026-11-17-consolidate-three-view-backed-tables.sql",
   "database/production/2026-11-17-consolidate-education-operations.sql",
+  "database/production/2026-11-17-consolidate-six-class-lifecycle-tables.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -38,6 +39,7 @@ const referenceRowCounts={
   survey_definitions:0,
   education_operations:1,
   publication_withdrawals:0,learner_outcomes:0,qualification_resource_fulfillments:0,
+  class_awards:0,class_enrollment_approval_requests:0,class_enrollment_invitations:0,class_enrollment_repeat_authorizations:0,class_enrollment_transfer_requests:0,class_offerings:0,
 };
 
 function migratedTableNames(){
@@ -120,6 +122,18 @@ async function run(){
             THEN (SELECT count(*) FROM public.learner_outcomes)
         WHEN c.relname='qualification_resource_fulfillments'
             THEN (SELECT count(*) FROM public.qualification_resource_fulfillments)
+        WHEN c.relname='class_awards'
+            THEN (SELECT count(*) FROM public.class_awards)
+        WHEN c.relname='class_enrollment_approval_requests'
+            THEN (SELECT count(*) FROM public.class_enrollment_approval_requests)
+        WHEN c.relname='class_enrollment_invitations'
+            THEN (SELECT count(*) FROM public.class_enrollment_invitations)
+        WHEN c.relname='class_enrollment_repeat_authorizations'
+            THEN (SELECT count(*) FROM public.class_enrollment_repeat_authorizations)
+        WHEN c.relname='class_enrollment_transfer_requests'
+            THEN (SELECT count(*) FROM public.class_enrollment_transfer_requests)
+        WHEN c.relname='class_offerings'
+            THEN (SELECT count(*) FROM public.class_offerings)
         END AS n
     ) count_table ON true
     WHERE ns.nspname='public' AND c.relname=ANY(${Object.keys(referenceRowCounts)}::text[])
@@ -152,8 +166,10 @@ async function run(){
     ...[...readFileSync("database/production/2026-11-17-consolidate-three-view-backed-tables.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm)]
       .filter(match=>match[1]!=="publication_withdrawals"),
+    ...readFileSync("database/production/2026-11-17-consolidate-six-class-lifecycle-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==58)throw new Error("Expected 58 reviewed protected table relocations");
+  if(protectedNames.length!==64)throw new Error("Expected 64 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
