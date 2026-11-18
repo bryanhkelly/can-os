@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
   assessmentAccess, assessmentAutoScores, assessmentDefinitions, assessmentExecutionAttempts,
   assessmentExecutionItems, assessmentExecutionResults, assessmentFormAdministrations,
-  assessmentVersions, auditEvents, domainEvents, learnerCourseAttempts,
+  assessmentVersions, learnerCourseAttempts,
   noncreditRegistrations, noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
@@ -107,13 +108,13 @@ export async function finalizeNoncreditKnowledgeCheck(context:CommandContext,inp
     const payload={courseAttemptId:courseAttempt.id,
       assessmentAttemptId:attempt.id,resultId:final.id,
       outcome:evaluated.outcome,noncredit:true};
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:context.actorPersonId,
       owningOrganizationId:training.providerOrganizationId,
       eventCode:"noncredit.assessment.finalized",
       entityKind:"assessment_attempt_result",entityId:final.id,payload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType:"NoncreditKnowledgeCheckFinalized",
       aggregateType:"assessment_attempt_result",aggregateId:final.id,
       actorPersonId:context.actorPersonId,payload,
