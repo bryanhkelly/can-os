@@ -63,7 +63,7 @@ function TeacherMarketplacePage() {
       or for an individual class. Each class assignment uses the existing school launch checks.
     </>}>
     <MutationFeedback state={mutation} pendingMessage="Engaging teacher for the selected course or class."/>
-    <p className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
+    <p className=" border px-4 py-3 text-sm text-muted-foreground">
       Real candidates are shown only for classes where published qualifications, schedule availability,
       and reserved capacity currently match. Your school decides whom to engage.
     </p>
@@ -92,13 +92,13 @@ function TeacherMarketplacePage() {
           value={query} onChange={event => setQuery(event.target.value)}
           placeholder="Course, subject, or teacher" />
       </Field>}
-      {market.courses.length === 0 && <section className="rounded-xl border p-5">
+      {market.courses.length === 0 && <section className=" border p-5">
         <p className="font-medium">No adopted curriculum is ready for teacher matching.</p>
         <p className="mt-1 text-sm text-muted-foreground">Finish selecting and adopting a published curriculum first.</p>
         <Link to="/operations/curriculum-marketplace" search={{ programId: market.program.id }}
           className="mt-3 inline-block text-sm underline">Select curriculum</Link>
       </section>}
-      {courses.map(course => <section key={course.versionId} className="space-y-3 rounded-xl border bg-card p-5">
+      {courses.map(course => <section key={course.versionId} className="space-y-3  border bg-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="text-xs text-muted-foreground">{course.subject} · {course.code}</p>
@@ -115,7 +115,7 @@ function TeacherMarketplacePage() {
             const selectedIsEligible = selection
               ? teacher.eligibleSectionIds.includes(selection)
               : eligibleSections.length > 0;
-            return <article key={teacher.personId} className="space-y-2 rounded-lg border p-3">
+            return <article key={teacher.personId} className="space-y-2  border p-3">
             <p className="font-semibold">{teacher.name}{teacher.isSynthetic && <span className="text-xs font-normal text-muted-foreground"> · Sample profile</span>}</p>
             <p className="text-sm text-muted-foreground">{teacher.modality.replaceAll("_", " ")} · Offered capacity: {teacher.indicativeSeatCapacity} seats</p>
             {teacher.isSynthetic && <p className="text-xs text-muted-foreground">
@@ -146,12 +146,12 @@ function TeacherMarketplacePage() {
           No eligible instructor has reservable capacity for these classes. Confirm each class has an open instructional capacity demand.
         </p>}
       </section>)}
-      <section className="space-y-3 rounded-xl border p-5" aria-label="Sample teacher previews">
+      <section className="space-y-3  border p-5" aria-label="Sample teacher previews">
         <h2 className="font-serif text-2xl">Explore sample teachers</h2>
         <p className="text-sm text-muted-foreground">Synthetic profiles for planning only. No verified credentials or permission to engage these teachers is implied.</p>
         <p className="text-sm">{previews?.teachers.length ?? 0} sample teachers available to preview</p>
         <div className="grid gap-3 md:grid-cols-2">
-          {previews?.teachers.filter(teacher=>!search || [teacher.name,...teacher.courses.map(course=>course.title),...teacher.courses.map(course=>course.subject)].some(value=>value.toLowerCase().includes(search))).map(teacher=><article key={teacher.personId} className="rounded-lg border p-3">
+          {previews?.teachers.filter(teacher=>!search || [teacher.name,...teacher.courses.map(course=>course.title),...teacher.courses.map(course=>course.subject)].some(value=>value.toLowerCase().includes(search))).map(teacher=><article key={teacher.personId} className=" border p-3">
             <p className="font-semibold">{teacher.name} · Sample profile</p>
             <p className="text-sm text-muted-foreground">{teacher.courses.length} illustrative course matches</p>
             <p className="text-sm">{[...new Set(teacher.courses.map(course=>course.subject))].join(", ")}</p>
