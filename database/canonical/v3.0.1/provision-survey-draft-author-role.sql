@@ -58,12 +58,12 @@ FROM unnest(ARRAY['audit_events','domain_events']) AS t
 SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v28_role_can_access_org(uuid,text) TO %I',
  :'draft_role')
 \gexec
-INSERT INTO education_v30.database_role_organization_bindings
+INSERT INTO public.database_role_organization_bindings
  (db_role,organization_id,purpose_code,valid_from,status)
 SELECT :'draft_role'::name,:'organization_id'::uuid,'survey_draft_author',
  clock_timestamp(),'approved'
 WHERE NOT EXISTS(
- SELECT 1 FROM education_v30.database_role_organization_bindings b
+ SELECT 1 FROM public.database_role_organization_bindings b
  WHERE b.db_role=:'draft_role'::name
  AND b.organization_id=:'organization_id'::uuid
  AND b.purpose_code='survey_draft_author' AND b.status='approved'
