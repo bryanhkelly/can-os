@@ -95,6 +95,20 @@ the exact production schema is ready.
 
 **Release gate:** Until both schema and application paths are migrated and verified together, main cannot be represented as having completed the identity cutover. Partial removal of the old session path is unsafe because existing guarded workflows still invoke it.
 
+## Incremental one-Person work on main, November 17, 2026
+
+The authenticated guardian identity resolver now returns the **immutable CAN Person UUID** from the verified `public.access_accounts.person_id` and current CAN guardian session. It no longer requires a second CAN-to-native guardian identity link. **Guardian access to a child is still independently checked** against the current verified guardian authority, time window, learner relationship, and verified age. This does not implicitly allow a guardian to assume the learner's identity or make native enrollment work before the remaining Person FKs are migrated.
+
+The facilitated classroom attendance name projection now reads `public.people`, after the existing Site-, Class-, release- and learner-specific roster authorization. Names are not accepted from browser payloads and the change does not expand roster visibility. Both changes are on GitHub `main`; authenticated browser acceptance remains outstanding.
+
+A guarded main-only transaction moved empty `course_sections` and `foundations` into `public`, retaining their original table objects and **seven incoming FKs**. SQL: `database/production/2026-11-17-relocate-course-sections-and-foundations.sql`.
+
+The opt-in, read-only `verify:person:runtime-main` command now evaluates both the live Neon main database and checked-out source files. It explicitly reports active blockers such as native Person/account creation in noncredit and reviewed-Class enrollment, native learner session issuance, dual-cookie fallbacks, and historical Person grant differences. The verifier has a strict failing mode; **it does not approve or run the staged 239-FK Person migration**.
+
+At the most recent concurrent main snapshot: **311 public tables, 360 remaining `education_v30` tables, seven secure-schema tables, 142 platform People, zero native Person rows, and 239 outstanding native Person FKs**. There are **five historically mismatched inactive grant rows**. These are evidence to preserve and reconcile, not permission to remap Persons or reactivate revoked grants. Counts may advance independently as other workstreams commit to main.
+
+The full Person/account/native session cutover remains **blocked** until all relevant writers, sensitive authorization, guardian and learner readers, release acceptance, and rollback checks agree on the one Person UUID.
+
 ## Main-only security checkpoint, November 17, 2026
 
 The authoritative `public.people` table now has **forced row-level security** and a restrictive direct-client deny policy. The inherited unscoped `authenticated` and `anonymous` read/write permissions have been revoked without changing any of the 142 existing People, access accounts, guardian relationships, grants or audit records. SQL: `database/production/2026-11-17-protect-authoritative-people.sql`.
