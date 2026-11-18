@@ -2,10 +2,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
   surveyDefinitions, surveyVersions, surveyQuestions, surveyQuestionOptions,
-  auditEvents, domainEvents,
-} from "@/db/canonical-v301";
+  } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import {
   canonicalSurveyDraftDatabaseRole, createSurveyDraftInput,
@@ -113,12 +113,12 @@ export const createCanonicalSurveyDraft = createServerFn({ method: "POST" })
         surveyId: definition.id, versionId: version.id,
         questionCount: data.questions.length, purposeCode: data.purposeCode,
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId: author.actorPersonId, owningOrganizationId: author.organizationId,
         eventCode: "survey.draft.created", entityKind: "survey_version",
         entityId: version.id, payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType: "SurveyDraftCreated", aggregateType: "survey_version",
         aggregateId: version.id, actorPersonId: author.actorPersonId, payload,
       });
