@@ -19,7 +19,8 @@ BEGIN
  -- The knowledge-check event belongs to one published Offering, not every
  -- training sharing the Deployment. A campaign without Offering scope is
  -- intentionally ineligible for an automatic course-feedback invitation.
- SELECT r.participant_person_id,r.deployment_id,ov.offering_id
+ SELECT r.participant_person_id,r.deployment_id,ov.offering_id,
+        r.registering_organization_id
  INTO participant
  FROM assessment_attempts a
  JOIN assessment_access_grants g ON g.id=a.access_grant_id
@@ -50,6 +51,7 @@ BEGIN
  JOIN evidence_document_versions permission ON permission.id=c.survey_permission_evidence_id
  WHERE c.deployment_id=participant.deployment_id
    AND c.offering_id=participant.offering_id
+   AND c.operating_organization_id=participant.registering_organization_id
    AND c.status='active' AND c.response_mode='identified'
    AND c.starts_at<=at AND (c.ends_at IS NULL OR c.ends_at>at)
    AND permission.verified_by_person_id IS NOT NULL AND permission.verified_at IS NOT NULL
