@@ -47,13 +47,18 @@ describe("one public Site and Organization identity",()=>{
   it("enforces least-privilege direct client access to both core tables",()=>{
     const org=read("database/production/2026-11-17-secure-public-organizations.sql");
     const site=read("database/production/2026-11-17-retire-duplicate-native-site.sql");
+    const people=read("database/production/2026-11-17-protect-authoritative-people.sql");
     const gate=read("scripts/acceptance/check-main-core-identity-fks.mjs");
     expect(org).toContain("ALTER TABLE public.organizations FORCE ROW LEVEL SECURITY");
     expect(org).toContain("REVOKE ALL PRIVILEGES ON TABLE public.organizations FROM PUBLIC,authenticated,anonymous");
     expect(org).toContain("organizations_no_direct_client_access");
+    expect(people).toContain("ALTER TABLE public.people FORCE ROW LEVEL SECURITY");
+    expect(people).toContain("REVOKE ALL PRIVILEGES ON TABLE public.people FROM PUBLIC,authenticated,anonymous");
+    expect(people).toContain("people_no_direct_client_access");
     expect(site).toContain("ALTER TABLE public.sites FORCE ROW LEVEL SECURITY");
     expect(gate).toContain("summary.duplicate_site_table_exists||summary.duplicate_org_table_exists");
     expect(gate).toContain("summary.client_can_read_sites||summary.client_can_read_orgs");
     expect(gate).toContain("siteAndOrganizationTablesRetired:true");
+    expect(gate).toContain("summary.client_can_read_people||summary.client_can_update_people");
   });
 });
