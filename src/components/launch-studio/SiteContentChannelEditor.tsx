@@ -104,7 +104,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
     if(!siteId||saving||publishing||unsavedChanges||(revision===0&&!saved))return;
     setError("");setPublishing(true);
     try{
-      const outcome=await publishSiteContentChannels({data:{siteId,expectedRevision:revision}});
+      await publishSiteContentChannels({data:{siteId,expectedRevision:revision}});
       setPublished(true);
       setSaved(false);
       onSaved();
