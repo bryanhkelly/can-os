@@ -47,7 +47,9 @@ for (const issue of regression.errors) {
 // Strict mode is an explicit final-compliance gate, not the current incremental
 // migration mode. It fails until all source and composed debt has been cleared.
 if (process.argv.includes("--strict") &&
-    inventory.routes.some(row => !row.composedSourceClean)) {
-  console.error("V6.1 strict gate: unresolved route or reachable component source debt.");
+    (inventory.routes.some(row => !row.composedSourceClean) ||
+      inventory.inspected.some(file =>
+        file.native.length || file.corners.length || file.syntaxErrors.length))) {
+  console.error("V6.1 strict gate: unresolved route, component or source syntax debt.");
   process.exitCode = 1;
 }
