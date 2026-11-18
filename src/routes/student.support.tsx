@@ -9,6 +9,12 @@ import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShel
 import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import { plural } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 
 const loadSupportReferrals=async()=>{
  const viewer=await getSupportViewerRole();
@@ -44,13 +50,13 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
   breadcrumbs={<Link to="/home" className="underline">Student Today</Link>}>
   <MutationFeedback state={mutation} className="mb-5" pendingMessage="Sending support request..."/>
   <WorkspacePanel title="Ask your school for help">
-   <label className="block text-sm">What do you need help with?
-    <textarea disabled={busy} value={message} onChange={event=>setMessage(event.target.value)}
-      rows={4} maxLength={1000} className="mt-2 w-full rounded border bg-background p-3"
+   <Label className="block text-sm">What do you need help with?
+    <Textarea disabled={busy} value={message} onChange={event=>setMessage(event.target.value)}
+      rows={4} maxLength={1000} className="mt-2 w-full  border bg-background p-3"
       placeholder="Describe the schoolwork, learning, or support concern"/>
-   </label>
-   <button type="button" disabled={busy||message.trim().length<3}
-     onClick={askForHelp} className="mt-3 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">Send request</button>
+   </Label>
+   <Button type="button" disabled={busy||message.trim().length<3}
+     onClick={askForHelp} className="mt-3  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">Send request</Button>
   </WorkspacePanel>
   <section className="mt-7">
    <h2 className="font-serif text-2xl">Your support actions</h2>
@@ -59,7 +65,7 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
     const target=action.subjectType==="assessment"&&action.subjectId
      ?{to:"/student/assignments" as const,search:{assessment:action.subjectId}}
      :{to:"/student/experiences" as const,search:{action:action.id}};
-    return <article key={action.id} className="rounded-xl border bg-card p-4">
+    return <article key={action.id} className=" border bg-card p-4">
     <p className="font-semibold"><Link {...target} className="hover:underline">{action.title}</Link></p>
     <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>
     <StatusBadge tone={action.status==="resolved"?"success":"info"}>Status: {action.status.replaceAll("_"," ")}</StatusBadge>
@@ -152,81 +158,81 @@ export function SupportView({referrals,role,search,route="/student/support"}:{re
    <section>
     <h2 className="font-serif text-3xl">{role==="teacher"?"My referrals":"Support caseload"}</h2>
     <div className="mt-4 space-y-3">
-     {referrals.filter(item=>!selected||item.id===selected).map(item=><Link key={item.id} to={route} search={{referral:item.id}} className={`block w-full rounded-xl border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.id?"border-foreground":"border-border"}`}>
+     {referrals.filter(item=>!selected||item.id===selected).map(item=><Link key={item.id} to={route} search={{referral:item.id}} className={`block w-full  border bg-card p-5 text-left hover:border-foreground/40 ${selected===item.id?"border-foreground":"border-border"}`}>
       <div className="flex flex-wrap justify-between gap-2"><p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{item.category} · {item.priority}</p><StatusBadge tone={item.stage==="closed"?"success":"info"}>{item.stage.replaceAll("_"," ")}</StatusBadge></div>
       <h3 className="mt-2 text-base font-semibold">{item.title}</h3>
       <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
       <p className="mt-3 text-xs text-muted-foreground">Assigned: {item.assignedTo}</p>
       <p className="mt-2 text-sm"><strong>{supportNextStep(item)}</strong></p>
-      {role==="teacher"&&item.academicRecommendation&&<p className="mt-2 rounded-lg bg-muted p-3 text-xs">Academic update: {item.academicRecommendation}</p>}
+      {role==="teacher"&&item.academicRecommendation&&<p className="mt-2  bg-muted p-3 text-xs">Academic update: {item.academicRecommendation}</p>}
      </Link>)}
      {!referrals.length&&<EmptyState title="No support referrals are available in your workspace."/>}
     </div>
    </section>
-   {role==="teacher"?<section className="h-fit rounded-2xl border border-border bg-card p-6">
+   {role==="teacher"?<section className="h-fit  border border-border bg-card p-6">
     <h2 className="font-serif text-3xl">Refer for support</h2>
-    <label className="mt-3 block text-sm font-semibold">Student
-     <select aria-label="Select student for referral" value={studentProfileId} onChange={event=>setStudentProfileId(event.target.value)} className="mt-2 w-full rounded-lg border bg-background p-3 text-sm">
+    <Label className="mt-3 block text-sm font-semibold">Student
+     <Select aria-label="Select student for referral" value={studentProfileId} onChange={event=>setStudentProfileId(event.target.value)} className="mt-2 w-full  border bg-background p-3 text-sm">
       <option value="">Choose a student in your classes</option>
       {students.map(student=><option key={student.id} value={student.id}>{student.name} · {student.sectionTitle}</option>)}
-     </select>
-    </label>
-    <label className="mt-5 block text-sm font-semibold">Reason
-     <select value={category} onChange={e=>setCategory(e.target.value as typeof category)} className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm">
+     </Select>
+    </Label>
+    <Label className="mt-5 block text-sm font-semibold">Reason
+     <Select value={category} onChange={e=>setCategory(e.target.value as typeof category)} className="mt-2 w-full  border border-border bg-background p-3 text-sm">
       {destinations.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}
-     </select>
-    </label>
-    <label className="mt-4 block text-sm font-semibold">Priority
-     <select value={priority} onChange={e=>setPriority(e.target.value as typeof priority)} className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"><option value="normal">Routine</option><option value="high">Priority</option></select>
-    </label>
-    <label className="mt-4 block text-sm font-semibold">Observations
-     <textarea value={observations} onChange={e=>setObservations(e.target.value)} rows={5} placeholder="Describe the learning concern, its impact and what has been tried" className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"/>
-    </label>
-    <label className="mt-3 flex items-start gap-2 text-sm"><input type="checkbox" checked={includeEvidence} onChange={e=>setIncludeEvidence(e.target.checked)} className="mt-1"/> Include relevant academic evidence</label>
-    <p className="mt-4 rounded-lg bg-muted p-3 text-xs">This routes to a designated support function. Urgent safeguarding concerns require a separate immediate-response pathway.</p>
-    <button disabled={busy||!studentProfileId||observations.trim().length<3} onClick={()=>execute(()=>createSupportReferral({data:{category,priority,observations,includeEvidence,studentProfileId}}),"Referral saved for triage.")} className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit referral</button>
-   </section>:<section className="h-fit rounded-2xl border border-border bg-card p-6">
+     </Select>
+    </Label>
+    <Label className="mt-4 block text-sm font-semibold">Priority
+     <Select value={priority} onChange={e=>setPriority(e.target.value as typeof priority)} className="mt-2 w-full  border border-border bg-background p-3 text-sm"><option value="normal">Routine</option><option value="high">Priority</option></Select>
+    </Label>
+    <Label className="mt-4 block text-sm font-semibold">Observations
+     <Textarea value={observations} onChange={e=>setObservations(e.target.value)} rows={5} placeholder="Describe the learning concern, its impact and what has been tried" className="mt-2 w-full  border border-border bg-background p-3 text-sm"/>
+    </Label>
+    <Label className="mt-3 flex items-start gap-2 text-sm"><Checkbox checked={includeEvidence} onChange={e=>setIncludeEvidence(e.target.checked)} className="mt-1"/> Include relevant academic evidence</Label>
+    <p className="mt-4  bg-muted p-3 text-xs">This routes to a designated support function. Urgent safeguarding concerns require a separate immediate-response pathway.</p>
+    <Button type="button" disabled={busy||!studentProfileId||observations.trim().length<3} onClick={()=>execute(()=>createSupportReferral({data:{category,priority,observations,includeEvidence,studentProfileId}}),"Referral saved for triage.")} className="mt-4 w-full  bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Submit referral</Button>
+   </section>:<section className="h-fit  border border-border bg-card p-6">
     <h2 className="font-serif text-3xl">Triage & service record</h2>
     {chosen?<>
      <p className="mt-3 text-sm font-semibold">{chosen.title}</p>
      <p className="mt-2 text-sm text-muted-foreground">{chosen.description}</p>
      <p className="mt-4 text-xs text-muted-foreground">Current: {chosen.stage.replaceAll("_"," ")} · Owner: {chosen.assignedTo}</p>
      <p role="status" className="mt-2 text-sm"><strong>{supportNextStep(chosen)}</strong></p>
-     <label className="mt-5 block text-sm">Assign to
-      <select value={area} onChange={e=>setArea(e.target.value as typeof area)} className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm">
+     <Label className="mt-5 block text-sm">Assign to
+      <Select value={area} onChange={e=>setArea(e.target.value as typeof area)} className="mt-2 w-full  border border-border bg-background p-3 text-sm">
        <option value="academic">Academic Coach</option><option value="learning">Learning Specialist</option><option value="counselor">School Counselor</option><option value="planning">College & Career Advisor</option>
-      </select>
-     </label>
-     <label className="mt-4 block text-sm">Support update
-      <textarea value={note} onChange={e=>setNote(e.target.value)} rows={4} placeholder="Summarize action, academic recommendations or review outcome" className="mt-2 w-full rounded-lg border border-border bg-background p-3 text-sm"/>
-     </label>
-     {chosen.stage==="accepted"&&<div className="mt-5 rounded-xl border border-border p-4">
+      </Select>
+     </Label>
+     <Label className="mt-4 block text-sm">Support update
+      <Textarea value={note} onChange={e=>setNote(e.target.value)} rows={4} placeholder="Summarize action, academic recommendations or review outcome" className="mt-2 w-full  border border-border bg-background p-3 text-sm"/>
+     </Label>
+     {chosen.stage==="accepted"&&<div className="mt-5  border border-border p-4">
       <h3 className="font-semibold">Create support plan</h3>
-      <label className="mt-3 block text-xs">Student goal<input value={goal} onChange={e=>setGoal(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-      <label className="mt-3 block text-xs">Intervention<textarea value={intervention} onChange={e=>setIntervention(e.target.value)} rows={3} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-      <label className="mt-3 block text-xs">Review target<input type="date" value={reviewDate} onChange={e=>setReviewDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-      <button disabled={busy||goal.trim().length<3||intervention.trim().length<3||!reviewDate} onClick={()=>execute(()=>saveSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Save support plan</button>
+      <Label className="mt-3 block text-xs">Student goal<Input value={goal} onChange={e=>setGoal(e.target.value)} className="mt-1 w-full  border border-border bg-background p-2 text-sm"/></Label>
+      <Label className="mt-3 block text-xs">Intervention<Textarea value={intervention} onChange={e=>setIntervention(e.target.value)} rows={3} className="mt-1 w-full  border border-border bg-background p-2 text-sm"/></Label>
+      <Label className="mt-3 block text-xs">Review target<Input type="date" value={reviewDate} onChange={e=>setReviewDate(e.target.value)} className="mt-1 w-full  border border-border bg-background p-2 text-sm"/></Label>
+      <Button type="button" disabled={busy||goal.trim().length<3||intervention.trim().length<3||!reviewDate} onClick={()=>execute(()=>saveSupportPlan({data:{referralId:chosen.id,goal,intervention,targetDate:reviewDate}}),"Support plan saved.")} className="mt-3  bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Save support plan</Button>
      </div>}
-     {chosen.plan&&<div className="mt-5 rounded-xl bg-muted p-4 text-sm"><p className="font-semibold">Support plan</p><p className="mt-2">Goal: {chosen.plan.goal}</p><p className="mt-2">Intervention: {chosen.plan.intervention}</p><p className="mt-2 text-xs">Review: {chosen.plan.targetDate.slice(0,10)}</p></div>}
-     {["plan_created","in_service"].includes(chosen.stage)&&<div className="mt-5 rounded-xl border border-border p-4">
+     {chosen.plan&&<div className="mt-5  bg-muted p-4 text-sm"><p className="font-semibold">Support plan</p><p className="mt-2">Goal: {chosen.plan.goal}</p><p className="mt-2">Intervention: {chosen.plan.intervention}</p><p className="mt-2 text-xs">Review: {chosen.plan.targetDate.slice(0,10)}</p></div>}
+     {["plan_created","in_service"].includes(chosen.stage)&&<div className="mt-5  border border-border p-4">
        <h3 className="font-semibold">Schedule student support</h3>
-       <label className="mt-3 block text-xs">Service type<select value={serviceKind} onChange={e=>setServiceKind(e.target.value as typeof serviceKind)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"><option value="coaching">Academic coaching</option><option value="tutoring">Tutoring</option><option value="learning_support">Learning support</option><option value="planning">College/career planning</option></select></label>
-       <label className="mt-3 block text-xs">Meeting time<input type="datetime-local" value={serviceDate} onChange={e=>setServiceDate(e.target.value)} className="mt-1 w-full rounded-lg border border-border bg-background p-2 text-sm"/></label>
-       <button disabled={busy||!serviceDate} onClick={()=>execute(()=>scheduleSupportService({data:{referralId:chosen.id,kind:serviceKind,scheduledAt:new Date(serviceDate).toISOString()}}),"Support service scheduled.")} className="mt-3 rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Schedule service</button>
+       <Label className="mt-3 block text-xs">Service type<Select value={serviceKind} onChange={e=>setServiceKind(e.target.value as typeof serviceKind)} className="mt-1 w-full  border border-border bg-background p-2 text-sm"><option value="coaching">Academic coaching</option><option value="tutoring">Tutoring</option><option value="learning_support">Learning support</option><option value="planning">College/career planning</option></Select></Label>
+       <Label className="mt-3 block text-xs">Meeting time<Input type="datetime-local" value={serviceDate} onChange={e=>setServiceDate(e.target.value)} className="mt-1 w-full  border border-border bg-background p-2 text-sm"/></Label>
+       <Button type="button" disabled={busy||!serviceDate} onClick={()=>execute(()=>scheduleSupportService({data:{referralId:chosen.id,kind:serviceKind,scheduledAt:new Date(serviceDate).toISOString()}}),"Support service scheduled.")} className="mt-3  bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-40">Schedule service</Button>
      </div>}
-     {chosen.services.map(service=><div key={service.id} className="mt-3 rounded-xl border border-border p-4">
+     {chosen.services.map(service=><div key={service.id} className="mt-3  border border-border p-4">
        <p className="text-sm font-semibold">{service.kind.replaceAll("_"," ")} · {service.status}</p>
        <p className="mt-1 text-xs text-muted-foreground">{new Date(service.scheduledAt).toLocaleString()}</p>
        {service.outcome&&<p className="mt-2 text-xs">Outcome: {service.outcome}</p>}
-       {service.status==="scheduled"&&<button disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3 rounded-lg border border-border px-3 py-2 text-xs">Record completed service using note</button>}
+       {service.status==="scheduled"&&<Button type="button" disabled={busy||note.trim().length<3} onClick={()=>execute(()=>completeSupportService({data:{referralId:chosen.id,serviceId:service.id,outcome:note}}),"Service completion documented.")} className="mt-3  border border-border px-3 py-2 text-xs">Record completed service using note</Button>}
      </div>)}
      {next&&next!=="plan_created"&&next!=="in_service"?<>
       {next==="review"&&!supportServicesReadyForReview(chosen.services)&&
        <p role="status" className="mt-4 text-sm">Complete every scheduled service before requesting review. The review transition requires at least one completed service.</p>}
-      <button disabled={busy||note.trim().length<3||
+      <Button type="button" disabled={busy||note.trim().length<3||
        (next==="review"&&!supportServicesReadyForReview(chosen.services))}
        onClick={()=>execute(()=>advanceSupportReferral({data:{referralId:chosen.id,nextStage:next,note,area}}),`Referral advanced to ${next.replaceAll("_"," ")}.`)}
-       className="mt-4 w-full rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</button>
+       className="mt-4 w-full  bg-foreground px-4 py-3 text-sm font-semibold text-background disabled:opacity-40">Move to {next.replaceAll("_"," ")}</Button>
      </>:<p className="mt-4 text-sm font-semibold">{chosen.stage==="closed"?"Referral closed":chosen.stage==="accepted"?"Create the support plan to continue.":"Schedule and complete services before review."}</p>}
     </>:<p className="mt-4 text-sm text-muted-foreground">Select a referral from your caseload to accept, plan, monitor or close it.</p>}
    </section>}
