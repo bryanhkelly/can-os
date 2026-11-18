@@ -3,8 +3,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents, evidenceDocuments, evidenceDocumentVersions,
+  evidenceDocuments, evidenceDocumentVersions,
   learnerAchievementDecisions, learningAwardIssuanceEvents, learningAwardIssuances,
   noncreditCompletionCertificates,
 } from "@/db/canonical-v301";
@@ -121,13 +122,13 @@ export const revokeLearningAwardIssuance = createServerFn({ method: "POST" })
       if (!event) throw new Error("Award revocation event not persisted");
       const payload={issuanceId:issuance.id,evidenceVersionId:data.evidenceVersionId,
         reason:data.reason};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,
         owningOrganizationId:issuance.issuerOrganizationId,
         eventCode:"learning.credential.revoked",entityKind:"credential_issuance",
         entityId:issuance.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId!,eventType:"CredentialRevoked",
         aggregateType:"credential_issuance",aggregateId:issuance.id,payload,
       });
