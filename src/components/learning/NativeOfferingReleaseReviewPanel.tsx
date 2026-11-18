@@ -5,11 +5,11 @@ import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspacePanel, WorkspaceNotice, EmptyState } from "@/components/workspace";
+import { WorkspacePanel, WorkspaceNotice, EmptyState, MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { NativeOfferingReleaseCheckpoints } from
   "@/components/learning/NativeOfferingReleaseCheckpoints";
 import { NativeOfferingReleasePolicyEditor } from "@/components/learning/NativeOfferingReleasePolicyEditor";
-import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativeOfferingReleaseReviewQueue, getNativeOfferingReviewContent,
   decideNativeOfferingRelease,
@@ -35,24 +35,21 @@ function ReleaseReview({item}:{item:Item}){
   const [decision,setDecision]=useState<"rejected"|"approved">("rejected");
   const [evidence,setEvidence]=useState("");
   const [reason,setReason]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [notice,setNotice]=useState("");
-  const [error,setError]=useState("");
+  const feedback=useMutationFeedback(async()=>{
+    await client.invalidateQueries({queryKey:["native-offering-release-review-queue"]});
+  });
   const fullyApproved=categories.every(kind=>item.reviews.some(review=>
     review.kind===kind&&review.decision==="approved"));
   async function run(action:()=>Promise<unknown>,message:string){
-    setBusy(true);setNotice("");setError("");
-    try{
-      await action();
-      setNotice(message);
-      await client.invalidateQueries({queryKey:["native-offering-release-review-queue"]});
-    }catch(cause){
-      setError(normalizeClientError(cause,"Release action was not accepted.").message);
-    }finally{setBusy(false)}
+    await feedback.run(action,{
+      successMessage:message,
+      commandErrorMessage:"Release decision was not accepted. Recheck the exact manuscript, independent appointment and verified evidence.",
+      refreshErrorMessage:"The release decision was saved, but current review records could not refresh. Retry refresh before another action.",
+    });
   }
   function submit(event:FormEvent){
     event.preventDefault();
-    if(!item.current||item.status!=="draft"||busy)return;
+    if(!item.current||item.status!=="draft"||feedback.pending||feedback.refreshFailed)return;
     void run(()=>decideNativeOfferingRelease({data:{
       offeringVersionId:item.offeringVersionId,manifestId:item.id,
       expectedHash:item.manifestHash,reviewKind:category,decision,
@@ -179,25 +176,25 @@ function ReleaseReview({item}:{item:Item}){
         <Input value={evidence} required={decision==="approved"}
           onChange={event=>setEvidence(event.target.value)}/>
       </Field>
-      <Button type="submit" disabled={!item.current||!content.isSuccess||busy||reason.trim().length<10||
+      <Button type="submit" disabled={!item.current||!content.isSuccess||feedback.pending||feedback.refreshFailed||reason.trim().length<10||
         decision==="approved"&&!evidence.trim()}>Record decision</Button>
     </form>}
     <div className="mt-4 flex flex-wrap gap-3">
       {!item.allCoursesPublished&&<Button variant="outline" type="button"
-        disabled={!item.current||!fullyApproved||busy}
+        disabled={!item.current||!fullyApproved||feedback.pending||feedback.refreshFailed}
         onClick={()=>void run(()=>publishNativeOfferingCourses({data:release}),
           "Approved native Course versions published.")}>Publish reviewed Courses</Button>}
       {!item.offeringPublished&&item.assetCount>0&&item.status==="draft"&&
         <Button variant="outline" type="button"
           disabled={!item.current||!fullyApproved||!item.releasePoliciesComplete||
-            !content.isSuccess||busy}
+            !content.isSuccess||feedback.pending||feedback.refreshFailed}
           onClick={()=>void run(()=>approveNativeOfferingAssetManifest({data:release}),
             "Exact asset-backed manifest approved after independent review.")}>
           Approve reviewed asset manifest
         </Button>}
       {!item.offeringPublished&&<Button variant="outline" type="button"
         disabled={!item.current||!fullyApproved||item.status!=="approved"||
-          !item.releasePoliciesComplete||!item.allCoursesPublished||busy}
+          !item.releasePoliciesComplete||!item.allCoursesPublished||feedback.pending||feedback.refreshFailed}
         onClick={()=>void run(()=>publishNativeOfferingVersion({data:release}),
           "Offering published. Local adoption still requires independent approval.")}>
         Publish reviewed Offering</Button>}
@@ -215,8 +212,8 @@ function ReleaseReview({item}:{item:Item}){
       Publication requires the latest independent academic, rights, accessibility,
       coverage and safety approvals with current verified evidence for this exact manifest.
     </p>}
-    {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
-    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    <MutationFeedback state={feedback} className="mt-3"
+      pendingMessage="Validating independent Course review, release evidence and exact version…"/>
   </article>;
 }
 
