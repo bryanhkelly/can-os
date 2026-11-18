@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { MutationFeedback, StatusBadge } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { fourSessionSchedulePreset, validClassroomScheduleWindow, validClassroomSessionWindows, type FourSessionCadence } from "@/domain/classroom-scheduling";
 
 import {
@@ -42,7 +44,8 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
   const [batchMeetings,setBatchMeetings]=useState<{start:string;end:string}[]>([]);
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
+  const feedback=useMutationFeedback(()=>schedule.refetch({throwOnError:true}));
+  const blocked=Boolean(busy)||feedback.refreshFailed;
   const [edit,setEdit]=useState<{
     planId:string;start:string;end:string;
   }|null>(null);
@@ -73,14 +76,14 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     }
   }
   async function run(key:string,action:()=>Promise<void>){
-    if(busy)return;
-    setBusy(key);setError("");setNotice("");
+    if(blocked)return;
+    setBusy(key);setError("");
     try{
-      await action();
-      await schedule.refetch();
-      setNotice("Classroom calendar updated. Learner Course attempts remain unchanged.");
-    }catch{
-      setError("The calendar operation was not saved. Check current Site authority, Course approval and the date window.");
+      await feedback.run(action,{
+        successMessage:"Classroom calendar updated. Learner Course attempts remain unchanged.",
+        commandErrorMessage:"The calendar action could not be confirmed. Check your Site authority and the meeting window.",
+        refreshErrorMessage:"The calendar action was saved, but the latest schedule could not be loaded. Retry the refresh before taking another action.",
+      });
     }finally{setBusy("");}
   }
   return <section className="mt-5 border border-border bg-card p-5"
@@ -121,7 +124,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       </label>
     </div>
     <Button className="mt-4" type="button"
-      disabled={!!busy||!choice||!iso(startsAt)||!iso(endsAt)}
+      disabled={blocked||!choice||!iso(startsAt)||!iso(endsAt)}
       onClick={()=>void run("new",async()=>{
         if(!choice)return;
         const begin=iso(startsAt),end=iso(endsAt);
@@ -144,13 +147,13 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
         All four bookings are saved together, using the same authorized Course and Site.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled={!!busy||!choice}
+        <Button type="button" variant="outline" disabled={blocked||!choice}
           onClick={()=>fillSessionDates("weekly")}>Fill weekly dates</Button>
-        <Button type="button" variant="outline" disabled={!!busy||!choice}
+        <Button type="button" variant="outline" disabled={blocked||!choice}
           onClick={()=>fillSessionDates("twice-weekly")}>Fill twice-weekly dates</Button>
-        <Button type="button" variant="outline" disabled={!!busy||!choice}
+        <Button type="button" variant="outline" disabled={blocked||!choice}
           onClick={()=>fillSessionDates("monday-thursday")}>Fill Monday–Thursday</Button>
-        {showSessionPlanner&&<Button type="button" variant="ghost" disabled={!!busy}
+        {showSessionPlanner&&<Button type="button" variant="ghost" disabled={blocked}
           onClick={()=>setShowSessionPlanner(false)}>Hide date editor</Button>}
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
@@ -178,7 +181,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
           Enter four future, non-overlapping meeting windows. Each must last at least
           15 minutes and meet the server's normal scheduling limits.
         </p>}
-        <Button type="button" disabled={!!busy||!choice||!batchReady}
+        <Button type="button" disabled={blocked||!choice||!batchReady}
           onClick={()=>void run("four-sessions",async()=>{
             if(!choice||!batchReady)return;
             const sorted=batchMeetings.map(row=>({
@@ -240,7 +243,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
             </div>
             {plan.state==="scheduled"&&!plan.nativeClassId&&<div className="flex flex-wrap gap-2">
               <Button type="button" size="sm"
-                disabled={!!busy||!withinStart}
+                disabled={blocked||!withinStart}
                 onClick={()=>void run(plan.id+":start",async()=>{
                   const result=await openScheduledClassroom({data:{planId:plan.id}});
                   if(result.pairingCode&&result.pairingExpiresAt)
@@ -248,12 +251,12 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
                       pairingCode:result.pairingCode,
                       pairingExpiresAt:result.pairingExpiresAt});
                 })}>Start scheduled room</Button>
-              <Button type="button" size="sm" variant="outline" disabled={!!busy}
+              <Button type="button" size="sm" variant="outline" disabled={blocked}
                 onClick={()=>setEdit({
                   planId:plan.id,start:localTime(new Date(plan.startsAt)),
                   end:localTime(new Date(plan.endsAt)),
                 })}>Reschedule</Button>
-              <Button type="button" size="sm" variant="outline" disabled={!!busy}
+              <Button type="button" size="sm" variant="outline" disabled={blocked}
                 onClick={()=>{if(window.confirm("Cancel this classroom meeting?"))
                   void run(plan.id+":cancel",async()=>{
                     await cancelClassroomPlan({data:{planId:plan.id}});
@@ -282,7 +285,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
                 className="mt-2 w-full border border-border bg-background p-2"/>
             </label>
             <div className="flex gap-2 sm:col-span-2">
-              <Button type="button" size="sm" disabled={!!busy}
+              <Button type="button" size="sm" disabled={blocked}
                 onClick={()=>void run(plan.id+":edit",async()=>{
                   if(!edit) return;
                   const start=iso(edit.start),end=iso(edit.end);
@@ -300,6 +303,6 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       })}
     </div>
     {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
-    {notice&&<p role="status" className="mt-4 text-sm">{notice}</p>}
+    <MutationFeedback state={feedback} pendingMessage="Updating classroom calendar…" className="mt-4"/>
   </section>;
 }
