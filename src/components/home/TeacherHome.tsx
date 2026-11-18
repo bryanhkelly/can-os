@@ -145,7 +145,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
         {activity.truncated && <p className="mt-2 text-xs">Large roster: showing a limited evidence sample.</p>}
         <div className="mt-4 grid gap-3">
           {activity.students.filter(student => student.observedEvents7d > 0).slice(0, 12).map(student =>
-            <article key={student.sectionId + ":" + student.studentProfileId} className="rounded-xl border p-4">
+            <article key={student.sectionId + ":" + student.studentProfileId} className="border border-border bg-card p-4">
               <p className="text-xs text-muted-foreground">{student.sectionTitle}</p>
               <Link to="/staff/students/$personId" params={{ personId: student.studentPersonId }} className="mt-1 block font-semibold underline">{student.studentName}</Link>
               <p className="mt-1 text-xs text-muted-foreground">{student.observedEvents7d} recorded interactions in 7 days
