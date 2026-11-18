@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { WorkspaceNotice } from "@/components/workspace";
 import { getFacilitatedRoomMedia } from "@/modules/learning/facilitated-learning.functions";
 import { issueClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 
@@ -57,19 +60,19 @@ export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonI
       {catalog.isFetching?"Checking…":"Refresh approved recordings"}
     </Button>
     {!!media.length&&<div className="mt-3 space-y-3">
-      <label className="block text-sm">Lesson
+      <Field label="Lesson">
         <Select className="mt-1"
           value={current?current.lessonId+":"+current.assetVersionId:""}
           onChange={event=>setSelected(event.target.value)}>
           {orderedMedia.map(item=><option key={item.lessonId+":"+item.assetVersionId}
             value={item.lessonId+":"+item.assetVersionId}>{item.lessonTitle}</option>)}
         </Select>
-      </label>
-      <label className="block text-sm">Position in seconds (for seek/start)
-        <input className="mt-1 w-32 border border-border bg-background p-2"
+      </Field>
+      <Field label="Position in seconds (for seek/start)">
+        <Input className="w-32"
           type="number" min={0} max={43200} step={1} value={position}
           onChange={event=>setPosition(Math.max(0,Math.min(43200,Math.floor(Number(event.target.value)||0))))}/>
-      </label>
+      </Field>
       <div className="flex flex-wrap gap-2">
         {(["load","play","pause","seek","stop"] as const).map(kind=>
           <Button type="button" key={kind} variant={kind==="play"?"default":"outline"}
@@ -78,7 +81,7 @@ export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonI
           </Button>)}
       </div>
     </div>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {message&&<WorkspaceNotice tone="info" className="mt-3">{message}</WorkspaceNotice>}
   </section>;
 }
