@@ -248,7 +248,7 @@ closed. Signed-in QA acceptance for both cohorts remains outstanding.
 Main now uses the shared raw account-Person invariant in Class review, activation
 and session recovery, and the same native learner authorization capability for
 Class enrollment and Class learning. The Class page delegates all three
-admission modes to `native-class-entry.client.ts`. This is deliberately a
+admission modes to `native-class-entry.ts`. This is deliberately a
 reusable *client application flow*, not a nested server RPC: TanStack Start
 does not make a newly set response cookie visible to subsequent handlers in
 the same HTTP request. Recovery/activation is one request; enrollment retry
