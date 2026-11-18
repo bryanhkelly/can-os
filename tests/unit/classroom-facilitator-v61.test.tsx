@@ -30,6 +30,13 @@ vi.mock("@/modules/learning/classroom-attendance.functions", () => ({
 }));
 
 describe("room facilitator's V6.1 attendance workspace", () => {
+  beforeEach(() => {
+    state.pairedDevice = false;
+    state.latestStatus = "unknown";
+    state.latestMethod = null;
+    state.lastAssertedAt = null;
+    state.attestationsOpen = true;
+  });
   it("shows required direct-observation evidence for no-device participants", () => {
     state.pairedDevice = false;
     state.lastAssertedAt = null;
