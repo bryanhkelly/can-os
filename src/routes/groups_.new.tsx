@@ -195,10 +195,13 @@ function StudentCreateGroupForm({ sections }: { sections: { id: string; title: s
   }, [sectionId]);
 
   const inviteError = submitted && inviteeIds.length === 0 ? "Choose at least one classmate to invite." : undefined;
-  return <form onSubmit={event => {
+  const titleError = submitted && title.trim().length < 3 ? "Enter a group name with at least 3 characters." : undefined;
+  const descriptionError = submitted && description.trim().length < 10 ? "Describe the study focus in at least 10 characters." : undefined;
+  return <form noValidate onSubmit={event => {
     event.preventDefault();
     setSubmitted(true);
-    if (inviteeIds.length === 0) return;
+    if (!sectionId || rosterLoading || rosterError || inviteeIds.length === 0 ||
+        title.trim().length < 3 || description.trim().length < 10) return;
     let createdGroupId = "";
     void mutation.run(async () => {
       const created = await createStudentStudyGroup({ data: {
@@ -224,10 +227,10 @@ function StudentCreateGroupForm({ sections }: { sections: { id: string; title: s
             {sections.map(section => <option key={section.id} value={section.id}>{section.title}</option>)}
           </Select>
         </Field>
-        <Field label="Group name" required className="sm:col-span-2">
+        <Field label="Group name" required className="sm:col-span-2" error={titleError}>
           <Input value={title} onChange={event => setTitle(event.target.value)} minLength={3} maxLength={100} />
         </Field>
-        <Field label="What will you study together?" required description="At least 10 characters." className="sm:col-span-2">
+        <Field label="What will you study together?" required description="At least 10 characters." className="sm:col-span-2" error={descriptionError}>
           <Textarea value={description} onChange={event => setDescription(event.target.value)} minLength={10} maxLength={2000} />
         </Field>
       </FormSection>
@@ -247,6 +250,6 @@ function StudentCreateGroupForm({ sections }: { sections: { id: string; title: s
     </fieldset>
     <MutationFeedback state={mutation} pendingMessage="Creating study group..." />
     <FormActions submitLabel="Create study group" pendingLabel="Creating study group..." pending={mutation.pending}
-      disabled={busy || rosterLoading || !sectionId} cancel={backToGroups} />
+      disabled={busy || rosterLoading || !!rosterError || !sectionId} cancel={backToGroups} />
   </form>;
 }
