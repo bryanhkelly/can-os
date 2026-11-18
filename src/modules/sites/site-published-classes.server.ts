@@ -38,7 +38,7 @@ export async function readLinkedSitePublishedClasses(
       ON s.id=c.site_id AND s.lifecycle_status='active'
     INNER JOIN education_v30.program_deployments pd
       ON pd.id=c.deployment_id AND pd.status='active'
-    INNER JOIN education_v30.education_operations op
+    INNER JOIN public.education_operations op
       ON op.id=pd.operation_id AND op.status='active'
     INNER JOIN education_v30.deployment_offering_adoptions adoption
       ON adoption.id=c.adoption_id
