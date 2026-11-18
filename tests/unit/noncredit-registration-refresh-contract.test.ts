@@ -62,7 +62,12 @@ describe("noncredit self-registration decision and refresh contract",()=>{
     expect(source).toContain("<QueryState");
     expect(source).toContain("<EmptyState");
     expect(source).toContain("<RecordFacts");
+    expect(source).toContain("<EntityCard");
+    expect(source).toContain("<StatusBadge");
+    expect(source).toContain('renderLink={({className,children})=><Link to="/learn/enroll"');
     expect(source).toContain("<WorkspaceNotice");
+    expect(confirmation).toContain('<Button asChild size="lg">');
+    expect(confirmation).toContain('<Button asChild size="lg" variant="outline">');
     expect(confirmation).toContain('to="/learn/course/$courseAttemptId"');
     expect(confirmation).toContain("params={{courseAttemptId:enrolled.courseAttemptId}}");
   });
