@@ -85,13 +85,13 @@ try{
   const installedIntents=await query(`
     SELECT c.relname,c.relrowsecurity,c.relforcerowsecurity
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])
+    WHERE n.nspname='public' AND c.relname=ANY($1::text[])
   `,[intentRelations]);
   const installedNames=new Set(installedIntents.rows.map(row=>row.relname));
   const missingIntents=intentRelations.filter(name=>!installedNames.has(name));
   const approvalContract=await query(`
     SELECT conname FROM pg_constraint
-    WHERE conrelid=to_regclass('education_v30.class_enrollment_approval_requests')
+    WHERE conrelid=to_regclass('public.class_enrollment_approval_requests')
       AND conname='ws2_approval_acceptance_only_after_review'
   `);
   const adultApprovalMigrationReady=approvalContract.rows.length===1;
