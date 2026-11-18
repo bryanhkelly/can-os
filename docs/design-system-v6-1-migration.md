@@ -657,3 +657,39 @@ failed code validation.
 beyond the guarded subset, then tackle remaining learner, parent,
 admissions, operations, public and platform views. Do not infer
 completion merely because a route imports WorkspaceShell.
+
+### Migration audit architecture correction (November 17, 2026)
+
+**This supersedes the manually maintained page/source-gate counts above.**
+Prior references to a 60-route checker manifest describe an earlier
+implementation, not the current migration mechanism.
+
+The migration no longer maintains an allowlist of route filenames, required
+JSX fragments or component counts, or duplicated checker/auditor manifests.
+The two entry points now share one source-analysis module:
+
+- `scripts/lib/v61-source-audit.mjs` discovers TSX routes and components,
+  parses JSX and Tailwind string values with the TypeScript AST, recognizes
+  deliberately hidden native POST fields, and follows component value imports
+  through named barrel exports. Type-only imports are not rendered UI.
+- `npm run design:routes` inventories the current routes and their composition.
+  Use `npm run design:routes -- --json` for machine-readable results;
+  `-- --strict` fails while any direct route/component source debt remains.
+- `npm run lint` invokes the same source discovery and compares changed TSX
+  files against the Git base. Any increase in an individual native-control
+  category, rounded utility or new TypeScript parse error fails the check.
+  Specify `V61_BASE_REF=<commit>` for a known base; the route reporter also
+  accepts `-- --base=<commit>` and defaults to `HEAD^`.
+- `npm run test:design-audit` provides AST and fixture-based regression tests
+  for actual JSX nodes, hidden inputs, named barrel resolution and changes.
+
+Additional pages require **no manifest edits**. Domain behavior belongs in
+behavioral unit/integration tests, not literal JSX fragment assertions.
+Older, specialist source contracts are temporarily retained until equivalent
+behavior-based coverage replaces them; do not extend those lists.
+
+A source-clean page is not automatically an accessible or production-accepted
+workflow. Role scoping, loading/error states, responsive behavior and
+authenticated browser journeys still need execution on an exact commit.
+The new scripts and test suite are committed to main but have **not** been
+executed end-to-end in this session.
