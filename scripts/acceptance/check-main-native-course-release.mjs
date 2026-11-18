@@ -205,7 +205,7 @@ async function main(){
         WHERE batch.execution_status='executed'
           AND bo.deployment_id IS NOT NULL
       ) AS offering_blueprint_outputs,
-      (SELECT count(*)::int FROM education_v30.deployment_offering_adoptions adoption
+      (SELECT count(*)::int FROM public.deployment_offering_adoptions adoption
         JOIN education_v30.program_deployments deployment
           ON deployment.id=adoption.deployment_id
         JOIN education_v30.education_operation_organization_roles relation
@@ -216,7 +216,7 @@ async function main(){
           AND (relation.valid_through IS NULL OR
             relation.valid_through>clock_timestamp())
       ) AS current_approved_operation_operators,
-      (SELECT count(*)::int FROM education_v30.deployment_offering_adoptions adoption
+      (SELECT count(*)::int FROM public.deployment_offering_adoptions adoption
         JOIN education_v30.program_deployments deployment
           ON deployment.id=adoption.deployment_id
         JOIN education_v30.education_operation_organization_roles relation
@@ -244,7 +244,7 @@ async function main(){
           SELECT DISTINCT ON (rr.deployment_id,rr.review_kind)
             rr.deployment_id,rr.review_kind,rr.outcome,rr.expires_at
           FROM education_v30.deployment_readiness_reviews rr
-          JOIN education_v30.deployment_offering_adoptions a
+          JOIN public.deployment_offering_adoptions a
             ON a.deployment_id=rr.deployment_id
           WHERE a.offering_version_id=(SELECT id FROM target)
             AND rr.review_kind IN ('operating','registration','delivery')
@@ -282,7 +282,7 @@ async function main(){
   const deployments=await sql`
     SELECT adoption.approval_status, p.status deployment_status,
       o.status operation_status
-    FROM education_v30.deployment_offering_adoptions adoption
+    FROM public.deployment_offering_adoptions adoption
     JOIN education_v30.program_deployments p ON p.id=adoption.deployment_id
     JOIN public.education_operations o ON o.id=p.operation_id
     WHERE adoption.offering_version_id=${offeringVersionId}::uuid
