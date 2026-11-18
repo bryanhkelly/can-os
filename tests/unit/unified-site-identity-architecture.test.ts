@@ -82,6 +82,27 @@ describe("one public-schema Site and Organization model",()=>{
     expect(gate).not.toMatch(/sql\`\s*(?:INSERT|UPDATE|DELETE|DROP|CREATE|ALTER)\b/i);
   });
 
+  it("fully retires the native Site and denies direct client table access",()=>{
+    const migration=read("database/production/2026-11-17-retire-duplicate-native-site.sql");
+    const gate=read("scripts/acceptance/check-main-site-schema-consolidation.mjs");
+    const catalog=read("src/db/canonical-v301/catalog.ts");
+    expect(migration).toContain("DROP TABLE education_v30.sites RESTRICT");
+    expect(migration).toContain("ALTER TABLE public.sites FORCE ROW LEVEL SECURITY");
+    expect(migration).toContain("REVOKE ALL PRIVILEGES ON TABLE public.sites");
+    expect(migration).toContain("sites_no_direct_client_access");
+    expect(gate).toContain("duplicate_site_retired");
+    expect(gate).toContain("platform_site_rls_forced");
+    expect(catalog).toContain('catalogSites = pgTable("sites"');
+    for(const path of [
+      "src/modules/sites/site-published-classes.server.ts",
+      "src/modules/sites/site-noncredit-releases.server.ts",
+      "src/modules/identity/platform-admin.functions.ts",
+      "src/modules/identity/canonical-sensitive-approvals.functions.ts",
+    ]) {
+      expect(read(path)).not.toContain("education_v30.sites");
+    }
+  });
+
   it("documents schema consolidation and removal of duplicate identities",()=>{
     const adr=read("docs/architecture/adr-one-platform-site-identity.md");
     expect(adr).toContain("one public application schema");
