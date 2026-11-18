@@ -139,6 +139,49 @@ describe("Site-owned website content channels", () => {
     expect(blocks[0]!.items[0]!.link).toBeUndefined();
   });
 
+  it("never advertises open enrollment without an authorized destination", () => {
+    const releaseId="11111111-1111-4111-8111-111111111111";
+    const seasonId="22222222-2222-4222-8222-222222222222";
+    const blocks=[
+      {id:"programs",channel:"learning.enrichment" as const,
+        placement:"learning" as const,layout:"cards" as const,enabled:true,
+        eyebrow:"Programs",title:"Programs",description:""},
+      {id:"courses",channel:"learning.noncredit" as const,
+        placement:"learning" as const,layout:"cards" as const,enabled:true,
+        eyebrow:"Courses",title:"Courses",description:""},
+    ];
+    const feeds={
+      mode:"public" as const,
+      enrichment:[{seasonId,title:"Summer Lab",programName:"Community",registrationOpen:true}],
+      noncredit:[{releaseId,title:"AI Skills",siteName:"Learning Center",
+        seatsRemaining:12,waitlistAvailable:false}],
+    };
+    const config={version:2 as const,revision:1,blocks};
+    const unavailable=resolveSiteContentBlocks(config,feeds);
+    expect(unavailable.find(block=>block.id==="programs")?.items[0]).toMatchObject({
+      label:"Program information only",link:{href:"/student-life"},
+    });
+    expect(unavailable.find(block=>block.id==="courses")?.items[0]).toMatchObject({
+      label:"Enrollment information only",
+    });
+    expect(unavailable.find(block=>block.id==="courses")?.items[0]?.link).toBeUndefined();
+    const published=resolveSiteContentBlocks(config,{
+      ...feeds,enrollmentOrigin:"https://app.example.org",
+    });
+    expect(published.find(block=>block.id==="programs")?.items[0]?.label)
+      .toBe("Published program · enrollment available");
+    expect(published.find(block=>block.id==="courses")?.items[0]?.label)
+      .toBe("Enrollment available");
+    expect(published.find(block=>block.id==="programs")?.items[0]?.link?.href)
+      .toBe("https://app.example.org/enrichment/"+seasonId);
+    expect(published.find(block=>block.id==="courses")?.items[0]?.link?.href)
+      .toBe("https://app.example.org/learn/enroll?release="+releaseId);
+    expect(resolveSiteContentBlocks(config,{
+      ...feeds,noncredit:[{...feeds.noncredit[0]!,releaseId:"invalid-release"}],
+      enrollmentOrigin:"https://app.example.org",
+    }).find(block=>block.id==="courses")).toBeUndefined();
+  });
+
   it("noncredit registration links require an eligible release and trusted HTTPS origin", () => {
     const config = {version: 2 as const, revision: 1, blocks: [{
       id: "training", channel: "learning.noncredit" as const,
