@@ -100,6 +100,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     if(outcome.status==="saved"||outcome.status==="refresh-failed")
       setCancelWaitlist(null);
   }
+  const fetchOlderWaitlist=()=>waiting.fetchNextPage();
   const visibleCourses=releaseId ? [] : query.data?.pages.flatMap(page=>page.items);
   const visibleWaitlist=registrationId ? [] : waiting.data?.pages.flatMap(page=>page.items);
   const waitingListToLeave=visibleWaitlist?.find(item=>item.releaseId===cancelWaitlist);
@@ -139,14 +140,14 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       {waiting.hasNextPage&&!releaseId&&<div className="mt-4">
         <Button type="button" variant="outline" loading={waiting.isFetchingNextPage}
           disabled={waiting.isFetchingNextPage||changeBusy}
-          onClick={()=>void waiting.fetchNextPage()}>
+          onClick={()=>void fetchOlderWaitlist()}>
           {waiting.isFetchingNextPage?"Loading older invitations…":"Load older waiting-list entries"}
         </Button>
       </div>}
       {waiting.isFetchNextPageError&&<WorkspaceNotice tone="attention" className="mt-4">
         <span>Older waiting-list entries could not be retrieved. Current entries remain visible.</span>
         <Button type="button" variant="outline" size="sm" className="ml-3"
-          onClick={()=>void waiting.fetchNextPage()}>Retry older invitations</Button>
+          onClick={()=>void fetchOlderWaitlist()}>Retry older invitations</Button>
       </WorkspaceNotice>}
     </section>}
     {visibleCourses && <div className="mt-6 space-y-3">
