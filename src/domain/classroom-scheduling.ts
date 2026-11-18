@@ -19,9 +19,32 @@ export function canOpenScheduledClassroom(start:Date,end:Date,now:Date):boolean{
     now.getTime()<end.getTime();
 }
 
-/** Four classroom meetings at the same local wall-clock time, including across DST.
- * The browser converts these local dates to instants; the server rechecks each.
+/** Accept one to four distinct, nonoverlapping dated meetings, any cadence.
+ * Course and Site authorization and future-time limits belong to the caller.
  */
+export type ClassroomMeetingWindow = {
+  startsAt: string | Date;
+  endsAt: string | Date;
+};
+const classroomInstant = (value: string | Date) =>
+  value instanceof Date ? value.getTime() : Date.parse(value);
+export function validClassroomSessionWindows(
+  windows: readonly ClassroomMeetingWindow[],
+): boolean {
+  if (windows.length < 1 || windows.length > 4) return false;
+  const ordered = [...windows].sort((a, b) =>
+    classroomInstant(a.startsAt) - classroomInstant(b.startsAt));
+  let previousEnd = -Infinity;
+  for (const row of ordered) {
+    const start = classroomInstant(row.startsAt);
+    const end = classroomInstant(row.endsAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) ||
+      end <= start || start < previousEnd) return false;
+    previousEnd = end;
+  }
+  return true;
+}
+
 export type FourSessionCadence = "weekly" | "twice-weekly";
 
 /**
