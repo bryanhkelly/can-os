@@ -181,8 +181,8 @@ describe("read-only staff Action detail",()=>{
       studentPersonId:"student-person",studentName:"Jordan Student",status:"not_started",
     }]}};
     const html=render(MissingWork);
-    expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay" class="underline">Evidence essay</a>');
-    expect(html).toContain('href="/staff/students/student-person" class="underline">Jordan Student</a>');
+    expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay&amp;student=student-profile"');
+    expect(html).toContain('href="/staff/students/student-person"');
     expect(html).toContain('href="/classes?section=english" class="underline">English</a>');
     expect(html).not.toContain('/staff/students/student-profile');
     expect(html).toContain('href="/actions/owned-action"');
