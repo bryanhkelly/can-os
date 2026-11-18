@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import {
   getClassroomRehearsalMedia,getClassroomRehearsalMediaAccess,
   recordClassroomRehearsalPlayback,
@@ -39,11 +40,11 @@ export function ClassroomRehearsalPlayer({scope,onClose}:{scope:Scope;onClose:()
     {data&&!data.media.length&&<p role="status" className="mt-3 text-sm">No distributable recorded lessons are available.</p>}
     {!!data?.media.length&&<div className="mt-4 space-y-3">
       <label className="block text-sm">Rehearse a lesson
-        <select value={selected} onChange={e=>setSelected(e.target.value)}
-          className="mt-1 w-full border border-border bg-background p-2">
+        <Select value={selected} onChange={e=>setSelected(e.target.value)}
+          className="mt-1">
           {data.media.map(m=><option key={m.lessonId+":"+m.assetVersionId}
             value={m.lessonId+":"+m.assetVersionId}>{m.lessonTitle}</option>)}
-        </select>
+        </Select>
       </label>
       {current&&<ClassVideoPlayer
         key={selected} title={current.lessonTitle+" · rehearsal"} presentation="classroom"
