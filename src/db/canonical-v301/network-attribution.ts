@@ -1,4 +1,4 @@
-import { boolean, index, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30, type JsonObject } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
@@ -62,7 +62,7 @@ export const networkMemberIdentifiers=educationV30.table("network_member_identif
 
 /** A member Site's affiliation never authorizes data exports or learner reads.
  * Each data-owning host separately permits named aggregate metrics. */
-export const networkReportingGrants = educationV30.table("network_reporting_grants",{
+export const networkReportingGrants = pgTable("network_reporting_grants",{
   id:id(),
   networkOrganizationId:uuid("network_organization_id").notNull(),
   hostOrganizationId:uuid("host_organization_id").notNull(),
