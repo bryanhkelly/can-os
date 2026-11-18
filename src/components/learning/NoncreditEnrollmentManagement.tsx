@@ -104,7 +104,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     {!releaseId&&<QueryState loading={query.isPending?"Loading your courses…":undefined}
       error={query.isError?"Your course records are temporarily unavailable.":undefined}
       onRetry={()=>void query.refetch()} retrying={query.isFetching}/>}
-    {error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}}
+    {error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
     <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
       pendingMessage="Saving enrollment change…" className="mt-4"/>
     {waiting.isError&&<QueryState error="Your waiting-list status is temporarily unavailable."
