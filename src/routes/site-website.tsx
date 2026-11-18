@@ -14,7 +14,7 @@ import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
-import { WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceNotice, WorkspacePanel, StatusBadge, type StatusTone } from "@/components/workspace";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -223,6 +223,88 @@ function WebsiteInformationChecklist({ data }: {
       not certify school opening or external hosting.
     </p>}
   </section>;
+}
+
+/** An authorized Site editor can reconcile Launch and Settings values with the
+ * independently reviewed fields actually eligible for the public website.
+ * This is a read-only mapping, never an alternative publisher or CMS. */
+function WebsiteSourceMappingPanel({data}: {
+  data: Awaited<ReturnType<typeof getPartnerWebsitePreviewView>>;
+}) {
+  const mapping = data.sourceMapping;
+  const sitePublished = data.status === "published";
+  type MappingRow = {label:string;source:string;status:string;tone:StatusTone;details:string};
+  const approvalStatus = (review:typeof mapping.physicalAddressReview,publicVisible:boolean) =>
+    publicVisible
+      ? sitePublished ? "Reviewed and publicly eligible" : "Reviewed; Site publication pending"
+      : review === "source_changed" ? "Changed since last review"
+      : review === "expired" ? "Review expired"
+      : review === "withdrawn" ? "Approval withdrawn"
+      : review === "invalid_review" ? "Review needs correction"
+      : review === "approved" ? "Reviewed; not displayed"
+      : "Independent review required";
+  const rows:MappingRow[] = [
+    {label:"School name and organization",source:"Canonical Site profile",
+      status:sitePublished?"Site identity published":"Saved Site identity",
+      tone:sitePublished?"success":"info",
+      details:data.siteName+" · "+data.organizationName},
+    {label:"Physical school address",source:"School profile · Location",
+      status:mapping.physicalAddressSaved
+        ? approvalStatus(mapping.physicalAddressReview,mapping.publicAddressVisible)
+        : "No validated address saved",
+      tone:mapping.publicAddressVisible?"success":mapping.physicalAddressSaved?"attention":"neutral",
+      details:"A saved location never proves opening authority. Public display requires separate identity review."},
+    {label:"Public contact information",source:"School profile · Contact",
+      status:mapping.contactSaved
+        ? approvalStatus(mapping.contactReview,mapping.publicContactVisible)
+        : "No public contact channel saved",
+      tone:mapping.publicContactVisible?"success":mapping.contactSaved?"attention":"neutral",
+      details:"Only a reviewed school contact is eligible for publication. Private staff contact details are excluded."},
+    {label:"School and community context",source:"Launch · Site information",
+      status:mapping.schoolContextSaved?"Saved for planning":"Not configured",
+      tone:mapping.schoolContextSaved?"info":"neutral",
+      details:"Site type, host church and reference website stay private; affiliations are not inferred from these fields."},
+    {label:"Learning interests and delivery intent",source:"Launch · Learning preferences",
+      status:mapping.learningIntentSaved?"Saved for private preview":"Not configured",
+      tone:mapping.learningIntentSaved?"info":"neutral",
+      details:"Proposed grades, delivery mode and program interests never become published offerings."},
+    {label:"Academic programs",source:"Reviewed Program marketing",
+      status:data.approvedAcademicCount
+        ? data.approvedAcademicCount+" reviewed Program"+(data.approvedAcademicCount===1?"":"s")
+        : "No approved academic listings",
+      tone:data.approvedAcademicCount?"success":"neutral",
+      details:"Grades, academic summaries, school-day schedules and Apply eligibility come from their separate approval services."},
+    {label:"Website blocks and placement",source:"Site content channel configuration",
+      status:mapping.contentChannelsPublished
+        ? "Published configuration · revision "+mapping.contentChannelPublishedRevision
+        : "Published blocks not configured",
+      tone:mapping.contentChannelsPublished?"success":"neutral",
+      details:"Private block revision "+mapping.contentChannelDraftRevision+
+        ". Saving a private layout never publishes it. Live pages read only the published configuration."},
+    {label:"Website theme, story and artwork",source:"Website & Brand Studio",
+      status:data.currentRevision===0?"No saved website revision":
+        "Latest revision "+data.currentRevision+" · "+(
+          data.localContentStatus==="published"?"published":
+          data.localContentStatus==="draft"?"private draft":"requires review"),
+      tone:data.localContentStatus==="published"?"success":
+        data.localContentStatus==="review_required"?"attention":"info",
+      details:"Artwork requires verified usage rights and child consent. Published pages use the latest independently eligible copy, not a private draft."},
+  ];
+  return <WorkspacePanel title="Launch and configuration mapping"
+    description="See where the website gets each fact and why some saved setup data is not public. This view never changes publication or approval.">
+    <dl className="divide-y border border-border/70">
+      {rows.map(row=><div key={row.label} className="grid gap-2 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] md:gap-5">
+        <dt className="font-medium text-sm">{row.label}
+          <span className="mt-1 block text-xs font-normal text-muted-foreground">{row.source}</span>
+        </dt>
+        <dd className="min-w-0 space-y-2">
+          <StatusBadge tone={row.tone}>{row.status}</StatusBadge>
+          <p className="text-sm leading-6 text-muted-foreground break-words">{row.details}</p>
+        </dd>
+      </div>)}
+    </dl>
+    <p className="mt-4 text-xs leading-5 text-muted-foreground">A published website address, a saved brand revision, public hosting reachability, and eligibility to accept applications are separate verifications. Changes in Launch or Settings do not bypass review.</p>
+  </WorkspacePanel>;
 }
 
 /** A shared quality guide for every partner school. This is advisory and
@@ -790,6 +872,7 @@ function LocalWebsiteCopyEditor({
         {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
         {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
         <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
+        <WebsiteSourceMappingPanel data={data} />
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
           <div className="mt-4"><WebsiteInformationChecklist data={data} /></div>
