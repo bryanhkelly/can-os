@@ -481,3 +481,51 @@ committed GitHub files. The checker was updated, but local Node execution,
 TypeScript typecheck, build, Storybook/axe, keyboard browser interaction and
 authenticated role journeys have **not** run on the latest main commit.
 Do not mark these source-gated pages or components as production accepted.
+
+
+### November 17 continuation: publisher and school operations
+
+The route-level source manifest now contains **35 of 180** TSX route files
+(as counted by the Git tree inventory). This is adoption *coverage*, not a
+measured percentage of complete user journeys or visual acceptance. Direct
+source checks on the newly changed routes and components found no unapproved
+native visible controls or legacy rounded geometry.
+
+The following seven route files joined the source gate after the previous
+28-route increment:
+
+| Route | Design system consolidation | Functional invariants |
+| --- | --- | --- |
+| `/sites/$siteId/publish` | StatusBadge, Button, Label, Checkbox, Textarea, notices and rectangular sections | Authorized publisher, approved-content gate, consent, revision and reachability verification unchanged |
+| `/site-website` and the composing `/launch/website` | Rectangular website-editor surfaces and common publisher notices | Protected-claim hold, revision conflict, private preview and local publishing authority unchanged |
+| `/canonical/blueprint-reviews` | Shared labels for evidence, decision and review rationale controls | Independent review, verified evidence and approval policy unchanged |
+| `/operations/family-alerts` | Shared delivery-retry action and rectangular cards | Provider acceptance is not proof of delivery; retry eligibility unchanged |
+| `/operations/teacher-marketplace` | Rectangular staffing workflow and shared existing primitives | Teacher engagement authority unchanged |
+| `/sites/$siteId/parent-information` | Rectangular public identity review panels | Verified public identity and publisher review unchanged |
+| `/operations/health-review` | Field, Textarea, Button, WorkspaceNotice, EmptyState, rectangular records | Independent verification confirmation and protected family health data unchanged |
+
+Shared Launch Studio components additionally migrated:
+
+- `BlueprintOfferingAdoptionPicker`, `BlueprintReferenceCatalogPanel`
+  and `ProgramDiscoveryPanel`: canonical Label/Select.
+- `SiteContentChannelEditor`: canonical Label/Checkbox.
+- `LaunchWizardPage`: shared error notices and rectangular workflows.
+- `LaunchSiteIdentityEditor`, `LaunchSiteAddressEditor`,
+  `LaunchSiteContactEditor`: rectangular editors, preserving revision checks.
+
+The design-system checker now guards these eight additional shared
+components, and asserts that the route audit and route checker both
+contain the same 35 source-gated pages.
+
+**Next pages by priority:** `/operations/field-trips`,
+`/operations/transfer-records`, `/operations/curriculum-marketplace`,
+`/classes`, and remaining teacher/student/guardian and Site administration
+workspaces. Inspect composed feature components and specialized interactions
+before applying controls; do not blanket-rewrite every route.
+
+**Verification still required:** Local TypeScript build/typecheck/lint, tests
+and Storybook, keyboard/focus checks, 390/768/1024/1440 responsive screenshots,
+theme and accessibility reviews, and authorized browser journeys on the exact
+`main` commit. GitHub Actions and Netlify are not prerequisites for this
+migration, and their known billing blocks must not be counted as code failures.
+No database schema or production data was modified for these presentation edits.
