@@ -21,13 +21,13 @@ Updated: 2026-11-17
 - The matched demo Site retained its existing planning lifecycle, classification, reference code, and clearly labeled synthetic metadata. This metadata is not a verified street address.
 - Migration files: `2026-11-17-retire-duplicate-native-site.sql` and `2026-11-17-retired-site-demo-address-preservation.sql`. The Site retirement is complete; the Organization was also subsequently retired. Person, Class, and remaining schema consolidation are not complete.
 
-## Current main verification, November 17, 2026
+## Main verification snapshot, November 17, 2026
 
 The authoritative Neon `main` database now has **no duplicate Site or Organization tables**. Current read-only measurements:
 
 | Metric | Public | Remaining native |
 | --- | ---: | ---: |
-| Base tables | 248 | 424 in `education_v30` |
+| Base tables | 270 | 401 in `education_v30` |
 | Sites | 9 | 0; `education_v30.sites` absent |
 | Organizations | 17 | 0; `education_v30.organizations` absent |
 | Foreign keys pointing to duplicate Site/Organization tables | n/a | 0 |
@@ -35,11 +35,11 @@ The authoritative Neon `main` database now has **no duplicate Site or Organizati
 | Native Person FKs still requiring review | n/a | 239 |
 | Separate sensitive-schema tables | n/a | 7 in `education_v30_secure` |
 
-Both `public.sites` and `public.organizations` have **enabled and forced row-level security**, a restrictive client-denial policy, and no direct `authenticated` or `anonymous` SELECT permissions. The server's privileged connection still requires application authorization; forced RLS does not replace command-level membership checks.
+The authoritative `public.people`, `public.sites`, and `public.organizations` tables now all have **enabled and forced row-level security**, restrictive client-denial policies, and no direct `authenticated` or `anonymous` SELECT permissions. The Person security migration preserved all 142 People and did not alter identity ownership. The server's privileged connection still requires application authorization; forced RLS does not replace command-level membership checks.
 
 The native staff-reader and five additional governed SQL functions were updated in place to reference `public.organizations`. An invalid synthetic staff/native session returned zero grants. `catalogSites`, `canonicalEnrollmentSites`, and `canonicalEnrollmentOrganizations` are now public-schema Drizzle projections, not new identities. A regression check and read-only acceptance command were committed on GitHub `main`.
 
-**Remaining:** public Person cutover, native account/session and correspondence retirement, 424 additional canonical tables and 7 sensitive tables, all associated routines/permissions, and an authenticated build/browser acceptance run. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
+**Remaining:** public Person cutover, native account/session and correspondence retirement, 401 additional canonical tables and 7 sensitive tables at this verification snapshot, all associated routines/permissions, and an authenticated build/browser acceptance run. Other workstreams can advance the table counts independently. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
 
 ## Historical pre-retirement Neon main inventory
 
