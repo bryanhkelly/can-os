@@ -1,4 +1,5 @@
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { Link, useRouter } from "@tanstack/react-router";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
@@ -9,10 +10,7 @@ import { plural, agree } from "@/lib/format";
 
 
 function Metric({label,value}:{label:string;value:number|string}) {
-  return <div className="rounded-lg border bg-background px-3 py-3">
-    <p className="text-2xl font-semibold tabular-nums">{value}</p>
-    <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-  </div>;
+  return <StatCard label={label} value={value}/>;
 }
 
 export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnType<typeof getWorkflowIntegration>> | null;error:string}) {
@@ -40,13 +38,11 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
     );
   }
   return <WorkspaceShell width="wide" eyebrow="Operations" title="Connected school workflows" subtitle="One authorized view of the host launch, admissions-to-enrollment, learning intervention, and attendance-excuse lifecycles. Every metric comes from the canonical domain records; use the linked workspaces to act." breadcrumbs={<Link to="/home" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Operations</Link>}>
-      {error && <p role="alert" className="mt-6 rounded-lg border p-4 text-sm">{error}</p>}
+      {error && <WorkspaceNotice tone="danger" className="mt-6">{error}</WorkspaceNotice>}
       <MutationFeedback state={mutation} pendingMessage="Updating connected workflows…" className="mt-6"/>
-      {data && data.programs.length === 0 && <p className="mt-6 rounded-lg border p-4 text-sm">
-        No programs are accessible to your active registrar grant.
-      </p>}
+      {data && data.programs.length === 0 && <EmptyState title="No authorized programs" description="No programs are accessible to your active registrar grant."/>}
       {data && <div className="mt-8 space-y-8">
-        {data.programs.map(program => <article key={program.id} className="rounded-2xl border bg-card p-5 sm:p-7">
+        {data.programs.map(program => <article key={program.id} className=" border bg-card p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="font-serif text-2xl"><Link to="/launch/school/$programId" params={{programId:program.id}} search={{siteId:program.siteId??undefined,programId:undefined}} className="hover:underline">{program.name}</Link></h2>
@@ -57,19 +53,19 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
             <div className="flex flex-wrap gap-2">
               <Link to="/launch/school/$programId" params={{programId:program.id}}
                 search={{siteId:undefined,programId:undefined}}
-                className="rounded-lg border px-3 py-2 text-xs font-semibold underline">
+                className=" border px-3 py-2 text-xs font-semibold underline">
                 Open program setup
               </Link>
               {program.status !== "active" && program.launch.journeyStatus === "ready" &&
-                <button type="button" disabled={busy}
+                <Button variant="outline" size="sm" type="button" disabled={busy}
                   onClick={() => void activate(program.id)}
-                  className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+                  className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50">
                   {mutation.pending ? "Updating…" : "Activate through canonical validation"}
-                </button>}
+                </Button>}
             </div>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <section className="rounded-xl border p-4">
+            <section className=" border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF23 / GF3 · Launch readiness</h3>
                 <Link to="/operations/school-years" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">School-year studio</Link>
@@ -84,7 +80,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                 section staffing, qualification, instructional-capacity or final activation validation.
               </p>
             </section>
-            <section className="rounded-xl border p-4">
+            <section className=" border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF22 / GF2 · Admissions to enrollment</h3>
                 <Link to="/admissions/families" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">Family readiness</Link>
@@ -101,13 +97,13 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
               </p>
               {program.enrollment.expiredOffersAwaitingReconciliation > 0 && <div className="mt-3 flex flex-wrap items-center gap-3">
                 <span className="text-xs text-muted-foreground">{plural(program.enrollment.expiredOffersAwaitingReconciliation, "elapsed offer")} awaiting reconciliation.</span>
-                <button type="button" className="rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                <Button variant="outline" size="sm" type="button" className=" border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
                   disabled={busy} onClick={() => void reconcile(program.id)}>
                   {mutation.pending ? "Updating…" : "Expire elapsed offers"}
-                </button>
+                </Button>
               </div>}
             </section>
-            <section className="rounded-xl border p-4">
+            <section className=" border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF1 · Learning and intervention</h3>
                 <Link to="/home" search={{siteId:program.siteId??undefined,programId:program.id}} className="text-xs underline">Actions queue</Link>
@@ -122,7 +118,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                 in their authorized teacher, family and support workspaces.
               </p>
             </section>
-            <section className="rounded-xl border p-4">
+            <section className=" border p-4">
               <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold">GF4 · Attendance and excuses</h3>
                 <Link to="/staff/attendance" className="text-xs underline">Review attendance</Link>
@@ -140,7 +136,7 @@ export function ConnectedWorkflowsWorkspace({data,error}: {data: Awaited<ReturnT
                 Unmarked days are <strong>not</strong> automatically absences.
               </p>
               {program.attendance.outsideConfiguredExpectations > 0 &&
-                <div role="alert" className="mt-3 rounded-lg border border-amber-500 p-3 text-sm">
+                <div role="alert" className="mt-3  border border-amber-500 p-3 text-sm">
                   <p className="font-semibold">
                     {plural(program.attendance.outsideConfiguredExpectations, "recorded onsite mark")}
                     {" "}{agree(program.attendance.outsideConfiguredExpectations, "no longer matches", "no longer match")} configured expected student-days.
