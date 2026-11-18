@@ -61,6 +61,20 @@ describe("teacher V6.1 design adoption", () => {
     expect(source).not.toMatch(/\brounded(?:-(?:sm|md|lg|xl|2xl|3xl|full))?\b/);
   });
 
+  it("uses shared V6.1 invitation fields and validates conference windows before publishing", () => {
+    const group = inspect("src/routes/groups_.$groupId.tsx");
+    expect(group.source).toContain('from "@/components/ui/choice"');
+    expect(group.source).toContain('<Checkbox disabled={busy}');
+    expect(group.nativeControls).toEqual(["button"]); // Native ARIA tablist button; not an ad-hoc form control.
+
+    const conference = inspect("src/components/teacher/TeacherConferencePanel.tsx");
+    expect(conference.source).toContain('<DashboardPanel');
+    expect(conference.source).toContain('<StatusBadge');
+    expect(conference.source).toContain('<Checkbox checked={createFollowUp}');
+    expect(conference.source).toContain('if (busy || !canPublish) return;');
+    expect(conference.source).toContain("The appointment window must end after it starts.");
+  });
+
   it("preserves explicit, separate draft and grade-publication actions", () => {
     const composer = inspect("src/components/learning/GradebookAssessmentComposer.tsx").source;
     const review = inspect("src/components/learning/GradebookReviewActions.tsx").source;
