@@ -23,7 +23,7 @@ export function LaunchSiteContactEditor({
  const [error,setError]=useState("");
  const changes=useLaunchDraftChanges(contact);
  useLaunchUnsavedChanges(changes.dirty || (editing && busy));
- return <div className="rounded-lg border p-3">
+ return <div className="border p-3">
    <div className="flex flex-wrap items-center justify-between gap-2">
      <p className="text-sm text-muted-foreground">School contact · private</p>
      <Button type="button" size="sm" variant="outline"
