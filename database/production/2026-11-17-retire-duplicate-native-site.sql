@@ -12,49 +12,102 @@ SET LOCAL statement_timeout = '120s';
 
 -- CAN_SQL_STEP 3
 DO $site_guard$
-DECLARE rec record; stale bigint; seen integer:=0; duplicate_sites integer;
+DECLARE
+  duplicate_sites integer;
+  expected_pairs integer;
+  orphans bigint;
+  record_row record;
 BEGIN
   IF current_setting('neon.project_id',true) IS DISTINCT FROM 'sweet-hall-62441909'
-     OR current_setting('neon.branch_id',true) IS DISTINCT FROM 'br-restless-sea-ar9ooo55'
-     OR current_database()<>'neondb' THEN
+    OR current_setting('neon.branch_id',true) IS DISTINCT FROM 'br-restless-sea-ar9ooo55'
+    OR current_database()<>'neondb' THEN
     RAISE EXCEPTION 'Refusing a database other than CAN OS Neon main';
   END IF;
-  IF to_regclass('education_v30.sites') IS NULL
-     OR to_regclass('public.sites') IS NULL THEN
+  IF to_regclass('education_v30.sites') IS NULL OR to_regclass('public.sites') IS NULL THEN
     RAISE EXCEPTION 'Expected duplicate and authoritative Site tables for cutover';
   END IF;
   SELECT count(*) INTO duplicate_sites FROM education_v30.sites;
-  IF duplicate_sites<>1 THEN
-    RAISE EXCEPTION 'Unexpected duplicate Site count %, cancel cutover',duplicate_sites;
-  END IF;
-  IF EXISTS(SELECT 1 FROM education_v30.sites n
-    WHERE NOT EXISTS(SELECT 1 FROM public.sites p WHERE p.id=n.id)) THEN
-    RAISE EXCEPTION 'A duplicate Site UUID has no exact public Site';
-  END IF;
-  FOR rec IN SELECT ns.nspname AS source_schema,t.relname AS source_table,
-       a.attname AS source_column,c.conname AS fk_name,c.convalidated,
-       c.conkey,c.confkey
+  IF duplicate_sites<>1 THEN RAISE EXCEPTION 'Unexpected duplicate Site count: %',duplicate_sites; END IF;
+  IF EXISTS(
+    SELECT 1 FROM education_v30.sites n
+    WHERE NOT EXISTS(SELECT 1 FROM public.sites p WHERE p.id=n.id)
+  ) THEN RAISE EXCEPTION 'Duplicate Site is not backed by exact public UUID'; END IF;
+  IF EXISTS(
+    SELECT 1 FROM pg_constraint c
+    WHERE c.contype='f' AND c.confrelid='education_v30.sites'::regclass
+  ) THEN RAISE EXCEPTION 'Native Site foreign keys remain; do not drop duplicate'; END IF;
+
+  WITH expected (source_table,fk_name,site_column) AS (
+    VALUES
+    ("education_v30.application_principal_grants","application_principal_grants_site_id_fkey","site_id"),
+    ("education_v30.assurance_cases","assurance_cases_site_id_fkey","site_id"),
+    ("education_v30.canonical_account_grants","canonical_account_grants_site_id_fkey","site_id"),
+    ("education_v30.class_enrollment_approval_requests","class_enrollment_approval_requests_site_id_fkey","site_id"),
+    ("education_v30.class_enrollment_invitations","class_enrollment_invitations_site_id_fkey","site_id"),
+    ("education_v30.classes","classes_site_id_fkey","site_id"),
+    ("education_v30.connectivity_services","connectivity_services_site_id_fkey","site_id"),
+    ("education_v30.control_obligations","control_obligations_site_id_fkey","site_id"),
+    ("education_v30.deployment_sites","deployment_sites_site_id_fkey","site_id"),
+    ("education_v30.education_operation_sites","education_operation_sites_site_id_fkey","site_id"),
+    ("education_v30.equipment_assignments","equipment_assignments_site_id_fkey","site_id"),
+    ("education_v30.equipment_custody_events","equipment_custody_events_from_site_id_fkey","from_site_id"),
+    ("education_v30.equipment_custody_events","equipment_custody_events_to_site_id_fkey","to_site_id"),
+    ("education_v30.evaluation_basis_dependencies","evaluation_basis_dependencies_site_id_fkey","site_id"),
+    ("education_v30.facilitated_classroom_plans","facilitated_classroom_plans_site_id_fkey","site_id"),
+    ("education_v30.facilitated_learning_sessions","facilitated_learning_sessions_site_id_fkey","site_id"),
+    ("education_v30.facilitated_rehearsal_events","facilitated_rehearsal_events_site_id_fkey","site_id"),
+    ("education_v30.feedback_subjects","feedback_subjects_site_id_fkey","site_id"),
+    ("education_v30.governance_policy_scopes","governance_policy_scopes_site_id_fkey","site_id"),
+    ("education_v30.learning_completion_evidence_bindings","learning_completion_evidence_bindings_delivery_site_id_fkey","delivery_site_id"),
+    ("education_v30.learning_completion_evidence_review_requests","learning_completion_evidence_review_reque_delivery_site_id_fkey","delivery_site_id"),
+    ("education_v30.metric_observations","metric_observations_site_id_fkey","site_id"),
+    ("education_v30.noncredit_self_enrollment_claims","noncredit_self_enrollment_claims_site_id_fkey","site_id"),
+    ("education_v30.noncredit_self_enrollment_releases","noncredit_self_enrollment_releases_site_id_fkey","site_id"),
+    ("education_v30.official_authorization_scopes","official_authorization_scopes_site_id_fkey","site_id"),
+    ("education_v30.operational_authorization_decisions","operational_authorization_decisions_site_id_fkey","site_id"),
+    ("education_v30.operator_rollout_applications","operator_rollout_applications_site_id_fkey","site_id"),
+    ("education_v30.participation_attributions","participation_attributions_delivery_site_id_fkey","delivery_site_id"),
+    ("education_v30.participation_attributions","participation_attributions_reporting_site_id_fkey","reporting_site_id"),
+    ("education_v30.qualification_proposed_sites","qualification_proposed_sites_linked_site_id_fkey","linked_site_id"),
+    ("education_v30.qualification_subjects","qualification_subjects_site_id_fkey","site_id"),
+    ("education_v30.quality_evaluations","quality_evaluations_subject_site_id_fkey","subject_site_id"),
+    ("education_v30.shared_resource_pools","shared_resource_pools_site_id_fkey","site_id"),
+    ("education_v30.site_device_policies","site_device_policies_site_id_fkey","site_id"),
+    ("education_v30.site_device_registrations","site_device_registrations_site_id_fkey","site_id"),
+    ("education_v30.site_organization_roles","site_organization_roles_site_id_fkey","site_id"),
+    ("education_v30.site_publication_bindings","site_publication_bindings_site_id_fkey","site_id"),
+    ("education_v30.site_spaces","site_spaces_site_id_fkey","site_id"),
+    ("education_v30.survey_campaigns","survey_campaigns_site_id_fkey","site_id"),
+    ("education_v30.technology_readiness_evaluations","technology_readiness_evaluations_site_id_fkey","site_id")
+  ),
+  matching AS (
+    SELECT e.source_table,e.fk_name,e.site_column,c.oid,c.convalidated
+    FROM expected e
+    LEFT JOIN pg_constraint c ON c.conname=e.fk_name
+      AND c.conrelid=to_regclass(e.source_table)
+      AND c.confrelid='public.sites'::regclass AND c.contype='f'
+    LEFT JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attname=e.site_column
+    WHERE c.oid IS NOT NULL AND c.convalidated
+      AND cardinality(c.conkey)=1 AND c.conkey[1]=a.attnum
+  )
+  SELECT count(*) INTO expected_pairs FROM matching;
+  IF expected_pairs<>40 THEN RAISE EXCEPTION 'Expected 40 named validated public Site FKs, found %',expected_pairs; END IF;
+
+  FOR record_row IN
+    SELECT n.nspname AS sch,t.relname AS tbl,a.attname AS col
     FROM pg_constraint c
     JOIN pg_class t ON t.oid=c.conrelid
-    JOIN pg_namespace ns ON ns.oid=t.relnamespace
+    JOIN pg_namespace n ON n.oid=t.relnamespace
     JOIN pg_attribute a ON a.attrelid=t.oid AND a.attnum=c.conkey[1]
-    WHERE c.contype='f' AND c.confrelid='education_v30.sites'::regclass
-    ORDER BY ns.nspname,t.relname,c.conname
+    WHERE c.contype='f' AND c.confrelid='public.sites'::regclass
+      AND n.nspname='education_v30'
   LOOP
-    seen:=seen+1;
-    IF NOT rec.convalidated OR cardinality(rec.conkey)<>1
-      OR cardinality(rec.confkey)<>1 THEN
-      RAISE EXCEPTION 'Unexpected or unvalidated Site FK %',rec.fk_name;
-    END IF;
     EXECUTE format(
       'SELECT count(*) FROM %I.%I child WHERE child.%I IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.sites s WHERE s.id=child.%I)',
-      rec.source_schema,rec.source_table,rec.source_column,rec.source_column
-    ) INTO stale;
-    IF stale>0 THEN
-      RAISE EXCEPTION 'Orphaned Site values in %.% (%)',rec.source_schema,rec.source_table,stale;
-    END IF;
+      record_row.sch,record_row.tbl,record_row.col,record_row.col
+    ) INTO orphans;
+    IF orphans<>0 THEN RAISE EXCEPTION 'Orphaned Site FK in %.%: %',record_row.sch,record_row.tbl,orphans; END IF;
   END LOOP;
-  IF seen<>40 THEN RAISE EXCEPTION 'Expected 40 remaining Site FKs, got %',seen; END IF;
 END $site_guard$;
 
 -- CAN_SQL_STEP 4
@@ -64,32 +117,13 @@ UPDATE public.sites p SET
   reference_code=COALESCE(p.reference_code,n.code),
   geographic_area_id=COALESCE(p.geographic_area_id,n.geographic_area_id),
   capacity=COALESCE(p.capacity,n.capacity),
-  address=COALESCE(p.address,n.address),
+  address=CASE WHEN p.address='{}'::jsonb AND n.address<>'{}'::jsonb THEN n.address ELSE p.address END,
   updated_at=clock_timestamp()
 FROM education_v30.sites n WHERE p.id=n.id;
 
 -- CAN_SQL_STEP 5
-DO $site_rebind$
-DECLARE fk record; rewritten text; changed integer:=0;
-BEGIN
-  FOR fk IN SELECT ns.nspname AS source_schema,t.relname AS source_table,
-      c.conname AS fk_name,pg_get_constraintdef(c.oid) AS definition
-    FROM pg_constraint c
-    JOIN pg_class t ON t.oid=c.conrelid
-    JOIN pg_namespace ns ON ns.oid=t.relnamespace
-    WHERE c.contype='f' AND c.confrelid='education_v30.sites'::regclass
-    ORDER BY ns.nspname,t.relname,c.conname
-  LOOP
-    rewritten:=replace(fk.definition,'REFERENCES education_v30.sites(','REFERENCES public.sites(');
-    IF rewritten=fk.definition THEN RAISE EXCEPTION 'Unexpected Site FK %',fk.fk_name; END IF;
-    EXECUTE format('ALTER TABLE %I.%I DROP CONSTRAINT %I',
-      fk.source_schema,fk.source_table,fk.fk_name);
-    EXECUTE format('ALTER TABLE %I.%I ADD CONSTRAINT %I %s',
-      fk.source_schema,fk.source_table,fk.fk_name,rewritten);
-    changed:=changed+1;
-  END LOOP;
-  IF changed<>40 THEN RAISE EXCEPTION 'Incomplete Site FK cutover, got %',changed; END IF;
-END $site_rebind$;
+-- FKs already individually rebound to public.sites and validated by the guard.
+-- No additional DDL or duplicate identity relation is introduced.;
 
 -- CAN_SQL_STEP 6
 CREATE OR REPLACE FUNCTION education_v30.v292_guard_fit_assessment()
