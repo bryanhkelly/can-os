@@ -87,22 +87,22 @@ function ReviewEditor({item}:{item:Item}){
   );
   if(verified.status!=="duplicate")setVerifyDialogOpen(false);
  }
- return <details className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+ return <details className=" border border-border/70 bg-card p-5 shadow-sm">
   <summary className="cursor-pointer font-serif text-lg font-semibold">{item.name} · {item.revision} · {item.status} · {item.verificationStatus}</summary>
   <div className="mt-4 space-y-3">
    <Field label="Title"><Input value={title} disabled={!editable||busy} onChange={e=>setTitle(e.target.value)}/></Field>
    <Field label="Summary"><Textarea rows={3} value={summary} disabled={!editable||busy} onChange={e=>setSummary(e.target.value)}/></Field>
-   <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+   <section className="space-y-3  border border-border/70 bg-card p-4">
     <div className="flex items-center justify-between"><h3 className="font-semibold">Operating models</h3>{editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,operatingModels:[...models,""]}))}>Add model</Button>}</div>
     {models.length===0&&<p className="text-sm text-muted-foreground">Add applicable models after researching state rules.</p>}
     {models.map((model,i)=><div key={i} className="flex items-end gap-2"><Field label={`Operating model ${i+1}`} className="flex-1"><Input disabled={!editable||busy} value={model} onChange={e=>setProfile(v=>({...v,operatingModels:models.map((x,j)=>i===j?e.target.value:x)}))}/></Field>{editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,operatingModels:models.filter((_,j)=>i!==j)}))}>Remove</Button>}</div>)}
    </section>
-   <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+   <section className="space-y-3  border border-border/70 bg-card p-4">
     <div className="flex items-center justify-between"><h3 className="font-semibold">Funding programs</h3>{editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,fundingPrograms:[...(Array.isArray(v.fundingPrograms)?v.fundingPrograms:[]),{id:crypto.randomUUID(),name:"",summary:"",eligibilityStatus:"unknown",evidenceIds:[]}]}))}>Add funding program</Button>}</div>
     {(Array.isArray(profile.fundingPrograms)?profile.fundingPrograms:[]).map((entry:unknown,i:number)=>{
      const program=entry as {id:string;name:string;summary:string;eligibilityStatus:string;evidenceIds:string[]};
      const update=(patch:Partial<typeof program>)=>setProfile(v=>({...v,fundingPrograms:(v.fundingPrograms as typeof program[]).map((p,j)=>i===j?{...p,...patch}:p)}));
-     return <div key={program.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+     return <div key={program.id} className="grid gap-3  border p-3 sm:grid-cols-2">
       <Field label="Program name"><Input disabled={!editable||busy} value={program.name} onChange={e=>update({name:e.target.value})}/></Field>
       <Field label="Eligibility status"><Select disabled={!editable||busy} value={program.eligibilityStatus} onChange={e=>update({eligibilityStatus:e.target.value})}>{["unknown","under_review","conditional","verified"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</Select></Field>
       <Field label="Program summary" className="sm:col-span-2"><Textarea disabled={!editable||busy} value={program.summary} onChange={e=>update({summary:e.target.value})}/></Field>
@@ -111,18 +111,18 @@ function ReviewEditor({item}:{item:Item}){
      </div>;
     })}
    </section>
-   <section className="space-y-3 rounded-xl border border-border/70 bg-card p-4">
+   <section className="space-y-3  border border-border/70 bg-card p-4">
     <div className="flex items-center justify-between"><h3 className="font-semibold">Requirements & responsibilities</h3>{editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setProfile(v=>({...v,requirements:[...(Array.isArray(v.requirements)?v.requirements:[]),{id:crypto.randomUUID(),title:"",description:"",responsibleParty:"church",phase:"before_opening",evidenceIds:[]}]}))}>Add requirement</Button>}</div>
     {(Array.isArray(profile.requirements)?profile.requirements:[]).map((entry:unknown,i:number)=>{
      const requirement=entry as {id:string;title:string;description:string;responsibleParty:string;phase:string;evidenceIds:string[];category?:string;disclosureAudience?:string;applicability?:{states:string[];operatingModels:string[];responsibleEntities:Array<"school_of_record"|"host_church">;serviceTypes?:Array<"academic"|"enrichment"|"childcare">}};
      const update=(patch:Partial<typeof requirement>)=>setProfile(v=>({...v,requirements:(v.requirements as typeof requirement[]).map((r,j)=>i===j?{...r,...patch}:r)}));
-     return <div key={requirement.id} className="grid gap-3 rounded-lg border p-3 sm:grid-cols-2">
+     return <div key={requirement.id} className="grid gap-3  border p-3 sm:grid-cols-2">
       <Field label="Requirement" className="sm:col-span-2"><Input disabled={!editable||busy} value={requirement.title} onChange={e=>update({title:e.target.value})}/></Field>
       <Field label="Responsible party"><Select disabled={!editable||busy} value={requirement.responsibleParty} onChange={e=>update({responsibleParty:e.target.value})}>{["can","church","family"].map(s=><option key={s} value={s}>{s.toUpperCase()}</option>)}</Select></Field>
       <Field label="When needed"><Select disabled={!editable||busy} value={requirement.phase} onChange={e=>update({phase:e.target.value})}>{["before_opening","before_enrollment","follow_up"].map(s=><option key={s} value={s}>{s.replaceAll("_"," ")}</option>)}</Select></Field>
       <Field label="Requirement category"><Select disabled={!editable||busy} value={requirement.category??"other"} onChange={e=>update({category:e.target.value})}>{["authorization","academic","safety","staffing","facilities","finance","records","other"].map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}</Select></Field>
       <Field label="Disclosure audience"><Select disabled={!editable||busy} value={requirement.disclosureAudience??"internal_only"} onChange={e=>update({disclosureAudience:e.target.value})}>{["internal_only","parent_on_request","authenticated_family","public_required","public_optional"].map(v=><option key={v} value={v}>{v.replaceAll("_"," ")}</option>)}</Select></Field>
-      <div className="sm:col-span-2 space-y-2 rounded-lg border border-border/70 p-3">
+      <div className="sm:col-span-2 space-y-2  border border-border/70 p-3">
        <p className="text-sm font-medium">School-specific applicability</p>
        <p className="text-xs text-muted-foreground">Without a reviewed scope, this requirement is held for CAN/legal review and cannot be publicly claimed.</p>
        {!requirement.applicability
@@ -145,7 +145,7 @@ function ReviewEditor({item}:{item:Item}){
     <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Official source evidence</h3>
      {editable&&<Button type="button" variant="outline" size="sm" disabled={busy} onClick={()=>setSources(previous=>[...previous,{title:"",url:"",authority:"",checkedAt:new Date().toISOString()}])}>Add source</Button>}</div>
     {sources.length===0&&<p className="text-sm text-muted-foreground">No sources yet. Add an official reference before publishing.</p>}
-    {sources.map((source,i)=><div key={i} className="grid gap-2 rounded-lg border p-3 sm:grid-cols-2">
+    {sources.map((source,i)=><div key={i} className="grid gap-2  border p-3 sm:grid-cols-2">
      {(["title","url","authority","checkedAt"] as const).map(field=><Field key={field} label={field==="checkedAt"?"Checked at (UTC)":field}>
       <Input type={field==="url"?"url":field==="checkedAt"?"datetime-local":"text"}
        value={field==="checkedAt"?utcInputValue(source.checkedAt):source[field]}
@@ -156,7 +156,7 @@ function ReviewEditor({item}:{item:Item}){
      {editable&&<Button type="button" variant="ghost" size="sm" disabled={busy} className="justify-self-start" onClick={()=>setSources(previous=>previous.filter((_,index)=>index!==i))}>Remove source</Button>}
     </div>)}
    </section>
-   {item.verificationStatus==="verified"&&item.verifiedByPersonId&&<section className="rounded-xl border border-border/70 bg-card p-4">
+   {item.verificationStatus==="verified"&&item.verifiedByPersonId&&<section className=" border border-border/70 bg-card p-4">
     <h3 className="font-semibold">Independent verification</h3>
     <p className="text-sm text-muted-foreground">Reviewer {item.verifiedByPersonId} · {item.reviewedAt?new Date(item.reviewedAt).toISOString():"time unavailable"}</p>
     <p className="mt-2 text-sm">{(JSON.parse(item.verificationEvidence) as {note?:string}).note}</p>
