@@ -72,13 +72,24 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
 
 function AssignmentResourcesPanel({ assessmentId, onError }: { assessmentId: string; onError: (message: string) => void }) {
  const [resources, setResources] = useState<{ documentId: string; fileName: string; mimeType: string | null }[]>([]);
+ const [loadError, setLoadError] = useState(false);
+ const [loading, setLoading] = useState(true);
+ const [retry, setRetry] = useState(0);
  useEffect(() => {
   let active = true;
+  setLoading(true);
+  setLoadError(false);
   listAssessmentResources({ data: { assessmentId } })
    .then(result => { if (active) setResources(result.resources); })
-   .catch(() => { if (active) setResources([]); });
+   .catch(() => { if (active) { setResources([]); setLoadError(true); } })
+   .finally(() => { if (active) setLoading(false); });
   return () => { active = false; };
- }, [assessmentId]);
+ }, [assessmentId, retry]);
+ if (loading) return <WorkspacePanel title="Assignment resources"><p role="status" className="text-sm text-muted-foreground">Loading teacher resources…</p></WorkspacePanel>;
+ if (loadError) return <WorkspacePanel title="Assignment resources">
+  <WorkspaceNotice tone="attention">Teacher resources could not be loaded. This does not mean the assignment has no files.</WorkspaceNotice>
+  <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => setRetry(value => value + 1)}>Try again</Button>
+ </WorkspacePanel>;
  if (!resources.length) return null;
  return <WorkspacePanel title="Assignment resources" description="Materials your teacher attached for this assignment.">
   <ul className="divide-y divide-border/60">
