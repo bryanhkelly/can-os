@@ -459,8 +459,7 @@ export const instructionalTrackPolicyWithdrawals = educationV30.table(
   },
 );
 
-export const officialCourseRequirementVersions = educationV30.table(
-  "official_course_requirement_versions",
+export const officialCourseRequirementVersions = pgTable("official_course_requirement_versions",
   {
     id: id(),
     courseVersionId: uuid("course_version_id").notNull(),
@@ -689,8 +688,7 @@ export const formativePracticeAttempts = educationV30.table("formative_practice_
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const instructionalTrackCommandReceipts = educationV30.table(
-  "instructional_track_command_receipts",
+export const instructionalTrackCommandReceipts = pgTable("instructional_track_command_receipts",
   {
     actorPersonId: uuid("actor_person_id").notNull(),
     requestId: uuid("request_id").notNull(),
