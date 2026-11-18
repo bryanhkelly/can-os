@@ -117,6 +117,36 @@ export function safeReadSiteContentChannelConfig(raw: unknown): SiteContentChann
   catch { return defaultSiteContentChannelConfig; }
 }
 
+/**
+ * Canonical Site layout lifecycle. A default layout is a previewable
+ * suggestion, not a persisted draft. The first Save must create revision 1,
+ * even when the operator accepts every default block unchanged.
+ * Subsequent identical saves are idempotent and do not increment revisions.
+ */
+export function planSiteContentChannelSave(
+  stored: unknown,
+  expectedRevision: number,
+  blocks: SiteContentBlock[],
+): { config: SiteContentChannelConfig; changed: boolean } {
+  const current = readSiteContentChannelConfig(stored);
+  if (current.revision !== expectedRevision)
+    throw new Error("Site content channels have changed. Reload before saving.");
+  const next = siteContentChannelConfigSchema.parse({
+    version: 2, revision: current.revision + 1, blocks,
+  });
+  const exists = stored !== null && stored !== undefined;
+  if (exists && JSON.stringify(current.blocks) === JSON.stringify(next.blocks))
+    return { config: current, changed: false };
+  return { config: next, changed: true };
+}
+
+/** Publishing cannot create a public snapshot of an unsaved default. */
+export function requireSavedSiteContentChannelDraft(stored: unknown): SiteContentChannelConfig {
+  if (stored === null || stored === undefined)
+    throw new Error("Save the Site website layout before publishing it.");
+  return readSiteContentChannelConfig(stored);
+}
+
 export const siteContentChannelDescriptions: Record<SiteContentChannelId, {
   label: string; description: string; privateOnly: boolean;
   defaultTitle: string; defaultEyebrow: string; defaultDescription: string;
