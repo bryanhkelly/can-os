@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { getProviderContentWorkspace } from "@/modules/learning/provider-content-workspace.functions";
 import { decideRecordedInstructionReview, publishRecordedInstruction } from "@/modules/learning/instructional-tracks.functions";
+import { NativeOfferingReleaseReviewPanel } from "@/components/learning/NativeOfferingReleaseReviewPanel";
 
 type Queue = Awaited<ReturnType<typeof getProviderContentWorkspace>>;
 type Track = Queue["tracks"][number];
@@ -38,6 +39,7 @@ export function ProviderInstructionReviews({navigation}:{navigation?:ReactNode})
         courseName={courses.find(course=>course.id===track.courseId)?.title??"Assigned Course"}/>)}
       {!tracks.length && <p role="status" className="border border-border bg-card p-5 text-sm">There are no submitted track versions available under your current independent review appointments.</p>}
     </div>
+    <NativeOfferingReleaseReviewPanel/>
   </WorkspaceShell>;
 }
 
