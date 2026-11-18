@@ -17,6 +17,7 @@ const sharedControlSurfaces = [
   "src/components/learning/GradebookReviewActions.tsx",
   "src/components/learning/GradebookReviewedFeedback.tsx",
   "src/components/learning/GradebookReviewQueue.tsx",
+  "src/components/learning/ClassTeacherPlanningPanel.tsx",
   "src/components/teacher/TeacherFirstWeekCard.tsx",
   "src/components/teacher/TeacherDaySchedule.tsx",
   "src/components/teacher/TeacherConferencePanel.tsx",
