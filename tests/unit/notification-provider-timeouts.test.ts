@@ -47,6 +47,36 @@ describe("bounded outbound provider requests", () => {
     }]);
     expect(fetch.mock.calls[0]![1].headers["Idempotency-Key"]).toBe("event-delivery-id");
   });
+  it("omits untrusted email action links without a configured HTTPS application origin", async () => {
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ id: "email-accepted" }),
+    });
+    vi.stubGlobal("fetch", fetch);
+    const message = {
+      to: "guardian@example.org", subject: "Notice", text: "Sign in",
+      actionUrl: "https://untrusted.example/redirect",
+    };
+    vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN", "");
+    expect(await sendNotificationEmail(message, "action-test-unconfigured")).toBe(true);
+    let body = JSON.parse(fetch.mock.calls[0]![1].body as string) as { text: string };
+    expect(body.text).toBe("Sign in");
+
+    vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN", "http://app.can-os.test");
+    expect(await sendNotificationEmail(message, "action-test-insecure")).toBe(true);
+    body = JSON.parse(fetch.mock.calls[1]![1].body as string) as { text: string };
+    expect(body.text).toBe("Sign in");
+
+    vi.stubEnv("CAN_ACCESS_PUBLIC_ORIGIN", "https://app.can-os.test");
+    expect(await sendNotificationEmail(message, "action-test-external")).toBe(true);
+    body = JSON.parse(fetch.mock.calls[2]![1].body as string) as { text: string };
+    expect(body.text).toBe("Sign in");
+
+    expect(await sendNotificationEmail({
+      ...message, actionUrl: "https://app.can-os.test/account/notifications",
+    }, "action-test-trusted")).toBe(true);
+    body = JSON.parse(fetch.mock.calls[3]![1].body as string) as { text: string };
+    expect(body.text).toContain("https://app.can-os.test/account/notifications");
+  });
   it.each(["email", "sms"])("reports aborted %s requests as failed, never accepted", async channel => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new DOMException("Timed out", "TimeoutError")));
     vi.spyOn(console, "log").mockImplementation(() => {});

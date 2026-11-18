@@ -28,10 +28,12 @@ function resolveActionUrl(actionUrl: string | undefined): string | undefined {
   try {
     const url = new URL(actionUrl);
     if (url.protocol !== "https:" || !url.hostname) return undefined;
+    // The sending service must never fall back to arbitrary HTTPS links if
+    // the trusted application origin is missing or misconfigured.
     const allowedOrigin = process.env.CAN_ACCESS_PUBLIC_ORIGIN;
-    if (allowedOrigin && url.origin !== new URL(allowedOrigin).origin) {
-      return undefined;
-    }
+    if (!allowedOrigin) return undefined;
+    const trusted = new URL(allowedOrigin);
+    if (trusted.protocol !== "https:" || url.origin !== trusted.origin) return undefined;
     return url.toString();
   } catch {
     return undefined;
