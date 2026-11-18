@@ -1,5 +1,5 @@
 import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
@@ -91,7 +91,7 @@ export async function readPublishedSiteCatalog(slug: string) {
       academicPrograms:authorizedPrograms,enrichment:publicOfferings,
       noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
     });
-    const contentConfig = safeReadSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
+    const contentConfig = readPublishedSiteContentChannelConfig(site.metadata.publishedWebsiteContentChannels);
     const contentBlocks = resolveSiteContentBlocks(
       contentConfig, {
         mode: "public", academicPrograms: authorizedPrograms,
