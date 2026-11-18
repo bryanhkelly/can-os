@@ -56,6 +56,10 @@ export function analyzeSource(source, path, options = {}) {
         corners.push({ utility: match[0].trim(), ...location(syntax, node) });
       }
     }
+    if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword &&
+        node.arguments.length === 1 && ts.isStringLiteral(node.arguments[0])) {
+      imports.push({ kind: "import", from: node.arguments[0].text, names: ["*"] });
+    }
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       imports.push({ kind: "import", from: node.moduleSpecifier.text, names: importNames(node.importClause) });
     }
