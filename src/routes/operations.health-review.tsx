@@ -1,6 +1,9 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -56,14 +59,14 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
  return <WorkspaceShell eyebrow="Restricted school review" title="Family emergency and health updates"
   subtitle="Independently review changes proposed by verified guardians. Only approval updates the school medical record; proposed information must never be treated as cleared emergency instructions."
   actions={<Link to="/home" search={{siteId:undefined,programId:undefined,action:undefined}}
-   className="rounded border px-3 py-2 text-sm">School operations</Link>}>
-  {validationError&&<p role="alert" className="mt-5 rounded border p-4 text-sm">{validationError}</p>}
+   className=" border px-3 py-2 text-sm">School operations</Link>}>
+  {validationError&&<WorkspaceNotice tone="danger" className="mt-5">{validationError}</WorkspaceNotice>}
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving confidential review..."/>
   {action&&<Link to="/operations/health-review" className="mt-4 inline-block text-sm underline">View entire confidential review queue</Link>}
-  {action&&!visible.length&&<p role="status" className="mt-5 rounded border p-4 text-sm">This requested medical update is not available for review in your current school scope.</p>}
-  {!items.length&&<p className="mt-5 rounded border p-4 text-sm">No pending family medical updates in your authorized schools.</p>}
+  {action&&!visible.length&&<WorkspaceNotice tone="attention" className="mt-5">This requested medical update is not available for review in your current school scope.</WorkspaceNotice>}
+  {!items.length&&<EmptyState title="No pending family medical updates" description="No pending family medical updates in your authorized schools."/>}
   <div className="mt-6 space-y-5">
-   {visible.map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
+   {visible.map(item=><article key={item.id} className=" border bg-card p-5">
     <h2 className="text-lg font-semibold"><Link to="/operations/health-review" search={{action:item.id}} className="underline">{item.studentName}</Link></h2>
     <p className="mt-1 text-xs text-muted-foreground">Submitted {new Date(item.requestedAt).toLocaleString()} · Confidential medical review</p>
     <p className="mt-3 text-sm text-muted-foreground">
@@ -71,22 +74,22 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
      Approval replaces every listed field, including a proposed blank value.
     </p>
     <dl className="mt-4 grid gap-4 text-sm sm:grid-cols-2">
-     <div className="rounded-lg border p-3">
+     <div className=" border p-3">
       <dt className="font-semibold">Allergy instructions</dt>
       <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>{item.currentAllergySummary||"None recorded"}</dd>
       <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>{item.allergySummary||"Clear existing instructions"}</dd>
      </div>
-     <div className="rounded-lg border p-3">
+     <div className=" border p-3">
       <dt className="font-semibold">Emergency instructions</dt>
       <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>{item.currentEmergencySummary||"None recorded"}</dd>
       <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>{item.emergencySummary||"Clear existing instructions"}</dd>
      </div>
-     <div className="rounded-lg border p-3">
+     <div className=" border p-3">
       <dt className="font-semibold">Accommodations</dt>
       <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>{item.currentAccommodationSummary||"None recorded"}</dd>
       <dd className="mt-2 whitespace-pre-wrap"><span className="block text-xs font-semibold text-muted-foreground">Family proposal</span>{item.accommodationSummary||"Clear existing accommodations"}</dd>
      </div>
-     <div className="rounded-lg border p-3">
+     <div className=" border p-3">
       <dt className="font-semibold">Emergency contact</dt>
       <dd className="mt-2"><span className="block text-xs font-semibold text-muted-foreground">Current approved</span>
        {item.currentEmergencyContact?.phone
@@ -98,17 +101,16 @@ function HealthReviewList({items,action}:{items:Item[];action?:string}){
       </dd>
      </div>
     </dl>
-    <label className="mt-5 block text-sm font-semibold">School verification and decision note
-     <textarea required minLength={10} maxLength={1500} rows={3}
-      className="mt-2 block w-full rounded border bg-background p-3"
+    <Field label="School verification and decision note" className="mt-5" required>
+     <Textarea required minLength={10} maxLength={1500} rows={3}
       placeholder="Describe school verification or why further information is required; do not paste clinical details."
       value={notes[item.id]??""} onChange={e=>setNotes(current=>({...current,[item.id]:e.target.value}))}/>
-    </label>
+    </Field>
     <div className="mt-3 flex flex-wrap gap-3">
-     <button type="button" disabled={busy||(notes[item.id]??"").trim().length<10}
-      onClick={()=>void decide(item,true)} className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-50">Approve verified information</button>
-     <button type="button" disabled={busy||(notes[item.id]??"").trim().length<10}
-      onClick={()=>void decide(item,false)} className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50">Decline and ask family to clarify</button>
+     <Button type="button" disabled={busy||(notes[item.id]??"").trim().length<10}
+      onClick={()=>void decide(item,true)}>Approve verified information</Button>
+     <Button type="button" variant="outline" disabled={busy||(notes[item.id]??"").trim().length<10}
+      onClick={()=>void decide(item,false)}>Decline and ask family to clarify</Button>
     </div>
    </article>)}
   </div>
