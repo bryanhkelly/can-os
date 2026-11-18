@@ -289,15 +289,13 @@ function StudentMembershipPanel({ group, availability, hasEnrollmentGuardian, bu
       </WorkspaceNotice>}
       <div className="flex flex-wrap gap-2">
         {!status || status === "left" || status === "declined"
-          ? <button disabled={busy || !availability.membershipEnabled || hasEnrollmentGuardian !== true}
-              className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
+          ? <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled || hasEnrollmentGuardian !== true}
               onClick={() => void run(() => requestCanonicalGroupMembership({ data: { groupId: group.id } }),
-                "Membership requested. A guardian and the facilitator must approve.")}>Request to join</button>
-          : <button disabled={busy || !availability.membershipEnabled}
-              className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50"
+                "Membership requested. A guardian and the facilitator must approve.")}>Request to join</Button>
+          : <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
               onClick={() => void run(() => leaveCanonicalGroup({ data: { groupId: group.id } }),
                 status === "pending" ? "Membership request withdrawn." : "You left the study group.")}>
-              {status === "pending" ? "Withdraw request" : "Leave group"}</button>}
+              {status === "pending" ? "Withdraw request" : "Leave group"}</Button>}
       </div>
     </div>
   </WorkspacePanel>;
@@ -319,10 +317,9 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
     !group.sessions.some(session => session.id === selectedSession);
   return <WorkspacePanel title="Sessions"
     description={`Times shown in ${group.timezone}.`}
-    actions={role === "teacher" && <button type="button" disabled={busy || !availability.writesEnabled}
-      className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
+    actions={role === "teacher" && <Button variant="outline" size="sm" type="button" disabled={busy || !availability.writesEnabled}
       onClick={() => setScheduling(open => !open)}>
-      {scheduling ? "Close scheduler" : "Schedule session"}</button>}>
+      {scheduling ? "Close scheduler" : "Schedule session"}</Button>}>
     <div className="space-y-3">
       {unknownSession && <WorkspaceNotice tone="danger">This session is unavailable in this study group.</WorkspaceNotice>}
       {role === "teacher" && scheduling && <form noValidate
@@ -359,7 +356,7 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
         const upcoming = !session.cancelled && new Date(session.startsAt) > now;
         const past = !session.cancelled && new Date(session.startsAt) <= now;
         return <div key={session.id} aria-current={selectedSession === session.id ? "true" : undefined}
-          className={selectedSession === session.id ? "rounded-lg border-2 border-primary p-3" : "rounded-lg border p-3"}>
+          className={selectedSession === session.id ? "border-2 border-primary bg-card p-3" : "border border-border bg-card p-3"}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold">{session.title}</p>
             {session.cancelled && <StatusBadge tone="danger">Cancelled</StatusBadge>}
@@ -372,25 +369,22 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
           {role === "student" && upcoming && <div className="mt-3 flex flex-wrap items-center gap-2">
             <span className="text-xs">Your RSVP: {session.rsvp ?? "not selected"}</span>
             {(["going", "maybe", "declined"] as const).map(value =>
-              <button key={value} disabled={busy || !availability.writesEnabled}
-                className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+              <Button variant="outline" size="sm" type="button" key={value} disabled={busy || !availability.writesEnabled}
                 onClick={() => void run(() => rsvpCanonicalGroupSession({
                   data: { sessionId: session.id, rsvp: value },
-                }), "RSVP updated.")}>{value}</button>)}
+                }), "RSVP updated.")} aria-pressed={session.rsvp === value}>{value}</Button>)}
           </div>}
           {role === "teacher" && upcoming && <div className="mt-3 flex flex-wrap gap-2">
-            <button type="button" disabled={busy || !availability.writesEnabled}
-              className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+            <Button variant="outline" size="sm" type="button" disabled={busy || !availability.writesEnabled}
               onClick={() => setReschedule({
                 id: session.id, title: session.title,
                 start: dateTimeInputValue(session.startsAt, group.timezone),
                 end: dateTimeInputValue(session.endsAt, group.timezone),
-              })}>Reschedule</button>
-            <button type="button" disabled={busy || !availability.writesEnabled}
-              className="rounded border border-destructive px-3 py-1 text-xs disabled:opacity-50"
+              })}>Reschedule</Button>
+            <Button variant="destructive" size="sm" type="button" disabled={busy || !availability.writesEnabled}
               onClick={() => void run(() => reviseCanonicalGroupSession({ data: {
                 sessionId: session.id, action: "cancel",
-              } }), "Session cancelled.")}>Cancel session</button>
+              } }), "Session cancelled.")}>Cancel session</Button>
           </div>}
           {role === "teacher" && past && <div className="mt-3 space-y-2">
             <p className="text-xs font-semibold">Attendance</p>
@@ -401,11 +395,10 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
                   {" · "}{attendance?.attended === true ? "Present"
                     : attendance?.attended === false ? "Absent" : "Not recorded"}</span>
                 {([true, false] as const).map(attended =>
-                  <button type="button" key={String(attended)} disabled={busy || !availability.writesEnabled}
-                    className="rounded border px-2 py-1 text-xs disabled:opacity-50"
+                  <Button variant="outline" size="sm" type="button" key={String(attended)} disabled={busy || !availability.writesEnabled}
                     onClick={() => void run(() => recordCanonicalGroupAttendance({ data: {
                       sessionId: session.id, studentPersonId: student.personId, attended,
-                    } }), "Attendance saved.")}>{attended ? "Present" : "Absent"}</button>)}
+                    } }), "Attendance saved.")} aria-pressed={attendance?.attended === attended}>{attended ? "Present" : "Absent"}</Button>)}
               </div>;
             })}
             {group.roster.length === 0 &&
@@ -460,10 +453,10 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
         <p className="mt-2 text-xs text-muted-foreground">
           {formatTimestamp(post.createdAt, group.timezone)}
         </p>
-        {role === "student" && <button type="button"
-          disabled={busy || !availability.contentEnabled} className="mt-2 text-xs underline disabled:opacity-50"
+        {role === "student" && <Button variant="ghost" size="sm" type="button"
+          disabled={busy || !availability.contentEnabled}
           onClick={() => { setReport({ postId: post.id, body: post.body }); setReportReason(""); }}>
-          Report</button>}
+          Report</Button>}
       </div>)}
       {group.posts.length === 0 && <p className="text-sm text-muted-foreground">No posts yet.</p>}
       <form noValidate className="flex flex-col gap-2" onSubmit={event => {
@@ -534,10 +527,9 @@ function MembersPanel({ group, availability, busy, run }: {
   }, [inviting, group.id]);
   return <WorkspacePanel title="Members and invitations"
     description="Invited students still need guardian permission and facilitator approval to join."
-    actions={<button type="button" disabled={busy || !availability.membershipEnabled}
-      className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
+    actions={<Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
       onClick={() => { setSelectedInviteeIds([]); setInviteAttempted(false); setInviting(open => !open); }}>
-      {inviting ? "Close invitations" : "Invite students"}</button>}>
+      {inviting ? "Close invitations" : "Invite students"}</Button>}>
     <div className="space-y-4">
       <div>
         <h3 className="text-sm font-semibold">Pending requests</h3>
@@ -550,16 +542,14 @@ function MembersPanel({ group, availability, busy, run }: {
             </p>
           </div>
           <div className="flex gap-2">
-            <button disabled={busy || !availability.membershipEnabled}
-              className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
+            <Button variant="outline" size="sm" type="button" disabled={busy || !availability.membershipEnabled}
               onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
                 groupId: group.id, studentPersonId: member.studentPersonId, approve: false,
-              } }), "Membership declined.")}>Decline</button>
-            <button disabled={busy || !availability.membershipEnabled || !member.guardianReady}
-              className="rounded-lg bg-foreground px-3 py-2 text-xs text-background disabled:opacity-50"
+              } }), "Membership declined.")}>Decline</Button>
+            <Button variant="default" size="sm" type="button" disabled={busy || !availability.membershipEnabled || !member.guardianReady}
               onClick={() => void run(() => decideCanonicalGroupMembership({ data: {
                 groupId: group.id, studentPersonId: member.studentPersonId, approve: true,
-              } }), "Membership approved.")}>Approve</button>
+              } }), "Membership approved.")}>Approve</Button>
           </div>
         </div>)}
         {group.pendingMembers.length === 0 &&
@@ -620,16 +610,14 @@ function ReportsPanel({ group, availability, busy, run }: {
         </blockquote>
         {report.postHidden && <p className="mt-1 text-xs text-muted-foreground">Post already hidden</p>}
         <div className="mt-2 flex gap-2">
-          <button type="button" disabled={busy || !availability.moderationEnabled}
-            className="rounded border border-destructive px-3 py-2 text-xs disabled:opacity-50"
+          <Button variant="destructive" size="sm" type="button" disabled={busy || !availability.moderationEnabled}
             onClick={() => void run(() => resolveCanonicalGroupReport({ data: {
               reportId: report.id, hidePost: true,
-            } }), "Reported post hidden.")}>Hide post</button>
-          <button type="button" disabled={busy || !availability.moderationEnabled}
-            className="rounded border px-3 py-2 text-xs disabled:opacity-50"
+            } }), "Reported post hidden.")}>Hide post</Button>
+          <Button variant="outline" size="sm" type="button" disabled={busy || !availability.moderationEnabled}
             onClick={() => void run(() => resolveCanonicalGroupReport({ data: {
               reportId: report.id, hidePost: false,
-            } }), "Report reviewed; content retained.")}>Retain post</button>
+            } }), "Report reviewed; content retained.")}>Retain post</Button>
         </div>
       </div>)}
       {group.reports.length === 0 && <p className="text-xs text-muted-foreground">No open content reports.</p>}
