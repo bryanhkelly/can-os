@@ -133,6 +133,8 @@ export const getNativeOfferingAdoptionReviewQueue=createServerFn({method:"GET"})
         ))
         .where(and(
           inArray(blueprintOutputs.deploymentId,deploymentIds),
+          inArray(blueprintConfigurationOfferingIntents.offeringVersionId,
+            [...new Set(visible.map(item=>item.offeringVersionId))]),
           eq(blueprintExecutionBatches.executingOrganizationId,organizationId),
           eq(blueprintExecutionBatches.executionStatus,"executed"),
         )).limit(121),
