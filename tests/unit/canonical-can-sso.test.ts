@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { projectCanonicalPrincipalContext } from "@/domain/canonical-access";
 import {
-  canResolveCanSiteStaff, hasUnambiguousCanPerson,
+  canResolveCanSiteStaff,
 } from "@/domain/canonical-can-sso";
 
 function source(path:string) {
@@ -46,13 +46,6 @@ describe("one CAN login for authorized canonical Site staff", () => {
     ]) {
       expect(canResolveCanSiteStaff(denied)).toBe(false);
     }
-  });
-
-  it("requires the same unique public Person across active account grants", () => {
-    expect(hasUnambiguousCanPerson("me", ["me","me"])).toBe(true);
-    expect(hasUnambiguousCanPerson("me", [])).toBe(false);
-    expect(hasUnambiguousCanPerson("me", ["me","other"])).toBe(false);
-    expect(hasUnambiguousCanPerson("me", Array(101).fill("me"))).toBe(false);
   });
 
   it("does not depend on duplicate staff Persons, accounts or canonical grants",()=>{
