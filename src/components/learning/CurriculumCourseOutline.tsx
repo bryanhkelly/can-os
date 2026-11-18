@@ -13,7 +13,7 @@ export function CurriculumCourseOutline({ courses }: { courses: readonly Course[
       </p>
       <ul className="mt-3 max-h-80 space-y-2 overflow-y-auto">
         {courses.map((course) => (
-          <li key={course.courseVersionId} className="rounded border p-3">
+          <li key={course.courseVersionId} className=" border p-3">
             <p className="font-medium">{course.code}: {course.title} · {course.subject}</p>
             <p className="mt-2 text-xs font-semibold">
               {course.recommendation.recommended ? "Recommended first-class option" : "Not yet recommended"}
