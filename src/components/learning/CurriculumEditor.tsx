@@ -91,7 +91,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
   {notice&&<p role="status" className=" border p-3">{notice}</p>}
   {mode!=="publish"&&<><fieldset disabled={busy} className="space-y-4">
    <Label className="block text-sm">Syllabus
-    <Textarea value={content.syllabus} maxLength={100000} rows={5} className="mt-1 block w-full  border bg-background p-2"
+    <Textarea value={content.syllabus} maxLength={100000} rows={5} className="mt-1"
      onChange={event=>setContent({...content,syllabus:event.target.value})}/>
    </Label>
    <section className="space-y-3  border p-4" aria-label="Publisher course outline navigator">
@@ -108,9 +108,9 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
      </Label>
     </div>
     {activeModule&&<div className="flex flex-wrap gap-3 text-sm">
-     <Button type="button" variant="outline" className=" border px-3 py-2 disabled:opacity-40" disabled={activeModuleIndex===0}
+     <Button type="button" variant="outline"  disabled={activeModuleIndex===0}
       onClick={()=>setSelectedModuleId(content.modules[activeModuleIndex-1]!.id)}>Previous unit</Button>
-     <Button type="button" variant="outline" className=" border px-3 py-2 disabled:opacity-40"
+     <Button type="button" variant="outline" 
       disabled={activeModuleIndex===content.modules.length-1}
       onClick={()=>setSelectedModuleId(content.modules[activeModuleIndex+1]!.id)}>Next unit</Button>
     </div>}
@@ -128,7 +128,7 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
       <summary className="cursor-pointer text-sm font-medium">Preview student-facing lesson (draft)</summary>
       <p className="mt-2 text-xs text-muted-foreground">Read-only publisher draft preview. This is not a classroom assignment, student progress or published lesson. Restricted teacher solutions are not included.</p>
       <Label className="mt-3 block text-sm">Lesson to preview
-       <Select aria-label="Lesson to preview" className="mt-1 block w-full  border bg-background p-2"
+       <Select aria-label="Lesson to preview" className="mt-1"
         value={previewLesson?.id??""} onChange={e=>setPreviewLessonId(e.target.value)}>
         {activeModule.lessons.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
        </Select>
@@ -147,12 +147,12 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
    {content.modules.map((module,index)=>index===activeModuleIndex?<section key={module.id} className="space-y-3  border p-4">
     <div className="flex flex-wrap items-center gap-3">
      <Label className="flex-1 text-sm">Module title<Input value={module.title} maxLength={200}
-      onChange={event=>moduleChange(index,{title:event.target.value})} className="mt-1 block w-full  border bg-background p-2"/></Label>
-     <Button type="button" variant="outline" className=" border px-3 py-2 text-sm" onClick={()=>{
+      onChange={event=>moduleChange(index,{title:event.target.value})} className="mt-1"/></Label>
+     <Button type="button" variant="outline"  onClick={()=>{
       setContent(current=>({...current,modules:current.modules.filter(item=>item.id!==module.id)}));
       setSelectedModuleId(content.modules.find(item=>item.id!==module.id)?.id??"");
      }}>Remove module</Button>
-     {index>0&&<Button type="button" variant="outline" className=" border px-3 py-2 text-sm" onClick={()=>setContent(current=>{
+     {index>0&&<Button type="button" variant="outline"  onClick={()=>setContent(current=>{
       const modules=[...current.modules];[modules[index-1],modules[index]]=[modules[index]!,modules[index-1]!];
       return {...current,modules};
      })}>Move module up</Button>}
@@ -160,31 +160,31 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
     {module.lessons.map((lesson,lessonIndex)=><div key={lesson.id} className="space-y-2 border-t pt-3">
      <Label className="block text-sm">Lesson title<Input value={lesson.title} maxLength={200}
       onChange={event=>moduleChange(index,{lessons:module.lessons.map(item=>item.id===lesson.id?{...item,title:event.target.value}:item)})}
-      className="mt-1 block w-full  border bg-background p-2"/></Label>
+      className="mt-1"/></Label>
      <Label className="block text-sm">Lesson reading
       <Textarea value={lesson.body} maxLength={100000} rows={6}
        onChange={event=>moduleChange(index,{lessons:module.lessons.map(item=>item.id===lesson.id?{...item,body:event.target.value}:item)})}
-       className="mt-1 block w-full  border bg-background p-2"/>
+       className="mt-1"/>
      </Label>
 
      <Label className="block text-sm">Recorded lesson transcript
       <Textarea value={lesson.transcript ?? ""} maxLength={100000} rows={5}
        onChange={event=>lessonChange(index,lesson.id,l=>({...l,transcript:event.target.value}))}
-       className="mt-1 block w-full  border bg-background p-2"/>
+       className="mt-1"/>
       <span className="mt-1 block text-xs text-muted-foreground">Student-accessible transcript, published with this course release. Keep teacher-only answers in the protected guide.</span>
      </Label>
 
      <div className="grid gap-3 sm:grid-cols-2">
       <Label className="block text-sm">Learning targets (one per line)
-       <Textarea rows={3} value={(lesson.learningTargets??[]).join("\n")} className="mt-1 block w-full  border bg-background p-2"
+       <Textarea rows={3} value={(lesson.learningTargets??[]).join("\n")} className="mt-1"
         onChange={event=>lessonChange(index,lesson.id,l=>({...l,learningTargets:event.target.value.split("\n").map(x=>x.trim()).filter(Boolean)}))}/>
       </Label>
       <Label className="block text-sm">Standards (comma separated)
-       <Textarea rows={3} value={(lesson.standards??[]).join(", ")} className="mt-1 block w-full  border bg-background p-2"
+       <Textarea rows={3} value={(lesson.standards??[]).join(", ")} className="mt-1"
         onChange={event=>lessonChange(index,lesson.id,l=>({...l,standards:event.target.value.split(",").map(x=>x.trim()).filter(Boolean)}))}/>
       </Label>
       <Label className="block text-sm">Total lesson minutes
-       <Input type="number" min={1} max={180} value={lesson.estimatedMinutes??""} className="mt-1 block w-full  border bg-background p-2"
+       <Input type="number" min={1} max={180} value={lesson.estimatedMinutes??""} className="mt-1"
         onChange={event=>lessonChange(index,lesson.id,l=>({...l,estimatedMinutes:event.target.value?Number(event.target.value):undefined}))}/>
       </Label>
      </div>
@@ -192,45 +192,45 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
       <div className="flex items-center justify-between gap-3"><h4 className="text-sm font-semibold">Structured lesson activities</h4>
        <span className="text-xs text-muted-foreground">{(lesson.activities??[]).length} / 20</span></div>
       {(lesson.activities??[]).map((activity,activityIndex)=><div key={activity.id} className="grid gap-2  border p-3">
-       <Label className="text-sm">Activity title<Input value={activity.title} maxLength={200} className="mt-1 block w-full  border bg-background p-2"
+       <Label className="text-sm">Activity title<Input value={activity.title} maxLength={200} className="mt-1"
         onChange={event=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).map(a=>a.id===activity.id?{...a,title:event.target.value}:a)}))}/></Label>
        <div className="grid gap-2 sm:grid-cols-3">
-        <Label className="text-sm">Activity type<Select value={activity.kind} className="mt-1 block w-full  border bg-background p-2"
+        <Label className="text-sm">Activity type<Select value={activity.kind} className="mt-1"
          onChange={event=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).map(a=>a.id===activity.id?{...a,kind:event.target.value as typeof a.kind}:a)}))}>
          {["launch","instruction","worked_example","guided_practice","independent_practice","exit_ticket","reflection","self_check"].map(k=><option key={k} value={k}>{k.replaceAll("_"," ")}</option>)}
         </Select></Label>
         <Label className="text-sm">Minutes<Input type="number" min={1} max={180} value={activity.estimatedMinutes??""}
-         className="mt-1 block w-full  border bg-background p-2"
+         className="mt-1"
          onChange={event=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).map(a=>a.id===activity.id?{...a,estimatedMinutes:event.target.value?Number(event.target.value):undefined}:a)}))}/></Label>
-        <Label className="text-sm">Evidence<Select value={activity.evidence??""} className="mt-1 block w-full  border bg-background p-2"
+        <Label className="text-sm">Evidence<Select value={activity.evidence??""} className="mt-1"
          onChange={event=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).map(a=>a.id===activity.id?{...a,evidence:event.target.value?event.target.value as typeof a.evidence:undefined}:a)}))}>
          <option value="">Not specified</option>{["practice","formative","teacher_review"].map(k=><option key={k} value={k}>{k.replaceAll("_"," ")}</option>)}
         </Select></Label>
        </div>
        <Label className="text-sm">Student instructions<Textarea rows={4} maxLength={30000} value={activity.instructions}
-        className="mt-1 block w-full  border bg-background p-2"
+        className="mt-1"
         onChange={event=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).map(a=>a.id===activity.id?{...a,instructions:event.target.value}:a)}))}/></Label>
        <div className="flex gap-2">
-        <Button type="button" variant="outline" className=" border px-2 py-1 text-xs" onClick={()=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).filter(a=>a.id!==activity.id)}))}>Remove activity</Button>
-        {activityIndex>0&&<Button type="button" variant="outline" className=" border px-2 py-1 text-xs" onClick={()=>lessonChange(index,lesson.id,l=>{
+        <Button type="button" variant="outline"  onClick={()=>lessonChange(index,lesson.id,l=>({...l,activities:(l.activities??[]).filter(a=>a.id!==activity.id)}))}>Remove activity</Button>
+        {activityIndex>0&&<Button type="button" variant="outline"  onClick={()=>lessonChange(index,lesson.id,l=>{
          const activities=[...(l.activities??[])];[activities[activityIndex-1],activities[activityIndex]]=[activities[activityIndex]!,activities[activityIndex-1]!];
          return {...l,activities};
         })}>Move activity up</Button>}
        </div>
       </div>)}
-      <Button type="button" variant="outline" disabled={(lesson.activities??[]).length>=20} className=" border px-3 py-2 text-sm disabled:opacity-50"
+      <Button type="button" variant="outline" disabled={(lesson.activities??[]).length>=20} 
        onClick={()=>lessonChange(index,lesson.id,l=>({...l,activities:[...(l.activities??[]),{
         id:crypto.randomUUID(),kind:"instruction",title:"New activity",instructions:"Write student instructions here before saving.",
         evidence:"practice",
        }]}))}>Add activity</Button>
       <p className="text-xs text-muted-foreground">Activities and student instructions are publisher content. Keep answer keys in the protected teacher guide, not here.</p>
      </section>
-     <Button type="button" variant="outline" disabled={busy} className=" border px-3 py-2 text-sm disabled:opacity-50"
+     <Button type="button" variant="outline" disabled={busy} 
       onClick={()=>void saveOneLesson(module.id,lesson.id)}>Save this lesson only</Button>
      <div className="flex gap-3">
-      <Button type="button" variant="outline" className=" border px-3 py-2 text-sm" onClick={()=>moduleChange(index,{
+      <Button type="button" variant="outline"  onClick={()=>moduleChange(index,{
        lessons:module.lessons.filter(item=>item.id!==lesson.id)})}>Remove lesson</Button>
-      {lessonIndex>0&&<Button type="button" variant="outline" className=" border px-3 py-2 text-sm" onClick={()=>{
+      {lessonIndex>0&&<Button type="button" variant="outline"  onClick={()=>{
        const lessons=[...module.lessons];[lessons[lessonIndex-1],lessons[lessonIndex]]=[lessons[lessonIndex]!,lessons[lessonIndex-1]!];
        moduleChange(index,{lessons});
       }}>Move lesson up</Button>}
@@ -239,16 +239,16 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
       <p>Existing lesson resources are preserved. Private documents cannot be republished through this HTTPS-only workflow.</p>
       {lesson.resources.map(resource=><div key={resource.id} className="flex items-center gap-3">
        <span>{resource.title} · {resource.url??"Private document"}</span>
-       <Button type="button" variant="outline" className=" border px-2 py-1" onClick={()=>moduleChange(index,{
+       <Button type="button" variant="outline"  onClick={()=>moduleChange(index,{
         lessons:module.lessons.map(item=>item.id===lesson.id?{...item,resources:item.resources.filter(row=>row.id!==resource.id)}:item),
        })}>Remove lesson resource</Button>
       </div>)}
      </div>}
     </div>)}
-    <Button type="button" variant="outline" disabled={module.lessons.length>=200} className=" border px-3 py-2 text-sm"
+    <Button type="button" variant="outline" disabled={module.lessons.length>=200} 
      onClick={()=>moduleChange(index,{lessons:[...module.lessons,{id:crypto.randomUUID(),title:"New lesson",body:"",resources:[]}]})}>Add lesson</Button>
    </section>:null)}
-   <Button type="button" variant="outline" disabled={content.modules.length>=100} className=" border px-3 py-2 text-sm"
+   <Button type="button" variant="outline" disabled={content.modules.length>=100} 
     onClick={()=>{
       const id=crypto.randomUUID();
       setContent(current=>({...current,modules:[...current.modules,{id,title:"New module",lessons:[]}]}));
@@ -258,14 +258,14 @@ export function CurriculumEditor({programId,courseCode,release,onSaved,mode="com
    {content.resources.map((resource,index)=><div key={resource.id} className="flex flex-wrap gap-3  border p-3">
     <Label className="flex-1 text-sm">Resource title<Input value={resource.title} maxLength={200}
      onChange={event=>setContent({...content,resources:content.resources.map((item,i)=>i===index?{...item,title:event.target.value}:item)})}
-     className="mt-1 block w-full  border bg-background p-2"/></Label>
+     className="mt-1"/></Label>
     <Label className="flex-1 text-sm">HTTPS URL<Input type="url" value={resource.url??""} maxLength={2048}
      onChange={event=>setContent({...content,resources:content.resources.map((item,i)=>i===index?
-      {id:item.id,title:item.title,url:event.target.value}:item)})} className="mt-1 block w-full  border bg-background p-2"/></Label>
-    <Button type="button" variant="outline" className=" border px-3 py-2 text-sm"
+      {id:item.id,title:item.title,url:event.target.value}:item)})} className="mt-1"/></Label>
+    <Button type="button" variant="outline" 
      onClick={()=>setContent({...content,resources:content.resources.filter(item=>item.id!==resource.id)})}>Remove resource</Button>
    </div>)}
-   <Button type="button" variant="outline" disabled={content.resources.length>=500} className=" border px-3 py-2 text-sm"
+   <Button type="button" variant="outline" disabled={content.resources.length>=500} 
     onClick={()=>setContent({...content,resources:[...content.resources,{id:crypto.randomUUID(),title:"New resource",url:"https://"}]})}>Add resource link</Button>
    <div><Button type="button" variant="outline" onClick={()=>void save()} className=" border px-4 py-2 text-sm">Save draft</Button>
     {dirty&&<span className="ml-3 text-sm">Unsaved changes</span>}</div>
