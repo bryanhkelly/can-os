@@ -1,3 +1,4 @@
+import { buttonVariants } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import {createFileRoute,Link,useRouter} from "@tanstack/react-router";
@@ -59,7 +60,7 @@ function FamilyInvitationsWorkspace({data}:{data:Data}){
  }
  return <WorkspaceShell eyebrow="Admissions" title="Invite families to apply"
   subtitle="Send verified-email enrollment invitations to prospective families, including transfers from another school. The receiving-school registrar controls the invitation; no child identity or admissions decision is inferred."
-  actions={<Link to="/admissions" className="rounded border px-3 py-2 text-sm">Admissions</Link>}>
+  actions={<Link to="/admissions" className={buttonVariants({ variant: "outline" })}>Admissions</Link>}>
   <MutationFeedback state={mutation} pendingMessage="Queuing invitations..."/>
   <FamilyInvitationForm programs={eligible} draft={{programId,contacts,subject,introduction}} busy={busy}
    onChange={patch=>{
