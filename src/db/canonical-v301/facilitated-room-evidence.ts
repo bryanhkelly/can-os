@@ -1,4 +1,4 @@
-import { check, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { pgTable, check, index, integer, jsonb, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 import { learnerCourseAttempts } from "./learning";
@@ -6,7 +6,7 @@ import { facilitatedLearningSessions } from "./facilitated-learning";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 const at = () => timestamp("received_at", { withTimezone: true }).defaultNow().notNull();
-export const facilitatedRoomActivityReleases = educationV30.table("facilitated_room_activity_releases",{
+export const facilitatedRoomActivityReleases = pgTable("facilitated_room_activity_releases",{
   id:id(),
   facilitatedSessionId:uuid("facilitated_session_id").notNull().references(()=>facilitatedLearningSessions.id),
   releasedByPersonId:uuid("released_by_person_id").notNull(),
@@ -22,7 +22,7 @@ export const facilitatedRoomActivityReleases = educationV30.table("facilitated_r
   index("facilitated_room_release_session_time_idx").on(t.facilitatedSessionId,t.releasedAt),
   check("facilitated_room_release_prompt_ck",sql`length(${t.prompt}) BETWEEN 5 AND 1000`),
 ]);
-export const facilitatedRoomActivityResponses = educationV30.table("facilitated_room_activity_responses",{
+export const facilitatedRoomActivityResponses = pgTable("facilitated_room_activity_responses",{
   id:id(),
   facilitatedSessionId:uuid("facilitated_session_id").notNull().references(()=>facilitatedLearningSessions.id),
   activityReleaseId:uuid("activity_release_id").notNull().references(()=>facilitatedRoomActivityReleases.id),
@@ -38,7 +38,7 @@ export const facilitatedRoomActivityResponses = educationV30.table("facilitated_
   index("facilitated_room_responses_room_idx").on(t.facilitatedSessionId,t.activityReleaseId),
   index("facilitated_room_responses_attempt_idx").on(t.courseAttemptId,t.submittedAt),
 ]);
-export const facilitatedRoomPresenceEvents = educationV30.table("facilitated_room_presence_events",{
+export const facilitatedRoomPresenceEvents = pgTable("facilitated_room_presence_events",{
   id:id(),
   facilitatedSessionId:uuid("facilitated_session_id").notNull().references(()=>facilitatedLearningSessions.id),
   courseAttemptId:uuid("course_attempt_id").notNull().references(()=>learnerCourseAttempts.id),
@@ -66,7 +66,7 @@ export const facilitatedRoomAttendanceAssertions = educationV30.table("facilitat
   uniqueIndex("facilitated_room_attendance_request_uq").on(t.facilitatedSessionId,t.requestId),
   index("facilitated_room_attendance_latest_idx").on(t.facilitatedSessionId,t.courseAttemptId,t.assertedAt),
 ]);
-export const facilitatedRoomSurveyCampaigns = educationV30.table("facilitated_room_survey_campaigns",{
+export const facilitatedRoomSurveyCampaigns = pgTable("facilitated_room_survey_campaigns",{
   facilitatedSessionId:uuid("facilitated_session_id").notNull().references(()=>facilitatedLearningSessions.id),
   surveyCampaignId:uuid("survey_campaign_id").notNull(),
   stage:text("stage").$type<"entry"|"pulse"|"exit">().notNull(),
