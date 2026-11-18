@@ -1,4 +1,4 @@
-import { check, index, integer, text, timestamp, uniqueIndex, uuid, foreignKey } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid, foreignKey } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 import { learnerCourseAttempts, courseVersions } from "./learning";
@@ -64,7 +64,7 @@ export const facilitatedLearningPlayback = educationV30.table("facilitated_learn
 
 
 /** Bounded global per-person pairing attempts, no raw failed codes retained. */
-export const facilitatedPairingRateLimits = educationV30.table("facilitated_pairing_rate_limits", {
+export const facilitatedPairingRateLimits = pgTable("facilitated_pairing_rate_limits", {
   participantPersonId: uuid("participant_person_id").primaryKey(),
   windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull().defaultNow(),
   attemptCount: integer("attempt_count").notNull().default(0),
