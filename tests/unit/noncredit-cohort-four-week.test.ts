@@ -69,7 +69,7 @@ describe("flexible four-session COGIC pilot dates",()=>{
       {...weekly[0]!,state:"cancelled"},...weekly.slice(1),
     ],["a"],0)).toEqual([]);
   });
-  it("supplies two convenient date patterns without making either mandatory",()=>{
+  it("supplies three convenient date patterns without making any mandatory",()=>{
     expect(fourSessionSchedulePreset(
       "2026-11-17T18:00","2026-11-17T19:00","weekly",
     )).toHaveLength(4);
@@ -79,6 +79,38 @@ describe("flexible four-session COGIC pilot dates",()=>{
     const days=twice.map(x=>Math.round((Date.parse(x.startsAt)-
       Date.parse(twice[0]!.startsAt))/(24*3600_000)));
     expect(days).toEqual([0,3,7,10]);
+  });
+});
+
+describe("Monday–Thursday four-session intensive",()=>{
+  const days=(rows:ReturnType<typeof fourSessionSchedulePreset>)=>
+    rows.map(row=>new Date(row.startsAt).getDate());
+  it("uses the selected Monday and preserves the same wall-clock times",()=>{
+    const rows=fourSessionSchedulePreset(
+      "2026-11-16T18:00","2026-11-16T19:00","monday-thursday");
+    expect(days(rows)).toEqual([16,17,18,19]);
+    expect(rows.map(row=>new Date(row.startsAt).getDay())).toEqual([1,2,3,4]);
+    expect(rows.every(row=>new Date(row.startsAt).getHours()===18 &&
+      new Date(row.endsAt).getHours()===19)).toBe(true);
+    expect(validClassroomSessionWindows(rows)).toBe(true);
+  });
+  it("moves a selected Tuesday to the next Monday without changing the time",()=>{
+    const rows=fourSessionSchedulePreset(
+      "2026-11-17T18:00","2026-11-17T19:00","monday-thursday");
+    expect(days(rows)).toEqual([23,24,25,26]);
+    expect(rows.map(row=>new Date(row.startsAt).getDay())).toEqual([1,2,3,4]);
+  });
+  it("moves a selected Sunday to the following Monday",()=>{
+    const rows=fourSessionSchedulePreset(
+      "2026-11-22T18:00","2026-11-22T19:00","monday-thursday");
+    expect(days(rows)).toEqual([23,24,25,26]);
+  });
+  it("keeps the resulting sessions editable through the shared batch calendar",()=>{
+    const panel=read("src/components/learning/ClassroomSchedulePanel.tsx");
+    expect(panel).toContain('fillSessionDates("monday-thursday")');
+    expect(panel).toContain("Fill Monday–Thursday");
+    expect(panel).toContain("Save all four sessions");
+    expect(panel).toContain("setBatchMeetings(current=>current.map");
   });
 });
 
@@ -111,6 +143,7 @@ describe("shared four-session operator and server boundaries",()=>{
     expect(planner).toContain('import { Input } from "@/components/ui/input"');
     expect(planner).toContain('import { Select } from "@/components/ui/select"');
     expect(planner).toContain('fillSessionDates("twice-weekly")');
+    expect(planner).toContain('fillSessionDates("monday-thursday")');
     expect(planner).toContain('Save all four sessions');
     expect(operator).toContain("selectedCohortSessionPlanIds");
     expect(operator).toContain('import {Checkbox} from "@/components/ui/choice"');
