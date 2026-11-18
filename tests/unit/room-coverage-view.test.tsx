@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 
-const state = vi.hoisted(() => ({ canManage: true, error: null as Error | null }));
+const state = vi.hoisted(() => ({ canManage: true, noSchedules: false, error: null as Error | null }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ isPending: false, error: state.error, refetch: vi.fn(),
     data: state.error ? undefined : {
       siteId: "site", timezone: "America/Los_Angeles", today: "2026-11-03", canManage: state.canManage,
       rooms: [{ id: "room", name: "Youth Classroom 2", capacity: 20, retiredAt: null, revision: 1 }],
       staff: [{ id: "facilitator", name: "Synthetic Facilitator" }], classes: [],
-      schedules: [{ id: "coverage", roomId: "room", revision: 1, primaryPersonId: "facilitator",
+      schedules: state.noSchedules ? [] : [{ id: "coverage", roomId: "room", revision: 1, primaryPersonId: "facilitator",
         backupPersonId: null, startsOn: "2026-11-03", endsOn: "2026-12-03", weekdays: [2, 3, 4],
         startsAtLocal: "08:00", endsAtLocal: "14:00", sectionIds: [] }],
     } }),
@@ -17,7 +17,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/modules/operations/room-coverage.functions", () => ({
   getRoomCoverageWorkspaceFn: vi.fn(), createRoomAtSiteFn: vi.fn(), saveRoomCoverageFn: vi.fn(),
 }));
-beforeEach(() => { state.canManage = true; state.error = null; });
+beforeEach(() => { state.canManage = true; state.noSchedules = false; state.error = null; });
 
 describe("physical-room coverage setup and facilitator view", () => {
   it("shows exact local shift, occupancy and incomplete safety/class setup before a Program exists", () => {
@@ -34,6 +34,17 @@ describe("physical-room coverage setup and facilitator view", () => {
     expect(html).toContain("Youth Classroom 2");
     for (const text of ["Create a physical room", "Assign all-day room coverage", "Edit room assignment", "gradebook"])
       expect(html).not.toContain(text);
+    expect(html).not.toContain("<form");
+  });
+  it("gives an unassigned facilitator a safe next step, without admin creation controls", () => {
+    state.canManage = false;
+    state.noSchedules = true;
+    const html = renderToStaticMarkup(<RoomCoverageWorkspace />);
+    expect(html).toContain("My assigned room coverage");
+    expect(html).toContain("Contact your Site Leader");
+    expect(html).toContain("No room coverage assignments recorded for your current Site");
+    expect(html).not.toContain("Create a physical room");
+    expect(html).not.toContain("Assign all-day room coverage");
     expect(html).not.toContain("<form");
   });
   it("surfaces read failures instead of showing an empty successful setup", () => {
