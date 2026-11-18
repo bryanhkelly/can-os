@@ -6,11 +6,13 @@ import { StudentSuccessSupportPanel } from "@/components/student/StudentSuccessS
 
 vi.mock("@tanstack/react-router", async importOriginal => ({
   ...await importOriginal<typeof import("@tanstack/react-router")>(),
-  Link: ({ to, search, children, ...props }: {
-    to: string; search?: Record<string, string | undefined>; children: ReactNode;
-  }) => <a href={to + (search ? "?" + new URLSearchParams(
-    Object.entries(search).filter((item): item is [string,string] => item[1] !== undefined),
-  ).toString() : "")} {...props}>{children}</a>,
+  Link: ({ to, search, params, children, ...props }: {
+    to: string; search?: Record<string, string | undefined>; params?: Record<string, string>; children: ReactNode;
+  }) => {
+    const path = to.replace(/\$([^/]+)/g, (_, key: string) => encodeURIComponent(params?.[key] ?? key));
+    const query = new URLSearchParams(Object.entries(search ?? {}).filter((item): item is [string,string] => item[1] !== undefined)).toString();
+    return <a href={path + (query ? "?" + query : "")} {...props}>{children}</a>;
+  },
 }));
 
 const actions = [
@@ -45,7 +47,7 @@ describe("Student Success support-task confidentiality", () => {
     const html = renderToStaticMarkup(<StudentSuccessSupportPanel
       support={deriveStudentSuccessSupportTasks(actions)} />);
     expect(html).toContain("Your learning support");
-    expect(html).toContain('href="/student/assignments?assessment=assessment-fractions"');
+    expect(html).toContain('href="/student/assignments/assessment-fractions"');
     expect(html).toContain('href="/student/experiences?action=student-help"');
     expect(html).toContain('href="/student/experiences?action=teacher-shared"');
     expect(html).not.toContain("Restricted counseling allegations");
