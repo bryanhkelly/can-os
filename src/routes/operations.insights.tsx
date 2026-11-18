@@ -133,7 +133,7 @@ function InsightsPage() {
     </div>}
     <QueryState loading={loading?"Loading insights...":undefined} isEmpty={insights.length===0} empty={selection.insight
      ?<WorkspaceNotice tone="danger" className="mt-8">This insight is unavailable in your current workspace.</WorkspaceNotice>
-     :<EmptyState className="mt-8" title={`No ${tabs.find(tab => tab.id === status)?.label.toLowerCase()} insights in your scope`}/>>
+     :<EmptyState className="mt-8" title={`No ${tabs.find(tab => tab.id === status)?.label.toLowerCase()} insights in your scope`}/>}>
     <div className="mt-6 grid gap-4">
      {insights.map(insight => <article key={insight.id} className=" border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
