@@ -18,6 +18,7 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-four-empty-native-tables.sql",
   "database/production/2026-11-17-consolidate-19-empty-protected-tables.sql",
   "database/production/2026-11-17-consolidate-13-empty-protected-tables.sql",
+  "database/production/2026-11-17-consolidate-16-empty-policy-tables.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -100,8 +101,10 @@ async function run(){
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-17-consolidate-13-empty-protected-tables.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-17-consolidate-16-empty-policy-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==32)throw new Error("Expected 32 reviewed protected table relocations");
+  if(protectedNames.length!==48)throw new Error("Expected 48 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
