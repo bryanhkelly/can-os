@@ -769,3 +769,69 @@ if (auditManifestStart < 0 || auditManifestEnd < 0) {
     process.exitCode = 1;
   }
 }
+
+
+// The curriculum marketplace composes these V6.1 controls. A source-clean
+// route is not enough if its imported rights, CSV or reconciliation screens
+// reintroduce raw controls or one-off corner geometry.
+const migratedCurriculumSurfaceControls = {
+  "learning/CurriculumPdfPicker.tsx": [
+    "@/components/ui/input", "@/components/ui/choice", "@/components/ui/label",
+    "<Input", "<Checkbox", "<Label", "rightsConfirmed",
+  ],
+  "learning/OneRosterClassMappingFields.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/label",
+    "<Button", "<Select", "<Label", "new Set(rows.map(row => mappings[row.sourcedId])).size === rows.length",
+  ],
+  "learning/CommonCartridgeValidationSummary.tsx": [
+    "role=\"status\"", "report.preview.notices",
+  ],
+  "learning/CurriculumCourseOutline.tsx": [
+    "<details", "course.recommendation.recommended",
+  ],
+  "learning/StaffClassVideos.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "<Button", "<Field",
+  ],
+  "learning/OneRosterStudentReconciliation.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/textarea",
+    "@/components/ui/choice", "@/components/ui/label", "<Checkbox",
+    "<WorkspaceNotice", "!placementValidated||!placementApproved",
+    "studentProfileId:studentId", "approved:true",
+  ],
+};
+for (const [file, fragments] of Object.entries(migratedCurriculumSurfaceControls)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(file + " lost V6.1 presentation or a protected curriculum workflow condition: " + fragment);
+    process.exitCode = 1;
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " reintroduced a native visible control or legacy geometry");
+    process.exitCode = 1;
+  }
+}
+const v61ProtectedOperatorFlows = {
+  "routes/operations.field-trips.tsx": [
+    'type="submit" disabled={busy || !siteId',
+    'participant.status !== "permission_complete"',
+    '!trip.hasPublishedPermission',
+    'recordCanonicalFieldTripCheckpoint',
+  ],
+  "routes/operations.transfer-records.tsx": [
+    '!item.consentRecorded', '!verified[item.id]||!delivered[item.id]',
+    'if(internal&&!item.destinationApplicationId)return;',
+    'window.confirm(internal',
+  ],
+  "routes/operations.curriculum-marketplace.tsx": [
+    '!accepted[pack.id]', '!adoptionConfirmed[pack.versionId]',
+    '!cartridgeRights', '!rightsConfirmed',
+  ],
+};
+for (const [file, fragments] of Object.entries(v61ProtectedOperatorFlows)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(file + " lost a protected workflow invariant: " + fragment);
+    process.exitCode = 1;
+  }
+}
