@@ -6,6 +6,7 @@ import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/doma
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import {
   dispatchOutboundMessages, type OutboundClaim, type OutboundPreparation,
+  type OutboundSendResult,
 } from "./outbound-dispatcher.server";
 import {
   sendNotificationEmailWithReceipt, type NotificationEmailMessage,
@@ -194,7 +195,7 @@ const schoolFamilyAdapter = {
     }).where(owned(claim)).returning({ id: delivery.id });
     return rows.length > 0;
   },
-  async send(message: OutboundMessage, key: string): Promise<boolean> {
+  async send(message: OutboundMessage, key: string): Promise<OutboundSendResult> {
     if (message.channel === "email")
       return sendNotificationEmailWithReceipt({
         ...message.email,
