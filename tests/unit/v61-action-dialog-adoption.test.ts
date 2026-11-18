@@ -6,6 +6,8 @@ const dialogConsumers = [
   "src/routes/guardian.admission-offers.tsx",
   "src/routes/operations.insights.tsx",
   "src/components/teacher/TeacherConferencePanel.tsx",
+  "src/components/learning/GradebookAssessmentHeader.tsx",
+  "src/components/learning/GradebookReviewedFeedback.tsx",
   "src/components/operations/OperationsWorkspace.tsx",
   "src/components/student/LiveSchoolExperiences.tsx",
   "src/routes/groups_.$groupId.tsx",
