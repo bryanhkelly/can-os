@@ -2,6 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { WorkspaceShell } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import { getPublisherCourseActivityOptions } from "@/modules/classes/publisher-course-activity-options.functions";
@@ -147,10 +150,10 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           authorization. Choose a Course from the verified list.
         </p>}
       {courses.data&&<>
-        <label className="mt-4 block text-sm font-semibold" htmlFor="course-activity-course">
+        <Label className="mt-4 block text-sm font-semibold" htmlFor="course-activity-course">
           Course version
-        </label>
-        <select id="course-activity-course" value={courseVersionId}
+        </Label>
+        <Select id="course-activity-course" value={courseVersionId}
           onChange={e=>{
             setCourseVersionId(e.target.value);
             setQuizDraft(null);setQuiz(freshQuiz());setQuizKey("");
@@ -160,7 +163,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           <option value="">Select a publisher-owned Course</option>
           {courses.data.courses.map(row=><option key={row.courseVersionId}
             value={row.courseVersionId}>{row.title} · {row.courseCode}</option>)}
-        </select>
+        </Select>
         {courses.data.truncated&&<p className="mt-2 text-xs text-muted-foreground">
           More than 200 publisher Courses exist. Catalog pagination is required.
         </p>}
@@ -220,74 +223,74 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
         approve and publish it. No learner sees draft questions or answer keys.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-semibold">
+        <Label className="text-sm font-semibold">
           Assessment title
-          <input value={quizTitle} minLength={5} maxLength={160} required
+          <Input value={quizTitle} minLength={5} maxLength={160} required
             disabled={quizBusy||!!quizDraft}
             onChange={e=>setQuizTitle(e.target.value)}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
             placeholder="AI skills knowledge check"/>
-        </label>
-        <label className="text-sm font-semibold">
+        </Label>
+        <Label className="text-sm font-semibold">
           Unique assessment key
-          <input value={quizKey} required pattern="[a-z][a-z0-9_-]{2,63}"
+          <Input value={quizKey} required pattern="[a-z][a-z0-9_-]{2,63}"
             maxLength={64} disabled={quizBusy||!!quizDraft}
             onChange={e=>setQuizKey(e.target.value.toLowerCase())}
             placeholder="ai_skills_check_01"
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-        </label>
-        <label className="text-sm font-semibold">
+        </Label>
+        <Label className="text-sm font-semibold">
           Passing threshold
-          <select value={passing} disabled={quizBusy||!!quizDraft}
+          <Select value={passing} disabled={quizBusy||!!quizDraft}
             onChange={e=>setPassing(Number(e.target.value))}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
             {[0.6,0.7,0.8,0.9,1].map(v=><option key={v} value={v}>
               {Math.round(v*100)}%
             </option>)}
-          </select>
-        </label>
-        <label className="text-sm font-semibold">
+          </Select>
+        </Label>
+        <Label className="text-sm font-semibold">
           Maximum attempts
-          <select value={maxAttempts} disabled={quizBusy||!!quizDraft}
+          <Select value={maxAttempts} disabled={quizBusy||!!quizDraft}
             onChange={e=>setMaxAttempts(Number(e.target.value))}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
             {[1,2,3,4,5].map(v=><option key={v} value={v}>{v} attempt{v>1?"s":""}</option>)}
-          </select>
-        </label>
+          </Select>
+        </Label>
       </div>
       <div className="mt-4 space-y-4">
         {quiz.map((question,index)=><fieldset key={question.key} className="border border-border p-4">
           <legend className="px-1 font-semibold">Question {index+1}</legend>
-          <label className="mt-2 block text-sm font-semibold" htmlFor={"quiz-prompt-"+question.key}>
+          <Label className="mt-2 block text-sm font-semibold" htmlFor={"quiz-prompt-"+question.key}>
             Question text
-          </label>
-          <input id={"quiz-prompt-"+question.key} value={question.prompt} maxLength={500}
+          </Label>
+          <Input id={"quiz-prompt-"+question.key} value={question.prompt} maxLength={500}
             disabled={quizBusy||!!quizDraft}
             onChange={e=>editQuiz(question.key,{prompt:e.target.value})}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
             placeholder="Enter an original knowledge-check question"/>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {question.choices.map((choice,i)=><label key={i} className="text-sm">
+            {question.choices.map((choice,i)=><Label key={i} className="text-sm">
               Answer {i+1}
-              <input value={choice} maxLength={200}
+              <Input value={choice} maxLength={200}
                 disabled={quizBusy||!!quizDraft}
                 onChange={e=>editQuiz(question.key,{choices:question.choices.map(
                   (value,j)=>j===i?e.target.value:value,
                 )})}
                 className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-            </label>)}
+            </Label>)}
           </div>
-          <label className="mt-3 block text-sm font-semibold" htmlFor={"quiz-answer-"+question.key}>
+          <Label className="mt-3 block text-sm font-semibold" htmlFor={"quiz-answer-"+question.key}>
             Correct answer (publisher only)
-          </label>
-          <select id={"quiz-answer-"+question.key} value={question.correctIndex}
+          </Label>
+          <Select id={"quiz-answer-"+question.key} value={question.correctIndex}
             disabled={quizBusy||!!quizDraft}
             onChange={e=>editQuiz(question.key,{correctIndex:Number(e.target.value)})}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
             {question.choices.map((choice,i)=><option value={i} key={i}>
               Answer {i+1}{choice?" · "+choice:""}
             </option>)}
-          </select>
+          </Select>
           <Button type="button" variant="outline" size="sm" className="mt-3"
             disabled={quizBusy||!!quizDraft||quiz.length<=1}
             onClick={()=>setQuiz(rows=>rows.filter(row=>row.key!==question.key))}>
@@ -348,45 +351,45 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
         separate governed steps. Participation should be voluntary by default.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <label className="text-sm font-semibold">
+        <Label className="text-sm font-semibold">
           Survey title
-          <input value={surveyTitle} minLength={5} maxLength={160} required
+          <Input value={surveyTitle} minLength={5} maxLength={160} required
             onChange={e=>setSurveyTitle(e.target.value)}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-        </label>
-        <label className="text-sm font-semibold">
+        </Label>
+        <Label className="text-sm font-semibold">
           Unique survey code
-          <input value={surveyCode} required pattern="[a-z][a-z0-9_-]{2,63}"
+          <Input value={surveyCode} required pattern="[a-z][a-z0-9_-]{2,63}"
             maxLength={64} placeholder="ai_skills_feedback_2027"
             onChange={e=>setSurveyCode(e.target.value.toLowerCase())}
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-        </label>
+        </Label>
       </div>
       <div className="mt-4 space-y-3">
         {feedback.map((question,index)=><div key={question.key}
           className="grid gap-3 border border-border p-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
-          <label className="text-sm font-semibold">
+          <Label className="text-sm font-semibold">
             Question {index+1}
-            <input value={question.prompt} minLength={5} maxLength={1000} required
+            <Input value={question.prompt} minLength={5} maxLength={1000} required
               placeholder="What was most useful in this session?"
               onChange={e=>editFeedback(question.key,{prompt:e.target.value})}
               className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-          </label>
-          <label className="text-sm font-semibold">
+          </Label>
+          <Label className="text-sm font-semibold">
             Response
-            <select value={question.kind} onChange={e=>editFeedback(question.key,{
+            <Select value={question.kind} onChange={e=>editFeedback(question.key,{
               kind:e.target.value as "rating"|"text",
             })} className="mt-1 min-h-11 w-full border border-border bg-background px-2 text-sm">
               <option value="rating">1–5 rating</option>
               <option value="text">Written</option>
-            </select>
-          </label>
+            </Select>
+          </Label>
           <div className="flex flex-col items-start justify-end gap-2">
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" checked={question.required}
+            <Label className="flex items-center gap-2 text-xs">
+              <Input type="checkbox" checked={question.required}
                 onChange={e=>editFeedback(question.key,{required:e.target.checked})}/>
               Required
-            </label>
+            </Label>
             <Button type="button" variant="outline" size="sm"
               disabled={feedback.length<=1} onClick={()=>setFeedback(rows=>rows.filter(
                 row=>row.key!==question.key))}>Remove</Button>
