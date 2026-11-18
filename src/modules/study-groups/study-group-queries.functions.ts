@@ -68,11 +68,22 @@ export const listStudyGroups=createServerFn({method:"GET"}).handler(async()=>{
  .where(and(eq(s.studyGroups.status,"active"),inArray(s.studyGroups.siteId,actor.sites),
   or(isNull(s.studyGroups.programId),inArray(s.studyGroups.programId,actor.scope.programIds??[]))))
  .orderBy(desc(s.studyGroups.createdAt)).limit(100);
+ // Compatibility readers must observe the same school-year boundary as
+ // the canonical group workspace and class access.
+ const currentProgram=alias(s.enrollments,"visible_group_program_enrollment");
  const sections=await db.select({id:s.sections.id}).from(s.enrollments)
   .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
   .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(currentProgram,and(
+   eq(currentProgram.studentProfileId,s.enrollments.studentProfileId),
+   eq(currentProgram.programId,s.sections.programId),
+   eq(currentProgram.schoolYearId,s.terms.schoolYearId),
+   eq(currentProgram.kind,"program"),eq(currentProgram.status,"active")))
   .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),eq(s.enrollments.kind,"section"),
-   eq(s.enrollments.status,"active"),eq(s.sections.active,true),inArray(s.sections.siteId,actor.sites),
+   eq(s.enrollments.status,"active"),eq(s.enrollments.programId,s.sections.programId),
+   eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+   eq(s.sections.active,true),inArray(s.sections.siteId,actor.sites),
    inArray(s.sections.programId,actor.scope.programIds??[])));
  return rows.filter(group=>enrolled.some(row=>row.siteId===group.siteId&&
   (!group.programId||row.programId===group.programId))&&(!group.sectionId||sections.some(section=>section.id===group.sectionId)));
