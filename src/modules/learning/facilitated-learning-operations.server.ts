@@ -4,7 +4,8 @@
 import { randomInt, createHmac } from "node:crypto";
 import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { auditEvents, catalogSites, canonicalAccounts, canonicalAccountGrants, contentAssetVersions, courseLessons, courseVersions, enrollments, learnerProfiles, canonicalClassEnrollments, noncreditRegistrations, noncreditTrainingVersions, deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses, domainEvents, educationOperationOrganizationRoles, educationOperationSites, facilitatedLearningParticipants, facilitatedLearningSessions, learnerCourseAttempts, programDeployments, classroomDeploymentSites, classroomEnrollmentSitePlacements, siteOrganizationRoles, trackLessonPresentations, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
+import { catalogSites, canonicalAccounts, canonicalAccountGrants, contentAssetVersions, courseLessons, courseVersions, enrollments, learnerProfiles, canonicalClassEnrollments, noncreditRegistrations, noncreditTrainingVersions, deploymentOfferingAdoptions, offeringVersions, classroomOfferingCourses, educationOperationOrganizationRoles, educationOperationSites, facilitatedLearningParticipants, facilitatedLearningSessions, learnerCourseAttempts, programDeployments, classroomDeploymentSites, classroomEnrollmentSitePlacements, siteOrganizationRoles, trackLessonPresentations, noncreditSelfEnrollmentClaims } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { facilitatedCodeAlphabet, facilitatedCodeLength, facilitatedPairingWindowMs, facilitatedRoomOperationalState, roomMediaAudienceEligible } from "@/domain/facilitated-learning";
 import { attemptInAssignedClassroomRelease } from "./classroom-release-boundary.server";
@@ -45,7 +46,7 @@ export async function recordRoomAuditAndEvent(
     payload: Record<string, string>;
   },
 ) {
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
     actorPersonId: input.actorPersonId,
     owningOrganizationId: input.organizationId,
     eventCode: input.eventCode,
@@ -53,7 +54,7 @@ export async function recordRoomAuditAndEvent(
     entityId: input.sessionId,
     payload: input.payload,
   });
-  await tx.insert(domainEvents).values({
+  await emitCanonicalDomainEvent(tx,{
     eventType: input.eventType,
     aggregateType: "facilitated_learning_session",
     aggregateId: input.sessionId,
