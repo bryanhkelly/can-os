@@ -1,11 +1,10 @@
-import { text,timestamp,uuid } from "drizzle-orm/pg-core";
+import { pgTable,text,timestamp,uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 
 /** WS3 reviewed source-evidence intent; this is workflow state, NOT a second
  * completion or credential ledger. SQL owns immutable scope and forced RLS.
  */
-export const learningCompletionEvidenceReviewRequests=educationV30.table(
-  "learning_completion_evidence_review_requests",{
+export const learningCompletionEvidenceReviewRequests=pgTable("learning_completion_evidence_review_requests",{
     id:uuid("id").primaryKey().defaultRandom(),
     purpose:text("purpose").$type<
       "completion_correction"|"award_revocation"|"class_completion_decision"
