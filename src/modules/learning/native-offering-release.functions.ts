@@ -470,7 +470,8 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
   .handler(async({data})=>{
     noStore();
     const actor=await getCommandContext(getRequest());
-    if(!actor.actorPersonId||actor.role!=="academic_content_reviewer"||
+    const reviewerPersonId=actor.actorPersonId;
+    if(!reviewerPersonId||actor.role!=="academic_content_reviewer"||
       !actor.scope.organizationIds?.length)throw new AuthorizationError("publisher reviewer");
     return db.transaction(async tx=>{
       const rows=await tx.select({
@@ -484,7 +485,7 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
         .where(and(
           inArray(contentPublicationManifests.ownerOrganizationId,actor.scope.organizationIds),
           isNotNull(contentPublicationManifests.offeringVersionId),
-          ne(contentPublicationManifests.createdByPersonId,actor.actorPersonId),
+          ne(contentPublicationManifests.createdByPersonId,reviewerPersonId),
           data.cursor?or(
             lt(contentPublicationManifests.createdAt,new Date(data.cursor.createdAt)),
             and(eq(contentPublicationManifests.createdAt,new Date(data.cursor.createdAt)),
@@ -498,7 +499,7 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
       const {page,nextCursor}=pageNativeOfferingReviewCandidates(rows);
       const items=[];
       for(const row of page){
-        if(!row.offeringVersionId||row.createdByPersonId===actor.actorPersonId)continue;
+        if(!row.offeringVersionId||row.createdByPersonId===reviewerPersonId)continue;
         try{
           const bundle=await loadBundle(tx,row.offeringVersionId,false);
           await requireAppointments(tx,actor,bundle,"instructional_track.review");
