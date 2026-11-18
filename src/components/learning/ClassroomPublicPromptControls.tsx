@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { WorkspaceNotice } from "@/components/workspace";
 import { releaseClassroomActivity } from "@/modules/learning/classroom-evidence.functions";
 
 /** Safe to render on a public single-laptop display. This component never
@@ -39,34 +43,25 @@ export function ClassroomPublicPromptControls({facilitatedSessionId}:{
       Public presentation controls only. Responses, identities and results are
       available exclusively in the private facilitator console.
     </p>
-    <label className="mt-3 block text-sm font-medium" htmlFor="public-question">
-      Question
-    </label>
-    <textarea id="public-question" rows={2} maxLength={1000}
+    <Field label="Question" className="mt-3"><Textarea id="public-question" rows={2} maxLength={1000}
       className="mt-1 w-full border border-border bg-background p-2 text-sm"
-      value={prompt} onChange={event=>setPrompt(event.target.value)}/>
-    <label className="mt-3 block text-sm font-medium" htmlFor="public-answer-kind">
-      Answer format
-    </label>
-    <select id="public-answer-kind" value={kind}
+      value={prompt} onChange={event=>setPrompt(event.target.value)}/></Field>
+    <Field label="Answer format" className="mt-3"><Select id="public-answer-kind" value={kind}
       onChange={event=>setKind(event.target.value as typeof kind)}
       className="mt-1 w-full border border-border bg-background p-2 text-sm">
       <option value="single_choice">Multiple choice</option>
       <option value="text">Short written response</option>
-    </select>
+    </Select></Field>
     {kind==="single_choice"&&<>
-      <label className="mt-3 block text-sm font-medium" htmlFor="public-answer-options">
-        Choices, one per line
-      </label>
-      <textarea id="public-answer-options" rows={3} maxLength={1607}
+      <Field label="Choices, one per line" className="mt-3"><Textarea id="public-answer-options" rows={3} maxLength={1607}
         className="mt-1 w-full border border-border bg-background p-2 text-sm"
-        value={choices} onChange={event=>setChoices(event.target.value)}/>
+        value={choices} onChange={event=>setChoices(event.target.value)}/></Field>
     </>}
     <Button className="mt-3" size="sm" disabled={!valid||busy}
       onClick={()=>void release()}>
       {busy?"Releasing…":"Release question"}
     </Button>
-    {notice&&<p role="status" className="mt-2 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+    {notice&&<WorkspaceNotice tone="info" className="mt-2">{notice}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-2">{error}</WorkspaceNotice>}
   </section>;
 }
