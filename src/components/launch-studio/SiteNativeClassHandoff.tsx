@@ -6,6 +6,7 @@ import { getLaunchSiteClassScope } from "@/modules/programs/program-discovery.fu
 import { getMyUnifiedClassDrafts, getUnifiedClassCourseOptions, getNativeClassOperatorSites } from "@/modules/classes/unified-class.functions";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
+import { nativeClassOperatorQueryKeys } from "@/domain/native-class-operator-query-keys";
 import { ProgramDiscoveryPanel } from "./ProgramDiscoveryPanel";
 
 /** One Site UUID across Launch Studio and Class. This scope read checks the
@@ -15,7 +16,7 @@ export function SiteNativeClassHandoff({publicSiteId}:{publicSiteId:string}){
  const scope=useQuery({queryKey:["launch-native-class-scope",publicSiteId],
    queryFn:()=>getLaunchSiteClassScope({data:{siteId:publicSiteId}}),retry:false});
  const canonicalSiteId=scope.data?.kind==="ready"?publicSiteId:null;
- const classesRead=useQuery({queryKey:["launch-native-classes",canonicalSiteId],
+ const classesRead=useQuery({queryKey:nativeClassOperatorQueryKeys.site(canonicalSiteId),
    queryFn:()=>getMyUnifiedClassDrafts({data:{siteId:canonicalSiteId!}}),enabled:Boolean(canonicalSiteId),retry:false});
  const adoptedCourses=useQuery({queryKey:["launch-class-course-adoptions",canonicalSiteId],
    queryFn:()=>getUnifiedClassCourseOptions({data:{siteId:canonicalSiteId!,search:"",cursor:0}}),
