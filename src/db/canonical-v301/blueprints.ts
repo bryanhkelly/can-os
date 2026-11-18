@@ -416,7 +416,7 @@ export const offeringReleaseRequirements = educationV30.table(
     accessibilityReviewRequired: boolean("accessibility_review_required").notNull(),
   },
   (table) => [
-    uniqueIndex("offering_release_requirements_version_course_uq")
+    uniqueIndex("offering_release_requirements_offering_version_id_course_ve_key")
       .on(table.offeringVersionId, table.courseVersionId),
   ],
 );
