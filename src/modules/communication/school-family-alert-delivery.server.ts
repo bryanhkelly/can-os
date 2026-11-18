@@ -5,8 +5,8 @@ import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/domain/outbound-sms-safety";
 import { isDemoTenantOrganization } from "@/modules/identity/demo-school-tenants.server";
 import {
-  dispatchOutboundMessages, type OutboundClaim, type OutboundPreparation,
-  type OutboundSendResult,
+  dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
+  type OutboundPreparation, type OutboundSendResult,
 } from "./outbound-dispatcher.server";
 import {
   sendNotificationEmailWithReceipt, type NotificationEmailMessage,
@@ -232,7 +232,7 @@ const schoolFamilyAdapter = {
       .from(delivery).where(owned(claim)).limit(1);
     return row ? row.attempts + 1 : null;
   },
-};
+} satisfies OutboundAdapter<OutboundMessage>;
 
 /** Retain the original scheduled job contract and bounded concurrency. */
 export async function processSchoolFamilyOutboundDeliveries(now = new Date(), limit = 120) {

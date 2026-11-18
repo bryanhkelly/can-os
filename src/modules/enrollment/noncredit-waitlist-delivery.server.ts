@@ -6,7 +6,7 @@ import {
   noncreditWaitlistEmailDeliveries,
 } from "@/db/canonical-v301";
 import {
-  dispatchOutboundMessages, type OutboundClaim,
+  dispatchOutboundMessages, type OutboundAdapter, type OutboundClaim,
   type OutboundPreparation,
 } from "@/modules/communication/outbound-dispatcher.server";
 import {
@@ -192,7 +192,7 @@ const waitlistAdapter = {
     }).from(noncreditWaitlistEmailDeliveries).where(owned(claim)).limit(1);
     return current ? current.attempts + 1 : null;
   },
-};
+} satisfies OutboundAdapter<NotificationEmailMessage>;
 
 /** Backward-compatible scheduled job and Cloudflare entrypoint. */
 export function processNoncreditWaitlistEmailDeliveries(now = new Date(), limit = 30):
