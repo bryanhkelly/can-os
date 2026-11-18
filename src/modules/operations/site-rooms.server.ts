@@ -11,7 +11,8 @@ import { executeCommand } from "@/platform/execute-command";
 import type { z } from "zod";
 import { assertRoomCoverageManager, createRoomAtSiteSchema } from "@/domain/room-coverage";
 
-type Reader = Pick<typeof db, "select">;\ntype Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type Reader = Pick<typeof db, "select">;
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function roomSchool(tx: Reader, actor: AccessContext, programId: string, access: "read" | "manage" = "manage") {
   const [school] = await tx.select({
