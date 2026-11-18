@@ -1,9 +1,9 @@
-import { mutationErrorMessage } from "@/lib/mutation-feedback";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
 import { FacilitatedClassroomEntry } from "@/components/operations/FacilitatedClassroomEntry";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
-import { QueryState, StatCard, StatusBadge } from "@/components/workspace";
+import { QueryState, StatCard, StatusBadge, MutationFeedback } from "@/components/workspace";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
 import { getCalendarRange, type CalendarFeedItem } from "@/modules/calendar/calendar.functions";
 import { addCalendarDays, dateKeyInTimezone, dateOnlyDayStartInTimezone, formatDateOnly, formatTimestamp } from "@/modules/calendar/timezone";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { normalizeClientError } from "@/lib/client-error";
 import { OnsiteSupervisionPanel } from "@/components/operations/OnsiteSupervisionPanel";
 import { OnsiteDayReconciliationPanel } from "@/components/operations/OnsiteDayReconciliationPanel";
@@ -143,6 +143,9 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const attendanceFeedback = useMutationFeedback(() => dayQuery.refetch({throwOnError:true}));
+  const attendanceBlocked = Boolean(busy) || attendanceFeedback.pending || attendanceFeedback.refreshFailed;
+  const attendanceRequests = useRef(new Map<string, string>());
 
   const load = async (targetDate: string, prepare = false) => {
     setError("");
@@ -152,27 +155,38 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
   };
 
   async function mark(student: Student, status: (typeof marks)[number]) {
-    if (!context || busy) return;
+    if (!context || attendanceBlocked || !roster || date > context.date || siteSelectionMismatch) return;
     const key = student.programId + ":" + student.studentProfileId;
     const note = notes[key]?.trim() ?? "";
     if (student.attendanceEventId && note.length < 10) {
       setError("Explain the reason for changing an existing school attendance record (at least 10 characters).");
       return;
     }
+    // A retry with the same evidence must reuse the server's mutation identity.
+    // Changes to the recorded status, date, or correction evidence get a new identity.
+    const requestKey = JSON.stringify([
+      context.siteId, date, student.programId, student.studentProfileId,
+      student.attendanceEventId ?? null, status, note,
+    ]);
+    const mutationId = attendanceRequests.current.get(requestKey) ?? crypto.randomUUID();
+    attendanceRequests.current.set(requestKey, mutationId);
     setBusy(key); setError(""); setNotice("");
     try {
-      await markExpectedOnsiteAttendance({ data: {
+      const outcome = await attendanceFeedback.run(() => markExpectedOnsiteAttendance({ data: {
         studentProfileId: student.studentProfileId,
         programId: student.programId,
-        date, status, mutationId: crypto.randomUUID(),
+        date, status, mutationId,
         expectedPreviousEventId: student.attendanceEventId,
         note,
-      } });
-      setNotice(student.studentName + " — " + status + " recorded.");
-      setNotes(current => ({ ...current, [key]: "" }));
-      await load(date);
-    } catch (cause) {
-      setError(mutationErrorMessage(cause, "Unable to record attendance. Refresh and verify."));
+      } }), {
+        successMessage: student.studentName + " — " + status + " recorded.",
+        commandErrorMessage: "Attendance could not be confirmed. Recheck the current roster and retry with the same observation.",
+        refreshErrorMessage: "Attendance was saved, but the roster did not refresh. Retry the refresh before recording another mark.",
+      });
+      if (outcome.status === "saved" || outcome.status === "refresh-failed") {
+        attendanceRequests.current.delete(requestKey);
+        setNotes(current => ({ ...current, [key]: "" }));
+      }
     } finally { setBusy(""); }
   }
 
@@ -231,9 +245,9 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
     </>}>
     <WorkflowIntro eyebrow="Site supervision · Attendance" title="A clear record of the onsite day." description="Record staff-observed attendance for your assigned site. Online learning activity is not proof of physical presence, and arrival marks do not authorize student release." />
     {context?.hasPrograms&&<nav aria-label="School day workflow" className="mt-5 flex flex-wrap items-center gap-3">
-      <Button variant={!preparing ? "secondary" : "outline"} aria-pressed={!preparing}
+      <Button variant={!preparing ? "secondary" : "outline"} aria-pressed={!preparing} disabled={attendanceBlocked}
         onClick={()=>{setPreparing(false);setDateOverride(context.date);setNotice("");setNotes({});void load(context.date);}}>Operate today</Button>
-      {context.canPrepareSchoolDays&&<Button variant={preparing ? "secondary" : "outline"} aria-pressed={preparing}
+      {context.canPrepareSchoolDays&&<Button variant={preparing ? "secondary" : "outline"} aria-pressed={preparing} disabled={attendanceBlocked}
         onClick={()=>{const target=addCalendarDays(context.date,1);
           setPreparing(true);setDateOverride(target);setNotice("");setNotes({});void load(target,true);}}>Prepare tomorrow</Button>}
       {!preparing&&<><Button asChild variant="ghost" size="sm" className="underline">
@@ -252,7 +266,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
     {preparing&&<p role="status" className="mt-4 border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
     {context?.hasPrograms && <Label className="mt-6 block max-w-sm">
       {preparing?"School-local preparation date":"School-local attendance date"}
-      <Input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
+      <Input type="date" value={date} disabled={attendanceBlocked} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
         className="mt-2"
         onChange={event => {
           setDateOverride(event.target.value); setNotice(""); setNotes({});
@@ -261,6 +275,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
       <span className="mt-1 block text-xs text-muted-foreground">{context.timeZone}</span>
     </Label>}
     {(notice || noProgramNotice) && <p role="status" className="mt-4 border p-3 text-sm">{notice || noProgramNotice}</p>}
+    <MutationFeedback state={attendanceFeedback} pendingMessage="Recording observed attendance…" className="mt-4"/>
     {(error || workspaceError) && <p role="alert" className="mt-4 border p-3 text-sm">{error || workspaceError}</p>}
     <QueryState loading={!context && contextQuery.isPending ? "Loading your verified site workspace…" : undefined}
       error={!context && contextFailure?.message}
@@ -353,7 +368,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
             <div className="mt-4 flex flex-wrap gap-2">
               {marks.map(status => <Button key={status} type="button" size="sm"
                 variant={student.status===status ? "secondary" : "outline"}
-                disabled={!!busy || !date || date > (context?.date ?? "")}
+                disabled={attendanceBlocked || !date || date > (context?.date ?? "")}
                 className="capitalize"
                 onClick={() => void mark(student, status)}>
                 Record {status}
@@ -362,7 +377,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
           </section>;
         })}
       </div>
-      <Button type="button" variant="ghost" size="sm" onClick={() => void load(date)}
+      <Button type="button" variant="ghost" size="sm" disabled={attendanceBlocked} onClick={() => void load(date)}
         className="mt-6 underline">Refresh school roster</Button>
     </>}
     {roster && !preparing && <OnsitePickupPanel date={date} onChanged={() => void load(date)} />}
