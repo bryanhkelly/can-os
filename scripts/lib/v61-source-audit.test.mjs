@@ -93,3 +93,15 @@ test("unstaged and untracked TSX regressions are detected before commit", () => 
   assert.match(result.errors.join("\n"), /page\.tsx: native increased \(button\)/);
   assert.match(result.errors.join("\n"), /new\.tsx: native increased \(textarea\)/);
 }));
+
+
+test("lazy-loaded feature components appear in the composed source audit", () => temp(({ root, write }) => {
+  write("src/routes/home.tsx", 'export const load = () => import("@/components/views/Legacy");');
+  write("src/components/views/Legacy.tsx",
+    'export const Legacy = () => <button className="rounded-lg">Open</button>;');
+  const inventory = createInventory(root);
+  assert.equal(inventory.totals.routes, 1);
+  assert.equal(inventory.routes[0].reachableNative, 1);
+  assert.equal(inventory.routes[0].reachableCorners, 1);
+  assert.equal(inventory.routes[0].composedSourceClean, false);
+}));
