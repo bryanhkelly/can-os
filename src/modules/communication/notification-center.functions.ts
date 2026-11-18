@@ -7,6 +7,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { assertCapability } from "@/domain/command-context";
 import {z} from "zod";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
+import { studentAssignmentHref } from "@/domain/student-assignment-navigation";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 const pickupNotificationTypes=new Set([
  "child_release_verified","child_pickup_denied","child_uncollected_follow_up",
@@ -688,7 +689,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
    n.resourceType==="submission"&&n.resourceId&&
     (bySubmission.has(n.resourceId)||guardianSubmissionById.has(n.resourceId))?
    (context.role==="student"&&bySubmission.has(n.resourceId)?
-     `/student/assignments?assessment=${encodeURIComponent(bySubmission.get(n.resourceId)!)}`:
+     studentAssignmentHref(bySubmission.get(n.resourceId)!):
      context.role==="guardian"&&guardianSubmissionById.has(n.resourceId)?
      (()=>{const row=guardianSubmissionById.get(n.resourceId)!;
        return `/guardian/students?student=${encodeURIComponent(row.studentPersonId)}&section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.assessmentId)}`;})():null):
@@ -696,7 +697,7 @@ export const getNotifications=createServerFn({method:"GET"}).handler(async()=>{
     verifiedGradeActions.has(n.resourceId)?verifiedGradeActions.get(n.resourceId)!:
    n.resourceType==="action"&&n.resourceId&&referralIds.has(n.resourceId)?
    (context.role==="student"?`/student/support?referral=${encodeURIComponent(n.resourceId)}`:null):
-   n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?`/student/assignments?assessment=${encodeURIComponent(missingAssessmentByAction.get(n.resourceId)!)}`:null):
+   n.type==="missing_work_follow_up"&&n.resourceType==="action"&&n.resourceId&&missingAssessmentByAction.has(n.resourceId)?(context.role==="student"?studentAssignmentHref(missingAssessmentByAction.get(n.resourceId)!):null):
    n.resourceType==="application"&&n.resourceId&&enrollmentStudent.has(n.resourceId)?
    (n.type==="admissions_stage_changed"&&!enrollmentApplicationOfferReady.get(n.resourceId)?"/launch/family":
     `/guardian/admission-offers?student=${encodeURIComponent(enrollmentStudent.get(n.resourceId)!)}&application=${encodeURIComponent(n.resourceId)}`):
