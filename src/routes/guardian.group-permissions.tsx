@@ -5,7 +5,10 @@ import {decideCanonicalGroupConsent} from "@/modules/study-groups/canonical-memb
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {useMutationFeedback} from "@/lib/mutation-feedback";
-import {WorkspaceShell} from "@/components/workspace";
+import {WorkspaceShell, WorkspaceNotice, EmptyState} from "@/components/workspace";
+import {Button} from "@/components/ui/button";
+import {Checkbox} from "@/components/ui/choice";
+import {Label} from "@/components/ui/label";
 import {groupPermissionContext} from "@/domain/guardian-permission-context";
 export const Route=createFileRoute("/guardian/group-permissions")({
  validateSearch:(search:Record<string,unknown>):{action?:string}=>({
@@ -45,14 +48,14 @@ function ConsentList({items}:{items:ConsentItem[]}){
  return <WorkspaceShell eyebrow="Family" title="Study group permissions"
   subtitle="Decide whether your student may participate in a teacher-facilitated group. The facilitator must also approve membership."
   actions={<div className="flex flex-wrap gap-2">
-   <Link to="/guardian/course-approvals" className="rounded-lg border px-3 py-2 text-sm">Course approvals</Link>
-   <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trips</Link>
-   <Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
+   <Link to="/guardian/course-approvals" className=" border px-3 py-2 text-sm">Course approvals</Link>
+   <Link to="/guardian/field-trips" className=" border px-3 py-2 text-sm">Field trips</Link>
+   <Link to="/home" className=" border px-3 py-2 text-sm">Family home</Link>
   </div>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving permission decision..."/>
   {action&&<Link to="/guardian/group-permissions" className="mt-4 inline-block text-sm underline">View all group permissions</Link>}
-  {action&&!items.some(item=>item.id===action)&&<p role="alert" className="mt-4 rounded-xl border p-4">This permission request is unavailable in your current family workspace.</p>}
-  <div className="mt-7 space-y-3">{items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className="rounded-xl border bg-card p-5">
+  {action&&!items.some(item=>item.id===action)&&<WorkspaceNotice tone="attention" className="mt-4">This permission request is unavailable in your current family workspace.</WorkspaceNotice>}
+  <div className="mt-7 space-y-3">{items.filter(item=>!action||item.id===action).map(item=><article key={item.id} className=" border bg-card p-5">
    <h2 className="font-semibold">{item.groupTitle}</h2>
    <p className="mt-1 text-sm font-medium">Student: {item.studentName}</p>
    <p className="mt-2 text-sm text-muted-foreground">{item.obsolete?"This request is no longer active — the student's membership request was withdrawn or already decided.":item.status==="open"?"Your decision is needed":item.decision==="approve"?"Permission approved":"Permission declined"}</p>
@@ -64,20 +67,20 @@ function ConsentList({items}:{items:ConsentItem[]}){
       ?"Next actor: the group facilitator — guardian permission is recorded, but membership is not active until the facilitator approves."
       :"No further action: permission was declined and the student was not added to the group."}</p>
    {item.obsolete&&<div className="mt-4 flex gap-2">
-    <button disabled={busy} onClick={()=>void decide(item,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Dismiss</button>
+    <Button type="button" variant="outline" disabled={busy} onClick={()=>void decide(item,false)}>Dismiss</Button>
    </div>}
-   {!item.obsolete&&item.status==="open"&&<label className="mt-4 flex items-start gap-3 text-sm">
-    <input type="checkbox" checked={acknowledged[item.id]===groupPermissionContext(item)}
+   {!item.obsolete&&item.status==="open"&&<Label className="mt-4 flex items-start gap-3 text-sm">
+    <Checkbox checked={acknowledged[item.id]===groupPermissionContext(item)}
       onChange={event=>setAcknowledged(previous=>({...previous,[item.id]:event.target.checked?groupPermissionContext(item):""}))}
       className="mt-1"/>
     <span>I understand this request permits my student to participate in a supervised school study group, subject to facilitator approval.</span>
-   </label>}
+   </Label>}
    {!item.obsolete&&item.status==="open"&&<div className="mt-4 flex gap-2">
-    <button disabled={busy||acknowledged[item.id]!==groupPermissionContext(item)} onClick={()=>void decide(item,true)} className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Allow participation</button>
-    <button disabled={busy} onClick={()=>void decide(item,false)} className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">Decline</button>
+    <Button type="button" disabled={busy||acknowledged[item.id]!==groupPermissionContext(item)} onClick={()=>void decide(item,true)}>Allow participation</Button>
+    <Button type="button" variant="outline" disabled={busy} onClick={()=>void decide(item,false)}>Decline</Button>
    </div>}
   </article>)}
-  {!items.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No group permission requests are waiting for your decision.</p>}
+  {!items.length&&<EmptyState title="No pending group permissions" description="No group permission requests are waiting for your decision."/>}
   </div>
  </WorkspaceShell>;
 }
