@@ -1,17 +1,19 @@
-import {and,eq,gt,isNull,lte,or} from "drizzle-orm";
+import {and,eq,gt,lte,or} from "drizzle-orm";
 import {db} from "@/db/client";
-import {accessAccounts,accessAccountCanonicalPrincipals} from "@/db/schema";
+import {accessAccounts} from "@/db/schema";
 import {canonicalPersons,guardianAuthorities,learnerProfiles} from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getIdentityContext} from "@/modules/identity/command-context.server";
 
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-/** Verify the existing CAN guardian login and its independently reviewed
- * canonical Person association. Public and canonical UUIDs are never
- * assumed to be interchangeable.
+/** Authenticate with ONE real CAN account and its immutable public Person.
+ * Guardian authority over a particular child is independently verified by
+ * requireNativeGuardianChild below, not by a second Person identity mapping.
+ * Never derive parental access from a shared login, an organization role,
+ * an email match, or an arbitrary selected child UUID.
  */
-export async function requireNativeGuardian(request:Request,now:Date){
+export async function requireNativeGuardian(request:Request,_now:Date){
  const actor=await getIdentityContext(request);
  if(actor.role!=="guardian"||!actor.actorPersonId||
     !actor.accountId||actor.sessionAccountId)
@@ -23,15 +25,7 @@ export async function requireNativeGuardian(request:Request,now:Date){
  }).from(accessAccounts).where(eq(accessAccounts.id,actor.accountId)).limit(1);
  if(account?.personId!==actor.actorPersonId||!account.verified||account.disabled)
   throw new AuthorizationError("current guardian account");
- const links=await db.select({
-  personId:accessAccountCanonicalPrincipals.canonicalPrincipalId,
- }).from(accessAccountCanonicalPrincipals).where(and(
-  eq(accessAccountCanonicalPrincipals.accountId,actor.accountId),
-  isNull(accessAccountCanonicalPrincipals.revokedAt),
-  lte(accessAccountCanonicalPrincipals.verifiedAt,now),
- )).limit(2);
- if(links.length!==1)throw new AuthorizationError("verified canonical guardian mapping");
- return {personId:links[0]!.personId};
+ return {personId:actor.actorPersonId};
 }
 
 /** A current verified canonical guardian authority, not a caller-supplied
