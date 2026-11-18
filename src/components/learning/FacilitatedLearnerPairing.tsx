@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { pairWithFacilitatedRoom, leaveFacilitatedRoom, getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type PairingStatus = Awaited<ReturnType<typeof getLearnerFacilitatedRoom>>;
 
@@ -14,16 +15,17 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
   const [pending,setPending] = useState(false);
   const [message,setMessage] = useState("");
   const [available,setAvailable] = useState(false);
+  const [loadError,setLoadError] = useState(false);
   async function refresh() {
     const result = await getLearnerFacilitatedRoom({data:{courseAttemptId}});
-    setStatus(result);setAvailable(true);
+    setStatus(result);setAvailable(true);setLoadError(false);
   }
   useEffect(()=>{
     let live=true;
-    setStatus(null);setAvailable(false);setMessage("");setCode("");
+    setStatus(null);setAvailable(false);setLoadError(false);setMessage("");setCode("");
     void getLearnerFacilitatedRoom({data:{courseAttemptId}})
       .then(result=>{if(live){setStatus(result);setAvailable(true);}})
-      .catch(()=>{/* Guardian or unavailable service: no learner-pairing control. */});
+      .catch(()=>{if(live)setLoadError(true);});
     return ()=>{live=false;};
   },[courseAttemptId]);
   useEffect(()=>{
@@ -60,7 +62,14 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       setMessage("Unable to leave the room. Try again.");
     } finally {setPending(false);}
   }
-  if(!available)return null;
+  if(!available)return <section aria-label="Facilitator room pairing" className="border border-border bg-card p-4">
+    {loadError?<div role="alert" className="space-y-3">
+      <p className="text-sm">Facilitator room availability could not be verified. Your course enrollment has not changed.</p>
+      <Button type="button" size="sm" variant="outline" onClick={()=>void refresh().catch(()=>{
+        setLoadError(true);
+      })}>Retry room status</Button>
+    </div>:<p role="status" className="text-sm">Checking facilitator room availability…</p>}
+  </section>;
   return <section aria-label="Facilitator room pairing" className="border border-border bg-card p-4">
     <h3 className="font-serif text-lg font-semibold">Join a facilitator-led session</h3>
     <p className="mt-1 text-sm text-muted-foreground">
@@ -69,9 +78,9 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
     </p>
     <form className="mt-3 flex flex-wrap gap-2" onSubmit={event=>{event.preventDefault();void join();}}>
       <label htmlFor="facilitated-pair-code" className="sr-only">Facilitator pairing code</label>
-      <input id="facilitated-pair-code" aria-label="Facilitator pairing code"
+      <Input id="facilitated-pair-code" aria-label="Facilitator pairing code"
         autoComplete="off" maxLength={11} placeholder="XXXXX-XXXXX"
-        className="min-h-10 border border-border bg-background px-3 py-2 text-sm uppercase"
+        className="min-h-10 max-w-xs uppercase"
         value={code} onChange={event=>setCode(event.target.value)}/>
       <Button disabled={pending || !code.trim()} type="submit" size="sm">Pair device</Button>
       <Button disabled={pending} type="button" variant="outline" size="sm"
