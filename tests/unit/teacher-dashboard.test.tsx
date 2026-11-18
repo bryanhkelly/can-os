@@ -53,6 +53,8 @@ describe("teacher dashboard migration", () => {
     expect(html).toContain('href="/student/support"');
     expect(html).toContain("35 submitted items to review");
     expect(html).toContain("35 submitted work items to review");
+    expect(html).toContain("What needs you next");
+    expect(html).toContain("Grade next submission");
     expect(html).toContain("28");
     expect(html).toContain('href="/calendar?view=agenda"');
     expect(html.indexOf("Authorized teacher schedule")).toBeGreaterThan(html.indexOf("<aside"));
