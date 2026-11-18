@@ -3,11 +3,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
   canonicalClasses, canonicalClassSurveyCampaigns, surveyCampaigns,
   surveyDefinitions, surveyVersions, surveyInvitations, surveyResponses,
-  evidenceDocumentVersions, auditEvents, domainEvents,
-} from "@/db/canonical-v301";
+  evidenceDocumentVersions, } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
 import { assertCurrentCanonicalStaffForMutation } from "@/modules/identity/canonical-transaction-authorization.server";
@@ -144,12 +144,12 @@ export const linkNativeClassSurveyCampaign=createServerFn({method:"POST"})
     });
     const payload={classId:cls.id,siteId:cls.siteId,
       deploymentId:cls.deploymentId,campaignId:data.campaignId};
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:actor.actorPersonId!,owningOrganizationId:organizationId,
       eventCode:"class.survey_campaign.linked",entityKind:"survey_campaign",
       entityId:data.campaignId,payload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       actorPersonId:actor.actorPersonId!,eventType:"ClassSurveyCampaignLinked",
       aggregateType:"survey_campaign",aggregateId:data.campaignId,payload,
     });
