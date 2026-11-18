@@ -14,6 +14,21 @@ describe("Site-owned content source and publication contract",()=>{
     expect(renderer).not.toContain("renderSiteFirstPrivatePlan");
   });
 
+  it("does not expose private starter blocks as a public layout without explicit publication",()=>{
+    const reader=read("src/modules/sites/site-public-catalog.server.ts");
+    const publisher=read("src/modules/sites/site-publication.server.ts");
+    const preview=read("src/modules/sites/site-website-preview.server.ts");
+    const config=read("src/domain/site-content-channels.ts");
+    for(const source of [reader,publisher,preview]){
+      expect(source).toContain("readPublishedSiteContentChannelConfig(");
+    }
+    expect(reader).toContain("site.metadata.publishedWebsiteContentChannels");
+    expect(publisher).toContain("siteConfiguration?.metadata?.publishedWebsiteContentChannels");
+    expect(config).toContain("return {version: 2, revision: 0, blocks: []}");
+    expect(config).toContain("requireSavedSiteContentChannelDraft(");
+    expect(preview).toContain("publishedContentConfig.revision > 0");
+  });
+
   it("separates Site preview drafts from anonymous public content snapshots",()=>{
     const publicSite=read("src/modules/sites/site-public-catalog.server.ts");
     const editor=read("src/modules/sites/site-website-preview.server.ts");
