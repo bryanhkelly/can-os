@@ -154,7 +154,7 @@ async function run(){
     SELECT v.id::text AS offering_version_id,
       v.class_id::text AS class_id
     FROM education_v30.class_offering_versions v
-    JOIN education_v30.class_offerings o
+    JOIN public.class_offerings o
       ON o.id=v.class_offering_id AND o.class_id=v.class_id
     JOIN education_v30.classes c ON c.id=v.class_id
     WHERE c.id=${ids[0]}::uuid AND c.state='active'
