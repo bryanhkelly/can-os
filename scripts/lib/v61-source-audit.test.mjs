@@ -36,7 +36,8 @@ test("AST ignores JSX-like comments and literal text; hidden inputs remain nativ
 test("routes and reachable components are discovered, without route manifests", () => temp(({ root, write }) => {
   write("src/routes/home.tsx", 'import { Widget } from "@/components/cards"; export const Page = () => <Widget/>;');
   write("src/routes/old.tsx", 'export const Page = () => <button className="rounded-xl">Legacy</button>;');
-  write("src/components/cards/index.ts", 'export { Widget } from "./Widget";');
+  write("src/components/cards/index.ts", 'export { Widget } from "./Widget"; export { Legacy } from "./Legacy";');
+  write("src/components/cards/Legacy.tsx", 'export const Legacy = () => <button>Unused legacy component</button>;');
   write("src/components/cards/Widget.tsx", 'export const Widget = () => <div className="border"/>;');
   write("src/components/ui/input.tsx", 'export const Input = () => <input/>;');
   const inventory = createInventory(root);
