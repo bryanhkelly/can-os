@@ -1,4 +1,4 @@
-import { boolean, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { alias, boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
@@ -99,16 +99,18 @@ export const canonicalOfferingCourses = educationV30.table("offering_courses", {
   sequenceNo: integer("sequence_no"),
 });
 
-/** Read-only canonical Site and provider labels for an explicitly published
- * enrollment release. Do not import similarly named public-schema entities. */
-export const canonicalEnrollmentSites = educationV30.table("sites", {
+/** Published enrollment projections use exactly the same public Site
+ * and Organization UUIDs. The Site alias permits a second Site selection
+ * in queries that already join the shared catalog Site model.
+ * Only released training is eligible for public discovery. */
+export const canonicalEnrollmentSites = alias(pgTable("sites", {
   id: uuid("id").primaryKey(),
   name: text("name").notNull(),
-  timeZone: text("time_zone").notNull(),
-  status: text("status").notNull(),
-});
-export const canonicalEnrollmentOrganizations = educationV30.table("organizations", {
+  timeZone: text("timezone").notNull(),
+  status: text("lifecycle_status").$type<"planning" | "active" | "closed">(),
+}), "canonical_enrollment_sites");
+export const canonicalEnrollmentOrganizations = pgTable("organizations", {
   id: uuid("id").primaryKey(),
-  displayName: text("display_name").notNull(),
-  status: text("status").notNull(),
+  displayName: text("name").notNull(),
+  status: text("lifecycle_status").$type<"prospective" | "active" | "inactive" | "closed">(),
 });
