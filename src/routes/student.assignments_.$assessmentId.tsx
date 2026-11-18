@@ -140,7 +140,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
  const editable = assignment.canEdit === true && !submittedReceipt;
  // Autosave is delayed; prevent navigation from silently discarding typed work
  // or attachments that have not reached the authorized submission record.
- useUnsavedChangesGuard(editable && (draft !== savedDraft || pendingFiles.length > 0 || pendingAutosaves > 0));
+ useUnsavedChangesGuard(editable && (draft !== savedDraft || pendingFiles.length > 0 || pendingAutosaves > 0 || mutation.pending));
  // The verified current-attempt attachment list is authoritative. A newly
  // attached file can be submitted even if the initial loader had no draft.
  const canSubmit = canSubmitAssignmentWork({
@@ -370,7 +370,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
        <Textarea disabled={!hydrated || busy} rows={8} value={draft} maxLength={20000} onChange={event => { setDraft(event.target.value); setDraftStatus("idle"); }}
         className="mt-2 min-h-44" placeholder="Write your response…" />
       </Label>
-      <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus === "saving" ? "Saving…" : draftStatus === "saved" ? "Saved" : draftStatus === "error" ? "Could not autosave" : "Ready"}</p>
+      <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {pendingAutosaves > 0 || draftStatus === "saving" ? "Saving…" : draftStatus === "saved" ? "Saved" : draftStatus === "error" ? "Could not autosave" : "Ready"}</p>
       <Label className="mt-4 block text-sm font-semibold">Attachments (PDF, PNG or JPEG; maximum 10 MB each)
        <Input type="file" multiple accept={attachmentAccept} disabled={!hydrated || busy}
         onChange={event => {
