@@ -2,6 +2,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getMyNoncreditSelfEnrollments, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { openMyNoncreditCourse } from "@/modules/enrollment/noncredit-self-enrollment-resume.functions";
@@ -17,8 +19,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   const client=useQueryClient();
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
   const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
-  const [withdrawBusy,setWithdrawBusy]=useState<string|null>(null);
-  const [notice,setNotice]=useState("");
+
   const query=useQuery({queryKey:["my-noncredit-self-enrollments",scopeKey,registrationId??"all"],
     queryFn:async()=>{
       if(!registrationId)return getMyNoncreditSelfEnrollments();
@@ -32,6 +33,14 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     return entry?[entry]:[];
   },enabled:authorized&&!registrationId,retry:false,staleTime:15_000});
   const [error,setError]=useState("");
+  const mutation=useMutationFeedback(async()=>{
+    await Promise.all([
+      client.invalidateQueries({queryKey:["my-noncredit-self-enrollments"]},{throwOnError:true}),
+      client.invalidateQueries({queryKey:["my-noncredit-waitlist"]},{throwOnError:true}),
+      client.invalidateQueries({queryKey:["my-activity"]},{throwOnError:true}),
+    ]);
+  });
+  const changeBusy=mutation.pending||mutation.refreshFailed;
   async function open(courseAttemptId:string) {
     if(busy)return;
     setBusy(courseAttemptId);setError("");
@@ -44,27 +53,32 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     }
   }
   async function withdraw(registrationId:string) {
-    if(withdrawConfirm!==registrationId||withdrawBusy)return;
-    setWithdrawBusy(registrationId);
-    setError("");setNotice("");
-    try {
-      const result=await withdrawMyNoncreditRegistration({data:{
-        registrationId,confirm:true,
-      }});
+    if(withdrawConfirm!==registrationId||changeBusy||busy!==null)return;
+    const outcome=await mutation.run(
+      ()=>withdrawMyNoncreditRegistration({data:{registrationId,confirm:true}}),
+      {
+        successMessage:result=>result.alreadyWithdrawn
+          ?"This registration was already withdrawn."
+          :"Registration withdrawn. Your learning history and original consent record were retained.",
+        commandErrorMessage:"We could not withdraw this registration.",
+        refreshErrorMessage:"Withdrawal was saved, but your learning records could not refresh. Retry refresh, not the withdrawal.",
+      },
+    );
+    if(outcome.status==="saved"||outcome.status==="refresh-failed")
       setWithdrawConfirm(null);
-      await Promise.all([
-        client.invalidateQueries({queryKey:["my-noncredit-self-enrollments"]}),
-        // A withdrawal changes the canonical participation displayed by WS1.
-        client.invalidateQueries({queryKey:["my-activity"]}),
-      ]);
-      setNotice(result.alreadyWithdrawn
-        ?"This registration was already withdrawn."
-        :"Registration withdrawn. Your learning history and original consent record were retained.");
-    } catch (cause) {
-      setError(normalizeClientError(cause,"We could not withdraw this registration.").message);
-    } finally {
-      setWithdrawBusy(null);
-    }
+  }
+  async function leaveWaitlist(releaseId:string) {
+    if(cancelWaitlist!==releaseId||changeBusy||busy!==null)return;
+    const outcome=await mutation.run(
+      ()=>cancelMyNoncreditWaitlist({data:{releaseId}}),
+      {
+        successMessage:"You left the waiting list. Your enrollment history was not changed.",
+        commandErrorMessage:"Unable to cancel your waitlist entry.",
+        refreshErrorMessage:"Your waiting-list cancellation was saved, but My Activity could not refresh. Retry refresh instead of cancelling again.",
+      },
+    );
+    if(outcome.status==="saved"||outcome.status==="refresh-failed")
+      setCancelWaitlist(null);
   }
   const visibleCourses=releaseId ? [] : query.data;
   const visibleWaitlist=registrationId ? [] : waiting.data;
@@ -76,7 +90,8 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       Your course records are temporarily unavailable. <button type="button" onClick={()=>void query.refetch()} className="font-semibold text-primary underline">Try again</button>
     </p>}
     {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
-    {notice && <p role="status" className="mt-4 border border-border bg-card p-4 text-sm">{notice}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
+      pendingMessage="Saving enrollment change…" className="mt-4"/>
     {waiting.isError&&<p role="alert" className="text-sm">Your waiting-list status is temporarily unavailable. <button type="button" className="font-semibold underline" onClick={()=>void waiting.refetch()}>Try again</button></p>}
     {waiting.isPending&&!registrationId&&<p role="status" className="text-sm">Loading waiting-list controls…</p>}
     {releaseId&&waiting.isSuccess&&!visibleWaitlist?.length&&<p role="status" className="text-sm">This waiting-list entry is no longer available in your account.</p>}
@@ -93,24 +108,11 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
             {item.invitationActive&&<Link to="/learn/enroll" search={{release:item.releaseId}} className="text-sm underline text-primary">Claim reserved place</Link>}
             {cancelWaitlist===item.releaseId?
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant="destructive" disabled={busy!==null}
-                  onClick={()=>void (async()=>{
-                    setBusy(item.releaseId);
-                    try{
-                      await cancelMyNoncreditWaitlist({data:{releaseId:item.releaseId}});
-                      await Promise.all([
-                        client.invalidateQueries({queryKey:["my-noncredit-waitlist"]}),
-                        // Waitlist invitations are opportunities in My Activity,
-                        // never registrations; refresh them after cancellation.
-                        client.invalidateQueries({queryKey:["my-activity"]}),
-                      ]);
-                      setCancelWaitlist(null);
-                    }catch(e){setError(normalizeClientError(e,"Unable to cancel your waitlist entry.").message);}
-                    finally{setBusy(null);}
-                  })()}>Confirm leave waitlist</Button>
-                <Button type="button" variant="outline" size="sm" onClick={()=>setCancelWaitlist(null)}>Keep my place</Button>
+                <Button type="button" size="sm" variant="destructive" disabled={busy!==null||changeBusy}
+                  onClick={()=>void leaveWaitlist(item.releaseId)}>Confirm leave waitlist</Button>
+                <Button type="button" variant="outline" size="sm" disabled={changeBusy} onClick={()=>setCancelWaitlist(null)}>Keep my place</Button>
               </div>:
-              <button type="button" className="text-sm underline text-muted-foreground" onClick={()=>setCancelWaitlist(item.releaseId)}>Leave waiting list</button>}
+              <Button variant="ghost" type="button" size="sm" disabled={changeBusy||busy!==null} className="text-sm underline text-muted-foreground" onClick={()=>setCancelWaitlist(item.releaseId)}>Leave waiting list</Button>}
           </div>
         </article>)}
       </div>
@@ -137,7 +139,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
           </div>
           <div className="flex flex-col items-start gap-3">
             {["registered","active"].includes(course.registrationStatus)&&course.attemptStatus==="active"?
-              <Button type="button" disabled={busy!==null||withdrawBusy!==null}
+              <Button type="button" disabled={busy!==null||changeBusy}
                 onClick={()=>void open(course.courseAttemptId)}>
                 {busy===course.courseAttemptId?"Opening…":"Open course"}
               </Button>:
@@ -152,16 +154,16 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
                     Your original place is not automatically reassigned.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-3">
-                    <Button type="button" variant="destructive" disabled={withdrawBusy!==null}
+                    <Button type="button" variant="destructive" disabled={changeBusy||busy!==null}
                       onClick={()=>void withdraw(course.registrationId)}>
-                      {withdrawBusy===course.registrationId?"Withdrawing…":"Confirm withdrawal"}
+                      {mutation.pending?"Withdrawing…":"Confirm withdrawal"}
                     </Button>
-                    <Button type="button" variant="outline" disabled={withdrawBusy!==null}
+                    <Button type="button" variant="outline" disabled={changeBusy||busy!==null}
                       onClick={()=>setWithdrawConfirm(null)}>Keep registration</Button>
                   </div>
                 </div>:
                 <button type="button" className="text-xs font-semibold text-muted-foreground underline underline-offset-4"
-                  onClick={()=>{setNotice("");setWithdrawConfirm(course.registrationId);}}>
+                  onClick={()=>setWithdrawConfirm(course.registrationId)} disabled={changeBusy||busy!==null}>
                   Withdraw registration
                 </button>)}
           </div>
