@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { classroomQrJoinUrl, displayClassroomCode } from "@/domain/classroom-connect";
+import { Button } from "@/components/ui/button";
 
 /** Local QR rendering: never send short-lived pairing secrets to a third party. */
 export function ClassroomConnectQr({ code, expiresAt }: { code: string; expiresAt: string }) {
@@ -37,9 +38,9 @@ export function ClassroomConnectQr({ code, expiresAt }: { code: string; expiresA
       {expired && <p role="status" className="text-center text-sm">Pairing code expired. Generate a new code.</p>}
       {!expired && qrError && <div className="space-y-2 text-center">
         <p role="status" className="text-sm">QR unavailable. Enter the code at /join.</p>
-        <button type="button" className="text-sm underline" onClick={() => setRetry(v => v + 1)}>
+        <Button type="button" variant="ghost" size="sm" className="underline" onClick={() => setRetry(v => v + 1)}>
           Retry QR rendering
-        </button>
+        </Button>
       </div>}
     </figure>
     <div className="flex flex-col justify-center">
