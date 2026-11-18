@@ -2,7 +2,7 @@ import {createFileRoute, Link, redirect} from "@tanstack/react-router";
 import {useQuery} from "@tanstack/react-query";
 import {useEffect,useMemo,useRef,useState} from "react";
 import {ArrowUpRight, BookOpen, CalendarDays, Clock3, History, MapPin, RefreshCw, Users} from "lucide-react";
-import {WorkspaceShell, StatusBadge} from "@/components/workspace";
+import {WorkspaceShell, StatusBadge, QueryState, EmptyState, WorkspaceNotice} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
 import {NoncreditEnrollmentManagement} from "@/components/learning/NoncreditEnrollmentManagement";
 import {workspaceSessionQueryOptions, useWorkspaceSession} from "@/components/shell/WorkspaceSession";
@@ -296,18 +296,18 @@ function MyActivityPage() {
       </Button>
     </div>
 
-    {activity.isPending && <div role="status" className="mt-5 border border-border bg-card p-6 text-sm">
-      Loading verified learning and program records…
-    </div>}
-    {activity.isError && <div role="alert" className="mt-5 border border-border bg-card p-6">
-      <h2 className="font-semibold">My Activity is unavailable</h2>
-      <p className="mt-2 text-sm text-muted-foreground">The combined participation summary could not be loaded. Your registrations remain source-authoritative. Use Manage training to access your registrations and waiting lists.</p>
-      <Button type="button" variant="outline" className="mt-4"
-        onClick={() => void activity.refetch()}>Try again</Button>
-    </div>}
+    <QueryState
+      loading={activity.isPending?"Loading verified learning and program records…":undefined}
+      error={activity.isError?<span>
+        <strong>My Activity is unavailable.</strong>{" "}
+        The combined participation summary could not be loaded. Your registrations remain source-authoritative.
+        Use Manage training to access your registrations and waiting lists.
+      </span>:undefined}
+      onRetry={()=>void activity.refetch()}
+      retrying={activity.isFetching}/>
 
     {activity.data && <>
-      {partialSources.length > 0 && <div role="note" className="mt-5 border border-border bg-card p-4 text-sm">
+      {partialSources.length > 0 && <WorkspaceNotice tone="info" className="mt-5">
         <p className="font-semibold">Some sources have more history or limited coverage</p>
         <p className="mt-1 text-muted-foreground">These sources still have additional pages or source-managed limits: {partialSources.map(item => item.source.replaceAll("_", " ")).join(", ")}. This view does not certify missing records as nonexistent.</p>
         {partialSources.filter(item => item.message).map(item =>
@@ -316,14 +316,14 @@ function MyActivityPage() {
           <Link to="/class" className="mt-2 inline-block font-semibold text-primary underline underline-offset-4">
             Open paginated Class history
           </Link>}
-      </div>}
-      {unavailable.length > 0 && <div role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
+      </WorkspaceNotice>}
+      {unavailable.length > 0 && <WorkspaceNotice tone="attention" className="mt-5">
         <p className="font-semibold">Some sources could not be verified.</p>
         <p className="mt-1 text-muted-foreground">Items from unavailable sources may be missing. Existing access and private records have not changed.</p>
         <p className="mt-2 text-xs text-muted-foreground">
           {unavailable.map(item => item.source.replaceAll("_", " ")).join(" · ")}
         </p>
-      </div>}
+      </WorkspaceNotice>}
       <section className="mt-6" aria-label={bucket + " activity"}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-serif text-2xl">{views.find(view => view.id === bucket)?.title} activity</h2>
@@ -332,18 +332,16 @@ function MyActivityPage() {
         {shown.length ? <div className="mt-3 grid gap-3">
           {shown.map(item => <ActivityCard key={item.key} item={item} viewerRole={activity.data?.viewerRole??""}
              managing={managingKey===item.key} onManage={()=>{setShowAllTraining(false);setManagingKey(current=>current===item.key?null:item.key);}}/>)}
-        </div> : opportunities.length === 0 ? <div className="mt-3 border border-border bg-card p-6">
-          <h3 className="font-serif text-xl">Nothing to display in this view</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {unavailable.length ? "Some sources are unavailable, so this view may be incomplete." :
-              "No verified participation matches these filters in the active workspace."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-sm">
+        </div> : opportunities.length === 0 ? <EmptyState kind="matches" className="mt-3"
+          title="Nothing to display in this view"
+          description={unavailable.length
+            ?"Some sources are unavailable, so this view may be incomplete."
+            :"No verified participation matches these filters in the active workspace."}
+          actions={<>
             <Button type="button" variant="ghost" className="font-semibold text-primary underline"
-              onClick={() => {setBucket("current"); setKind("all");}}>Clear filters</Button>
+              onClick={()=>{setBucket("current");setKind("all");}}>Clear filters</Button>
             <Link to="/explore" className="font-semibold text-primary underline">Explore opportunities</Link>
-          </div>
-        </div> : null}
+          </>}/> : null}
       </section>
       {canLoadOlder&&<div className="mt-5 flex flex-wrap items-center gap-3">
         <Button type="button" variant="outline" 
@@ -354,9 +352,9 @@ function MyActivityPage() {
           Paged across verified participation and enrollment opportunities; older history is not discarded.
         </span>
       </div>}
-      {olderError&&<p role="alert" className="mt-3 text-sm text-destructive">
+      {olderError&&<WorkspaceNotice tone="attention" className="mt-3">
         {olderError}
-      </p>}
+      </WorkspaceNotice>}
       {opportunities.length > 0 && <section className="mt-8" aria-label="Enrollment opportunities">
         <h2 className="font-serif text-2xl">Enrollment opportunities</h2>
         <p className="mt-2 text-sm text-muted-foreground">
