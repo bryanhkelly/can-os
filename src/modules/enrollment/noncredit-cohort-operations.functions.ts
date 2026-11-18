@@ -12,7 +12,7 @@ import {
   noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
-import {isFourWeeklyCohort} from "@/domain/noncredit-cohort-schedule";
+import {validCohortSessionWindows} from "@/domain/noncredit-cohort-schedule";
 
 const id=z.string().uuid();
 const releaseInput=z.object({releaseId:id}).strict();
@@ -190,13 +190,13 @@ export const attachClassroomPlanToNoncreditRelease=createServerFn({method:"POST"
     });
   });
 
-/** Four-week cohort assignment is all-or-nothing, not four client requests.
+/** Assign up to four operator-selected cohort meetings atomically, not separate client requests.
  * A plan already attached to this release is idempotent; another release
  * or Site is always rejected. Never infer affiliation from a Site name.
  */
-export const attachFourWeekCohortPlans=createServerFn({method:"POST"})
+export const attachCohortSessionPlans=createServerFn({method:"POST"})
   .validator((v:unknown)=>releaseInput.extend({
-    planIds:z.array(id).length(4).refine(xs=>new Set(xs).size===xs.length,
+    planIds:z.array(id).min(1).max(4).refine(xs=>new Set(xs).size===xs.length,
       "Every meeting must be distinct"),
   }).strict().parse(v))
   .handler(async({data})=>{
@@ -213,8 +213,8 @@ export const attachFourWeekCohortPlans=createServerFn({method:"POST"})
           canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
         .where(inArray(facilitatedClassroomPlans.id,data.planIds))
         .for("update");
-      if(slots.length!==4||!isFourWeeklyCohort(slots))
-        throw new AuthorizationError("exactly four distinct weekly classroom meetings");
+      if(slots.length!==data.planIds.length||!validCohortSessionWindows(slots))
+        throw new AuthorizationError("one to four distinct, nonoverlapping classroom meetings");
       const assigned=[];
       for(const planId of data.planIds)
         assigned.push(await assignCohortPlan(tx,scope,planId));
