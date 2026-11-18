@@ -22,6 +22,11 @@ import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignmen
 import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import { EventTypes } from "@/domain/event-types";
+import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
+import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
+import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
+import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
 type Reader = Pick<typeof db, "select">;
 
 /**
@@ -97,7 +102,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
   const publicOfferings = publishedOfferings.map(toPublicSiteEnrichment);
   const approvedPhotos=address[0] ? await readApprovedSchoolSitePhotos(site.id) : [];
   const media=address[0] ? projectApprovedSchoolSiteMedia(site.id,publicSiteHost(address[0].slug),approvedPhotos) : {};
-  const [siteConfiguration] = await db.select({metadata: sites.metadata})
+  const [siteConfiguration] = await db.select({metadata: sites.metadata,timezone:sites.timezone})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const parentExtras = await readApprovedPublicParentExtras(site.id,
     approvedAcademicListings.map(program => program.programId),
@@ -109,7 +114,24 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     academicPrograms: authorizedPrograms, offerings: publicOfferings,
     localContent: localCopy?.content ?? null, ...parentExtras,
   });
-  // Render the same approved-source Site projection for every private page.
+  // Institutional publishing preview must use the exact published-channel
+  // configuration and approved Course/Class feeds as the anonymous Site.
+  // Private layout drafts cannot be mistaken for already-public content.
+  const noncreditReleases=address[0] ? await readOptionalSiteNoncreditReleases(site.id) : [];
+  const classes=address[0] ? await readOptionalSitePublishedClasses(site.id) : [];
+  const enrollmentAppOrigin=noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN);
+  const enrollmentOpportunities=projectSiteEnrollmentOpportunities({
+    academicPrograms:authorizedPrograms,enrichment:publicOfferings,
+    noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
+  });
+  const contentConfig=safeReadSiteContentChannelConfig(
+    siteConfiguration?.metadata?.publishedWebsiteContentChannels);
+  const contentBlocks=resolveSiteContentBlocks(contentConfig,{
+    mode:"public",academicPrograms:authorizedPrograms,enrichment:publicOfferings,
+    noncredit:noncreditReleases,classes,classTimezone:siteConfiguration?.timezone??null,
+    enrollmentOrigin:enrollmentAppOrigin,
+  });
+  // Render the same reviewed-source Site projection for every private page.
   // Synthetic demo starter copy is display-only and never written to Site CMS.
   const publisherPreview = address[0] ? withIllustrativeLocalPreview({
     demonstration: siteConfiguration?.metadata?.synthetic === true,
@@ -119,7 +141,8 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     localContent: localCopy?.content ?? null,
     offerings: publicOfferings,
     parentInformation,
-    media,
+    media,noncreditReleases,enrollmentAppOrigin,
+    enrollmentOpportunities,contentBlocks,
   }) : null;
   const previewPages = publisherPreview ? Object.fromEntries(
     availablePublicSitePaths(publisherPreview).map(path => [path,
