@@ -8,7 +8,7 @@ import { siteLocalTimeToIso } from "@/modules/calendar/site-local-time";
 import {
   ActionDialog, EmptyState, LocalDateTimeField, MutationFeedback, PageFrame,
   PageEyebrow, PageTitle, RecordHeader, RecordLayout, StatusBadge, WorkspaceNotice,
-  WorkspacePanel, secondaryActionClassName,
+  WorkspacePanel, secondaryActionClassName, useUnsavedChangesGuard,
 } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
@@ -458,6 +458,9 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
   const [postAttempted, setPostAttempted] = useState(false);
   const [report, setReport] = useState<{ postId: string; body: string } | null>(null);
   const [reportReason, setReportReason] = useState("");
+  // This panel remains mounted across tabs; preserve typed messages and
+  // prevent leaving the group before unsent student content is posted.
+  useUnsavedChangesGuard(approvedMember && (draft.trim().length > 0 || (report !== null && reportReason.trim().length > 0)));
   if (!approvedMember) return <WorkspacePanel title="Group discussion">
     <WorkspaceNotice>Discussions are visible to approved group members.</WorkspaceNotice>
   </WorkspacePanel>;
@@ -497,14 +500,14 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
       description="Explain why this post needs facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly."
       confirmLabel="Send report" pending={mutation.pending} pendingLabel="Sending report…"
       confirmDisabled={busy || !availability.contentEnabled || reportReason.trim().length < 5}
-      onClose={() => setReport(null)}
+      onClose={() => { setReport(null); setReportReason(""); }}
       onConfirm={() => void mutation.run(() => reportCanonicalGroupPost({ data: {
         groupId: group.id, postId: report.postId, reason: reportReason,
       } }), {
         successMessage: "Your report was sent for facilitator review.",
         commandErrorMessage: "Unable to report this post.",
       }).then(outcome => {
-        if (outcome.status === "saved" || outcome.status === "refresh-failed") setReport(null);
+        if (outcome.status === "saved" || outcome.status === "refresh-failed") { setReport(null); setReportReason(""); }
       })}>
       <blockquote className="border bg-muted p-3 text-sm whitespace-pre-wrap">{report.body}</blockquote>
       <Field label="Reason for reporting" className="text-sm" required>
