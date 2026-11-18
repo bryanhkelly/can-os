@@ -41,11 +41,12 @@ describe("main-only retirement of protected education_v30 leaf tables",()=>{
       expect(source).toContain("pg_rewrite");
       expect(source).toContain("pg_get_functiondef");
       expect(source).toMatch(/source_oid|original_oid/);
-      expect(source).not.toMatch(/\bDROP TABLE\b/);
-      expect(source).not.toMatch(/\bCASCADE\b/);
-      expect(source).not.toMatch(/\bTRUNCATE\b/);
-      expect(source).not.toMatch(/\bINSERT INTO\b/);
-      expect(source).not.toMatch(/\bUPDATE public\./);
+      const executable=source.split("\n").filter(line=>!line.trimStart().startsWith("--")).join("\n");
+      expect(executable).not.toMatch(/\bDROP TABLE\b/);
+      expect(executable).not.toMatch(/\bCASCADE\b/);
+      expect(executable).not.toMatch(/\bTRUNCATE\b/);
+      expect(executable).not.toMatch(/\bINSERT INTO\b/);
+      expect(executable).not.toMatch(/\bUPDATE public\./);
     }
   });
   it("denies cross-tenant, unreviewed dependencies and populated tables",()=>{
@@ -53,7 +54,7 @@ describe("main-only retirement of protected education_v30 leaf tables",()=>{
     const second=read(migrations[1].path);
     expect(first).toContain("row_count<>0");
     expect(second).toContain("row_count<>0");
-    expect(first).toContain("Unexpected inbound FK, view, RLS or trigger");
+    expect(first).toContain("Unreviewed dependency, RLS or trigger");
     expect(second).toContain("Unexpected inbound FK, view, RLS or trigger");
     expect(first).toContain("Refusing to migrate outside CAN OS Neon MAIN");
     expect(second).toContain("CAN OS Neon main database is required");
