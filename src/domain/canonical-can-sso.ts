@@ -26,22 +26,3 @@ export function hasUnambiguousCanPerson(
   return activePersonIds.length > 0 && activePersonIds.length <= 100 &&
     activePersonIds.every(id => id === actorPersonId);
 }
-
-export type CanonicalStaffGrantCandidate = {
-  personId: string;
-  grantId: string;
-  roleCode: string;
-  siteId: string | null;
-  organizationId: string;
-};
-
-export function selectExactCanonicalStaffGrant(
-  grants: readonly CanonicalStaffGrantCandidate[],
-  expected: { personId: string; roleCode: "site_admin" | "registrar"; siteId: string },
-): CanonicalStaffGrantCandidate | null {
-  // An ambiguous role/person/Site mapping must never silently pick a principal.
-  return grants.length === 1 &&
-    grants[0]?.personId === expected.personId &&
-    grants[0]?.roleCode === expected.roleCode &&
-    grants[0]?.siteId === expected.siteId ? grants[0] : null;
-}
