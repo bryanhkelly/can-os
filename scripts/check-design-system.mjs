@@ -690,6 +690,30 @@ const migratedV61RouteControls = {
     "<CurriculumEditor", "<PublisherPackComposer",
   ],
 
+  "routes/operations.course-policies.tsx": [
+    "@/components/ui/button", "@/components/ui/input",
+    "@/components/ui/choice", "@/components/ui/label",
+    "<Checkbox", "<EmptyState", "<Button",
+  ],
+  "routes/guardian.health.tsx": [
+    "@/components/ui/button", "@/components/ui/textarea",
+    "@/components/ui/field", "<QueryState", "<WorkspaceNotice",
+  ],
+  "routes/operations.interest-events.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/textarea",
+    "<DirectoryTable", "<PageFrame", "<Field",
+  ],
+  "routes/operations.workflows.tsx": [
+    "<ConnectedWorkflowsWorkspace",
+  ],
+  "routes/student.my-school.tsx": [
+    "<SchoolProfile", "<WorkspaceShell",
+  ],
+  "routes/guardian.experiences.tsx": [
+    "<LiveSchoolExperiences", "<SchoolProfile", "<WorkspaceShell",
+  ],
+
+
 
 
 
@@ -918,6 +942,37 @@ for (const [file, required] of Object.entries(guardedGuardianPreferences)) {
   if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
       radiusUtility.test(source)) {
     console.error(file + " reintroduced legacy visible controls or corners");
+    process.exitCode = 1;
+  }
+}
+
+
+// These three feature components are reused by more than one route.
+// Protect shared school records, conference booking and connected-workflow
+// presentation rather than cloning view-specific wrappers.
+const migratedSchoolExperienceComponents = {
+  "operations/ConnectedWorkflowsWorkspace.tsx": [
+    "@/components/ui/button", "<StatCard", "<WorkspaceNotice",
+    "<EmptyState", "activateLaunch", "reconcileExpiredAdmissionOffers",
+  ],
+  "operations/SchoolProfile.tsx": [
+    "<StatCard", "<StatusBadge", "<WorkspacePanel",
+    "<LiveSchoolExperiences",
+  ],
+  "student/LiveSchoolExperiences.tsx": [
+    "<StatusBadge", "<ActionDialog", "bookOfficeHour",
+    "cancelOfficeHour", "rescheduleOfficeHour",
+  ],
+};
+for (const [file, fragments] of Object.entries(migratedSchoolExperienceComponents)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(file + " lost a required shared school or experience feature: " + fragment);
+    process.exitCode = 1;
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " must use shared visible controls and square geometry");
     process.exitCode = 1;
   }
 }
