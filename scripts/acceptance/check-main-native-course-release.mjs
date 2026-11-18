@@ -221,7 +221,7 @@ async function main(){
           ON deployment.id=adoption.deployment_id
         JOIN education_v30.education_operation_organization_roles relation
           ON relation.operation_id=deployment.operation_id
-        JOIN education_v30.education_operation_sites os
+        JOIN public.education_operation_sites os
           ON os.operation_id=deployment.operation_id
         JOIN education_v30.site_organization_roles site_role
           ON site_role.site_id=os.site_id
