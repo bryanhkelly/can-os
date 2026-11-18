@@ -145,7 +145,7 @@ SELECT format('GRANT INSERT ON education_v30.%I TO %I,%I',
 FROM unnest(ARRAY['audit_events','domain_events']) AS t
 \gexec
 
-INSERT INTO education_v30.database_role_organization_bindings
+INSERT INTO public.database_role_organization_bindings
  (db_role,organization_id,purpose_code,valid_from,status)
 SELECT r.role_name,:'organization_id'::uuid,r.purpose,clock_timestamp(),'approved'
 FROM (VALUES
@@ -153,7 +153,7 @@ FROM (VALUES
  (:'reviewer_role'::name,'blueprint_reviewer')
 ) AS r(role_name,purpose)
 WHERE NOT EXISTS (
- SELECT 1 FROM education_v30.database_role_organization_bindings b
+ SELECT 1 FROM public.database_role_organization_bindings b
  WHERE b.db_role=r.role_name AND b.organization_id=:'organization_id'::uuid
    AND b.purpose_code=r.purpose AND b.status='approved'
    AND b.valid_from<=clock_timestamp()
