@@ -1,10 +1,8 @@
 import {describe,expect,it} from "vitest";
 import {readFileSync} from "node:fs";
 import {resolve} from "node:path";
-import {
-  selectedCohortSessionPlanIds,validCohortSessionWindows,
-} from "@/domain/noncredit-cohort-schedule";
-import {fourSessionSchedulePreset} from "@/domain/classroom-scheduling";
+import {selectedCohortSessionPlanIds} from "@/domain/noncredit-cohort-schedule";
+import {fourSessionSchedulePreset,validClassroomSessionWindows} from "@/domain/classroom-scheduling";
 
 const read=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
 function meeting(id:string,start:string,linked=false){
@@ -22,10 +20,10 @@ const weekly=[
 
 describe("flexible four-session COGIC pilot dates",()=>{
   it("accepts a weekly four-session plan",()=>{
-    expect(validCohortSessionWindows(weekly)).toBe(true);
+    expect(validClassroomSessionWindows(weekly)).toBe(true);
   });
   it("accepts a 2x2 pattern with two meetings each week",()=>{
-    expect(validCohortSessionWindows([
+    expect(validClassroomSessionWindows([
       meeting("1","2026-11-17T18:00:00Z"),
       meeting("2","2026-11-19T18:00:00Z"),
       meeting("3","2026-11-24T18:00:00Z"),
@@ -37,19 +35,19 @@ describe("flexible four-session COGIC pilot dates",()=>{
       "2026-11-18T18:00:00Z","2026-11-25T18:00:00Z",
       "2026-12-09T18:00:00Z","2026-12-16T18:00:00Z",
     ];
-    expect(validCohortSessionWindows(starts.map((s,i)=>meeting(String(i),s)))).toBe(true);
+    expect(validClassroomSessionWindows(starts.map((s,i)=>meeting(String(i),s)))).toBe(true);
   });
   it("rejects duplicate or overlapping meetings and invalid windows",()=>{
-    expect(validCohortSessionWindows([weekly[0]!,weekly[0]!])).toBe(false);
-    expect(validCohortSessionWindows([
+    expect(validClassroomSessionWindows([weekly[0]!,weekly[0]!])).toBe(false);
+    expect(validClassroomSessionWindows([
       weekly[0]!,
       {...weekly[1]!,startsAt:weekly[0]!.startsAt},
     ])).toBe(false);
-    expect(validCohortSessionWindows([{
+    expect(validClassroomSessionWindows([{
       startsAt:"2026-11-20T18:00:00Z",endsAt:"2026-11-20T17:00:00Z",
     }])).toBe(false);
-    expect(validCohortSessionWindows([])).toBe(false);
-    expect(validCohortSessionWindows([...weekly,weekly[0]!])).toBe(false);
+    expect(validClassroomSessionWindows([])).toBe(false);
+    expect(validClassroomSessionWindows([...weekly,weekly[0]!])).toBe(false);
   });
   it("requires deliberate selection, not the first four arbitrary meetings",()=>{
     const other=meeting("other","2026-11-21T18:00:00Z");
@@ -89,7 +87,7 @@ describe("shared four-session operator and server boundaries",()=>{
     const server=read("src/modules/learning/classroom-scheduling.functions.ts");
     expect(server).toContain("export const scheduleFourClassroomSessions");
     expect(server).toContain("meetings:z.array(scheduleInput).length(4)");
-    expect(server).toContain("validCohortSessionWindows(data.meetings)");
+    expect(server).toContain("validClassroomSessionWindows(data.meetings)");
     expect(server).toContain("await scheduleOneClassroom(tx,host,meeting,now)");
     expect(server).not.toContain("four consecutive weekly meetings with the same duration");
   });
@@ -97,7 +95,7 @@ describe("shared four-session operator and server boundaries",()=>{
     const server=read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
     expect(server).toContain("export const attachCohortSessionPlans");
     expect(server).toContain("planIds:z.array(id).min(1).max(4)");
-    expect(server).toContain("!validCohortSessionWindows(slots)");
+    expect(server).toContain("!validClassroomSessionWindows(slots)");
     expect(server).toContain('.for("update")');
     expect(server).toContain("await assignCohortPlan(tx,scope,planId)");
     const scope=read("src/modules/enrollment/noncredit-cohort-operations.server.ts");
