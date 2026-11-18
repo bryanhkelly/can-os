@@ -14,7 +14,7 @@ SELECT (
      AND NOT r.rolsuper AND NOT r.rolcanlogin AND NOT r.rolbypassrls
      AND NOT r.rolinherit AND NOT r.rolcreatedb AND NOT r.rolcreaterole)
   AND (SELECT count(*)=2
-   FROM education_v30.database_role_organization_bindings b
+   FROM public.database_role_organization_bindings b
    WHERE b.organization_id=:'organization_id'::uuid AND b.status='approved'
      AND b.valid_from<=clock_timestamp() AND
      (b.valid_through IS NULL OR b.valid_through>clock_timestamp())
