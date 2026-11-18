@@ -8,6 +8,9 @@ import { Field } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
+import { Textarea } from "@/components/ui/textarea";
 import { CurriculumPdfPicker } from "@/components/learning/CurriculumPdfPicker";
 import { StaffClassVideos } from "@/components/learning/StaffClassVideos";
 import { SafeExternalOpenLink } from "@/components/learning/SafeClassExternalLink";
@@ -99,11 +102,11 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
    <Link to="/operations/curriculum-marketplace/roster" search={{programId:market?.program.id}} className="underline">Roster exchange</Link>
   </nav>}>
   <div className="space-y-6">
-  {mode==="browse" && data.demoPreview && <section className="space-y-3 rounded-xl border p-5" aria-label="Sample curriculum catalog">
+  {mode==="browse" && data.demoPreview && <section className="space-y-3  border p-5" aria-label="Sample curriculum catalog">
     <h2 className="font-serif text-2xl">Explore sample curriculum</h2>
     <p className="text-sm text-muted-foreground">These {data.demoPreview.courses.length} synthetic courses are for demonstration and planning only. They are not academically approved or available for adoption.</p>
     <div className="grid max-h-96 gap-2 overflow-y-auto md:grid-cols-2">
-      {data.demoPreview.courses.map(course=><article key={course.code} className="rounded-lg border p-3">
+      {data.demoPreview.courses.map(course=><article key={course.code} className=" border p-3">
         <p className="text-xs text-muted-foreground">{course.subject} · {course.code}</p>
         <p className="font-medium">{course.title}</p>
         <p className="text-sm text-muted-foreground">{course.description}</p>
@@ -113,14 +116,14 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
   <p className="max-w-3xl text-sm text-muted-foreground">Install published curriculum packs into your organization's library, adopt releases for a school program and supplement classes without changing the publisher's immutable material.</p>
   <CurriculumProgramNavigation destination={destination} programs={data.programs} selectedProgramId={market?.program.id} canPublish={Boolean(market?.canPublish)} />
   <MutationFeedback state={mutation} pendingMessage="Saving curriculum change..."/>
-  {!market&&<p className="rounded-lg border p-4">Select a program to browse packs under its verified school membership.</p>}
+  {!market&&<p className=" border p-4">Select a program to browse packs under its verified school membership.</p>}
   {market&&<>
-  {mode==="browse"&&data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="School curriculum next actions">
+  {mode==="browse"&&data.journey&&<section className="space-y-4  border bg-card p-5" aria-label="School curriculum next actions">
     <div>
       <h2 className="font-serif text-2xl">School curriculum next actions</h2>
       <p className="text-sm text-muted-foreground">Suggested next steps from current school records. They do not establish academic approval or end-to-end test completion.</p>
     </div>
-    {nextActions.length?<ol className="space-y-2">{nextActions.map((action,index)=><li key={action.key} className="flex flex-wrap items-start justify-between gap-3 rounded border p-3">
+    {nextActions.length?<ol className="space-y-2">{nextActions.map((action,index)=><li key={action.key} className="flex flex-wrap items-start justify-between gap-3  border p-3">
       <div className="min-w-0 flex-1">
         <p className="font-semibold text-sm">{index+1}. {action.title}</p>
         <p className="mt-1 text-xs text-muted-foreground">{action.detail}</p>
@@ -129,7 +132,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
        action.destination==="launch"?<Link to="/launch/school/$programId" params={{programId:market.program.id}} className="text-sm underline">Open class setup</Link>:null}
     </li>)}</ol>:<p className="text-sm">No immediate gaps detected in the tracked curriculum handoffs. Continue monitoring instruction and student evidence; this is not an acceptance-test result.</p>}
    </section>}
-  {mode==="browse"&&data.journey&&<section className="space-y-4 rounded-xl border bg-card p-5" aria-label="Curriculum operational evidence">
+  {mode==="browse"&&data.journey&&<section className="space-y-4  border bg-card p-5" aria-label="Curriculum operational evidence">
     <div>
      <h2 className="font-serif text-2xl">Curriculum journey: operational evidence</h2>
      <p className="text-sm text-muted-foreground">Read-only counts from this program's real adopted curriculum, sections and assessed student work. These are not proof that signed-in end-to-end acceptance tests have passed.</p>
@@ -146,13 +149,13 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
       ["Classes with published assignments",data.journey.totals.classesWithAssignments],
       ["Submitted responses",data.journey.totals.studentSubmissions],
       ["Graded responses",data.journey.totals.gradedSubmissions],
-     ] as [string,number][]).map(([label,value])=><div key={label} className="rounded border p-3">
+     ] as [string,number][]).map(([label,value])=><div key={label} className=" border p-3">
       <p className="text-xs text-muted-foreground">{label}</p><p className="text-xl font-semibold tabular-nums">{value}</p>
      </div>)}
     </div>
     <Link to="/launch/school/$programId" params={{programId:market.program.id}} className="inline-block text-sm underline">Provision and staff classes for this program →</Link>
     <h3 className="text-sm font-semibold">Classes using adopted publisher courses</h3>
-    {data.journey.classes.map(klass=><div key={klass.id} className="rounded border p-3 text-sm">
+    {data.journey.classes.map(klass=><div key={klass.id} className=" border p-3 text-sm">
      <p className="font-semibold">{klass.code} · {klass.title}</p>
      <p>{klass.publishedLessonCount} lessons · {klass.teacherCount} teachers · {klass.studentCount} students · {klass.assignedAssessmentCount} published assessments · {klass.submittedAttemptCount} submitted responses · {klass.gradedAttemptCount} graded</p>
       {klass.firstClassroom&&<div className="mt-3">
@@ -177,7 +180,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
   {mode==="browse"&&<section id="curriculum-packs" className="space-y-3">
     <h2 className="font-serif text-2xl">Available curriculum packs</h2>
     <div className="grid gap-4 md:grid-cols-2">
-     {market.packs.map(pack=><article key={pack.versionId} id={`curriculum-pack-${pack.versionId}`} className="scroll-mt-6 space-y-3 rounded-xl border bg-card p-5">
+     {market.packs.map(pack=><article key={pack.versionId} id={`curriculum-pack-${pack.versionId}`} className="scroll-mt-6 space-y-3  border bg-card p-5">
        <p className="text-xs uppercase tracking-wide text-muted-foreground">Version {pack.version} · {pack.licenseCode} · Published by {pack.publisherName}</p>
        <h3 className="font-serif text-2xl">{pack.name}</h3>
        <p className="text-sm text-muted-foreground">{pack.description}</p>
@@ -186,21 +189,21 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
        {pack.entitlement && pack.entitlement!=="active"?
         <p role="status" className="text-sm text-muted-foreground">License status: {pack.entitlement}. Publisher review is required to restore this organization's entitlement. Accepting terms again cannot reactivate it.</p>:
         pack.entitlement!=="active"?<>
-        <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={accepted[pack.id]??false}
+        <Label className="flex items-start gap-2 text-sm"><Checkbox checked={accepted[pack.id]??false}
          onChange={e=>setAccepted(old=>({...old,[pack.id]:e.target.checked}))}/>
          <span>I accept this pack's {pack.licenseCode} terms and understand that commercial or third-party rights require a verified agreement.</span>
-        </label>
-        <button type="button" disabled={busy||!accepted[pack.id]} className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
-         onClick={()=>perform(()=>installCurriculumPack({data:{programId:market.program.id,packId:pack.id,termsAccepted:true}}),"Pack added to your organization's library.")}>Add to library</button>
+        </Label>
+        <Button type="button" disabled={busy||!accepted[pack.id]} 
+         onClick={()=>perform(()=>installCurriculumPack({data:{programId:market.program.id,packId:pack.id,termsAccepted:true}}),"Pack added to your organization's library.")}>Add to library</Button>
        </>:pack.adoption?.status==="active" && pack.adoption.versionId===pack.versionId?
         <p className="text-sm font-medium">Release v{pack.version} adopted for {market.program.name}</p>:
         pack.adoption?.status==="active"?
         <p className="text-sm text-muted-foreground">Installed; a different release of this pack is already adopted. Upgrades must be reviewed to preserve class progress.</p>:
         pack.adoption?
         <p role="status" className="text-sm text-muted-foreground">Program adoption status: {pack.adoption.status}. An explicit adoption revision is required before this pack can be used again. Existing class version pins and local supplements are preserved.</p>:
-        <section className="space-y-3 rounded border p-3" aria-label={"Review adoption for "+pack.name}>
-         {adoptionReview!==pack.versionId?<button type="button" disabled={busy}
-           className="rounded border px-3 py-2 text-sm" onClick={()=>setAdoptionReview(pack.versionId)}>Review adoption</button>:<>
+        <section className="space-y-3  border p-3" aria-label={"Review adoption for "+pack.name}>
+         {adoptionReview!==pack.versionId?<Button type="button" disabled={busy}
+           variant="outline" onClick={()=>setAdoptionReview(pack.versionId)}>Review adoption</Button>:<>
           <h4 className="font-semibold text-sm">Confirm curriculum adoption</h4>
           <dl className="grid gap-1 text-sm">
            <div><dt className="inline text-muted-foreground">School program: </dt><dd className="inline font-medium">{market.program.name}</dd></div>
@@ -210,22 +213,22 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
           </dl>
           <p className="text-xs text-muted-foreground">Included publisher course releases: {pack.courses.map(c=>`${c.code} (${c.title})`).join(" · ")}.</p>
           <p className="text-xs text-muted-foreground">This pins this publisher pack to the selected program. Existing class versions will not change. Academic-year-specific adoption is not yet available; license classification alone is not an executed commercial agreement.</p>
-          <label className="flex items-start gap-2 text-sm"><input type="checkbox"
+          <Label className="flex items-start gap-2 text-sm"><Checkbox
             checked={adoptionConfirmed[pack.versionId]??false}
             onChange={e=>setAdoptionConfirmed(v=>({...v,[pack.versionId]:e.target.checked}))}/>
             <span>I reviewed the publisher, exact release, included courses, program, and license conditions.</span>
-          </label>
+          </Label>
           <div className="flex flex-wrap gap-3">
-           <button type="button" disabled={busy||!adoptionConfirmed[pack.versionId]}
-            className="rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
-            onClick={()=>perform(()=>adoptCurriculumPack({data:{programId:market.program.id,packId:pack.id,versionId:pack.versionId}}),"Published pack release adopted by this program.")}>Adopt for this program</button>
-           <button type="button" className="rounded border px-3 py-2 text-sm" onClick={()=>{setAdoptionReview(null);setAdoptionConfirmed(v=>({...v,[pack.versionId]:false}));}}>Cancel</button>
+           <Button type="button" disabled={busy||!adoptionConfirmed[pack.versionId]}
+            
+            onClick={()=>perform(()=>adoptCurriculumPack({data:{programId:market.program.id,packId:pack.id,versionId:pack.versionId}}),"Published pack release adopted by this program.")}>Adopt for this program</Button>
+           <Button type="button" variant="outline" onClick={()=>{setAdoptionReview(null);setAdoptionConfirmed(v=>({...v,[pack.versionId]:false}));}}>Cancel</Button>
           </div>
          </>}
         </section>}
       </article>)}
     </div>
-    {!market.packs.length&&<p className="rounded border p-4 text-sm">No published curriculum packs are available to this organization yet.</p>}
+    {!market.packs.length&&<p className=" border p-4 text-sm">No published curriculum packs are available to this organization yet.</p>}
     </section>}
   {mode==="resources"&&<><StaffClassVideos sections={market.sections} videos={market.overlays}/>
   <section className="space-y-4">
@@ -269,14 +272,14 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
     {supplementAttempted&&!courseVersionId&&<p role="alert" className="text-sm text-destructive">Choose a course.</p>}
     {supplementAttempted&&scope==="section"&&!sectionId&&<p role="alert" className="text-sm text-destructive">Choose a class section for this visibility scope.</p>}
     <Button type="submit" disabled={busy} className="justify-self-start">Add supplement</Button>
-     <fieldset className="sm:col-span-2 space-y-3 rounded-lg border p-4">
+     <fieldset className="sm:col-span-2 space-y-3  border p-4">
       <legend className="px-2 text-sm font-semibold">Upload a private PDF</legend>
       <CurriculumPdfPicker enabled={data.pdfUpload.enabled} busy={busy} fileKey={pdfKey}
        selectedFile={pdfFile} rightsConfirmed={rightsConfirmed}
        onFileChange={setPdfFile} onRightsChange={setRightsConfirmed} />
-      <button type="button" disabled={busy||!data.pdfUpload.enabled||!pdfFile||!rightsConfirmed||!courseVersionId||
+      <Button type="button" disabled={busy||!data.pdfUpload.enabled||!pdfFile||!rightsConfirmed||!courseVersionId||
           !title.trim()||(scope==="section"&&!sectionId)}
-       className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       variant="outline"
        onClick={()=>void perform(async()=>{
          if(!pdfFile)throw new Error("Select a PDF.");
          const params={programId:market.program.id,courseVersionId,scope,title,
@@ -295,13 +298,13 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
          await pendingPdf.current.task.run();
          pendingPdf.current=null;
          setPdfFile(null);setPdfKey(v=>v+1);setRightsConfirmed(false);
-       },"Private PDF uploaded and attached to the selected curriculum scope.")}>Upload PDF</button>
+       },"Private PDF uploaded and attached to the selected curriculum scope.")}>Upload PDF</Button>
       {!data.pdfUpload.enabled&&<p className="text-xs text-muted-foreground" role="status">
         Private PDF uploads require CAN_R2_CURRICULUM_UPLOADS_ENABLED=true and a configured private R2 bucket. External HTTPS PDF links remain available above.</p>}
      </fieldset>
     </form>}
     <h3 className="font-semibold">Current supplements</h3>
-    <ul className="space-y-2 text-sm">{market.overlays.map(item=><li className="rounded border p-3" key={item.id}>
+    <ul className="space-y-2 text-sm">{market.overlays.map(item=><li className=" border p-3" key={item.id}>
      <strong>{item.title}</strong> · {item.kind} · {item.sectionId?"Class":item.siteId?"Site":"Program"} ·
      {item.url && <SafeExternalOpenLink url={item.url}/>}
     </li>)}</ul>
@@ -311,12 +314,12 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
   {mode==="imports"&&market.canPublish&&<section className="space-y-3">
      <h2 className="font-serif text-2xl">Import Common Cartridge</h2>
      <p className="text-sm text-muted-foreground">Inspect a publisher-supplied 1EdTech Common Cartridge or Thin Common Cartridge (.imscc) without rebuilding it manually. The first stage validates the ZIP manifest, preserves publisher IDs and reports unsupported assessment or application resources. It does not yet publish a course or import embedded files.</p>
-     <label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
-       <input type="file" accept=".imscc,.zip" disabled={busy} className="mt-2 block"
+     <Label className="block text-sm">Cartridge package (.imscc, 2 MB maximum)
+       <Input type="file" accept=".imscc,.zip" disabled={busy} className="mt-2 block"
          onChange={e=>{setCartridgeReport(null);setCartridgeLinks([]);setCartridgeSection("");setCartridgeRights(false);setCartridgeFile(e.currentTarget.files?.[0]??null);}}/>
-     </label>
-     <button type="button" disabled={busy||!cartridgeFile}
-       className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+     </Label>
+     <Button type="button" disabled={busy||!cartridgeFile}
+       variant="outline"
        onClick={()=>void perform(async()=>{
         if(!cartridgeFile)throw new Error("Select a Common Cartridge file.");
         const base64=await encodeCommonCartridge(cartridgeFile);
@@ -326,27 +329,27 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
         setCartridgeReport(result);
        },"Cartridge manifest validated and audit-staged. Review the notices before publishing any content.")}>
        Validate cartridge
-     </button>
+     </Button>
      {cartridgeReport&&<CommonCartridgeValidationSummary report={cartridgeReport} />}
-      {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3 rounded border p-4" aria-label="Import supported Common Cartridge web links">
+      {cartridgeReport&&cartridgeWebLinks.length>0&&<section className="space-y-3  border p-4" aria-label="Import supported Common Cartridge web links">
        <h3 className="font-semibold">Add supported web links to a class</h3>
        <p className="text-xs text-muted-foreground">Select the original external links you reviewed. Their URLs and source identifiers are preserved in canonical curriculum resources; this does not import a course or lesson package.</p>
-       <label className="block text-sm">Destination class
-        <select className="mt-1 block w-full rounded border bg-background p-2" value={cartridgeSection} onChange={e=>setCartridgeSection(e.target.value)}>
+       <Label className="block text-sm">Destination class
+        <Select className="mt-1 block w-full  border bg-background p-2" value={cartridgeSection} onChange={e=>setCartridgeSection(e.target.value)}>
          <option value="">Select a class</option>
          {market.sections.map(section=><option key={section.id} value={section.id}>{section.code} · {section.title}</option>)}
-        </select>
-       </label>
-       <div className="space-y-2">{cartridgeWebLinks.map(link=><label key={link.identifier} className="flex items-start gap-2 text-sm">
-         <input type="checkbox" checked={cartridgeLinks.includes(link.identifier)}
+        </Select>
+       </Label>
+       <div className="space-y-2">{cartridgeWebLinks.map(link=><Label key={link.identifier} className="flex items-start gap-2 text-sm">
+         <Checkbox checked={cartridgeLinks.includes(link.identifier)}
           onChange={e=>setCartridgeLinks(old=>e.target.checked?[...old,link.identifier]:old.filter(id=>id!==link.identifier))}/>
          <span>{link.identifier} · {link.href??link.files[0]??"Link descriptor"}</span>
-       </label>)}</div>
-       <label className="flex items-start gap-2 text-sm"><input type="checkbox" checked={cartridgeRights}
+       </Label>)}</div>
+       <Label className="flex items-start gap-2 text-sm"><Checkbox checked={cartridgeRights}
         onChange={e=>setCartridgeRights(e.target.checked)}/>
         <span>I reviewed these external links, their destination class, and rights to share them with students.</span>
-       </label>
-       <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+       </Label>
+       <Button type="button" variant="outline"
         disabled={busy||!cartridgeFile||!cartridgeSection||!cartridgeRights||!cartridgeLinks.length}
         onClick={()=>void perform(async()=>{
          if(!cartridgeFile)throw new Error("Select the validated source package.");
@@ -355,7 +358,7 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
            programId:market.program.id,sectionId:cartridgeSection,fileName:cartridgeFile.name,
            base64,linkIdentifiers:cartridgeLinks,rightsConfirmed:true,
          }});
-        },"Selected web links added to the class as canonical curriculum resources.")}>Add selected links to class</button>
+        },"Selected web links added to the class as canonical curriculum resources.")}>Add selected links to class</Button>
       </section>}
      <h3 className="font-semibold">Recent validation jobs</h3>
      <ul className="space-y-1 text-sm">{data.imports.map(item=><li key={item.id}>
@@ -371,36 +374,36 @@ export function MarketView({data,mode="browse"}:{mode?:"browse"|"resources"|"imp
        This export contains identifiable student and teacher information and requires the school's separate registrar
        enrollment-approval authority. Gradebook result exchange and roster import are not yet enabled.
      </p>
-     <button type="button" disabled={busy} className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+     <Button type="button" disabled={busy} variant="outline"
       onClick={()=>void perform(async()=>{
         const archive=await exportOneRosterBulkRoster({data:{programId:market.program.id}});
         downloadBase64(archive.base64,archive.fileName,"application/zip");
-      },"OneRoster roster export generated and access logged.")}>Export OneRoster ZIP</button>
+      },"OneRoster roster export generated and access logged.")}>Export OneRoster ZIP</Button>
      <p className="text-xs text-muted-foreground">
        Only active, explicitly authorized sections and their enrolled students and assigned teachers are included.
        This is a roster-profile implementation, not a claim of complete OneRoster or gradebook conformance.
      </p>
    </section>
-   {market.canPublish&&<section className="space-y-3 rounded-xl border p-5" aria-label="Reconcile OneRoster classes">
+   {market.canPublish&&<section className="space-y-3  border p-5" aria-label="Reconcile OneRoster classes">
      <h2 className="font-serif text-2xl">Match OneRoster classes</h2>
      <p className="text-sm text-muted-foreground">Paste a OneRoster 1.2 classes.csv to connect external sourced IDs to existing CAN classes. No child profiles, enrollments, teacher accounts or grades are changed. Match every class explicitly and review the destination before saving.</p>
-     <label className="block text-sm">Source system
-      <input className="mt-1 block w-full rounded border bg-background p-2" value={rosterSource}
+     <Label className="block text-sm">Source system
+      <Input className="mt-1 block w-full  border bg-background p-2" value={rosterSource}
        placeholder="district-sis" maxLength={100} onChange={e=>{setRosterSource(e.target.value);setRosterValidated(false);}}/>
-     </label>
-     <label className="block text-sm">OneRoster classes.csv
-      <textarea className="mt-1 block min-h-28 w-full rounded border bg-background p-2 font-mono text-xs"
+     </Label>
+     <Label className="block text-sm">OneRoster classes.csv
+      <Textarea className="mt-1 block min-h-28 w-full  border bg-background p-2 font-mono text-xs"
        value={rosterCsv} maxLength={500000}
        placeholder={"sourcedId,title,courseSourcedId,classCode,schoolSourcedId"}
        onChange={e=>{setRosterCsv(e.target.value);setRosterValidated(false);setRosterMap({});}}/>
-     </label>
-     <button type="button" className="rounded border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+     </Label>
+     <Button type="button" variant="outline"
       disabled={busy||!rosterSource.trim()||!rosterCsv.trim()||!rosterClasses.length||rosterClasses.length>500}
       onClick={()=>void perform(async()=>{
        const result=await validateOneRosterCsvBundle({data:{programId:market.program.id,files:{classes:rosterCsv}}});
        if(!result.report.valid)throw new Error("The OneRoster CSV contains validation errors.");
        setRosterValidated(true);
-      },"OneRoster classes validated. Choose the corresponding CAN classes.")}>Validate class CSV</button>
+      },"OneRoster classes validated. Choose the corresponding CAN classes.")}>Validate class CSV</Button>
      {rosterValidated&&<OneRosterClassMappingFields rows={rosterClasses} sections={market.sections}
       mappings={rosterMap} busy={busy}
       onMappingChange={(sourcedId,sectionId)=>setRosterMap(old=>({...old,[sourcedId]:sectionId}))}
