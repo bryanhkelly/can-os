@@ -47,6 +47,30 @@ describe("Site-owned content source and publication contract",()=>{
     expect(publisher).toContain("mode:\"public\"");
   });
 
+  it("maps the same saved Site layout into Website Studio without a parallel CMS",()=>{
+    const launch=read("src/components/launch-studio/SiteFirstLaunch.tsx");
+    const website=read("src/routes/site-website.tsx");
+    const preview=read("src/modules/sites/site-website-preview.server.ts");
+    const service=read("src/modules/sites/site-content-channels.server.ts");
+    expect(launch).toContain("<SiteContentChannelEditor");
+    expect(website).toContain("<SiteContentChannelEditor");
+    expect(website).toContain("initialConfig={data.contentChannelConfig}");
+    expect(preview).toContain("contentChannelConfig: contentConfig");
+    expect(service).toContain("authorizeContentChannelEditor(actor, site, tx, \"write\")");
+    expect(service).toContain("requirePartnerWebsiteEditor(actor, executor,");
+    expect(service).toContain("editor.id !== site.id");
+    expect(service).toContain("siteWebsiteLocalPublishCapability");
+    expect(website).not.toContain("updateLaunchSiteAddress(");
+  });
+
+  it("can publish a saved layout after reentry but never accidentally publish dirty edits",()=>{
+    const editor=read("src/components/launch-studio/SiteContentChannelEditor.tsx");
+    expect(editor).toContain("unsavedChanges||(revision===0&&!saved)");
+    expect(editor).toContain("if(!siteId||saving||publishing||unsavedChanges");
+    expect(editor).toContain("onSaved();");
+    expect(editor).not.toContain("||!saved}");
+  });
+
   it("uses source-bound blocks rather than arbitrary URLs or approved-Program writes",()=>{
     const config=read("src/domain/site-content-channels.ts");
     const editor=read("src/components/launch-studio/SiteContentChannelEditor.tsx");
