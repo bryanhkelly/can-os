@@ -129,7 +129,8 @@ async function main() {
       SELECT count(*)::integer AS table_count
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'education_v30'
+      WHERE (n.nspname = 'education_v30'
+          OR (n.nspname='public' AND c.relname='published_asset_reviews'))
         AND c.relname = ANY($1::text[])
         AND c.relrowsecurity
         AND c.relforcerowsecurity
@@ -668,7 +669,8 @@ async function main() {
       FROM pg_policy p
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'education_v30'
+      WHERE (n.nspname = 'education_v30'
+          OR (n.nspname='public' AND c.relname='published_asset_reviews'))
         AND c.relname = ANY($1::text[])
     `, [[
       "instructional_track_policy_versions",
