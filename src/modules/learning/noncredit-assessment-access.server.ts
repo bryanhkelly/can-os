@@ -1,8 +1,8 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  assessmentAccess, assessmentFormAdministrations, auditEvents, domainEvents,
-  learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
+  assessmentAccess, assessmentFormAdministrations, learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
   noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
@@ -86,13 +86,13 @@ export async function provisionNoncreditAssessmentAccess(
     if(!granted)throw new Error("Could not provision assessment access");
     const payload={courseAttemptId:attempt.id,registrationId:registration.id,
       administrationId:administration.id,accessGrantId:granted.id};
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:context.actorPersonId!,
       owningOrganizationId:training.providerOrganizationId,
       eventCode:"noncredit.assessment.access_granted",
       entityKind:"assessment_access_grant",entityId:granted.id,payload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType:"NoncreditAssessmentAccessGranted",
       aggregateType:"assessment_access_grant",aggregateId:granted.id,
       actorPersonId:context.actorPersonId!,payload,
