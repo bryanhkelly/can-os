@@ -19,6 +19,7 @@ function Preview({ reply = false }: { reply?: boolean }) {
 const meta = {
   title: "Student/Shared discussion composer",
   component: DiscussionComposer,
+  args: { value: "", onChange: () => {}, onSubmit: () => {} },
   parameters: { chromatic: { modes: {
     light: { theme: "light" }, dark: { theme: "dark" }, site: { theme: "site" },
   } } },
