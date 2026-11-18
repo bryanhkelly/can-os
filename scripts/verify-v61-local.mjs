@@ -42,6 +42,8 @@ const checks = [
     "tests/unit/noncredit-waitlist-query-isolation.test.ts",
     "tests/unit/launch-class-cache-integration.test.ts",
     "tests/unit/native-class-availability-cache.test.ts",
+    "tests/unit/native-offering-adoption-publication.test.ts",
+    "tests/unit/native-adoption-readiness.test.ts",
     "tests/unit/my-activity-v61-state-composition.test.ts"] },
   { id: "unit-suite", name: "Complete nonintegration unit suite", cmd: npm, args: ["test"] },
   { id: "storybook-build", name: "Static Storybook build", cmd: npm, args: ["run", "build-storybook"] },
