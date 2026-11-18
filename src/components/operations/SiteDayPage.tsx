@@ -193,7 +193,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
       {context && <span>{context.timeZone}</span>}
       <span>Attendance does not authorize student release.</span>
     </div>
-    {openingQuery.isPending && <p role="status" className="mt-4 rounded-xl border p-3 text-sm">Checking current school-opening authorization…</p>}
+    {openingQuery.isPending && <p role="status" className="mt-4 border p-3 text-sm">Checking current school-opening authorization…</p>}
     {openingQuery.isError && <section role="alert" aria-label="School opening verification unavailable"
       className="mt-4 border-l-4 border-destructive bg-muted/40 px-5 py-4">
       <h2 className="font-semibold">School-opening status could not be verified</h2>
@@ -247,7 +247,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
           <a href="#day-review">4. Reconcile the day</a>
         </Button></>}
     </nav>}
-    {preparing&&<p role="status" className="mt-4 rounded border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
+    {preparing&&<p role="status" className="mt-4 border p-3 text-sm">Preparation mode — preview and plan only. Record attendance, physical arrival and student release in Operate today.</p>}
     {context?.hasPrograms && <Label className="mt-6 block max-w-sm">
       {preparing?"School-local preparation date":"School-local attendance date"}
       <Input type="date" value={date} min={preparing?context.date:undefined} max={preparing?context.preparationThrough:context.date}
@@ -258,8 +258,8 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
         }} />
       <span className="mt-1 block text-xs text-muted-foreground">{context.timeZone}</span>
     </Label>}
-    {(notice || noProgramNotice) && <p role="status" className="mt-4 rounded border p-3 text-sm">{notice || noProgramNotice}</p>}
-    {(error || workspaceError) && <p role="alert" className="mt-4 rounded border p-3 text-sm">{error || workspaceError}</p>}
+    {(notice || noProgramNotice) && <p role="status" className="mt-4 border p-3 text-sm">{notice || noProgramNotice}</p>}
+    {(error || workspaceError) && <p role="alert" className="mt-4 border p-3 text-sm">{error || workspaceError}</p>}
     <QueryState loading={!context && contextQuery.isPending ? "Loading your verified site workspace…" : undefined}
       error={!context && contextFailure?.message}
       onRetry={!context && contextFailure?.retryable ? () => void contextQuery.refetch() : undefined}
@@ -269,26 +269,26 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
       onRetry={!workspaceError && dayFailure?.retryable ? () => void dayQuery.refetch() : undefined}
       retrying={dayQuery.isFetching}/>
     {preparing&&preparation&&<SchoolDayPreparationPanel preparation={preparation} onChanged={()=>void load(date,true)}/>}
-    {roster && !preparing && <section aria-label="Today's operational steps" className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+    {roster && !preparing && <section aria-label="Today's operational steps" className="mt-7 border border-border/70 bg-card p-5 shadow-sm">
       <h2 className="font-serif text-2xl font-semibold">Run today's school day</h2>
       <p className="mt-2 text-sm text-muted-foreground">Work through the current school day in order. These are navigation steps, not proof that opening, supervision, attendance, or custody requirements are satisfied.</p>
       <ol className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <li><a href="#supervision" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+        <li><a href="#supervision" className="block min-h-24 border p-4 hover:bg-muted/40 focus-visible:outline-2">
           <span className="text-xs font-bold uppercase tracking-wide text-primary">1 · Coverage</span>
           <span className="mt-1 block font-semibold">Confirm staff and supervision</span>
           <span className="mt-1 block text-xs text-muted-foreground">Review scheduled duties and actual presence</span>
         </a></li>
-        <li><a href="#attendance" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+        <li><a href="#attendance" className="block min-h-24 border p-4 hover:bg-muted/40 focus-visible:outline-2">
           <span className="text-xs font-bold uppercase tracking-wide text-primary">2 · Arrival</span>
           <span className="mt-1 block font-semibold">Record observed attendance</span>
           <span className="mt-1 block text-xs text-muted-foreground">{roster.students.filter(student=>["unmarked","expected"].includes(student.status)).length} student-program roster entries need a mark</span>
         </a></li>
-        <li><a href="#pickup" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+        <li><a href="#pickup" className="block min-h-24 border p-4 hover:bg-muted/40 focus-visible:outline-2">
           <span className="text-xs font-bold uppercase tracking-wide text-primary">3 · Dismissal</span>
           <span className="mt-1 block font-semibold">Verify student pickup</span>
           <span className="mt-1 block text-xs text-muted-foreground">Use independent custody and release verification</span>
         </a></li>
-        <li><a href="#day-review" className="block min-h-24 rounded-xl border p-4 hover:bg-muted/40 focus-visible:outline-2">
+        <li><a href="#day-review" className="block min-h-24 border p-4 hover:bg-muted/40 focus-visible:outline-2">
           <span className="text-xs font-bold uppercase tracking-wide text-primary">4 · Closeout</span>
           <span className="mt-1 block font-semibold">Review unresolved records</span>
           <span className="mt-1 block text-xs text-muted-foreground">Reconcile attendance and linked custody evidence</span>
@@ -333,7 +333,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
       <div className="mt-6 grid gap-4">
         {roster.students.map(student => {
           const key = student.programId + ":" + student.studentProfileId;
-          return <section key={key} className="rounded-xl border p-4">
+          return <section key={key} className="border p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div><h2 className="font-semibold">{student.studentName}</h2>
                 <p className="text-xs text-muted-foreground">
@@ -343,10 +343,10 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
             </div>
             {student.attendanceEventId && <label className="mt-3 block text-xs">
               Correction reason (required)
-              <input value={notes[key] ?? ""} maxLength={2000}
+              <Input value={notes[key] ?? ""} maxLength={2000}
                 onChange={event => setNotes(current => ({ ...current, [key]: event.target.value }))}
                 placeholder="Why is this recorded attendance changing?"
-                className="mt-1 w-full rounded border p-2 text-sm"/>
+                className="mt-1"/>
             </label>}
             <div className="mt-4 flex flex-wrap gap-2">
               {marks.map(status => <Button key={status} type="button" size="sm"
