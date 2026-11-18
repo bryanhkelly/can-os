@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
-import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
+import { createPrivateUploadTask, documentUploadPolicy, validateUploadFile } from "@/platform/storage/private-upload";
 import { attachmentAccept, attachmentMimeForFileName as attachmentMime, MAX_ATTACHMENT_BYTES } from "@/modules/learning/attachment-mimes";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
@@ -121,6 +121,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
  const [submittedReceipt, setSubmittedReceipt] = useState<string | null>(null);
  const [error, setError] = useState("");
  const [draftStatus, setDraftStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+ const [pendingAutosaves, setPendingAutosaves] = useState(0);
  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
  const [attachments, setAttachments] = useState<{ documentId: string; fileName: string }[]>([]);
  const saveGeneration = useRef(0);
@@ -139,7 +140,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
  const editable = assignment.canEdit === true && !submittedReceipt;
  // Autosave is delayed; prevent navigation from silently discarding typed work
  // or attachments that have not reached the authorized submission record.
- useUnsavedChangesGuard(editable && (draft !== savedDraft || pendingFiles.length > 0));
+ useUnsavedChangesGuard(editable && (draft !== savedDraft || pendingFiles.length > 0 || pendingAutosaves > 0));
  // The verified current-attempt attachment list is authoritative. A newly
  // attached file can be submitted even if the initial loader had no draft.
  const canSubmit = canSubmitAssignmentWork({
@@ -164,12 +165,18 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
     await previous?.catch(() => undefined);
     if (generation !== saveGeneration.current || saving.current) return;
     await saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } });
-    if (generation === saveGeneration.current) setSavedDraft(draft);
+    // Even when the learner has typed again, record what actually reached
+    // the server. The effect then schedules the latest text if it differs.
+    setSavedDraft(draft);
    })();
    autosaveInFlight.current = request;
+   setPendingAutosaves(count => count + 1);
    void request.then(() => { if (generation === saveGeneration.current) setDraftStatus("saved"); })
     .catch(() => { if (generation === saveGeneration.current) setDraftStatus("error"); })
-    .finally(() => { if (autosaveInFlight.current === request) autosaveInFlight.current = null; });
+    .finally(() => {
+     setPendingAutosaves(count => Math.max(0, count - 1));
+     if (autosaveInFlight.current === request) autosaveInFlight.current = null;
+    });
   }, 950);
   return () => { clearTimeout(task); saveGeneration.current++; };
  }, [assignment.assessmentId, editable, busy, draft, hydrated, savedDraft]);
@@ -368,7 +375,12 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
        <Input type="file" multiple accept={attachmentAccept} disabled={!hydrated || busy}
         onChange={event => {
          const chosen = Array.from(event.currentTarget.files ?? []);
-         const valid = chosen.filter(file => file.size > 0 && file.size <= MAX_ATTACHMENT_BYTES && attachmentMime(file.name));
+         const valid = chosen.filter(file => {
+          const contentType = attachmentMime(file.name);
+          if (!contentType) return false;
+          try { validateUploadFile(file, documentUploadPolicy, contentType); return true; }
+          catch { return false; }
+         });
          if (valid.length !== chosen.length) setError("Choose PDF, PNG, or JPEG files no larger than 10 MB each.");
          setPendingFiles(current => [...current, ...valid].filter((file, index, all) =>
           all.findIndex(candidate => candidate.name === file.name && candidate.size === file.size && candidate.lastModified === file.lastModified) === index));
