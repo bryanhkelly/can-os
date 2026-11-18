@@ -11,8 +11,9 @@ deployment/adoption, program Offering, and scope-specific role.
 
 - Published, approved adult enrollment releases can be paired with real dated
   `facilitated_classroom_plans` and their authoritative `delivery_sessions`.
-  Four-week courses reuse existing classroom scheduling rather than inventing
-  new meeting records or turning paired devices into attendance.
+  Multi-session courses reuse existing classroom scheduling. Four-session pilots
+  can meet weekly, twice weekly, or across holiday gaps; neither booking nor
+  device pairing creates attendance.
 - Scoped provider operator workspace with release rosters, scheduled sessions,
   explicit registration, latest completion decisions, and facilitator-attested
   live-room attendance. The same read model exposes safe operational summaries.
