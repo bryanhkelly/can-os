@@ -268,6 +268,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     <ActionDialog open={endingRoomId!==null} title="End facilitated room?"
       description="End live playback and new device pairing for this room. Existing recorded participation and any available correction window remain independent."
       confirmLabel="End room" destructive pending={feedback.pending}
+      confirmDisabled={feedback.refreshFailed}
       onClose={()=>setEndingRoomId(null)}
       onConfirm={()=>{
         const id=endingRoomId;
