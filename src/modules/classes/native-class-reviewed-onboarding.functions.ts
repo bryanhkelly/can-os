@@ -2,13 +2,16 @@ import { createServerFn } from "@tanstack/react-start";
 import { appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 import {
   accessAccounts, accessAccountCanonicalPrincipals,
   accessAccountNoncreditPrincipals, accessAdultLearningReviews,
 } from "@/db/schema";
 import {
-  canonicalAccounts, canonicalPersons, canonicalAccountGrants,
-  canonicalEnrollmentOrganizations, auditEvents,
+  canonicalAccounts,
+  canonicalPersons,
+  canonicalAccountGrants,
+  canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
@@ -168,7 +171,7 @@ export const activateReviewedNativeClassLearner=createServerFn({method:"POST"})
       isNull(accessAdultLearningReviews.consumedAt),
     )).returning({accessAccountId:accessAdultLearningReviews.accessAccountId});
     if(!consumed)throw new AuthorizationError("approved adult review was already consumed");
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:nativePersonId,owningOrganizationId:org.id,
       eventCode:"class.learner.identity.activated",
       entityKind:"canonical_account",entityId:nativeAccountId,
