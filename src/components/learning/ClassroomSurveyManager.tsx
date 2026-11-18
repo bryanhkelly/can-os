@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import {
   attachClassroomSurvey,getClassroomSurveyOptions,
 } from "@/modules/learning/classroom-surveys.functions";
@@ -49,21 +50,21 @@ export function ClassroomSurveyManager({facilitatedSessionId}:{
     </p>}
     {campaigns.isSuccess&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
       <label className="text-sm font-medium">Approved campaign
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={selected} onChange={e=>setSelected(e.target.value)}>
           <option value="">Choose a governed survey</option>
           {campaigns.data.campaigns.map(row=><option key={row.id} value={row.id}>
             {row.title}
           </option>)}
-        </select>
+        </Select>
       </label>
       <label className="text-sm font-medium">Session stage
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={stage} onChange={e=>setStage(e.target.value as Stage)}>
           <option value="entry">Before instruction (entry)</option>
           <option value="pulse">During instruction (pulse)</option>
           <option value="exit">After instruction (exit)</option>
-        </select>
+        </Select>
       </label>
       <div className="sm:col-span-2">
         <Button type="button" size="sm" disabled={!selected||busy}
