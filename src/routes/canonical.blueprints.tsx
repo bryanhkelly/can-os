@@ -6,6 +6,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
 import { safeLoader } from "@/lib/safe-loader";
 import { readCanonicalBlueprintHome } from "@/modules/blueprints/blueprint-studio.functions";
+import { NativeOfferingAdoptionReviewPanel } from "@/components/launch-studio/NativeOfferingAdoptionReviewPanel";
 
 /** Native v3.0.1 memberships, isolated from public-schema Launch identities. */
 export const Route = createFileRoute("/canonical/blueprints")({
@@ -33,6 +34,7 @@ function CanonicalBlueprintPage() {
           Open submitted Blueprint reviews
         </Link>
       </p>
+      <NativeOfferingAdoptionReviewPanel/>
     </WorkspaceShell>;
   }
   if (!selectedSiteId || !siteIds.includes(selectedSiteId)) {
