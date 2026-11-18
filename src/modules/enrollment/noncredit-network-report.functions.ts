@@ -12,6 +12,7 @@ import {
 } from "@/db/canonical-v301";
 import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
 import {currentNoncreditCompletionStates} from "@/domain/verified-completion-projection";
+import {summarizeVerifiedRoomAttendance} from "@/domain/classroom-attendance";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
  * grant from a label, favorite Site, or marketing affiliation.
@@ -117,13 +118,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
       )).orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
         desc(facilitatedRoomAttendanceAssertions.id)).limit(20001):[];
     if(asserted.length>20000)throw new Error("Attendance assertions exceed reporting bounds");
-    const latest=new Map<string,string>();
-    for(const a of asserted){
-      const key=a.roomId+":"+a.attemptId;
-      if(!latest.has(key))latest.set(key,a.status);
-    }
-    const present=new Set<string>();
-    for(const [key,status] of latest)if(status==="present")present.add(key);
+    const {presentPairs:present}=summarizeVerifiedRoomAttendance(asserted);
     const attemptsByRegistration=new Map<string,string[]>();
     for(const a of attempts){
       if(!a.registrationId)continue;
