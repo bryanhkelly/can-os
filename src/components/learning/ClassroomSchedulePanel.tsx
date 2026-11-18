@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { MutationFeedback, StatusBadge, ActionDialog } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -97,7 +98,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       A schedule does not create a new Course or enroll anyone.
     </p>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <label className="block text-sm font-medium sm:col-span-2">
+      <Label className="block text-sm font-medium sm:col-span-2">
         Authorized Site and Course
         <Select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
           value={selected} onChange={e=>{
@@ -112,17 +113,17 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
             {row.deploymentName} · {row.courseTitle} · Site {row.siteId.slice(0,8)}
           </option>)}
         </Select>
-      </label>
-      <label className="block text-sm font-medium">Starts (your local time)
+      </Label>
+      <Label className="block text-sm font-medium">Starts (your local time)
         <Input type="datetime-local" value={startsAt}
           onChange={e=>setStartsAt(e.target.value)}
           className="mt-2 min-h-10 w-full border border-border bg-background p-2"/>
-      </label>
-      <label className="block text-sm font-medium">Ends (your local time)
+      </Label>
+      <Label className="block text-sm font-medium">Ends (your local time)
         <Input type="datetime-local" value={endsAt}
           onChange={e=>setEndsAt(e.target.value)}
           className="mt-2 min-h-10 w-full border border-border bg-background p-2"/>
-      </label>
+      </Label>
     </div>
     <Button className="mt-4" type="button"
       disabled={blocked||!choice||!iso(startsAt)||!iso(endsAt)}
@@ -165,18 +166,18 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
         {batchMeetings.map((meeting,index)=><fieldset key={index}
           className="grid gap-3 border border-border bg-card p-3 sm:grid-cols-2">
           <legend className="px-1 text-sm font-semibold">Session {index+1}</legend>
-          <label className="text-sm font-medium">Start (your local time)
+          <Label className="text-sm font-medium">Start (your local time)
             <Input type="datetime-local" value={meeting.start}
               onChange={event=>setBatchMeetings(current=>current.map((row,i)=>
                 i===index?{...row,start:event.target.value}:row))}
               className="mt-1"/>
-          </label>
-          <label className="text-sm font-medium">End (your local time)
+          </Label>
+          <Label className="text-sm font-medium">End (your local time)
             <Input type="datetime-local" value={meeting.end}
               onChange={event=>setBatchMeetings(current=>current.map((row,i)=>
                 i===index?{...row,end:event.target.value}:row))}
               className="mt-1"/>
-          </label>
+          </Label>
         </fieldset>)}
         {!batchReady&&<p role="status" className="text-sm text-muted-foreground">
           Enter four future, non-overlapping meeting windows. Each must last at least
@@ -276,16 +277,16 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
               </p>}
           </div>
           {edit?.planId===plan.id&&!plan.nativeClassId&&<div className="mt-3 grid gap-3 border border-border p-4 sm:grid-cols-2">
-            <label className="text-sm font-medium">New start
+            <Label className="text-sm font-medium">New start
               <Input type="datetime-local" value={edit.start}
                 onChange={e=>setEdit(current=>current?{...current,start:e.target.value}:null)}
                 className="mt-2 w-full border border-border bg-background p-2"/>
-            </label>
-            <label className="text-sm font-medium">New end
+            </Label>
+            <Label className="text-sm font-medium">New end
               <Input type="datetime-local" value={edit.end}
                 onChange={e=>setEdit(current=>current?{...current,end:e.target.value}:null)}
                 className="mt-2 w-full border border-border bg-background p-2"/>
-            </label>
+            </Label>
             <div className="flex gap-2 sm:col-span-2">
               <Button type="button" size="sm" disabled={blocked}
                 onClick={()=>void run(plan.id+":edit",async()=>{
