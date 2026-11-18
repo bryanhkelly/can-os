@@ -50,6 +50,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
           or(
             sectionIds.length ? inArray(s.studyGroups.sectionId, sectionIds) : undefined,
             sites.length ? and(
+              isNull(s.studyGroups.sectionId),
               inArray(s.studyGroups.siteId, sites),
               programs.length
                 ? or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs))
@@ -70,7 +71,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
     .where(and(eq(s.sectionTeachers.personId, actor.actorPersonId),
       eq(s.sections.active, true), inArray(s.sections.id, sectionIds)))
-    .orderBy(asc(s.sections.title)).limit(100) : [];
+    .orderBy(asc(s.sections.title)) : [];
 
   const studentPrograms = actor.role === "student" ? await db.select({
     id: s.studentProfiles.id, siteId: s.programs.siteId,
