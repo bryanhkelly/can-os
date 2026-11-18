@@ -346,9 +346,11 @@ export const publishNativeOfferingCourses=createServerFn({method:"POST"})
       if(bundle.version.lifecycle!=="draft")
         conflict("The Offering has already been published.");
       await requireApprovedSnapshot(tx,manifest);
-      if(manifest.manifestStatus==="draft")
-        await tx.update(contentPublicationManifests).set({manifestStatus:"approved"})
-          .where(eq(contentPublicationManifests.id,manifest.id));
+      // A manuscript review can publish native Course versions before any
+      // recorded media exists. The existing database manifest-approval trigger
+      // explicitly rejects empty asset manifests. Never upgrade that manifest
+      // here: the separately governed Offering media release must supply real
+      // approved asset items and satisfy Offering release requirements.
       const published=[];
       for(const row of bundle.courses){
         if(row.lifecycle==="published")continue;
@@ -380,10 +382,25 @@ export const publishNativeOfferingVersion=createServerFn({method:"POST"})
       const manifest=await exactManifest(tx,data,bundle);
       if(manifest.createdByPersonId===actor.actorPersonId)
         throw new AuthorizationError("independent Offering publication");
-      if(manifest.manifestStatus!=="approved"||
-        bundle.courses.some(row=>row.lifecycle!=="published"))
+      if(manifest.manifestStatus!=="approved")
+        invalid("The Offering needs a separately approved asset-bearing publication manifest. Native Course manuscript review alone cannot release the Offering.");
+      if(bundle.courses.some(row=>row.lifecycle!=="published"))
         invalid("Publish all independently reviewed native Courses before the Offering.");
       await requireApprovedSnapshot(tx,manifest);
+      // Mirror the database release gate for an actionable error, never
+      // create or silently relax publisher-defined release requirements.
+      const missing=await tx.execute(sql`
+        SELECT oc.course_version_id
+        FROM education_v30.offering_courses oc
+        LEFT JOIN education_v30.offering_release_requirements r
+          ON r.offering_version_id=oc.offering_version_id
+         AND r.course_version_id=oc.course_version_id
+        WHERE oc.offering_version_id=${data.offeringVersionId}::uuid
+          AND oc.is_required AND r.id IS NULL
+        LIMIT 1
+      `);
+      if(missing.rows.length)
+        invalid("Every required Course needs an explicitly reviewed Offering release policy before publication.");
       const extra=await tx.execute(sql`
         SELECT course_version_id FROM education_v30.offering_release_requirements
         WHERE offering_version_id=${data.offeringVersionId}::uuid
