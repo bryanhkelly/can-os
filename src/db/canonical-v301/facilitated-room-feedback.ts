@@ -1,4 +1,4 @@
-import { index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { pgTable, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 import { learnerCourseAttempts } from "./learning";
 import { facilitatedLearningSessions } from "./facilitated-learning";
@@ -8,7 +8,7 @@ import { facilitatedLearningSessions } from "./facilitated-learning";
  * Optional subjective ratings are kept separate from official progress,
  * attendance, assessment grades, certificates and grant evidence.
  */
-export const facilitatedRoomFeedback = educationV30.table("facilitated_room_feedback", {
+export const facilitatedRoomFeedback = pgTable("facilitated_room_feedback", {
   id: uuid("id").defaultRandom().primaryKey(),
   facilitatedSessionId: uuid("facilitated_session_id").notNull()
     .references(() => facilitatedLearningSessions.id),
