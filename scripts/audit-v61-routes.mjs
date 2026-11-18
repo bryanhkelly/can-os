@@ -1,151 +1,53 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, extname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkChangedFiles, createInventory } from "./lib/v61-source-audit.mjs";
 
-// Route-by-route *source inventory*, not a visual, security, or release certificate.
-// A route can compose legacy feature components even when its own JSX is clean.
-// Canonical primitives intentionally render native elements and are excluded.
-const root = fileURLToPath(new URL("../src/", import.meta.url));
-const routeRoot = join(root, "routes");
-const nativePattern = /<(?:button|input|select|textarea|label)\b/g;
-function visibleNativeCount(source) {
-  // Hidden authentication POST fields are native by design, never styled controls.
-  const withoutHidden = source.replace(/<input\s+type=["']hidden["'][^>]*\/>/g, "");
-  return [...withoutHidden.matchAll(nativePattern)].length;
-}
-const radiusPattern = /(?:^|[\s"'\x60])(?:[\w-]+:)*rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?(?=[\s"'\x60])/g;
-const importPattern = /(?:from\s*|import\s*\()\s*["']([^"']+)["']/g;
-const sourceGuarded = new Set([
-  "access.index.tsx",
-  "access.register.tsx",
-  "access.verify.tsx",
-  "account.index.tsx",
-  "account.sessions.tsx",
-  "explore.index.tsx",
-  "learn.my-activity.tsx",
-  "learn.enroll.tsx",
-  "student.settings.tsx",
-  "guardian.students.tsx",
-  "guardian.attendance.tsx",
-  "guardian.enrichment.tsx",
-  "guardian.report-cards.tsx",
-  "student.assignments.tsx",
-  "operations.insights.tsx",
-  "admissions.families.tsx",
-  "operations.course-requests.tsx",
-  "guardian.field-trips.tsx",
-  "teacher.discussions.tsx",
-  "platform.tsx",
-  "guardian.course-approvals.tsx",
-  "teacher.missing-work.tsx",
-  "student.discussions.tsx",
-  "student.courses.tsx",
-  "class.tsx",
-  "admissions.index.tsx",
-  "teacher.gradebook.tsx",
-  "calendar.tsx",
-  "sites.$siteId.publish.tsx",
-  "canonical.blueprint-reviews.tsx",
-  "site-website.tsx",
-  "operations.family-alerts.tsx",
-  "operations.teacher-marketplace.tsx",
-  "sites.$siteId.parent-information.tsx",
-  "operations.health-review.tsx",
-  "operations.field-trips.tsx",
-  "operations.transfer-records.tsx",
-  "operations.curriculum-marketplace.tsx",
-  "guardian.native-classes.tsx",
-  "class_.$classId.tsx",
-  "classes.tsx",
-  "guardian.group-permissions.tsx",
-  "student.assignments_.$assessmentId.tsx",
-  "student.field-trips.tsx",
-  "guardian.admission-offers.tsx",
-  "guardian.enrollment-changes.tsx",
-  "student.support.tsx",
-  "guardian.watching.tsx",
-  "operations.jurisdiction-profiles.tsx",
-  "operations.curriculum.tsx",
-  "operations.course-policies.tsx",
-  "guardian.health.tsx",
-  "operations.interest-events.tsx",
-  "operations.workflows.tsx",
-  "student.my-school.tsx",
-  "guardian.experiences.tsx",
-  "operations.school-years.tsx",
-  "operations.school-years_.$yearId.tsx",
-  "operations.school-years_.new.tsx",
-  "launch.school.tsx",
-]);
+// Discover route and component TSX files from the current checkout.
+// This inventory reports source-level debt; it does not certify UX, security,
+// accessibility, SSR, or successful production user journeys.
+const root = fileURLToPath(new URL("../", import.meta.url));
+const inventory = createInventory(root);
+const base = process.argv.find(arg => arg.startsWith("--base="))?.slice("--base=".length);
+const regression = checkChangedFiles(root, base);
 
-function resolveSource(from, specifier) {
-  const base = specifier.startsWith("@/") ? join(root, specifier.slice(2))
-    : specifier.startsWith(".") ? resolve(dirname(from), specifier) : null;
-  if (!base || !base.startsWith(root)) return null;
-  for (const candidate of [base, base + ".tsx", join(base, "index.tsx")]) {
-    if (existsSync(candidate) && extname(candidate) === ".tsx") return candidate;
-  }
-  return null;
-}
-const cache = new Map();
-function inspect(file) {
-  if (cache.has(file)) return cache.get(file);
-  const source = readFileSync(file, "utf8");
-  const deps = new Set();
-  for (const match of source.matchAll(importPattern)) {
-    const dependency = resolveSource(file, match[1]);
-    if (dependency && dependency !== file &&
-        !relative(root, dependency).startsWith("components/ui/")) deps.add(dependency);
-  }
-  const result = {
-    raw: visibleNativeCount(source),
-    radius: [...source.matchAll(radiusPattern)].length,
-    dependencies: [...deps],
-  };
-  cache.set(file, result);
-  return result;
-}
-function closure(entry) {
-  const visited = new Set();
-  function visit(file) {
-    if (visited.has(file)) return;
-    visited.add(file);
-    for (const dependency of inspect(file).dependencies) visit(dependency);
-  }
-  visit(entry);
-  const featureFiles = [...visited].filter(file => file !== entry);
-  return {
-    featureFiles: featureFiles.length,
-    native: featureFiles.reduce((sum, file) => sum + inspect(file).raw, 0),
-    radius: featureFiles.reduce((sum, file) => sum + inspect(file).radius, 0),
-  };
-}
-const routes = readdirSync(routeRoot).filter(name => name.endsWith(".tsx")).sort();
-const rows = routes.map(name => {
-  const file = join(routeRoot, name);
-  const source = readFileSync(file, "utf8");
-  const declared = source.match(/createFileRoute\(\s*["']([^"']+)["']/)?.[1] ?? "(inspect route)";
-  const direct = inspect(file);
-  const composed = closure(file);
-  return {
-    file: name, route: declared,
-    directNative: direct.raw, directRounded: direct.radius,
-    composedNative: composed.native, composedRounded: composed.radius,
-    composedFiles: composed.featureFiles,
-    sourceControlGate: sourceGuarded.has(name),
-    acceptance: "unverified",
-  };
-});
 if (process.argv.includes("--json")) {
-  console.log(JSON.stringify({ source: "local checkout", routes: rows }, null, 2));
+  console.log(JSON.stringify({
+    source: "current checkout",
+    totals: inventory.totals,
+    comparison: regression,
+    routes: inventory.routes,
+  }, null, 2));
 } else {
-  const flagged = rows.filter(row => row.directNative || row.directRounded ||
-    row.composedNative || row.composedRounded);
-  console.log(`V6.1 route audit: ${rows.length} TSX route files, ${sourceGuarded.size} source-control gated, ${flagged.length} with potential legacy signals. No runtime acceptance inferred.\n`);
-  console.log("| Route | Source file | Native JSX (direct/composed) | Radius (direct/composed) | Source gate |");
-  console.log("| --- | --- | ---: | ---: | --- |");
-  for (const row of rows) {
-    console.log(`| ${row.route.replaceAll("|", "\\|")} | \`${row.file}\` | ${row.directNative}/${row.composedNative} | ${row.directRounded}/${row.composedRounded} | ${row.sourceControlGate ? "Yes" : "Not yet"} |`);
+  console.log("V6.1 route/component source inventory");
+  console.log("Routes: " + inventory.totals.routes +
+    ", directly source-clean: " + inventory.totals.directlyClean +
+    ", reachable composition clean: " + inventory.totals.composedClean);
+  console.log("Feature components: " + inventory.totals.components +
+    ", directly source-clean: " + inventory.totals.directlyCleanComponents);
+  console.log("Neither status represents visual or end-to-end acceptance.");
+  const pending = inventory.routes.filter(row => !row.composedSourceClean)
+    .sort((a, b) => (b.directNative + b.directCorners + b.reachableNative + b.reachableCorners) -
+                    (a.directNative + a.directCorners + a.reachableNative + a.reachableCorners));
+  console.table(pending.slice(0, 30).map(row => ({
+    route: row.route ?? row.file,
+    directNative: row.directNative,
+    directCorners: row.directCorners,
+    reachableNative: row.reachableNative,
+    reachableCorners: row.reachableCorners,
+  })));
+  if (pending.length > 30) {
+    console.log("Use --json for all " + pending.length + " routes requiring further review.");
   }
-  console.log("\nCounts are source-level review signals, not errors by themselves. Read each feature component, including specialized calendar/gradebook controls, before changing it.");
+  console.log("Incremental check: " + (regression.warning ??
+    regression.checked + " changed source files compared with " + regression.base));
+}
+for (const issue of regression.errors) {
+  console.error("V6.1 regression: " + issue);
+  process.exitCode = 1;
+}
+// Strict mode is an explicit final-compliance gate, not the current incremental
+// migration mode. It fails until all source and composed debt has been cleared.
+if (process.argv.includes("--strict") &&
+    inventory.routes.some(row => !row.composedSourceClean)) {
+  console.error("V6.1 strict gate: unresolved route or reachable component source debt.");
+  process.exitCode = 1;
 }
