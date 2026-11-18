@@ -3,12 +3,22 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  assessmentAccess, assessmentAutoScores, assessmentDefinitions,
-  assessmentExecutionAttempts, assessmentExecutionItems, assessmentExecutionResults,
-  assessmentFormAdministrations, assessmentFormVersions, assessmentVersions,
-  learnerCourseAttempts, canonicalClassEnrollments, canonicalClasses, canonicalPersons, learnerProfiles,
-  auditEvents, domainEvents,
+  assessmentAccess,
+  assessmentAutoScores,
+  assessmentDefinitions,
+  assessmentExecutionAttempts,
+  assessmentExecutionItems,
+  assessmentExecutionResults,
+  assessmentFormAdministrations,
+  assessmentFormVersions,
+  assessmentVersions,
+  learnerCourseAttempts,
+  canonicalClassEnrollments,
+  canonicalClasses,
+  canonicalPersons,
+  learnerProfiles,
 } from "@/db/canonical-v301";
 import { AuthorizationError,assertCapability } from "@/domain/command-context";
 import { evaluateKnowledgeCheckResult } from "@/domain/noncredit-knowledge-check";
@@ -217,12 +227,12 @@ export const finalizeNativeClassKnowledgeCheck=createServerFn({method:"POST"})
         .where(eq(assessmentExecutionAttempts.id,assessment.id));
       const payload={classEnrollmentId:enrollment.id,courseAttemptId:course.id,
         assessmentAttemptId:assessment.id,resultId:final.id,outcome:evaluated.outcome};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId,owningOrganizationId:organizationId,
         eventCode:"class.assessment.finalized",
         entityKind:"assessment_attempt_result",entityId:final.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId,eventType:"ClassKnowledgeCheckFinalized",
         aggregateType:"assessment_attempt_result",aggregateId:final.id,payload,
       });
