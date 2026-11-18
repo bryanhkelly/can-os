@@ -2,6 +2,9 @@ import type { getGradebook } from "@/modules/learning/gradebook.functions";
 import { RubricScoreFields } from "@/components/learning/RubricScoreFields";
 import { GradebookReviewActions } from "@/components/learning/GradebookReviewActions";
 import { StatusBadge } from "@/components/workspace";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
 type Assessment=Awaited<ReturnType<typeof getGradebook>>["assessments"][number];
 
@@ -19,14 +22,15 @@ export function GradebookScoringEditor({
   {assessment.rubric.length>0?<RubricScoreFields
     criteria={assessment.rubric} values={rubricInputs} onChange={onRubricChange}
     total={liveTotal} pointsPossible={assessment.pointsPossible}/>
-   :<label className="text-sm font-semibold">Score (0–{assessment.pointsPossible??"—"})
-     <input className="mt-2 block w-28 rounded-lg border bg-background p-2" type="number" min={0}
-      max={Number(assessment.pointsPossible??0)} value={score} onChange={event=>onScoreChange(event.target.value)}/>
-    </label>}
-  <label className="text-sm font-semibold">Feedback comment
-   <textarea rows={4} maxLength={4000} value={comment} onChange={event=>onCommentChange(event.target.value)}
-    className="mt-2 block w-full rounded-lg border bg-background p-3"/>
-  </label>
+   :<Field label={`Score (0–${assessment.pointsPossible??"—"})`} required className="max-w-40"
+      description="Enter the number of points awarded for this submission.">
+     <Input type="number" min={0} max={Number(assessment.pointsPossible??0)} step="any"
+      disabled={busy} value={score} onChange={event=>onScoreChange(event.target.value)}/>
+    </Field>}
+  <Field label="Feedback comment" description="Students can read this when you post the grade. Saving a draft does not release feedback.">
+   <Textarea rows={4} maxLength={4000} disabled={busy}
+    value={comment} onChange={event=>onCommentChange(event.target.value)}/>
+  </Field>
   <GradebookReviewActions busy={busy} sectionId={sectionId} onSaveDraft={onSaveDraft} onPostGrade={onPostGrade}/>
  </div>;
 }
