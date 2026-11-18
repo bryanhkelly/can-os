@@ -55,8 +55,8 @@ for(const absolute of files){
   // Public event journals deliberately reject reads/writes from restricted
   // database roles. A caller that SET LOCAL ROLE must retain an independently
   // authorized native writer until an explicitly reviewed SQL permission path exists.
-  if(/SET\\s+LOCAL\\s+ROLE/i.test(content)
-     && /\\b(?:writeCanonicalAudit|emitCanonicalDomainEvent)\\s*\\(/.test(content)){
+  if(/SET\s+LOCAL\s+ROLE/i.test(content)
+     && /\b(?:writeCanonicalAudit|emitCanonicalDomainEvent)\s*\(/.test(content)){
     roleScopedSharedWriters.push(file);
   }
   const references=[...content.matchAll(/education_v30\.(audit_events|domain_events)\b/g)];
