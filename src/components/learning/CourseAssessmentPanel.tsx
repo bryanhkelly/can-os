@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { WorkspaceNotice } from "@/components/workspace";
 import { LearningQuestionnaire } from "./LearningQuestionnaire";
 import {
   beginNoncreditKnowledgeCheckAttempt, getNoncreditKnowledgeCheck,
@@ -30,13 +31,14 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
   const load=useCallback(async()=>{
     const next=await getNoncreditKnowledgeCheck({data:{courseAttemptId,phase}});
     setCheck(next);
+    setError("");
   },[courseAttemptId,phase]);
   useEffect(()=>{
     let active=true;
     setCheck(null);setError("");setDraftStatus("idle");
     void getNoncreditKnowledgeCheck({data:{courseAttemptId,phase}})
       .then(next=>{if(active)setCheck(next);})
-      .catch(()=>{if(active)setError("No knowledge check is available for this course.");});
+      .catch(()=>{if(active)setError("Knowledge-check availability could not be verified.");});
     return ()=>{active=false;};
   },[courseAttemptId,phase]);
 
@@ -64,7 +66,17 @@ function KnowledgeCheckSession({courseAttemptId,phase,onAssessmentCompleted,cont
     }).catch(()=>setDraftStatus("failed"));
   }
 
-  if(error&&!check)return <p role="status" className="border p-3 text-sm">{error}</p>;
+  if(error&&!check)return <WorkspaceNotice tone="danger">
+    <p>{error} No answers or attempts were changed.</p>
+    <Button type="button" size="sm" variant="outline" className="mt-3" disabled={busy}
+      loading={busy} onClick={()=>void (async()=>{
+        if(busy)return;
+        setBusy(true);setError("");
+        try{await load();}
+        catch{setError("Knowledge-check availability could not be verified.");}
+        finally{setBusy(false);}
+      })()}>Retry knowledge check</Button>
+  </WorkspaceNotice>;
   if(!check)return <p role="status" className="text-sm">Loading knowledge check...</p>;
   return <section aria-label={phase==="baseline"?"Before-course diagnostic":context==="class"?"Class knowledge check":"Noncredit knowledge check"} className="space-y-4">
     <div>
