@@ -21,7 +21,7 @@ export function GradebookScoringEditor({
   <StatusBadge>Ready for grading</StatusBadge>
   {assessment.rubric.length>0?<RubricScoreFields
     criteria={assessment.rubric} values={rubricInputs} onChange={onRubricChange}
-    total={liveTotal} pointsPossible={assessment.pointsPossible}/>
+    total={liveTotal} pointsPossible={assessment.pointsPossible} disabled={busy}/>
    :<Field label={`Score (0–${assessment.pointsPossible??"—"})`} required className="max-w-40"
       description="Enter the number of points awarded for this submission.">
      <Input type="number" min={0} max={Number(assessment.pointsPossible??0)} step="any"
