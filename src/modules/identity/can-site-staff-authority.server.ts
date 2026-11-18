@@ -27,7 +27,7 @@ export async function resolveCanonicalSiteStaffFromCan(
   request: Request,
 ): Promise<CommandContext> {
   if (!canResolveCanSiteStaff(actor) || !actor.sessionId) {
-    throw new AuthorizationError("verified CAN Site administrator or registrar");
+    throw new AuthorizationError("verified CAN Site staff");
   }
   const rawCookie = readCookie(request, accessSessionCookie);
   if (!rawCookie || !/^[A-Za-z0-9_-]{40,}$/.test(rawCookie)) {
