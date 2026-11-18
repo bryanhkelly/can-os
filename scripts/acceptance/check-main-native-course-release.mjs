@@ -172,7 +172,7 @@ async function main(){
       o.status operation_status
     FROM education_v30.deployment_offering_adoptions adoption
     JOIN education_v30.program_deployments p ON p.id=adoption.deployment_id
-    JOIN education_v30.education_operations o ON o.id=p.operation_id
+    JOIN public.education_operations o ON o.id=p.operation_id
     WHERE adoption.offering_version_id=${offeringVersionId}::uuid
     LIMIT 51
   `;
