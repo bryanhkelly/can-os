@@ -3,11 +3,10 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  assessmentDefinitions, assessmentVersions, auditEvents,
-  canonicalClassEnrollments, canonicalClasses, canonicalClassSessions,
-  canonicalDeliverySessions, courseLessons, courseVersions, domainEvents,
-  facilitatedClassroomPlans, officialCourseAssignmentVersions,
+  assessmentDefinitions, assessmentVersions, canonicalClassEnrollments, canonicalClasses, canonicalClassSessions,
+  canonicalDeliverySessions, courseLessons, courseVersions, facilitatedClassroomPlans, officialCourseAssignmentVersions,
 } from "@/db/canonical-v301";
 import { classSessionAgendaRevisions } from "@/db/canonical-v301/class-session-agendas";
 import {
@@ -254,13 +253,13 @@ export const publishNativeClassSessionAgenda=createServerFn({method:"POST"})
       if(!saved)throw new Error("Class Session agenda revision was not recorded");
       const payload={classId:cls.id,classSessionId:link.id,
         courseVersionId:cls.courseVersionId,revisionNo,agendaRevisionId:saved.id};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:host.actor.actorPersonId!,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.session.agenda.published",
         entityKind:"class_session_agenda_revision",entityId:saved.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:host.actor.actorPersonId!,
         eventType:"ClassSessionAgendaPublished",
         aggregateType:"class_session",aggregateId:link.id,payload,
