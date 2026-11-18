@@ -10,6 +10,11 @@ import { CreateAction, DirectoryTable, EmptyState, PageFrame, RecordHeader, Reco
 import {SiteProgramFields} from "@/components/workspace/site-program-fields";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import {LocalDateTimeField} from "@/components/workspace/local-datetime-field";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   approveCanonicalFieldTrip, inviteCanonicalFieldTripStudent,
   listFieldTripOperations, proposeCanonicalFieldTrip,
@@ -94,40 +99,40 @@ export function FieldTripOperationsView({ data, mode="directory", tripId }: { da
           <SiteProgramFields sites={data.sites} programs={data.programs} siteId={siteId} programId={programId}
             siteRequired programPlaceholder="All enrolled programs at this school" disabled={busy}
             onChange={(site,program)=>{setSiteId(site);setProgramId(program);}}/>
-          <label className="text-sm">Trip title
-            <input required minLength={3} maxLength={150} value={title}
+          <Label className="text-sm">Trip title
+            <Input required minLength={3} maxLength={150} value={title}
               onChange={event => setTitle(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
-          <label className="text-sm">Destination
-            <input required minLength={3} maxLength={240} value={destination}
+              className="mt-1 block w-full  border bg-background p-2" />
+          </Label>
+          <Label className="text-sm">Destination
+            <Input required minLength={3} maxLength={240} value={destination}
               onChange={event => setDestination(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
+              className="mt-1 block w-full  border bg-background p-2" />
+          </Label>
           <LocalDateTimeField label="Departure" timezone={selectedSite?.timezone} value={departsAt} onChange={setDepartsAt} required disabled={busy}/>
           <LocalDateTimeField label="Return" timezone={selectedSite?.timezone} value={returnsAt} onChange={setReturnsAt} required disabled={busy}/>
           <LocalDateTimeField label="Permission deadline" timezone={selectedSite?.timezone} value={permissionDueAt} onChange={setPermissionDueAt} required disabled={busy}/>
-          <label className="text-sm">Trip fee (USD)
-            <input required type="number" min={0} max={10000} step="0.01" value={fee}
+          <Label className="text-sm">Trip fee (USD)
+            <Input required type="number" min={0} max={10000} step="0.01" value={fee}
               onChange={event => setFee(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
-          <label className="text-sm">Permission statement version
-            <input required maxLength={80} value={permissionVersion}
+              className="mt-1 block w-full  border bg-background p-2" />
+          </Label>
+          <Label className="text-sm">Permission statement version
+            <Input required maxLength={80} value={permissionVersion}
               onChange={event => setPermissionVersion(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-2" />
-          </label>
-          <label className="text-sm sm:col-span-2">School-approved guardian permission statement
-            <textarea required minLength={40} maxLength={5000} rows={6}
+              className="mt-1 block w-full  border bg-background p-2" />
+          </Label>
+          <Label className="text-sm sm:col-span-2">School-approved guardian permission statement
+            <Textarea required minLength={40} maxLength={5000} rows={6}
               value={permissionText}
               onChange={event => setPermissionText(event.target.value)}
-              className="mt-1 block w-full rounded border bg-background p-3 text-sm"
+              className="mt-1 block w-full  border bg-background p-3 text-sm"
               placeholder="Paste the school-approved permission and acknowledgement statement here." />
-          </label>
-          <button disabled={busy || !siteId || !data.programs.some(p => p.siteId === siteId)}
-            className="w-fit rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          </Label>
+          <Button type="submit" disabled={busy || !siteId || !data.programs.some(p => p.siteId === siteId)}
+            className="w-fit">
             Propose trip
-          </button>
+          </Button>
         </form>
       </section>}
       {mode==="directory"&&<DirectoryTable label="Field trips" caption="Trips in your authorized school and program scope."
@@ -157,7 +162,7 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
   run: (work: () => Promise<unknown>, message: string) => Promise<void>;
 }) {
   const remaining = trip.students.filter(student => !student.invited);
-  return <article className="rounded-xl border bg-card p-5">
+  return <article className=" border bg-card p-5">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
         <h3 className="text-lg font-semibold">{trip.title}</h3>
@@ -175,30 +180,30 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
       This older trip has no valid versioned permission statement. Invitations are unavailable.
     </p>}
     {trip.status === "proposed" &&
-      <button type="button" disabled={busy || !trip.hasPublishedPermission}
-        className="mt-4 rounded-lg bg-foreground px-4 py-2 text-sm text-background disabled:opacity-50"
+      <Button type="button" disabled={busy || !trip.hasPublishedPermission}
+        className="mt-4"
         onClick={() => void run(
           () => approveCanonicalFieldTrip({ data: { tripId: trip.id } }),
           "Trip approved and added to the school calendar.",
-        )}>Approve trip</button>}
+        )}>Approve trip</Button>}
     {trip.status === "approved" && trip.hasPublishedPermission &&
       <div className="mt-5 flex flex-wrap items-end gap-3">
-        <label className="min-w-56 flex-1 text-sm">Invite an enrolled student
-          <select value={candidate} onChange={event => onCandidateChange(event.target.value)}
-            className="mt-1 block w-full rounded border bg-background p-2">
+        <Label className="min-w-56 flex-1 text-sm">Invite an enrolled student
+          <Select value={candidate} onChange={event => onCandidateChange(event.target.value)}
+            className="mt-1 block w-full  border bg-background p-2">
             <option value="">Select a student</option>
             {remaining.map(student =>
               <option key={student.id} value={student.id}>{student.name}</option>)}
-          </select>
-        </label>
-        <button type="button" disabled={busy || !candidate}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+          </Select>
+        </Label>
+        <Button type="button" disabled={busy || !candidate}
+          variant="outline"
           onClick={() => void run(async () => {
             await inviteCanonicalFieldTripStudent({ data: {
               tripId: trip.id, studentProfileId: candidate,
             } });
             onCandidateChange("");
-          }, "Invitation sent to the student's guardians.")}>Invite student</button>
+          }, "Invitation sent to the student's guardians.")}>Invite student</Button>
       </div>}
     <div className="mt-5 border-t pt-4">
       <h4 className="text-sm font-semibold">Participant permissions and attendance · {trip.roster.length}</h4>
@@ -208,7 +213,7 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
       </p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {trip.roster.map(participant =>
-          <div key={participant.id} className="rounded-lg border p-3 text-sm">
+          <div key={participant.id} className=" border p-3 text-sm">
             <p className="font-medium">{participant.name}</p>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <StatusBadge tone={participant.status === "permission_complete" ? "success"
@@ -232,26 +237,26 @@ function TripCard({ trip, busy, candidate, onCandidateChange, run }: {
               <div className="mt-3 flex flex-wrap gap-2">
                 {!participant.departure &&
                   <>
-                    <button type="button"
+                    <Button type="button"
                       disabled={busy || participant.status !== "permission_complete" ||
                         Date.now() > new Date(trip.returnsAt).getTime()}
-                      className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                      variant="outline" size="sm"
                       onClick={() => void run(() => recordCanonicalFieldTripCheckpoint({ data: {
                         participantId: participant.id, checkpoint: "departure", status: "boarded",
-                      } }), "Boarding recorded.")}>Boarded</button>
-                    <button type="button" disabled={busy ||
+                      } }), "Boarding recorded.")}>Boarded</Button>
+                    <Button type="button" disabled={busy ||
                         Date.now() > new Date(trip.returnsAt).getTime()}
-                      className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                      variant="outline" size="sm"
                       onClick={() => void run(() => recordCanonicalFieldTripCheckpoint({ data: {
                         participantId: participant.id, checkpoint: "departure", status: "absent",
-                      } }), "Departure absence recorded.")}>Absent at departure</button>
+                      } }), "Departure absence recorded.")}>Absent at departure</Button>
                   </>}
                 {participant.departure === "boarded" && !participant.returned &&
-                  <button type="button" disabled={busy}
-                    className="rounded border px-3 py-1 text-xs disabled:opacity-50"
+                  <Button type="button" disabled={busy}
+                    variant="outline" size="sm"
                     onClick={() => void run(() => recordCanonicalFieldTripCheckpoint({ data: {
                       participantId: participant.id, checkpoint: "return", status: "returned",
-                    } }), "Return recorded.")}>Returned</button>}
+                    } }), "Return recorded.")}>Returned</Button>}
               </div>}
           </div>)}
       </div>
