@@ -38,13 +38,15 @@ export function GradebookAssessmentComposer({
   const updateCriterion=(id:string,patch:Partial<AssessmentCriterionInput>)=>
     onRubricChange(newRubric.map(row=>row.id===id?{...row,...patch}:row));
   const updateContent=(patch:Partial<AssessmentContentInput>)=>onContentChange({...content,...patch});
-  const submit=(event:FormEvent<HTMLFormElement>)=>event.preventDefault();
-  return <details className="mt-8 rounded-xl border bg-card p-5" open={lessonContext?true:undefined}>
+  const submit=(event:FormEvent<HTMLFormElement>)=>{event.preventDefault();if(!busy)onSubmit(false);};
+  const invalidLesson = Boolean(curriculumLessonId) && !lessons.some(lesson=>lesson.id===curriculumLessonId);
+  return <details className="mt-8 border border-border bg-card p-5" open={lessonContext?true:undefined}>
     <summary className="cursor-pointer text-lg font-semibold">Create an assessment</summary>
     {lessonContext&&<p className="mt-2 text-sm text-muted-foreground">Creating {assignmentKind} from the selected publisher lesson. This activity belongs to your class, not the publisher's immutable course.</p>}
     {lessonContext&&!lessons.some(lesson=>lesson.id===lessonContext)&&
       <p role="alert" className="mt-2 text-sm">This publisher lesson is unavailable in this class. Choose a listed lesson before creating the assessment.</p>}
     <form onSubmit={submit} className="mt-4" aria-label="New assessment">
+      <fieldset disabled={busy} aria-busy={busy || undefined} className="contents">
       <h2 className="text-lg font-semibold">New assessment</h2>
       <div className="mt-4 grid gap-4 sm:grid-cols-3">
         <Field label="Title"><Input value={title} onChange={e=>onTitleChange(e.target.value)} maxLength={200} placeholder="e.g. Chapter 4 quiz"/></Field>
@@ -79,7 +81,7 @@ export function GradebookAssessmentComposer({
         <Textarea className="min-h-32" rows={5} maxLength={20000}
           value={instructions} onChange={e=>onInstructionsChange(e.target.value)} placeholder="Directions, deliverables, submission requirements and allowed resources."/>
       </Field>
-      <fieldset className="mt-4 rounded-lg border p-4">
+      <fieldset className="mt-4 border border-border p-4">
         <legend className="px-1 text-sm font-semibold">Assignment page sections (optional)</legend>
         <p className="mb-3 text-xs text-muted-foreground">These optional sections give the student assignment page its structured layout. Anything left blank is simply omitted; plain instructions above always remain visible.</p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -106,7 +108,7 @@ export function GradebookAssessmentComposer({
       <fieldset className="mt-4 rounded-lg border p-4">
         <legend className="px-1 text-sm font-semibold">Scoring rubric (optional)</legend>
         <p className="mb-3 text-xs text-muted-foreground">Add criteria for graded projects, tests, discussions or other work. Criterion points must sum to the assignment's points possible.</p>
-        {newRubric.map((criterion,index)=><div key={criterion.id} className="mb-3 grid gap-2 rounded-lg border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
+        {newRubric.map((criterion,index)=><div key={criterion.id} className="mb-3 grid gap-2 border border-border p-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto]">
           <Field label={`Criterion ${index+1}`}>
             <Input
               value={criterion.label} maxLength={120} placeholder="e.g. Mathematical reasoning"
@@ -132,14 +134,16 @@ export function GradebookAssessmentComposer({
       </fieldset>
       <p className="mt-2 text-xs text-muted-foreground">The assignment belongs to this teacher's class. Linking to a publisher lesson preserves the original curriculum.</p>
       <p className="mt-3 text-xs text-muted-foreground">Due dates are planning information until you explicitly publish. Saving a draft never assigns work, even if it has a due date.</p>
+      {invalidLesson && <p role="alert" className="mt-3 text-sm text-destructive">This publisher lesson is not available in this class. Select a listed lesson or choose General class activity before saving.</p>}
       <Label className="mt-3 flex items-start gap-2 text-sm leading-6">
         <Checkbox checked={publishConfirmed} onChange={e=>onPublishConfirmedChange(e.target.checked)} disabled={busy}/>
-        <span>I reviewed this assignment and understand Publish &amp; assign makes it available to enrolled students now.</span>
+        <span>I reviewed this assignment. Publishing assigns it to enrolled students, with access beginning at the scheduled release time, or immediately if no release time is set.</span>
       </Label>
       <div className="mt-4 flex flex-wrap gap-3">
-        <Button type="button" variant="outline" disabled={busy} onClick={()=>onSubmit(false)}>Save draft</Button>
-        <Button type="button" disabled={busy||!due||!publishConfirmed} onClick={()=>onSubmit(true)}>Publish &amp; assign</Button>
+        <Button type="submit" variant="outline" disabled={busy||invalidLesson}>Save draft</Button>
+        <Button type="button" disabled={busy||invalidLesson||!due||!publishConfirmed} onClick={()=>onSubmit(true)}>Publish &amp; assign</Button>
       </div>
+      </fieldset>
     </form>
   </details>;
 }
