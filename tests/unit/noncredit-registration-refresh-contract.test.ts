@@ -48,6 +48,23 @@ describe("noncredit self-registration decision and refresh contract",()=>{
     expect(controller).not.toContain("catch(error)");
   });
 
+  it("uses the current exact release for every form and does not trust stale discovery copies",()=>{
+    expect(source).toContain("const selected=search.release?linkedRelease.data??undefined:undefined");
+    expect(source).not.toContain("catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data");
+    expect(source).toContain("linkedRelease.isPending");
+    expect(source).toContain("linkedRelease.isSuccess&&!linkedRelease.data");
+    expect(source).toContain("Browse available training");
+    expect(source).toContain("selected&&!catalog.data.items.some(item=>item.id===selected.id)");
+  });
+
+  it("refreshes public discovery as advisory information after a saved enrollment",()=>{
+    expect(controller).toContain('client.invalidateQueries({queryKey:["noncredit-open-releases"]})');
+    expect(controller).toContain('client.invalidateQueries({queryKey:["noncredit-open-release"]})');
+    // Only personal registration, waitlist, and My Activity reads can turn a
+    // successful saved command into a refresh-required notice.
+    expect(controller.match(/throwOnError:true/g)).toHaveLength(3);
+  });
+
   it("checks the selected release's exact invitation and fails closed when waitlist status is unavailable",()=>{
     expect(source).toContain("getMyNoncreditWaitlistByRelease({data:{releaseId:selected!.id}})");
     expect(source).not.toContain("getMyNoncreditWaitlist()");
