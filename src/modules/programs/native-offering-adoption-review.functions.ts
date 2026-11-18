@@ -86,6 +86,8 @@ export const getNativeOfferingAdoptionReviewQueue=createServerFn({method:"GET"})
       offeringVersionId:offeringVersions.id,
       title:offerings.title,versionNo:offeringVersions.versionNo,
       lifecycle:offeringVersions.lifecycle,
+      publishedAt:offeringVersions.publishedAt,
+      offeringStatus:offerings.status,
       deploymentName:programDeployments.name,
       deploymentState:programDeployments.status,
       operationState:educationOperations.status,
