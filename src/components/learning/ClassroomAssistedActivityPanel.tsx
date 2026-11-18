@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Field } from "@/components/ui/field";
+import { WorkspaceNotice } from "@/components/workspace";
 import { getClassroomAttendanceRoster } from "@/modules/learning/classroom-attendance.functions";
 import { getClassroomHostActivity } from "@/modules/learning/classroom-evidence.functions";
 import { recordClassroomAssistedActivity } from "@/modules/learning/classroom-assisted-activity.functions";
@@ -77,7 +79,7 @@ export function ClassroomAssistedActivityPanel({facilitatedSessionId}:{
       Checking the Course roster and released activities…
     </p>}
     {roster.isSuccess&&releases.isSuccess&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm font-medium">Registered learner
+      <Field label="Registered learner">
         <Select className="mt-2"
           value={learner} onChange={e=>setLearner(e.target.value)}>
           <option value="">Choose a learner</option>
@@ -86,8 +88,8 @@ export function ClassroomAssistedActivityPanel({facilitatedSessionId}:{
             {x.displayName}{x.pairedDevice?"":" (no device)"}
           </option>)}
         </Select>
-      </label>
-      <label className="text-sm font-medium">Released classroom activity
+      </Field>
+      <Field label="Released classroom activity">
         <Select className="mt-2"
           value={releaseId} onChange={e=>{setReleaseId(e.target.value);setAnswer("");}}>
           <option value="">Choose a question</option>
@@ -95,41 +97,39 @@ export function ClassroomAssistedActivityPanel({facilitatedSessionId}:{
             {x.prompt.slice(0,80)}{x.closed?" (closed)":""}
           </option>)}
         </Select>
-      </label>
-      <label className="text-sm font-medium">Evidence source
+      </Field>
+      <Field label="Evidence source">
         <Select className="mt-2"
           value={method} onChange={e=>setMethod(e.target.value as Method)}>
           <option value="paper">Paper response</option>
           <option value="shared_device">Shared device</option>
           <option value="verbal">Verbal response</option>
         </Select>
-      </label>
-      {activity?.answerType==="single_choice"?<label className="text-sm font-medium">
-        Recorded choice
+      </Field>
+      {activity?.answerType==="single_choice"?<Field label="Recorded choice">
         <Select className="mt-2"
           value={answer} onChange={e=>setAnswer(e.target.value)}>
           <option value="">Select reported choice</option>
           {activity.choices.map((choice,i)=><option key={i} value={i}>{choice}</option>)}
         </Select>
-      </label>:<label className="text-sm font-medium">Recorded short response
+      </Field>:<Field label="Recorded short response">
         <Textarea rows={2} maxLength={1000} value={answer}
           onChange={e=>setAnswer(e.target.value)}
           className="mt-2"/>
-      </label>}
-      <label className="text-sm font-medium sm:col-span-2">
-        Required collection note (15–500 characters)
+      </Field>}
+      <Field label="Required collection note (15–500 characters)" className="sm:col-span-2">
         <Textarea rows={2} minLength={15} maxLength={500} value={evidenceNote}
           onChange={e=>setEvidenceNote(e.target.value)}
           placeholder="Collected this answer directly from the learner on a printed response sheet…"
           className="mt-2"/>
-      </label>
+      </Field>
       <div className="sm:col-span-2">
         <Button type="button" size="sm" disabled={busy||!chosen||!activity||
           !answer.trim()||evidenceNote.trim().length<15||!roster.data.attestationsOpen}
           onClick={()=>void save()}>{busy?"Saving…":"Record assisted practice"}</Button>
       </div>
     </div>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    {success&&<p role="status" className="mt-3 text-sm">{success}</p>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
+    {success&&<WorkspaceNotice tone="info" className="mt-3">{success}</WorkspaceNotice>}
   </section>;
 }
