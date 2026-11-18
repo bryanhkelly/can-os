@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
+import type { AccessContext } from "@/domain/access-context";
 import { sites } from "@/db/schema";
 import { siteContentChannelConfigSchema, readSiteContentChannelConfig,
   safeReadSiteContentChannelConfig, type SiteContentBlock } from "@/domain/site-content-channels";
@@ -8,13 +9,35 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
 import { AuthorizationError } from "@/domain/command-context";
 import { requirePartnerWebsiteEditor } from "./site-website-authorization.server";
-import { siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
+import { siteWebsiteDraftReadCapability, siteWebsiteLocalPublishCapability } from "@/domain/site-publication-policy";
 import { getRequest } from "@tanstack/react-start/server";
+
+/** School setup users and exact-Site Website Studio editors share one
+ * presentation document. Neither access path grants Program approvals or
+ * website publication. Authorization is rederived by the server. */
+async function authorizeContentChannelEditor(
+  actor: AccessContext,
+  site: {id:string;organizationId:string}|null|undefined,
+  executor: typeof db,
+  operation: "read" | "write",
+): Promise<void> {
+  if (!site) throw new AuthorizationError("Site content channel scope");
+  const setupCapability = operation === "read" ? "program.read" : "program.launch.start";
+  if ((actor.role === "registrar" || actor.role === "site_admin") &&
+      actor.capabilities.has(setupCapability)) {
+    assertSiteSetupScope(actor, site, setupCapability);
+    return;
+  }
+  const editor = await requirePartnerWebsiteEditor(actor, executor,
+    operation === "read" ? siteWebsiteDraftReadCapability : siteWebsiteLocalPublishCapability);
+  if (editor.id !== site.id)
+    throw new AuthorizationError("exact Site website content editor");
+}
 
 export async function readAuthorizedSiteContentChannels(siteId: string) {
   const actor = await getCommandContext(getRequest());
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
-  assertSiteSetupScope(actor, site, "program.read");
+  await authorizeContentChannelEditor(actor, site, db, "read");
   return readSiteContentChannelConfig(site.metadata.websiteContentChannels);
 }
 
@@ -29,7 +52,7 @@ export async function saveAuthorizedSiteContentChannels(input: {
   return db.transaction(async tx => {
     const [site] = await tx.select().from(sites)
       .where(eq(sites.id, input.siteId)).for("update").limit(1);
-    assertSiteSetupScope(actor, site, "program.launch.start");
+    await authorizeContentChannelEditor(actor, site, tx, "write");
     const current = readSiteContentChannelConfig(site.metadata.websiteContentChannels);
     if (current.revision !== input.expectedRevision)
       throw new Error("Site content channels have changed. Reload before saving.");
