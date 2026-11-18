@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import {
   getFacilitatedRoomMedia, getFacilitatedRoomMediaAccess, recordFacilitatedPlayback,
 } from "@/modules/learning/facilitated-learning.functions";
@@ -74,14 +75,14 @@ export function FacilitatedRoomPlayer({ facilitatedSessionId }: {
     {catalog?.media.length ? <div className="mt-3 space-y-3">
       <label className="block text-sm font-medium">
         Select a recorded lesson
-        <select className="mt-2 min-h-10 w-full border border-border bg-background px-3 py-2"
+        <Select className="mt-2"
           value={selected} onChange={event=>setSelected(event.target.value)}>
           {catalog.media.map(item=><option
             key={item.lessonId+":"+item.assetVersionId}
             value={item.lessonId+":"+item.assetVersionId}>
             {item.lessonTitle}
           </option>)}
-        </select>
+        </Select>
       </label>
       {current&&<ClassVideoPlayer
         key={facilitatedSessionId+":"+selected}
