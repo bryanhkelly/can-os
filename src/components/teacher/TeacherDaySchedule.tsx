@@ -3,6 +3,8 @@ import { Link } from "@tanstack/react-router";
 import { getCalendarRange } from "@/modules/calendar/calendar.functions";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
+import { StatusBadge } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { calendarItemDestination } from "@/domain/calendar-view";
 
 type Schedule = Awaited<ReturnType<typeof getCalendarRange>>;
@@ -46,11 +48,11 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
     {error || (data && !data.connected)
       ? <p role="status" className="mt-3 text-sm">Schedule unavailable. Try opening the calendar.</p>
       : !data && <p role="status" className="mt-3 text-sm">Loading schedule…</p>}
-    {upcomingClass&&upcomingSection&&<div className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4" aria-label="Next scheduled class">
-      <p className="text-xs font-bold uppercase tracking-widest text-primary">Next scheduled class</p>
+    {upcomingClass&&upcomingSection&&<div className="mt-4 border border-primary/40 bg-card p-4" aria-label="Next scheduled class">
+      <StatusBadge tone="info">Next scheduled class</StatusBadge>
       <p className="mt-1 font-semibold">{upcomingSection.title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{format(upcomingClass.startsAt)}{upcomingClass.endsAt?` – ${format(upcomingClass.endsAt)}`:""}</p>
-      <Link to="/classes" search={{section:upcomingSection.id}} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open class workspace →</Link>
+      <Button asChild size="sm" variant="outline" className="mt-3"><Link to="/classes" search={{section:upcomingSection.id}}>Open class workspace</Link></Button>
     </div>}
     {available && <>
       {data.truncated && <p role="status" className="mt-3 text-sm">This schedule is incomplete. Open the calendar to review additional events.</p>}
@@ -59,12 +61,14 @@ export function TeacherDayScheduleView({ data, error, timezone, sections }: {
         {data.items.map(item => {
           const section = sections.find(section => section.id === item.sectionId);
           const destination = calendarItemDestination(item, data.viewerRole);
-          return <article key={item.id} className="rounded-xl border p-4">
+          return <article key={item.id} className="border border-border bg-card p-4">
             {destination
               ? <Link {...destination} className="font-semibold underline">{item.title}</Link>
               : <Link to="/calendar" search={{ date: dateKeyInTimezone(item.startsAt, item.timezone), event: item.id }} className="font-semibold underline">{item.title}</Link>}
             <p className="mt-1 text-sm">{format(item.startsAt)}{item.endsAt ? ` – ${format(item.endsAt)}` : ""}
-              {item.cancelled ? " · Cancelled" : item.source === "assessment" ? " · Due" : ""}</p>
+              </p>
+            {item.cancelled ? <StatusBadge tone="danger">Cancelled</StatusBadge>
+              : item.source === "assessment" ? <StatusBadge tone="attention">Due</StatusBadge> : null}
             {section && <Link to="/classes" search={{ section: section.id }} className="mt-2 inline-block text-sm underline">Open {section.title}</Link>}
           </article>;
         })}
