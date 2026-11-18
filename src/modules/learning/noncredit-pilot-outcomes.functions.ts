@@ -9,6 +9,7 @@ import {
   assessmentExecutionAttempts,assessmentExecutionResults,
   assessmentFormAdministrations,noncreditCompletionDecisions,
   surveyInvitations,surveyCampaigns,surveyResponses,noncreditParticipationEvents,
+  noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
 } from "@/db/canonical-v301";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,
@@ -18,8 +19,10 @@ import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capa
 
 /**
  * Scoped operational reporting, not a public annual-report endpoint.
- * Exposes aggregated outcomes to the authorized provider only; participant
- * identity and raw questionnaire answers are never returned.
+ * Exposes only self-registered release evidence from explicitly authorized
+ * Sites. Other provider-assisted noncredit registrations need their own
+ * verified Site attribution before joining this report. Participant identity
+ * and raw questionnaire answers are never returned.
  */
 const params=z.object({
   from:z.string().datetime({offset:true}).optional(),
@@ -34,7 +37,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
   .validator((value:unknown)=>params.parse(value))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const {organizationId}=await requireCanonicalLabProvider();
+    const {organizationId,siteIds}=await requireCanonicalLabProvider("noncredit.enrollment.read");
     const to=data.to?new Date(data.to):new Date();
     const from=data.from?new Date(data.from):new Date(to.getTime()-90*86400000);
     if(!(to>from)||to.getTime()-from.getTime()>366*86400000)
@@ -61,7 +64,21 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       offeringVersionId:noncreditRegistrations.offeringVersionId,
       registeredAt:noncreditRegistrations.registeredAt,
     }).from(noncreditRegistrations)
+      // A local Site operator cannot see registrations from unrelated Sites.
+      // Claim + release establish the exact authorized Site for this pilot.
+      .innerJoin(noncreditSelfEnrollmentClaims,and(
+        eq(noncreditSelfEnrollmentClaims.registrationId,noncreditRegistrations.id),
+        eq(noncreditSelfEnrollmentClaims.participantPersonId,noncreditRegistrations.participantPersonId),
+      ))
+      .innerJoin(noncreditSelfEnrollmentReleases,and(
+        eq(noncreditSelfEnrollmentReleases.id,noncreditSelfEnrollmentClaims.releaseId),
+        eq(noncreditSelfEnrollmentReleases.siteId,noncreditSelfEnrollmentClaims.siteId),
+        eq(noncreditSelfEnrollmentReleases.deploymentId,noncreditRegistrations.deploymentId),
+        eq(noncreditSelfEnrollmentReleases.trainingVersionId,noncreditRegistrations.trainingVersionId),
+      ))
       .where(and(
+        eq(noncreditSelfEnrollmentReleases.providerOrganizationId,organizationId),
+        inArray(noncreditSelfEnrollmentReleases.siteId,siteIds),
         inArray(noncreditRegistrations.trainingVersionId,trainings.map(t=>t.id)),
         gte(noncreditRegistrations.registeredAt,from),
         lt(noncreditRegistrations.registeredAt,to),
