@@ -459,7 +459,7 @@ export const deploymentReadinessReviews = educationV30.table(
   },
 );
 
-export const deploymentOfferingAdoptions = educationV30.table(
+export const deploymentOfferingAdoptions = pgTable(
   "deployment_offering_adoptions",
   {
     id: id(),
