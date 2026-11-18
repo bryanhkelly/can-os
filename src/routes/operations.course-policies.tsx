@@ -4,7 +4,11 @@ import {listCoursePolicies,updateCoursePolicy} from "@/modules/learning/registra
 import {safeLoader} from "@/lib/safe-loader";
 import {LoaderFailure} from "@/lib/loader-failure";
 import {useMutationFeedback} from "@/lib/mutation-feedback";
-import {WorkspaceShell} from "@/components/workspace";
+import {WorkspaceShell, EmptyState} from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 export const Route=createFileRoute("/operations/course-policies")({
  loader:safeLoader(()=>listCoursePolicies(),{authMessage:"Sign in as the authorized registrar."}),
  component:CoursePoliciesPage,
@@ -33,16 +37,14 @@ function CoursePolicies({rows}:{rows:CoursePolicyRow[]}){
  return <WorkspaceShell eyebrow="Academic operations" title="Course registration policies"
   subtitle="Set enrollment limits, academic prerequisites, credit rules and registration deadlines. Schedule conflicts use the section’s canonical timetable."
   actions={<div className="flex flex-wrap gap-2">
-   <Link to="/operations/course-requests" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Registration requests</Link>
-   <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className="rounded-lg border px-3 py-2 text-sm">Operations</Link>
+   <Link to="/operations/course-requests" search={{siteId:selection.siteId,programId:selection.programId}} className=" border px-3 py-2 text-sm">Registration requests</Link>
+   <Link to="/home" search={{siteId:selection.siteId,programId:selection.programId}} className=" border px-3 py-2 text-sm">Operations</Link>
   </div>}>
   <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving course policy..."/>
   <div className="mt-8 space-y-4">
    {visibleRows.map(r=><CoursePolicyCard key={r.id} row={r}
      disabled={Boolean(saving)} save={policy=>save(r.id,policy)}/>)}
-   {!visibleRows.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">
-    No sections are available. Provision courses in the School Launch workspace first.
-   </p>}
+   {!visibleRows.length&&<EmptyState title="No sections available" description="Provision courses in the School Launch workspace first."/>}
   </div>
  </WorkspaceShell>;
 }
@@ -55,37 +57,37 @@ function CoursePolicyCard({row,save,disabled}:{
  function update<K extends keyof typeof value>(key:K,updated:(typeof value)[K]){
   setValue(v=>({...v,[key]:updated}));
  }
- return <article className="rounded-xl border bg-card p-5">
+ return <article className=" border bg-card p-5">
   <h2 className="text-lg font-semibold">{row.title} · {row.code}</h2>
   <p className="mt-1 text-xs text-muted-foreground">{row.programName} · {row.startsOn} to {row.endsOn}</p>
   <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-   <label className="text-sm">Maximum seats<input type="number" min={1} max={5000} value={value.capacity}
-    onChange={e=>update("capacity",Number(e.target.value))} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">Course credits<input type="number" min={0} max={20} step="0.5" value={value.credits}
-    onChange={e=>update("credits",Number(e.target.value))} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">Term credit limit<input type="number" min={0} max={40} step="0.5" value={value.maxCreditsPerTerm}
-    onChange={e=>update("maxCreditsPerTerm",Number(e.target.value))} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">Add/drop deadline<input type="date" value={value.addDropEndsOn}
-    onChange={e=>update("addDropEndsOn",e.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">Withdrawal deadline<input type="date" value={value.withdrawalEndsOn}
-    onChange={e=>update("withdrawalEndsOn",e.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm sm:col-span-2 lg:col-span-3">Prerequisite course codes (comma-separated)
-    <input value={prerequisites} onChange={e=>setPrerequisites(e.target.value)}
+   <Label className="text-sm">Maximum seats<Input type="number" min={1} max={5000} value={value.capacity}
+    onChange={e=>update("capacity",Number(e.target.value))} className="mt-1 block w-full  border bg-background p-2"/></Label>
+   <Label className="text-sm">Course credits<Input type="number" min={0} max={20} step="0.5" value={value.credits}
+    onChange={e=>update("credits",Number(e.target.value))} className="mt-1 block w-full  border bg-background p-2"/></Label>
+   <Label className="text-sm">Term credit limit<Input type="number" min={0} max={40} step="0.5" value={value.maxCreditsPerTerm}
+    onChange={e=>update("maxCreditsPerTerm",Number(e.target.value))} className="mt-1 block w-full  border bg-background p-2"/></Label>
+   <Label className="text-sm">Add/drop deadline<Input type="date" value={value.addDropEndsOn}
+    onChange={e=>update("addDropEndsOn",e.target.value)} className="mt-1 block w-full  border bg-background p-2"/></Label>
+   <Label className="text-sm">Withdrawal deadline<Input type="date" value={value.withdrawalEndsOn}
+    onChange={e=>update("withdrawalEndsOn",e.target.value)} className="mt-1 block w-full  border bg-background p-2"/></Label>
+   <Label className="text-sm sm:col-span-2 lg:col-span-3">Prerequisite course codes (comma-separated)
+    <Input value={prerequisites} onChange={e=>setPrerequisites(e.target.value)}
      placeholder="ALG-1, BIO-101"
-     className="mt-1 block w-full rounded border bg-background p-2"/>
-   </label>
+     className="mt-1 block w-full  border bg-background p-2"/>
+   </Label>
   </div>
-  <label className="mt-4 flex items-start gap-3 rounded-lg border p-3 text-sm">
-    <input type="checkbox" checked={value.guardianApprovalRequired}
+  <Label className="mt-4 flex items-start gap-3  border p-3 text-sm">
+    <Checkbox checked={value.guardianApprovalRequired}
       onChange={e=>update("guardianApprovalRequired",e.target.checked)} className="mt-1"/>
     <span>Require verified guardian approval before a registrar may approve this class addition.
       Student requests remain pending until an authorized guardian records their decision.</span>
-  </label>
-  <button type="button" disabled={disabled}
+  </Label>
+  <Button type="button" disabled={disabled}
    onClick={()=>save({...value,prerequisites:prerequisites.split(",").map(s=>s.trim()).filter(Boolean)})}
-   className="mt-4 rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+   className="mt-4">
    Save policy
-  </button>
+  </Button>
  </article>;
 }
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
