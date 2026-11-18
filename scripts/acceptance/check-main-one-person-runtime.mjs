@@ -38,6 +38,13 @@ async function main(){
        WHERE revoked_at IS NULL AND expires_at>clock_timestamp()) AS live_native_sessions,
       (SELECT count(*)::int FROM pg_constraint
        WHERE contype='f' AND confrelid='education_v30.persons'::regclass) AS native_person_fks,
+      (SELECT count(*)::int FROM pg_constraint
+       WHERE contype='f' AND confrelid='public.people'::regclass
+       AND conname IN ('audit_events_actor_person_id_fkey',
+          'domain_events_actor_person_id_fkey',
+          'class_sessions_facilitator_person_id_fkey')) AS critical_shared_actor_fks,
+      (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+       WHERE oid='public.people'::regclass) AS public_people_rls_forced,
       (SELECT count(*)::int FROM public.access_account_canonical_principals) AS staff_mapping_rows,
       (SELECT count(*)::int FROM public.access_account_noncredit_principals) AS learner_mapping_rows,
       (SELECT count(*)::int FROM public.account_person_grants g
@@ -92,6 +99,10 @@ async function main(){
     blockers.push("Active account grants disagree with immutable CAN Person IDs");
   if(identity.native_person_fks)
     blockers.push("Native Person foreign keys remain; staged FK move must not be run independently");
+  if(identity.critical_shared_actor_fks!==3)
+    blockers.push("Critical audit, event or Class facilitator Person FKs have not converged to public.people");
+  if(!identity.public_people_rls_forced)
+    blockers.push("Authoritative public People identity is missing forced row-level security");
   if(identity.staff_mapping_rows||identity.learner_mapping_rows)
     blockers.push("Existing Person correspondence rows require independent review");
   for(const [name,stillActive] of Object.entries(runtime))
