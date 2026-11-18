@@ -46,7 +46,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
     // does not create another identity and never grants operator authority.
     const siteRows = await db.execute(sql`
       SELECT s.id AS "siteId", s.name AS "siteName",
-        EXISTS(SELECT 1 FROM education_v30.deployment_sites ds
+        EXISTS(SELECT 1 FROM public.deployment_sites ds
           WHERE ds.site_id=s.id) AS "hasDeliveryAssignment",
         COALESCE(s.lifecycle_status,'unclassified') AS "siteLifecycle"
       FROM public.sites s
