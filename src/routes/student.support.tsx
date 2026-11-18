@@ -5,7 +5,9 @@ import { safeLoader } from "@/lib/safe-loader";
 import {getQuickWinActions,requestQuickWinHelp} from "@/modules/actions/student-actions.functions";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { isStudentSupportAction } from "@/modules/actions/student-action-policy";
-import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell } from "@/components/workspace";
+import { EmptyState, StatusBadge, WorkspaceNotice, WorkspacePanel, WorkspaceShell, useUnsavedChangesGuard } from "@/components/workspace";
+import { StudentAssignmentLink } from "@/components/student/StudentAssignmentLink";
+import { Field } from "@/components/ui/field";
 import {useMutationFeedback} from "@/lib/mutation-feedback";
 import {MutationFeedback} from "@/components/workspace/mutation-feedback";
 import { plural } from "@/lib/format";
@@ -36,6 +38,8 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
  const router=useRouter();
  const [message,setMessage]=useState("");
  const mutation=useMutationFeedback(()=>router.invalidate());
+ // Student help requests are not autosaved. Protect the typed message.
+ useUnsavedChangesGuard(message.trim().length > 0 || mutation.pending);
  const busy=mutation.pending||mutation.refreshFailed;
  const relevant=actions.filter(action=>isStudentSupportAction(action.type));
  async function askForHelp(){
@@ -50,26 +54,28 @@ function StudentSupportView({actions}:{actions:Awaited<ReturnType<typeof getQuic
   breadcrumbs={<Link to="/home" className="underline">Student Today</Link>}>
   <MutationFeedback state={mutation} className="mb-5" pendingMessage="Sending support request..."/>
   <WorkspacePanel title="Ask your school for help">
-   <Label className="block text-sm">What do you need help with?
-    <Textarea disabled={busy} value={message} onChange={event=>setMessage(event.target.value)}
-      rows={4} maxLength={1000} className="mt-2 w-full  border bg-background p-3"
-      placeholder="Describe the schoolwork, learning, or support concern"/>
-   </Label>
-   <Button type="button" disabled={busy||message.trim().length<3}
-     onClick={askForHelp} className="mt-3  bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground disabled:opacity-40">Send request</Button>
+   <Field label="What do you need help with?" required
+     description="Describe the schoolwork or support concern in at least 3 characters.">
+     <Textarea disabled={busy} value={message} onChange={event=>setMessage(event.target.value)}
+       rows={4} maxLength={1000} placeholder="Describe the schoolwork, learning, or support concern"/>
+   </Field>
+   <Button type="button" disabled={busy||message.trim().length<3} loading={mutation.pending}
+     loadingLabel="Sending request…" onClick={()=>void askForHelp()} className="mt-3">Send request</Button>
   </WorkspacePanel>
   <section className="mt-7">
    <h2 className="font-serif text-2xl">Your support actions</h2>
    {relevant.length===0&&<EmptyState className="mt-3" title="No support actions recorded yet."/>}
    <div className="mt-3 space-y-3">{relevant.map(action=>{
-    const target=action.subjectType==="assessment"&&action.subjectId
-     ?{to:"/student/assignments" as const,search:{assessment:action.subjectId}}
-     :{to:"/student/experiences" as const,search:{action:action.id}};
+    const assessmentId=action.subjectType==="assessment" ? action.subjectId : undefined;
     return <article key={action.id} className=" border bg-card p-4">
-    <p className="font-semibold"><Link {...target} className="hover:underline">{action.title}</Link></p>
+    <p className="font-semibold">{assessmentId
+     ? <StudentAssignmentLink assessmentId={assessmentId} className="hover:underline">{action.title}</StudentAssignmentLink>
+     : <Link to="/student/experiences" search={{action:action.id}} className="hover:underline">{action.title}</Link>}</p>
     <p className="mt-2 text-sm text-muted-foreground">{action.description}</p>
     <StatusBadge tone={action.status==="resolved"?"success":"info"}>Status: {action.status.replaceAll("_"," ")}</StatusBadge>
-    <Link {...target} className="mt-3 inline-block text-sm underline">{target.to==="/student/assignments"?"Review assignment":"Review action"} →</Link>
+    {assessmentId
+     ? <StudentAssignmentLink assessmentId={assessmentId} className="mt-3 inline-block text-sm underline">Review assignment →</StudentAssignmentLink>
+     : <Link to="/student/experiences" search={{action:action.id}} className="mt-3 inline-block text-sm underline">Review action →</Link>}
    </article>;})}</div>
   </section>
  </WorkspaceShell>;
