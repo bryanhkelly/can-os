@@ -237,7 +237,7 @@ export function NativeOfferingReleaseReviewPanel(){
     className="mt-6"
     description="Exact-version publisher review, without a parallel curriculum publisher or local adoption shortcut.">
     {queue.isPending&&<p role="status">Checking independently verified Course review appointments…</p>}
-    {queue.isError&&<WorkspaceNotice tone="danger">
+    {queue.isError&&!queue.data&&<WorkspaceNotice tone="danger">
       The native Course review queue is unavailable for this verified reviewer account.
     </WorkspaceNotice>}
     {queue.isFetchNextPageError&&<WorkspaceNotice tone="danger">
