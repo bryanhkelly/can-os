@@ -36,6 +36,7 @@ const repoFiles=[
   "database/production/2026-11-18-consolidate-education-operation-sites.sql",
   "database/production/2026-11-18-consolidate-three-active-view-backed-tables.sql",
   "database/production/2026-11-18-consolidate-approved-deployment-adoptions.sql",
+  "database/production/2026-11-18-consolidate-deployment-sites.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -49,6 +50,7 @@ const referenceRowCounts={
   education_operations:1,
   education_operation_sites:1,
   deployment_offering_adoptions:1,
+  deployment_sites:1,
   facilitated_learning_participants:0,facilitated_learning_playback:0,program_publication_claims:0,
   publication_withdrawals:0,learner_outcomes:0,qualification_resource_fulfillments:0,
   noncredit_enrollment_waitlist:0,
@@ -136,6 +138,8 @@ async function run(){
             THEN (SELECT count(*) FROM public.education_operation_sites)
         WHEN c.relname='deployment_offering_adoptions'
             THEN (SELECT count(*) FROM public.deployment_offering_adoptions)
+        WHEN c.relname='deployment_sites'
+            THEN (SELECT count(*) FROM public.deployment_sites)
         WHEN c.relname='facilitated_learning_participants'
             THEN (SELECT count(*) FROM public.facilitated_learning_participants)
         WHEN c.relname='facilitated_learning_playback'
@@ -249,6 +253,22 @@ async function run(){
       JSON.stringify(adoptionValidator.path)!==
         JSON.stringify(['search_path=education_v30, pg_catalog']))
     throw new Error("Deployment adoption publication validator cutover failed");
+
+
+  // The active deployment-site contract has no direct authenticated grants.
+  // Its guarded trigger functions must still use the authoritative public table.
+  const [siteValidators]=await sql`
+    SELECT count(*)::int AS valid_count FROM pg_proc p
+    WHERE p.oid IN (
+      'education_v30.v29_guard_operational_gate()'::regprocedure,
+      'education_v30.v30_guard_shared_resource_allocation()'::regprocedure
+    )
+    AND p.prosecdef
+    AND p.proconfig=ARRAY['search_path=education_v30, pg_catalog']::text[]
+    AND p.prosrc LIKE '%FROM public.deployment_sites ds%'
+  `;
+  if(siteValidators?.valid_count!==2)
+    throw new Error("Deployment Site function rebinding was not preserved");
 
   // Security must not be weakened by a physical schema move. The two guarded
   // protected-table batches retained their existing FORCE RLS and policies.
