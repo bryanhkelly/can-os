@@ -453,9 +453,8 @@
 .student-glance > a > svg { width:30px; height:30px; flex-shrink:0; padding:5px; background:var(--muted); color:var(--muted-foreground); }
 .student-glance b { display:block; font-size:11px; font-weight:600; }
 .student-glance small { display:block; margin-top:3px; font-size:10px; color:var(--muted-foreground); }
-.student-assignment-filters { display:flex; gap:16px; border-bottom:1px solid var(--border); padding-bottom:8px; }
-.student-assignment-filters button { padding:5px 0; font-size:11px; color:var(--muted-foreground); border-bottom:2px solid transparent; }
-.student-assignment-filters button[aria-pressed="true"] { border-color:var(--primary); color:var(--primary); font-weight:600; }
+.student-assignment-filters { display:flex; flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--border); padding-bottom:12px; }
+/* Filter state, focus rings, and hit area come from shared V6.1 Button. */
 .student-assignment-row { display:grid; grid-template-columns:16px minmax(80px,1fr) minmax(65px,.6fr) auto; align-items:center; gap:9px; padding:12px 0; border-bottom:1px solid var(--border); }
 .student-assignment-row strong { display:none; }
 .student-assignment-row:last-child { border-bottom:0; }
