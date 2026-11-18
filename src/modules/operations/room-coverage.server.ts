@@ -49,11 +49,14 @@ export async function activeRoomCoverageSectionIds(tx: Reader, actor: AccessCont
       eq(accountPersonGrants.siteId, actor.grantSiteId), eq(accountPersonGrants.active, true),
       eq(accessAccounts.disabled, false), eq(people.active, true), verifiedStaffIdentityPredicate())).limit(1);
   if (!identity) throw new AuthorizationError("current room facilitator identity");
-  const day = siteDate(new Date(), site.timezone);
+  // Attendance corrections and scheduled shifts must use the date being
+  // verified, never today's date mixed with a different requested date.
+  // The current staff identity is still independently revalidated above.
+  const day = date ?? siteDate(new Date(), site.timezone);
   const schedules = await loadRoomCoverageSchedules(tx, actor.grantSiteId);
   return [...new Set(schedules.filter(row =>
     (row.primaryPersonId === actor.actorPersonId || row.backupPersonId === actor.actorPersonId) &&
-    row.startsOn <= day && row.endsOn >= day && roomCoverageOccurs(row, date ?? day)).flatMap(row => row.sections.filter(section =>
+    row.startsOn <= day && row.endsOn >= day && roomCoverageOccurs(row, day)).flatMap(row => row.sections.filter(section =>
       section.programId === programId).map(section => section.sectionId)))];
 }
 export function roomCoverageForBlock(schedules: readonly RoomCoverage[], block: {
