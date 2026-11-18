@@ -14,6 +14,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { isVerifiedEvidenceCurrent } from "@/domain/instructional-tracks";
 import { getCommandContext } from "@/modules/identity/command-context.server";
+import { auditEvents as platformAuditEvents } from "@/db/schema";
 import { assertTrackProvider, type TrackProviderCapability } from
   "@/modules/learning/instructional-track-access.server";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from
@@ -193,8 +194,36 @@ async function requireVerifiedEvidence(tx:Tx,evidenceVersionId:string,kind:strin
     (kind==="rights"&&evidence.kindCode!=="rights"))
     invalid("Each approval needs current independently verified evidence; rights need rights evidence.");
 }
+/** The submitter is not the only person who may have authored a native
+ * Course. Recheck the shared Course lesson audit history, so changing the
+ * active account grant cannot turn a previous editor into their own reviewer.
+ * Missing, truncated or unattributed audit rows fail closed. */
+async function requireIndependentNativeCourseReview(
+  tx:Tx,
+  bundle:Awaited<ReturnType<typeof loadBundle>>,
+  reviewerPersonIds:ReadonlySet<string>,
+){
+  if(!reviewerPersonIds.size)return;
+  const lessonIds=bundle.lessons.map(lesson=>lesson.id);
+  if(!lessonIds.length)invalid("Native Course review requires inspectable lesson content.");
+  const history=await tx.select({
+    actorPersonId:platformAuditEvents.actorPersonId,
+  }).from(platformAuditEvents)
+    .where(and(
+      eq(platformAuditEvents.action,"curriculum.native_draft_lesson.save"),
+      eq(platformAuditEvents.resourceType,"course_lesson"),
+      inArray(platformAuditEvents.resourceId,lessonIds),
+    )).limit(1001);
+  if(history.length>1000)
+    invalid("Course edit provenance exceeds the independent review limit.");
+  if(history.some(change=>!change.actorPersonId||
+    reviewerPersonIds.has(change.actorPersonId)))
+    throw new AuthorizationError("Course reviewer cannot approve lessons they previously edited");
+}
+
 async function requireApprovedSnapshot(tx:Tx,manifest:
-  typeof contentPublicationManifests.$inferSelect){
+  typeof contentPublicationManifests.$inferSelect,
+  bundle:Awaited<ReturnType<typeof loadBundle>>){
   const reviews=await currentReviews(tx,manifest.id);
   for(const review of reviews){
     const row=review.decision;
@@ -203,6 +232,9 @@ async function requireApprovedSnapshot(tx:Tx,manifest:
       invalid("All five latest decisions must independently approve the exact manifest.");
     await requireVerifiedEvidence(tx,row.evidenceVersionId,review.kind);
   }
+  await requireIndependentNativeCourseReview(tx,bundle,
+    new Set(reviews.flatMap(review=>
+      review.decision?.reviewerPersonId?[review.decision.reviewerPersonId]:[])));
   return reviews;
 }
 /** A raw policy table row is not an independent authorization decision.
@@ -316,6 +348,12 @@ export const submitNativeOfferingRelease=createServerFn({method:"POST"})
         tx,bundle.offering.publisherOrganizationId,data.assets,actor.actorPersonId!):[];
       const snapshotHash=nativeReleaseSnapshotHash(bundle.hash,policies,items);
       const previous=await currentManifest(tx,data.offeringVersionId);
+      // An already submitted asset-backed snapshot may not be silently
+      // superseded by an empty manuscript through the API, even when a
+      // client does not expose the downgrade option.
+      if(previous&&!items.length&&
+        (await readNativeReleaseManifestItems(tx,previous.id)).length>0)
+        conflict("An asset-backed release cannot be downgraded to a manuscript-only submission. Submit a revised asset-bearing snapshot.");
       if(previous?.manifestHash===snapshotHash)
         return {manifestId:previous.id,manifestHash:snapshotHash,created:false};
       const [manifest]=await tx.insert(contentPublicationManifests).values({
@@ -389,6 +427,8 @@ export const saveNativeOfferingReleasePolicy=createServerFn({method:"POST"})
       if(policyRevision(previous)!==data.expectedPolicyRevision)
         conflict("The release policy changed. Refresh before saving.");
       await requireVerifiedEvidence(tx,data.reviewEvidenceVersionId,"academic");
+      await requireIndependentNativeCourseReview(tx,bundle,
+        new Set([actor.actorPersonId!]));
       const changed=policyRevision(previous)!==policyRevision(data.requirements);
       if(changed){
         for(const policy of data.requirements)
@@ -528,6 +568,8 @@ export const decideNativeOfferingRelease=createServerFn({method:"POST"})
         manifest.createdByPersonId===actor.actorPersonId)
         throw new AuthorizationError("independent review of submitted draft");
       if(data.decision==="approved"){
+        await requireIndependentNativeCourseReview(tx,bundle,
+          new Set([actor.actorPersonId!]));
         if(!data.evidenceVersionId)
           invalid("Approvals require current independently verified evidence.");
         await requireVerifiedEvidence(tx,data.evidenceVersionId,data.reviewKind);
@@ -561,7 +603,7 @@ export const publishNativeOfferingCourses=createServerFn({method:"POST"})
         throw new AuthorizationError("independent Course publication");
       if(bundle.version.lifecycle!=="draft")
         conflict("The Offering has already been published.");
-      await requireApprovedSnapshot(tx,manifest);
+      await requireApprovedSnapshot(tx,manifest,bundle);
       // A manuscript review can publish native Course versions before any
       // recorded media exists. The existing database manifest-approval trigger
       // explicitly rejects empty asset manifests. Never upgrade that manifest
@@ -602,7 +644,7 @@ export const approveNativeOfferingAssetManifest=createServerFn({method:"POST"})
       const policies=await readNativeReleasePolicies(tx,bundle.version.id);
       requireCompleteReleasePolicies(policies,bundle.courses.map(row=>row.courseVersionId));
       await requireAuditedReleasePolicy(tx,bundle,manifest.createdByPersonId,policies);
-      await requireApprovedSnapshot(tx,manifest);
+      await requireApprovedSnapshot(tx,manifest,bundle);
       await assertNativeReleaseAssetEvidence(
         tx,bundle.offering.publisherOrganizationId,items,manifest.createdByPersonId);
       if(manifest.manifestStatus==="approved")
@@ -640,7 +682,7 @@ export const publishNativeOfferingVersion=createServerFn({method:"POST"})
         invalid("The Offering needs a separately approved asset-bearing publication manifest. Native Course manuscript review alone cannot release the Offering.");
       if(bundle.courses.some(row=>row.lifecycle!=="published"))
         invalid("Publish all independently reviewed native Courses before the Offering.");
-      await requireApprovedSnapshot(tx,manifest);
+      await requireApprovedSnapshot(tx,manifest,bundle);
       const items=await readNativeReleaseManifestItems(tx,manifest.id);
       await assertNativeReleaseAssetEvidence(
         tx,bundle.offering.publisherOrganizationId,items,manifest.createdByPersonId);
