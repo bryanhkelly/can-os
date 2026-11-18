@@ -252,12 +252,12 @@ export const publishUnifiedClassOffering = createServerFn({ method:"POST" })
          terms.enrollmentMethods.includes("approval")){
         const readiness=await tx.execute(sql`
           SELECT
-            to_regclass('education_v30.class_enrollment_invitations') IS NOT NULL
+            to_regclass('public.class_enrollment_invitations') IS NOT NULL
               AS "invitationReady",
-            to_regclass('education_v30.class_enrollment_approval_requests') IS NOT NULL
+            to_regclass('public.class_enrollment_approval_requests') IS NOT NULL
               AND EXISTS(
                 SELECT 1 FROM pg_constraint
-                WHERE conrelid=to_regclass('education_v30.class_enrollment_approval_requests')
+                WHERE conrelid=to_regclass('public.class_enrollment_approval_requests')
                   AND conname='ws2_approval_acceptance_only_after_review'
               ) AS "approvalReady",
             EXISTS(
