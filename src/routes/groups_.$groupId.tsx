@@ -64,7 +64,9 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
   const router = useRouter();
   const { session: selectedSession } = Route.useSearch();
   const mutation = useMutationFeedback(() => router.invalidate());
-  const [activeTab, setActiveTab] = useState<"overview" | "discussion" | "resources" | "sessions">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "discussion" | "resources" | "sessions">(selectedSession ? "sessions" : "overview");
+  // Calendar deep links must expose the session rather than a hidden panel.
+  useEffect(() => { if (selectedSession) setActiveTab("sessions"); }, [selectedSession]);
   const busy = mutation.pending || mutation.refreshFailed;
   const { availability, workspace } = data;
   const group = workspace?.groups.find(candidate => candidate.id === groupId);
@@ -178,7 +180,7 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
         </section>
         <section id="group-panel-resources" role="tabpanel" aria-labelledby="group-tab-resources" tabIndex={0}
           hidden={activeTab !== "resources"}>
-          <ResourcesPanel />
+          <ResourcesPanel group={group} approvedMember={approvedMember} role={role} />
         </section>
         <section id="group-panel-sessions" role="tabpanel" aria-labelledby="group-tab-sessions" tabIndex={0}
           hidden={activeTab !== "sessions"}>
@@ -249,11 +251,22 @@ function GroupDetailsPanel({ group }: { group: Group }) {
   </WorkspacePanel>;
 }
 
-function ResourcesPanel() {
+function ResourcesPanel({group, approvedMember, role}: {
+  group: Group; approvedMember: boolean; role: Workspace["role"];
+}) {
   return <WorkspacePanel className="rounded-sm shadow-none" title="Shared learning resources"
-    description="Resources shared by a facilitator will appear here.">
-    <EmptyState title="Group resources are not available here yet."
-      description="No resources are exposed in this study-group workspace." />
+    description="Open existing class materials instead of keeping a separate copy in study groups.">
+    {approvedMember && group.sectionId ? <nav aria-label="Class learning resources" className="flex flex-wrap gap-3">
+      <Button asChild variant="outline"><Link to="/classes" search={{section: group.sectionId, tab: "lessons"}}>
+        Open class lessons
+      </Link></Button>
+      {role === "student" && <Button asChild variant="outline"><Link to="/student/assignments" search={{section: group.sectionId}}>
+        View class assignments
+      </Link></Button>}
+    </nav> : <EmptyState title={approvedMember ? "No class resources linked" : "Join to access shared resources"}
+      description={approvedMember
+        ? "This interest group is not linked to a class. Ask your facilitator to share materials through an authorized class workspace."
+        : "Group learning materials are available after membership approval."} />}
   </WorkspacePanel>;
 }
 
