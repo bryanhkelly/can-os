@@ -3,11 +3,17 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  canonicalClasses, canonicalClassEnrollments, learnerCourseAttempts,
-  learnerProfiles, assessmentAccess, assessmentFormAdministrations,
-  assessmentVersions, assessmentDefinitions, assessmentFormVersions,
-  auditEvents, domainEvents,
+  canonicalClasses,
+  canonicalClassEnrollments,
+  learnerCourseAttempts,
+  learnerProfiles,
+  assessmentAccess,
+  assessmentFormAdministrations,
+  assessmentVersions,
+  assessmentDefinitions,
+  assessmentFormVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -134,12 +140,12 @@ export const provisionNativeClassKnowledgeCheckAccess=createServerFn({method:"PO
         classId:cls.id,classEnrollmentId:enrollment.id,
         courseAttemptId:attempt.id,assessmentAdministrationId:administration.id,
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,owningOrganizationId:organizationId,
         eventCode:"class.assessment.access_granted",
         entityKind:"assessment_access_grant",entityId:created.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"ClassAssessmentAccessGranted",
         aggregateType:"assessment_access_grant",aggregateId:created.id,
         actorPersonId:actor.actorPersonId!,payload,
