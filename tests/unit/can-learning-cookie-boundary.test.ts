@@ -53,4 +53,13 @@ describe("single CAN login is required for instructional learning",()=>{
   expect(source).not.toContain("canonicalSessionDigestFromRequest");
   expect(source).not.toContain("issueNativeLearnerSession");
  });
+ it("blocks native-only learner access across canonical Class commands",()=>{
+  const source=readFileSync("src/modules/identity/canonical-command-context.server.ts","utf8");
+  expect(source).toContain('if (legacy.role_code === "learner")');
+  expect(source).toContain('throw new AuthorizationError("current CAN learner login required")');
+  expect(source).toContain('return projectCanonicalCommandContext(legacy)');
+  expect(source).not.toContain('return projectCanonicalCommandContext(await getCanonicalSessionRow(request))');
+  // Independently scoped non-learner native reviewers are not silently
+  // converted into unverified CAN organization grants by this change.
+ });
 });
