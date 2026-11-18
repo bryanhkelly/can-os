@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { StudentAssignmentLink } from "./StudentAssignmentLink";
 import { WorkspacePanel } from "@/components/workspace";
 import type { StudentSuccessSupportSummary } from "@/domain/student-success-support";
 
@@ -30,8 +31,8 @@ export function StudentSuccessSupportPanel({
           </p>
           <p className="mt-1 font-semibold">
             {task.destination === "assignment"
-              ? <Link to="/student/assignments" search={{ assessment: task.destinationId }}
-                  className="underline">{task.title}</Link>
+              ? <StudentAssignmentLink assessmentId={task.destinationId}
+                  className="underline">{task.title}</StudentAssignmentLink>
               : <Link to="/student/experiences" search={{ action: task.destinationId }}
                   className="underline">{task.title}</Link>}
           </p>
