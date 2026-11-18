@@ -28,7 +28,7 @@ export const religiousAffiliationOptions = pgTable("religious_affiliation_option
   active: boolean("active").notNull().default(true),
 });
 
-export const blueprints = educationV30.table(
+export const blueprints = pgTable(
   "blueprints",
   {
     id: id(),
