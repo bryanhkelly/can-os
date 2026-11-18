@@ -19,6 +19,7 @@ import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storag
 import { attachmentAccept, attachmentMimeForFileName as attachmentMime, MAX_ATTACHMENT_BYTES } from "@/modules/learning/attachment-mimes";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { formatTimestamp } from "@/modules/calendar/timezone";
+import { canSubmitAssignmentWork, shouldAutosaveAssignmentDraft } from "@/domain/student-assignment-work";
 
 export const Route = createFileRoute("/student/assignments_/$assessmentId")({
  validateSearch: (search: Record<string, unknown>): { filter?: "all" | "todo" | "missing" | "submitted" | "feedback"; section?: string } => ({
@@ -138,8 +139,11 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
  // Autosave is delayed; prevent navigation from silently discarding typed work
  // or attachments that have not reached the authorized submission record.
  useUnsavedChangesGuard(editable && (draft !== savedDraft || pendingFiles.length > 0));
- const canSubmit = draft.trim().length >= 3 || pendingFiles.length > 0 ||
-  (assignment.status === "assigned" && attachments.length > 0);
+ // The verified current-attempt attachment list is authoritative. A newly
+ // attached file can be submitted even if the initial loader had no draft.
+ const canSubmit = canSubmitAssignmentWork({
+  responseText: draft, queuedFiles: pendingFiles.length, verifiedFiles: attachments.length,
+ });
  useEffect(() => {
   let active = true;
   listSubmissionAttachments({ data: { assessmentId: assignment.assessmentId } })
@@ -148,7 +152,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
   return () => { active = false; };
  }, [assignment.assessmentId]);
  useEffect(() => {
-  if (!hydrated || !editable || busy || draft === (assignment.responseText ?? "")) return;
+  if (!shouldAutosaveAssignmentDraft({hydrated, editable, busy, draft, lastSaved: savedDraft})) return;
   const generation = ++saveGeneration.current;
   const task = setTimeout(() => {
    if (generation !== saveGeneration.current) return;
@@ -167,7 +171,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
     .finally(() => { if (autosaveInFlight.current === request) autosaveInFlight.current = null; });
   }, 950);
   return () => { clearTimeout(task); saveGeneration.current++; };
- }, [assignment.assessmentId, assignment.status, assignment.responseText, editable, busy, draft, hydrated]);
+ }, [assignment.assessmentId, editable, busy, draft, hydrated, savedDraft]);
  async function saveWork(submitFinal: boolean) {
   if (saving.current) return;
   if (!editable) {
