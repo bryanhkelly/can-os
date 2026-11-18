@@ -2,12 +2,15 @@ import { createServerFn } from "@tanstack/react-start";
 import { appendResponseHeader, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 import {
   accessAccounts, accessAccountNoncreditPrincipals,
   accessAccountCanonicalPrincipals, accessAdultLearningReviews,
 } from "@/db/schema";
 import {
-  auditEvents, canonicalAccounts, canonicalPersons, canonicalAccountGrants,
+  canonicalAccounts,
+  canonicalPersons,
+  canonicalAccountGrants,
   canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -128,7 +131,7 @@ export const resumeLinkedNativeClassLearner=createServerFn({method:"POST"})
         throw new DomainError("CANONICAL_LEARNER_ONBOARDING_REQUIRED");
       const grant=review?home[0]!:grants[0]!;
       const issued=await issueNativeLearnerSession(tx,native.accountId,grant.id,now);
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:link.canonicalPersonId,
         owningOrganizationId:grant.organizationId,
         eventCode:"class.learner.session.resumed",
