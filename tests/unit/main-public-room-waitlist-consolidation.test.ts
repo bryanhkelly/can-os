@@ -23,7 +23,8 @@ describe("Neon main public room evidence and noncredit waitlist cutover",()=>{
       expect(migration).toContain("relforcerowsecurity");
       expect(migration).toContain("pg_constraint");
       expect(migration).toContain("pg_policy");
-      expect(migration).not.toMatch(/\\b(?:DROP TABLE|CASCADE|DISABLE ROW LEVEL SECURITY|TRUNCATE|INSERT INTO)\\b/i);
+      const statements=migration.replace(/^--.*$/gm,"");
+      expect(statements).not.toMatch(/\b(?:DROP TABLE|CASCADE|DISABLE ROW LEVEL SECURITY|TRUNCATE|INSERT INTO)\b/i);
     }
     for(const view of [
       "facilitated_room_pilot_evidence",
@@ -52,7 +53,7 @@ describe("Neon main public room evidence and noncredit waitlist cutover",()=>{
     const fourSessions=read("scripts/acceptance/check-ws4-four-session-journey.mjs");
     const consolidation=read("scripts/acceptance/check-public-schema-consolidation.mjs");
     expect(room).toContain('const publicTables=new Set([');
-    for(const table of roomTables)expect(room).toContain('"${table}"'.replace("${table}",table));
+    for(const table of roomTables)expect(room).toContain('"' + table + '"');
     expect(fourSessions).toContain("public.facilitated_room_presence_events");
     expect(fourSessions).not.toContain("education_v30.facilitated_room_presence_events");
     expect(consolidation).toContain(roomMigration);
