@@ -90,7 +90,7 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
       {experiences && (experiences.connected
         ? <StatusBadge tone="success">School updates connected</StatusBadge>
         : <StatusBadge tone="attention">School updates unavailable</StatusBadge>)}
-      <span aria-hidden="true" data-school-mark="" className="grid size-16 shrink-0 place-items-center rounded-lg border bg-muted font-serif text-2xl text-muted-foreground"
+      <span aria-hidden="true" data-school-mark="" className="grid size-16 shrink-0 place-items-center  border bg-muted font-serif text-2xl text-muted-foreground"
         style={site.brand ? { backgroundColor: site.brand.theme.ink, color: site.brand.theme.onDark, fontFamily: site.brand.theme.displayFont } : undefined}>
         {site.brand?.logo ? <img src={site.brand.logo.src} alt="" width={64} height={64} className="size-16 object-contain" /> : schoolInitials(site.name)}
       </span>
@@ -115,7 +115,7 @@ export function SchoolProfile({ data, tab = "overview", tabLink }: {
       srcSet={"srcSet" in schoolImage ? schoolImage.srcSet : undefined} sizes="(max-width: 720px) calc(100vw - 40px), 1136px"
       width={"width" in schoolImage ? schoolImage.width : undefined} height={"height" in schoolImage ? schoolImage.height : undefined}
       decoding="async" fetchPriority="high"
-      className="mb-6 aspect-[4/1] w-full rounded-lg object-cover" />}
+      className="mb-6 aspect-[4/1] w-full  object-cover" />}
     {canManageSchool && siteCount === null && <p role="status" className="mb-4 border p-3 text-sm">The school directory is unavailable. The number of authorized schools could not be verified.</p>}
     <div className="grid gap-3 sm:grid-cols-3">
       <StatCard label="Programs" value={site.programs.length} />
