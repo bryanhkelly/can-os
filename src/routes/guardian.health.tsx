@@ -3,7 +3,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { QueryState, WorkspaceShell } from "@/components/workspace";
+import { QueryState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -39,33 +39,32 @@ function GuardianHealthPage() {
     subtitle="Review the school's recorded health instructions, compliance status and return clearance. Medical decisions and changes require authorized school review."
     breadcrumbs={<><Link to="/home" search={{student}} className="underline">Family home</Link><span>/</span><span>Health</span></>}>
     <div className="mt-6 flex flex-wrap gap-3 text-sm">
-      <button type="button" disabled={healthQuery.isFetching} onClick={() => void healthQuery.refetch()}
-        className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">
+      <Button type="button" variant="outline" disabled={healthQuery.isFetching} onClick={() => void healthQuery.refetch()}>
         {healthQuery.isFetching ? "Checking school review…" : "Refresh school review status"}
-      </button>
-      <Link to="/messages" className="rounded-lg border px-4 py-2 font-semibold">Contact the school about a health update</Link>
-      <Link to="/guardian/attendance" search={{student}} className="rounded-lg border px-4 py-2">Attendance and excuses</Link>
+      </Button>
+      <Link to="/messages" className=" border px-4 py-2 font-semibold">Contact the school about a health update</Link>
+      <Link to="/guardian/attendance" search={{student}} className=" border px-4 py-2">Attendance and excuses</Link>
     </div>
     <QueryState loading={healthQuery.isPending ? "Loading verified school health records…" : undefined}
       error={failure?.message}
       onRetry={failure?.retryable ? () => void healthQuery.refetch() : undefined}
       retrying={healthQuery.isFetching}/>
-    {data && data.children.length === 0 && <p className="mt-6 rounded-lg border p-4">No health records are available for this authorized student. If the child has recently enrolled or transferred, contact the school.</p>}
-    {data?.children.map(child => <section key={child.studentPersonId} className="mt-6 space-y-4 rounded-xl border bg-card p-5">
+    {data && data.children.length === 0 && <p className="mt-6  border p-4">No health records are available for this authorized student. If the child has recently enrolled or transferred, contact the school.</p>}
+    {data?.children.map(child => <section key={child.studentPersonId} className="mt-6 space-y-4  border bg-card p-5">
       <h2 className="text-xl font-semibold">{child.studentName}</h2>
       {child.awaitingSchoolHealthReview ? (
-        <p role="status" className="rounded-lg border p-4 text-sm">
+        <p role="status" className=" border p-4 text-sm">
           <strong>School review pending.</strong> Your proposed emergency and medical information has not been approved.
           The school-recorded instructions below remain authoritative until staff complete their review.
         </p>
       ) : child.lastSchoolReview?.status === "approved" ? (
-        <p role="status" className="rounded-lg border p-4 text-sm">
+        <p role="status" className=" border p-4 text-sm">
           <strong>Family update approved.</strong> The school reviewed your request on{" "}
           {new Date(child.lastSchoolReview.reviewedAt).toLocaleDateString()}.
           The approved instructions below reflect the school's current record.
         </p>
       ) : child.lastSchoolReview?.status === "rejected" ? (
-        <p role="status" className="rounded-lg border p-4 text-sm">
+        <p role="status" className=" border p-4 text-sm">
           <strong>School needs clarification.</strong> Your last proposed health update was not approved
           ({new Date(child.lastSchoolReview.reviewedAt).toLocaleDateString()}).
           The school-recorded instructions below have not been replaced. You may correct and
@@ -73,14 +72,14 @@ function GuardianHealthPage() {
         </p>
       ) : null}
       <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border p-4">
+        <div className=" border p-4">
           <h3 className="font-semibold">School-recorded medical instructions</h3>
           <p className="mt-3 text-sm"><strong>Allergies:</strong> {child.profile?.allergySummary || "No allergy summary recorded"}</p>
           <p className="mt-2 text-sm"><strong>Emergency instructions:</strong> {child.profile?.emergencySummary || "No emergency summary recorded"}</p>
           <p className="mt-2 text-sm"><strong>Accommodations:</strong> {child.profile?.accommodationSummary || "No accommodations recorded"}</p>
           <p className="mt-3 text-xs text-muted-foreground">Contact the school if anything here is missing or inaccurate. This page does not change the medical record.</p>
         </div>
-        <div className="rounded-lg border p-4">
+        <div className=" border p-4">
           <h3 className="font-semibold">Health requirements</h3>
           {child.compliance.map((item, i) => <p key={i} className="mt-3 text-sm">
             <strong>{item.type.replaceAll("_", " ")}:</strong> {item.status.replaceAll("_", " ")}
@@ -89,7 +88,7 @@ function GuardianHealthPage() {
           </p>)}
           {!child.compliance.length && <p className="mt-3 text-sm">No health requirements have been recorded.</p>}
         </div>
-        <div className="rounded-lg border p-4">
+        <div className=" border p-4">
           <h3 className="font-semibold">Medication authorizations</h3>
           {child.medications.map((item, i) => <p key={i} className="mt-3 text-sm">
             <strong>{item.medicationName}:</strong> {item.status.replaceAll("_", " ")}
@@ -98,7 +97,7 @@ function GuardianHealthPage() {
           </p>)}
           {!child.medications.length && <p className="mt-3 text-sm">No medication authorization is on file. Do not assume a medication may be administered.</p>}
         </div>
-        <div className="rounded-lg border p-4">
+        <div className=" border p-4">
           <h3 className="font-semibold">Return-to-school clearances</h3>
           {child.clearances.map((item, i) => <p key={i} className="mt-3 text-sm">
             <strong>{item.status.replaceAll("_", " ")}</strong> · {new Date(item.date).toLocaleDateString()}
@@ -111,7 +110,7 @@ function GuardianHealthPage() {
         const refreshed = await healthQuery.refetch();
         if (refreshed.isError) throw refreshed.error;
       }}/>
-      <div className="rounded-lg border p-4">
+      <div className=" border p-4">
         <h3 className="font-semibold">Recent health-office visits</h3>
         {child.visits.map((visit, i) => <p key={i} className="mt-2 text-sm">
           {new Date(visit.date).toLocaleString()} · {visit.reason}
@@ -150,10 +149,10 @@ function GuardianHealthUpdateForm({child,onSubmitted}:{child:Child;onSubmitted:(
   },{successMessage:"Submitted for school review. Your changes are not yet approved emergency or medical instructions.",
     commandErrorMessage:"School health information could not be submitted."});
  }
- return <form onSubmit={event=>void submit(event)} className="space-y-3 rounded-lg border p-4">
+ return <form onSubmit={event=>void submit(event)} className="space-y-3  border p-4">
   <h3 className="font-semibold">Update emergency and health information</h3>
   <p className="text-sm text-muted-foreground">Request corrections to the existing school medical record. Only authorized school staff can approve them. If your child needs immediate help, call the school directly; this form is not monitored as an emergency service.</p>
-  {child.awaitingSchoolHealthReview?<p role="status" className="rounded border p-3 text-sm">A previous update is pending school review. Contact the office for urgent changes.</p>:<>
+  {child.awaitingSchoolHealthReview?<WorkspaceNotice tone="attention">A previous update is pending school review. Contact the office for urgent changes.</WorkspaceNotice>:<>
   <Field label="Allergy instructions" className="text-sm font-medium"><Textarea value={allergies} onChange={e=>setAllergies(e.target.value)} maxLength={2000} rows={2}/></Field>
   <Field label="Emergency instructions" className="text-sm font-medium"><Textarea value={emergency} onChange={e=>setEmergency(e.target.value)} maxLength={2000} rows={2}/></Field>
   <Field label="Accommodations requiring school review" className="text-sm font-medium"><Textarea value={accommodations} onChange={e=>setAccommodations(e.target.value)} maxLength={2000} rows={2}/></Field>
