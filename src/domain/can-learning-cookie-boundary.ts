@@ -18,7 +18,8 @@ export function canLearningCookieMode(
   // These readers refuse duplicate names rather than silently choosing one.
   const can = readCookie(request, accessSessionCookie);
   const native = readCookie(request, canonicalSessionCookie);
-  if (!can || !/^[A-Za-z0-9_-]{40,}$/.test(can)) {
+  if (!can || !/^[A-Za-z0-9_-]{40,}$/.test(can) ||
+      (native !== undefined && !/^[A-Za-z0-9_-]{40,}$/.test(native))) {
     throw new AuthorizationError("authenticated session");
   }
   return native === undefined ? "can" : "can_with_native";
