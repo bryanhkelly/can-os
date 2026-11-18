@@ -22,6 +22,7 @@ import {
   activateUnifiedClass, createNextUnifiedClassOfferingVersion,
 } from "@/modules/classes/unified-class.functions";
 import type { ClassOfferingTerms } from "@/domain/unified-class";
+import { classOfferingLocalTimeToUtc } from "@/domain/class-offering-local-time";
 import { getPublisherRolloutTemplate } from "@/modules/programs/publisher-rollout.functions";
 import { assessLocalRollout, parsePortableRollout, serializeProgramRollout, type ProgramRolloutRecipe } from "@/domain/network-program-rollout";
 
@@ -45,7 +46,6 @@ function optionKey(o:{deploymentId:string;adoptionId:string;offeringVersionId:st
 function toggle<T extends string>(list:T[],name:T):T[]{
   return list.includes(name)?list.filter(v=>v!==name):[...list,name];
 }
-function utc(value:string):string|null{return value?new Date(value).toISOString():null;}
 
 export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation}: {preferredSiteId?: string;preferredOfferingVersionId?:string;navigation?:ReactNode}) {
   const client=useQueryClient();
@@ -117,6 +117,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const rolloutReadiness=recipePlan
     ?assessLocalRollout(recipePlan,exactRolloutData,rolloutSiteId||null):[];
   const rolloutSiteOptions=operatorSites.data??[];
+  const selectedSiteTimeZone=rolloutSiteOptions.find(site=>site.id===siteId)?.timeZone??null;
   // Offering versions remain canonical publisher products. Each authorized
   // adoption may support many Course components and local Classes; no extra
   // Program records are synthesized for standalone Courses.
@@ -249,7 +250,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         },
         terms:createWithOffering?{
           visibility,enrollmentMethods:methods,allowedCreditModes:creditModes,
-          opensAt:utc(opensAt),closesAt:utc(closesAt),
+          opensAt:classOfferingLocalTimeToUtc(opensAt,selectedSiteTimeZone),
+          closesAt:classOfferingLocalTimeToUtc(closesAt,selectedSiteTimeZone),
           capacity:capacity?Number(capacity):null,
           consentVersion:methods.includes("self")?consentVersion.trim():null,
           consentText:methods.includes("self")?consentText.trim():null,
@@ -268,10 +270,12 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       }
     }finally{setBusy(false)}
   }
-  function currentTerms():ClassOfferingTerms{
+  function currentTerms(targetSiteId:string|null):ClassOfferingTerms{
+    const siteTimeZone=rolloutSiteOptions.find(site=>site.id===targetSiteId)?.timeZone??null;
     return {
       visibility,enrollmentMethods:methods,allowedCreditModes:creditModes,
-      opensAt:utc(opensAt),closesAt:utc(closesAt),
+      opensAt:classOfferingLocalTimeToUtc(opensAt,siteTimeZone),
+      closesAt:classOfferingLocalTimeToUtc(closesAt,siteTimeZone),
       capacity:capacity?Number(capacity):null,
       consentVersion:methods.includes("self")?consentVersion.trim():null,
       consentText:methods.includes("self")?consentText.trim():null,
@@ -293,7 +297,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
     setBusy(true);setError("");setNotice("");
     try{
       await feedback.run(()=>createNextUnifiedClassOfferingVersion({
-        data:{classId,terms:currentTerms()},
+        data:{classId,terms:currentTerms(classes.data?.find(item=>item.classId===classId)?.siteId??null)},
       }),{
         successMessage:"Optional Class Offering draft created. Publish it when ready.",
         commandErrorMessage:"Could not create Class Offering. Verify authorized Class and valid terms.",
@@ -663,6 +667,11 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                   onChange={e=>setCapacity(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
               </div>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Registration times use the hosting Site time zone:
+              {" "}{selectedSiteTimeZone??"select an authorized Site with a configured time zone"}.
+              Missing or ambiguous daylight-saving times cannot be submitted.
+            </p>
             {methods.includes("self")&&<div className="mt-4 space-y-3">
               <p className="text-sm font-semibold">Self-enrollment consent terms</p>
               <div><Label htmlFor="native-class-consent-version" className="block text-xs font-semibold">Version</Label>
