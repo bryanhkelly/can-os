@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
+    "netlify/**/*.ts",
+    "netlify/**/*.tsx",
+    "scripts/**/*.ts",
+    "scripts/**/*.tsx",
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx",
+    "*.ts",
+    "*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".netlify",
+    ".wrangler",
+    "storybook-static",
+    "playwright-report",
+    "test-results"
+  ]
+}
