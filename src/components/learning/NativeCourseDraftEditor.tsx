@@ -1,7 +1,6 @@
 import { useEffect,useState, type FormEvent } from "react";
-import { normalizeClientError } from "@/lib/client-error";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
-import { WorkspacePanel,StatusBadge,MutationFeedback } from "@/components/workspace";
+import { WorkspacePanel,StatusBadge,MutationFeedback,WorkspaceNotice } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -101,13 +100,16 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
     queryFn:()=>getNativeOfferingReleaseOverview({data:{offeringVersionId}}),
     retry:false,
   });
-  const [busy,setBusy]=useState(false);
+  const feedback=useMutationFeedback(async()=>{
+    await Promise.all([
+      client.invalidateQueries({queryKey:["native-offering-release-overview",offeringVersionId]}),
+      client.invalidateQueries({queryKey:["native-offering-release-review-queue"]}),
+    ]);
+  });
   const [assetUses,setAssetUses]=useState<Array<{
     assetVersionId:string;
     usageKind:"required_instruction"|"supporting"|"accessibility"|"assessment";
   }>>([]);
-  const [notice,setNotice]=useState("");
-  const [error,setError]=useState("");
   useEffect(()=>{
     setAssetUses(current.data?.manifest?.assetUses??[]);
   },[current.data?.manifest?.id]);
@@ -118,30 +120,25 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
       selected.assetVersionId===item.assetVersionId&&
       selected.usageKind===item.usageKind)));
   async function submit(){
-    if(!current.data||current.data.lifecycle!=="draft"||busy)return;
-    setBusy(true);setNotice("");setError("");
-    try{
-      const response=await submitNativeOfferingRelease({data:{
-        offeringVersionId,expectedHash:current.data.manuscriptHash,assets:assetUses,
-      }});
-      setNotice(response.created?(assetUses.length
-        ?"Submitted exact published assets and native Course composition for independent release review."
-        :"Submitted native Course manuscript for independent review."): 
-        "This exact native release snapshot was already submitted.");
-      await Promise.all([
-        client.invalidateQueries({queryKey:["native-offering-release-overview",offeringVersionId]}),
-        client.invalidateQueries({queryKey:["native-offering-release-review-queue"]}),
-      ]);
-    }catch(cause){
-      setError(normalizeClientError(cause,
-        "Release submission denied. Verify current Course creator appointments and the unchanged draft.").message);
-    }finally{setBusy(false)}
+    if(!current.data||current.data.lifecycle!=="draft"||
+      feedback.pending||feedback.refreshFailed)return;
+    await feedback.run(()=>submitNativeOfferingRelease({data:{
+      offeringVersionId,expectedHash:current.data!.manuscriptHash,assets:assetUses,
+    }}),{
+      successMessage:response=>response.created
+        ?assetUses.length>0
+          ?"Submitted exact published assets and Course composition for independent release review."
+          :"Submitted native Course manuscript for independent review."
+        :"This exact native release snapshot was already submitted.",
+      commandErrorMessage:"Release submission denied. Verify current Course creator appointments and an unchanged draft.",
+      refreshErrorMessage:"Submission saved, but release records did not refresh. Retry refresh before submitting another version.",
+    });
   }
   return <div className="mt-3 border-t border-border pt-3 text-sm">
     {current.isPending&&<p role="status">Checking Course release manifest…</p>}
-    {current.isError&&<p role="alert">
-      This publisher Offering cannot be submitted under the current verified Course appointments.
-    </p>}
+    {current.isError&&<WorkspaceNotice tone="danger">
+      This publisher Offering cannot be submitted under current verified Course appointments.
+    </WorkspaceNotice>}
     {current.data&&<>
       <p>{current.data.courseCount} Course(s), {current.data.lessonCount} lesson(s).
         {" "}Snapshot {current.data.manuscriptHash.slice(0,12)}.
@@ -195,7 +192,8 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
                     <option value="assessment">Assessment</option>
                   </Select>}
                   <Button type="button" variant="outline" aria-pressed={Boolean(selected)}
-                    disabled={busy||(!selected&&assetUses.length>=50)}
+                    disabled={feedback.pending||feedback.refreshFailed||
+                      (!selected&&assetUses.length>=50)}
                     onClick={()=>setAssetUses(current=>selected?
                       current.filter(item=>item.assetVersionId!==asset.id):
                       [...current,{assetVersionId:asset.id,usageKind:"required_instruction"}])}>
@@ -217,18 +215,18 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
             select replacement assets for another independent review.
           </p>}
         <Button className="mt-3" type="button" variant="outline"
-          disabled={busy||sameSelection||
+          disabled={feedback.pending||feedback.refreshFailed||sameSelection||
             (assetUses.length>0&&!current.data.releasePoliciesComplete)||
             Boolean(assetUses.length===0&&manifest?.current&&manifest.assetCount>0)}
           onClick={()=>void submit()}>
-          {busy?"Submitting…":assetUses.length?
+          {feedback.pending?"Submitting…":assetUses.length?
             `Submit ${assetUses.length} reviewed asset(s) for Offering release`:
             "Submit native Course manuscript for independent review"}
         </Button>
       </>}
     </>}
-    {notice&&<p role="status" className="mt-2">{notice}</p>}
-    {error&&<p role="alert" className="mt-2 text-destructive">{error}</p>}
+    <MutationFeedback state={feedback} className="mt-3"
+      pendingMessage="Validating the Course appointment and exact asset-backed release snapshot…"/>
   </div>;
 }
 
