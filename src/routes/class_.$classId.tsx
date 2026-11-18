@@ -3,6 +3,10 @@ import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-quer
 import { lazy, Suspense, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { WorkspaceShell, RosterList } from "@/components/workspace";
 import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
@@ -460,10 +464,10 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </p>
             {approvals.isError&&<p role="alert" className="mt-2 text-sm">Approval queue unavailable.</p>}
             {approvals.data?.length===0&&<p className="mt-2 text-sm">No pending requests.</p>}
-            <label className="mt-3 block text-sm font-semibold" htmlFor="class-approval-reason">
+            <Label className="mt-3 block text-sm font-semibold" htmlFor="class-approval-reason">
               Decision rationale
-            </label>
-            <textarea id="class-approval-reason" value={reviewReason}
+            </Label>
+            <Textarea id="class-approval-reason" value={reviewReason}
               maxLength={1000} onChange={event=>setReviewReason(event.target.value)}
               placeholder="Record the independent eligibility review and reason for approving or rejecting"
               className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
@@ -491,10 +495,10 @@ function ManagingClass({workspace}:{workspace:Workspace}){
             </p>
             {repeats.isError&&<p role="alert" className="mt-2 text-sm">Repeat evidence is unavailable.</p>}
             {repeats.data?.length===0&&<p className="mt-2 text-sm">No independently reviewable completed learners.</p>}
-            <label className="mt-3 block text-sm font-semibold" htmlFor="class-repeat-reason">
+            <Label className="mt-3 block text-sm font-semibold" htmlFor="class-repeat-reason">
               Independent review rationale
-            </label>
-            <textarea id="class-repeat-reason" maxLength={1000} value={repeatReason}
+            </Label>
+            <Textarea id="class-repeat-reason" maxLength={1000} value={repeatReason}
               onChange={e=>setRepeatReason(e.target.value)}
               placeholder="Document the independent reason for allowing the learner to repeat this completed Class"
               className="mt-2 w-full border border-border bg-background p-3 text-sm"/>
@@ -519,25 +523,25 @@ function ManagingClass({workspace}:{workspace:Workspace}){
               The Class's Site authority is checked independently. Minors
               require the separate school/guardian placement flow.
             </p>
-            <label htmlFor="class-assign-learner" className="mt-4 block text-sm font-semibold">
+            <Label htmlFor="class-assign-learner" className="mt-4 block text-sm font-semibold">
               Verified learner
-            </label>
-            <select id="class-assign-learner" value={learnerPersonId}
+            </Label>
+            <Select id="class-assign-learner" value={learnerPersonId}
               onChange={event=>setLearnerPersonId(event.target.value)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Choose an authorized learner</option>
               {workspace.learnerCandidates.map(person=><option
                 key={person.personId} value={person.personId}>{person.name}</option>)}
-            </select>
-            <label htmlFor="class-assign-credit" className="mt-4 block text-sm font-semibold">
+            </Select>
+            <Label htmlFor="class-assign-credit" className="mt-4 block text-sm font-semibold">
               Individual participation
-            </label>
-            <select id="class-assign-credit" value={learnerCreditMode}
+            </Label>
+            <Select id="class-assign-credit" value={learnerCreditMode}
               onChange={event=>setLearnerCreditMode(event.target.value as typeof learnerCreditMode)}
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="not_applicable">No academic credit</option>
               <option value="audit">Audit</option>
-            </select>
+            </Select>
             <Button className="mt-4" disabled={!learnerPersonId||pending}
               onClick={()=>void assignLearner()}>Assign to Class</Button>
             {workspace.offering?.state==="published"&&
@@ -583,22 +587,22 @@ function ManagingClass({workspace}:{workspace:Workspace}){
           A verified Site role alone cannot open this Class as a teacher. Each teacher or facilitator also requires an explicit Class assignment.
         </p>
         {workspace.siteId?<div className="mt-4 space-y-3">
-          <label htmlFor="class-staff-person" className="block text-sm font-semibold">Verified Site staff</label>
-          <select id="class-staff-person" value={staffPersonId} onChange={e=>setStaffPersonId(e.target.value)}
+          <Label htmlFor="class-staff-person" className="block text-sm font-semibold">Verified Site staff</Label>
+          <Select id="class-staff-person" value={staffPersonId} onChange={e=>setStaffPersonId(e.target.value)}
             className="min-h-11 w-full border border-border bg-background px-3 text-sm">
             <option value="">Select an authorized person</option>
             {workspace.staffCandidates.map(person=><option key={person.personId} value={person.personId}>
               {person.name}
             </option>)}
-          </select>
-          <label htmlFor="class-staff-role" className="block text-sm font-semibold">Class responsibility</label>
-          <select id="class-staff-role" value={staffRole} onChange={e=>setStaffRole(e.target.value as typeof staffRole)}
+          </Select>
+          <Label htmlFor="class-staff-role" className="block text-sm font-semibold">Class responsibility</Label>
+          <Select id="class-staff-role" value={staffRole} onChange={e=>setStaffRole(e.target.value as typeof staffRole)}
             className="min-h-11 w-full border border-border bg-background px-3 text-sm">
             <option value="facilitator">Facilitator</option>
             <option value="teacher">Class teacher</option>
-          </select>
-          <label className="flex items-start gap-3 border border-border p-3 text-sm">
-            <input type="checkbox" checked={canVerifyAttendance}
+          </Select>
+          <Label className="flex items-start gap-3 border border-border p-3 text-sm">
+            <Checkbox checked={canVerifyAttendance}
               onChange={event=>setCanVerifyAttendance(event.target.checked)}
               className="mt-1"/>
             <span><strong>Authorize attendance verification</strong>
@@ -607,7 +611,7 @@ function ManagingClass({workspace}:{workspace:Workspace}){
                 roster, roll call and recorded corrections. This is not academic grading authority.
               </span>
             </span>
-          </label>
+          </Label>
           <Button disabled={pending||!staffPersonId} onClick={()=>void assign()}>Assign to Class</Button>
         </div>:<p className="mt-4 text-sm">Provider-wide self-paced Classes do not need local teaching staff.</p>}
         <ul className="mt-5 divide-y divide-border">
