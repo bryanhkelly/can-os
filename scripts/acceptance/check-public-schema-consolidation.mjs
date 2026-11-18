@@ -22,6 +22,7 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-survey-confidential-redemptions.sql",
   "database/production/2026-11-17-migrate-blueprint-reference-catalog-to-public.sql",
   "database/production/2026-11-17-consolidate-empty-blueprints-table.sql",
+  "database/production/2026-11-17-consolidate-enrollment-prospects.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -30,6 +31,7 @@ const referenceRowCounts={
   blueprint_reference_items:74,blueprint_reference_item_versions:74,
   religious_affiliation_options:25,
   blueprints:0,
+  enrollment_prospects:0,
 };
 
 function migratedTableNames(){
@@ -100,6 +102,8 @@ async function run(){
             THEN (SELECT count(*) FROM public.religious_affiliation_options)
         WHEN c.relname='blueprints'
             THEN (SELECT count(*) FROM public.blueprints)
+        WHEN c.relname='enrollment_prospects'
+            THEN (SELECT count(*) FROM public.enrollment_prospects)
         END AS n
     ) count_table ON true
     WHERE ns.nspname='public' AND c.relname=ANY(${Object.keys(referenceRowCounts)}::text[])
@@ -123,8 +127,10 @@ async function run(){
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-17-consolidate-empty-blueprints-table.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-17-consolidate-enrollment-prospects.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==53)throw new Error("Expected 53 reviewed protected table relocations");
+  if(protectedNames.length!==54)throw new Error("Expected 54 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
