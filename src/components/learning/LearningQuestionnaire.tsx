@@ -1,6 +1,11 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Radio, Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { WorkspaceNotice } from "@/components/workspace";
 import { validateCourseSurveyAnswers, type SurveyAnswerInput, type SurveyQuestion } from "@/domain/course-survey";
 
 export type LearningQuestion = Omit<SurveyQuestion,"options"> & {
@@ -60,15 +65,16 @@ export function LearningQuestionnaire({
     {questions.map((question,index)=>{
       const current=draft[question.id];
       const selected=current?.optionIds??[];
+      const Choice=question.type==="single_choice"?Radio:Checkbox;
       return <fieldset key={question.id} disabled={pending} className="space-y-3 border-b pb-5 last:border-0">
         <legend className="font-semibold text-sm">
           {index+1}. {question.prompt}{question.required?" *":""}
         </legend>
         {question.type==="single_choice"||question.type==="multiple_choice"
           ? <div className="space-y-2">
-            {question.options.map(option=><label key={option.id}
+            {question.options.map(option=><Label key={option.id}
               className="flex items-start gap-2 text-sm">
-              <input type={question.type==="single_choice"?"radio":"checkbox"}
+              <Choice
                 name={question.id} value={option.id}
                 checked={selected.includes(option.id)}
                 onChange={()=>{
@@ -77,21 +83,21 @@ export function LearningQuestionnaire({
                   update(question.id,next.length?{questionId:question.id,optionIds:next}:null);
                 }}/>
               <span>{option.label}</span>
-            </label>)}
+            </Label>)}
           </div>
           : question.type==="rating"||question.type==="likert"||question.type==="nps"
             ? question.min!==null&&question.max!==null&&question.max-question.min<=20
-              ? <select className="w-full max-w-xs border bg-background p-2 text-sm"
+              ? <Select className="max-w-xs"
                   aria-label={question.prompt} value={current?.number??""}
                   onChange={event=>update(question.id,event.target.value===""
                     ?null:{questionId:question.id,number:Number(event.target.value)})}>
                 <option value="">Select a rating</option>
                 {Array.from({length:question.max-question.min+1},(_,i)=>i+question.min!).map(n=>
                   <option key={n} value={n}>{n}</option>)}
-              </select>
+              </Select>
               : <p role="alert">This rating scale is unavailable.</p>
             : question.type==="text"
-              ? <textarea className="w-full min-h-24 border bg-background p-3 text-sm"
+              ? <Textarea className="min-h-24"
                   aria-label={question.prompt} maxLength={4000}
                   value={current?.text??""}
                   onChange={event=>update(question.id,event.target.value.trim()
@@ -99,7 +105,7 @@ export function LearningQuestionnaire({
               : <p role="alert">This question requires a supported answer form.</p>}
       </fieldset>;
     })}
-    {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}
+    {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
     <Button type="submit" disabled={pending||questions.length===0}>
       {pending?"Saving...":submitLabel}
     </Button>
