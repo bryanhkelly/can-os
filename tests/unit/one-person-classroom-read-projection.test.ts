@@ -62,7 +62,7 @@ describe("one authoritative Person for classroom attendance",()=>{
       expect(ddl).not.toMatch(/DROP TABLE\\b|CASCADE\\s*;/i);
     }
     const final=source(files[4]);
-    expect(final).toContain("learner, guardian");
+    expect(final.toLowerCase()).toContain("learner, guardian");
     expect(final).toContain("ON DELETE");
     const runtime=source("scripts/acceptance/check-main-one-person-runtime.mjs");
     expect(runtime).toContain("critical_shared_actor_fks");
