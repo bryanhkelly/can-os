@@ -16,7 +16,7 @@ export const Route = createFileRoute("/launch/site")({
   loaderDeps: ({ search }) => ({ siteId: search.siteId }),
   loader: ({ deps }) => safeLoader(async () => {
     const options = await listLaunchOptions();
-    const siteId = deps.siteId ?? (!options.canCreateSite && options.sites.length === 1 ? options.sites[0].id : undefined);
+    const siteId = deps.siteId ?? (!options.canCreateSite && options.sites.length === 1 ? options.sites[0]?.id : undefined);
     if (!siteId) return { options, selectedSiteId: "", preferences: null, selectionError: null, sitePrograms: null, programsState: "empty" as const, contentChannels: defaultSiteContentChannelConfig };
     if (!options.sites.some(item => item.id === siteId))
       return { options, selectedSiteId: siteId, preferences: null, sitePrograms: null, programsState: "unauthorized" as const, contentChannels: defaultSiteContentChannelConfig,
