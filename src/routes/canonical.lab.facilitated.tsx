@@ -1,6 +1,7 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
@@ -61,24 +62,24 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     rehearsalChoice===choice.deploymentId+":"+choice.adoptionId+":"+
     choice.courseVersionId+":"+choice.siteId);
   const [selected,setSelected]=useState("");
-  const [busy,setBusy]=useState(false);
+  const feedback=useMutationFeedback(()=>router.invalidate());
+  const busy=feedback.pending||feedback.refreshFailed;
   const [message,setMessage]=useState("");
+  const [expandedRoomId,setExpandedRoomId]=useState<string|null>(null);
+  const [endingRoomId,setEndingRoomId]=useState<string|null>(null);
   const [code,setCode]=useState<{
     roomId:string;code:string;expiresAt:string;
   }|null>(null);
   const available=data.choices.find(choice=>selected===
     choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId);
-  async function run(action:()=>Promise<void>) {
+  async function run(action:()=>Promise<void>,successMessage="Room action saved.") {
     if(busy)return;
-    setBusy(true);setMessage("");
-    try {
-      await action();
-      await router.invalidate();
-    } catch {
-      setMessage("The requested room action was not saved. Check your Site authority and active deployment.");
-    } finally {
-      setBusy(false);
-    }
+    setMessage("");
+    await feedback.run(action,{
+      successMessage,
+      commandErrorMessage:"The room action could not be confirmed. Verify your current Site and classroom authority.",
+      refreshErrorMessage:"The room action was saved but current room information could not be refreshed. Retry the refresh before taking another action.",
+    });
   }
   return <WorkspaceShell width="wide" eyebrow="Canonical · Learning operations"
     title="Facilitated learning" subtitle="One facilitator controls the room, while each enrolled learner may pair their own device. Pairing is not attendance or academic credit.">
@@ -110,6 +111,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           }});
           setCode({roomId:created.facilitatedSessionId,
             code:created.pairingCode,expiresAt:created.pairingExpiresAt});
+          setExpandedRoomId(created.facilitatedSessionId);
         })}>Start facilitator room</Button>
       </div>
       {!data.choices.length&&<p role="status" className="mt-3 text-sm text-muted-foreground">
@@ -154,10 +156,14 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
         scope={rehearsalScope} onClose={()=>setRehearsalScope(null)}/>}
     </section>
     <ClassroomSchedulePanel choices={data.choices}
-      onRoomStarted={async value=>{
+      onRoomStarted={value=>{
         setCode({roomId:value.roomId,code:value.pairingCode,expiresAt:value.pairingExpiresAt});
-        await router.invalidate();
+        setExpandedRoomId(value.roomId);
+        void router.invalidate().catch(()=>setMessage(
+          "The scheduled room started, but the room list could not be refreshed. Refresh this page before continuing."
+        ));
       }}/>
+    <MutationFeedback state={feedback} pendingMessage="Updating the room…" className="mt-4"/>
     {message&&<p role="alert" className="mt-4 border border-border p-4 text-sm">{message}</p>}
     {code && Date.parse(code.expiresAt) > clockMs &&
       data.rooms.some(room => room.id === code.roomId &&
@@ -193,9 +199,9 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
                 Started {new Date(room.startedAt).toLocaleString()}
               </p>
             </div>
-            <span className="border border-border px-3 py-1 text-sm">
+            <StatusBadge tone={roomState==="live"?"success":roomState==="expired"?"attention":"neutral"}>
               {roomState==="ended"?"Ended":roomState==="expired"?"Expired":"Live"}
-            </span>
+            </StatusBadge>
           </div>
           <dl className="mt-4 grid gap-3 sm:grid-cols-3">
             <div>
@@ -217,25 +223,37 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               </dd>
             </div>
           </dl>
-          {roomState==="live"&&<ClassroomFacilitatorConsole facilitatedSessionId={room.id}/>}
-          <ClassroomAttendancePanel facilitatedSessionId={room.id}/>
-          <ClassroomAssistedActivityPanel facilitatedSessionId={room.id}/>
-          <ClassroomSurveyManager facilitatedSessionId={room.id}/>
-          {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="outline" disabled={busy}
-              onClick={()=>void run(async()=>{
-                const renewed=await renewFacilitatedLearningPairing({
-                  data:{facilitatedSessionId:room.id},
-                });
-                setCode({roomId:room.id,code:renewed.pairingCode,
-                  expiresAt:renewed.pairingExpiresAt});
-              })}>Generate new pairing code</Button>
-            <Button type="button" size="sm" variant="outline" disabled={busy}
-              onClick={()=>{if(window.confirm("End this facilitated room?"))void run(async()=>{
-                await endFacilitatedLearningRoom({data:{facilitatedSessionId:room.id}});
-                if(code?.roomId===room.id)setCode(null);
-              });}}>End room</Button>
-          </div>}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" variant="outline"
+              aria-expanded={expandedRoomId===room.id}
+              aria-controls={`facilitated-room-workspace-${room.id}`}
+              onClick={()=>setExpandedRoomId(current=>current===room.id?null:room.id)}>
+              {expandedRoomId===room.id?"Hide room workspace":"Open room workspace"}
+            </Button>
+            <p className="text-xs text-muted-foreground">
+              Attendance, practice, surveys and playback load only for the room you open.
+            </p>
+          </div>
+          <div id={`facilitated-room-workspace-${room.id}`} hidden={expandedRoomId!==room.id}>
+            {expandedRoomId===room.id&&<>
+              {roomState==="live"&&<ClassroomFacilitatorConsole facilitatedSessionId={room.id}/>}
+              <ClassroomAttendancePanel facilitatedSessionId={room.id}/>
+              <ClassroomAssistedActivityPanel facilitatedSessionId={room.id}/>
+              <ClassroomSurveyManager facilitatedSessionId={room.id}/>
+              {roomState==="live"&&<div className="mt-4 flex flex-wrap gap-2">
+                <Button type="button" size="sm" variant="outline" disabled={busy}
+                  onClick={()=>void run(async()=>{
+                    const renewed=await renewFacilitatedLearningPairing({
+                      data:{facilitatedSessionId:room.id},
+                    });
+                    setCode({roomId:room.id,code:renewed.pairingCode,
+                      expiresAt:renewed.pairingExpiresAt});
+                  },"New pairing code generated.")}>Generate new pairing code</Button>
+                <Button type="button" size="sm" variant="destructive" disabled={busy}
+                  onClick={()=>setEndingRoomId(room.id)}>End room</Button>
+              </div>}
+            </>}
+          </div>
         </article>;
         })}
         {!data.rooms.length&&<p className="border border-border p-5 text-sm text-muted-foreground">
@@ -247,5 +265,20 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
         delivery remains subject to the published track's content-rights policy.
       </p>
     </section>
+    <ActionDialog open={endingRoomId!==null} title="End facilitated room?"
+      description="End live playback and new device pairing for this room. Existing recorded participation and any available correction window remain independent."
+      confirmLabel="End room" destructive pending={feedback.pending}
+      onClose={()=>setEndingRoomId(null)}
+      onConfirm={()=>{
+        const id=endingRoomId;
+        if(!id)return;
+        void run(async()=>{
+          await endFacilitatedLearningRoom({data:{facilitatedSessionId:id}});
+          if(code?.roomId===id)setCode(null);
+          setEndingRoomId(null);
+        },"Room ended.");
+      }}>
+      {feedback.error&&!feedback.refreshFailed&&<p role="alert" className="text-sm text-destructive">{feedback.error}</p>}
+    </ActionDialog>
   </WorkspaceShell>;
 }
