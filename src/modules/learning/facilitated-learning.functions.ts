@@ -230,7 +230,7 @@ export const getFacilitatedHostWorkspace = createServerFn({method:"GET"})
         .orderBy(desc(facilitatedLearningPlayback.occurredAt)).limit(200) : [];
       const latest=new Map<string,typeof playback[number]>();
       for(const item of playback) if(!latest.has(item.sessionId))latest.set(item.sessionId,item);
-      return {choices,rooms:authorizedRooms.map(room=>({
+      return {siteId:host.siteIds[0]!,choices,rooms:authorizedRooms.map(room=>({
         ...room,
         state: facilitatedRoomOperationalState(room, now),
         expiresAt: new Date(room.startedAt.getTime() + facilitatedRoomMaxMs).toISOString(),
