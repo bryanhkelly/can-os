@@ -102,7 +102,7 @@ describe("one CAN login for authorized canonical Site staff", () => {
 
   it("uses CAN sessions before native sessions for school staff and fails closed", () => {
     const auth = source("src/modules/identity/canonical-command-context.server.ts");
-    const bridge = source("src/modules/identity/canonical-can-staff-bridge.server.ts");
+    const bridge = source("src/modules/identity/can-site-staff-authority.server.ts");
     expect(auth).toContain("accessSessionCookie");
     expect(auth).toContain("getIdentityContext(request)");
     expect(auth).toContain("resolveCanonicalSiteStaffFromCan(actor, request)");
