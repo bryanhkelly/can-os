@@ -32,4 +32,18 @@ describe("adult learner bookmarked Course Attempt access",()=>{
     expect(read).toContain("eq(noncreditSelfEnrollmentClaims.participantPersonId,link.canonicalPersonId)");
     expect(read).toContain("eq(noncreditRegistrations.participantPersonId,link.canonicalPersonId)");
   });
+
+  it("restores native learner sessions exactly once at the Course workspace",()=>{
+    const management=readFileSync(
+      new URL("../../src/components/learning/NoncreditEnrollmentManagement.tsx",import.meta.url),
+      "utf8",
+    );
+    expect(courseRoute).toContain("function VerifiedCourseAccess(");
+    expect(courseRoute).toContain("openMyNoncreditCourse({data:{courseAttemptId:course.courseAttemptId}})");
+    expect(courseRoute).toContain("if(request.current?.key!==key)");
+    expect(courseRoute).toContain("setStatus(\"error\")");
+    expect(courseRoute).toContain("Retry course access");
+    expect(management).not.toContain("await openMyNoncreditCourse({data:{courseAttemptId}})");
+    expect(management).toContain('to:"/learn/course/$courseAttemptId"');
+  });
 });
