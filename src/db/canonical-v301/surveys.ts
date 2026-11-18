@@ -1,9 +1,9 @@
-import { bigint, boolean, integer, numeric, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { bigint, boolean, integer, numeric, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
 /** Existing v3.0.1 canonical SQL owns all constraints, review gates and RLS. */
-export const surveyDefinitions = educationV30.table("survey_definitions", {
+export const surveyDefinitions = pgTable("survey_definitions", {
   id:id(),ownerOrganizationId:uuid("owner_organization_id").notNull(),
   code:text("code").notNull(),title:text("title").notNull(),
   purposeCode:text("purpose_code").notNull(),
