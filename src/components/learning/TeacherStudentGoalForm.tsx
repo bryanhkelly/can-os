@@ -22,9 +22,9 @@ export function TeacherStudentGoalForm({
   const [shared, setShared] = useState(false);
 
   return <div className="mt-3">
-    {!expanded && <button type="button" className="text-sm underline"
-      onClick={() => setExpanded(true)}>Share a learning goal with student</button>}
-    {expanded && <form noValidate className="mt-3 grid gap-3 rounded-lg border p-3"
+    {!expanded && <Button type="button" variant="ghost" size="sm" className="underline"
+      onClick={() => setExpanded(true)}>Share a learning goal with student</Button>}
+    {expanded && <form noValidate className="mt-3 grid gap-3  border p-3"
       onSubmit={async event => {
         event.preventDefault();
         setAttempted(true);
