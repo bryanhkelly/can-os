@@ -11,6 +11,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditReleaseOperations";
 import { NoncreditNetworkReportPanel } from "@/components/enrollment/NoncreditNetworkReportPanel";
 import { NoncreditPilotOutcomesPanel } from "@/components/learning/NoncreditPilotOutcomesPanel";
+import { NoncreditTrainingReadiness } from "@/components/enrollment/NoncreditTrainingReadiness";
 
 export const Route=createFileRoute("/programs/noncredit/enrollment")({
   validateSearch:(search:Record<string,unknown>):{publicSiteId?:string}=>({
@@ -145,6 +146,12 @@ function NoncreditPublicationPage(){
               </option>)}
             </select>
           </div>
+          {selected&&<NoncreditTrainingReadiness key={candidateKey(selected)} selection={{
+            deploymentId:selected.deploymentId,
+            adoptionId:selected.adoptionId,
+            trainingVersionId:selected.trainingVersionId,
+            courseVersionId:selected.courseVersionId,
+          }}/>}
           <fieldset className="space-y-2">
             <legend className="text-sm font-semibold">Delivery mode</legend>
             <div className="flex flex-wrap gap-4 text-sm">
