@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  countCurrentNoncreditCompletions, projectCurrentNoncreditCompletion,
+  countCurrentNoncreditCompletions, currentNoncreditCompletionStates, projectCurrentNoncreditCompletion,
   projectUnverifiedClassOutcome,projectCurrentNativeClassCompletion,
   type NoncreditCompletionDecisionRef,
 } from "@/domain/verified-completion-projection";
@@ -76,6 +76,40 @@ describe("WS3 completion reference source of truth",()=>{
   });
 });
 
+
+describe("COGIC cohort and Site reporting decision reconciliation",()=>{
+  it("counts corrected completions only while the supersession chain remains completed",()=>{
+    const registrationIds=["registration-A","registration-B","registration-C"];
+    const source=[
+      old,newer,
+      {...old,id:"b-1",registrationId:"registration-B"},
+      {...old,id:"c-1",registrationId:"registration-C",outcome:"not_yet_completed" as const},
+    ];
+    const result=currentNoncreditCompletionStates(registrationIds,source);
+    expect(result.invalidRegistrations).toEqual([]);
+    expect(result.states.get("registration-A")).toBe("voided");
+    expect(result.states.get("registration-B")).toBe("completed");
+    expect(result.states.get("registration-C")).toBe("not_yet_completed");
+    expect([...result.states.values()].filter(value=>value==="completed")).toHaveLength(1);
+  });
+  it("keeps undecided registrations separate from approved outcomes",()=>{
+    const result=currentNoncreditCompletionStates(
+      ["registration-A","registration-B"],[old]);
+    expect(result.invalidRegistrations).toEqual([]);
+    expect(result.states.get("registration-A")).toBe("completed");
+    expect(result.states.get("registration-B")).toBe("not_decided");
+  });
+  it("fails closed on conflicting correction chains, truncated history, or cross-scope rows",()=>{
+    const fork={...newer,id:"decision-4",supersedesId:old.id};
+    expect(currentNoncreditCompletionStates(
+      ["registration-A"],[old,newer,fork]).invalidRegistrations).toEqual(["registration-A"]);
+    expect(currentNoncreditCompletionStates(
+      ["registration-A"],[newer]).invalidRegistrations).toEqual(["registration-A"]);
+    expect(currentNoncreditCompletionStates(
+      ["registration-A"],[{...old,registrationId:"other"}]).invalidRegistrations)
+      .toEqual(["other"]);
+  });
+});
 
 describe("WS3 native Class Activity projection",()=>{
   const first={
