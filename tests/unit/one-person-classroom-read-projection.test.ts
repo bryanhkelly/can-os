@@ -32,4 +32,31 @@ describe("one authoritative Person for classroom attendance",()=>{
     expect(ddl).toContain("Native Person FK graph changed");
     expect(ddl).toContain("historical");
   });
+  it("keeps guardian identity on the verified CAN Person and verifies child authority separately",()=>{
+    const guardian=source("src/modules/classes/native-class-guardian-authority.server.ts");
+    expect(guardian).toContain("getIdentityContext(request)");
+    expect(guardian).toContain('actor.role!=="guardian"');
+    expect(guardian).toContain("account?.personId!==actor.actorPersonId");
+    expect(guardian).toContain("return {personId:actor.actorPersonId}");
+    expect(guardian).toContain("guardianAuthorities.verifiedAt");
+    expect(guardian).toContain("guardianAuthorities.startsAt");
+    expect(guardian).toContain("guardianAuthorities.endsAt");
+    expect(guardian).toContain("age<0||age>=18");
+    expect(guardian).not.toContain("accessAccountCanonicalPrincipals");
+  });
+
+  it("fails the main cutover until second Person writers and native cookie paths retire",()=>{
+    const script=source("scripts/acceptance/check-main-one-person-runtime.mjs");
+    expect(script).toContain('const PROJECT="sweet-hall-62441909",MAIN="br-restless-sea-ar9ooo55"');
+    expect(script).toContain("CAN_MAIN_ONE_PERSON_RUNTIME_CHECK");
+    expect(script).toContain("nativeLearnerPersonCreation");
+    expect(script).toContain("nativeReviewedLearnerCreation");
+    expect(script).toContain("nativeLearnerSessionIssuance");
+    expect(script).toContain("dualCookieLearnerContext");
+    expect(script).toContain("secondPersonGuardianLink");
+    expect(script).toContain("historical_person_differences");
+    expect(script).toContain('state:blockers.length?"BLOCKED"');
+    expect(script).not.toMatch(/sql`\s*(?:INSERT|UPDATE|DELETE|ALTER|DROP|TRUNCATE|CREATE|GRANT)\b/i);
+  });
+
 });
