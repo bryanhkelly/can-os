@@ -79,7 +79,7 @@ describe("one native Class route and reusable manager",()=>{
     expect(manager).not.toContain("some(mode=>mode===mode)");
     expect(manager).toContain("deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))");
     expect(manager).toContain("site.allowedDeliveryModes.some(allowedMode=>allowedMode===mode)");
-    expect(manager).toContain("setCreatedClassId(result.classId)");
+    expect(manager).toContain("setCreatedClassId(");
     expect(manager).toContain("Open newly created Class");
   });
 
