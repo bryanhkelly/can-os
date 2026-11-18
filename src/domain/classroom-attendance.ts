@@ -25,3 +25,47 @@ export function classroomAttendanceNeedsExplanation(input:{
      (input.previousStatus!==input.nextStatus ||
       input.previousMethod!==input.nextMethod));
 }
+
+
+/** Project the latest independent host assertion per exact room and Course
+ * attempt. Rows must be ordered newest first (asserted_at DESC, id DESC).
+ * This intentionally ignores pairing, playback and browser presence events.
+ *
+ * Shared by the Site cohort view and the provider's multi-Site rollup so
+ * corrected absences cannot remain counted as verified attendance.
+ */
+export type VerifiedRoomAssertion = {
+  roomId: string;
+  attemptId: string;
+  status: "present" | "absent" | "unknown";
+};
+export function summarizeVerifiedRoomAttendance(
+  newestFirst: readonly VerifiedRoomAssertion[],
+): {
+  presentPairs: ReadonlySet<string>;
+  presentAttemptIds: ReadonlySet<string>;
+  verifiedAttendeesByRoom: ReadonlyMap<string, number>;
+} {
+  const roomAssertions = new Map<string, Map<string, VerifiedRoomAssertion["status"]>>();
+  for (const assertion of newestFirst) {
+    const attempts = roomAssertions.get(assertion.roomId) ??
+      new Map<string, VerifiedRoomAssertion["status"]>();
+    if (!attempts.has(assertion.attemptId))
+      attempts.set(assertion.attemptId, assertion.status);
+    roomAssertions.set(assertion.roomId, attempts);
+  }
+  const presentPairs = new Set<string>();
+  const presentAttemptIds = new Set<string>();
+  const verifiedAttendeesByRoom = new Map<string, number>();
+  for (const [roomId, attempts] of roomAssertions) {
+    let verified = 0;
+    for (const [attemptId, status] of attempts) {
+      if (status !== "present") continue;
+      verified++;
+      presentAttemptIds.add(attemptId);
+      presentPairs.add(roomId + ":" + attemptId);
+    }
+    verifiedAttendeesByRoom.set(roomId, verified);
+  }
+  return {presentPairs, presentAttemptIds, verifiedAttendeesByRoom};
+}
