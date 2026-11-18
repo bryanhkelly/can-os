@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
 import { UnifiedLessonOutline } from "@/components/learning/UnifiedLessonOutline";
 import { CanonicalLearningActivityProvider, DisabledCanonicalLearningActivityProvider, useCanonicalLearningActivity } from "@/components/learning/CanonicalLearningTracker";
@@ -263,8 +265,8 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
                 lesson.progress?.status==="waived"?"waived":"not_started",
             }))}
             label="Recorded course lessons"
-            renderAction={item=><button type="button" className="text-left underline-offset-2 hover:underline"
-              onClick={()=>{setLessonId(item.id);setAnswers({});}}>{item.title}</button>}/>
+            renderAction={item=><Button type="button" variant="ghost" size="sm" className="text-left underline-offset-2 hover:underline"
+              onClick={()=>{setLessonId(item.id);setAnswers({});}}>{item.title}</Button>}/>
         </div>
       </div>
 
@@ -274,14 +276,14 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
           lessonCount={instruction.lessons.length} completedCount={completedCount}
           previousLesson={instruction.lessons[instruction.lessons.findIndex(item=>item.id===currentLesson.id)-1]}
           nextLesson={instruction.lessons[instruction.lessons.findIndex(item=>item.id===currentLesson.id)+1]}
-          renderPrevious={lesson=><button type="button" className="underline"
+          renderPrevious={lesson=><Button type="button" variant="ghost" size="sm" className="underline"
             onClick={()=>{setLessonId(lesson.id);setAnswers({});}}>
             ← Previous: {lesson.title}
-          </button>}
-          renderNext={lesson=><button type="button" className="underline"
+          </Button>}
+          renderNext={lesson=><Button type="button" variant="ghost" size="sm" className="underline"
             onClick={()=>{setLessonId(lesson.id);setAnswers({});}}>
             Next: {lesson.title} →
-          </button>}
+          </Button>}
         />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h3 className="font-serif text-xl font-semibold">{currentLesson.title}</h3>
@@ -325,15 +327,14 @@ function RecordedInstructorCourseSession({ courseAttemptId, activityEnabled, fac
           onSubmit={event => { event.preventDefault(); void savePractice(material); }}>
           <h4 className="font-semibold">Supplemental practice</h4>
           <p className="text-sm">{material.practice?.instructions}</p>
-          {material.practice?.prompts.map(prompt => <label key={prompt.key} className="block space-y-1 text-sm">
-            <span className="block font-medium">{prompt.text}</span>
-            <textarea className="min-h-24 w-full border bg-background p-3" required maxLength={20_000}
+          {material.practice?.prompts.map(prompt => <Field key={prompt.key} label={prompt.text}>
+            <Textarea className="min-h-24 w-full border bg-background p-3" required maxLength={20_000}
               value={answers[`${material.id}:${prompt.key}`] ?? ""}
               disabled={pending} onChange={event => setAnswers(current => ({
                 ...current,
                 [`${material.id}:${prompt.key}`]: event.target.value,
               }))}/>
-          </label>)}
+          </Field>)}
           <Button type="submit" size="sm" disabled={pending}>
             {pending ? "Saving..." : "Save practice"}
           </Button>
