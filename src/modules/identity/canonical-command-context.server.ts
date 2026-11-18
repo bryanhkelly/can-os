@@ -181,5 +181,13 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
       throw new AuthorizationError("current reviewed learner identity");
     return projectCanonicalCommandContext(native);
   }
-  return projectCanonicalCommandContext(await getCanonicalSessionRow(request));
+  // Legacy non-learner reviewers retain their separately scoped native
+  // sessions until independent grant authority is fully migrated. Learners
+  // may NEVER access a Course, Class or credential through a native bearer
+  // alone: their sole sign-in is the verified public CAN account.
+  const legacy = await getCanonicalSessionRow(request);
+  if (legacy.role_code === "learner") {
+    throw new AuthorizationError("current CAN learner login required");
+  }
+  return projectCanonicalCommandContext(legacy);
 }
