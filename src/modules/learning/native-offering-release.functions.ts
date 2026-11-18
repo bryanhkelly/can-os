@@ -5,7 +5,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalOfferingCourses, contentManifestReviewDecisions, contentAssets,
+  auditEvents, canonicalOfferingCourses, contentManifestReviewDecisions, contentAssets,
   contentAssetVersions, contentPublicationManifests, contentPublicationManifestItems,
   courseLessons, courses, courseUnits, courseVersions,
   evidenceDocuments, evidenceDocumentVersions, offeringReleaseRequirements, offeringVersions, offerings,
@@ -205,6 +205,33 @@ async function requireApprovedSnapshot(tx:Tx,manifest:
   }
   return reviews;
 }
+/** A raw policy table row is not an independent authorization decision.
+ * Require the existing canonical audit record of an evidence-backed reviewer
+ * attestation for these exact policy values and this exact manuscript. */
+async function requireAuditedReleasePolicy(
+  tx:Tx,bundle:Awaited<ReturnType<typeof loadBundle>>,
+  authorPersonId:string,policies:Awaited<ReturnType<typeof readNativeReleasePolicies>>,
+){
+  const revision=policyRevision(policies);
+  const attestations=await tx.select({
+    actorPersonId:auditEvents.actorPersonId,
+    payload:auditEvents.payload,
+  }).from(auditEvents).where(and(
+    eq(auditEvents.entityKind,"offering_version"),
+    eq(auditEvents.entityId,bundle.version.id),
+    eq(auditEvents.owningOrganizationId,bundle.offering.publisherOrganizationId),
+    eq(auditEvents.eventCode,"NativeOfferingReleasePolicyReviewed"),
+  )).orderBy(desc(auditEvents.occurredAt),desc(auditEvents.id)).limit(51);
+  const current=attestations.find(event=>
+    event.actorPersonId&&event.actorPersonId!==authorPersonId&&
+    event.payload.policyRevision===revision&&
+    event.payload.manuscriptHash===bundle.hash&&
+    typeof event.payload.evidenceVersionId==="string");
+  if(!current)
+    invalid("This exact Course release policy needs a current independent, evidence-backed publisher reviewer attestation.");
+  await requireVerifiedEvidence(tx,
+    current.payload.evidenceVersionId as string,"academic");
+}
 async function log(tx:Tx,actor:Actor,organizationId:string,
   versionId:string,eventCode:string,details:Record<string,unknown>){
   await writeCanonicalAudit(tx,{
@@ -277,8 +304,10 @@ export const submitNativeOfferingRelease=createServerFn({method:"POST"})
       // produced. An asset-bearing version must pin reviewed native policies
       // and immutable asset hashes, without reusing an old approval.
       const policies=data.assets.length?await readNativeReleasePolicies(tx,data.offeringVersionId):[];
-      if(data.assets.length)requireCompleteReleasePolicies(
-        policies,bundle.courses.map(row=>row.courseVersionId));
+      if(data.assets.length){
+        requireCompleteReleasePolicies(policies,bundle.courses.map(row=>row.courseVersionId));
+        await requireAuditedReleasePolicy(tx,bundle,actor.actorPersonId!,policies);
+      }
       const items=data.assets.length?await prepareNativeReleaseAssetItems(
         tx,bundle.offering.publisherOrganizationId,data.assets,actor.actorPersonId!):[];
       const snapshotHash=nativeReleaseSnapshotHash(bundle.hash,policies,items);
@@ -371,13 +400,16 @@ export const saveNativeOfferingReleasePolicy=createServerFn({method:"POST"})
               rightsClearanceRequired:true,accessibilityReviewRequired:true,
             },
           });
-        await log(tx,actor,bundle.offering.publisherOrganizationId,bundle.version.id,
-          "NativeOfferingReleasePolicyReviewed",{
-            before:previous,after:data.requirements,
-            policyRevision:policyRevision(data.requirements),
-            evidenceVersionId:data.reviewEvidenceVersionId,rationale:data.rationale,
-          });
       }
+      // A reviewer may independently attest a previously provisioned policy
+      // without mutating its values; this still requires verified evidence.
+      await log(tx,actor,bundle.offering.publisherOrganizationId,bundle.version.id,
+        "NativeOfferingReleasePolicyReviewed",{
+          before:previous,after:data.requirements,changed,
+          manuscriptHash:bundle.hash,
+          policyRevision:policyRevision(data.requirements),
+          evidenceVersionId:data.reviewEvidenceVersionId,rationale:data.rationale,
+        });
       return {offeringVersionId:bundle.version.id,
         policyRevision:policyRevision(data.requirements),changed};
     });
@@ -565,6 +597,7 @@ export const approveNativeOfferingAssetManifest=createServerFn({method:"POST"})
       const items=await readNativeReleaseManifestItems(tx,manifest.id);
       const policies=await readNativeReleasePolicies(tx,bundle.version.id);
       requireCompleteReleasePolicies(policies,bundle.courses.map(row=>row.courseVersionId));
+      await requireAuditedReleasePolicy(tx,bundle,manifest.createdByPersonId,policies);
       await requireApprovedSnapshot(tx,manifest);
       await assertNativeReleaseAssetEvidence(
         tx,bundle.offering.publisherOrganizationId,items,manifest.createdByPersonId);
@@ -608,6 +641,7 @@ export const publishNativeOfferingVersion=createServerFn({method:"POST"})
       await assertNativeReleaseAssetEvidence(
         tx,bundle.offering.publisherOrganizationId,items,manifest.createdByPersonId);
       const policies=await readNativeReleasePolicies(tx,bundle.version.id);
+      await requireAuditedReleasePolicy(tx,bundle,manifest.createdByPersonId,policies);
       await assertNativeOfferingDistributionReady(
         tx,bundle.version.id,bundle.offering.id,policies);
       if(bundle.version.lifecycle==="published")
