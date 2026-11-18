@@ -672,6 +672,25 @@ const migratedV61RouteControls = {
     "@/components/ui/label", "<Button", "<Checkbox", "<Select",
   ],
 
+  "routes/student.support.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/textarea", "@/components/ui/label", "@/components/ui/choice",
+    "<WorkspaceNotice", "<Button", "<Checkbox",
+  ],
+  "routes/guardian.watching.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/label", "<StatusBadge", "<Button", "<Label",
+  ],
+  "routes/operations.jurisdiction-profiles.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/textarea", "<ActionDialog", "<Field",
+  ],
+  "routes/operations.curriculum.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "<Button",
+    "<CurriculumEditor", "<PublisherPackComposer",
+  ],
+
+
 
 
 };
@@ -872,6 +891,33 @@ for (const [file, fragments] of Object.entries(v61ProtectedOperatorFlows)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
   for (const fragment of fragments) if (!source.includes(fragment)) {
     console.error(file + " lost a protected workflow invariant: " + fragment);
+    process.exitCode = 1;
+  }
+}
+
+
+// Every guardian subscription page reuses personal notification preferences;
+// SMS opt-in and read-only delivery history must not be rewritten per route.
+const guardedGuardianPreferences = {
+  "guardian/NotificationPreferences.tsx": [
+    "@/components/ui/button", "@/components/ui/input",
+    "@/components/ui/label", "@/components/ui/choice",
+    "<Checkbox", "<Label", "<WorkspaceNotice",
+    "!consent", "verifyMySmsConsent", "disableMySms",
+    "feedback.retryRefresh()",
+  ],
+};
+for (const [file, required] of Object.entries(guardedGuardianPreferences)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const value of required) {
+    if (!source.includes(value)) {
+      console.error(file + " must preserve consent and shared 6.1 presentation: " + value);
+      process.exitCode = 1;
+    }
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " reintroduced legacy visible controls or corners");
     process.exitCode = 1;
   }
 }
