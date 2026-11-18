@@ -9,7 +9,7 @@ import { canonicalRestrictedAuthUrlValid } from "@/domain/canonical-auth-connect
 import { accessSessionCookie } from "@/domain/access-tokens";
 import { readCookie } from "@/domain/session-cookies";
 import { getIdentityContext } from "./command-context.server";
-import { resolveCanonicalSiteStaffFromCan } from "./canonical-can-staff-bridge.server";
+import { resolveCanonicalSiteStaffFromCan } from "./can-site-staff-authority.server";
 import { AuthorizationError, type CommandContext } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import {
