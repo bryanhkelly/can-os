@@ -112,7 +112,63 @@ export const getNativeOfferingAdoptionReviewQueue=createServerFn({method:"GET"})
       .where(eq(deploymentOfferingAdoptions.approvalStatus,"proposed"))
       .orderBy(desc(deploymentOfferingAdoptions.validFrom))
       .limit(61);
-    return {items:rows.slice(0,60),limited:rows.length>60};
+    // Scope the evidence preview to the exact proposed adoptions already
+    // returned under the reviewer's Organization. This is diagnostic only:
+    // an executed batch is not an independently approved Blueprint, and
+    // a recorded "ready" outcome is not proof of current verified evidence.
+    const visible=rows.slice(0,60);
+    if(!visible.length)return {items:[],limited:rows.length>60};
+    const deploymentIds=[...new Set(visible.map(item=>item.deploymentId))];
+    const [outputs,reviews]=await Promise.all([
+      db.select({
+        deploymentId:blueprintOutputs.deploymentId,
+        offeringVersionId:blueprintConfigurationOfferingIntents.offeringVersionId,
+      }).from(blueprintOutputs)
+        .innerJoin(blueprintExecutionBatches,eq(
+          blueprintExecutionBatches.id,blueprintOutputs.executionBatchId))
+        .innerJoin(blueprintConfigurationOfferingIntents,and(
+          eq(blueprintConfigurationOfferingIntents.configurationVersionId,
+            blueprintExecutionBatches.configurationVersionId),
+        ))
+        .where(and(
+          inArray(blueprintOutputs.deploymentId,deploymentIds),
+          eq(blueprintExecutionBatches.executingOrganizationId,organizationId),
+          eq(blueprintExecutionBatches.executionStatus,"executed"),
+        )).limit(121),
+      db.select({
+        deploymentId:deploymentReadinessReviews.deploymentId,
+        kind:deploymentReadinessReviews.reviewKind,
+        outcome:deploymentReadinessReviews.outcome,
+        expiresAt:deploymentReadinessReviews.expiresAt,
+      }).from(deploymentReadinessReviews)
+        .where(inArray(deploymentReadinessReviews.deploymentId,deploymentIds))
+        .orderBy(desc(deploymentReadinessReviews.evaluatedAt),
+          desc(deploymentReadinessReviews.id)).limit(601),
+    ]);
+    const evidenceLimited=outputs.length>120||reviews.length>600;
+    const outputKeys=new Set(outputs.slice(0,120).map(row=>
+      row.deploymentId+":"+row.offeringVersionId));
+    const latestReview=new Map<string,(typeof reviews)[number]>();
+    for(const item of reviews.slice(0,600)){
+      const key=item.deploymentId+":"+item.kind;
+      if(!latestReview.has(key))latestReview.set(key,item);
+    }
+    const reviewKinds=["operating","registration","delivery"] as const;
+    const items=visible.map(item=>{
+      const reviewStates=reviewKinds.map(kind=>{
+        const review=latestReview.get(item.deploymentId+":"+kind);
+        return {kind,
+          recordedReady:Boolean(review&&review.outcome==="ready"&&
+            (!review.expiresAt||review.expiresAt>now))};
+      });
+      return {...item,
+        blueprintExecutionRecorded:!evidenceLimited&&
+          outputKeys.has(item.deploymentId+":"+item.offeringVersionId),
+        readiness:reviewStates,
+        evidencePreviewLimited:evidenceLimited,
+      };
+    });
+    return {items,limited:rows.length>60||evidenceLimited};
   });
 
 /** Governance: exact published Offering version + independent reviewed
