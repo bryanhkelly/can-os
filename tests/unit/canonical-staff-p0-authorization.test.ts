@@ -21,6 +21,24 @@ const admin = {
 };
 
 describe("canonical single-login P0 authorization boundaries", () => {
+  it("keeps credential issuance explicitly outside room-facilitator authority", () => {
+    const facilitator = projectCanonicalPrincipalContext({
+      role_code: "room_facilitator", person_id: "room-person",
+      organization_id: "site-operator", site_id: "site-a",
+    });
+    expect(facilitator.capabilities.has("learning.room.facilitate")).toBe(true);
+    expect(facilitator.capabilities.has("credential.issue")).toBe(false);
+    expect(facilitator.capabilities.has("class.manage")).toBe(false);
+    expect(facilitator.capabilities.has("blueprint.review")).toBe(false);
+    expect(canResolveCanSiteStaff({ ...admin, role: "room_facilitator" })).toBe(true);
+    const gate = source("database/production/2026-11-17-room-facilitator-sensitive-issuer-boundary.sql");
+    expect(gate).toContain("staff.role_code IN ('site_admin','registrar')");
+    expect(gate).toContain("approval.status='approved'");
+    expect(gate).toContain("approval.reviewed_by_can_account_id <>");
+    expect(gate).toContain("Unknown session gained issuer capability");
+    expect(gate).not.toContain("INSERT INTO");
+  });
+
   it("authenticates identity without an enrollment-specific capability", () => {
     expect(canResolveCanSiteStaff(admin)).toBe(true);
     expect(canResolveCanSiteStaff({...admin, role: "registrar"})).toBe(true);
