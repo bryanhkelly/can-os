@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Field } from "@/components/ui/field";
 import {
   attachClassroomSurvey,getClassroomSurveyOptions,
 } from "@/modules/learning/classroom-surveys.functions";
@@ -49,7 +50,7 @@ export function ClassroomSurveyManager({facilitatedSessionId}:{
       Approved survey campaigns could not be verified.
     </p>}
     {campaigns.isSuccess&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
-      <label className="text-sm font-medium">Approved campaign
+      <Field label="Approved campaign">
         <Select className="mt-2"
           value={selected} onChange={e=>setSelected(e.target.value)}>
           <option value="">Choose a governed survey</option>
@@ -57,15 +58,15 @@ export function ClassroomSurveyManager({facilitatedSessionId}:{
             {row.title}
           </option>)}
         </Select>
-      </label>
-      <label className="text-sm font-medium">Session stage
+      </Field>
+      <Field label="Session stage">
         <Select className="mt-2"
           value={stage} onChange={e=>setStage(e.target.value as Stage)}>
           <option value="entry">Before instruction (entry)</option>
           <option value="pulse">During instruction (pulse)</option>
           <option value="exit">After instruction (exit)</option>
         </Select>
-      </label>
+      </Field>
       <div className="sm:col-span-2">
         <Button type="button" size="sm" disabled={!selected||busy}
           onClick={()=>void attach()}>{busy?"Linking…":"Link approved survey"}</Button>
