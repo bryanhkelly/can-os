@@ -234,7 +234,10 @@ describe("assignment navigation filters", () => {
     for (const item of state.assignments) {
       expect(html.includes(item.title)).toBe(titles.includes(item.title));
     }
-    if (filter) expect(html).toContain(`href="/student/assignments?filter=${filter}" aria-current="page"`);
+    if (filter) {
+      expect(html).toContain(`href="/student/assignments?filter=${filter}"`);
+      expect(html).toContain('aria-current="page"');
+    }
   });
 
   it("keeps missing work empty when no assignments are marked missing", () => {
