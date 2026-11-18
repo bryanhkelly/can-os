@@ -48,7 +48,7 @@ export async function resolveCanonicalSiteStaffFromCan(
   // A new selected role or logged-out session may not reuse another context.
   if (native.session_id !== actor.sessionId ||
       native.account_id !== actor.accountId ||
-      native.grant_id !== actor.activeGrantId ||
+      native.grant_id !== actor.grantId ||
       native.person_id !== actor.actorPersonId ||
       native.role_code !== actor.role ||
       native.organization_id !== actor.scope.organizationIds?.[0] ||
