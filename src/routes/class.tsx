@@ -19,7 +19,7 @@ import {transferMyNativeClassEnrollment} from "@/modules/classes/native-class-tr
 import { withdrawMyNativeClassEnrollment } from
   "@/modules/classes/native-class-lifecycle.functions";
 import { resumeLinkedNativeClassLearner } from "@/modules/classes/native-class-session-recovery.functions";
-import { enrollCurrentPersonInClass } from "@/modules/classes/native-class-entry.client";
+import { enrollCurrentPersonInClass } from "@/modules/classes/native-class-entry";
 import {
   canNativeSelfTransferTo,
   nativeSelfTransferCreditModes,
