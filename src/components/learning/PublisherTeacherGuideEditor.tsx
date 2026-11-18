@@ -48,43 +48,43 @@ export function PublisherTeacherGuideEditor({courseCode,content,guides,onChange}
    return <section key={module.id} className="space-y-3  border p-3">
     <h4 className="text-sm font-semibold">{module.title}</h4>
     {unit&&<Label className="block text-sm">Instructor unit overview<Textarea rows={3} maxLength={5000}
-     value={unit.teacherOverview} className="mt-1 block w-full  border bg-background p-2"
+     value={unit.teacherOverview} className="mt-1"
      onChange={e=>updateUnit(module.id,u=>({...u,teacherOverview:e.target.value}))}/></Label>}
     {unit?.lessons.map(guide=>{
      const lesson=module.lessons.find(item=>item.id===guide.lessonId);
      return <fieldset key={guide.lessonId} className="space-y-3  border p-3">
       <legend className="px-2 text-sm font-semibold">{lesson?.title??guide.lessonId} · teacher only</legend>
       <Label className="block text-sm">Instructor preparation<Textarea rows={3} maxLength={5000}
-       className="mt-1 block w-full  border bg-background p-2" value={guide.preparation}
+       className="mt-1" value={guide.preparation}
        onChange={e=>updateLesson(module.id,guide.lessonId,l=>({...l,preparation:e.target.value}))}/></Label>
       <h5 className="text-sm font-semibold">Worked answers (not student-facing)</h5>
       {guide.workedAnswers.map((worked,i)=><div className="grid gap-2  border p-3" key={i}>
        <Label className="block text-sm">Teacher prompt<Textarea rows={2} maxLength={5000} value={worked.prompt}
-        className="mt-1 block w-full  border bg-background p-2"
+        className="mt-1"
         onChange={e=>updateLesson(module.id,guide.lessonId,l=>({...l,workedAnswers:l.workedAnswers.map((a,j)=>i===j?{...a,prompt:e.target.value}:a)}))}/></Label>
        <Label className="block text-sm">Protected worked solution<Textarea rows={3} maxLength={5000} value={worked.answer}
-        className="mt-1 block w-full  border bg-background p-2"
+        className="mt-1"
         onChange={e=>updateLesson(module.id,guide.lessonId,l=>({...l,workedAnswers:l.workedAnswers.map((a,j)=>i===j?{...a,answer:e.target.value}:a)}))}/></Label>
-       {guide.workedAnswers.length>1&&<Button type="button" variant="outline" size="sm" className="justify-self-start  border px-2 py-1 text-xs"
+       {guide.workedAnswers.length>1&&<Button type="button" variant="outline" size="sm" className="justify-self-start"
         onClick={()=>updateLesson(module.id,guide.lessonId,l=>({...l,workedAnswers:l.workedAnswers.filter((_,j)=>j!==i)}))}>Remove worked answer</Button>}
       </div>)}
-      {guide.workedAnswers.length<15&&<Button type="button" variant="outline" size="sm" className=" border px-3 py-2 text-sm"
+      {guide.workedAnswers.length<15&&<Button type="button" variant="outline" size="sm" 
        onClick={()=>updateLesson(module.id,guide.lessonId,l=>({...l,workedAnswers:[...l.workedAnswers,{prompt:"",answer:""}]}))}>Add worked answer</Button>}
       <Label className="block text-sm">Likely misconceptions (one per line)<Textarea rows={3} maxLength={50000}
-       value={guide.misconceptions.join("\n")} className="mt-1 block w-full  border bg-background p-2"
+       value={guide.misconceptions.join("\n")} className="mt-1"
        onChange={e=>updateLesson(module.id,guide.lessonId,l=>({...l,misconceptions:e.target.value.split("\n").map(x=>x.trim()).filter(Boolean)}))}/></Label>
       <Label className="block text-sm">Targeted interventions (one per line)<Textarea rows={3} maxLength={50000}
-       value={guide.interventions.join("\n")} className="mt-1 block w-full  border bg-background p-2"
+       value={guide.interventions.join("\n")} className="mt-1"
        onChange={e=>updateLesson(module.id,guide.lessonId,l=>({...l,interventions:e.target.value.split("\n").map(x=>x.trim()).filter(Boolean)}))}/></Label>
       <Label className="block text-sm">Extensions (one per line, optional)<Textarea rows={2} maxLength={50000}
-       value={guide.extensions.join("\n")} className="mt-1 block w-full  border bg-background p-2"
+       value={guide.extensions.join("\n")} className="mt-1"
        onChange={e=>updateLesson(module.id,guide.lessonId,l=>({...l,extensions:e.target.value.split("\n").map(x=>x.trim()).filter(Boolean)}))}/></Label>
-      <Button type="button" variant="outline" size="sm" className=" border px-2 py-1 text-xs"
+      <Button type="button" variant="outline" size="sm" 
        onClick={()=>removeLesson(module.id,guide.lessonId)}>Remove draft teacher guide</Button>
      </fieldset>;
     })}
     {unassigned.length>0&&<Label className="block text-sm">Add guidance for a lesson
-     <Select className="mt-1 block w-full  border bg-background p-2" value=""
+     <Select className="mt-1" value=""
       onChange={e=>{if(e.target.value)addLesson(module.id,e.target.value);}}>
       <option value="">Choose a lesson</option>
       {unassigned.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
