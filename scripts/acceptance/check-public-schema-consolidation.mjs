@@ -20,11 +20,14 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-13-empty-protected-tables.sql",
   "database/production/2026-11-17-consolidate-16-empty-policy-tables.sql",
   "database/production/2026-11-17-consolidate-survey-confidential-redemptions.sql",
+  "database/production/2026-11-17-migrate-blueprint-reference-catalog-to-public.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
   vocabularies:12,vocabulary_terms:80,facility_capability_types:6,
   capability_delivery_modes:20,
+  blueprint_reference_items:74,blueprint_reference_item_versions:74,
+  religious_affiliation_options:25,
 };
 
 function migratedTableNames(){
@@ -87,6 +90,12 @@ async function run(){
             THEN (SELECT count(*) FROM public.facility_capability_types)
         WHEN c.relname='capability_delivery_modes'
             THEN (SELECT count(*) FROM public.capability_delivery_modes)
+        WHEN c.relname='blueprint_reference_items'
+            THEN (SELECT count(*) FROM public.blueprint_reference_items)
+        WHEN c.relname='blueprint_reference_item_versions'
+            THEN (SELECT count(*) FROM public.blueprint_reference_item_versions)
+        WHEN c.relname='religious_affiliation_options'
+            THEN (SELECT count(*) FROM public.religious_affiliation_options)
         END AS n
     ) count_table ON true
     WHERE ns.nspname='public' AND c.relname=ANY(${Object.keys(referenceRowCounts)}::text[])
@@ -106,8 +115,10 @@ async function run(){
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-17-consolidate-survey-confidential-redemptions.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-17-migrate-blueprint-reference-catalog-to-public.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==49)throw new Error("Expected 49 reviewed protected table relocations");
+  if(protectedNames.length!==52)throw new Error("Expected 52 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
