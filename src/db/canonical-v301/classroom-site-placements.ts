@@ -1,5 +1,4 @@
 import { pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
 
 /**
  * Existing canonical placement tables. A school enrollment must be currently
