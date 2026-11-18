@@ -31,7 +31,7 @@ const approvalInput=z.object({
   rationale:z.string().trim().min(10).max(2000),
 }).strict();
 const noStore=()=>setResponseHeader("Cache-Control","private, no-store");
-const invalid=(reason:string):never=>{throw new DomainError("VALIDATION_FAILED",reason);};
+function invalid(reason:string):never { throw new DomainError("VALIDATION_FAILED",reason); }
 type Tx=Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 function reviewerScope(actor:CommandContext):string{
