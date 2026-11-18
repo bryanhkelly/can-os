@@ -62,6 +62,10 @@ const sourceGuarded = new Set([
   "student.field-trips.tsx",
   "guardian.admission-offers.tsx",
   "guardian.enrollment-changes.tsx",
+  "student.support.tsx",
+  "guardian.watching.tsx",
+  "operations.jurisdiction-profiles.tsx",
+  "operations.curriculum.tsx",
 ]);
 
 function resolveSource(from, specifier) {
