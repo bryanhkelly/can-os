@@ -21,7 +21,7 @@ describe("one authoritative Person for classroom attendance",()=>{
     expect(ddl).toContain("ALTER TABLE education_v30.course_sections SET SCHEMA public");
     expect(ddl).toContain("ALTER TABLE education_v30.foundations SET SCHEMA public");
     expect(ddl).toContain("Seven existing inbound foreign keys were not preserved");
-    expect(ddl).toContain("WHERE current_setting");
+    expect(ddl).toContain("current_setting('neon.branch_id',true)");
     expect(ddl).not.toMatch(/DROP TABLE\s+|CASCADE\s*;/i);
   });
 
