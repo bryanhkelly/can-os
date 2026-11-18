@@ -1,9 +1,10 @@
 -- Reviewed opt-in feedback dispatch; run only on isolated v3.0.1 first.
+-- Shared survey definitions and trigger rules are already authoritative in public.
 BEGIN;
 SET LOCAL search_path TO education_v30,pg_catalog;
-ALTER TABLE education_v30.survey_trigger_rules
+ALTER TABLE public.survey_trigger_rules
  DROP CONSTRAINT IF EXISTS survey_trigger_rules_trigger_kind_check;
-ALTER TABLE education_v30.survey_trigger_rules
+ALTER TABLE public.survey_trigger_rules
  ADD CONSTRAINT survey_trigger_rules_trigger_kind_check
  CHECK(trigger_kind IN (
  'enrollment_started','unit_completed','track_switched','tutoring_completed',
@@ -41,10 +42,10 @@ BEGIN
  INSERT INTO survey_invitations(campaign_id,invited_person_id,delivery_channel,sent_at)
  SELECT c.id,participant.participant_person_id,'in_app',at
  FROM survey_campaigns c
- JOIN survey_trigger_rules rule ON rule.campaign_id=c.id
+ JOIN public.survey_trigger_rules rule ON rule.campaign_id=c.id
    AND rule.enabled AND rule.trigger_kind='knowledge_check_submitted'
  JOIN survey_versions v ON v.id=c.survey_version_id AND v.lifecycle='published'
- JOIN survey_definitions d ON d.id=v.survey_id AND d.status='active'
+ JOIN public.survey_definitions d ON d.id=v.survey_id AND d.status='active'
    AND d.intended_audience IN ('learner','any')
  JOIN evidence_document_versions permission ON permission.id=c.survey_permission_evidence_id
  WHERE c.deployment_id=participant.deployment_id
