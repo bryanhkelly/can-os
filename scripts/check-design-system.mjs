@@ -653,6 +653,26 @@ const migratedV61RouteControls = {
     "<Button", "<WorkspacePanel", "<Textarea",
   ],
 
+  "routes/guardian.group-permissions.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/label",
+    "<Checkbox", "<EmptyState", "<WorkspaceNotice",
+  ],
+  "routes/student.assignments_.$assessmentId.tsx": [
+    "@/components/ui/button", "@/components/ui/textarea", "@/components/ui/label",
+    "<Button", "<Textarea", "useUnsavedChangesGuard",
+  ],
+  "routes/student.field-trips.tsx": [
+    "<FieldTripFacts", "<WorkspaceShell",
+  ],
+  "routes/guardian.admission-offers.tsx": [
+    "<EmptyState", "<StatusBadge", "<WorkspaceNotice", "<ActionDialog",
+  ],
+  "routes/guardian.enrollment-changes.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/select",
+    "@/components/ui/label", "<Button", "<Checkbox", "<Select",
+  ],
+
+
 
 };
 for (const [file, required] of Object.entries(migratedV61RouteControls)) {
