@@ -98,7 +98,7 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(staff).toContain('readRestrictedCanonicalSession("can_staff", digest)');
     expect(staff).toContain("native.account_id !== actor.accountId");
     expect(staff).toContain("native.session_id !== actor.sessionId");
-    expect(staff).toContain("native.grant_id !== actor.activeGrantId");
+    expect(staff).toContain("native.grant_id !== actor.grantId");
     expect(staff).toContain("native.person_id !== actor.actorPersonId");
     expect(staff).toContain("native.organization_id !== actor.scope.organizationIds?.[0]");
     expect(staff).toContain("native.site_id !== actor.grantSiteId");
