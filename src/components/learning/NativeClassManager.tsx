@@ -6,6 +6,11 @@ import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLau
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   getUnifiedClassCourseOptions, getNativeClassOperatorSites,
@@ -344,13 +349,13 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
       <form className="mt-4 flex flex-wrap items-end gap-2" onSubmit={event=>{
         event.preventDefault();setSearch(searchDraft.trim());setChoice("");
       }}>
-        <label className="min-w-[15rem] flex-1 text-sm font-semibold" htmlFor="authorized-course-search">
+        <Label className="min-w-[15rem] flex-1 text-sm font-semibold" htmlFor="authorized-course-search">
           Find approved Programs or Courses
-          <input id="authorized-course-search" value={searchDraft}
+          <Input id="authorized-course-search" value={searchDraft}
             onChange={event=>setSearchDraft(event.target.value)} maxLength={100}
             placeholder="Course name, code, Program or Deployment"
             className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
-        </label>
+        </Label>
         <Button type="submit" variant="outline">Search</Button>
         {search&&<Button type="button" variant="outline"
           onClick={()=>{setSearch("");setSearchDraft("");setChoice("");}}>Clear</Button>}
@@ -422,10 +427,10 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             activities and clubs follow their own approval lifecycle, not this Class recipe.
             Each receiving operator must separately adopt the Offering and authorize local Classes.
           </p>
-          <label className="mt-3 block text-sm font-semibold" htmlFor="native-network-recipe">
+          <Label className="mt-3 block text-sm font-semibold" htmlFor="native-network-recipe">
             Portable publisher rollout (JSON, legacy Class recipes also accepted)
-          </label>
-          <textarea id="native-network-recipe" value={recipeText} rows={4}
+          </Label>
+          <Textarea id="native-network-recipe" value={recipeText} rows={4}
             maxLength={24000} onChange={e=>{setRecipeText(e.target.value);
               setRecipePlan(null);setRecipeCourseId(null);setRecipeOfferingVersionId(null);
               setChoice("");setSiteId("");}}
@@ -444,15 +449,15 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
           </div>
           {recipePlan&&<div className="mt-4 space-y-2" aria-label="Local rollout checklist">
             <p className="text-sm font-semibold">{recipePlan.offeringTitle} · rollout v{recipePlan.revision}</p>
-            <label className="block text-sm font-semibold" htmlFor="publisher-rollout-site">Receiving Site</label>
+            <Label className="block text-sm font-semibold" htmlFor="publisher-rollout-site">Receiving Site</Label>
             {operatorSites.isError&&<p role="alert" className="text-xs">Authorized Site directory unavailable. Do not prepare a Class.</p>}
-            <select id="publisher-rollout-site" value={rolloutSiteId}
+            <Select id="publisher-rollout-site" value={rolloutSiteId}
               disabled={operatorSites.isPending||operatorSites.isError}
               onChange={event=>{setRolloutSiteId(event.target.value);setChoice("");setSiteId("");}}
               className="min-h-11 w-full border border-border bg-background px-3 text-sm">
               <option value="">Select an authorized physical or virtual Site</option>
               {rolloutSiteOptions.map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-            </select>
+            </Select>
             <p className="text-xs text-muted-foreground">
               Readiness uses a separate exact Offering, Course version and Site authorization query.
               No Class is created automatically; live authorization is rechecked when submitted.
@@ -503,8 +508,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         </section>
         <form onSubmit={event=>void create(event)} className="mt-5 space-y-5">
           <div>
-            <label className="block text-sm font-semibold" htmlFor="native-class-course">Approved Course Offering</label>
-            <select id="native-class-course" required value={choice} onChange={e=>{
+            <Label className="block text-sm font-semibold" htmlFor="native-class-course">Approved Course Offering</Label>
+            <Select id="native-class-course" required value={choice} onChange={e=>{
               const selectedOption=visibleOptions.find(option=>optionKey(option)===e.target.value);
               setChoice(e.target.value);
               if(selectedOption){
@@ -525,7 +530,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               {visibleOptions.map(row=><option key={optionKey(row)} value={optionKey(row)}>
                 {row.offeringTitle} · {row.courseTitle} (v{row.courseVersionNo}) · {row.deploymentName}
               </option>)}
-            </select>
+            </Select>
           </div>
           {selected&&<aside className="border border-border bg-muted/20 p-4 text-sm">
             <p className="font-semibold">{selected.offeringKind==="program"?"Program":selected.offeringKind==="course"?"Course Offering":"Published Offering"} · {selected.offeringTitle} (v{selected.offeringVersionNo})</p>
@@ -547,17 +552,17 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
               <Link to="/class" search={{view:"activities",courseVersionId:selected.courseVersionId}} className="underline">Course activities</Link>
             </p>
           </aside>}
-          <div><label className="block text-sm font-semibold" htmlFor="native-class-title">Class name</label>
-            <input id="native-class-title" required minLength={3} maxLength={200} value={title}
+          <div><Label className="block text-sm font-semibold" htmlFor="native-class-title">Class name</Label>
+            <Input id="native-class-title" required minLength={3} maxLength={200} value={title}
               disabled={selected?.localClassPolicy.classTitle==="locked"}
               onChange={e=>setTitle(e.target.value)} placeholder="AI Literacy · January 2027"
               className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
           </div>
           <div>
-            <label className="block text-sm font-semibold" htmlFor="native-class-overall-capacity">
+            <Label className="block text-sm font-semibold" htmlFor="native-class-overall-capacity">
               Class capacity
-            </label>
-            <input id="native-class-overall-capacity" type="number" min={1}
+            </Label>
+            <Input id="native-class-overall-capacity" type="number" min={1}
               max={selected?.localClassPolicy.maxClassCapacity??undefined}
               value={classCapacity} placeholder="Unlimited"
               onChange={event=>setClassCapacity(event.target.value)}
@@ -570,8 +575,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div><label className="block text-sm font-semibold" htmlFor="native-class-mode">Delivery</label>
-              <select id="native-class-mode" value={deliveryMode} onChange={e=>{
+            <div><Label className="block text-sm font-semibold" htmlFor="native-class-mode">Delivery</Label>
+              <Select id="native-class-mode" value={deliveryMode} onChange={e=>{
                 const mode=e.target.value as typeof deliveryMode;
                 setDeliveryMode(mode);
                 if(!selected?.siteOptions.some(site=>site.id===siteId&&
@@ -581,16 +586,16 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 {deliveryOptions.filter(mode=>!selected||selected.localClassPolicy.allowedDeliveryModes.some(allowedMode=>allowedMode===mode))
                   .map(mode=><option key={mode} value={mode}>{mode.replace("_"," ")}</option>)}
-              </select>
+              </Select>
             </div>
-            <div><label className="block text-sm font-semibold" htmlFor="native-class-site">Site</label>
-              <select id="native-class-site" value={siteId} required
+            <div><Label className="block text-sm font-semibold" htmlFor="native-class-site">Site</Label>
+              <Select id="native-class-site" value={siteId} required
                 onChange={e=>setSiteId(e.target.value)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 <option value="">Select an approved physical or virtual Site</option>
                 {(selected?.siteOptions??[]).filter(site=>site.allowedDeliveryModes.some(mode=>mode===deliveryMode))
                   .map(site=><option key={site.id} value={site.id}>{site.name}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -598,59 +603,59 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             including self-paced delivery. An unassigned draft cannot be activated.
           </p>
           <div className="border-t border-border pt-4">
-            <label className="flex items-center gap-3 text-sm font-semibold">
-              <input type="checkbox" checked={createWithOffering}
+            <Label className="flex items-center gap-3 text-sm font-semibold">
+              <Checkbox checked={createWithOffering}
                 onChange={event=>setCreateWithOffering(event.target.checked)}/>
               Also create a draft Class Offering
-            </label>
+            </Label>
             {createWithOffering&&<div className="mt-4">
             <h3 className="text-base font-semibold">Class Offering terms</h3>
             <p className="mt-1 text-sm text-muted-foreground">Availability and admission methods do not change the Course or Class identity.</p>
             <div className="mt-4">
-              <label htmlFor="native-class-visibility" className="block text-sm font-semibold">Visibility</label>
-              <select id="native-class-visibility" value={visibility}
+              <Label htmlFor="native-class-visibility" className="block text-sm font-semibold">Visibility</Label>
+              <Select id="native-class-visibility" value={visibility}
                 onChange={e=>setVisibility(e.target.value as typeof visibility)}
                 className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
                 <option value="private">Private</option><option value="unlisted">Unlisted</option><option value="public">Public</option>
-              </select>
+              </Select>
             </div>
             <fieldset className="mt-4">
               <legend className="text-sm font-semibold">Allowed enrollment methods</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">{methodOptions.map(method=><label key={method.value} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={methods.includes(method.value)}
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">{methodOptions.map(method=><Label key={method.value} className="flex items-center gap-2 text-sm">
+                <Checkbox checked={methods.includes(method.value)}
                   onChange={()=>setMethods(toggle(methods,method.value))}/> {method.label}
-              </label>)}</div>
+              </Label>)}</div>
             </fieldset>
             <fieldset className="mt-4">
               <legend className="text-sm font-semibold">Allowed credit participation</legend>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">{creditOptions.map(mode=><label key={mode.value} className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={creditModes.includes(mode.value)}
+              <div className="mt-2 grid gap-2 sm:grid-cols-2">{creditOptions.map(mode=><Label key={mode.value} className="flex items-center gap-2 text-sm">
+                <Checkbox checked={creditModes.includes(mode.value)}
                   onChange={()=>setCreditModes(toggle(creditModes,mode.value))}/> {mode.label}
-              </label>)}</div>
+              </Label>)}</div>
               <p className="mt-2 text-xs text-muted-foreground">For-credit participation does not award credit without separate institutional approval and an earned outcome.</p>
             </fieldset>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
-              <div><label htmlFor="native-class-open" className="block text-sm font-semibold">Opens</label>
-                <input id="native-class-open" type="datetime-local" value={opensAt}
+              <div><Label htmlFor="native-class-open" className="block text-sm font-semibold">Opens</Label>
+                <Input id="native-class-open" type="datetime-local" value={opensAt}
                   onChange={e=>setOpensAt(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
               </div>
-              <div><label htmlFor="native-class-close" className="block text-sm font-semibold">Closes</label>
-                <input id="native-class-close" type="datetime-local" value={closesAt}
+              <div><Label htmlFor="native-class-close" className="block text-sm font-semibold">Closes</Label>
+                <Input id="native-class-close" type="datetime-local" value={closesAt}
                   onChange={e=>setClosesAt(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
               </div>
-              <div><label htmlFor="native-class-capacity" className="block text-sm font-semibold">Capacity</label>
-                <input id="native-class-capacity" type="number" min={1} value={capacity} placeholder="Unlimited"
+              <div><Label htmlFor="native-class-capacity" className="block text-sm font-semibold">Capacity</Label>
+                <Input id="native-class-capacity" type="number" min={1} value={capacity} placeholder="Unlimited"
                   onChange={e=>setCapacity(e.target.value)} className="mt-2 min-h-11 w-full border border-border bg-background px-2 text-sm"/>
               </div>
             </div>
             {methods.includes("self")&&<div className="mt-4 space-y-3">
               <p className="text-sm font-semibold">Self-enrollment consent terms</p>
-              <div><label htmlFor="native-class-consent-version" className="block text-xs font-semibold">Version</label>
-                <input id="native-class-consent-version" value={consentVersion} required minLength={3}
+              <div><Label htmlFor="native-class-consent-version" className="block text-xs font-semibold">Version</Label>
+                <Input id="native-class-consent-version" value={consentVersion} required minLength={3}
                   onChange={e=>setConsentVersion(e.target.value)} placeholder="participation-v1"
                   className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/></div>
-              <div><label htmlFor="native-class-consent-text" className="block text-xs font-semibold">Participation and data-use terms</label>
-                <textarea id="native-class-consent-text" value={consentText} required minLength={25} maxLength={10000} rows={4}
+              <div><Label htmlFor="native-class-consent-text" className="block text-xs font-semibold">Participation and data-use terms</Label>
+                <Textarea id="native-class-consent-text" value={consentText} required minLength={25} maxLength={10000} rows={4}
                   onChange={e=>setConsentText(e.target.value)}
                   className="mt-1 w-full border border-border bg-background p-3 text-sm"/></div>
             </div>}
