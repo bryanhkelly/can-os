@@ -28,6 +28,7 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-education-operations.sql",
   "database/production/2026-11-17-consolidate-six-class-lifecycle-tables.sql",
   "database/production/2026-11-17-consolidate-six-facilitated-room-evidence-tables.sql",
+  "database/production/2026-11-17-consolidate-noncredit-enrollment-waitlist.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -40,6 +41,7 @@ const referenceRowCounts={
   survey_definitions:0,
   education_operations:1,
   publication_withdrawals:0,learner_outcomes:0,qualification_resource_fulfillments:0,
+  noncredit_enrollment_waitlist:0,
   facilitated_room_activity_releases:0,facilitated_room_activity_responses:0,facilitated_room_control_commands:0,facilitated_room_feedback:0,facilitated_room_presence_events:0,facilitated_room_survey_campaigns:0,
   class_awards:0,class_enrollment_approval_requests:0,class_enrollment_invitations:0,class_enrollment_repeat_authorizations:0,class_enrollment_transfer_requests:0,class_offerings:0,
 };
@@ -148,6 +150,8 @@ async function run(){
             THEN (SELECT count(*) FROM public.facilitated_room_presence_events)
         WHEN c.relname='facilitated_room_survey_campaigns'
             THEN (SELECT count(*) FROM public.facilitated_room_survey_campaigns)
+        WHEN c.relname='noncredit_enrollment_waitlist'
+            THEN (SELECT count(*) FROM public.noncredit_enrollment_waitlist)
         END AS n
     ) count_table ON true
     WHERE ns.nspname='public' AND c.relname=ANY(${Object.keys(referenceRowCounts)}::text[])
@@ -184,8 +188,10 @@ async function run(){
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-17-consolidate-six-facilitated-room-evidence-tables.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-17-consolidate-noncredit-enrollment-waitlist.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==70)throw new Error("Expected 70 reviewed protected table relocations");
+  if(protectedNames.length!==71)throw new Error("Expected 71 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
