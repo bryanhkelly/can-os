@@ -99,13 +99,17 @@ export const listStudentStudyGroupSections=createServerFn({method:"GET"}).handle
  }).from(s.enrollments)
  .innerJoin(s.studentProfiles,eq(s.studentProfiles.id,s.enrollments.studentProfileId))
  .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
+ .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
  .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
  .innerJoin(programEnrollment,and(
   eq(programEnrollment.studentProfileId,s.studentProfiles.id),
   eq(programEnrollment.kind,"program"),eq(programEnrollment.status,"active"),
-  eq(programEnrollment.programId,s.sections.programId)))
+  eq(programEnrollment.programId,s.sections.programId),
+  eq(programEnrollment.schoolYearId,s.terms.schoolYearId)))
  .where(and(eq(s.studentProfiles.personId,actor.actorPersonId!),
   eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+  eq(s.enrollments.programId,s.sections.programId),
+  eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
   eq(s.sections.active,true),eq(s.programs.status,"active"),
   inArray(s.sections.siteId,actor.sites),
   inArray(s.sections.programId,actor.scope.programIds??[])))
@@ -119,7 +123,10 @@ export const listStudentStudyGroupClassmates=createServerFn({method:"GET"})
   const {db,s}=await context();
   const [section]=await db.select({
    id:s.sections.id,siteId:s.sections.siteId,programId:s.sections.programId,
-  }).from(s.sections).innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
+   schoolYearId:s.terms.schoolYearId,
+  }).from(s.sections)
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(s.programs,eq(s.programs.id,s.sections.programId))
   .where(and(eq(s.sections.id,data.sectionId),eq(s.sections.active,true),
    eq(s.programs.status,"active"),inArray(s.sections.siteId,actor.sites),
    inArray(s.sections.programId,actor.scope.programIds??[]))).limit(1);
@@ -135,8 +142,11 @@ export const listStudentStudyGroupClassmates=createServerFn({method:"GET"})
   .innerJoin(programEnrollment,and(
    eq(programEnrollment.studentProfileId,s.studentProfiles.id),
    eq(programEnrollment.kind,"program"),eq(programEnrollment.status,"active"),
-   eq(programEnrollment.programId,section.programId)))
+   eq(programEnrollment.programId,section.programId),
+   eq(programEnrollment.schoolYearId,section.schoolYearId)))
   .where(and(eq(s.enrollments.sectionId,section.id),
+   eq(s.enrollments.programId,section.programId),
+   eq(s.enrollments.schoolYearId,section.schoolYearId),
    eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
    ne(s.people.id,actor.actorPersonId!)))
   .orderBy(asc(s.people.legalFirstName),asc(s.people.legalLastName));
