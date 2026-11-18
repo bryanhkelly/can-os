@@ -13,6 +13,7 @@ import { PageFrame, RecordHeader, RecordLayout, WorkspacePanel, StatusBadge, Wor
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
 import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
@@ -96,13 +97,13 @@ function AssignmentResourcesPanel({ assessmentId, onError }: { assessmentId: str
   <ul className="divide-y divide-border/60">
    {resources.map(resource => <li key={resource.documentId} className="flex items-center justify-between gap-3 py-3 text-sm">
     <span className="min-w-0 font-semibold break-words">{resource.fileName}</span>
-    <button type="button" className="shrink-0 text-sm font-semibold text-primary underline"
+    <Button type="button" variant="ghost" size="sm" className="shrink-0 text-primary underline"
      onClick={async () => {
       try {
        const download = await getAssessmentResourceDownload({ data: { assessmentId, documentId: resource.documentId } });
        window.location.assign(download.downloadUrl);
       } catch (cause) { onError(mutationErrorMessage(cause, "Unable to open this resource")); }
-     }}>View</button>
+     }}>View</Button>
    </li>)}
   </ul>
  </WorkspacePanel>;
@@ -350,20 +351,20 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
      {assignment.submissionId && ["graded", "returned"].includes(assignment.status ?? "") && <SubmissionAnnotations key={assignment.submissionId} submissionId={assignment.submissionId} />}
      {assignment.revisionFeedbackSubmissionId && <SubmissionAnnotations
       key={assignment.revisionFeedbackSubmissionId} submissionId={assignment.revisionFeedbackSubmissionId} />}
-     {attachments.length > 0 && <div className="mt-4 border border-border p-3"><p className="text-sm font-semibold">Attached files</p>{attachments.map(file => <button type="button" key={file.documentId}
-      className="mt-1 block text-xs underline" onClick={async () => {
+     {attachments.length > 0 && <div className="mt-4 border border-border p-3"><p className="text-sm font-semibold">Attached files</p>{attachments.map(file => <Button type="button" variant="ghost" size="sm" key={file.documentId}
+      className="mt-1 underline" onClick={async () => {
        try {
         const download = await getSubmissionAttachmentDownload({ data: { assessmentId: assignment.assessmentId, documentId: file.documentId } });
         window.location.assign(download.downloadUrl);
        } catch (cause) { setError(mutationErrorMessage(cause, "Unable to open attachment")); }
-      }}>{file.fileName}</button>)}</div>}
+      }}>{file.fileName}</Button>)}</div>}
      {editable ? <div className="mt-5" aria-busy={busy}>
-      <label className="text-sm font-semibold">Your response (optional when submitting a file)
+      <Label className="text-sm font-semibold">Your response (optional when submitting a file)
        <Textarea disabled={!hydrated || busy} rows={8} value={draft} maxLength={20000} onChange={event => { setDraft(event.target.value); setDraftStatus("idle"); }}
         className="mt-2 min-h-44" placeholder="Write your response…" />
-      </label>
+      </Label>
       <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus === "saving" ? "Saving…" : draftStatus === "saved" ? "Saved" : draftStatus === "error" ? "Could not autosave" : "Ready"}</p>
-      <label className="mt-4 block text-sm font-semibold">Attachments (PDF, PNG or JPEG; maximum 10 MB each)
+      <Label className="mt-4 block text-sm font-semibold">Attachments (PDF, PNG or JPEG; maximum 10 MB each)
        <Input type="file" multiple accept={attachmentAccept} disabled={!hydrated || busy}
         onChange={event => {
          const chosen = Array.from(event.currentTarget.files ?? []);
@@ -374,7 +375,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
          event.currentTarget.value = "";
         }}
         className="mt-2 min-h-11 w-full" />
-      </label>
+      </Label>
       {pendingFiles.length > 0 && <div className="mt-3 space-y-2 text-sm">
        <p className="text-xs text-muted-foreground">Files waiting to upload. Save draft or submit to attach them to this attempt.</p>
        <ul aria-label="Files waiting to upload" className="divide-y divide-border border border-border">
@@ -412,7 +413,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
       <DetailRow label="Accepted files">PDF, PNG or JPEG · {MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB each</DetailRow>
       {assignment.score !== null && assignment.score !== undefined && <DetailRow label="Score">{assignment.score}{points !== null ? ` / ${points}` : ""}</DetailRow>}
      </dl>
-     {editable && <a href="#your-work" className="mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground">Start submission →</a>}
+     {editable && <a href="#your-work" className="mt-4 inline-flex min-h-11 w-full items-center justify-center  bg-primary px-4 text-sm font-semibold text-primary-foreground">Start submission →</a>}
      <p className="mt-3 text-center text-xs text-muted-foreground">Submissions are accepted until the assignment closes.</p>
     </WorkspacePanel>
     <AssignmentResourcesPanel assessmentId={assignment.assessmentId} onError={setError} />
