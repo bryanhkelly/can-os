@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
 import {
   getClassroomHostActivity, releaseClassroomActivity, closeClassroomActivity,
@@ -94,22 +96,22 @@ export function ClassroomFacilitatorConsole({
       </p>
       <label className="mt-3 block text-sm font-medium">
         Question or discussion prompt
-        <textarea className="mt-1 w-full border border-border bg-background p-3"
+        <Textarea className="mt-1"
           rows={3} maxLength={1000} value={prompt}
           onChange={e => setPrompt(e.target.value)}
           placeholder="What is one responsible way to use AI at work?"/>
       </label>
       <label className="mt-3 block text-sm font-medium">
         Response format
-        <select className="mt-1 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-1"
           value={kind} onChange={e => setKind(e.target.value as "single_choice" | "text")}>
           <option value="single_choice">Multiple choice</option>
           <option value="text">Short written response</option>
-        </select>
+        </Select>
       </label>
       {kind === "single_choice" && <label className="mt-3 block text-sm font-medium">
         Options, one per line (2–8)
-        <textarea className="mt-1 w-full border border-border bg-background p-3"
+        <Textarea className="mt-1"
           rows={4} maxLength={1600} value={choicesText}
           onChange={e => setChoicesText(e.target.value)}/>
       </label>}
