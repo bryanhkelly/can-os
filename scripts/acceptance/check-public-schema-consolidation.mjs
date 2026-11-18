@@ -31,6 +31,8 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-noncredit-enrollment-waitlist.sql",
   "database/production/2026-11-18-batch-01-empty-append-only-tables.sql",
   "database/production/2026-11-18-batch-02-empty-leaf-tables.sql",
+  "database/production/2026-11-18-batch-03-eight-empty-unmapped-tables.sql",
+  "database/production/2026-11-18-consolidate-three-active-empty-leaf-tables.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -46,6 +48,7 @@ const referenceRowCounts={
   noncredit_enrollment_waitlist:0,
   instructional_track_command_receipts:0,learning_award_artifacts:0,official_course_requirement_versions:0,noncredit_released_seats:0,network_member_identifiers:0,
   facilitated_room_activity_releases:0,facilitated_room_activity_responses:0,facilitated_room_control_commands:0,facilitated_room_feedback:0,facilitated_room_presence_events:0,facilitated_room_survey_campaigns:0,
+  academic_course_specification_versions:0,assurance_case_findings:0,course_curriculum_alignments:0,course_grading_policy_versions:0,experience_standard_versions:0,foundation_refresher_rule_versions:0,governance_policy_versions:0,qualified_creator_usage:0,class_staff_assignments:0,learning_session_events:0,learning_completion_evidence_review_requests:0,
   class_awards:0,class_enrollment_approval_requests:0,class_enrollment_invitations:0,class_enrollment_repeat_authorizations:0,class_enrollment_transfer_requests:0,class_offerings:0,
 };
 
@@ -165,6 +168,28 @@ async function run(){
             THEN (SELECT count(*) FROM public.noncredit_released_seats)
         WHEN c.relname='network_member_identifiers'
             THEN (SELECT count(*) FROM public.network_member_identifiers)
+        WHEN c.relname='academic_course_specification_versions'
+            THEN (SELECT count(*) FROM public.academic_course_specification_versions)
+        WHEN c.relname='assurance_case_findings'
+            THEN (SELECT count(*) FROM public.assurance_case_findings)
+        WHEN c.relname='course_curriculum_alignments'
+            THEN (SELECT count(*) FROM public.course_curriculum_alignments)
+        WHEN c.relname='course_grading_policy_versions'
+            THEN (SELECT count(*) FROM public.course_grading_policy_versions)
+        WHEN c.relname='experience_standard_versions'
+            THEN (SELECT count(*) FROM public.experience_standard_versions)
+        WHEN c.relname='foundation_refresher_rule_versions'
+            THEN (SELECT count(*) FROM public.foundation_refresher_rule_versions)
+        WHEN c.relname='governance_policy_versions'
+            THEN (SELECT count(*) FROM public.governance_policy_versions)
+        WHEN c.relname='qualified_creator_usage'
+            THEN (SELECT count(*) FROM public.qualified_creator_usage)
+        WHEN c.relname='class_staff_assignments'
+            THEN (SELECT count(*) FROM public.class_staff_assignments)
+        WHEN c.relname='learning_session_events'
+            THEN (SELECT count(*) FROM public.learning_session_events)
+        WHEN c.relname='learning_completion_evidence_review_requests'
+            THEN (SELECT count(*) FROM public.learning_completion_evidence_review_requests)
         END AS n
     ) count_table ON true
     WHERE ns.nspname='public' AND c.relname=ANY(${Object.keys(referenceRowCounts)}::text[])
@@ -206,8 +231,13 @@ async function run(){
     ...[...readFileSync("database/production/2026-11-18-batch-02-empty-leaf-tables.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm)]
       .filter(match=>match[1]!=="official_course_requirement_versions"),
+    ...[...readFileSync("database/production/2026-11-18-batch-03-eight-empty-unmapped-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm)]
+      .filter(match=>["assurance_case_findings","experience_standard_versions","governance_policy_versions","qualified_creator_usage"].includes(match[1])),
+    ...readFileSync("database/production/2026-11-18-consolidate-three-active-empty-leaf-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==75)throw new Error("Expected 75 reviewed protected table relocations");
+  if(protectedNames.length!==82)throw new Error("Expected 82 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
