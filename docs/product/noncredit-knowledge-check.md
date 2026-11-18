@@ -72,6 +72,13 @@ enrollment release as every other adult training.
   requires exact Offering scope, verified permission evidence and a personal
   invitation.
 - The normal `/programs/noncredit/enrollment` workspace now includes
+  a reusable **Training content preflight** for each selected, currently
+  authorized training. It inventories published Course lessons, approved
+  knowledge-check questions, the live attempt window and active, verified
+  Offering-scoped feedback campaigns. The inventory is read-only and cannot
+  replace an actual learner-device acceptance run. It does **not** hardcode
+  partner-specific lesson or question counts into a shared enrollment workflow.
+- The normal `/programs/noncredit/enrollment` workspace also includes
   the Site-scoped pilot outcomes panel. It requires the existing
   `noncredit.enrollment.read` capability and matches self-enrollment claims
   to approved releases. Provider-assisted registrations without an evidenced
