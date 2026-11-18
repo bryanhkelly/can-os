@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   getGuardianEnrollmentChangeOptions, listGuardianEnrollmentChanges,
   requestGuardianEnrollmentChange,
@@ -121,16 +122,16 @@ function GuardianEnrollmentChanges(){
  const visibleRequests=requests.filter(item=>!selected||item.studentPersonId===selected.split(":")[0]);
  return <WorkspaceShell eyebrow="Family" title="Enrollment and family changes"
    subtitle="Request a withdrawal, transfer or family record correction from your current school. These requests go to the authorized school office; they never automatically remove a student, alter custody or issue a transcript."
-   actions={<Link to="/home" search={{student}} className="rounded-lg border px-3 py-2 text-sm">Family home</Link>}>
+   actions={<Link to="/home" search={{student}} className=" border px-3 py-2 text-sm">Family home</Link>}>
   {loading&&<p className="mt-6" role="status">Checking verified family enrollment…</p>}
-  {error&&<div className="mt-6 rounded-lg border p-4 text-sm" role="alert">
+  {error&&<div className="mt-6  border p-4 text-sm" role="alert">
    <p>{error}</p>
-   {!loading&&<button type="button" className="mt-3 rounded border px-4 py-2 font-semibold"
-    onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry verifying family enrollment</button>}
+   {!loading&&<Button type="button" variant="outline" className="mt-3"
+    onClick={()=>{setError("");setRetryKey(current=>current+1);}}>Retry verifying family enrollment</Button>}
   </div>}
   <MutationFeedback state={mutation} className="mt-6" pendingMessage="Saving family request..."/>
-  {!loading&&!error&&choices.length===0&&<p className="mt-6 rounded-lg border p-4 text-sm">No active school enrollment is available for a new request. Contact admissions if your child has already transferred or withdrawn.</p>}
-  {!error&&choices.length>0&&<form noValidate onSubmit={event=>void submit(event)} className="mt-6 max-w-2xl space-y-4 rounded-xl border bg-card p-5">
+  {!loading&&!error&&choices.length===0&&<p className="mt-6  border p-4 text-sm">No active school enrollment is available for a new request. Contact admissions if your child has already transferred or withdrawn.</p>}
+  {!error&&choices.length>0&&<form noValidate onSubmit={event=>void submit(event)} className="mt-6 max-w-2xl space-y-4  border bg-card p-5">
    <h2 className="text-lg font-semibold">New request to your school</h2>
    <Field label="Student and school" required>
     <Select
@@ -147,7 +148,7 @@ function GuardianEnrollmentChanges(){
      <option value="family_change">Request family information correction</option>
     </Select>
    </Field>
-   {kind==="transfer"&&<fieldset className="space-y-3 rounded-lg border p-4">
+   {kind==="transfer"&&<fieldset className="space-y-3  border p-4">
     <legend className="px-2 text-sm font-semibold">Destination school coordination</legend>
     <Field label="Destination school name" required
       error={attempted&&destinationSchoolName.trim().length<3?"Enter the destination school's name (at least 3 characters).":undefined}>
@@ -182,7 +183,7 @@ function GuardianEnrollmentChanges(){
   </form>}
   <section className="mt-8 space-y-3">
    <h2 className="text-lg font-semibold">Your requests and school responses</h2>
-   {visibleRequests.map(item=><article key={item.id} className="rounded-lg border bg-card p-4">
+   {visibleRequests.map(item=><article key={item.id} className=" border bg-card p-4">
     <p className="font-semibold">{item.title} · {item.schoolName}</p>
     <p className="mt-1 text-sm">Status: {item.status.replaceAll("_"," ")} · {new Date(item.createdAt).toLocaleDateString()}</p>
     {item.destinationSchoolName&&<p className="mt-2 text-sm"><strong>Destination:</strong> {item.destinationSchoolName}{item.intendedLastDay?" · Requested last school day "+item.intendedLastDay:""}</p>}
@@ -191,16 +192,16 @@ function GuardianEnrollmentChanges(){
       item.destinationApplicationId?
       "Destination application exists; offer acceptance and actual placement are separate":
       "No linked receiving-school enrollment yet"}</p>}
-    {item.kind==="transfer"&&!item.destinationApplicationId&&<div className="mt-3 space-y-3 rounded-lg border p-4 text-sm">
+    {item.kind==="transfer"&&!item.destinationApplicationId&&<div className="mt-3 space-y-3  border p-4 text-sm">
       <p className="font-semibold">Continue at the receiving school</p>
-      {item.destinationFamilyStartRequestedAt&&<p className="rounded border p-3 text-sm" role="status">
+      {item.destinationFamilyStartRequestedAt&&<p className=" border p-3 text-sm" role="status">
         Secure sign-in email requested for {item.destinationFamilyStartProgramName??"the receiving school"} on {new Date(item.destinationFamilyStartRequestedAt).toLocaleDateString()}.
         Check your verified email and open its link to start or resume an application. A requested email is not proof of receipt.
       </p>}
       <p>If the destination is a published CAN school, request a secure email verification link. This provides prospective family application access only. The original school handles enrollment exit and records.</p>
       {destinations.length>0&&<>
-        <label className="block font-medium">Receiving CAN school
-          <select className="mt-1 w-full rounded border bg-background p-3"
+        <Label className="block font-medium">Receiving CAN school
+          <Select className="mt-1 w-full  border bg-background p-3"
             value={destinationChoices[item.id]??""}
             onChange={event=>{
               setDestinationChoices(old=>({...old,[item.id]:event.target.value}));
@@ -210,19 +211,19 @@ function GuardianEnrollmentChanges(){
             {destinations.map(program=><option key={program.id} value={program.id}>
               {program.siteName} · {program.name}
             </option>)}
-          </select>
-        </label>
-        {!!destinationChoices[item.id]&&<label className="flex items-start gap-3">
-          <input type="checkbox" checked={!!destinationConfirmations[item.id]}
+          </Select>
+        </Label>
+        {!!destinationChoices[item.id]&&<Label className="flex items-start gap-3">
+          <Checkbox checked={!!destinationConfirmations[item.id]}
             onChange={event=>setDestinationConfirmations(old=>({...old,[item.id]:event.target.checked}))}
             className="mt-1"/>
           <span>I confirm this is the receiving school I wish to contact. My original transfer request names <strong>{item.destinationSchoolName}</strong>. A different school selection does not change that records-release authorization.</span>
-        </label>}
-        <button type="button" disabled={busy||!destinationChoices[item.id]||!destinationConfirmations[item.id]}
+        </Label>}
+        <Button type="button" disabled={busy||!destinationChoices[item.id]||!destinationConfirmations[item.id]}
           onClick={()=>void requestDestination(item)}
-          className="rounded bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
           {busy?"Requesting…":"Email a secure receiving-school sign-in link"}
-        </button>
+        </Button>
       </>}
       <Link to="/launch/family" className="inline-block font-semibold underline">
         Review existing school applications →
@@ -243,7 +244,7 @@ function GuardianEnrollmentChanges(){
     {item.resolutionNote&&<p className="mt-3 text-sm"><strong>School response:</strong> {item.resolutionNote}</p>}
     <p className="mt-2 text-xs text-muted-foreground">Origin-school exit, destination enrollment and transcript release are distinct steps. A completed records handoff reflects a school-recorded secure transfer, not automatic admission or independent delivery verification.</p>
    </article>)}
-   {!visibleRequests.length&&!loading&&<p className="rounded-lg border p-4 text-sm">No school change requests are recorded for this family selection.</p>}
+   {!visibleRequests.length&&!loading&&<p className=" border p-4 text-sm">No school change requests are recorded for this family selection.</p>}
   </section>
  </WorkspaceShell>;
 }
