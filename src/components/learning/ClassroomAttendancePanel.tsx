@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { StatusBadge } from "@/components/workspace";
 import { classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import {
   attestClassroomParticipation, getClassroomAttendanceRoster,
@@ -44,7 +45,11 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       setError("Add a direct-observation note of at least 15 characters for a learner without a paired device or a changed verification.");
       return;
     }
-    const key=[courseAttemptId,status,method,note||""].join(":");
+    if(participant.lastAssertedAt && participant.latestStatus===status && participant.latestMethod===method){
+      setMessage("This verification is already recorded. Choose a different status or method to correct it.");
+      return;
+    }
+    const key=[facilitatedSessionId,courseAttemptId,status,method,note||""].join(":");
     const requestId=retries.current[key]??crypto.randomUUID();
     retries.current[key]=requestId;
     setBusy(courseAttemptId);setError("");setMessage("");
@@ -96,7 +101,7 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
           <p className="mt-1 text-xs text-muted-foreground">
             {person.source==="noncredit"?"Noncredit registration":"School enrollment"}
             {" · "}{person.pairedDevice?"Device currently paired":"No current device pairing"}
-            {" · "}Verified: {person.latestStatus}
+            {" · "}<StatusBadge tone={person.lastAssertedAt ? "info" : "neutral"}>{person.lastAssertedAt ? `Verified: ${person.latestStatus}` : "No verification recorded"}</StatusBadge>
           </p>
           {person.lastAssertedAt&&<p className="mt-1 text-xs text-muted-foreground">
             Last assertion {new Date(person.lastAssertedAt).toLocaleString()}
@@ -118,7 +123,8 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
         {(["present","absent","unknown"] as const).map(status=>
           <Button type="button" size="sm" key={status}
             variant={person.latestStatus===status?"default":"outline"}
-            disabled={!!busy||!roster.data.attestationsOpen}
+            disabled={!!busy||!roster.data.attestationsOpen||
+              Boolean(person.lastAssertedAt && person.latestStatus===status && person.latestMethod===method)}
             onClick={()=>void attest(person.courseAttemptId,status)}>
             {busy===person.courseAttemptId?"Saving…":
               status==="present"?"Verified present":status==="absent"?"Verified absent":"Not verified"}
