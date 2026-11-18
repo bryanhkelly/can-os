@@ -14,7 +14,7 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(service).toContain("contentManifestReviewDecisions");
     expect(service).toContain("manifest.manifestHash!==await currentReleaseSnapshotHash");
     expect(service).toContain("manifest.createdByPersonId===actor.actorPersonId");
-    expect(service).toContain("requireApprovedSnapshot(tx,manifest)");
+    expect(service).toContain("requireApprovedSnapshot(tx,manifest,bundle)");
   });
   it("publishes Courses without bypassing the database's real-asset manifest gate",()=>{
     const service=source("src/modules/learning/native-offering-release.functions.ts");
