@@ -35,7 +35,7 @@ INSERT INTO education_v30.offering_courses (offering_version_id,course_version_i
 VALUES ('ca270000-0000-4000-8000-000000000051','ca270000-0000-4000-8000-000000000042',true,1)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO education_v30.education_operation_sites (id,operation_id,site_id,valid_from,purpose)
+INSERT INTO public.education_operation_sites (id,operation_id,site_id,valid_from,purpose)
 VALUES ('ca270000-0000-4000-8000-000000000054','ca270000-0000-4000-8000-000000000049','ca270000-0000-4000-8000-000000000002','2026-11-17T00:00:00Z','planned_instruction')
 ON CONFLICT (id) DO NOTHING;
 
