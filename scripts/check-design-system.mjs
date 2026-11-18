@@ -621,6 +621,23 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "@/components/ui/textarea", "@/components/ui/field",
     "<WorkspaceNotice", "<EmptyState",
   ],
+
+  "routes/operations.field-trips.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/textarea", "@/components/ui/label", "<LocalDateTimeField",
+    "<Button type=\"submit\"", "<StatusBadge", "<DirectoryTable",
+  ],
+  "routes/operations.transfer-records.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/choice", "@/components/ui/label", "<WorkspaceNotice",
+    "<EmptyState", "<Checkbox",
+  ],
+  "routes/operations.curriculum-marketplace.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/textarea", "@/components/ui/choice", "@/components/ui/label",
+    "<CurriculumPdfPicker", "<OneRosterStudentReconciliation",
+  ],
+
 };
 for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
