@@ -1,6 +1,6 @@
 # Decision: One CAN OS database model, one public application schema
 
-Status: **Shared Site identity retired on Neon main; broader schema consolidation still in progress**
+Status: **Shared Site and Organization identities retired on Neon main; Person and broader schema consolidation still in progress**
 Updated: 2026-11-17
 
 ## Outcome
@@ -19,7 +19,27 @@ Updated: 2026-11-17
 - Six database functions that previously resolved the duplicate Site now use `public.sites`; no inspected database routine retains an explicit `education_v30.sites` reference.
 - `public.sites` has RLS enabled and forced. The `authenticated` and `anonymous` database roles have no direct Site table access, and a restrictive deny policy is installed. Database-owner service queries can bypass RLS and still require audited application authorization.
 - The matched demo Site retained its existing planning lifecycle, classification, reference code, and clearly labeled synthetic metadata. This metadata is not a verified street address.
-- Migration files: `2026-11-17-retire-duplicate-native-site.sql` and `2026-11-17-retired-site-demo-address-preservation.sql`. This completes **Site identity retirement only**, not the Organization, Person, Class, and remaining schema consolidation.
+- Migration files: `2026-11-17-retire-duplicate-native-site.sql` and `2026-11-17-retired-site-demo-address-preservation.sql`. The Site retirement is complete; the Organization was also subsequently retired. Person, Class, and remaining schema consolidation are not complete.
+
+## Current main verification, November 17, 2026
+
+The authoritative Neon `main` database now has **no duplicate Site or Organization tables**. Current read-only measurements:
+
+| Metric | Public | Remaining native |
+| --- | ---: | ---: |
+| Base tables | 248 | 424 in `education_v30` |
+| Sites | 9 | 0; `education_v30.sites` absent |
+| Organizations | 17 | 0; `education_v30.organizations` absent |
+| Foreign keys pointing to duplicate Site/Organization tables | n/a | 0 |
+| Foreign keys pointing to `public.sites` / `public.organizations` | 94 / 229 | n/a |
+| Native Person FKs still requiring review | n/a | 239 |
+| Separate sensitive-schema tables | n/a | 7 in `education_v30_secure` |
+
+Both `public.sites` and `public.organizations` have **enabled and forced row-level security**, a restrictive client-denial policy, and no direct `authenticated` or `anonymous` SELECT permissions. The server's privileged connection still requires application authorization; forced RLS does not replace command-level membership checks.
+
+The native staff-reader and five additional governed SQL functions were updated in place to reference `public.organizations`. An invalid synthetic staff/native session returned zero grants. `catalogSites`, `canonicalEnrollmentSites`, and `canonicalEnrollmentOrganizations` are now public-schema Drizzle projections, not new identities. A regression check and read-only acceptance command were committed on GitHub `main`.
+
+**Remaining:** public Person cutover, native account/session and correspondence retirement, 424 additional canonical tables and 7 sensitive tables, all associated routines/permissions, and an authenticated build/browser acceptance run. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
 
 ## Historical pre-retirement Neon main inventory
 
@@ -40,9 +60,9 @@ Additional: `education_v30_secure` contains 7 particularly sensitive tables, whi
 
 The 9 collisions are `admission_offers`, `audit_events`, `domain_events`, `enrollments`, `graduation_decisions`, `organizations`, `qualification_definitions`, `sites`, `transcript_issuances`. They have different column definitions. Never overwrite a public table using `ALTER TABLE ... SET SCHEMA` before resolving its actual semantics. Keep ONE core entity; where concepts really differ, choose descriptive domain names rather than a `canonical_` duplicate.
 
-At this historical snapshot, `education_v30.sites` had zero inbound foreign keys and `public.sites` had 94. The native Site table has since been retired, while the duplicate native Organization remains. Its remaining authorization and consumer dependencies require a separate guarded cutover.
+At this historical snapshot, `education_v30.sites` had zero inbound foreign keys and `public.sites` had 94. Both the duplicate Site and Organization tables have since been retired using guarded migrations, after preserving the exact public UUIDs and dependent authorization behavior.
 
-**Current security status:** Forced RLS and restrictive direct-client privileges now protect the authoritative Site table. Application-level Site authorization and related sensitive tables must still be independently verified, particularly for privileged database-owner connections.
+**Current security status:** Forced RLS and restrictive direct-client privileges protect both authoritative Site and Organization tables. Application-level Site authorization and related sensitive tables must still be independently verified, particularly for privileged database-owner connections.
 
 ## Main progress applied
 
@@ -72,12 +92,17 @@ At this historical snapshot, `education_v30.sites` had zero inbound foreign keys
 
 19. Rebound **all 40 native Site foreign keys** directly to `public.sites(id)`, in reviewed batches of 11 and 29. Preserved existing `ON DELETE RESTRICT` behavior and every child table's RLS/permissions. The Site UUID did not change and no correspondence service or table was introduced. Migration files: `2026-11-17-rebind-11-core-native-site-fks.sql`, `2026-11-17-rebind-remaining-29-native-site-fks.sql`. **Verified: 0 FKs still reference `education_v30.sites`.**
 20. Preserved the one matched native demo Site's education-only fields (`site_kind`, `status`, `code`, capacity, geography) on its **same** `public.sites` row. Verified exact ID, name and timezone agreement. The unverified synthetic address was initially omitted; it was subsequently preserved with `synthetic` and `addressVerified: false` markers, not treated as a verified physical address. SQL: `2026-11-17-consolidate-native-site-attributes.sql`.
-21. Rebound **all 154 native Organization foreign keys** to `public.organizations(id)`, preserving constraint names, validation, and delete behaviors, including two actual published/draft Course/Offering reference rows. Completed in core 23-FK and subsequent 30-FK batches plus the final adult review FK. **Verified: 0 FKs still reference `education_v30.organizations`.** The actual Organization record remains to be retired after its readers have migrated.
+21. Rebound **all 154 native Organization foreign keys** to `public.organizations(id)`, preserving constraint names, validation, and delete behaviors, including two actual published/draft Course/Offering reference rows. Completed in core 23-FK and subsequent 30-FK batches plus the final adult review FK. **Verified: 0 FKs still reference `education_v30.organizations`.** The actual duplicate Organization has subsequently been retired after its readers were migrated.
 22. Preserved the one matching canonical demo Organization's `prospective` status, external reference, and explicitly synthetic legal name on its **same** public Organization row; no new Organization was created. SQL: `2026-11-17-consolidate-native-organization-attributes.sql`.
-23. Added `verify:identity:main-core-fks`, a **read-only main-only verification milestone** for zero native Site/Organization FKs, exact UUID/attribute agreement, and absent Site identity bridge. This remains a schema reconciliation check rather than full browser acceptance. Native Person, Account, and Organization identities still require separate consolidation.
+23. Added `verify:identity:main-core-fks`, a **read-only main-only verification milestone** for zero native Site/Organization FKs, exact UUID/attribute agreement, and absent Site identity bridge. This remains a schema reconciliation check rather than full browser acceptance. Native Person and Account identities still require separate consolidation.
 24. **Retired `education_v30.sites` on Neon main** using a guarded transaction, updated six dependent SQL functions and relevant app readers, installed forced RLS on `public.sites`, and verified anonymous/authenticated roles cannot read or modify that table directly. A negative synthetic staff-session query returned zero grants.
 
-## Production cutover (dependency order; not yet executed)
+25. Repointed the restricted CAN staff SQL projection and five additional canonical SQL functions to `public.organizations`, including active lifecycle checks and display names. No identity correspondence or role grants were invented; unknown sessions still return zero rows. SQL: `2026-11-17-repoint-restricted-staff-identity-to-public.sql` and `2026-11-17-repoint-five-canonical-organization-functions.sql`.
+26. **Dropped the duplicate `education_v30.organizations` table with `RESTRICT`**, after verifying the only native demo row already existed in `public.organizations`, all FKs were redirected and all affected SQL functions had been migrated. SQL: `2026-11-17-retire-duplicate-native-organization.sql`.
+27. **Enabled and forced RLS on `public.organizations`**, revoked unscoped `authenticated` / `anonymous` table privileges and applied a restrictive direct-client deny policy. A direct privilege probe confirms the generic client roles have no Site or Organization SELECT. SQL: `2026-11-17-secure-public-organizations.sql`.
+28. Updated public-only Drizzle Site and Organization projections, Launch Studio Course Site scope, tests and the `verify:identity:main-core-fks` gate. The verifier now fails if either duplicate table returns, direct client read permission reappears, or forced RLS is disabled. App-wide build and browser acceptance remain unverified.
+
+## Production cutover (dependency order; remaining steps)
 
 1. Inventory every schema object and real record, including colliding names, 430 remaining canonical tables, 245 routines, 7 sensitive tables, sequences, views, non-FK UUIDs, triggers, migrations, role grants, RLS policies, published URLs and identity-related consumers.
 2. Review a semantic collision plan: merge or retire duplicate `sites` and `organizations` only after rekeying inbound FKs; evaluate near-equivalent event/audit/learner tables field by field. No guessed identity matches.
