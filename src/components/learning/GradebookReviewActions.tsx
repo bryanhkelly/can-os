@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
 
 export function GradebookReviewActions(props: {
   busy: boolean;
@@ -7,11 +8,14 @@ export function GradebookReviewActions(props: {
   onPostGrade: () => void;
 }) {
   return <div className="flex flex-wrap gap-3">
-    <button type="button" disabled={props.busy} onClick={props.onSaveDraft}
-      className="rounded-lg border px-4 py-2 text-sm disabled:opacity-50">Save grading draft</button>
-    <button type="button" disabled={props.busy} onClick={props.onPostGrade}
-      className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">Post grade</button>
-    <Link to="/teacher/gradebook" search={{section:props.sectionId}}
-      className="rounded-lg border px-4 py-2 text-sm">Close review</Link>
+    <Button type="button" variant="outline" disabled={props.busy} onClick={props.onSaveDraft}>
+      Save grading draft
+    </Button>
+    <Button type="button" disabled={props.busy} onClick={props.onPostGrade}>
+      Post grade
+    </Button>
+    <Button asChild variant="ghost"><Link to="/teacher/gradebook" search={{section:props.sectionId}}>
+      Close review
+    </Link></Button>
   </div>;
 }
