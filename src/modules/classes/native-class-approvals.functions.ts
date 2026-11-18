@@ -33,9 +33,10 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
  .handler(async({data})=>{
   guard();const request=getRequest();
   const actor=await getCanonicalCommandContext(request);
-  if(!actor.actorPersonId||actor.role!=="learner")
+  if(!learnerPersonId||actor.role!=="learner")
    throw new AuthorizationError("verified canonical adult learner");
   assertCapability(actor,"learning.participate");
+  const learnerPersonId=actor.actorPersonId;
   return db.transaction(async tx=>{
    const [locator]=await tx.select({classId:canonicalClassOfferingVersions.classId})
     .from(canonicalClassOfferingVersions)
@@ -55,22 +56,22 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
       (terms.opensAt&&terms.opensAt>now)||(terms.closesAt&&terms.closesAt<=now))
      throw new AuthorizationError("current public approval-based Class");
    const [person]=await tx.select({birthDate:canonicalPersons.birthDate})
-     .from(canonicalPersons).where(eq(canonicalPersons.id,actor.actorPersonId)).limit(1);
+     .from(canonicalPersons).where(eq(canonicalPersons.id,learnerPersonId)).limit(1);
    if(!verifiedAdultOn(person?.birthDate,now))
      throw new AuthorizationError("verified adult only; guardian placement uses separate authority");
    await assertCurrentNativeClassLearnerForMutation(tx,request,actor);
    const [existingEnrollment]=await tx.select({id:canonicalClassEnrollments.id})
     .from(canonicalClassEnrollments).where(and(
      eq(canonicalClassEnrollments.classId,cls.id),
-     eq(canonicalClassEnrollments.learnerPersonId,actor.actorPersonId),
+     eq(canonicalClassEnrollments.learnerPersonId,learnerPersonId),
      inArray(canonicalClassEnrollments.status,["pending","active"]))).limit(1);
    if(existingEnrollment)throw new AuthorizationError("already enrolled in Class");
    const [replay]=await tx.select().from(canonicalClassEnrollmentApprovalRequests).where(and(
      eq(canonicalClassEnrollmentApprovalRequests.classId,cls.id),
-     eq(canonicalClassEnrollmentApprovalRequests.applicantPersonId,actor.actorPersonId),
+     eq(canonicalClassEnrollmentApprovalRequests.applicantPersonId,learnerPersonId),
      eq(canonicalClassEnrollmentApprovalRequests.requestId,data.requestId))).limit(1);
    if(replay){
-    if(replay.classOfferingVersionId!==terms.id||replay.learnerPersonId!==actor.actorPersonId)
+    if(replay.classOfferingVersionId!==terms.id||replay.learnerPersonId!==learnerPersonId)
      throw new AuthorizationError("conflicting approval request replay");
     return {approvalRequestId:replay.id,state:replay.state,duplicate:true};
    }
@@ -81,39 +82,39 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
       decisionReason:"Approval request expired before independent review"})
     .where(and(
       eq(canonicalClassEnrollmentApprovalRequests.classId,cls.id),
-      eq(canonicalClassEnrollmentApprovalRequests.learnerPersonId,actor.actorPersonId),
+      eq(canonicalClassEnrollmentApprovalRequests.learnerPersonId,learnerPersonId),
       eq(canonicalClassEnrollmentApprovalRequests.state,"pending"),
       lte(canonicalClassEnrollmentApprovalRequests.expiresAt,now),
     )).returning({id:canonicalClassEnrollmentApprovalRequests.id});
    for(const item of expired){
-    await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
+    await writeCanonicalAudit(tx,{actorPersonId:learnerPersonId,
      owningOrganizationId:current.operatingOrganizationId,
      eventCode:"class.approval.expired",entityKind:"class_approval_request",entityId:item.id,
      payload:{classId:cls.id,siteId:current.siteId,reason:"expired_before_reapply"}});
     await emitCanonicalDomainEvent(tx,{eventType:"ClassApprovalExpired",
      aggregateType:"class_approval_request",aggregateId:item.id,
-     actorPersonId:actor.actorPersonId,payload:{classId:cls.id,siteId:current.siteId}});
+     actorPersonId:learnerPersonId,payload:{classId:cls.id,siteId:current.siteId}});
    }
    const [pending]=await tx.select({id:canonicalClassEnrollmentApprovalRequests.id})
     .from(canonicalClassEnrollmentApprovalRequests).where(and(
      eq(canonicalClassEnrollmentApprovalRequests.classId,cls.id),
-     eq(canonicalClassEnrollmentApprovalRequests.learnerPersonId,actor.actorPersonId),
+     eq(canonicalClassEnrollmentApprovalRequests.learnerPersonId,learnerPersonId),
      eq(canonicalClassEnrollmentApprovalRequests.state,"pending"))).limit(1);
    if(pending)throw new AuthorizationError("an approval request is already pending");
    const [saved]=await tx.insert(canonicalClassEnrollmentApprovalRequests).values({
     classId:cls.id,classOfferingVersionId:terms.id,
     operatingOrganizationId:current.operatingOrganizationId,siteId:current.siteId,
-    learnerPersonId:actor.actorPersonId,applicantPersonId:actor.actorPersonId,
+    learnerPersonId:learnerPersonId,applicantPersonId:learnerPersonId,
     requestId:data.requestId,expiresAt:new Date(now.getTime()+maxAgeMs),
    }).returning({id:canonicalClassEnrollmentApprovalRequests.id});
    if(!saved)throw new Error("Class approval request not saved");
-   await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
+   await writeCanonicalAudit(tx,{actorPersonId:learnerPersonId,
     owningOrganizationId:current.operatingOrganizationId,
     eventCode:"class.approval.requested",entityKind:"class_approval_request",entityId:saved.id,
     payload:{classId:cls.id,siteId:current.siteId,seatReserved:false}});
    await emitCanonicalDomainEvent(tx,{eventType:"ClassApprovalRequested",
     aggregateType:"class_approval_request",aggregateId:saved.id,
-    actorPersonId:actor.actorPersonId,payload:{classId:cls.id,siteId:current.siteId}});
+    actorPersonId:learnerPersonId,payload:{classId:cls.id,siteId:current.siteId}});
    return {approvalRequestId:saved.id,state:"pending" as const,duplicate:false};
   });
  });
