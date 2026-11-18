@@ -116,6 +116,7 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
 function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistration>>}){
  const {section,tab="overview"}=Route.useSearch();
  const enrolled=data.sections.filter(item=>item.enrollmentStatus==="active");
+ const pendingRequests=data.requests.filter(request=>["open","in_progress","waiting"].includes(request.status));
  const course=enrolled.find(item=>item.id===section);
  const work=(data.classwork??[]).filter(item=>item.sectionId===course?.id);
  
@@ -143,6 +144,20 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
       <Link to="/student/assignments" search={{section:item.id}} className=" border px-4 py-2">Classwork</Link>
      </div>
     </WorkspacePanel>)}
+    {pendingRequests.length>0&&<WorkspacePanel title="Pending class changes"
+     description="A request is not an enrollment. The registrar reviews class availability, and some additions also require guardian permission."
+     className="md:col-span-2">
+     <ul className="divide-y divide-border">
+      {pendingRequests.map(request=><li key={request.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+       <div className="min-w-0">
+        <p className="text-sm font-semibold">{request.title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{String(request.operation)} · {request.status==="waiting"?"Waiting":request.status==="in_progress"?"In review":"Awaiting review"}</p>
+       </div>
+       <Link to="/student/courses" search={{view:"catalog",section:request.sectionId}}
+        className="text-sm font-semibold text-primary underline underline-offset-4">Review request</Link>
+      </li>)}
+     </ul>
+    </WorkspacePanel>}
    </div>:<>
     <DetailNavigation label="Class detail">
      <SectionTab current={tab==="overview"} link={{to:"/student/courses",search:{section:course.id,tab:"overview"}}}>Overview</SectionTab>
