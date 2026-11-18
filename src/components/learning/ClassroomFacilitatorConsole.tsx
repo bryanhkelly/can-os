@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { ClassroomPlaybackControls } from "@/components/learning/ClassroomPlaybackControls";
 import {
   getClassroomHostActivity, releaseClassroomActivity, closeClassroomActivity,
@@ -20,9 +22,6 @@ export function ClassroomFacilitatorConsole({
   const [prompt, setPrompt] = useState("");
   const [kind, setKind] = useState<"single_choice" | "text">("single_choice");
   const [choicesText, setChoicesText] = useState("Yes\nNo");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   // Preserve one request identity across uncertain network failures.
   // A new prompt/options payload receives its own activity identity.
   const activityRequests = useRef(new Map<string, string>());
@@ -31,25 +30,18 @@ export function ClassroomFacilitatorConsole({
     queryFn: () => getClassroomHostActivity({ data: { facilitatedSessionId } }),
     staleTime: 0, refetchInterval: 8000, retry: false,
   });
+  const feedback = useMutationFeedback(() => room.refetch({throwOnError:true}));
+  const busy = feedback.pending || feedback.refreshFailed;
   const currentState = room.data?.roomState ?? "unknown";
   const isLive = room.isSuccess && currentState === "live";
 
   async function run(action: () => Promise<void>) {
     if (busy) return;
-    setBusy(true); setError(""); setNotice("");
-    try {
-      await action();
-    } catch {
-      setError("The classroom action could not be confirmed. Refresh the room before retrying the same action.");
-      setBusy(false);
-      return;
-    }
-    try {
-      await room.refetch({ throwOnError: true });
-      setNotice("Classroom action saved.");
-    } catch {
-      setNotice("Classroom action saved, but the current room state could not be refreshed. Refresh the room before taking another action.");
-    } finally { setBusy(false); }
+    await feedback.run(action,{
+      successMessage:"Classroom action saved.",
+      commandErrorMessage:"The classroom action could not be confirmed. Check your current classroom permissions and retry with the same details.",
+      refreshErrorMessage:"Classroom action saved, but the current room state could not be refreshed. Retry the refresh before taking another action.",
+    });
   }
 
   const choices = kind === "single_choice"
@@ -167,7 +159,6 @@ export function ClassroomFacilitatorConsole({
           })}>Close responses</Button>}
       </article>)}
     </section>}
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    {notice && <p role="status" className="text-sm">{notice}</p>}
+    <MutationFeedback state={feedback} pendingMessage="Saving classroom action…" className="mt-3"/>
   </section>;
 }
