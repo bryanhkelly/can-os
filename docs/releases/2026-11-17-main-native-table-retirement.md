@@ -26,3 +26,20 @@ Source migration files:
 - `database/production/2026-11-17-retire-unused-native-admission-offers.sql`
 - `database/production/2026-11-17-consolidate-three-empty-gov-tables.sql`
 - `database/production/2026-11-17-consolidate-device-scope-tables.sql`
+
+## Continued low-risk consolidation
+
+Seven additional empty, noncolliding native tables were moved in two main-only guarded transactions:
+
+- `equipment_ownership_periods`, `evaluation_basis_invalidations`, `improvement_action_evidence`, `qualification_reassessment_requests`
+- `deployment_operating_contexts`, `funding_award_eligible_deployments`, `initiative_deployments`
+
+No records were deleted or cloned. All seven preserved original table OIDs and the full set of **20 validated outgoing foreign keys**. All seven retained `ENABLE ROW LEVEL SECURITY`, `FORCE ROW LEVEL SECURITY`, one existing access policy, and denied direct `authenticated` SELECT access. Nine dependent SQL function bodies were re-pointed to the same physical tables in `public`.
+
+Verified on Neon `main`: seven `public` tables and nine updated SQL functions. The last inventory sampled **361 `education_v30` base tables** and **310 `public` base tables**; other agents' concurrent work may alter the totals.
+
+- Migrations: `2026-11-17-consolidate-four-empty-native-capabilities.sql` and `2026-11-17-consolidate-three-empty-operational-capabilities.sql`
+- Acceptance gate: `scripts/acceptance/check-main-easy-native-consolidation.mjs` (read-only, main-only)
+- Source contracts: `tests/unit/main-easy-native-consolidation-contract.test.ts`
+
+The migrations and SQL metadata checks succeeded. The added executable checks and browser workflows have **not** been run as part of this pass. Further quick moves need per-table routine/source reviews; avoid touching `education_v30_secure` or merging semantically different colliding tables under an "easy" cleanup.
