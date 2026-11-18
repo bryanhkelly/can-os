@@ -1,29 +1,54 @@
 import type { db } from "@/db/client";
-import { auditEvents, domainEvents } from "@/db/canonical-v301";
+import type { auditEvents as nativeAuditEvents, domainEvents as nativeDomainEvents } from "@/db/canonical-v301";
+import { emitEvent, writeAudit } from "@/platform/mutation";
 
 /**
- * Canonical education_v30 mutation evidence writers.
+ * Compatibility contract for native Class and noncredit callers.
+ * All runtime writes now use the one authoritative public.audit_events and
+ * public.domain_events journals through the shared platform writers.
  *
- * Keep these separate from the legacy public-schema writers in platform/mutation:
- * the canonical audit table has a different column contract. Callers own
- * domain eligibility and must invoke both writers in their existing business
- * transaction, never in a post-commit task.
+ * Native operation codes, organization attribution, payload, actor and
+ * original event time are retained. No duplicate journal write, shadow table,
+ * async side effect or independent transaction.
  */
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
-type CanonicalAuditInput = typeof auditEvents.$inferInsert;
-type CanonicalDomainEventInput = typeof domainEvents.$inferInsert;
+type CanonicalAuditInput = Omit<typeof nativeAuditEvents.$inferInsert, "id">;
+type CanonicalDomainEventInput = Omit<
+  typeof nativeDomainEvents.$inferInsert,
+  "id" | "status" | "attempts" | "lastError" | "nextAttemptAt" | "processedAt" | "createdAt"
+>;
 
 export async function writeCanonicalAudit(
   tx: Tx,
   entry: CanonicalAuditInput,
 ): Promise<void> {
-  await tx.insert(auditEvents).values(entry);
+  await writeAudit(tx, {
+    actorPersonId: entry.actorPersonId ?? null,
+    action: entry.eventCode,
+    resourceType: entry.entityKind,
+    resourceId: entry.entityId,
+    scope: entry.owningOrganizationId
+      ? { organizationId: entry.owningOrganizationId }
+      : {},
+    context: {
+      source: "canonical_v301",
+      nativeAuditPayload: entry.payload ?? {},
+    },
+    ...(entry.occurredAt ? { occurredAt: entry.occurredAt } : {}),
+  });
 }
 
-/** A durable pending event, atomically committed with its domain mutation. */
+/** Atomically enqueue native domain facts in the existing shared public outbox. */
 export async function emitCanonicalDomainEvent(
   tx: Tx,
   entry: CanonicalDomainEventInput,
 ): Promise<void> {
-  await tx.insert(domainEvents).values(entry);
+  await emitEvent(tx, {
+    eventType: entry.eventType,
+    aggregateType: entry.aggregateType,
+    aggregateId: entry.aggregateId,
+    actorPersonId: entry.actorPersonId ?? null,
+    payload: entry.payload ?? {},
+    ...(entry.occurredAt ? { occurredAt: entry.occurredAt } : {}),
+  });
 }
