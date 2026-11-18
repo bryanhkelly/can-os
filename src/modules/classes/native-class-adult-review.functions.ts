@@ -46,6 +46,7 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
       (actor.scope.siteIds?.length??0)!==0||
       actor.accountId===data.accessAccountId)
      throw new AuthorizationError("independent platform adult identity reviewer");
+   const reviewerPersonId=actor.actorPersonId;
    const now=new Date();
    if(!verifiedAdultOn(data.verifiedBirthDate,now))
      throw new AuthorizationError("independently reviewed adult date of birth");
@@ -217,6 +218,7 @@ export const revokeAdultClassLearnerReview=createServerFn({method:"POST"})
       (actor.scope.siteIds?.length??0)!==0||
       actor.accountId===data.accessAccountId)
      throw new AuthorizationError("independent platform adult identity reviewer");
+   const reviewerPersonId=actor.actorPersonId;
    return db.transaction(async tx=>{
      const [reviewer]=await tx.select({
        email:accessAccounts.emailNormalized,verified:accessAccounts.emailVerifiedAt,
