@@ -1,4 +1,7 @@
 import {useMemo,useState} from "react";
+import {Button} from "@/components/ui/button";
+import {Select} from "@/components/ui/select";
+import {StatCard} from "@/components/workspace";
 import {useQuery} from "@tanstack/react-query";
 import {getNoncreditOperatorNetworkSummary} from "@/modules/enrollment/noncredit-network-report.functions";
 import {useActiveWorkspaceMember} from "@/components/shell/workspace-session-context";
@@ -80,11 +83,10 @@ export function NoncreditProviderEvidencePanel(){
           These figures are source-backed registrations, not automatically distinct people.
         </p>
       </div>
-      <button type="button" disabled={!data||!selectedCohorts.length}
-        onClick={exportCsv}
-        className="min-h-11 border border-border bg-card px-4 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50">
+      <Button type="button" variant="outline" disabled={!data||!selectedCohorts.length}
+        onClick={exportCsv}>
         Export private evidence CSV
-      </button>
+      </Button>
     </div>
     {response.isPending&&<p role="status" className="border border-border p-4 text-sm">
       Reconciling authorized releases and canonical outcomes…
@@ -97,11 +99,11 @@ export function NoncreditProviderEvidencePanel(){
       <div className="grid gap-3 border border-border bg-card p-4 md:grid-cols-[minmax(0,18rem)_1fr]">
         <label className="block text-sm font-medium">
           Delivery Site
-          <select className="mt-2 block min-h-11 w-full border border-border bg-background px-3"
+          <Select className="mt-2"
             value={siteId} onChange={e=>setRequestedSite(e.target.value)}>
             <option value="">All authorized Sites</option>
             {data.sites.map(s=><option key={s.siteId} value={s.siteId}>{s.siteName}</option>)}
-          </select>
+          </Select>
         </label>
         <div className="text-xs text-muted-foreground md:self-end md:pb-3">
           <p>As of {new Date(data.asOf).toLocaleString()}</p>
@@ -109,7 +111,7 @@ export function NoncreditProviderEvidencePanel(){
             time-window selection requires a versioned source lifecycle projection.</p>
         </div>
       </div>
-      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {([
           ["Registrations",totals?.registrations],
           ["Currently active",totals?.active],
@@ -118,14 +120,9 @@ export function NoncreditProviderEvidencePanel(){
           ["Registrations with host-attested attendance",totals?.verifiedAttendees],
           ["Linked rooms (not delivery proof)",totals?.linkedRooms],
         ] as const).map(([label,value])=>
-          <div key={label} className="border border-border bg-card p-4">
-            <dt className="text-xs text-muted-foreground">{label}</dt>
-            <dd className="mt-2 font-serif text-3xl font-semibold tabular-nums">
-              {value?.toLocaleString()??"Unavailable"}
-            </dd>
-          </div>
+          <StatCard key={label} label={label} value={value?.toLocaleString()??"Unavailable"}/>
         )}
-      </dl>
+      </div>
       <div className="overflow-x-auto border border-border bg-card">
         <table className="w-full min-w-[40rem] text-left text-sm">
           <caption className="p-4 text-left font-semibold">Release-level evidence drill-down</caption>
@@ -156,12 +153,12 @@ export function NoncreditProviderEvidencePanel(){
         </table>
       </div>
       <section className="border border-border bg-card p-4">
-        <button type="button" aria-expanded={showDefinitions}
+        <Button type="button" variant="ghost" aria-expanded={showDefinitions}
           onClick={()=>setShowDefinitions(x=>!x)}
-          className="flex min-h-11 w-full justify-between gap-4 text-left text-sm font-semibold">
+          className="flex w-full justify-between gap-4 px-0 text-left">
           Metric definitions and source interpretation
           <span aria-hidden="true">{showDefinitions?"−":"+"}</span>
-        </button>
+        </Button>
         {showDefinitions&&<div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[36rem] text-left text-sm">
             <thead className="border-b border-border">
