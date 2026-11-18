@@ -97,9 +97,9 @@ async function run(){
   // protected-table batches retained their existing FORCE RLS and policies.
   const protectedNames=[
     ...readFileSync("database/production/2026-11-17-consolidate-19-empty-protected-tables.sql","utf8")
-      .matchAll(/^ALTER TABLE education_v30\\.([a-z_]+) SET SCHEMA public;$/gm),
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-17-consolidate-13-empty-protected-tables.sql","utf8")
-      .matchAll(/^ALTER TABLE education_v30\\.([a-z_]+) SET SCHEMA public;$/gm),
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
   if(protectedNames.length!==32)throw new Error("Expected 32 reviewed protected table relocations");
   const security=await sql`
