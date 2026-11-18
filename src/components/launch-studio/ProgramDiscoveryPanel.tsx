@@ -5,6 +5,7 @@ import { normalizeClientError } from "@/lib/client-error";
 import { discoverLaunchSitePrograms } from "@/modules/programs/program-discovery.functions";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const deliveryOptions = [
   { value: "onsite", label: "On site" },
@@ -53,7 +54,7 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
       Discovery is advisory; it does not qualify or approve a program.
     </p>
     <form className="mt-4 flex flex-wrap items-end gap-3" onSubmit={handleSubmit}>
-      <label className="min-w-52 flex-1 text-sm font-medium" htmlFor="program-delivery-context">
+      <Label className="min-w-52 flex-1 text-sm font-medium" htmlFor="program-delivery-context">
         Delivery model
         <Select
           id="program-delivery-context"
@@ -69,7 +70,7 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
             <option key={option.value} value={option.value}>{option.label}</option>,
           )}
         </Select>
-      </label>
+      </Label>
       <Button type="submit" disabled={loading}>
         {loading ? "Searching..." : "Find available programs"}
       </Button>
