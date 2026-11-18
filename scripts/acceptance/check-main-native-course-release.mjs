@@ -205,6 +205,39 @@ async function main(){
         WHERE batch.execution_status='executed'
           AND bo.deployment_id IS NOT NULL
       ) AS offering_blueprint_outputs,
+      (SELECT count(*)::int FROM education_v30.deployment_offering_adoptions adoption
+        JOIN education_v30.program_deployments deployment
+          ON deployment.id=adoption.deployment_id
+        JOIN education_v30.education_operation_organization_roles relation
+          ON relation.operation_id=deployment.operation_id
+        JOIN target t ON t.id=adoption.offering_version_id
+        WHERE relation.role_code='operator' AND relation.status='approved'
+          AND relation.valid_from<=clock_timestamp()
+          AND (relation.valid_through IS NULL OR
+            relation.valid_through>clock_timestamp())
+      ) AS current_approved_operation_operators,
+      (SELECT count(*)::int FROM education_v30.deployment_offering_adoptions adoption
+        JOIN education_v30.program_deployments deployment
+          ON deployment.id=adoption.deployment_id
+        JOIN education_v30.education_operation_organization_roles relation
+          ON relation.operation_id=deployment.operation_id
+        JOIN education_v30.education_operation_sites os
+          ON os.operation_id=deployment.operation_id
+        JOIN education_v30.site_organization_roles site_role
+          ON site_role.site_id=os.site_id
+          AND site_role.organization_id=relation.organization_id
+        JOIN target t ON t.id=adoption.offering_version_id
+        WHERE relation.role_code='operator' AND relation.status='approved'
+          AND relation.valid_from<=clock_timestamp()
+          AND (relation.valid_through IS NULL OR
+            relation.valid_through>clock_timestamp())
+          AND os.valid_from<=clock_timestamp()
+          AND (os.valid_through IS NULL OR os.valid_through>clock_timestamp())
+          AND site_role.role_code IN ('operator','host')
+          AND site_role.valid_from<=clock_timestamp()
+          AND (site_role.valid_through IS NULL OR
+            site_role.valid_through>clock_timestamp())
+      ) AS current_operator_site_paths,
       (SELECT count(*)::int FROM (
         SELECT latest.deployment_id
         FROM (
@@ -267,6 +300,8 @@ async function main(){
     approvedPublisherCapabilityAssignments:Number(upstream.approved_publisher_capability_assignments),
     offeringBlueprintOutputs:Number(upstream.offering_blueprint_outputs),
     candidateReadyDeployments:Number(upstream.candidate_ready_deployments),
+    currentApprovedOperationOperators:Number(upstream.current_approved_operation_operators),
+    currentOperatorSitePaths:Number(upstream.current_operator_site_paths),
   };
   const setupActions=[];
   if(!upstreamCounts.verifiedCreatorGrants||!upstreamCounts.verifiedReviewerGrants)
@@ -279,6 +314,8 @@ async function main(){
     setupActions.push("Create immutable publisher-owned content asset versions and verify content rights before submitting the exact release manifest.");
   if(!upstreamCounts.offeringBlueprintOutputs)
     setupActions.push("Execute a genuinely reviewed Blueprint configuration for the exact Offering and local Deployment.");
+  if(!upstreamCounts.currentApprovedOperationOperators||!upstreamCounts.currentOperatorSitePaths)
+    setupActions.push("Establish the currently approved Operation operator relationship and matching authorized Site host/operator relationships. These are distinct from a publisher Course appointment.");
   if(!upstreamCounts.candidateReadyDeployments)
     setupActions.push("Complete all three latest, unexpired operating, registration and delivery readiness reviews on the same Deployment; evidence and reviewer independence are checked by the approval command.");
 
@@ -296,6 +333,10 @@ async function main(){
     blockers.push("Publisher has no content asset versions for an asset-backed release.");
   if(!upstreamCounts.offeringBlueprintOutputs)
     blockers.push("No exact-Offering local Blueprint output exists; the proposed adoption cannot be independently approved.");
+  if(!upstreamCounts.currentApprovedOperationOperators)
+    blockers.push("No current approved Operation operator relationship for the proposed Deployment.");
+  if(!upstreamCounts.currentOperatorSitePaths)
+    blockers.push("No matching current Operation-Site operator/host relationship for the proposed Deployment.");
   if(!upstreamCounts.candidateReadyDeployments)
     blockers.push("No Deployment has all three latest current-ready review categories (operating, registration, delivery).");
 
@@ -335,7 +376,7 @@ async function main(){
   if(!deployments.some(row=>row.approval_status==="approved"&&
       row.deployment_status==="active"&&row.operation_status==="active")){
     blockers.push("No approved adoption has both an active Deployment and active Education Operation; Class discovery remains blocked.");
-    setupActions.push("After independent adoption approval, complete the separate authorized Deployment and Education Operation activation workflow. Do not set statuses in SQL.");
+    setupActions.push("After independent adoption approval, establish and verify governed Deployment and Education Operation activation; the source does not certify an operational activation workflow. Do not set statuses in SQL.");
   }
   const report={
     target:"CAN OS Neon main",readOnly:true,offeringVersionId,
