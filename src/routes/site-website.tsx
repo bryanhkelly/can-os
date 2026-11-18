@@ -551,12 +551,22 @@ function LocalWebsiteCopyEditor({
     if (busy || revisionConflict) return;
     if (dirty && !window.confirm("Restoring an older revision will discard unsaved changes. Continue?")) return;
     setError("");
-    await mutation.run(() => restoreChurchWebsiteContent({
+    const outcome = await mutation.run(() => restoreChurchWebsiteContent({
         data: { expectedRevision: editor.revision, restoreRevision: revision,siteId:data.siteId },
       }), { successMessage: result => result.status === "review_required"
         ? "Historical copy needs review under current claim rules; existing public content is unchanged."
         : `Revision ${revision} was restored as a new published revision.`,
       commandErrorMessage: "Unable to restore this revision." });
+    if (outcome.status === "saved" || outcome.status === "refresh-failed") {
+      // The restore returns its exact authorized, normalized snapshot. Apply it
+      // only after the mutation succeeded so a failed restore never discards
+      // unsaved copy, even when the route refresh was unable to complete.
+      const restored = outcome.value.restoredContent;
+      if (restored) markSaved(prepareWebsiteEditorContent(restored, data.siteName), outcome.value.revision);
+    } else if (outcome.status === "failed" &&
+      normalizeClientError(outcome.error).code === "CONFLICT") {
+      await router.invalidate().catch(() => undefined);
+    }
   }
 
   async function selectArtwork(event: ChangeEvent<HTMLInputElement>, field: "heroImage" | "logoImage" = "heroImage") {
