@@ -6,6 +6,8 @@ import { NativeClassHomeNavigation } from "@/components/learning/NativeClassHome
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { normalizeClientError } from "@/lib/client-error";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
@@ -132,25 +134,25 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
       </p>}
     {self?<>
       <div className="mt-4">
-        <label className="block text-sm font-semibold" htmlFor={"class-credit-"+item.classOfferingVersionId}>Participation</label>
-        <select id={"class-credit-"+item.classOfferingVersionId} value={mode}
+        <Label className="block text-sm font-semibold" htmlFor={"class-credit-"+item.classOfferingVersionId}>Participation</Label>
+        <Select id={"class-credit-"+item.classOfferingVersionId} value={mode}
           onChange={e=>setMode(e.target.value as CreditMode)}
-          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          className="mt-2 min-h-11">
           {item.allowedCreditModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
-        </select>
+        </Select>
       </div>
       <div className="mt-4 border border-border bg-muted/20 p-3">
         <p className="text-sm font-semibold">Participation and data-use terms</p>
         <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{item.consentText}</p>
       </div>
-      <label className="mt-4 flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1"
+      <Label className="mt-4 flex items-start gap-3 text-sm"><Checkbox className="mt-1"
         checked={adult} onChange={e=>setAdult(e.target.checked)}/>
         I confirm that I am at least 18. Class admission requires a separately verified adult learner identity.
-      </label>
-      <label className="mt-3 flex items-start gap-3 text-sm"><input type="checkbox" className="mt-1"
+      </Label>
+      <Label className="mt-3 flex items-start gap-3 text-sm"><Checkbox className="mt-1"
         checked={consent} onChange={e=>setConsent(e.target.checked)}/>
         I have read and accept these participation and data-use terms.
-      </label>
+      </Label>
       <Button className="mt-4" disabled={!adult||!consent||busy||full} onClick={()=>void enroll()}>
         {busy?"Enrolling…":full?"Class full":"Enroll in Class"}
       </Button>
@@ -193,17 +195,17 @@ function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>P
     <p className="mt-2 text-sm">Approval status: {item.state}</p>
     {eligible&&<>
       <p className="mt-2 text-sm">Approval expires {new Date(item.expiresAt).toLocaleString()}. A seat is not reserved.</p>
-      <label className="mt-3 block text-sm font-semibold">Participation mode
-        <select value={mode} onChange={e=>setMode(e.target.value as CreditMode)}
-          className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+      <Label className="mt-3 block text-sm font-semibold">Participation mode
+        <Select value={mode} onChange={e=>setMode(e.target.value as CreditMode)}
+          className="mt-2 min-h-11">
           {item.allowedCreditModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
-        </select>
-      </label>
+        </Select>
+      </Label>
       <p className="mt-3 whitespace-pre-wrap text-sm">{item.consentText}</p>
-      <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={adult}
-        onChange={e=>setAdult(e.target.checked)}/>I confirm that I am at least 18.</label>
-      <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={consent}
-        onChange={e=>setConsent(e.target.checked)}/>I accept the current Class participation and data-use terms.</label>
+      <Label className="mt-3 flex gap-2 text-sm"><Checkbox checked={adult}
+        onChange={e=>setAdult(e.target.checked)}/>I confirm that I am at least 18.</Label>
+      <Label className="mt-3 flex gap-2 text-sm"><Checkbox checked={consent}
+        onChange={e=>setConsent(e.target.checked)}/>I accept the current Class participation and data-use terms.</Label>
       <Button className="mt-4" disabled={!adult||!consent||busy}
         onClick={()=>void accept()}>{busy?"Accepting…":"Accept approved place"}</Button>
     </>}
@@ -261,16 +263,16 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
           {item.consentText??"Published consent unavailable. Acceptance will be denied."}
         </p>
       </div>
-      <label className="mt-4 flex items-start gap-3 text-sm">
-        <input type="checkbox" className="mt-1" checked={adult}
+      <Label className="mt-4 flex items-start gap-3 text-sm">
+        <Checkbox className="mt-1" checked={adult}
           onChange={e=>setAdult(e.target.checked)}/>
         I confirm that I am at least 18. Class admission requires a separately verified adult learner identity.
-      </label>
-      <label className="mt-3 flex items-start gap-3 text-sm">
-        <input type="checkbox" className="mt-1" checked={consent}
+      </Label>
+      <Label className="mt-3 flex items-start gap-3 text-sm">
+        <Checkbox className="mt-1" checked={consent}
           onChange={e=>setConsent(e.target.checked)}/>
         I accept the current participation and data-use terms.
-      </label>
+      </Label>
       <div className="mt-4 flex flex-wrap gap-2">
         <Button disabled={!adult||!consent||busy||!item.consentText}
           onClick={()=>void accept()}>{busy?"Processing…":"Accept invitation"}</Button>
@@ -350,9 +352,9 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
           Transfers are only available to public Classes accepting adult self-enrollment.
           The destination seat and current terms are checked again before moving you.
         </p>
-        <label className="mt-3 block text-sm font-semibold" htmlFor={"transfer-"+item.classEnrollmentId}>
+        <Label className="mt-3 block text-sm font-semibold" htmlFor={"transfer-"+item.classEnrollmentId}>
           Destination Class
-        </label>
+        </Label>
         <Select id={"transfer-"+item.classEnrollmentId} value={transferVersion}
           onChange={e=>{
             const next=eligibleDestinations.find(row=>row.classOfferingVersionId===e.target.value);
@@ -369,26 +371,26 @@ function EnrolledClassCard({item,onChanged,destinations}:{item:EnrolledClass;onC
             </option>)}
         </Select>
         {target&&<>
-          <label className="mt-3 block text-sm font-semibold">Participation
+          <Label className="mt-3 block text-sm font-semibold">Participation
             <Select value={transferCredit}
               onChange={e=>setTransferCredit(e.target.value as NativeSelfTransferCreditMode)}
               className="mt-2">
               {allowedTransferModes.map(m=><option key={m} value={m}>{creditName[m]}</option>)}
             </Select>
-          </label>
+          </Label>
           <p className="mt-3 whitespace-pre-wrap border border-border bg-muted/20 p-3 text-sm">
             {target.consentText}
           </p>
-          <label className="mt-3 flex gap-2 text-sm">
+          <Label className="mt-3 flex gap-2 text-sm">
             <Checkbox checked={transferAdult}
               onChange={e=>setTransferAdult(e.target.checked)}/>
             I confirm I am at least 18.
-          </label>
-          <label className="mt-3 flex gap-2 text-sm">
+          </Label>
+          <Label className="mt-3 flex gap-2 text-sm">
             <Checkbox checked={transferConsent}
               onChange={e=>setTransferConsent(e.target.checked)}/>
             I accept the destination Class terms and understand my current Class access ends.
-          </label>
+          </Label>
           <Button size="sm" className="mt-3" disabled={busy||!transferAdult||!transferConsent||
             !transferCredit||!allowedTransferModes.includes(transferCredit)}
             onClick={()=>void transfer()}>{busy?"Transferring…":"Confirm transfer"}</Button>
@@ -590,21 +592,21 @@ function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
       </p>}
       <form className="mt-4 flex flex-wrap gap-2" role="search"
         onSubmit={event=>{event.preventDefault();setFilteredClassId("");setSearch(searchText.trim());}}>
-        <label className="sr-only" htmlFor="native-class-catalog-search">Search Classes</label>
-        <input id="native-class-catalog-search" type="search" maxLength={100}
+        <Label className="sr-only" htmlFor="native-class-catalog-search">Search Classes</Label>
+        <Input id="native-class-catalog-search" type="search" maxLength={100}
           value={searchText} onChange={event=>setSearchText(event.target.value)}
           placeholder="Search by Class name"
-          className="min-h-11 min-w-[14rem] flex-1 border border-border bg-background px-3 text-sm"/>
-        <label className="sr-only" htmlFor="native-class-delivery-mode">Delivery format</label>
-        <select id="native-class-delivery-mode" value={deliveryMode}
+          className="min-h-11 min-w-[14rem] flex-1"/>
+        <Label className="sr-only" htmlFor="native-class-delivery-mode">Delivery format</Label>
+        <Select id="native-class-delivery-mode" value={deliveryMode}
           onChange={event=>setDeliveryMode(event.target.value as typeof deliveryMode)}
-          className="min-h-11 border border-border bg-background px-3 text-sm">
+          className="min-h-11">
           <option value="all">All formats</option>
           <option value="self_paced">Self-paced</option>
           <option value="scheduled">Scheduled</option>
           <option value="facilitated">Facilitated</option>
           <option value="hybrid">Hybrid</option>
-        </select>
+        </Select>
         <Button type="submit">Search Classes</Button>
         {(search||filteredClassId)&&<Button type="button" variant="outline"
           onClick={()=>{setFilteredClassId("");setSearch("");setSearchText("");}}>
