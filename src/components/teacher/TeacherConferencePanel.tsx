@@ -10,6 +10,10 @@ import { conferenceOutcomeProblem } from "@/modules/conferences/eligibility";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { QueryState } from "@/components/workspace/query-state";
+import { DashboardPanel } from "@/components/workspace/dashboard-layout";
+import { EmptyState, StatusBadge } from "@/components/workspace";
+import { FieldError } from "@/components/ui/field";
+import { Checkbox } from "@/components/ui/choice";
 import { ActionDialog } from "@/components/workspace/action-dialog";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
@@ -134,15 +138,19 @@ export function TeacherConferencePanel() {
     if (result.status === "saved" || result.status === "refresh-failed") setCompletionTarget(null);
   }
 
+  const windowStarts = Date.parse(range.startsAt);
+  const windowEnds = Date.parse(range.endsAt);
+  const validTimeRange = Number.isFinite(windowStarts) && Number.isFinite(windowEnds) && windowEnds > windowStarts;
+  const validSlotLength = Number.isInteger(slotMinutes) && slotMinutes >= 5 && slotMinutes <= 120 && slotMinutes % 5 === 0;
+  const canPublish = title.trim().length >= 3 && validTimeRange && validSlotLength
+    && (windowEnds - windowStarts) >= slotMinutes * 60_000;
+
   const format = (stamp: string) => new Intl.DateTimeFormat("en-US", {
     weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
   }).format(new Date(stamp));
 
-  return <section className="mt-10" aria-label="Family conferences">
-    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Family conferences</p>
-    <p className="mt-2 text-sm text-muted-foreground">
-      Open bookable office-hour windows for your students' guardians, then record how each appointment went.
-    </p>
+  return <DashboardPanel className="mt-10" title="Family conferences"
+    description="Open bookable office-hour windows for your students' guardians, then record how each appointment went.">
     {!cancelTarget && <MutationFeedback state={mutation} pendingMessage="Saving conference change..." className="mt-3" />}
 
     {!data && <QueryState loading={loading ? "Loading conference scheduling..." : undefined}
@@ -152,6 +160,7 @@ export function TeacherConferencePanel() {
       <form className="mt-4 grid gap-3 border border-border bg-card p-5 sm:grid-cols-2" aria-label="Open office-hour window"
         onSubmit={event => {
           event.preventDefault();
+          if (busy || !canPublish) return;
           void perform(async () => {
             const payload = {
               title: title.trim(),
@@ -176,7 +185,8 @@ export function TeacherConferencePanel() {
           <Input required type="datetime-local" value={range.startsAt}
             onChange={event => setRange(value => ({ ...value, startsAt: event.target.value }))} />
         </Field>
-        <Field label="Window ends" required>
+        <Field label="Window ends" required error={range.startsAt && range.endsAt && !validTimeRange
+          ? "The appointment window must end after it starts." : undefined}>
           <Input required type="datetime-local" value={range.endsAt}
             onChange={event => setRange(value => ({ ...value, endsAt: event.target.value }))} />
         </Field>
@@ -185,17 +195,19 @@ export function TeacherConferencePanel() {
             onChange={event => setSlotMinutes(Number(event.target.value))} />
         </Field>
         <div className="flex items-end">
-          <Button type="submit" disabled={busy}>
+          <Button type="submit" disabled={busy || !canPublish}>
             Publish bookable window
           </Button>
         </div>
+        {!validSlotLength && <FieldError className="sm:col-span-2">Choose 5 to 120 minutes in 5-minute increments.</FieldError>}
+        {validTimeRange && validSlotLength && windowEnds - windowStarts < slotMinutes * 60_000 &&
+          <FieldError className="sm:col-span-2">The appointment window must be at least one appointment long.</FieldError>}
         </fieldset>
       </form>
 
       <div className="mt-6 grid gap-3">
-        {data.series.length === 0 && <p className="border border-border bg-card p-5 text-sm text-muted-foreground">
-          No upcoming office-hour windows yet.
-        </p>}
+        {data.series.length === 0 && <EmptyState title="No upcoming office-hour windows yet."
+          description="Publish a window above to make appointments available to guardians."/>}
         {data.series.map(series => <article key={series.id} className="border border-border bg-card p-5">
           <h3 className="font-semibold">{series.title}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -213,9 +225,13 @@ export function TeacherConferencePanel() {
             <div>
               <h3 className="font-semibold">{booking.studentName}</h3>
               <p className="mt-1 text-xs text-muted-foreground">
-                {booking.seriesTitle} · {format(booking.startsAt)} · {booking.status === "booked" ? "Confirmed" : booking.status}
+                {booking.seriesTitle} · {format(booking.startsAt)}
               </p>
             </div>
+            <StatusBadge tone={booking.status === "booked" || booking.status === "held" ? "success"
+              : booking.status === "no_show" ? "attention" : booking.status === "cancelled" ? "danger" : "neutral"}>
+              {booking.status === "booked" ? "Confirmed" : booking.status === "no_show" ? "No-show" : booking.status}
+            </StatusBadge>
             {booking.status === "booked" && <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" size="sm" disabled={busy || conferenceOutcomeProblem({
                   status: booking.status, outcome: "held",
@@ -299,9 +315,9 @@ export function TeacherConferencePanel() {
         </Select>
       </Field>}
       <Label className="flex items-start gap-2 text-sm">
-        <Input type="checkbox" checked={createFollowUp}
+        <Checkbox checked={createFollowUp}
           onChange={event => setCreateFollowUp(event.target.checked)}
-          className="mt-1 h-4 w-4 min-h-0 p-0" />
+          className="mt-1" />
         <span>Create a follow-up action for this student</span>
       </Label>
       {createFollowUp && <>
@@ -317,5 +333,5 @@ export function TeacherConferencePanel() {
         <p className="text-xs text-muted-foreground">This action will appear in the student&apos;s support actions.</p>
       </>}
     </ActionDialog>
-  </section>;
+  </DashboardPanel>;
 }
