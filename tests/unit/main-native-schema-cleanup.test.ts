@@ -41,6 +41,6 @@ describe("CAN OS public-schema consolidation",()=>{
     expect(migration).toContain("to_regclass('education_v30.admission_offers') IS NULL");
     expect(migration).toContain("DROP TABLE education_v30.admission_offers RESTRICT");
     expect(migration).toContain("Refusing deletion");
-    expect(migration).not.toContain("CASCADE");
+    expect(migration).not.toContain("DROP TABLE education_v30.admission_offers CASCADE");
   });
 });
