@@ -35,17 +35,17 @@ function StudentFieldTrips() {
       eyebrow="Learning"
       title="My field trips"
       subtitle="Trips your school has invited you to, with departure details and your permission status. Parents sign permission from their own account."
-      actions={<Link to="/calendar" className="rounded-lg border px-3 py-2 text-sm">Open calendar</Link>}
+      actions={<Link to="/calendar" className=" border px-3 py-2 text-sm">Open calendar</Link>}
     >
       <div className="mt-7 space-y-4">
         {items.map(item => <article key={item.tripId}
-          className={`rounded-xl border bg-card p-5 ${search.trip === item.tripId ? "border-primary ring-1 ring-primary" : ""}`}>
+          className={` border bg-card p-5 ${search.trip === item.tripId ? "border-primary ring-1 ring-primary" : ""}`}>
           <h2 className="text-xl font-semibold">{item.title}</h2>
           <p className="mt-2 text-sm">{item.destination}</p>
           <FieldTripFacts trip={item}/>
-          <p className="mt-4 rounded-lg border p-3 text-sm">{statusCopy(item)}</p>
+          <p className="mt-4  border p-3 text-sm">{statusCopy(item)}</p>
         </article>)}
-        {items.length === 0 && <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+        {items.length === 0 && <p className=" border bg-card p-5 text-sm text-muted-foreground">
           Your school has not invited you to any upcoming field trips.
         </p>}
       </div>
