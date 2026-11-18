@@ -13,6 +13,7 @@ import { AuthorizationError } from "@/domain/command-context";
 import {
   validClassroomScheduleWindow, canOpenScheduledClassroom,
 } from "@/domain/classroom-scheduling";
+import {validCohortSessionWindows} from "@/domain/noncredit-cohort-schedule";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   authorizedHostDeployment, createFacilitatedRoomForHost,
@@ -144,11 +145,11 @@ export const scheduleClassroom=createServerFn({method:"POST"})
     return db.transaction(tx=>scheduleOneClassroom(tx,host,data,new Date()));
   });
 
-/** Book a four-week sequence atomically, without creating or switching
+/** Book four explicitly dated sessions atomically, without creating or switching
  * enrollments. Every meeting passes the same current host/Course/Site gate.
  * Stable request IDs make a retried batch idempotent.
  */
-export const scheduleFourWeekClassrooms=createServerFn({method:"POST"})
+export const scheduleFourClassroomSessions=createServerFn({method:"POST"})
   .validator((raw:unknown)=>z.object({
     meetings:z.array(scheduleInput).length(4),
   }).strict().parse(raw))
@@ -158,23 +159,17 @@ export const scheduleFourWeekClassrooms=createServerFn({method:"POST"})
     const now=new Date();
     const first=data.meetings[0]!;
     const ids=new Set<string>();
-    for(const [index,meeting] of data.meetings.entries()){
+    for(const meeting of data.meetings){
       if(meeting.deploymentId!==first.deploymentId||
         meeting.courseVersionId!==first.courseVersionId||
         meeting.siteId!==first.siteId||ids.has(meeting.requestId))
-        throw new AuthorizationError("one distinct weekly schedule per authorized Site and Course");
+        throw new AuthorizationError("distinct session requests for one authorized Site and Course");
       ids.add(meeting.requestId);
       const startsAt=new Date(meeting.startsAt),endsAt=new Date(meeting.endsAt);
       validateClassroomTimes(startsAt,endsAt,now);
-      if(index>0){
-        const previous=new Date(data.meetings[index-1]!.startsAt).getTime();
-        const week=startsAt.getTime()-previous;
-        if(week<7*86400000-3600000||week>7*86400000+3600000 ||
-          endsAt.getTime()-startsAt.getTime()!==
-            new Date(first.endsAt).getTime()-new Date(first.startsAt).getTime())
-          throw new AuthorizationError("four consecutive weekly meetings with the same duration");
-      }
     }
+    if(!validCohortSessionWindows(data.meetings))
+      throw new AuthorizationError("four distinct, nonoverlapping dated sessions");
     return db.transaction(async tx=>{
       const plans=[];
       for(const meeting of data.meetings)
