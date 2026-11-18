@@ -102,26 +102,27 @@ describe("canonical single-login P0 authorization boundaries", () => {
     expect(policy).toContain("assertCurrentCanonicalStaffForMutation(tx,getRequest(),actor)");
   });
 
-  it("proves the restricted SQL reader cannot accept caller-selected roles or grants", () => {
-    const sql = source(
-      "database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql");
-    expect(sql).toContain("p_can_session_hash text");
-    expect(sql).toContain("s.secret_hash = p_can_session_hash");
-    expect(sql).toContain("s.active_grant_id");
-    expect(sql).toContain("source.can_role");
-    expect(sql).toContain("person_link.revoked_at IS NULL");
-    expect(sql).toContain("native_grant.revoked_at IS NULL");
-    expect(sql).toContain("NOT EXISTS");
-    expect(sql).toContain("REVOKE ALL ON FUNCTION");
-    expect(sql).toContain("TO can_v30_canonical_auth_reader");
-    const acceptance = source(
-      "database/canonical/v3.0.1/accept-can-staff-restricted-auth-test01.sql");
-    expect(acceptance).toContain("expected one verified Site Admin context");
-    expect(acceptance).toContain("revoked session still has access");
-    expect(acceptance).toContain("revoked school membership still has access");
-    expect(acceptance).toContain("revoked Person link still has access");
-    expect(acceptance).toContain("revoked Site link still has access");
-    expect(acceptance).toContain("multi-Person account still has staff access");
-    expect(acceptance).toContain("ROLLBACK TO SAVEPOINT");
+  it("derives staff roles only from the original current CAN grant",()=>{
+    const ddl=source("database/production/2026-11-17-single-can-staff-projection.sql");
+    const authority=source("src/modules/identity/can-site-staff-authority.server.ts");
+    const reader=source("src/modules/identity/restricted-canonical-session-reader.server.ts");
+    expect(ddl).toContain("p_can_session_hash text");
+    expect(ddl).toContain("s.secret_hash = p_can_session_hash");
+    expect(ddl).toContain("g.id AS can_grant_id");
+    expect(ddl).toContain("g.id = s.active_grant_id");
+    expect(ddl).toContain("a.person_id = g.person_id");
+    expect(ddl).toContain("source.can_role");
+    expect(ddl).toContain("person.active = true");
+    expect(ddl).toContain("s.revoked_at IS NULL");
+    expect(ddl).toContain("other_grant.person_id <> g.person_id");
+    expect(ddl).not.toContain("person_link.");
+    expect(ddl).not.toContain("native_grant.");
+    expect(authority).toContain("native.grant_id !== actor.activeGrantId");
+    expect(authority).toContain("native.person_id !== actor.actorPersonId");
+    expect(reader).toContain("SET LOCAL ROLE");
+    expect(reader).toContain("BEGIN READ ONLY");
+    expect(ddl).toContain("SECURITY DEFINER");
+    expect(ddl).toContain("can_v30_canonical_auth_reader");
   });
+
 });
