@@ -231,11 +231,11 @@ export function InterestEventsWorkspace({ data, selection={}, mode="directory", 
           <div className="flex flex-wrap gap-2">
             {event.visibility === "invitation_only"
               ? <Button type="button" variant="outline" disabled={busy} onClick={() => void generateLink(event.id)}>Generate invite link</Button>
-              : event.rsvpUrl && <a href={event.rsvpUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center rounded-md border px-3 py-2 text-sm underline">Open public RSVP</a>}
-            <Link to="/calendar" search={{ event: undefined, date: undefined, section: undefined, source: "site", view: "agenda" }} className="rounded border px-3 py-2 text-sm underline">School calendar</Link>
+              : event.rsvpUrl && <a href={event.rsvpUrl} target="_blank" rel="noreferrer" className="inline-flex min-h-10 items-center  border px-3 py-2 text-sm underline">Open public RSVP</a>}
+            <Link to="/calendar" search={{ event: undefined, date: undefined, section: undefined, source: "site", view: "agenda" }} className=" border px-3 py-2 text-sm underline">School calendar</Link>
           </div>
         </div>
-        {shareLinks[event.id] && <p className="mt-3 break-all rounded bg-muted p-3 text-sm">
+        {shareLinks[event.id] && <p className="mt-3 break-all  bg-muted p-3 text-sm">
           Invite-only RSVP link: <a className="underline" href={shareLinks[event.id]}>{shareLinks[event.id]}</a>
         </p>}
         <h4 className="mt-4 text-sm font-semibold">RSVP and check-in list ({event.registrations.length})</h4>
