@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, ne, or } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -483,6 +483,8 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
       }).from(contentPublicationManifests)
         .where(and(
           inArray(contentPublicationManifests.ownerOrganizationId,actor.scope.organizationIds),
+          isNotNull(contentPublicationManifests.offeringVersionId),
+          ne(contentPublicationManifests.createdByPersonId,actor.actorPersonId),
           data.cursor?or(
             lt(contentPublicationManifests.createdAt,new Date(data.cursor.createdAt)),
             and(eq(contentPublicationManifests.createdAt,new Date(data.cursor.createdAt)),
