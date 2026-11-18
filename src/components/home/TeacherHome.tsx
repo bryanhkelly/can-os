@@ -54,6 +54,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
  }, []);
 
  const ready = data.connected;
+ const nextUngraded = data.ungraded[0];
  const { session } = useWorkspaceSession();
  const school = session?.authenticated && session.sites.length === 1 ? session.sites[0] : undefined;
 
@@ -102,9 +103,13 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
         <p className="font-semibold">{data.ungradedCount} submitted work item{data.ungradedCount===1?"":"s"} to review</p>
         <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
         <Button asChild size="lg" className="mt-3">
-          <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId,student:data.ungraded[0]!.studentProfileId}}>
-            Grade next submission <ArrowUpRight aria-hidden="true" className="size-4"/>
-          </Link>
+          {nextUngraded
+            ? <Link to="/teacher/gradebook" search={{section:nextUngraded.sectionId,assessment:nextUngraded.assessmentId,student:nextUngraded.studentProfileId}}>
+                Grade next submission <ArrowUpRight aria-hidden="true" className="size-4"/>
+              </Link>
+            : <Link to="/teacher/gradebook">
+                Open grading queue <ArrowUpRight aria-hidden="true" className="size-4"/>
+              </Link>}
         </Button>
       </div> : data.missingWorkCount>0 ? <div className="mt-3">
         <p className="font-semibold">{data.missingWorkCount} missing-work follow-up{data.missingWorkCount===1?"":"s"}</p>
