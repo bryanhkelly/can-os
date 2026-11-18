@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, MutationFeedback } from "@/components/workspace";
@@ -81,13 +82,13 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       required. Every assertion or correction is retained with the facilitator's
       identity. This is operational verification, not official academic roll-call.
     </p>
-    <label className="mt-4 block text-sm font-medium">How will you verify?
+    <Field className="mt-4" label="How will you verify?">
       <Select className="mt-2"
         value={method} onChange={e=>setMethod(e.target.value as Method)}>
         <option value="in_person_roll_call">Direct in-person roll call</option>
         <option value="remote_live_check">Direct remote-live check</option>
       </Select>
-    </label>
+    </Field>
     {roster.isPending&&<p role="status" className="mt-3 text-sm">Checking current Site roster…</p>}
     {roster.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
       Registered learners could not be verified. No attendance data is available.
@@ -113,14 +114,13 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
           </p>}
         </div>
       </div>
-      <label className="mt-3 block text-xs font-medium">
-        Verification note (required for no-device learners and changes)
+      <Field className="mt-3" label="Verification note (required for no-device learners and changes)">
         <Textarea className="mt-1"
           rows={2} maxLength={250}
           value={notes[person.courseAttemptId]??""}
           placeholder="I spoke directly with the learner during the session…"
           onChange={e=>{setError("");setNotes(old=>({...old,[person.courseAttemptId]:e.target.value}));}}/>
-      </label>
+      </Field>
       {(!person.pairedDevice || person.lastAssertedAt) && <p className="mt-1 text-xs text-muted-foreground">
         An explanation of at least 15 characters is required for unpaired learners or changes to a previous verification.
       </p>}
