@@ -15,7 +15,8 @@ import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
 import { schoolPlanningLocationSchema } from "@/domain/school-stub";
-import { siteInformationSchema } from "@/domain/site-setup-configuration";
+import { readSitePhysicalAddress, siteInformationSchema } from "@/domain/site-setup-configuration";
+import { canonicalPublicContact, publicIdentityReviewStatuses } from "@/domain/public-parent-identity";
 import { readEnrichmentCatalog } from "@/modules/activities/enrichment-catalog.server";
 import { readAcademicProgramCatalog } from "./academic-program-catalog.server";
 import { readCurrentLocalContent, readLocalContentHistory } from "./site-local-content.server";
@@ -64,10 +65,16 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   // saved draft. The starter is never persisted or published by this GET.
   const candidate = proposedContent ?? editingContent ?? local?.content
     ?? createSchoolWebsiteStarterContent(site.name);
-  const previewContent = candidate && siteLocalImagePublicationGaps(candidate.branding.heroImage).length
-    ? { ...candidate, branding: { ...candidate.branding, heroImage: null } }
-    : candidate;
-  const [siteConfiguration] = await db.select({metadata: sites.metadata,timezone:sites.timezone})
+  // The same rights gate applies to both artwork slots, including saved private drafts.
+  // Unsigned logos must never bypass the hero-image gate in a private HTML preview.
+  const previewContent = candidate ? { ...candidate, branding: {
+    ...candidate.branding,
+    heroImage: siteLocalImagePublicationGaps(candidate.branding.heroImage).length
+      ? null : candidate.branding.heroImage,
+    logoImage: siteLocalImagePublicationGaps(candidate.branding.logoImage ?? null).length
+      ? null : candidate.branding.logoImage ?? null,
+  } } : candidate;
+  const [siteConfiguration] = await db.select({metadata: sites.metadata,address:sites.address,timezone:sites.timezone})
     .from(sites).where(eq(sites.id, site.id)).limit(1);
   const siteInformation=siteInformationSchema.safeParse(siteConfiguration?.metadata?.siteInformation);
   const parentExtras = host ? await readApprovedPublicParentExtras(site.id,
@@ -92,6 +99,10 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
   const contentConfig = safeReadSiteContentChannelConfig(siteConfiguration?.metadata?.websiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
+  const sourceIdentityReviews = publicIdentityReviewStatuses(
+    site.id, siteConfiguration?.address ?? null, siteConfiguration?.metadata ?? null);
+  const savedPhysicalAddress = readSitePhysicalAddress(siteConfiguration?.address).value !== null;
+  const savedPublicContact = canonicalPublicContact(siteConfiguration?.metadata?.setupContact) !== null;
   // Show actual reviewed affiliation statuses only to Site-scoped users
   // holding network read authority; never generate public network claims.
   const networkRows=actor.capabilities.has("network.affiliations.read")
@@ -139,6 +150,22 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     canPrepareWebsite: actor.role === "site_admin",
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteInformation:siteInformation.success?siteInformation.data:null,
+    // Single-source mapping diagnostics for the authenticated Website & Brand
+    // review step. Private setup facts never become public claims here.
+    sourceMapping: {
+      physicalAddressSaved: savedPhysicalAddress,
+      physicalAddressReview: sourceIdentityReviews.address,
+      contactSaved: savedPublicContact,
+      contactReview: sourceIdentityReviews.contact,
+      schoolContextSaved: siteInformation.success,
+      learningIntentSaved: preferences.success,
+      contentChannelDraftRevision: contentConfig.revision,
+      contentChannelPublishedRevision: safeReadSiteContentChannelConfig(
+        siteConfiguration?.metadata?.publishedWebsiteContentChannels).revision,
+      contentChannelsPublished: siteConfiguration?.metadata?.publishedWebsiteContentChannels != null,
+      publicAddressVisible: parentInformation.site.address.canDisplay,
+      publicContactVisible: parentInformation.site.contact.canDisplay,
+    },
     host,
     status: address?.status ?? null,
     approvedAcademicCount: academicPrograms.length,
