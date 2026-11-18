@@ -253,6 +253,17 @@ describe("transactional church-local publication", () => {
     });
   });
 
+  it("returns the restored snapshot even when it matches the current revision", async () => {
+    state.rows.push([{ siteId: "site-a" }], [revision(3)], [{ content: copy }]);
+    await expect(publishPartnerLocalContent(actor, {
+      operation: "restore", expectedRevision: 3, restoreRevision: 1,
+    })).resolves.toMatchObject({
+      changed: false, revision: 3, status: "published", restoredContent: copy,
+    });
+    expect(state.inserts).toHaveLength(0);
+    expect(state.audit).not.toHaveBeenCalled();
+  });
+
   it("returns an idempotent no-op for identical current content", async () => {
     state.rows.push([{ siteId: "site-a" }], [revision(2)]);
     await expect(publishPartnerLocalContent(actor, { operation: "save", expectedRevision: 2, content: copy }))
