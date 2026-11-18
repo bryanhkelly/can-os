@@ -1,8 +1,8 @@
-import { index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { pgTable, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 import { facilitatedLearningSessions } from "./facilitated-learning";
 /** Intent to control a shared display, not evidence that playback happened. */
-export const facilitatedRoomControlCommands=educationV30.table("facilitated_room_control_commands",{
+export const facilitatedRoomControlCommands=pgTable("facilitated_room_control_commands",{
   id:uuid("id").defaultRandom().primaryKey(),
   facilitatedSessionId:uuid("facilitated_session_id").notNull().references(()=>facilitatedLearningSessions.id),
   facilitatorPersonId:uuid("facilitator_person_id").notNull(),
