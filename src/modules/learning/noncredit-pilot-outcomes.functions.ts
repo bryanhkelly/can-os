@@ -13,6 +13,7 @@ import {
 } from "@/db/canonical-v301";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
+  countDistinctNoncreditLearners,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
@@ -59,7 +60,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       .orderBy(asc(noncreditTrainingVersions.title)).limit(take);
     checkBound(trainings.length,"Published pilot training versions");
     if(!trainings.length)return {
-      from:from.toISOString(),to:to.toISOString(),participantCount:0,
+      from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,
       totals:summarizeNoncreditPilot([]),byTraining:[],
       publicationSafe:publicationSafePilotSummary(summarizeNoncreditPilot([])),
     };
@@ -96,7 +97,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const registrationIds=registrations.map(r=>r.id);
     if(!registrationIds.length){
       const empty=summarizeNoncreditPilot([]);
-      return {from:from.toISOString(),to:to.toISOString(),participantCount:0,
+      return {from:from.toISOString(),to:to.toISOString(),participantCount:0,distinctLearners:0,
         totals:empty,byTraining:[],publicationSafe:publicationSafePilotSummary(empty)};
     }
     const attempts=await db.select({
@@ -298,6 +299,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     }).filter((r):r is NonNullable<typeof r>=>r!==null);
     const totals=summarizeNoncreditPilot(facts);
     return {from:from.toISOString(),to:to.toISOString(),
-      participantCount:registrations.length,totals,byTraining,
+      participantCount:registrations.length,
+      distinctLearners:countDistinctNoncreditLearners(registrations.map(r=>r.participantPersonId)),
+      totals,byTraining,
       publicationSafe:publicationSafePilotSummary(totals)};
   });
