@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { getFacilitatedRoomMedia } from "@/modules/learning/facilitated-learning.functions";
 import { issueClassroomProjectorCommand } from "@/modules/learning/classroom-projector.functions";
 
@@ -57,12 +58,12 @@ export function ClassroomPlaybackControls({facilitatedSessionId,preferredLessonI
     </Button>
     {!!media.length&&<div className="mt-3 space-y-3">
       <label className="block text-sm">Lesson
-        <select className="mt-1 w-full border border-border bg-background p-2"
+        <Select className="mt-1"
           value={current?current.lessonId+":"+current.assetVersionId:""}
           onChange={event=>setSelected(event.target.value)}>
           {orderedMedia.map(item=><option key={item.lessonId+":"+item.assetVersionId}
             value={item.lessonId+":"+item.assetVersionId}>{item.lessonTitle}</option>)}
-        </select>
+        </Select>
       </label>
       <label className="block text-sm">Position in seconds (for seek/start)
         <input className="mt-1 w-32 border border-border bg-background p-2"
