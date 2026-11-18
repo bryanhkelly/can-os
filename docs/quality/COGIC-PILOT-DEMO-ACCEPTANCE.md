@@ -1,8 +1,8 @@
 # COGIC pilot: four observable end-to-end journeys
 
 Status: acceptance **required**; source code is not proof of a deployed, working demonstration.
-Use an isolated `test01`-backed application preview at an exact matching GitHub commit.
-Never present synthetic test records as COGIC participation or publish real pilot courses without partner content approval.
+Use GitHub `main` as the code baseline and Neon `main` as the authoritative production-data baseline. Verify the deployed SHA and database branch explicitly. Never run this acceptance against `test01`.
+Synthetic negative-case fixtures belong only in an isolated disposable test environment, not in Neon `main`. Never present synthetic test records as COGIC participation or publish real pilot courses without partner content approval.
 
 ## 1. Local Site launch to enrollment publication (deck page 9)
 - Begin with a real authorized local Site-admin CAN login; create a Site using `/launch/site`, save the Site interests and render the real private website.
@@ -24,7 +24,8 @@ Never present synthetic test records as COGIC participation or publish real pilo
 - An operator may batch-publish independently authorized releases to many Sites **within the same operating organization**. This is not national cross-organization delegation.
 - Each local authorized facilitator schedules four distinct, nonoverlapping meetings atomically from the approved Site/Course. The dates may run Monday–Thursday in a single week, twice per week (2×2), weekly, or across five or more weeks around holidays. An authorized provider explicitly selects and associates one to four meetings at a time with the exact enrollment release. Validate all scheduled dates and changes in the learner calendar.
 - Exercise a facilitator projector session, learner pairing, registered-person roll call (including no-device participants), independently attested attendance and one real approved knowledge check and feedback invitation.
-- For each Site, reconcile registered, physically verified, assessed and completed learners without mixing those measures. Observe Site-level reports and operator-only aggregation, including small-cell disclosure rules.
+- For each Site and each dated session, reconcile registrations, latest independent room-attendance assertions (including corrections), assessments and governed completion decisions without mixing those measures. Check four-session coverage, and compare the Site cohort view with provider-level totals.
+- Completion reporting uses the authoritative supersession chain. A voided completion, ambiguous revision, or truncated history must not appear as a successful completion. Observe Site-level reports and operator-only aggregation, including small-cell disclosure rules.
 - Negative checks: unapproved Site, cross-release roster leakage, concurrent booking retry, duplicate or overlapping dates, nonconsecutive/holiday dates wrongly rejected, same Course with different release, conflicting plan attachment and revoked Site authorization.
 - **Remaining program scope:** COGIC's independently run churches require approved cross-organization delegation, Site-specific authority and nationally scoped reporting before a true denominational 15–25-Site rollup is accepted.
 
@@ -37,7 +38,8 @@ Never present synthetic test records as COGIC participation or publish real pilo
 
 ## Release gate
 - [ ] CI build, typecheck, relevant unit tests and migrations pass at one exact SHA
-- [ ] Test01 backend role permissions and read/write transactions verified
+- [ ] Confirm authenticated browser release is the inspected `main` commit and connects to Neon `main`
+- [ ] Verify Site-scope denial and role transitions with disposable fixtures, without polluting production records
 - [ ] Separate real accounts for Site admin, CAN reviewer, facilitator and adult learner
 - [ ] Live signed-in browser journey for each step, including refresh and negative scenarios
 - [ ] Site-level figures reconcile to enrollment, attendance, assessment and final decision records
@@ -47,7 +49,7 @@ Never present synthetic test records as COGIC participation or publish real pilo
 ## Implementation ownership
 - Site start: `src/components/launch-studio/SiteFirstLaunch.tsx`
 - Site-context enrollment: `src/routes/programs.noncredit.enrollment.tsx`
-- Four-week schedule: `src/modules/learning/classroom-scheduling.functions.ts`
+- Flexible four-session schedule: `src/modules/learning/classroom-scheduling.functions.ts`
 - Cohort assignment: `src/modules/enrollment/noncredit-cohort-operations.functions.ts`
 - Learner course: `src/components/learning/NoncreditCourseActivities.tsx`
 - Resource need entry: `src/modules/operations/canonical-qualification-lab.functions.ts`
