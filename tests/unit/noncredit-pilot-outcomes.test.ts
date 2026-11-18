@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
+  countDistinctNoncreditLearners,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 const sample: PilotParticipantFact={
@@ -51,5 +52,10 @@ describe("noncredit pilot reporting",()=>{
     latestSubmittedAt:new Date("2026-10-30T11:00:00Z")})).toBe(false);
   expect(attributableNoncreditFeedback({...valid,
     latestSubmittedAt:new Date("invalid")})).toBe(false);
+ });
+ it("counts distinct learners across repeats and Sites without exposing identities",()=>{
+  expect(countDistinctNoncreditLearners([])).toBe(0);
+  expect(countDistinctNoncreditLearners(["person-a","person-a","person-b"])).toBe(2);
+  expect(()=>countDistinctNoncreditLearners(["person-a",""])).toThrow("canonical Person");
  });
 });
