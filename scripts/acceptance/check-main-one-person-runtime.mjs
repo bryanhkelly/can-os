@@ -1,0 +1,115 @@
+#!/usr/bin/env node
+/**
+ * Read-only Person runtime/dependency cutover audit for CAN OS Neon MAIN.
+ * Cross-checks the actual database with the currently checked-out source.
+ * Optional --strict turns remaining blockers into a failing release gate.
+ *
+ * CAN_MAIN_ONE_PERSON_RUNTIME_CHECK=1 DATABASE_URL=<Neon main URL> \
+ *   node scripts/acceptance/check-main-one-person-runtime.mjs --strict
+ */
+import {readFileSync} from "node:fs";
+import {neon} from "@neondatabase/serverless";
+
+const PROJECT="sweet-hall-62441909",MAIN="br-restless-sea-ar9ooo55";
+function read(file){return readFileSync(new URL("../../"+file,import.meta.url),"utf8");}
+function sourceHas(file,pattern){return pattern.test(read(file));}
+
+async function main(){
+  if(process.env.CAN_MAIN_ONE_PERSON_RUNTIME_CHECK!=="1")
+    throw new Error("CAN_MAIN_ONE_PERSON_RUNTIME_CHECK=1 is required");
+  const connection=process.env.DATABASE_URL;
+  if(!connection||!["postgres:","postgresql:"].includes(new URL(connection).protocol))
+    throw new Error("A PostgreSQL DATABASE_URL is required");
+  const sql=neon(connection);
+  const [target]=await sql`
+    SELECT current_setting('neon.project_id',true) AS project,
+      current_setting('neon.branch_id',true) AS branch,
+      current_database() AS database
+  `;
+  if(target?.project!==PROJECT||target?.branch!==MAIN||target?.database!=="neondb")
+    throw new Error("Refusing anything other than the exact CAN OS Neon main");
+
+  const [identity]=await sql`
+    SELECT (SELECT count(*)::int FROM public.people) AS platform_people,
+      (SELECT count(*)::int FROM public.access_accounts) AS platform_accounts,
+      (SELECT count(*)::int FROM education_v30.persons) AS native_persons,
+      (SELECT count(*)::int FROM education_v30.canonical_accounts) AS native_accounts,
+      (SELECT count(*)::int FROM education_v30.canonical_sessions
+       WHERE revoked_at IS NULL AND expires_at>clock_timestamp()) AS live_native_sessions,
+      (SELECT count(*)::int FROM pg_constraint
+       WHERE contype='f' AND confrelid='education_v30.persons'::regclass) AS native_person_fks,
+      (SELECT count(*)::int FROM public.access_account_canonical_principals) AS staff_mapping_rows,
+      (SELECT count(*)::int FROM public.access_account_noncredit_principals) AS learner_mapping_rows,
+      (SELECT count(*)::int FROM public.account_person_grants g
+       JOIN public.access_accounts a ON a.id=g.account_id
+       WHERE g.active AND g.person_id IS DISTINCT FROM a.person_id) AS active_person_conflicts,
+      (SELECT count(*)::int FROM public.account_person_grants g
+       JOIN public.access_accounts a ON a.id=g.account_id
+       WHERE NOT g.active AND g.person_id IS DISTINCT FROM a.person_id) AS historical_person_differences
+  `;
+  const runtime={
+    nativeLearnerPersonCreation:sourceHas(
+      "src/modules/enrollment/noncredit-self-enrollment.functions.ts",
+      /tx\.insert\(canonicalPersons\)/,
+    ),
+    nativeLearnerAccountCreation:sourceHas(
+      "src/modules/enrollment/noncredit-self-enrollment.functions.ts",
+      /tx\.insert\(canonicalAccounts\)/,
+    ),
+    nativeReviewedLearnerCreation:sourceHas(
+      "src/modules/classes/native-class-reviewed-onboarding.functions.ts",
+      /tx\.insert\(canonicalPersons\)|tx\.insert\(canonicalAccounts\)/,
+    ),
+    dualCookieLearnerContext:sourceHas(
+      "src/modules/identity/canonical-command-context.server.ts",
+      /CANONICAL_LEARNER_SESSION_REQUIRED/,
+    ),
+    nativeLearnerSessionIssuance:sourceHas(
+      "src/modules/enrollment/noncredit-self-enrollment-identity.server.ts",
+      /export async function issueNativeLearnerSession/,
+    ),
+    nativeTransactionCookieFallback:sourceHas(
+      "src/modules/identity/canonical-transaction-authorization.server.ts",
+      /canonicalSessionDigestFromRequest/,
+    ),
+    nativeClassLearnerCookieGuard:sourceHas(
+      "src/modules/classes/native-class-learner-session.server.ts",
+      /canonicalSessionDigestFromRequest/,
+    ),
+    secondPersonClassroomRoster:sourceHas(
+      "src/db/canonical-v301/classroom-persons.ts",
+      /educationV30\.table\("persons"/,
+    ),
+    secondPersonGuardianLink:sourceHas(
+      "src/modules/classes/native-class-guardian-authority.server.ts",
+      /accessAccountCanonicalPrincipals/,
+    ),
+  };
+  const blockers=[];
+  if(identity.native_persons||identity.native_accounts||identity.live_native_sessions)
+    blockers.push("Native identities or current native sessions need evidence-preserving reconciliation");
+  if(identity.active_person_conflicts)
+    blockers.push("Active account grants disagree with immutable CAN Person IDs");
+  if(identity.native_person_fks)
+    blockers.push("Native Person foreign keys remain; staged FK move must not be run independently");
+  if(identity.staff_mapping_rows||identity.learner_mapping_rows)
+    blockers.push("Existing Person correspondence rows require independent review");
+  for(const [name,stillActive] of Object.entries(runtime))
+    if(stillActive)blockers.push("Runtime dependency remains: "+name);
+  if(identity.historical_person_differences)
+    blockers.push("Retain and reconcile historical multi-Person grant evidence, without reactivation or ID guessing");
+
+  const report={
+    target:"CAN OS Neon main",readOnly:true,
+    state:blockers.length?"BLOCKED":"DATA_AND_SOURCE_PREFLIGHT_ONLY",
+    identity,runtime,blockers,
+    caveat:"A clean preflight is not authenticated enrollment, guardian, RLS, browser, CI or rollback acceptance",
+  };
+  console.log(JSON.stringify(report,null,2));
+  if(blockers.length&&process.argv.includes("--strict"))process.exitCode=2;
+}
+main().catch(error=>{
+  console.error("Person main runtime preflight refused:",
+    error instanceof Error?error.message:"unknown");
+  process.exitCode=1;
+});
