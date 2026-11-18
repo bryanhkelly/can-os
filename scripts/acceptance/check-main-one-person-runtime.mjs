@@ -122,6 +122,10 @@ async function main(){
       "src/modules/identity/canonical-command-context.server.ts",
       /if \(legacy\.role_code === "learner"\)/,
     ),
+    directCANLearnerNotDelegated:sourceHas(
+      "src/modules/identity/learning-command-context.server.ts",
+      /actor\.sessionAccountId/,
+    ),
   };
   const blockers=[];
   if(identity.native_persons||identity.native_accounts||identity.live_native_sessions)
