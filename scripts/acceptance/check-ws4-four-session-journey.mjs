@@ -55,9 +55,9 @@ async function main(){
       (SELECT count(*)::int FROM education_v30.facilitated_room_attendance_assertions a
        WHERE a.facilitated_session_id=p.facilitated_session_id AND a.status='present'
          AND a.facilitator_person_id=cs.facilitator_person_id) AS attestations,
-      (SELECT count(*)::int FROM education_v30.facilitated_room_presence_events v
+      (SELECT count(*)::int FROM public.facilitated_room_presence_events v
        WHERE v.facilitated_session_id=p.facilitated_session_id AND v.event_kind='joined') AS joins,
-      (SELECT count(*)::int FROM education_v30.facilitated_room_presence_events v
+      (SELECT count(*)::int FROM public.facilitated_room_presence_events v
        WHERE v.facilitated_session_id=p.facilitated_session_id
          AND v.event_kind='heartbeat') AS heartbeats,
       (SELECT count(*)::int FROM education_v30.facilitated_learning_participants v
