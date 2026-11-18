@@ -1,7 +1,6 @@
 import { z } from "zod";
 import type { PublicAcademicProgram } from "./academic-program-publication";
 import type { SiteNoncreditListing } from "./site-noncredit-public";
-import { noncreditEnrollmentOrigin } from "./site-noncredit-public";
 import { containsProtectedInstitutionalClaim } from "./site-local-content";
 import { siteLaunchInterestIds, type SiteLaunchPreferences } from "./site-launch-preferences";
 import { projectSiteEnrollmentOpportunities } from "./site-enrollment-opportunities";
@@ -224,7 +223,13 @@ export function resolveSiteContentBlocks(
   config: SiteContentChannelConfig,
   feeds: SiteContentChannelFeeds,
 ): SiteContentBlockProjection[] {
-  const origin = noncreditEnrollmentOrigin(feeds.enrollmentOrigin);
+  // One authoritative enrollment projection feeds every website presentation.
+  // Never derive "Enrollment available" from seat counts or marketing flags
+  // independently of the corresponding approved destination.
+  const opportunities = projectSiteEnrollmentOpportunities(feeds);
+  const opportunityByTarget = new Map(opportunities.map(opportunity => [
+    opportunity.kind + ":" + opportunity.targetId, opportunity,
+  ] as const));
   return config.blocks.flatMap(block => {
     if (!block.enabled) return [];
     if ((block.channel === "learning.interests" || block.channel === "site.setup" ||
@@ -281,15 +286,15 @@ export function resolveSiteContentBlocks(
         }));
         break;
       case "learning.enrichment": {
-        const actions=new Map(projectSiteEnrollmentOpportunities(feeds)
-          .filter(opportunity=>opportunity.kind==="program")
-          .map(opportunity=>[opportunity.targetId,opportunity.action]));
-        items=(feeds.enrichment ?? []).map(item=>({
-          id:item.seasonId,title:item.title,description:item.programName,
-          label:item.registrationOpen?"Published program · enrollment available":"Registration not open",
-          ...(feeds.mode==="public" && actions.get(item.seasonId)
-            ?{link:actions.get(item.seasonId)!}:{}),
-        }));
+        items=(feeds.enrichment ?? []).map(item=>{
+          const opportunity=opportunityByTarget.get("program:"+item.seasonId);
+          return {
+            id:item.seasonId,title:item.title,description:item.programName,
+            label:opportunity?.status==="register"?"Published program · enrollment available":
+              opportunity?.status==="closed"?"Registration not open":"Program information only",
+            ...(feeds.mode==="public" && opportunity?.action ? {link:opportunity.action} : {}),
+          };
+        });
         break;
       }
       case "learning.classes": {
@@ -297,9 +302,6 @@ export function resolveSiteContentBlocks(
           self_paced:"Self-paced",scheduled:"Scheduled",facilitated:"Facilitated",
           hybrid:"Hybrid",
         } as const;
-        const links=new Map(projectSiteEnrollmentOpportunities(feeds)
-          .filter(opportunity=>opportunity.kind==="class")
-          .map(opportunity=>[opportunity.targetId,opportunity.action]));
         items=(feeds.classes ?? []).map(item=>{
           let next="";
           if(item.nextStartsAt){
@@ -310,7 +312,8 @@ export function resolveSiteContentBlocks(
               }).format(new Date(item.nextStartsAt));
             }catch{next="";}
           }
-          const action=feeds.mode==="public"?links.get(item.classId):undefined;
+          const action=feeds.mode==="public"
+            ? opportunityByTarget.get("class:"+item.classId)?.action : undefined;
           return {
             id:item.classId,title:item.title,
             description:labels[item.deliveryMode]+next,
@@ -321,7 +324,7 @@ export function resolveSiteContentBlocks(
         break;
       }
       case "learning.opportunities":
-        items = projectSiteEnrollmentOpportunities(feeds)
+        items = opportunities
           .filter(item=>!block.targetKinds?.length || block.targetKinds.includes(item.kind))
           .map(item=>({
             id:item.id,title:item.title,description:item.description,
@@ -335,16 +338,18 @@ export function resolveSiteContentBlocks(
           }));
         break;
       case "learning.noncredit":
-        items = (feeds.noncredit ?? []).map(item => ({
-          id: item.releaseId, title: item.title, description: item.siteName,
-          label: item.seatsRemaining > 0 ? "Enrollment available" :
-            item.waitlistAvailable ? "Waitlist available" : "Registration unavailable",
-          ...(feeds.mode === "public" && origin && (item.seatsRemaining > 0 || item.waitlistAvailable) &&
-            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(item.releaseId)
-            ? {link: {href: origin + "/learn/enroll?release=" + encodeURIComponent(item.releaseId),
-              label: item.seatsRemaining > 0 ? "Register for training" : "Join the waitlist"}}
-            : {}),
-        }));
+        items = (feeds.noncredit ?? []).flatMap(item => {
+          const opportunity=opportunityByTarget.get("course:"+item.releaseId);
+          // An invalid or non-public release is not a public Course card.
+          if (!opportunity) return [];
+          return [{
+            id:item.releaseId,title:item.title,description:item.siteName,
+            label:opportunity.status==="register"?"Enrollment available":
+              opportunity.status==="waitlist"?"Waitlist available":
+              opportunity.status==="closed"?"Registration unavailable":"Enrollment information only",
+            ...(feeds.mode==="public" && opportunity.action ? {link:opportunity.action} : {}),
+          }];
+        });
         break;
     }
     if (block.sort==="title") items.sort((a,b)=>a.title.localeCompare(b.title));
