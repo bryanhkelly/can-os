@@ -1,14 +1,14 @@
 import { and, asc, desc, eq, inArray, lte, or, gt, isNull } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
   assessmentAccess, assessmentAccommodations, assessmentDefinitions,
   assessmentFormAdministrations, assessmentFormItems, assessmentFormSections,
   assessmentFormVersions, assessmentItemOptions, assessmentItemVersions,
   assessmentVersions, assessmentExecutionAttempts, assessmentExecutionItems,
   assessmentExecutionResponses, assessmentExecutionChoices, assessmentItemSecureKeys,
-  assessmentAutoScores, assessmentExecutionResults, auditEvents, domainEvents,
-  noncreditRegistrations, noncreditTrainingVersions, learnerCourseAttempts,
+  assessmentAutoScores, assessmentExecutionResults, noncreditRegistrations, noncreditTrainingVersions, learnerCourseAttempts,
   learnerLessonProgress,noncreditParticipationEvents,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
@@ -345,13 +345,13 @@ export async function beginNoncreditKnowledgeCheck(context:CommandContext,input:
       assessmentSource:scope.access.source,
         assessmentPhase:scope.phase,
         ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{})};
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:context.actorPersonId,
       owningOrganizationId:scope.providerOrganizationId,
       eventCode:scope.access.source==="class"?"class.assessment.started":"noncredit.assessment.started",
       entityKind:"assessment_attempt",entityId:attempt.id,payload:startedPayload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType:scope.access.source==="class"?"ClassKnowledgeCheckStarted":"NoncreditKnowledgeCheckStarted",
       aggregateType:"assessment_attempt",aggregateId:attempt.id,
       actorPersonId:context.actorPersonId,payload:startedPayload,
@@ -539,13 +539,13 @@ export async function submitNoncreditKnowledgeCheck(context:CommandContext,input
         ...(scope.access.source==="noncredit"?{noncreditPhase:scope.phase}:{}),
       autoFinalized:autoFinalize,
     };
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:context.actorPersonId,
       owningOrganizationId:scope.providerOrganizationId,
       eventCode:scope.access.source==="class"?"class.assessment.submitted":"noncredit.assessment.submitted",
       entityKind:"assessment_attempt",entityId:attempt.id,payload:submittedPayload,
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType:scope.access.source==="class"?"ClassKnowledgeCheckSubmitted":"NoncreditKnowledgeCheckSubmitted",
       aggregateType:"assessment_attempt",aggregateId:attempt.id,
       actorPersonId:context.actorPersonId,payload:submittedPayload,
