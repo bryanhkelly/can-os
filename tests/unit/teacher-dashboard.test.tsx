@@ -46,8 +46,10 @@ describe("teacher dashboard migration", () => {
     expect(html).toContain("Your teaching day");
     expect(html).toContain("Welcome, Avery.");
     expect(html).toContain("English Literature");
-    expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay"');
+    expect(html).toContain('href="/teacher/gradebook?section=english&amp;assessment=essay&amp;student=learner"');
     expect(html).toContain('href="/messages"');
+    expect(html).toContain('href="/groups"');
+    expect(html).toContain('href="/teacher/discussions"');
     expect(html).toContain('href="/student/support"');
     expect(html).toContain("35 submitted items to review");
     expect(html).toContain("35 submitted work items to review");
