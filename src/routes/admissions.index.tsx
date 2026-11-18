@@ -21,6 +21,8 @@ import { PageNavigation } from "@/components/workspace/page-navigation";
 import { SiteProgramFields } from "@/components/workspace/site-program-fields";
 import { plural } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
@@ -114,7 +116,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
     >
       <MutationFeedback state={mutation} pendingMessage="Saving enrollment records..." className="mt-4"/>
       {!selected.application&&<>
-      <div className="mt-6 flex flex-wrap items-end gap-3 rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
+      <div className="mt-6 flex flex-wrap items-end gap-3  border border-border/70 bg-card p-5 shadow-sm">
         <SiteProgramFields sites={sites} programs={programs} siteId={selected.siteId??""} programId={selected.programId??""}
           labelPrefix="Admissions" sitePlaceholder="All permitted schools" programPlaceholder="All permitted programs"
           onChange={(siteId,programId)=>openScope(siteId||undefined,programId||undefined)}/>
@@ -124,7 +126,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         <StatCard label="Awaiting decision" value={summary.awaitingDecision} />
         <StatCard label="Blocking requirements" value={summary.missingRequirements} />
       </div>
-      <div className="mt-3 rounded-xl border p-4"><p className="text-sm">Active students across programs: <strong>{activeEnrollmentCount}</strong></p></div>
+      <div className="mt-3  border p-4"><p className="text-sm">Active students across programs: <strong>{activeEnrollmentCount}</strong></p></div>
       <h2 className="mt-9 font-serif text-2xl">Pipeline</h2>
       <DetailNavigation label="Admissions stages">
        <SectionTab current={!selected.stage} link={{to:"/admissions",search:{siteId:selected.siteId,programId:selected.programId}}}>All ({summary.total})</SectionTab>
@@ -150,13 +152,13 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
             className="underline">{nextStep(row)}</Link>},
         ]}/>}
       {!selected.application&&pageCount>1&&<PageNavigation label="Admissions pages" className="mt-4 justify-between" showUnavailable
-       previous={page>1&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page-1}} className="rounded border px-3 py-2">Previous page</Link>}
-       next={hasMore&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className="rounded border px-3 py-2">Next page</Link>}>
+       previous={page>1&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page-1}} className=" border px-3 py-2">Previous page</Link>}
+       next={hasMore&&<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,stage:selected.stage,page:page+1}} className=" border px-3 py-2">Next page</Link>}>
        <span>Page {page} of {pageCount} · {filteredTotal} applications</span>
       </PageNavigation>}
       </>}
       {selected.application&&<Link to="/admissions" search={listSearch} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold underline"><ArrowLeft className="size-4" aria-hidden="true" />All applications</Link>}
-      {selected.application&&!detail&&<p role="alert" className="mt-4 rounded-xl border p-4">This application is unavailable in the current admissions view.</p>}
+      {selected.application&&!detail&&<p role="alert" className="mt-4  border p-4">This application is unavailable in the current admissions view.</p>}
       <div className="mt-4 space-y-3">{detail&&[detail].map(x => {
         const years = options.find(o => o.applicationId === x.id)?.years ?? [];
         // Program enrollment is authoritative even when its original offer is
@@ -165,11 +167,11 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
         const enrolledOffer = x.offers.find(offer =>
           x.enrollments.some(enrollment => enrollment.schoolYearId === offer.schoolYearId));
         const latest = enrolledOffer ?? selectActionableOffer(x.offers);
-        return <article key={x.id} aria-labelledby="selected-application" className="rounded-xl border p-4">
+        return <article key={x.id} aria-labelledby="selected-application" className=" border p-4">
           <h2 id="selected-application" ref={selectedHeading} tabIndex={-1} className="mb-2 font-serif text-2xl outline-none">{x.studentName??x.id}</h2>
           <p className="font-semibold"><Link to="/admissions/families" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="hover:underline">{x.program}</Link></p>
           <p className="mt-1 text-sm text-muted-foreground">{formatStatus(x.stage)} · {x.outstandingRequirements} outstanding blocking requirements</p>
-          <section aria-label="Next enrollment action" className="mt-4 rounded-xl border border-primary/30 bg-muted/30 p-4">
+          <section aria-label="Next enrollment action" className="mt-4  border border-primary/30 bg-muted/30 p-4">
            <p className="text-xs font-bold uppercase tracking-widest text-primary">Next action</p>
            {activated ? <>
             <p className="mt-2 font-semibold">{x.activeSectionCount===0?"Place this student in a staffed class":x.studentAccessStatus==="pending_review"?"Review the student's account request":x.studentAccessStatus==="approved"?"Prepare the student's first school day":"Complete the student's learning access"}</p>
@@ -194,7 +196,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
           </section>
           {x.disposition==="waitlisted"&&<p role="status" className="mt-2 text-sm">Waitlisted - restore this application to review in admissions intake before issuing an offer.</p>}
           <Link to="/admissions/intake" search={{siteId:selected.siteId,programId:x.programId,application:x.id}} className="mt-2 inline-block text-xs underline">Manage admissions decisions and waitlist →</Link>
-          <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className="rounded-lg border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
+          <div className="mt-3 flex flex-wrap gap-2">{x.offers.map(o => <span key={o.id} className=" border px-3 py-1 text-xs">Offer: {o.status}{o.expiresAt ? ` · Expires ${new Date(o.expiresAt).toLocaleDateString()}` : ""}</span>)}{!latest && <span className="text-xs text-muted-foreground">No currently actionable offer</span>}</div>
           {activated && <p className="mt-3 text-sm font-semibold">Enrollment active · Student is enrolled in this school year</p>}
           <div className="mt-4 flex flex-wrap gap-2">
             {!years.length && !latest && (x.stage==="application"||x.stage==="eligibility") &&
@@ -202,7 +204,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                 <Link to="/admissions/capacity" search={{siteId:selected.siteId,programId:x.programId}}
                   className="underline">Configure program capacity →</Link>
               </p>}
-            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <button key={year.id} disabled={busy} className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50" onClick={() => transact(() => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</button>)}
+            {years.filter(year => canIssueAnotherOffer(x.stage, x.outstandingRequirements, x.offers, year.id,new Date(),x.disposition)).map(year => <Button type="button" variant="outline" size="sm" key={year.id} disabled={busy} onClick={() => transact(() => issueAdmissionOffer({ data: { applicationId: x.id, schoolYearId: year.id } }))}>Registrar: Issue offer · {year.name}</Button>)}
             {latest?.status === "issued" && <p className="text-xs text-muted-foreground">Waiting for guardian response in the guardian enrollment-offers workspace.</p>}
             {latest?.status === "accepted" && !activated && <p role="status" className="text-xs">Accepted offer ready. Select a staffed class below to activate enrollment and placement together.</p>}
           </div>
@@ -213,7 +215,7 @@ function AdmissionsView({ data }: { data: Awaited<ReturnType<typeof loadAdmissio
                enrollmentActivated={activated} />}
           {activated&&<StudentLearningAccessHandoff applicationId={x.id} role="registrar"/>}
           {activated&&<FirstSchoolDayHandoff applicationId={x.id} programId={x.programId}/>}
-          {activated&&<div className="mt-3 rounded-lg border p-3 text-sm">
+          {activated&&<div className="mt-3  border p-3 text-sm">
             <p className="font-semibold">Enrollment → learning → supervised school day</p>
             <ol className="mt-2 space-y-1 text-muted-foreground" aria-label="School start handoff">
               <li>1. School-year enrollment active.</li>
@@ -269,7 +271,7 @@ function OfferWithdrawal({offerId}:{offerId:string}){
  const mutation=useMutationFeedback(()=>router.invalidate());
  const busy=mutation.pending||mutation.refreshFailed;
  const [error,setError]=useState("");
- return <details className="mt-3 rounded border p-3 text-sm">
+ return <details className="mt-3  border p-3 text-sm">
   <summary>Withdraw an unaccepted offer</summary>
   <p className="mt-2">This releases the offered seat without deleting the application or its history.
    Accepted offers and active enrollments cannot be withdrawn here.</p>
@@ -350,18 +352,17 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
       setChosen("");
     }, { successMessage: "Course placement saved.", commandErrorMessage: "Cannot assign course" });
   }
-  return <section className="mt-4 rounded-lg border bg-card p-4" aria-label="Course placement">
+  return <section className="mt-4  border bg-card p-4" aria-label="Course placement">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <h3 className="text-sm font-semibold">Course placement</h3>
-      <button type="button" disabled={busy} onClick={open}
-        className="rounded-md border px-3 py-1.5 text-xs disabled:opacity-50">
+      <Button type="button" variant="outline" size="sm" disabled={busy} onClick={open}>
         Refresh eligible classes
-      </button>
+      </Button>
     </div>
     {error && <p role="alert" className="mt-2 text-xs text-destructive">{error}</p>}
     <MutationFeedback state={mutation} pendingMessage="Saving course placement..." className="mt-2"/>
     {acceptedOfferId&&!enrollmentActivated&&transferBlocker&&
-      <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+      <p role="status" className="mt-3  border p-3 text-sm">
         <strong>Receiving-school enrollment blocked:</strong> {transferBlocker}
         {" "}The family may retain an accepted offer while the origin school finishes its exit.
         <Link to="/admissions/intake" search={{application:applicationId}} className="ml-2 font-semibold underline">Review this application →</Link>
@@ -370,7 +371,7 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
     {loaded && <div className="mt-3 space-y-3">
       <div className="flex flex-wrap gap-2">
         {sections.filter(s => s.enrolled).map(s =>
-          <span key={s.id} className="rounded-full border px-2 py-1 text-xs">Assigned: {s.title}</span>)}
+          <span key={s.id} className=" border px-2 py-1 text-xs">Assigned: {s.title}</span>)}
       </div>
       {sections.some(s => !s.enrolled && !s.readyForPlacement) && <p role="status" className="text-xs text-warning">
         Some classes cannot accept students yet: verify an institutional teacher
@@ -378,18 +379,17 @@ function CoursePlacement({ applicationId, acceptedOfferId, enrollmentActivated }
          an open add/drop window, and available Section capacity.
       </p>}
       {sections.some(s => !s.enrolled && s.readyForPlacement) ? <div className="flex flex-wrap items-end gap-2">
-        <label className="min-w-48 flex-1 text-xs">Available section
-          <select value={chosen} onChange={e => setChosen(e.target.value)}
-            className="mt-1 block w-full rounded-md border bg-background p-2">
+        <Label className="min-w-48 flex-1 text-xs">Available section
+          <Select value={chosen} onChange={e => setChosen(e.target.value)}
+            className="mt-1">
             <option value="">Select a section</option>
             {sections.filter(s => !s.enrolled && s.readyForPlacement).map(s =>
               <option key={s.id} value={s.id}>{s.title} ({s.code})</option>)}
-          </select>
-        </label>
-        <button type="button" disabled={!chosen || busy || !!(acceptedOfferId&&!enrollmentActivated&&transferBlocker)} onClick={place}
-          className="rounded-md bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
+          </Select>
+        </Label>
+        <Button type="button" size="sm" disabled={!chosen || busy || !!(acceptedOfferId&&!enrollmentActivated&&transferBlocker)} onClick={place}>
           {acceptedOfferId&&!enrollmentActivated?"Activate enrollment and assign class":"Assign student"}
-        </button>
+        </Button>
       </div> : <p className="text-xs text-muted-foreground">
         {sections.length
           ? sections.every(s => s.enrolled) ? "All currently available sections are assigned."
