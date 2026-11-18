@@ -124,7 +124,7 @@ export const readPlatformAdminOverview = createServerFn({ method: "GET" })
             SELECT m.id FROM education_v30.content_publication_manifests m
             WHERE m.offering_version_id=ov.id
             ORDER BY m.created_at DESC,m.id DESC LIMIT 1)) AS "releaseAssets",
-        (SELECT count(*)::int FROM education_v30.deployment_offering_adoptions a
+        (SELECT count(*)::int FROM public.deployment_offering_adoptions a
           WHERE a.offering_version_id=ov.id AND a.approval_status='approved')
           AS "approvedAdoptions"
       FROM education_v30.offering_versions ov
