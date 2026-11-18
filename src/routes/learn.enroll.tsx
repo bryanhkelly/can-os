@@ -50,7 +50,9 @@ function PublicSelfEnrollment() {
     queryFn:()=>getOpenNoncreditSelfEnrollmentById({data:{releaseId:search.release!}}),
     enabled:!!search.release,retry:false,staleTime:30_000,
   });
-  const selected=catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data??undefined;
+  // The exact approved release read is authoritative for selection, consent
+  // and remaining capacity. A cached discovery page is only a navigation list.
+  const selected=search.release?linkedRelease.data??undefined:undefined;
   // Select by exact release rather than scanning a bounded cross-course list.
   // Both the cache and server-side lookup remain scoped to this verified account.
   const waiting=useQuery({
@@ -100,7 +102,7 @@ function PublicSelfEnrollment() {
             loading={catalog.isPending?"Loading published enrollment opportunities…":undefined}
             error={catalog.isError?"Enrollment availability is temporarily unavailable.":undefined}
             onRetry={()=>void catalog.refetch()} retrying={catalog.isFetching}/>
-          {catalog.data && catalog.data.items.length===0 && <EmptyState kind="matches" className="mt-5"
+          {catalog.data && catalog.data.items.length===0 && !selected && <EmptyState kind="matches" className="mt-5"
             title={term?"No matching training":"No training accepting registration"}
             description={catalog.data.nextCursor
               ?"No available training in this segment. Select More training to continue."
@@ -118,6 +120,8 @@ function PublicSelfEnrollment() {
               {catalog.data.items.map(item=><option key={item.id} value={item.id}>
                 {item.title} · {item.provider}
               </option>)}
+              {selected&&!catalog.data.items.some(item=>item.id===selected.id)&&
+                <option value={selected.id}>{selected.title} · {selected.provider}</option>}
             </Select>
             {!selected && <div className="mt-4 grid gap-2">
               {catalog.data.items.map(item=><EntityCard key={item.id}
@@ -146,6 +150,16 @@ function PublicSelfEnrollment() {
                 setHistory(h=>[...h,cursor]);setCursor(catalog.data.nextCursor);
               }}>More training</Button>
           </nav>}
+          {search.release&&linkedRelease.isPending&&
+            <QueryState loading="Checking this training's current approval, seats and terms…"/>}
+          {search.release&&linkedRelease.isSuccess&&!linkedRelease.data&&
+            <WorkspaceNotice tone="attention" className="mt-4">
+              <span>This training is no longer available for self-registration. Choose another published training.</span>
+              <Button type="button" variant="outline" size="sm" className="ml-3"
+                onClick={()=>void router.navigate({to:"/learn/enroll",search:{release:undefined,ref:search.ref}})}>
+                Browse available training
+              </Button>
+            </WorkspaceNotice>}
           {search.release&&linkedRelease.isError&&
             <WorkspaceNotice tone="attention" className="mt-4">
               <span>Unable to verify this training's current published terms.</span>
@@ -207,6 +221,11 @@ function SelfEnrollmentActionForm({release,signedIn,returnTo,referralCode,
       client.invalidateQueries({queryKey:["my-noncredit-waitlist"]},{throwOnError:true}),
       client.invalidateQueries({queryKey:["my-noncredit-self-enrollments"]},{throwOnError:true}),
       client.invalidateQueries({queryKey:["my-activity"]},{throwOnError:true}),
+      // Seat counts and published-release status are advisory public reads.
+      // Refresh them after a saved decision without treating a failed catalog
+      // reload as a failed enrollment or a reason to resubmit the command.
+      client.invalidateQueries({queryKey:["noncredit-open-releases"]}),
+      client.invalidateQueries({queryKey:["noncredit-open-release"]}),
     ]);
   });
   const busy=feedback.pending||feedback.refreshFailed;
