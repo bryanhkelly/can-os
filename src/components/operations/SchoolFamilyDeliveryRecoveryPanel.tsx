@@ -62,7 +62,7 @@ export function SchoolFamilyDeliveryRecoveryPanel({onRecovered}:{onRecovered?:()
       <p>{notice}</p>
       {error&&<p className="mt-1">{error}</p>}
     </WorkspaceNotice>}
-    {error&&!notice&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>
+    {error&&!notice&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
     {results.isPending&&<p role="status" className="mt-3 text-sm">Loading delivery receipts…</p>}
     {results.isError&&<WorkspaceNotice tone="danger" className="mt-3">
       Delivery history is unavailable for your current Site and Organization scope.
