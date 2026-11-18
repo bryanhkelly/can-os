@@ -11,7 +11,7 @@ import { executeCommand } from "@/platform/execute-command";
 import type { z } from "zod";
 import { assertRoomCoverageManager, createRoomAtSiteSchema } from "@/domain/room-coverage";
 
-type Reader = Pick<typeof db, "select">;
+type Reader = Pick<typeof db, "select">;\ntype Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 async function roomSchool(tx: Reader, actor: AccessContext, programId: string, access: "read" | "manage" = "manage") {
   const [school] = await tx.select({
@@ -59,7 +59,7 @@ export async function createSchoolRoom(actor: AccessContext, value: z.infer<type
     validate: input => createSiteRoomSchema.parse(input),
     transaction: work => db.transaction(work),
     auditOwnedByExecute: true,
-    execute: async (tx, context, input) => {
+    execute: async (tx: Tx, context, input) => {
       const school = await roomSchool(tx, context as AccessContext, input.programId);
       // createRoomRecord owns stable room-ID replay, event and audit writes.
       return createRoomRecord(tx, context as AccessContext, school, input);
@@ -74,7 +74,7 @@ export async function createRoomAtSite(actor: AccessContext, value: z.infer<type
     validate: input => createRoomAtSiteSchema.parse(input),
     transaction: work => db.transaction(work),
     auditOwnedByExecute: true,
-    execute: async (tx, context, input) => {
+    execute: async (tx: Tx, context, input) => {
       const verifiedActor = context as AccessContext;
       const [site] = await tx.select().from(sites).where(eq(sites.id, input.siteId)).limit(1);
       if (!site) throw new AuthorizationError("existing school Site");
@@ -118,7 +118,7 @@ export async function assignSchoolSectionRoom(actor: AccessContext, value: z.inf
     validate: input => assignSectionRoomSchema.parse(input),
     transaction: work => db.transaction(work),
     auditOwnedByExecute: true,
-    execute: async (tx, context, input) => {
+    execute: async (tx: Tx, context, input) => {
       const actor = context as AccessContext;
     const school = await roomSchool(tx, actor, input.programId);
     await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, school.siteId)).for("update");
@@ -159,7 +159,7 @@ export async function updateSchoolRoom(actor: AccessContext, value: z.infer<type
     validate: input => updateSiteRoomSchema.parse(input),
     transaction: work => db.transaction(work),
     auditOwnedByExecute: true,
-    execute: async (tx, context, input) => {
+    execute: async (tx: Tx, context, input) => {
       const actor = context as AccessContext;
     const school = await roomSchool(tx, actor, input.programId);
     await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, school.siteId)).for("update");
@@ -194,7 +194,7 @@ export async function retireSchoolRoom(actor: AccessContext, value: z.infer<type
     validate: input => retireSiteRoomSchema.parse(input),
     transaction: work => db.transaction(work),
     auditOwnedByExecute: true,
-    execute: async (tx, context, input) => {
+    execute: async (tx: Tx, context, input) => {
       const actor = context as AccessContext;
     const school = await roomSchool(tx, actor, input.programId);
     await tx.select({ id: sites.id }).from(sites).where(eq(sites.id, school.siteId)).for("update");
