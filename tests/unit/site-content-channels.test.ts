@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultSiteContentChannelConfig, readSiteContentChannelConfig,
+  planSiteContentChannelSave, requireSavedSiteContentChannelDraft,
   resolveSiteContentBlocks, siteContentChannelConfigSchema,
   siteContentChannelDescriptions,
 } from "@/domain/site-content-channels";
@@ -8,6 +9,29 @@ import {
 const proposed = {delivery: "both" as const, interestIds: ["afterschool", "adult"] as const};
 
 describe("Site-owned website content channels", () => {
+  it("persists first default layout save, preserves idempotency and requires explicit publication", () => {
+    const blocks = defaultSiteContentChannelConfig.blocks;
+    const first = planSiteContentChannelSave(undefined, 0, blocks);
+    expect(first.changed).toBe(true);
+    expect(first.config.version).toBe(2);
+    expect(first.config.revision).toBe(1);
+    expect(first.config.blocks).toEqual(blocks);
+    expect(() => requireSavedSiteContentChannelDraft(undefined))
+      .toThrow(/Save the Site website layout/);
+    expect(() => requireSavedSiteContentChannelDraft(null))
+      .toThrow(/Save the Site website layout/);
+    expect(requireSavedSiteContentChannelDraft(first.config)).toEqual(first.config);
+    const repeated = planSiteContentChannelSave(first.config, 1, blocks);
+    expect(repeated).toEqual({config:first.config,changed:false});
+    const modified = planSiteContentChannelSave(first.config, 1, [
+      {...blocks[0]!,title:"My saved Site overview"},...blocks.slice(1),
+    ]);
+    expect(modified.changed).toBe(true);
+    expect(modified.config.revision).toBe(2);
+    expect(() => planSiteContentChannelSave(first.config, 0, blocks))
+      .toThrow(/changed/);
+  });
+
   it("resolves private planning intent from the Site channel rather than page HTML", () => {
     const config = readSiteContentChannelConfig(undefined);
     const privateBlocks = resolveSiteContentBlocks(config, {
