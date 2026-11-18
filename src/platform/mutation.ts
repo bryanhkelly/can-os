@@ -41,6 +41,8 @@ export async function emitEvent(
     aggregateId: string;
     actorPersonId?: string | null;
     payload?: Record<string, unknown>;
+    /** Preserve authoritative domain timestamp from the originating transaction. */
+    occurredAt?: Date;
   } & ScopeIds,
 ): Promise<string> {
   const scope: Record<string, unknown> = {};
@@ -56,6 +58,7 @@ export async function emitEvent(
       aggregateType: event.aggregateType,
       aggregateId: event.aggregateId,
       actorPersonId: event.actorPersonId ?? null,
+      ...(event.occurredAt ? { occurredAt: event.occurredAt } : {}),
       payload: { ...scope, ...(event.payload ?? {}) },
     })
     .returning({ id: domainEvents.id });
@@ -70,7 +73,7 @@ export async function emitEvent(
  * request. Same shape as `recordAudit` in modules/identity/actors.server.ts:
  * actor in the column, request/session detail in the `context` jsonb.
  */
-type AuditRow = Omit<typeof auditEvents.$inferInsert, "id" | "occurredAt">;
+type AuditRow = Omit<typeof auditEvents.$inferInsert, "id">;
 type AuditChange = {
   action: string;
   entityType: string;
