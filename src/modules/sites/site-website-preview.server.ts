@@ -10,7 +10,7 @@ import { organizations, siteAffiliations, sitePublications, sites } from "@/db/s
 import type { AccessContext } from "@/domain/access-context";
 import { publicSiteHost } from "@/domain/public-site-address";
 import { availablePublicSitePaths, renderPublicSiteHtml } from "@/domain/public-site-html";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { safeReadSiteContentChannelConfig, readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { siteLaunchPreferencesSchema } from "@/domain/site-launch-preferences";
 import { toPublicSiteEnrichment } from "@/domain/public-site-catalog";
 import { createSchoolWebsiteStarterContent, normalizeSiteLocalContent, siteLocalImagePublicationGaps, type SiteLocalContent } from "@/domain/site-local-content";
@@ -97,6 +97,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
   });
   const contentConfig = safeReadSiteContentChannelConfig(siteConfiguration?.metadata?.websiteContentChannels);
+  const publishedContentConfig = readPublishedSiteContentChannelConfig(
+    siteConfiguration?.metadata?.publishedWebsiteContentChannels);
   const preferences = siteLaunchPreferencesSchema.safeParse(siteConfiguration?.metadata?.launchPreferences);
   const planningLocation = schoolPlanningLocationSchema.safeParse(siteConfiguration?.metadata?.schoolPlanningLocation);
   const sourceIdentityReviews = publicIdentityReviewStatuses(
@@ -163,9 +165,8 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
       schoolContextSaved: siteInformation.success,
       learningIntentSaved: preferences.success,
       contentChannelDraftRevision: contentConfig.revision,
-      contentChannelPublishedRevision: safeReadSiteContentChannelConfig(
-        siteConfiguration?.metadata?.publishedWebsiteContentChannels).revision,
-      contentChannelsPublished: siteConfiguration?.metadata?.publishedWebsiteContentChannels != null,
+      contentChannelPublishedRevision: publishedContentConfig.revision,
+      contentChannelsPublished: publishedContentConfig.revision > 0,
       publicAddressVisible: parentInformation.site.address.canDisplay,
       publicContactVisible: parentInformation.site.contact.canDisplay,
     },
