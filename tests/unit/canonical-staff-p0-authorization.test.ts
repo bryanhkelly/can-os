@@ -117,7 +117,7 @@ describe("canonical single-login P0 authorization boundaries", () => {
     expect(ddl).toContain("other_grant.person_id <> g.person_id");
     expect(ddl).not.toContain("person_link.");
     expect(ddl).not.toContain("native_grant.");
-    expect(authority).toContain("native.grant_id !== actor.activeGrantId");
+    expect(authority).toContain("native.grant_id !== actor.grantId");
     expect(authority).toContain("native.person_id !== actor.actorPersonId");
     expect(reader).toContain("SET LOCAL ROLE");
     expect(reader).toContain("BEGIN READ ONLY");
