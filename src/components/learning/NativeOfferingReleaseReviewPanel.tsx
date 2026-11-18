@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspacePanel, WorkspaceNotice, EmptyState, MutationFeedback } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { invalidateNativeClassAvailability } from "@/lib/native-class-availability-cache";
 import { NativeOfferingReleaseCheckpoints } from
   "@/components/learning/NativeOfferingReleaseCheckpoints";
 import { NativeOfferingReleasePolicyEditor } from "@/components/learning/NativeOfferingReleasePolicyEditor";
@@ -36,7 +37,11 @@ function ReleaseReview({item}:{item:Item}){
   const [evidence,setEvidence]=useState("");
   const [reason,setReason]=useState("");
   const feedback=useMutationFeedback(async()=>{
-    await client.invalidateQueries({queryKey:["native-offering-release-review-queue"]});
+    await Promise.all([
+      client.invalidateQueries({queryKey:["native-offering-release-review-queue"]},
+        {throwOnError:true}),
+      invalidateNativeClassAvailability(client),
+    ]);
   });
   const fullyApproved=categories.every(kind=>item.reviews.some(review=>
     review.kind===kind&&review.decision==="approved"));
