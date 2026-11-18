@@ -32,12 +32,12 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
   const physicalLocation=[address.street1,address.city,address.state,address.postalCode].filter(Boolean).join(", ");
   return <>
     <LaunchCreatedHandoff created={created}/>
-    <details id="new-school-launch" className="launch-school-form rounded-xl border bg-card p-5" open={!hasSchoolPreparation}>
+    <details id="new-school-launch" className="launch-school-form  border bg-card p-5" open={!hasSchoolPreparation}>
       <summary className="cursor-pointer"><h2 className="inline font-serif text-2xl">Your academic program</h2></summary>
       <p className="mt-2 text-sm text-muted-foreground">
         Confirm the school location, then plan grades, how students will learn and who is responsible for teaching and credit.
       </p>
-      {hasSchoolPreparation&&<p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+      {hasSchoolPreparation&&<p role="status" className="mt-3  border p-3 text-sm">
         Your existing school is saved above. Use its checklist to continue setup.
         This form adds another school offering; it won't change your existing one.
       </p>}
@@ -54,7 +54,7 @@ export function LaunchConfigurationForm({created,hasSchoolPreparation,modelPrese
             <LaunchProgramIdentityFields {...identity}/>
             <LaunchDeliveryModelFields {...delivery}/>
             </fieldset>
-            <section aria-label="Review your school details" className="rounded-xl bg-muted/30 p-5">
+            <section aria-label="Review your school details" className=" bg-muted/30 p-5">
               <h4 className="font-serif text-2xl">3. Review your academic plan</h4>
               <dl className="mt-4 grid gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
                 <div><dt>School organization</dt><dd>{host?.name??"Choose an organization"}</dd></div>
