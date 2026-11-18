@@ -59,13 +59,17 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
         status,method,evidenceNote:note,
       }});
       delete retries.current[key];
-      await roster.refetch();
       setNotes(current=>({...current,[courseAttemptId]:""}));
-      setMessage(result.noDeviceEvidence?
-        "Direct facilitator verification recorded without adding a device pairing.":
-        "Facilitator verification recorded independently of device activity.");
+      try {
+        await roster.refetch({throwOnError:true});
+        setMessage(result.noDeviceEvidence?
+          "Direct facilitator verification recorded without adding a device pairing.":
+          "Facilitator verification recorded independently of device activity.");
+      } catch {
+        setMessage("Facilitator verification was saved, but the roster could not be refreshed. Refresh the room before making another correction.");
+      }
     }catch{
-      setError("Attendance verification was not saved. For a no-device learner or a correction, include a direct-observation explanation of at least 15 characters.");
+      setError("Attendance verification could not be confirmed. Check current Site access and observation evidence, then refresh before retrying with the same details.");
     }finally{setBusy("");}
   }
   return <section className="mt-4 border border-border bg-card p-4"
