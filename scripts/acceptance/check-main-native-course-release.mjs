@@ -146,6 +146,67 @@ async function main(){
            'education_v30.professional_capability_authorizations'::regclass
          )) legacy_provider_person_fks
   `;
+
+  // Evidence-backed release setup is not created by this preflight. These are
+  // bounded, publisher/Offering-scoped counts only: no Person, grant, document
+  // or storage identifiers leave the database in the report.
+  const [upstream]=await sql`
+    WITH target AS (
+      SELECT ov.id, o.publisher_organization_id
+      FROM education_v30.offering_versions ov
+      JOIN education_v30.offerings o ON o.id=ov.offering_id
+      WHERE ov.id=${offeringVersionId}::uuid
+    )
+    SELECT
+      (SELECT count(*)::int FROM public.account_person_grants g
+        JOIN public.access_accounts acc
+          ON acc.id=g.account_id AND acc.person_id=g.person_id
+        JOIN target t ON t.publisher_organization_id=g.organization_id
+        WHERE g.active AND g.site_id IS NULL
+          AND g.role='academic_content_creator'
+          AND acc.email_verified_at IS NOT NULL AND NOT acc.disabled
+      ) AS verified_creator_grants,
+      (SELECT count(*)::int FROM public.account_person_grants g
+        JOIN public.access_accounts acc
+          ON acc.id=g.account_id AND acc.person_id=g.person_id
+        JOIN target t ON t.publisher_organization_id=g.organization_id
+        WHERE g.active AND g.site_id IS NULL
+          AND g.role='academic_content_reviewer'
+          AND acc.email_verified_at IS NOT NULL AND NOT acc.disabled
+      ) AS verified_reviewer_grants,
+      (SELECT count(*)::int FROM education_v30.evidence_document_versions v
+        JOIN education_v30.evidence_documents d ON d.id=v.document_id
+        JOIN target t ON t.publisher_organization_id=d.owning_organization_id
+        WHERE v.verified_at IS NOT NULL
+          AND v.verified_by_person_id IS NOT NULL
+      ) AS verified_publisher_evidence,
+      (SELECT count(*)::int FROM education_v30.content_asset_versions v
+        JOIN public.content_assets a ON a.id=v.asset_id
+        JOIN target t ON t.publisher_organization_id=a.owner_organization_id
+      ) AS publisher_asset_versions,
+      (SELECT count(*)::int FROM education_v30.professional_capability_authorizations ca
+        JOIN education_v30.professional_role_assignments a
+          ON a.capability_authorization_id=ca.id AND a.person_id=ca.person_id
+        JOIN education_v30.offering_courses oc
+          ON oc.offering_version_id=(SELECT id FROM target)
+        JOIN education_v30.course_versions cv
+          ON cv.id=oc.course_version_id AND cv.course_id=a.course_id
+        WHERE ca.decision='approved'
+      ) AS approved_publisher_capability_assignments,
+      (SELECT count(*)::int FROM education_v30.blueprint_outputs bo
+        WHERE bo.offering_version_id=(SELECT id FROM target)
+      ) AS offering_blueprint_outputs,
+      (SELECT count(*)::int FROM education_v30.deployment_readiness_reviews rr
+        JOIN education_v30.deployment_offering_adoptions a
+          ON a.deployment_id=rr.deployment_id
+        WHERE a.offering_version_id=(SELECT id FROM target)
+          AND rr.review_kind IN ('operating','registration','delivery')
+          AND rr.outcome='ready'
+          AND (rr.expires_at IS NULL OR rr.expires_at>clock_timestamp())
+      ) AS current_ready_deployment_reviews
+  `;
+  if(!upstream)throw new Error("Publisher release preflight returned no upstream status");
+
   const policies=await sql`
     SELECT course_version_id,minimum_approved_primary_tracks,
       complete_lesson_coverage_required,independent_academic_review_required,
@@ -177,7 +238,49 @@ async function main(){
     LIMIT 51
   `;
 
+
+  // These missing records are prerequisites, not permission to auto-provision,
+  // approve evidence, publish a draft, or change a proposed adoption.
+  const upstreamCounts={
+    verifiedCreatorGrants:Number(upstream.verified_creator_grants),
+    verifiedReviewerGrants:Number(upstream.verified_reviewer_grants),
+    verifiedPublisherEvidence:Number(upstream.verified_publisher_evidence),
+    publisherAssetVersions:Number(upstream.publisher_asset_versions),
+    approvedPublisherCapabilityAssignments:Number(upstream.approved_publisher_capability_assignments),
+    offeringBlueprintOutputs:Number(upstream.offering_blueprint_outputs),
+    currentReadyDeploymentReviews:Number(upstream.current_ready_deployment_reviews),
+  };
+  const setupActions=[];
+  if(!upstreamCounts.verifiedCreatorGrants||!upstreamCounts.verifiedReviewerGrants)
+    setupActions.push("Establish distinct verified Organization-wide CAN creator and reviewer grants under the publisher; no Site grant or general login substitutes.");
+  if(!upstreamCounts.verifiedPublisherEvidence)
+    setupActions.push("Capture real publisher-owned authority/rights evidence versions and independently verify them before appointments or release decisions.");
+  if(!upstreamCounts.approvedPublisherCapabilityAssignments||!identity.raw_appointments)
+    setupActions.push("Approve Person- and Course-specific professional capability authorizations and evidence-backed appointments for creator and independent reviewer.");
+  if(!upstreamCounts.publisherAssetVersions)
+    setupActions.push("Create immutable publisher-owned content asset versions and verify content rights before submitting the exact release manifest.");
+  if(!upstreamCounts.offeringBlueprintOutputs)
+    setupActions.push("Execute a genuinely reviewed Blueprint configuration for the exact Offering and local Deployment.");
+  if(upstreamCounts.currentReadyDeploymentReviews<3)
+    setupActions.push("Complete independent, unexpired operating, registration and delivery readiness reviews for the Deployment.");
+
   const blockers=[];
+
+  if(!upstreamCounts.verifiedCreatorGrants)
+    blockers.push("Publisher has no current verified Organization-wide creator grant.");
+  if(!upstreamCounts.verifiedReviewerGrants)
+    blockers.push("Publisher has no current verified Organization-wide independent reviewer grant.");
+  if(!upstreamCounts.verifiedPublisherEvidence)
+    blockers.push("Publisher has no independently verified authority/rights evidence versions.");
+  if(!upstreamCounts.approvedPublisherCapabilityAssignments)
+    blockers.push("Publisher has no approved exact-Course professional capability appointment.");
+  if(!upstreamCounts.publisherAssetVersions)
+    blockers.push("Publisher has no content asset versions for an asset-backed release.");
+  if(!upstreamCounts.offeringBlueprintOutputs)
+    blockers.push("No exact-Offering local Blueprint output exists; the proposed adoption cannot be independently approved.");
+  if(upstreamCounts.currentReadyDeploymentReviews<3)
+    blockers.push("Fewer than three current ready Deployment review records (operating, registration, delivery); validate each independently.");
+
   if(!courses.length||courses.length>50)
     blockers.push("Offering composition must have 1-50 bounded native Course versions.");
   if(identity.legacy_provider_person_fks)
@@ -212,7 +315,7 @@ async function main(){
   const report={
     target:"CAN OS Neon main",readOnly:true,offeringVersionId,
     offering:{title:offering.title,lifecycle:offering.lifecycle,versionNo:offering.version_no},
-    identity,courseStatuses,releasePolicies:policies.length,
+    identity,upstream:upstreamCounts,setupActions,courseStatuses,releasePolicies:policies.length,
     latestManifest:manifest?{
       status:manifest.manifest_status,assetUses:Number(manifest.asset_uses),
       approvedReviewCategories:Number(manifest.approved_review_categories),
