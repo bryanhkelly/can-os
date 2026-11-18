@@ -43,6 +43,13 @@ async function main(){
        AND conname IN ('audit_events_actor_person_id_fkey',
           'domain_events_actor_person_id_fkey',
           'class_sessions_facilitator_person_id_fkey')) AS critical_shared_actor_fks,
+      (SELECT pg_get_functiondef(
+          'education_v30.v301_can_staff_session_context(text)'::regprocedure
+        ) ILIKE '%access_account_canonical_principals%' OR
+        pg_get_functiondef(
+          'education_v30.v301_can_staff_session_context(text)'::regprocedure
+        ) ILIKE '%canonical_account_grants%'
+      ) AS staff_reader_uses_second_identity,
       (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
        WHERE oid='public.people'::regclass) AS public_people_rls_forced,
       (SELECT count(*)::int FROM public.access_account_canonical_principals) AS staff_mapping_rows,
@@ -91,6 +98,10 @@ async function main(){
       "src/modules/classes/native-class-guardian-authority.server.ts",
       /accessAccountCanonicalPrincipals/,
     ),
+    duplicateStaffAuthorityModule:sourceHas(
+      "src/modules/identity/canonical-command-context.server.ts",
+      /canonical-can-staff-bridge\.server/,
+    ),
   };
   const blockers=[];
   if(identity.native_persons||identity.native_accounts||identity.live_native_sessions)
@@ -101,6 +112,8 @@ async function main(){
     blockers.push("Native Person foreign keys remain; staged FK move must not be run independently");
   if(identity.critical_shared_actor_fks!==3)
     blockers.push("Critical audit, event or Class facilitator Person FKs have not converged to public.people");
+  if(identity.staff_reader_uses_second_identity)
+    blockers.push("Restricted CAN staff reader still requires native correspondence or duplicate grants");
   if(!identity.public_people_rls_forced)
     blockers.push("Authoritative public People identity is missing forced row-level security");
   if(identity.staff_mapping_rows||identity.learner_mapping_rows)
