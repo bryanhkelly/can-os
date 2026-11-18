@@ -1,3 +1,4 @@
+import { buttonVariants } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { AdmissionsApplicantCard } from "@/components/admissions/AdmissionsApplicantCard";
@@ -106,7 +107,7 @@ function Intake({data}:{data:Awaited<ReturnType<typeof load>>}){
  }
  return <WorkspaceShell eyebrow="Admissions" title="Admissions pipeline"
   subtitle="Capture family inquiries, qualify applicants, record decisions and hand accepted applications into enrollment."
-  actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className="rounded-lg border px-3 py-2 text-sm">Offers & enrollment →</Link>}>
+  actions={<Link to="/admissions" search={{siteId:selected.siteId,programId:selected.programId,application:selected.application}} className={buttonVariants({ variant: "outline" })}>Offers & enrollment →</Link>}>
   <div className="mt-5"><CreateAction><Link to="/admissions/intake/new" search={{siteId:selected.siteId,programId:selected.programId}}>New inquiry</Link></CreateAction></div>
   <MutationFeedback state={mutation} pendingMessage="Saving admissions records..." className="mt-5"/>
   <PublicInterestInbox initialPage={data.publicInterests}
