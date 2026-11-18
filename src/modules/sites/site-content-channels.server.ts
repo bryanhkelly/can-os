@@ -18,7 +18,7 @@ import { getRequest } from "@tanstack/react-start/server";
 async function authorizeContentChannelEditor(
   actor: AccessContext,
   site: {id:string;organizationId:string}|null|undefined,
-  executor: typeof db,
+  executor: Pick<typeof db, "select">,
   operation: "read" | "write",
 ): Promise<void> {
   if (!site) throw new AuthorizationError("Site content channel scope");
