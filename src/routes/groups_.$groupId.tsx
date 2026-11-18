@@ -312,6 +312,7 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
   const [ends, setEnds] = useState("");
   const [attempted, setAttempted] = useState(false);
   const [reschedule, setReschedule] = useState<{ id: string; title: string; start: string; end: string } | null>(null);
+  const [cancelling, setCancelling] = useState<{ id: string; title: string } | null>(null);
   const now = new Date();
   const unknownSession = Boolean(selectedSession) &&
     !group.sessions.some(session => session.id === selectedSession);
@@ -382,9 +383,7 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
                 end: dateTimeInputValue(session.endsAt, group.timezone),
               })}>Reschedule</Button>
             <Button variant="destructive" size="sm" type="button" disabled={busy || !availability.writesEnabled}
-              onClick={() => void run(() => reviseCanonicalGroupSession({ data: {
-                sessionId: session.id, action: "cancel",
-              } }), "Session cancelled.")}>Cancel session</Button>
+              onClick={() => setCancelling({ id: session.id, title: session.title })}>Cancel session</Button>
           </div>}
           {role === "teacher" && past && <div className="mt-3 space-y-2">
             <p className="text-xs font-semibold">Attendance</p>
@@ -429,6 +428,21 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
       <LocalDateTimeField label="New end" timezone={group.timezone} value={reschedule.end}
         onChange={end => setReschedule(current => current && { ...current, end })} required />
       <MutationFeedback state={mutation} pendingMessage="Saving group change..." />
+    </ActionDialog>}
+    {cancelling && <ActionDialog open destructive title={`Cancel ${cancelling.title}?`}
+      description="This will cancel the scheduled group session and update its calendar event. It will not erase historical attendance."
+      confirmLabel="Cancel session" pending={mutation.pending} pendingLabel="Cancelling session…"
+      confirmDisabled={busy || !availability.writesEnabled}
+      onClose={() => setCancelling(null)}
+      onConfirm={() => void mutation.run(() => reviseCanonicalGroupSession({ data: {
+        sessionId: cancelling.id, action: "cancel",
+      } }), {
+        successMessage: "Session cancelled.",
+        commandErrorMessage: "Unable to cancel session.",
+      }).then(outcome => {
+        if (outcome.status === "saved" || outcome.status === "refresh-failed") setCancelling(null);
+      })}>
+      <MutationFeedback state={mutation} pendingMessage="Cancelling session…" />
     </ActionDialog>}
   </WorkspacePanel>;
 }
