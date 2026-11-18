@@ -23,7 +23,8 @@ describe("Site-owned content source and publication contract",()=>{
     expect(editor).toContain("siteConfiguration?.metadata?.websiteContentChannels");
     expect(service).toContain("publishedWebsiteContentChannels: draft");
     expect(service).toContain("requirePartnerWebsiteEditor(actor, tx, siteWebsiteLocalPublishCapability)");
-    expect(service).toContain('assertSiteSetupScope(actor, site, "program.launch.start")');
+    expect(service).toContain('assertSiteSetupScope(actor, site, setupCapability)');
+    expect(service).toContain('requirePartnerWebsiteEditor(actor, executor,');
     expect(service).toContain("if (current.revision !== input.expectedRevision)");
   });
 
