@@ -49,7 +49,7 @@ export const noncreditSelfEnrollmentClaims = educationV30.table("noncredit_self_
 /** Waitlist preserves original CAN account/Person references, not a guessed
  * native canonical learner identity. Invitations reserve seats for 48 hours.
  * One row represents one person's current queue state with full audit history. */
-export const noncreditEnrollmentWaitlist=educationV30.table("noncredit_enrollment_waitlist",{
+export const noncreditEnrollmentWaitlist=pgTable("noncredit_enrollment_waitlist",{
   id:id(),
   releaseId:uuid("release_id").notNull().references(()=>noncreditSelfEnrollmentReleases.id),
   accessAccountId:uuid("access_account_id").notNull(),
