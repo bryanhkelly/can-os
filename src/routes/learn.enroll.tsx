@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { WorkspaceShell, MutationFeedback, QueryState, EmptyState, WorkspaceNotice, RecordFacts } from "@/components/workspace";
+import { WorkspaceShell, MutationFeedback, QueryState, EmptyState, WorkspaceNotice, RecordFacts, EntityCard, StatusBadge } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import {
@@ -117,13 +117,18 @@ function PublicSelfEnrollment() {
               </option>)}
             </Select>
             {!selected && <div className="mt-4 grid gap-2">
-              {catalog.data.items.map(item=><Button variant="outline" type="button" key={item.id}
-                onClick={()=>void router.navigate({to:"/learn/enroll",search:{release:item.id,ref:search.ref}})}
-                className="h-auto w-full flex-col items-start gap-1 p-4 text-left">
-                <strong className="block text-sm">{item.title}</strong>
-                <span className="mt-2 block text-xs text-muted-foreground">{item.provider} · {item.deliveryMode==="facilitated"?"Facilitated at "+(item.siteName??"approved Site"):"Learn independently"}</span>
-                <span className="mt-1 block text-xs text-muted-foreground">{item.seatsRemaining>0?item.seatsRemaining+" seats remaining":"Registration is full"}</span>
-              </Button>)}
+              {catalog.data.items.map(item=><EntityCard key={item.id}
+                title={item.title}
+                subtitle={item.deliveryMode==="facilitated"
+                  ?"Facilitated at "+(item.siteName??"approved Site"):"Independent online learning"}
+                status={<StatusBadge tone={item.seatsRemaining>0?"success":"attention"}>
+                  {item.seatsRemaining>0?item.seatsRemaining+" places open":"Join waiting list"}
+                </StatusBadge>}
+                meta={item.provider} openLabel="View registration"
+                renderLink={({className,children})=><Link to="/learn/enroll"
+                  search={{release:item.id,ref:search.ref}} className={className}>
+                  {children}
+                </Link>}/>)}
             </div>}
           </div>}
           {catalog.data&&<nav aria-label="Training discovery pages" className="mt-4 flex flex-wrap gap-3">
@@ -304,12 +309,12 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     {!signedIn && <div className="mt-5 space-y-3 border-t border-border pt-4">
       <p className="text-sm">Verify your CAN account to finish. Your course selection will be preserved after signing in.</p>
       <div className="flex flex-wrap gap-3">
-        <Link to="/access" search={{returnTo}} className="inline-flex min-h-11 items-center border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+        <Button asChild size="lg"><Link to="/access" search={{returnTo}}>
           Sign in
-        </Link>
-        <Link to="/access/register" search={{returnTo}} className="inline-flex min-h-11 items-center border border-border px-4 py-2 text-sm font-semibold">
+        </Link></Button>
+        <Button asChild size="lg" variant="outline"><Link to="/access/register" search={{returnTo}}>
           Create an adult CAN account
-        </Link>
+        </Link></Button>
       </div>
     </div>}
     {waitlistStatus&&<p role="status" className="mt-4 text-sm text-muted-foreground">
@@ -325,10 +330,8 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     </Button>}
     <MutationFeedback state={feedback} pendingMessage="Saving enrollment decision…" className="mt-4"/>
     {enrolled && <nav aria-label="After enrollment" className="mt-4 flex flex-wrap items-center gap-4 text-sm">
-      <Link to="/learn/course/$courseAttemptId" params={{courseAttemptId:enrolled.courseAttemptId}}
-        className="inline-flex min-h-11 items-center border border-primary bg-primary px-4 py-2 font-semibold text-primary-foreground">
-        Start learning
-      </Link>
+      <Button asChild size="lg"><Link to="/learn/course/$courseAttemptId"
+        params={{courseAttemptId:enrolled.courseAttemptId}}>Start learning</Link></Button>
       <Link to="/learn/my-activity" className="font-semibold text-primary underline underline-offset-4">
         View My Activity
       </Link>
