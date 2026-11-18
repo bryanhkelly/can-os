@@ -122,7 +122,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
         <p className="mt-2">This learning room is separate from physical room coverage,
           staff presence, verified attendance and student release. None of those
           safeguards may be inferred from enrollment or device pairing.</p>
-      </WorkspaceNotice>
+      </WorkspaceNotice>}
     </section>
     <section className="mt-5 border border-border bg-card p-5" aria-label="Practice a course before opening a room">
       <h2 className="font-serif text-xl font-semibold">Facilitator rehearsal</h2>
