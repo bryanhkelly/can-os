@@ -31,6 +31,15 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 
 ## Development and completion
 
+### Write-time source validation (all coding agents)
+
+- For TypeScript, TSX, JavaScript, and JSX edits, validate the candidate **before** replacing the file. In a local checkout with dependencies installed, use `npm run write:source -- src/path.tsx --from /tmp/candidate.tsx` or pipe candidate contents into `npm run write:source -- src/path.tsx`. A rejected write must leave the existing source untouched.
+- For multiple agents sharing a checkout, pass `--expected-sha256 <64-character hash of original file>` to refuse stale replacements.
+- When a tool writes directly and cannot use the guarded writer, run `npm run check:write -- src/path.tsx` immediately after **each edited file**. Run `npm run watch:write` alongside the editor for live feedback; the watcher reports errors but does not block writes.
+- Repair syntax and duplicate import-binding errors before moving on to another file. Run affected unit tests and typecheck at logical checkpoints; single-file syntax validation is not typechecking or a build.
+- Agents editing through GitHub APIs with no executable checkout **cannot assert write-time validation passed**. Leave such edits on a review branch and provide execution evidence before integrating. A successful GitHub API write is not a parser or compiler result.
+- Run `npm run test:write-guard` when changing these validator scripts. Keep the production syntax gate and write-time checker on the same parser implementation.
+
 - Use `main` as the active development baseline unless a task explicitly authorizes a different branch. FullFlow is released and retired; old phase and FullFlow branch/database handoffs are historical, not active instructions.
 - For V6.1 page migration, discover routes, components and legacy controls from the actual source graph using `scripts/lib/v61-source-audit.mjs`. Do not add route-name allowlists, fixed migration counts, duplicated per-page checklists or JSX-text assertions to the design-system checker. Put domain-specific state transitions and permissions in behavioral tests, and source/design rules in reusable AST analysis.
 - Before coding, identify the canonical owning service, related callers, routes, migrations, invariants, and test coverage. Prefer deleting dead paths only after reference checks.

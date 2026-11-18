@@ -7,20 +7,16 @@
  * Pure local file parsing: no database, network, generated assets or deploy.
  */
 import {readdir, readFile} from "node:fs/promises";
-import {join, relative, resolve, extname} from "node:path";
-import ts from "typescript";
-import { duplicateImportBindings } from "../lib/import-binding-conflicts.mjs";
+import {join, resolve, extname} from "node:path";
+import {
+  SOURCE_KINDS, sourceWriteDiagnostics, formatSourceWriteDiagnostic,
+} from "../lib/source-write-validation.mjs";
 
 const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
 // are parsed by their own test/CI commands, not production asset generation.
 const roots=["src","scripts"];
-const sourceExts=new Map([
-  [".ts",ts.ScriptKind.TS], [".tsx",ts.ScriptKind.TSX],
-  [".mts",ts.ScriptKind.TS], [".cts",ts.ScriptKind.TS],
-  [".js",ts.ScriptKind.JS], [".jsx",ts.ScriptKind.JSX],
-  [".mjs",ts.ScriptKind.JS], [".cjs",ts.ScriptKind.JS],
-]);
+const sourceExts=SOURCE_KINDS;
 const ignoredDirs=new Set([
   "node_modules",".git",".output","dist",".next",".vinxi","coverage","playwright-report",
   "test-results",".tanstack",".wrangler",
@@ -41,21 +37,9 @@ files.sort();
 let errors=0;
 for(const filename of files){
   const source=await readFile(filename,"utf8");
-  const kind=sourceExts.get(extname(filename));
-  const parsed=ts.createSourceFile(filename,source,ts.ScriptTarget.Latest,true,kind);
-  for(const diagnostic of parsed.parseDiagnostics){
-    const {line,character}=parsed.getLineAndCharacterOfPosition(diagnostic.start??0);
-    const message=ts.flattenDiagnosticMessageText(diagnostic.messageText," ");
-    console.error(relative(root,filename)+":"+(line+1)+":"+(character+1)+
-      " TS"+diagnostic.code+" "+message);
-    errors++;
-  }
-  // Parser diagnostics alone do not catch two imports declaring the same
-  // local name. Report this deterministic binding collision before building.
-  for(const conflict of duplicateImportBindings(parsed)){
-    const {line,character}=parsed.getLineAndCharacterOfPosition(conflict.start);
-    console.error(relative(root,filename)+":"+(line+1)+":"+(character+1)+
-      " Duplicate import binding: "+conflict.name);
+  // The same diagnostics are used before file writes and at full build.
+  for(const diagnostic of sourceWriteDiagnostics(filename,source)){
+    console.error(formatSourceWriteDiagnostic(filename,diagnostic,root));
     errors++;
   }
 }
