@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 
 export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: {
   sectionId: string;
@@ -53,7 +54,7 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
     }, { successMessage: "Video uploaded and attached to this class.",
       commandErrorMessage: "Unable to upload this video. Check the file, connection and deployment storage settings, then retry." });
   }
-  return <form noValidate className="mb-5 grid gap-3 rounded-lg border p-4" aria-label="Upload class video"
+  return <form noValidate className="mb-5 grid gap-3  border p-4" aria-label="Upload class video"
     aria-busy={feedback.pending} onSubmit={event => { event.preventDefault(); void submit(); }}>
     <h3 className="text-sm font-semibold">Upload a video</h3>
     <p className="text-xs text-muted-foreground">Private MP4 or WebM, up to 500 MB. Use browser-compatible codecs.
@@ -68,11 +69,11 @@ export function ClassVideoUploadForm({ sectionId, lessons, lessonId, enabled }: 
         <Input ref={fileInput} type="file" accept="video/mp4,video/webm,.mp4,.webm"
           onChange={event => setFile(event.target.files?.[0] ?? null)}/>
       </Field>
-      {!lessonId && <label className="text-sm">Attach video to<select value={selectedLesson}
-        onChange={event => setSelectedLesson(event.target.value)} className="mt-1 w-full rounded border p-2">
+      {!lessonId && <Field label="Attach video to"><Select value={selectedLesson}
+        onChange={event => setSelectedLesson(event.target.value)}>
         <option value="">Entire class</option>
         {lessons.map(lesson => <option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
-      </select></label>}
+      </Select></Field>}
       <Field label="I have permission to share this video with the class" required
         error={validationAttempted&&!rights?"Confirm that you have permission to share this video.":undefined}>
         <Checkbox checked={rights} onChange={event => setRights(event.target.checked)}/>
