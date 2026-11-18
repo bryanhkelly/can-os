@@ -14,6 +14,7 @@ import {
   getOpenNoncreditSelfEnrollmentPage,
 } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { noncreditRegistrationRoute } from "@/domain/noncredit-seat-policy";
+import { noncreditWaitlistQueryKeys } from "@/domain/noncredit-waitlist-query-keys";
 import { useHydrated } from "@/lib/use-hydrated";
 import {getMyNoncreditWaitlistByRelease,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 import {findNoncreditEnrollmentAffiliates} from "@/modules/enrollment/noncredit-affiliate-directory.functions";
@@ -53,8 +54,10 @@ function PublicSelfEnrollment() {
   // Select by exact release rather than scanning a bounded cross-course list.
   // Both the cache and server-side lookup remain scoped to this verified account.
   const waiting=useQuery({
-    queryKey:["my-noncredit-waitlist",
-      session?.authenticated===true?session.activeGrantId:"signed-out",selected?.id??null],
+    queryKey:noncreditWaitlistQueryKeys.detail(
+      session?.authenticated===true?session.activeGrantId:"signed-out",
+      selected?.id??null,
+    ),
     queryFn:()=>getMyNoncreditWaitlistByRelease({data:{releaseId:selected!.id}}),
     enabled:!!selected&&session?.authenticated===true&&session.role!=="student",
     retry:false,staleTime:15_000,
