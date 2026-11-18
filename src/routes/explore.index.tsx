@@ -44,15 +44,15 @@ function ExplorePage(){
               maxLength={100} placeholder="Program, site, city or region"
               className="min-h-11 pl-10"/>
           </span>
-        </Label
+        </Label>
         <Label className="block text-sm font-semibold" htmlFor="explore-type">Program type
           <Select id="explore-type" value={category} onChange={event=>chooseCategory(event.target.value as Category)}
             className="mt-2 min-h-11">
             <option value="all">All offerings</option>
             <option value="school">Schools and K–12</option>
             <option value="community">Summer and community</option>
-          </Select
-        </Label
+          </Select>
+        </Label>
       </div>
       <p className="mt-3 text-xs text-muted-foreground">Searches reviewed public programs throughout the published directory. Private rosters and unpublished programs are never included.</p>
       <Link to="/learn/enroll" search={{}} className="mt-3 inline-flex min-h-10 items-center text-sm font-semibold text-primary underline">
