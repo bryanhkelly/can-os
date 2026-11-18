@@ -38,6 +38,10 @@ async function run(){
       to_regclass('public.site_canonical_identity_links') IS NULL AS site_identity_bridge_absent,
       (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
        WHERE oid='public.sites'::regclass) AS platform_site_rls_forced,
+      (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+       WHERE oid='public.organizations'::regclass) AS platform_org_rls_forced,
+      has_table_privilege('authenticated','public.sites','SELECT') AS client_can_read_sites,
+      has_table_privilege('authenticated','public.organizations','SELECT') AS client_can_read_orgs,
       (SELECT count(*)::int FROM public.sites) AS platform_sites,
       (SELECT count(*)::int FROM public.organizations) AS platform_organizations,
       (SELECT count(*)::int FROM education_v30.persons) AS native_persons,
@@ -46,8 +50,11 @@ async function run(){
   `;
   if(summary.legacy_site_fk_count!==0||summary.legacy_org_fk_count!==0||
      !summary.site_identity_bridge_absent||
+     summary.duplicate_site_table_exists||summary.duplicate_org_table_exists||
+     !summary.platform_site_rls_forced||!summary.platform_org_rls_forced||
+     summary.client_can_read_sites||summary.client_can_read_orgs||
      summary.platform_site_fk_count<94||summary.platform_org_fk_count<229)
-    throw new Error("Shared Site/Organization FK milestone regressed");
+    throw new Error("Shared Site/Organization retirement or security regressed");
 
   // No name matching or crosswalk. While duplicate tables remain, their
   // UUIDs must already exist in the authoritative source.
@@ -75,6 +82,8 @@ async function run(){
   console.log(JSON.stringify({
     checkedOn:"CAN OS Neon main",readOnly:true,
     siteAndOrganizationForeignKeysConverged:true,
+    siteAndOrganizationTablesRetired:true,
+    publicIdentityRlsForced:true,
     ...summary,
     fullyConsolidated:!summary.duplicate_site_table_exists&&
       !summary.duplicate_org_table_exists&&summary.remaining_native_person_fks===0,
