@@ -12,7 +12,7 @@ import {
   noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
-import {validCohortSessionWindows} from "@/domain/noncredit-cohort-schedule";
+import {validClassroomSessionWindows} from "@/domain/classroom-scheduling";
 
 const id=z.string().uuid();
 const releaseInput=z.object({releaseId:id}).strict();
@@ -213,7 +213,7 @@ export const attachCohortSessionPlans=createServerFn({method:"POST"})
           canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
         .where(inArray(facilitatedClassroomPlans.id,data.planIds))
         .for("update");
-      if(slots.length!==data.planIds.length||!validCohortSessionWindows(slots))
+      if(slots.length!==data.planIds.length||!validClassroomSessionWindows(slots))
         throw new AuthorizationError("one to four distinct, nonoverlapping classroom meetings");
       const assigned=[];
       for(const planId of data.planIds)
