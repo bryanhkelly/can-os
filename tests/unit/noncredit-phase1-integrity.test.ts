@@ -65,6 +65,8 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(access).toContain('state:"closed" as const');
     expect(access).toContain("canStart=scope.canStart&&participantAttempt?.status");
     expect(assessment).toContain("check.canStart&&check.remainingAttempts>0");
+    expect(assessment).toContain("Retry knowledge check");
+    expect(assessment).toContain("Knowledge-check availability could not be verified.");
   });
 
   it("only displays published and invited course surveys with permission evidence",()=>{
