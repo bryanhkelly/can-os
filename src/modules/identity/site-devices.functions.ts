@@ -3,7 +3,11 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,desc,eq} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
-import {siteDeviceRegistrations,siteDevicePolicies,auditEvents} from "@/db/canonical-v301";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
+import {
+  siteDeviceRegistrations,
+  siteDevicePolicies,
+} from "@/db/canonical-v301";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
 import {AuthorizationError} from "@/domain/command-context";
 const category=z.enum(["desktop","laptop","tablet","phone","chromebook","other"]);
@@ -60,7 +64,7 @@ export const createSiteDeviceRegistration=createServerFn({method:"POST"})
   const [created]=await tx.insert(siteDeviceRegistrations).values({...data,siteId})
    .returning({id:siteDeviceRegistrations.id});
   if(!created)throw new Error("Unable to register device");
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
    actorPersonId,owningOrganizationId:organizationId,
    eventCode:"site_device.registered",entityKind:"site_device_registration",
    entityId:created.id,payload:{siteId,deviceCategory:data.deviceCategory,ownership:data.ownership,managed:data.managed}
@@ -83,7 +87,7 @@ export const changeSiteDeviceStatus=createServerFn({method:"POST"})
    .where(and(eq(siteDeviceRegistrations.id,data.id),eq(siteDeviceRegistrations.siteId,siteId)))
    .returning({id:siteDeviceRegistrations.id});
   if(!saved)throw new AuthorizationError("Site-owned device record");
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
    actorPersonId,owningOrganizationId:organizationId,
    eventCode:"site_device.status_changed",entityKind:"site_device_registration",
    entityId:data.id,payload:{siteId,previousStatus:previous.status,newStatus:data.status}
@@ -105,7 +109,7 @@ export const updateSiteDevicePolicy=createServerFn({method:"POST"})
    target:siteDevicePolicies.siteId,
    set:{...data,updatedAt:new Date()},
   });
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
    actorPersonId,owningOrganizationId:organizationId,
    eventCode:"site_device.policy_updated",entityKind:"site_device_policy",
    entityId:siteId,payload:{
