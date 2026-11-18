@@ -493,6 +493,10 @@ console.log("V6.1 source inventory: " + JSON.stringify(inventory.totals));
 const regression = checkChangedFiles(inventory.root);
 if (regression.warning) {
   console.warn("V6.1 incremental comparison: " + regression.warning);
+  if (process.env.CI || process.env.V61_BASE_REF) {
+    // Missing Git history must not silently be reported as an executed gate.
+    process.exitCode = 1;
+  }
 } else {
   console.log("V6.1 incremental comparison: " + regression.checked +
     " changed TSX files against " + regression.base);
