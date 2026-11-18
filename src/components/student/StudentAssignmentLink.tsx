@@ -1,30 +1,28 @@
-import type { ReactNode } from "react";
+import { forwardRef, type ComponentPropsWithoutRef } from "react";
 import { Link } from "@tanstack/react-router";
 import {
   studentAssignmentDetailRoute,
   type StudentAssignmentFilter,
 } from "@/domain/student-assignment-navigation";
 
-/** V6.1 navigation primitive used by student learning, actions, and dashboards.
- * The detail route remains authoritative; optional search preserves return context.
- */
-export function StudentAssignmentLink({
-  assessmentId, sectionId, filter, className, children, title, "aria-label": ariaLabel,
-}: {
+type StudentAssignmentLinkProps = Omit<ComponentPropsWithoutRef<"a">, "href"> & {
   assessmentId: string;
   sectionId?: string | null;
   filter?: StudentAssignmentFilter;
-  className?: string;
-  children?: ReactNode;
-  title?: string;
-  "aria-label"?: string;
-}) {
-  return <Link
-    to={studentAssignmentDetailRoute}
-    params={{ assessmentId }}
-    search={{ section: sectionId ?? undefined, filter }}
-    className={className}
-    title={title}
-    aria-label={ariaLabel}
-  >{children}</Link>;
-}
+};
+
+/** V6.1 assignment navigation primitive.
+ * Forwards anchor props and refs so shared Button, Slot, and dashboard actions
+ * retain focus, keyboard behavior, and accessible labels.
+ */
+export const StudentAssignmentLink = forwardRef<HTMLAnchorElement, StudentAssignmentLinkProps>(
+  function StudentAssignmentLink({ assessmentId, sectionId, filter, ...anchorProps }, ref) {
+    return <Link
+      {...anchorProps}
+      ref={ref}
+      to={studentAssignmentDetailRoute}
+      params={{ assessmentId }}
+      search={{ section: sectionId ?? undefined, filter }}
+    />;
+  },
+);
