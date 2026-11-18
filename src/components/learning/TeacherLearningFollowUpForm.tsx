@@ -28,7 +28,7 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
     {!expanded && <button type="button" className="underline" onClick={() => setExpanded(true)}>
       Plan a teacher follow-up
     </button>}
-    {expanded && <form noValidate className="grid gap-3 rounded-lg border p-3"
+    {expanded && <form noValidate className="grid gap-3 border border-border p-3"
       onSubmit={async event => {
         event.preventDefault();
         setAttempted(true);
