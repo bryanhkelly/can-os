@@ -1,6 +1,7 @@
-import { and, eq, gt, notInArray, isNull, lte, or, asc } from "drizzle-orm";
+import { and, eq, gt, ne, notInArray, isNull, isNotNull, lte, or, asc } from "drizzle-orm";
 import { db } from "@/db/client";
 import { OUTBOUND_LEASE_MS, OUTBOUND_MAX_ATTEMPTS, outboundRetryDelayMs } from "@/domain/outbound-retry-policy";
+import { SMS_PROVIDER_OUTCOME_UNCONFIRMED, outboundAttemptOutcome } from "@/domain/outbound-sms-safety";
 import { domainEvents, subscriptionDeliveries, subscriptions, conversationMessages } from "@/db/schema";
 import { emailNotificationRecipients, sendNotificationEmail } from "@/modules/communication/notification-email.server";
 import { getSubscriptionPolicy } from "./policy";
@@ -24,6 +25,22 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
   const clock = () => new Date(now.getTime() + Math.max(0, Date.now() - startedAt));
   const processed: string[] = [];
   let accepted = 0;
+  // Twilio currently has no idempotent receipt in this transport. A crashed
+  // worker may have sent its SMS before losing the processing lease. Do not
+  // send it again, and retire SMS failures queued by older worker versions.
+  const recoveryTime=clock();
+  await db.update(subscriptionDeliveries).set({
+    status:"failed", nextAttemptAt:null, leaseUntil:null,
+    lastError:SMS_PROVIDER_OUTCOME_UNCONFIRMED, updatedAt:recoveryTime,
+  }).where(and(
+    eq(subscriptionDeliveries.channel,"sms"),
+    or(
+      and(eq(subscriptionDeliveries.status,"processing"),
+        lte(subscriptionDeliveries.leaseUntil,recoveryTime)),
+      and(eq(subscriptionDeliveries.status,"failed"),
+        isNotNull(subscriptionDeliveries.nextAttemptAt)),
+    ),
+  ));
   while (processed.length < limit) {
     const claimTime = clock();
     let leaseUntil = new Date(claimTime.getTime() + LEASE_MS);
@@ -35,8 +52,12 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
           or(
             and(eq(subscriptionDeliveries.status, "pending"),
               or(isNull(subscriptionDeliveries.nextAttemptAt), lte(subscriptionDeliveries.nextAttemptAt, claimTime))),
-            and(eq(subscriptionDeliveries.status, "failed"), lte(subscriptionDeliveries.nextAttemptAt, claimTime)),
-            and(eq(subscriptionDeliveries.status, "processing"), lte(subscriptionDeliveries.leaseUntil, claimTime)),
+            and(eq(subscriptionDeliveries.status, "failed"),
+              ne(subscriptionDeliveries.channel,"sms"),
+              lte(subscriptionDeliveries.nextAttemptAt, claimTime)),
+            and(eq(subscriptionDeliveries.status, "processing"),
+              ne(subscriptionDeliveries.channel,"sms"),
+              lte(subscriptionDeliveries.leaseUntil, claimTime)),
           ),
         ))
         .orderBy(asc(subscriptionDeliveries.createdAt))
@@ -143,16 +164,24 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
         }
       }
       const attempt = delivery.attempt;
+      const finishedAt=clock();
+      const outcome=error==="sms_consent_required"
+        ? {lastError:error,nextAttemptAt:null}
+        : outboundAttemptOutcome(delivery.channel,{
+          kind:ok?"accepted":"failed",
+          reason:ok?null:error,
+          nextAttemptAt:ok || attempt>=MAX_ATTEMPTS || error==="channel_not_supported"
+            ? null : new Date(finishedAt.getTime()+RETRY_MS(attempt)),
+        });
       await db.transaction(async tx => {
         const rows = await tx.update(subscriptionDeliveries).set({
           status: ok ? "delivered" : "failed",
           attempts: attempt,
-          deliveredAt: ok ? new Date() : null,
-          lastError: ok ? null : error,
-          nextAttemptAt: ok || attempt >= MAX_ATTEMPTS || ["channel_not_supported", "sms_consent_required"].includes(error)
-            ? null : new Date(Date.now() + RETRY_MS(attempt)),
+          deliveredAt: ok ? finishedAt : null,
+          lastError: outcome.lastError,
+          nextAttemptAt: outcome.nextAttemptAt,
           leaseUntil: null,
-          updatedAt: new Date(),
+          updatedAt: finishedAt,
         }).where(owned())
           .returning({ id: subscriptionDeliveries.id });
         if (rows.length && ok && delivery.sourceConversationId) {
@@ -168,14 +197,22 @@ export async function processQueuedSubscriptionDeliveries(now = new Date(), limi
         if (rows.length && ok) accepted++;
       });
     } catch (error) {
-      const [row] = await db.select({ attempts: subscriptionDeliveries.attempts }).from(subscriptionDeliveries)
-        .where(owned()).limit(1);
+      const [row] = await db.select({
+        attempts:subscriptionDeliveries.attempts,channel:subscriptionDeliveries.channel,
+      }).from(subscriptionDeliveries).where(owned()).limit(1);
       if (!row) continue;
       const attempts = row.attempts + 1;
+      const failedAt=clock();
+      const outcome=outboundAttemptOutcome(row.channel,{
+        kind:"failed",
+        reason:error instanceof Error ? error.message.slice(0,500) : "delivery_failed",
+        nextAttemptAt:attempts>=MAX_ATTEMPTS
+          ? null : new Date(failedAt.getTime()+RETRY_MS(attempts)),
+      });
       await db.update(subscriptionDeliveries).set({
-        status: "failed", attempts, leaseUntil: null,
-        nextAttemptAt: attempts >= MAX_ATTEMPTS ? null : new Date(Date.now() + RETRY_MS(attempts)),
-        lastError: error instanceof Error ? error.message.slice(0, 500) : "delivery_failed",
+        status:"failed", attempts, leaseUntil:null,
+        nextAttemptAt:outcome.nextAttemptAt,lastError:outcome.lastError,
+        updatedAt:failedAt,
       }).where(owned());
     }
   }
