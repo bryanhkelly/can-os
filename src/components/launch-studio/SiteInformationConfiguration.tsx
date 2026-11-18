@@ -5,6 +5,8 @@ import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { siteInformationContexts, siteInformationSchema } from "@/domain/site-setup-configuration";
 import { updateLaunchSiteInformation } from "@/modules/programs/site-configuration.functions";
@@ -59,8 +61,8 @@ export function SiteInformationConfiguration({ site }: { site: SchoolHubOptions[
     <fieldset className="space-y-3 border bg-card p-5">
       <legend className="px-2 text-sm font-semibold">What describes this school or its setting?</legend>
       <p className="text-sm text-muted-foreground">Select all that apply. These descriptions do not establish legal status, school authority, or a verified organization relationship.</p>
-      {siteInformationContexts.map(context => <label key={context} className="flex min-h-11 items-center gap-3 text-sm">
-        <input type="checkbox" checked={information.contexts.includes(context)}
+      {siteInformationContexts.map(context => <Label key={context} className="flex min-h-11 items-center gap-3 text-sm">
+        <Checkbox checked={information.contexts.includes(context)}
           onChange={event => setInformation(current => ({
             ...current,
             contexts: event.target.checked
@@ -68,7 +70,7 @@ export function SiteInformationConfiguration({ site }: { site: SchoolHubOptions[
               : current.contexts.filter(value => value !== context),
           }))} />
         {contextLabels[context]}
-      </label>)}
+      </Label>)}
     </fieldset>
     <div className="space-y-4 border bg-card p-5">
       <Field label="Host church or community name (optional)">
