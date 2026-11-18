@@ -1,62 +1,121 @@
-import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
-import { chooseFourWeekCohortPlans, isFourWeeklyCohort } from "@/domain/noncredit-cohort-schedule";
+import {describe,expect,it} from "vitest";
+import {readFileSync} from "node:fs";
+import {resolve} from "node:path";
+import {
+  selectedCohortSessionPlanIds,validCohortSessionWindows,
+} from "@/domain/noncredit-cohort-schedule";
+import {fourSessionSchedulePreset} from "@/domain/classroom-scheduling";
 
-const meeting = (id: string, start: string, linked = false) => ({
-  planId: id, linked, state: "scheduled", startsAt: start,
-  endsAt: new Date(Date.parse(start) + 60 * 60_000).toISOString(),
-});
-const weekly = [
+const read=(path:string)=>readFileSync(resolve(process.cwd(),path),"utf8");
+function meeting(id:string,start:string,linked=false){
+  return {
+    planId:id,linked,state:"scheduled",
+    startsAt:start,endsAt:new Date(Date.parse(start)+60*60_000).toISOString(),
+  };
+}
+const weekly=[
   meeting("a","2026-11-20T18:00:00Z"),
   meeting("b","2026-11-27T18:00:00Z"),
   meeting("c","2026-12-04T18:00:00Z"),
   meeting("d","2026-12-11T18:00:00Z"),
 ];
-describe("COGIC-style four-session cohort scheduling", () => {
-  it("selects four authorized-looking, unallocated weekly dates, not arbitrary first four", () => {
-    expect(chooseFourWeekCohortPlans([
-      meeting("other","2026-11-21T18:00:00Z"),...weekly,
-    ],Date.parse("2026-11-01"))).toEqual(["a","b","c","d"]);
+
+describe("flexible four-session COGIC pilot dates",()=>{
+  it("accepts a weekly four-session plan",()=>{
+    expect(validCohortSessionWindows(weekly)).toBe(true);
   });
-  it("never calls two or three sessions four weeks", () => {
-    expect(chooseFourWeekCohortPlans(weekly.slice(0,3),0)).toEqual([]);
-    expect(isFourWeeklyCohort(weekly.slice(0,3))).toBe(false);
-  });
-  it("rejects a linked, cancelled, duplicate or off-week meeting", () => {
-    expect(chooseFourWeekCohortPlans(weekly.map((r,i)=>i===2?{...r,linked:true}:r),0)).toEqual([]);
-    expect(chooseFourWeekCohortPlans(weekly.map((r,i)=>i===2?{...r,state:"cancelled"}:r),0)).toEqual([]);
-    expect(isFourWeeklyCohort([weekly[0]!,weekly[1]!,weekly[1]!,weekly[3]!])).toBe(false);
-    expect(isFourWeeklyCohort([weekly[0]!,meeting("bad","2026-11-29T18:00:00Z"),weekly[2]!,weekly[3]!])).toBe(false);
-  });
-  it("accepts a local-time schedule across a one-hour daylight saving shift", () => {
-    expect(isFourWeeklyCohort([
-      meeting("a","2027-03-05T18:00:00Z"),
-      meeting("b","2027-03-12T18:00:00Z"),
-      meeting("c","2027-03-19T17:00:00Z"),
-      meeting("d","2027-03-26T17:00:00Z"),
+  it("accepts a 2x2 pattern with two meetings each week",()=>{
+    expect(validCohortSessionWindows([
+      meeting("1","2026-11-17T18:00:00Z"),
+      meeting("2","2026-11-19T18:00:00Z"),
+      meeting("3","2026-11-24T18:00:00Z"),
+      meeting("4","2026-11-26T18:00:00Z"),
     ])).toBe(true);
+  });
+  it("accepts a holiday pause that stretches four meetings to five weeks",()=>{
+    const starts=[
+      "2026-11-18T18:00:00Z","2026-11-25T18:00:00Z",
+      "2026-12-09T18:00:00Z","2026-12-16T18:00:00Z",
+    ];
+    expect(validCohortSessionWindows(starts.map((s,i)=>meeting(String(i),s)))).toBe(true);
+  });
+  it("rejects duplicate or overlapping meetings and invalid windows",()=>{
+    expect(validCohortSessionWindows([weekly[0]!,weekly[0]!])).toBe(false);
+    expect(validCohortSessionWindows([
+      weekly[0]!,
+      {...weekly[1]!,startsAt:weekly[0]!.startsAt},
+    ])).toBe(false);
+    expect(validCohortSessionWindows([{
+      startsAt:"2026-11-20T18:00:00Z",endsAt:"2026-11-20T17:00:00Z",
+    }])).toBe(false);
+    expect(validCohortSessionWindows([])).toBe(false);
+    expect(validCohortSessionWindows([...weekly,weekly[0]!])).toBe(false);
+  });
+  it("requires deliberate selection, not the first four arbitrary meetings",()=>{
+    const other=meeting("other","2026-11-21T18:00:00Z");
+    expect(selectedCohortSessionPlanIds(
+      [other,...weekly],["a","b","c","d"],Date.parse("2026-11-01"),
+    )).toEqual(["a","b","c","d"]);
+    expect(selectedCohortSessionPlanIds([other,...weekly],[],0)).toEqual([]);
+    expect(selectedCohortSessionPlanIds(weekly,["a","a"],0)).toEqual([]);
+    expect(selectedCohortSessionPlanIds(weekly,["missing"],0)).toEqual([]);
+    expect(selectedCohortSessionPlanIds(weekly,["a","b","c","d","other"],0)).toEqual([]);
+  });
+  it("allows partial cohort assignment and rejects linked, stale or cancelled plans",()=>{
+    expect(selectedCohortSessionPlanIds(weekly,["b","a"],0)).toEqual(["a","b"]);
+    expect(selectedCohortSessionPlanIds(weekly,["a"],Date.parse("2026-12-01"))).toEqual([]);
+    expect(selectedCohortSessionPlanIds([
+      {...weekly[0]!,linked:true},...weekly.slice(1),
+    ],["a"],0)).toEqual([]);
+    expect(selectedCohortSessionPlanIds([
+      {...weekly[0]!,state:"cancelled"},...weekly.slice(1),
+    ],["a"],0)).toEqual([]);
+  });
+  it("supplies two convenient date patterns without making either mandatory",()=>{
+    expect(fourSessionSchedulePreset(
+      "2026-11-17T18:00","2026-11-17T19:00","weekly",
+    )).toHaveLength(4);
+    const twice=fourSessionSchedulePreset(
+      "2026-11-17T18:00","2026-11-17T19:00","twice-weekly",
+    );
+    const days=twice.map(x=>Math.round((Date.parse(x.startsAt)-
+      Date.parse(twice[0]!.startsAt))/(24*3600_000)));
+    expect(days).toEqual([0,3,7,10]);
   });
 });
 
-describe("four-week operator journey integration", () => {
-  const read = (path: string) => readFileSync(resolve(process.cwd(),path),"utf8");
-  it("links facilitator calendar from authorized host courses, not the media rehearsal catalog", () => {
-    const host = read("src/routes/canonical.lab.facilitated.tsx");
-    expect(host).toContain("<ClassroomSchedulePanel choices={data.choices}");
-    expect(host).not.toContain("<ClassroomSchedulePanel choices={rehearsalOptions?.choices??[]}");
-    const calendar = read("src/components/learning/ClassroomSchedulePanel.tsx");
-    expect(calendar).toContain('import { Input } from "@/components/ui/input"');
-    expect(calendar).toContain('import { Select } from "@/components/ui/select"');
+describe("shared four-session operator and server boundaries",()=>{
+  it("books four nonoverlapping sessions at one authorized Site and Course",()=>{
+    const server=read("src/modules/learning/classroom-scheduling.functions.ts");
+    expect(server).toContain("export const scheduleFourClassroomSessions");
+    expect(server).toContain("meetings:z.array(scheduleInput).length(4)");
+    expect(server).toContain("validCohortSessionWindows(data.meetings)");
+    expect(server).toContain("await scheduleOneClassroom(tx,host,meeting,now)");
+    expect(server).not.toContain("four consecutive weekly meetings with the same duration");
   });
-  it("requires four dated meetings and locks the underlying calendar before assignment", () => {
-    const server = read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
-    expect(server).toContain("planIds:z.array(id).length(4)");
-    expect(server).toContain("!isFourWeeklyCohort(slots)");
+  it("attaches between one and four explicit sessions with transactional Site checks",()=>{
+    const server=read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
+    expect(server).toContain("export const attachCohortSessionPlans");
+    expect(server).toContain("planIds:z.array(id).min(1).max(4)");
+    expect(server).toContain("!validCohortSessionWindows(slots)");
     expect(server).toContain('.for("update")');
     expect(server).toContain("await assignCohortPlan(tx,scope,planId)");
-    const operator = read("src/components/enrollment/NoncreditReleaseOperations.tsx");
-    expect(operator).toContain("chooseFourWeekCohortPlans");
-    expect(operator).toContain("fourWeekPlanIds.length===4");
+    const scope=read("src/modules/enrollment/noncredit-cohort-operations.server.ts");
+    expect(scope).toContain("plan.hostOrganizationId!==provider.organizationId");
+    expect(scope).toContain("plan.courseVersionId!==release.courseVersionId");
+    expect(scope).toContain("plan.siteId!==release.siteId");
+  });
+  it("shows editable local-time dates and deliberate selected meeting attachment in V6.1",()=>{
+    const host=read("src/routes/canonical.lab.facilitated.tsx");
+    const planner=read("src/components/learning/ClassroomSchedulePanel.tsx");
+    const operator=read("src/components/enrollment/NoncreditReleaseOperations.tsx");
+    expect(host).toContain("<ClassroomSchedulePanel choices={data.choices}");
+    expect(planner).toContain('import { Input } from "@/components/ui/input"');
+    expect(planner).toContain('import { Select } from "@/components/ui/select"');
+    expect(planner).toContain('fillSessionDates("twice-weekly")');
+    expect(planner).toContain('Save all four sessions');
+    expect(operator).toContain("selectedCohortSessionPlanIds");
+    expect(operator).toContain('import {Checkbox} from "@/components/ui/choice"');
+    expect(operator).toContain("Attach selected sessions");
   });
 });
