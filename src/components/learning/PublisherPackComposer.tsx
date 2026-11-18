@@ -53,7 +53,7 @@ function PackDraftEditor({programId,release,courses,onSaved}:{
    {!courses.length&&<p className="text-sm">Publish at least one publisher-owned course before composing the pack.</p>}
   </fieldset>
   {dirty&&<p className="text-xs">Unsaved composition changes</p>}
-  <Button type="button" variant="outline" disabled={busy||!dirty||selected.length<1} className=" border px-3 py-2 text-sm disabled:opacity-50"
+  <Button type="button" variant="outline" disabled={busy||!dirty||selected.length<1} 
    onClick={()=>void act(async()=>{
     const result=await saveAuthoredPublisherPack({data:{
      programId,versionId:release.id,expectedRevision:revision,courseVersionIds:selected,
@@ -111,19 +111,19 @@ export function PublisherPackComposer({studio,onSaved}:{studio:Studio;onSaved:()
   }}>
    <h3 className="font-semibold sm:col-span-2">Create curriculum pack</h3>
    <Field label="Pack name"><Input required minLength={3} maxLength={160} value={name}
-    onChange={e=>{requestId.current=null;setName(e.target.value);}} className="mt-1 block w-full  border bg-background p-2"/></Field>
+    onChange={e=>{requestId.current=null;setName(e.target.value);}} className="mt-1"/></Field>
    <Field label="URL slug"><Input required minLength={3} maxLength={80} pattern="[a-z0-9-]+"
     value={slug} onChange={e=>{requestId.current=null;setSlug(e.target.value);}}
-    className="mt-1 block w-full  border bg-background p-2"/></Field>
+    className="mt-1"/></Field>
    <Field label="Publisher description"><Textarea required minLength={10} maxLength={2000}
     value={description} onChange={e=>{requestId.current=null;setDescription(e.target.value);}}
-    className="mt-1 block w-full  border bg-background p-2"/></Field>
+    className="mt-1"/></Field>
    <Field label="Visibility"><Select value={visibility} onChange={e=>{requestId.current=null;setVisibility(e.target.value as typeof visibility);}}
-    className="mt-1 block w-full  border bg-background p-2">
+    className="mt-1">
     <option value="private">Private</option><option value="public">Public discovery</option>
    </Select></Field>
    <Field label="License type"><Select value={licenseCode} onChange={e=>{requestId.current=null;setLicenseCode(e.target.value as typeof licenseCode);}}
-    className="mt-1 block w-full  border bg-background p-2">
+    className="mt-1">
     <option value="CC0">CC0</option><option value="CC-BY-4.0">CC-BY 4.0</option>
     <option value="COMMERCIAL">Commercial (verified agreement required)</option>
    </Select></Field>
