@@ -45,7 +45,7 @@ export function validClassroomSessionWindows(
   return true;
 }
 
-export type FourSessionCadence = "weekly" | "twice-weekly";
+export type FourSessionCadence = "weekly" | "twice-weekly" | "monday-thursday";
 
 /**
  * Convenience dates, not an authoritative cadence requirement. Operators can
@@ -59,7 +59,16 @@ export function fourSessionSchedulePreset(
   const end = new Date(endLocal);
   if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
     end.getTime() <= start.getTime()) throw new Error("Invalid first classroom meeting");
-  const offsets = cadence === "weekly" ? [0, 7, 14, 21] : [0, 3, 7, 10];
+  // A Monday–Thursday intensive begins on the first Monday on or after
+  // the selected date. Preserve the requested local wall-clock time.
+  // Other presets remain anchored to the exact date selected by the host.
+  if (cadence === "monday-thursday") {
+    const daysUntilMonday = (8 - start.getDay()) % 7;
+    start.setDate(start.getDate() + daysUntilMonday);
+    end.setDate(end.getDate() + daysUntilMonday);
+  }
+  const offsets = cadence === "weekly" ? [0, 7, 14, 21]
+    : cadence === "twice-weekly" ? [0, 3, 7, 10] : [0, 1, 2, 3];
   return offsets.map(days => {
     const startsAt = new Date(start);
     const endsAt = new Date(end);
