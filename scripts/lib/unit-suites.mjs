@@ -25,7 +25,7 @@ export const UNIT_SUITE_PREFIXES = Object.freeze({
   classes: [
     "class-", "native-class-", "unified-class", "unified-classroom-",
     "activity-evidence-",
-    "canonical-objective-", "network-class-", "site-native-class-",
+    "canonical-objective-", "network-class-", "site-native-class-", "launch-class-",
     "site-first-launch-", "native-facilitated-classroom-",
   ],
   network: ["network-attribution", "noncredit-self-enrollment"],
