@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativeClassSurveyCampaignOptions, linkNativeClassSurveyCampaign,
@@ -65,10 +67,10 @@ export function NativeClassSurveyCampaignPanel({classId}:{classId:string}){
               </span>
             </li>)}
         </ul>}
-      <label className="mt-4 block text-sm font-semibold" htmlFor="native-class-survey-campaign">
+      <Label className="mt-4 block text-sm font-semibold" htmlFor="native-class-survey-campaign">
         Approved local campaign
-      </label>
-      <select id="native-class-survey-campaign" value={selection}
+      </Label>
+      <Select id="native-class-survey-campaign" value={selection}
         onChange={event=>setSelection(event.target.value)}
         disabled={busy||available.length===0}
         className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
@@ -76,7 +78,7 @@ export function NativeClassSurveyCampaignPanel({classId}:{classId:string}){
         {available.map(row=><option key={row.campaignId} value={row.campaignId}>
           {row.title} · {row.status}
         </option>)}
-      </select>
+      </Select>
       <Button type="button" className="mt-3" variant="outline"
         disabled={!selection||busy} onClick={()=>void link()}>
         {busy?"Linking…":"Link campaign to Class"}
