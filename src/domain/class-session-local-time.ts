@@ -65,7 +65,12 @@ export function siteWallWeek(firstLocal:string,index:number):string{
   const [datePart,timePart]=firstLocal.split("T");
   const [year=NaN,month=NaN,day=NaN]=datePart!.split("-").map(Number);
   const [hour=NaN,minute=NaN]=timePart!.split(":").map(Number);
-  return new Date(Date.UTC(year,month-1,day+index*7,hour,minute)).toISOString().slice(0,16);
+  // Date.UTC normalizes invalid day/hour values. Reject those before adding
+  // weeks, rather than silently scheduling the wrong calendar date.
+  const firstMillis=Date.UTC(year,month-1,day,hour,minute);
+  if(!Number.isFinite(firstMillis)||new Date(firstMillis).toISOString().slice(0,16)!==firstLocal)
+    throw new Error("Select a real calendar date and time.");
+  return new Date(firstMillis+index*7*86400000).toISOString().slice(0,16);
 }
 export function buildSiteClassMeetings(
   meetings:readonly LocalMeeting[],timeZone:string,

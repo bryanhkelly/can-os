@@ -14,16 +14,23 @@ export function isSharedDeviceMode():boolean {
 export function setSharedDeviceMode(enabled:boolean):void {
  try{if(enabled)window.localStorage.setItem(sharedKey,"1");else window.localStorage.removeItem(sharedKey);}catch{}
 }
+/** Clear only CAN-owned state. Other same-origin features may use this tab's
+ * storage, and a sign-out must not erase their unrelated data. Iterate
+ * backwards so removals cannot skip keys in the Storage index. */
+function clearCanStorageKeys(storage:Storage,preserve:ReadonlySet<string>=new Set()):void {
+ for(let index=storage.length-1;index>=0;index--){
+  const key=storage.key(index);
+  if(key?.startsWith("can-")&&!preserve.has(key))storage.removeItem(key);
+ }
+}
 /** Broadcast a local account handoff to every tab. Events carry no account ID or secret. */
 export function clearLearnerBrowserState(broadcast=true):void {
- try{window.sessionStorage.clear();}catch{}
- // Local storage persists across tabs. Preserve only the kiosk-mode preference.
+ try{clearCanStorageKeys(window.sessionStorage);}catch{}
+ // Preserve kiosk preference and the latest cross-tab revocation marker only.
  try{
-  const mode=window.localStorage.getItem(sharedKey);
-  for(const key of Object.keys(window.localStorage))
-   if(key.startsWith("can-")&&key!==sharedKey&&key!==revocationKey)window.localStorage.removeItem(key);
-  if(mode==="1")window.localStorage.setItem(sharedKey,"1");
-  if(broadcast)window.localStorage.setItem(revocationKey,
+  const storage=window.localStorage;
+  clearCanStorageKeys(storage,new Set([sharedKey,revocationKey]));
+  if(broadcast)storage.setItem(revocationKey,
    String(Date.now())+":"+crypto.randomUUID());
  }catch{}
 }
