@@ -70,7 +70,7 @@ export const operationPublicationSnapshots = educationV30.table(
   },
 );
 
-export const publicationWithdrawals = educationV30.table("publication_withdrawals", {
+export const publicationWithdrawals = pgTable("publication_withdrawals", {
   id: id(),
   publicationSnapshotId: uuid("publication_snapshot_id").notNull(),
   effectiveAt: timestamp("effective_at", { withTimezone: true }).notNull(),
