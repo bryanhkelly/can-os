@@ -54,6 +54,9 @@ const sourceGuarded = new Set([
   "operations.field-trips.tsx",
   "operations.transfer-records.tsx",
   "operations.curriculum-marketplace.tsx",
+  "guardian.native-classes.tsx",
+  "class_.$classId.tsx",
+  "classes.tsx",
 ]);
 
 function resolveSource(from, specifier) {
