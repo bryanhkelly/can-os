@@ -3,8 +3,9 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, asc, eq, gt, isNotNull, isNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents, evidenceDocumentVersions,
+  evidenceDocumentVersions,
   facilitatedLearningParticipants, facilitatedLearningSessions,
   facilitatedRoomSurveyCampaigns, surveyCampaigns, surveyDefinitions,
   surveyInvitations, surveyResponses, surveyVersions,
@@ -119,14 +120,14 @@ export const attachClassroomSurvey=createServerFn({method:"POST"})
       if(saved){
         const payload={facilitatedSessionId:room.id,
           surveyCampaignId:data.surveyCampaignId,stage:data.stage};
-        await tx.insert(auditEvents).values({
+        await writeCanonicalAudit(tx,{
           actorPersonId:host.actor.actorPersonId!,
           owningOrganizationId:host.organizationId,
           eventCode:"learning.classroom.survey.attached",
           entityKind:"facilitated_learning_session",
           entityId:room.id,payload,
         });
-        await tx.insert(domainEvents).values({
+        await emitCanonicalDomainEvent(tx,{
           actorPersonId:host.actor.actorPersonId!,
           eventType:"ClassroomSurveyAttached",aggregateType:"facilitated_learning_session",
           aggregateId:room.id,payload,
