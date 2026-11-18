@@ -29,5 +29,23 @@ describe("GradebookScoringEditor",()=>{
   expect(html).toMatch(/<input[^>]*disabled=""/);
   expect(html).toMatch(/<textarea[^>]*disabled=""/);
   expect(html.match(/disabled=""/g)?.length).toBeGreaterThanOrEqual(4);
+ }); it("shows V6.1 inline score errors and blocks invalid grades before saving",()=>{
+  const html=renderToStaticMarkup(<GradebookScoringEditor assessment={sample}
+   score="12" comment="" rubricInputs={{}} busy={false} sectionId="section-id" liveTotal={null}
+   onScoreChange={()=>{}} onCommentChange={()=>{}} onRubricChange={()=>{}}
+   onSaveDraft={()=>{}} onPostGrade={()=>{}}/>);
+  expect(html).toContain("Score must be between 0 and 10 points.");
+  expect(html).toContain('aria-invalid="true"');
+  expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Post grade<\/button>/);
  });
+ it("keeps grade posting available for a complete valid score",()=>{
+  const html=renderToStaticMarkup(<GradebookScoringEditor assessment={sample}
+   score="8.5" comment="Clear argument" rubricInputs={{}} busy={false} sectionId="section-id" liveTotal={null}
+   onScoreChange={()=>{}} onCommentChange={()=>{}} onRubricChange={()=>{}}
+   onSaveDraft={()=>{}} onPostGrade={()=>{}}/>);
+  expect(html).not.toContain('aria-invalid="true"');
+  expect(html).toMatch(/<button[^>]*>Post grade<\/button>/);
+  expect(html).not.toMatch(/<button[^>]*disabled=""[^>]*>Post grade<\/button>/);
+ });
+
 });
