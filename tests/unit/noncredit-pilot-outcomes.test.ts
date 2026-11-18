@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  summarizeNoncreditPilot,publicationSafePilotSummary,type PilotParticipantFact,
+  summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
+  type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 const sample: PilotParticipantFact={
  registrationId:"r1",trainingVersionId:"t1",registered:true,engaged:true,
@@ -36,5 +37,19 @@ describe("noncredit pilot reporting",()=>{
  });
  it("refuses double-counted registrations",()=>{
   expect(()=>summarizeNoncreditPilot([sample,sample])).toThrow("Duplicate pilot");
+ });
+ it("credits feedback only to one matching enrollment after registration",()=>{
+  const registeredAt=new Date("2026-11-01T12:00:00Z");
+  const valid={offeringId:"offering-a",registrationsForPersonOffering:1,
+    registeredAt,latestSubmittedAt:new Date("2026-11-01T13:00:00Z")};
+  expect(attributableNoncreditFeedback(valid)).toBe(true);
+  expect(attributableNoncreditFeedback({...valid,offeringId:null})).toBe(false);
+  expect(attributableNoncreditFeedback({...valid,registrationsForPersonOffering:2})).toBe(false);
+  expect(attributableNoncreditFeedback({...valid,registrationsForPersonOffering:0})).toBe(false);
+  expect(attributableNoncreditFeedback({...valid,latestSubmittedAt:null})).toBe(false);
+  expect(attributableNoncreditFeedback({...valid,
+    latestSubmittedAt:new Date("2026-10-30T11:00:00Z")})).toBe(false);
+  expect(attributableNoncreditFeedback({...valid,
+    latestSubmittedAt:new Date("invalid")})).toBe(false);
  });
 });
