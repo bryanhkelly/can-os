@@ -41,6 +41,9 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(evidence).toContain("contentAssets.ownerOrganizationId,organizationId");
     expect(evidence).toContain("contentWithdrawals.effectiveAt,at");
     expect(evidence).toContain("rightsEvidenceVersionId");
+    expect(evidence).toContain("latest.reviewerPersonId===manuscriptAuthorPersonId");
+    expect(evidence).toContain("rightsAuthorizedIds.has(id)");
+    expect(evidence).toContain("currentRights");
     expect(evidence).toContain("row.contentHash!==items[i]?.contentHash");
   });
   it("requires explicit independently reviewed full release policy and actual track coverage",()=>{
@@ -49,6 +52,10 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(service).toContain("getNativeOfferingReleasePolicyReview");
     expect(service).toContain("saveNativeOfferingReleasePolicy");
     expect(service).toContain("expectedPolicyRevision");
+    expect(service).toContain("requireAuditedReleasePolicy");
+    expect(service).toContain('eq(auditEvents.eventCode,"NativeOfferingReleasePolicyReviewed")');
+    expect(service).toContain("event.payload.manuscriptHash===bundle.hash");
+    expect(service).toContain("event.actorPersonId!==authorPersonId");
     expect(service).toContain("policyRevision(previous)!==data.expectedPolicyRevision");
     expect(service).toContain('NativeOfferingReleasePolicyReviewed');
     expect(service).toContain('requireVerifiedEvidence(tx,data.reviewEvidenceVersionId,"academic")');
@@ -78,6 +85,8 @@ describe("native Course review and separate Offering adoption governance",()=>{
     const reviewer=source("src/components/learning/NativeOfferingReleaseReviewPanel.tsx");
     const policy=source("src/components/learning/NativeOfferingReleasePolicyEditor.tsx");
     expect(creator).toContain("assetUses");
+    expect(creator).toContain("sameSelection");
+    expect(creator).toContain("manifest.assetUses");
     expect(creator).toContain("releasePoliciesComplete");
     expect(creator).toContain("submitNativeOfferingRelease");
     expect(reviewer).toContain("Inspect exact submitted Course material");
