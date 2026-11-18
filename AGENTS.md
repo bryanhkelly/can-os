@@ -32,6 +32,7 @@ Applies to all coding agents, including ChatGPT, Copilot and other tools. Start 
 ## Development and completion
 
 - Use `main` as the active development baseline unless a task explicitly authorizes a different branch. FullFlow is released and retired; old phase and FullFlow branch/database handoffs are historical, not active instructions.
+- For V6.1 page migration, discover routes, components and legacy controls from the actual source graph using `scripts/lib/v61-source-audit.mjs`. Do not add route-name allowlists, fixed migration counts, duplicated per-page checklists or JSX-text assertions to the design-system checker. Put domain-specific state transitions and permissions in behavioral tests, and source/design rules in reusable AST analysis.
 - Before coding, identify the canonical owning service, related callers, routes, migrations, invariants, and test coverage. Prefer deleting dead paths only after reference checks.
 - Keep route contracts in `docs/platform-route-contracts.json` aligned with source; newly added entries begin with `pending`, never invented acceptance claims. Run `node scripts/check-platform-route-contracts.mjs --check`.
 - Validate with typecheck, unit/integration, and browser tests as relevant, using disposable databases for mutation tests. If checks are deferred or cannot run, report them **unverified** rather than passed.
