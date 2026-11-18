@@ -613,3 +613,28 @@ for (const [file, required] of Object.entries(migratedV61RouteControls)) {
     process.exitCode = 1;
   }
 }
+
+ 
+// These are intentional specialized grids, not generic DirectoryTables.
+// V6.1 buttons must retain the existing focus, row/column identity and
+// keyboard model when their visual presentation is consolidated.
+const v61KeyboardGridContracts = {
+  "routes/teacher.gradebook.tsx": [
+    "onKeyDown={event => onCellKeyDown(event, rowIndex, colIndex)}",
+    "data-cell=",
+    "<Button type=\"button\" variant=\"outline\" size=\"sm\"",
+  ],
+  "routes/calendar.tsx": [
+    "onKeyDown={event=>onCalendarDayKeyDown(event,cell.key)}",
+    "aria-keyshortcuts=\"ArrowLeft ArrowRight ArrowUp ArrowDown\"",
+    "calendar-day-",
+    "<Button variant=\"ghost\" size=\"sm\"",
+  ],
+};
+for (const [file, required] of Object.entries(v61KeyboardGridContracts)) {
+  const source = readFileSync(join(srcRoot, file), "utf8");
+  for (const fragment of required) if (!source.includes(fragment)) {
+    console.error(file + " lost V6.1 cell focus or keyboard behavior: " + fragment);
+    process.exitCode = 1;
+  }
+}
