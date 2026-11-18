@@ -2,7 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { EmptyState, MutationFeedback, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { ActionDialog, EmptyState, MutationFeedback, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getMyNoncreditSelfEnrollmentHistoryPage, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
@@ -98,6 +98,8 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   }
   const visibleCourses=releaseId ? [] : query.data?.pages.flatMap(page=>page.items);
   const visibleWaitlist=registrationId ? [] : waiting.data?.pages.flatMap(page=>page.items);
+  const waitingListToLeave=visibleWaitlist?.find(item=>item.releaseId===cancelWaitlist);
+  const registrationToWithdraw=visibleCourses?.find(course=>course.registrationId===withdrawConfirm);
   if(!authorized)return <p role="status" className="border border-border p-4 text-sm">Sign in with your CAN account to manage training.</p>;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
@@ -122,13 +124,11 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
           {item.invitationActive&&<p className="mt-1 text-xs text-muted-foreground">Claim before {item.inviteExpiresAt?new Date(item.inviteExpiresAt).toLocaleString():"the invitation expires"}</p>}
           <div className="mt-3 flex flex-wrap gap-3">
             {item.invitationActive&&<Link to="/learn/enroll" search={{release:item.releaseId}} className="text-sm underline text-primary">Claim reserved place</Link>}
-            {cancelWaitlist===item.releaseId?
-              <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" variant="destructive" disabled={busy!==null||changeBusy}
-                  onClick={()=>void leaveWaitlist(item.releaseId)}>Confirm leave waitlist</Button>
-                <Button type="button" variant="outline" size="sm" disabled={changeBusy} onClick={()=>setCancelWaitlist(null)}>Keep my place</Button>
-              </div>:
-              <Button variant="ghost" type="button" size="sm" disabled={changeBusy||busy!==null} className="text-sm underline text-muted-foreground" onClick={()=>setCancelWaitlist(item.releaseId)}>Leave waiting list</Button>}
+            <Button variant="ghost" type="button" size="sm" disabled={changeBusy||busy!==null}
+              className="text-sm underline text-muted-foreground"
+              onClick={()=>{setWithdrawConfirm(null);setCancelWaitlist(item.releaseId);}}>
+              Leave waiting list
+            </Button>
           </div>
         </article>)}
       </div>
@@ -178,27 +178,12 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
               </Button>:
               <p className="text-sm text-muted-foreground">Learning access is not currently active</p>}
             {["registered","active"].includes(course.registrationStatus)&&
-              (withdrawConfirm===course.registrationId?
-                <div className="border border-border bg-muted/20 p-3 text-sm">
-                  <p className="font-medium">Withdraw from {course.trainingTitle}?</p>
-                  <p className="mt-2 max-w-sm text-muted-foreground">
-                    This ends course access and facilitator-room pairing.
-                    Your registration history and consent remain recorded.
-                    Your original place is not automatically reassigned.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    <Button type="button" variant="destructive" disabled={changeBusy||busy!==null}
-                      onClick={()=>void withdraw(course.registrationId)}>
-                      {mutation.pending?"Withdrawing…":"Confirm withdrawal"}
-                    </Button>
-                    <Button type="button" variant="outline" disabled={changeBusy||busy!==null}
-                      onClick={()=>setWithdrawConfirm(null)}>Keep registration</Button>
-                  </div>
-                </div>:
-                <button type="button" className="text-xs font-semibold text-muted-foreground underline underline-offset-4"
-                  onClick={()=>setWithdrawConfirm(course.registrationId)} disabled={changeBusy||busy!==null}>
-                  Withdraw registration
-                </button>)}
+              <Button type="button" variant="ghost" size="sm"
+                className="text-xs font-semibold text-muted-foreground underline underline-offset-4"
+                disabled={changeBusy||busy!==null}
+                onClick={()=>{setCancelWaitlist(null);setWithdrawConfirm(course.registrationId);}}>
+                Withdraw registration
+              </Button>}
           </div>
         </div>
       </article>)}
@@ -223,5 +208,26 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
           onClick={()=>void query.fetchNextPage()}>Retry older records</Button>
       </WorkspaceNotice>}
     </div>}
+    <ActionDialog open={Boolean(waitingListToLeave)}
+      title="Leave waiting list?"
+      description={<p>Leave the waiting list for <strong>{waitingListToLeave?.title??"this training"}</strong>?
+        Your place or invitation will be released. Existing learning and registration records are preserved.</p>}
+      confirmLabel="Leave waiting list" destructive
+      pending={mutation.pending} pendingLabel="Leaving waiting list…"
+      confirmDisabled={changeBusy||busy!==null}
+      onConfirm={()=>{if(cancelWaitlist)void leaveWaitlist(cancelWaitlist);}}
+      onClose={()=>setCancelWaitlist(null)}/>
+    <ActionDialog open={Boolean(registrationToWithdraw)}
+      title="Withdraw from registration?"
+      description={<>
+        <p>Withdraw from <strong>{registrationToWithdraw?.trainingTitle??"this training"}</strong>?</p>
+        <p className="mt-2">This ends course access and facilitator-room pairing. Your registration
+          history and consent remain recorded. Your original place is not automatically reassigned.</p>
+      </>}
+      confirmLabel="Withdraw registration" destructive
+      pending={mutation.pending} pendingLabel="Withdrawing…"
+      confirmDisabled={changeBusy||busy!==null}
+      onConfirm={()=>{if(withdrawConfirm)void withdraw(withdrawConfirm);}}
+      onClose={()=>setWithdrawConfirm(null)}/>
   </section>;
 }
