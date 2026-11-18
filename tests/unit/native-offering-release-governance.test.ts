@@ -98,6 +98,46 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(policy).toContain("expectedPolicyRevision");
   });
 
+  it("rejects asset-backed submission downgrades even when the client bypasses its guard",()=>{
+    const service=source("src/modules/learning/native-offering-release.functions.ts");
+    const submit=service.split("export const submitNativeOfferingRelease=")[1]
+      ?.split("export const getNativeOfferingReleasePolicyReview=")[0]??"";
+    expect(submit).toContain("if(previous&&!items.length&&");
+    expect(submit).toContain("readNativeReleaseManifestItems(tx,previous.id)");
+    expect(submit).toContain("An asset-backed release cannot be downgraded");
+    expect(submit).toContain("manifestHash===snapshotHash");
+  });
+  it("prevents active reviewers from approving Courses they previously edited",()=>{
+    const service=source("src/modules/learning/native-offering-release.functions.ts");
+    expect(service).toContain('import { auditEvents as platformAuditEvents } from "@/db/schema"');
+    expect(service).toContain('"curriculum.native_draft_lesson.save"');
+    expect(service).toContain('eq(platformAuditEvents.resourceType,"course_lesson")');
+    expect(service).toContain("inArray(platformAuditEvents.resourceId,lessonIds)");
+    expect(service).toContain("reviewerPersonIds.has(change.actorPersonId)");
+    expect(service).toContain("requireIndependentNativeCourseReview(tx,bundle,");
+    expect(service).toContain("await requireApprovedSnapshot(tx,manifest,bundle)");
+  });
+  it("uses reusable 6.1 release checkpoints and reliable mutation/refresh feedback",()=>{
+    const author=source("src/components/learning/NativeCourseDraftEditor.tsx");
+    const reviewer=source("src/components/learning/NativeOfferingReleaseReviewPanel.tsx");
+    const policy=source("src/components/learning/NativeOfferingReleasePolicyEditor.tsx");
+    const component=source("src/components/learning/NativeOfferingReleaseCheckpoints.tsx");
+    const creatorHome=source("src/components/learning/ProviderInstructionHome.tsx");
+    const reviewerHome=source("src/components/learning/ProviderInstructionReviews.tsx");
+    for(const sourceCode of [author,reviewer,policy]){
+      expect(sourceCode).toContain("useMutationFeedback");
+      expect(sourceCode).toContain("<MutationFeedback");
+    }
+    expect(author).toContain("<NativeOfferingReleaseCheckpoints");
+    expect(reviewer).toContain("<NativeOfferingReleaseCheckpoints");
+    expect(component).toContain("projectNativeReleaseCheckpoints");
+    expect(component).toContain("<StatusBadge");
+    expect(component).toContain("Class enrollment");
+    expect(creatorHome).toContain("<EmptyState");
+    expect(reviewerHome).toContain("<EmptyState");
+    expect(reviewerHome).toContain("<StatusBadge");
+  });
+
   it("requires independent canonical Blueprint and current readiness before adoption",()=>{
     const service=source("src/modules/programs/native-offering-adoption-review.functions.ts");
     expect(service).toContain('actor.role!=="blueprint_reviewer"');
