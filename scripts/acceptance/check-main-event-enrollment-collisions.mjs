@@ -43,6 +43,10 @@ async function run(){
       old.relforcerowsecurity AS legacy_force_rls,
       existing.relrowsecurity AS public_rls,
       existing.relforcerowsecurity AS public_force_rls,
+      has_table_privilege('authenticated',existing.oid,'SELECT') AS public_authenticated_select,
+      has_table_privilege('authenticated',existing.oid,'INSERT') AS public_authenticated_insert,
+      has_table_privilege('authenticated',existing.oid,'UPDATE') AS public_authenticated_update,
+      has_table_privilege('authenticated',existing.oid,'DELETE') AS public_authenticated_delete,
       (SELECT count(*)::int FROM pg_constraint fk
        WHERE fk.contype='f' AND fk.confrelid=old.oid) AS legacy_inbound_fks,
       (SELECT count(*)::int FROM pg_constraint fk
@@ -98,6 +102,12 @@ async function run(){
       legacy_inbound_fks:row.legacy_inbound_fks,
       public_inbound_fks:row.public_inbound_fks,
       legacy_rls:row.legacy_rls,public_rls:row.public_rls,
+      public_authenticated_direct_access:{
+        select:row.public_authenticated_select,
+        insert:row.public_authenticated_insert,
+        update:row.public_authenticated_update,
+        delete:row.public_authenticated_delete,
+      },
       routine_text_mentions:row.routine_text_mentions,
       columns_equal:JSON.stringify(row.legacy_columns)===JSON.stringify(row.public_columns),
     };
@@ -112,6 +122,12 @@ async function run(){
   if(result.some(row=>!row.legacy_oid||!row.public_oid||
       !row.public_rows_have_not_disappeared||!row.legacy_rls&&row.legacy_rows>0))
     throw new Error("Collision state changed; reconcile before proceeding");
+  const privileged=result.filter(row=>
+    !row.public_rls && Object.values(row.public_authenticated_direct_access).some(Boolean));
+  if(privileged.length)console.error(
+    "SECURITY REVIEW REQUIRED: public tables with authenticated direct grants and RLS disabled: "+
+      privileged.map(row=>row.table).join(", ")
+  );
   process.exitCode=2;
   console.error("BLOCKED: collisions and dependent FKs remain; no DROP is authorized");
 }
