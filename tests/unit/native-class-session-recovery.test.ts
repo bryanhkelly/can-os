@@ -82,6 +82,10 @@ describe("native Class enrollment with one interactive CAN sign-in",()=>{
  });
  it("keeps self, approval and invitation on the exact same service",()=>{
    const ui=read(uiPath);
+   // File-route modules are included in SSR; importing a .client module here
+   // is rejected by the TanStack Start server import-protection gate.
+   expect(ui).toContain('from "@/modules/classes/native-class-entry"');
+   expect(ui).not.toContain("native-class-entry.client");
    expect(ui.match(/await enrollCurrentPersonInClass\(\{data:\{/g)??[]).toHaveLength(3);
    expect(ui).not.toContain("async function enrollWithLinkedCanRecovery");
    expect(read(commandPath)).toContain("Each createServerFn call is its own HTTP round trip");
