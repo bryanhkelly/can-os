@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/choice";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { normalizeClientError } from "@/lib/client-error";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   getNativePublicClassCatalogPage, getMyNativeClassEnrollmentHistoryPage,
@@ -461,10 +460,6 @@ function ClassHome(){
 }
 
 function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
-  const [recovering,setRecovering]=useState(false);
-  const [recoveryNotice,setRecoveryNotice]=useState("");
-  const [recoveryError,setRecoveryError]=useState("");
-
   const client=useQueryClient();
   const requested=Route.useSearch();
   const [searchText,setSearchText]=useState(requested.search??"");
@@ -514,18 +509,18 @@ function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
       client.invalidateQueries({queryKey:["my-activity"]},{throwOnError:true}),
     ]);
   }
+  const recovery=useMutationFeedback(refresh);
+  const recovering=recovery.pending||recovery.refreshFailed;
   async function recoverExistingNativeLearning(){
     if(recovering)return;
-    setRecovering(true);setRecoveryError("");setRecoveryNotice("");
-    try{
-      await resumeLinkedNativeClassLearner();
-      setRecoveryNotice("Your existing verified CAN learner identity is connected. You can continue without another login.");
-      await refresh();
-    }catch(error){
-      setRecoveryError(normalizeClientError(error,
-        "No approved adult learner identity is linked to this CAN account yet. A verified Person, current learner grant and independent identity review may be required before native Class enrollment."
-      ).message);
-    }finally{setRecovering(false);}
+    await recovery.run(
+      ()=>resumeLinkedNativeClassLearner(),
+      {
+        successMessage:"Your existing verified CAN learner identity is connected. You can continue without another login.",
+        commandErrorMessage:"Class access could not be restored. An independently verified adult learner Person and current learner grant may be required.",
+        refreshErrorMessage:"Your verified Class access was restored, but the Class list could not refresh. Retry refresh rather than restoring the session again.",
+      },
+    );
   }
   return <WorkspaceShell width="wide" eyebrow="My CAN" title="My Classes"
     subtitle="One Class enrollment and one learning record, regardless of whether your Class is academic, independent or facilitated."
@@ -544,8 +539,8 @@ function NativeLearnerClasses({navigation}:{navigation:ReactNode}){
           disabled={recovering} onClick={()=>void recoverExistingNativeLearning()}>
           {recovering?"Checking linked identity…":"Restore verified Class access"}
         </Button>
-        {recoveryNotice&&<p role="status" className="mt-3 text-sm">{recoveryNotice}</p>}
-        {recoveryError&&<p role="alert" className="mt-3 text-sm text-destructive">{recoveryError}</p>}
+        <MutationFeedback state={{...recovery,retryRefresh:recovery.retryRefresh}}
+          pendingMessage="Restoring verified Class access…" className="mt-3"/>
       </section>}
     <section className="mt-6">
       <h2 className="font-serif text-2xl">My Class invitations</h2>
