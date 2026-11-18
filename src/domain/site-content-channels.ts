@@ -117,6 +117,17 @@ export function safeReadSiteContentChannelConfig(raw: unknown): SiteContentChann
   catch { return defaultSiteContentChannelConfig; }
 }
 
+/** Public layouts are opt-in. Missing or invalid published snapshots must
+ * not turn the private editor's sample/default blocks into live sections.
+ * Approved standard catalog pages remain governed by their own readers. */
+export function readPublishedSiteContentChannelConfig(raw: unknown): SiteContentChannelConfig {
+  if (raw !== null && raw !== undefined) {
+    try { return readSiteContentChannelConfig(raw); }
+    catch { /* Treat an invalid published snapshot as unconfigured, not default. */ }
+  }
+  return {version: 2, revision: 0, blocks: []};
+}
+
 /**
  * Canonical Site layout lifecycle. A default layout is a previewable
  * suggestion, not a persisted draft. The first Save must create revision 1,
