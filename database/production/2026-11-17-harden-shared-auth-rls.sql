@@ -25,10 +25,9 @@ BEGIN
   IF owner_role IS NULL OR current_user<>'neondb_owner' THEN
     RAISE EXCEPTION 'Reviewed server-owner security context required';
   END IF;
-  IF EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-    WHERE n.nspname='education_v30' AND p.proname='v301_can_staff_session_context'
-    HAVING count(*)<>1 AND count(*)<>0) THEN
-    RAISE EXCEPTION 'Unexpected CAN staff identity projection';
+  IF (SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='education_v30' AND p.proname='v301_can_staff_session_context')<>1 THEN
+    RAISE EXCEPTION 'Unexpected CAN staff identity projection count';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname='education_v30'
