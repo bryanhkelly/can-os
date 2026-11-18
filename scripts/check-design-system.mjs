@@ -976,3 +976,41 @@ for (const [file, fragments] of Object.entries(migratedSchoolExperienceComponent
     process.exitCode = 1;
   }
 }
+
+
+// Native Class is a composed operational workspace; route-only JSX checks
+// cannot detect drift in scheduling, staff planning or survey components.
+const migratedNativeClassComponents = {
+  "learning/NativeClassSessionsPanel.tsx": [
+    "@/components/ui/input", "@/components/ui/textarea",
+    "@/components/ui/label", "@/components/ui/choice",
+    "<Checkbox", "<Radio", "<Textarea", "<Input",
+    "revokeNativeClassSession", "changeNativeClassSessionSchedule",
+  ],
+  "learning/NativeClassSurveyCampaignPanel.tsx": [
+    "@/components/ui/select", "@/components/ui/label",
+    "<Select", "<Label", "linkNativeClassSurveyCampaign",
+  ],
+  "learning/ClassSupplementForm.tsx": [
+    "<ClassVideoUploadForm", "<Field", "<Button",
+  ],
+  "learning/ClassTeacherPlanningPanel.tsx": [
+    "<WorkspacePanel", "isLearnerFacingInstruction",
+  ],
+  "learning/ClassCreationRequestForm.tsx": [
+    "@/components/ui/field", "<Field", "<Input",
+    "<Select", "<Textarea", "<Button",
+  ],
+};
+for (const [file, fragments] of Object.entries(migratedNativeClassComponents)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(file + " lost canonical Class UI or the existing governed operation: " + fragment);
+    process.exitCode = 1;
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " reintroduced a native control or rounded presentation");
+    process.exitCode = 1;
+  }
+}
