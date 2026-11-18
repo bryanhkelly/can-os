@@ -48,7 +48,10 @@ describe("noncredit pilot correctness boundaries",()=>{
       expect(sql).toContain("rule.enabled");
       expect(sql).toContain("permission.verified_by_person_id IS NOT NULL");
       expect(sql).toContain("c.deployment_id=participant.deployment_id");
-      if(sql===feedbackPatch)expect(sql).toContain("c.offering_id=participant.offering_id");
+      if(sql===feedbackPatch){
+        expect(sql).toContain("c.offering_id=participant.offering_id");
+        expect(sql).toContain("c.operating_organization_id=participant.registering_organization_id");
+      }
       expect(sql).toContain("ON CONFLICT (campaign_id,invited_person_id) DO NOTHING");
     }
   });
@@ -66,9 +69,10 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(surveys).toContain("surveyInvitations.invitedPersonId");
     expect(surveys).toContain("evidenceDocumentVersions.verifiedByPersonId");
     expect(surveys).toContain("current verified permission for identifiable feedback");
-    expect(surveys).toContain("noncreditSurveyOfferingId");
-    expect(surveys).toContain("surveyCampaigns.offeringId,noncreditOfferingId");
-    expect(surveys).toContain("campaign.offeringId!==noncreditOfferingId");
+    expect(surveys).toContain("noncreditSurveyScope");
+    expect(surveys).toContain("surveyCampaigns.offeringId,noncreditScope.offeringId");
+    expect(surveys).toContain("surveyCampaigns.operatingOrganizationId,noncreditScope.operatingOrganizationId");
+    expect(surveys).toContain("campaign.operatingOrganizationId!==noncreditScope.operatingOrganizationId");
     expect(activities).toContain("NoncreditCourseSurveys");
     expect(activities).toContain("CourseAssessmentPanel");
   });
