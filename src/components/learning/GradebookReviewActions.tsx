@@ -3,15 +3,16 @@ import { Button } from "@/components/ui/button";
 
 export function GradebookReviewActions(props: {
   busy: boolean;
+  canSubmit?: boolean;
   sectionId: string;
   onSaveDraft: () => void;
   onPostGrade: () => void;
 }) {
   return <div className="flex flex-wrap gap-3">
-    <Button type="button" variant="outline" disabled={props.busy} onClick={props.onSaveDraft}>
+    <Button type="button" variant="outline" disabled={props.busy || props.canSubmit === false} onClick={props.onSaveDraft}>
       Save grading draft
     </Button>
-    <Button type="button" disabled={props.busy} onClick={props.onPostGrade}>
+    <Button type="button" disabled={props.busy || props.canSubmit === false} onClick={props.onPostGrade}>
       Post grade
     </Button>
     {props.busy
