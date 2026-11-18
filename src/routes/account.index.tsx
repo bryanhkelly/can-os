@@ -148,7 +148,7 @@ function MyCanAccount() {
             {!account.favoritesReady && <p role="status" className="mt-4 border border-border bg-muted/30 p-3 text-sm">
               Saved locations are not yet available in this database. Your school access remains unchanged.
             </p>}
-            <Label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a location</Label
+            <Label htmlFor="place-search" className="mt-4 block text-xs font-semibold">Find a location</Label>
             <Input id="place-search" type="search" value={search}
               onChange={event => setSearch(event.target.value)} placeholder="Search site, organization or city"
               className="mt-2 min-h-11"/>
@@ -260,12 +260,12 @@ function AccountContactEditor({ profile, editable }: {
       Your verified email and official institutional records are managed separately.
       Sharing with a new school still requires its own application or invitation.
     </p>
-    <Label className="block text-xs font-semibold" htmlFor="my-can-preferred-name">Preferred name</Label
+    <Label className="block text-xs font-semibold" htmlFor="my-can-preferred-name">Preferred name</Label>
     <Input id="my-can-preferred-name" value={preferredName} maxLength={80}
       disabled={!editable || saving} onChange={event => setPreferredName(event.target.value)}
       autoComplete="nickname"
       className="min-h-11"/>
-    <Label className="block text-xs font-semibold" htmlFor="my-can-phone">Contact phone</Label
+    <Label className="block text-xs font-semibold" htmlFor="my-can-phone">Contact phone</Label>
     <Input id="my-can-phone" value={phone} maxLength={30} type="tel"
       disabled={!editable || saving} onChange={event => setPhone(event.target.value)}
       autoComplete="tel"
@@ -335,7 +335,7 @@ function SiteContactSharing({ siteId, siteName, current, available, grantAllowed
       {expanded && <div className="mt-3 max-w-lg space-y-3 border border-border bg-muted/20 p-4">
         <p className="text-sm leading-6">Allow {siteName} to see your CAN name and verified email address
           for the purpose you select. This does not enroll you in anything or grant a staff role.</p>
-        <Label htmlFor={"share-purpose-"+siteId} className="block text-xs font-semibold">Purpose</Label
+        <Label htmlFor={"share-purpose-"+siteId} className="block text-xs font-semibold">Purpose</Label>
         <Select id={"share-purpose-"+siteId} value={purpose}
           onChange={event => setPurpose(event.target.value as SiteConsentView["purpose"])}
           className="min-h-11">
@@ -344,7 +344,7 @@ function SiteContactSharing({ siteId, siteName, current, available, grantAllowed
         <Label className="flex items-start gap-2 text-sm">
           <Checkbox checked={sharePhone} onChange={event => setSharePhone(event.target.checked)}/>
           Include my contact phone
-        </Label
+        </Label>
         <p className="text-xs leading-5 text-muted-foreground">You can revoke future access at any time.
           Revoking does not erase information already lawfully received or retained by an organization.</p>
         <Button type="button" size="sm" disabled={saving || !available}
