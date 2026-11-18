@@ -38,7 +38,8 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
   const [savedSnapshot,setSavedSnapshot]=useState(JSON.stringify({
     revision:initial.revision,blocks:initial.blocks,
   }));
-  useLaunchUnsavedChanges(JSON.stringify({revision,blocks})!==savedSnapshot,
+  const unsavedChanges = JSON.stringify({revision,blocks})!==savedSnapshot;
+  useLaunchUnsavedChanges(unsavedChanges,
     "Leave Site content setup? Unsaved block edits will be lost.");
   const [addChannel,setAddChannel]=useState<SiteContentChannelId| "">("");
   const [saving,setSaving]=useState(false);
@@ -98,13 +99,13 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
     finally{setSaving(false);}
   }
   async function publish(){
-    if(!siteId||saving||publishing)return;
+    if(!siteId||saving||publishing||unsavedChanges||(revision===0&&!saved))return;
     setError("");setPublishing(true);
     try{
       const outcome=await publishSiteContentChannels({data:{siteId,expectedRevision:revision}});
       setPublished(true);
       setSaved(false);
-      if(!outcome.changed)onSaved();
+      onSaved();
     }catch(e){setError(mutationErrorMessage(e,"Publication requires an authorized Site website publisher. No public content changed."));}
     finally{setPublishing(false);}
   }
@@ -235,7 +236,7 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
         <Button disabled={saving||publishing||!siteId} onClick={()=>void save()}>
           <Save/>{saving?"Saving channels…":"Save private blocks"}
         </Button>
-        {canPublish&&<Button variant="outline" disabled={saving||publishing||!siteId||!saved}
+        {canPublish&&<Button variant="outline" disabled={saving||publishing||!siteId||unsavedChanges||(revision===0&&!saved)}
           onClick={()=>void publish()}>
           {publishing?"Publishing…":"Publish approved content blocks"}
         </Button>}
