@@ -31,20 +31,20 @@ export function AdmissionsGuardianActions({applicationId,verified,loginProvision
      "Guardian sign-in is provisioned. The registrar may send the secure invitation; offer decisions remain with the guardian."}
   </p>
   <div className="mt-3 flex flex-wrap gap-2">
-   <button type="button" disabled={busy||verified} onClick={()=>setVerifying(true)}
-    className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+   <Button type="button" variant="outline" size="sm" disabled={busy||verified} onClick={()=>setVerifying(true)}
+    >
     {verified?"Relationship verified":"Verify guardian relationship"}
-   </button>
-   <button type="button" disabled={busy||!verified||loginProvisioned} onClick={()=>onProvision(applicationId)}
-    className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+   </Button>
+   <Button type="button" variant="outline" size="sm" disabled={busy||!verified||loginProvisioned} onClick={()=>onProvision(applicationId)}
+    >
     {loginProvisioned?"Login provisioned":"Provision guardian login"}
-   </button>
-   <button type="button" disabled={busy||!loginProvisioned} onClick={()=>onInvite(applicationId)}
-    className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+   </Button>
+   <Button type="button" variant="outline" size="sm" disabled={busy||!loginProvisioned} onClick={()=>onInvite(applicationId)}
+    >
     Send secure guardian invitation
-   </button>
+   </Button>
   </div>
-  {verifying&&!verified&&<form noValidate className="mt-3 space-y-3 rounded-lg border p-3 text-sm"
+  {verifying&&!verified&&<form noValidate className="mt-3 space-y-3  border p-3 text-sm"
    onSubmit={event=>{
     event.preventDefault();setAttempted(true);
     if(evidenceNote.trim().length<12)return;
