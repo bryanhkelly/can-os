@@ -33,7 +33,7 @@ export function GradebookReviewQueue({
   activeSubmissionId?: string | null;
 }) {
   return (
-    <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto">
+    <nav aria-label="Submission queue" className="grid max-h-96 gap-2 overflow-y-auto pr-1">
       {cells.map((cell) => {
         const active = activeSubmissionId === cell.submissionId;
         return (
@@ -42,7 +42,7 @@ export function GradebookReviewQueue({
             to="/teacher/gradebook"
             search={{ section: sectionId, assessment: cell.assessmentId, student: cell.studentProfileId }}
             aria-current={active ? "page" : undefined}
-            className={`rounded-lg border p-3 text-sm ${active ? "bg-muted" : "hover:bg-muted"}`}
+            className={`min-h-14 border p-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${active ? "border-primary bg-muted" : "border-border bg-card hover:bg-muted/60"}`}
           >
             <span className="block font-semibold">
               {students.find((student) => student.studentProfileId === cell.studentProfileId)?.displayName ?? "Student"}
