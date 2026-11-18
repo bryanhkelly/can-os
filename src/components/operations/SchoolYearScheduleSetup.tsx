@@ -19,7 +19,7 @@ export function SchoolYearScheduleSetup({ schoolYearId, programId, startsOn, end
   const mutation = useMutationFeedback(changed);
   const busy = Boolean(disabled || mutation.pending || mutation.refreshFailed || mutation.notice);
   const valid = scheduleDayPattern.safeParse(pattern).success && name.trim().length >= 2;
-  return <section aria-label="Prepare instructional schedule" className="mt-4 rounded-xl border bg-card p-5">
+  return <section aria-label="Prepare instructional schedule" className="mt-4  border bg-card p-5">
     <h3 className="font-serif text-xl">Prepare your instructional schedule</h3>
     <p className="mt-2 text-sm">Review a recurring instruction block for {startsOn} through {endsOn}. Times use {timezone}. Include home-learning days where appropriate; this is not a record of onsite attendance or staff coverage.</p>
     <form noValidate className="mt-3 space-y-3 text-sm" onSubmit={event => {
