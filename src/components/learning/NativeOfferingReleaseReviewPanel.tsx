@@ -40,6 +40,8 @@ function ReleaseReview({item}:{item:Item}){
     await Promise.all([
       client.invalidateQueries({queryKey:["native-offering-release-review-queue"]},
         {throwOnError:true}),
+      client.invalidateQueries({queryKey:["native-adoption-review-queue"]},
+        {throwOnError:true}),
       invalidateNativeClassAvailability(client),
     ]);
   });
