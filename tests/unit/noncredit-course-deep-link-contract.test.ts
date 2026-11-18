@@ -31,6 +31,8 @@ describe("adult learner bookmarked Course Attempt access",()=>{
     expect(read).toContain("eq(noncreditSelfEnrollmentClaims.canonicalAccountId,link.canonicalAccountId)");
     expect(read).toContain("eq(noncreditSelfEnrollmentClaims.participantPersonId,link.canonicalPersonId)");
     expect(read).toContain("eq(noncreditRegistrations.participantPersonId,link.canonicalPersonId)");
+    expect(read).toContain("FROM ${learnerCourseAttempts} attempt");
+    expect(read).toContain("FROM ${noncreditCompletionDecisions} later");
   });
 
   it("restores native learner sessions exactly once at the Course workspace",()=>{
