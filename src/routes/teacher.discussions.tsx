@@ -54,8 +54,8 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
     breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Updating class discussion..."/>
     {section && !sections.length && <WorkspaceNotice tone="danger" className="mt-5">This class is unavailable in your current teaching membership.</WorkspaceNotice>}
-    {sections.length > 0 && <details className="mt-6  border bg-card p-5" open={lesson?true:undefined}>
-      <summary className="cursor-pointer font-semibold">Start a class discussion</summary>
+    {sections.length > 0 && <details className="mt-6 border border-border bg-card p-5" open={lesson?true:undefined}>
+      <summary className="min-h-10 cursor-pointer font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">Start a class discussion</summary>
       <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
         event.preventDefault();
         setCreateAttempted(true);
@@ -99,8 +99,11 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
       </p>}
       <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void run(() => setCourseDiscussionLock({ data: { threadId: thread.id, locked: !thread.locked } }))}
         className="text-sm underline">{thread.locked ? "Unlock discussion" : "Lock discussion"}</Button>
-      <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={" border p-4 text-sm " + (message.parentMessageId ? "ml-4" : "")}>
-        <p className="text-xs text-muted-foreground">{message.authorLabel} · {new Date(message.createdAt).toLocaleString()}</p>
+      <div className="mt-4 grid gap-3">{thread.messages.map(message => <article key={message.id} className={"border border-border bg-card p-4 text-sm " + (message.parentMessageId ? "ml-4 border-l-2 border-l-primary/50" : "")}>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-muted-foreground">{message.authorLabel} · <time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time></p>
+          {message.hidden && <StatusBadge tone="attention">Hidden from students</StatusBadge>}
+        </div>
         <p className="mt-2 whitespace-pre-wrap">{message.body}</p>
         {message.canModerate && <Button type="button" variant="ghost" size="sm" disabled={busy} onClick={() => void run(() => moderateDiscussionMessage({ data: { messageId: message.id, hidden: !message.hidden } }))}
           className="mt-3 text-xs underline">{message.hidden ? "Restore post" : "Hide post"}</Button>}
