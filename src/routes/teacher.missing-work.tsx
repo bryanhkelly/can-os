@@ -3,7 +3,7 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getTeacherMissingWork, createMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
-import { WorkspaceShell, StatCard, EmptyState, WorkspaceNotice } from "@/components/workspace";
+import { WorkspaceShell, StatCard, EmptyState, WorkspaceNotice, WorkspacePanel, StatusBadge } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -39,29 +39,38 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
     >
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating follow-up..."/>
       {!connected && <WorkspaceNotice tone="attention" className="mt-4">The school data service is unavailable. The queue cannot load.</WorkspaceNotice>}
-      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+      {connected && <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <StatCard value={items.length} label="Overdue student-assignment items" />
         <StatCard value={studentCount} label="Students needing follow-up" />
-      </div>
-      <section className="mt-6 space-y-3">
+      </div>}
+      <WorkspacePanel className="mt-6" title="Follow-up queue"
+        description="Review overdue assignments in your assigned Sections. Follow-ups are recorded in the shared Operations workflow.">
+        <ul className="space-y-3">
         {items.map(x => (
-          <article key={x.assessmentId + ":" + x.studentProfileId} className=" border bg-card p-5">
+          <li key={x.assessmentId + ":" + x.studentProfileId} className="border border-border bg-card p-4 sm:p-5">
             <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {formatDateOnly(dateKeyInTimezone(x.dueAt,x.timezone))}</p>
-            <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId}} className="underline">{x.title}</Link></h2>
+            <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId,student:x.studentProfileId}} className="underline underline-offset-4">{x.title}</Link></h2>
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
-            <p className="mt-1 text-sm"><Link to="/staff/students/$personId" params={{personId:x.studentPersonId}} className="underline">{x.studentName}</Link> · {x.status === "returned" ? "Returned for revision; awaiting resubmission" : x.status === "assigned" ? "Assigned but not submitted" : "No attempt recorded"}</p>
-            <span className="mt-3 inline-block text-xs text-muted-foreground">Assessment ID: {x.assessmentId.slice(0,8)}</span>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+              <Link to="/staff/students/$personId" params={{personId:x.studentPersonId}}
+                className="font-medium underline underline-offset-4">{x.studentName}</Link>
+              <StatusBadge tone={x.status === "returned" ? "attention" : "neutral"}>
+                {x.status === "returned" ? "Awaiting revision"
+                  : x.status === "assigned" ? "Not submitted" : "No attempt recorded"}
+              </StatusBadge>
+            </div>
             {(followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId) ? (
-              <Link to="/actions/$actionId"
-                params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId!}}
-                className="ml-4 inline-block  border px-3 py-2 text-xs font-semibold underline">
-                Open follow-up
-              </Link>
+              <Button asChild variant="outline" size="sm" className="mt-3">
+                <Link to="/actions/$actionId"
+                  params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId!}}>
+                  Open follow-up
+                </Link>
+              </Button>
             ) : handledElsewhere[x.assessmentId + ":" + x.studentProfileId] ? (
-              <p role="status" className="ml-4 inline-block text-xs text-muted-foreground">A colleague is handling this follow-up</p>
+              <p role="status" className="mt-3 text-sm text-muted-foreground">A colleague is handling this follow-up</p>
             ) : (
               <Button type="button" variant="outline" size="sm" disabled={busy}
-                className="ml-4"
+                className="mt-3"
                 onClick={async () => {
                   const result=await mutation.run(
                     () => createMissingWorkFollowUp({data:{
@@ -86,10 +95,11 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
               </Button>
             )}
 
-          </article>
+          </li>
         ))}
         {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}
-      </section>
+        </ul>
+      </WorkspacePanel>
     </WorkspaceShell>
   );
 }
