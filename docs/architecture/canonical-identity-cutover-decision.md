@@ -1,5 +1,46 @@
 # Canonical identity cutover decision (main)
 
+## Active main checkpoint: 14 remaining native Person references (November 17, 2026)
+
+**Live Neon main is authoritative.** The latest verified database scan shows **142
+`public.people`, zero `education_v30.persons` and native accounts, 21
+authoritative `public.account_person_grants`, and 14 foreign keys still
+targeting `education_v30.persons`. These divide into **11 native learner/Class
+references** and **three `public` correspondence/adult-review references**.
+Other earlier inventory counts below document past checkpoints, not the
+current production state. Other agents are consolidating tables concurrently.
+
+Applied on `main`:
+
+- `2026-11-17-rebind-13-professional-qualification-person-fks.sql`: verified
+  13 empty professional, screening, equipment, qualification and workforce
+  source constraints now point to `public.people`, preserving validation,
+  source columns, exact names and NO ACTION semantics
+- `2026-11-17-rebind-native-class-staff-person-to-public.sql`: rebinds
+  the protected Class staff recipient Person constraint to `public.people`.
+  `src/modules/classes/class-staff.functions.ts` now requires the existing
+  CAN Person and precisely scoped, currently active and verified
+  `room_facilitator` grant at the Class's exact Organization and Site.
+  The grant and account/Person rows are locked during the Class mutation,
+  and the existing operator Class authorization and independent review
+  remain separate
+
+**Staged, deliberately NOT executed:**
+`2026-11-17-stage-final-11-learner-person-fks.sql`. Its runtime cutover and
+independent authorization flags must not be set while noncredit self-enrollment
+or reviewed Class onboarding still creates `canonicalPersons` and
+`canonicalAccounts` or issues a second learner cookie. The existing
+`verify:person:runtime-main -- --strict` command continues to report these
+blockers. The three empty correspondence tables may be removed only after
+their application readers, protected adult-review history and learner session
+ownership are migrated. Do not remap correspondence IDs onto public People
+without an independently verified evidence-preserving decision.
+
+**Verification:** direct SQL catalog and record-count checks on Neon `main`
+passed. Source-level tests were committed; actual TypeScript, Vitest and live
+browser acceptance have not been executed for this batch. The end-to-end
+one-Person cutover remains **P0 BLOCKED**, not released.
+
 **Decision:** One CAN login and one authoritative Person identity. There is no requirement to preserve native-v3 browser login, account-to-account bridges, or old identity endpoints during the cutover. This is an architecture decision, **not** evidence that the cutover is implemented or tested.
 
 ## Latest main checkpoint: One CAN staff identity and 36 native Person FKs remaining
