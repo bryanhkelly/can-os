@@ -48,14 +48,14 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
   }
 
   return (
-    <section className="mt-7 rounded-xl border bg-card p-5" aria-labelledby="class-request-title">
+    <section className="mt-7  border bg-card p-5" aria-labelledby="class-request-title">
       <h2 id="class-request-title" className="font-serif text-2xl">Request a class</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Send a class setup request to your registrar. The registrar will select approved curriculum,
         confirm the term and schedule, and create the class after the usual school checks.
       </p>
       {!options.programs.length ? (
-        <p role="status" className="mt-4 rounded-lg border p-3 text-sm">
+        <p role="status" className="mt-4  border p-3 text-sm">
           This teacher account is not scoped to a school program yet. Ask your school administrator
           to set up your program access before requesting a class.
         </p>
@@ -134,7 +134,7 @@ export function ClassCreationRequestForm({ options }: { options: Options }) {
           <h3 id="class-request-history-title" className="font-semibold">Your class requests</h3>
           <ul className="mt-3 space-y-3">
             {options.requests.map(request => (
-              <li key={request.id} className="rounded-lg border p-3 text-sm">
+              <li key={request.id} className=" border p-3 text-sm">
                 <p className="font-medium">{request.requestedClassTitle} · {request.programName}</p>
                 <p className="mt-1 text-muted-foreground">
                   {request.status === "open" ? "Waiting for registrar review" :
