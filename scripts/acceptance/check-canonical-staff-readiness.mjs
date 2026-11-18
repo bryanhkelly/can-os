@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
  * Read-only CAN -> canonical Site staff release preflight.
- * Checks installed schema and relationship readiness without inferring or
- * granting identity links, and without printing identities or credentials.
+ * Checks CAN-only staff sessions, exact public Person/Site/Organization grants,
+ * enforced RLS and installed restricted SQL without printing identities.
  *
  * DATABASE_URL=<target database> npm run db:canonical:staff-readiness
- * Requires at least one exact, approved, non-demo staff Person/Site/role path.
+ * Requires at least one current, verified, non-demo CAN staff Site-role path.
  * Still not proof a browser session authenticates or that the restricted login can SET ROLE.
  */
 import { Pool } from "@neondatabase/serverless";
@@ -17,23 +17,41 @@ let client;
 try {
   client = await pool.connect();
   await client.query("BEGIN READ ONLY");
-  const [{ staff_reader, person_link_table, platform_site_table, native_grants_table, operators_table }] =
+  const [{ project_id, branch_id, database_name, staff_reader, sites,
+    organizations, people, access_grants, access_sessions, public_rls }] =
     (await client.query(`
-      SELECT
+      SELECT current_setting('neon.project_id',true) AS project_id,
+        current_setting('neon.branch_id',true) AS branch_id,
+        current_database() AS database_name,
         to_regprocedure('education_v30.v301_can_staff_session_context(text)') IS NOT NULL AS staff_reader,
-        to_regclass('public.access_account_canonical_principals') IS NOT NULL AS person_link_table,
-        to_regclass('public.sites') IS NOT NULL AS platform_site_table,
-        to_regclass('education_v30.canonical_account_grants') IS NOT NULL AS native_grants_table,
-        to_regclass('education_v30.site_organization_roles') IS NOT NULL AS operators_table
+        to_regclass('public.sites') IS NOT NULL AS sites,
+        to_regclass('public.organizations') IS NOT NULL AS organizations,
+        to_regclass('public.people') IS NOT NULL AS people,
+        to_regclass('public.account_person_grants') IS NOT NULL AS access_grants,
+        to_regclass('public.access_sessions') IS NOT NULL AS access_sessions,
+        (SELECT bool_and(relrowsecurity AND relforcerowsecurity)
+         FROM pg_class WHERE oid IN ('public.people'::regclass,
+          'public.sites'::regclass,'public.organizations'::regclass)) AS public_rls
     `)).rows;
-  const checks = { staff_reader, person_link_table, platform_site_table, native_grants_table, operators_table };
-  const missing = Object.entries(checks).filter(([, present]) => !present).map(([name]) => name);
-  if (missing.length) {
+  if(project_id!=="sweet-hall-62441909"||
+    branch_id!=="br-restless-sea-ar9ooo55"||database_name!=="neondb")
+    throw new Error("Refusing Neon branch other than CAN OS main");
+  const checks={staff_reader,sites,organizations,people,access_grants,access_sessions,public_rls};
+  const missing=Object.entries(checks).filter(([,present])=>!present).map(([key])=>key);
+  const [{projection}]=(await client.query(`
+    SELECT pg_get_functiondef('education_v30.v301_can_staff_session_context(text)'::regprocedure)
+      AS projection
+  `)).rows;
+  if(!projection.includes("source.can_grant_id")||
+    projection.includes("access_account_canonical_principals")||
+    projection.includes("canonical_account_grants"))
+    missing.push("native_staff_correspondence_not_retired");
+  if(missing.length){
     await client.query("ROLLBACK");
-    console.error("FAIL: canonical staff infrastructure is incomplete: " + missing.join(", "));
-    console.error("Apply the reviewed additive CAN staff migrations before any live acceptance run.");
-    process.exitCode = 1;
-  } else {
+    console.error("BLOCKED: canonical Site-staff reader or core security is incomplete: "+
+      missing.join(", "));
+    process.exitCode=1;
+  }else{
     const [counts] = (await client.query(`
       SELECT
         (SELECT count(*)::int FROM public.account_person_grants g
@@ -101,88 +119,49 @@ try {
                 )
             ) = 1
         ) AS eligible_institutional_approver_grants,
-        (SELECT count(*)::int FROM public.access_accounts a
-           JOIN public.account_person_grants g ON g.account_id = a.id
-          WHERE a.disabled = false AND a.email_verified_at IS NOT NULL
+        (SELECT count(*)::int FROM public.account_person_grants public_grant
+          JOIN public.access_accounts a ON a.id=public_grant.account_id
+          JOIN public.people can_person ON can_person.id=public_grant.person_id
+          JOIN public.sites site ON site.id=public_grant.site_id
+            AND site.organization_id=public_grant.organization_id
+          JOIN public.organizations org ON org.id=public_grant.organization_id
+          WHERE public_grant.active AND public_grant.role IN ('site_admin','registrar')
+            AND public_grant.site_id IS NOT NULL AND a.person_id=public_grant.person_id
+            AND can_person.active AND NOT a.disabled AND a.email_verified_at IS NOT NULL
             AND a.email_normalized NOT LIKE '%.demo'
-            AND a.person_id = g.person_id AND g.active = true
-            AND g.role IN ('site_admin','registrar')
-            AND g.organization_id IS NOT NULL AND g.site_id IS NOT NULL
+            AND site.lifecycle_status IN ('planning','active')
+            AND org.lifecycle_status='active'
+            AND NOT EXISTS (
+              SELECT 1 FROM public.account_person_grants conflicting
+              WHERE conflicting.account_id=a.id AND conflicting.active
+                AND conflicting.person_id<>a.person_id)
         ) AS verified_can_staff_grants,
-        (SELECT count(*)::int FROM public.access_account_canonical_principals
-          WHERE revoked_at IS NULL AND verified_at IS NOT NULL) AS verified_person_links,
-        (SELECT count(*)::int FROM public.sites platform_site
-          WHERE platform_site.lifecycle_status IN ('planning','active')
-        ) AS matching_shared_sites,
-        (SELECT count(*)::int FROM education_v30.canonical_account_grants
-          WHERE active = true AND revoked_at IS NULL
-            AND role_code IN ('site_admin','registrar')) AS active_staff_grants,
-        (SELECT count(*)::int FROM education_v30.site_organization_roles
-          WHERE role_code IN ('operator','host') AND valid_from <= now()
-            AND (valid_through IS NULL OR valid_through > now())) AS active_site_relationships,
-        (SELECT count(*)::int FROM (
-          SELECT a.id AS account_id, public_grant.id AS public_grant_id
-           FROM public.access_accounts a
-           JOIN public.account_person_grants public_grant
-             ON public_grant.account_id = a.id
+        (SELECT count(*)::int FROM public.access_sessions s
+          JOIN public.access_accounts a ON a.id=s.account_id
+          JOIN public.account_person_grants public_grant
+            ON public_grant.id=s.active_grant_id AND public_grant.account_id=a.id
+          JOIN public.people can_person ON can_person.id=public_grant.person_id
+          JOIN public.sites site ON site.id=public_grant.site_id
+            AND site.organization_id=public_grant.organization_id
+          JOIN public.organizations org ON org.id=public_grant.organization_id
+          WHERE s.revoked_at IS NULL AND s.expires_at>now()
+            AND s.updated_at>now()-interval '30 minutes'
+            AND (NOT s.shared_device OR s.last_activity_at>now()-interval '5 minutes')
             AND public_grant.active AND public_grant.role IN ('site_admin','registrar')
-            AND public_grant.site_id IS NOT NULL
-           JOIN public.sites public_site ON public_site.id = public_grant.site_id
-            AND public_site.organization_id = public_grant.organization_id
-           JOIN public.access_account_canonical_principals person_link
-             ON person_link.account_id = a.id
-            AND person_link.revoked_at IS NULL AND person_link.verified_at IS NOT NULL
-            AND person_link.verified_by_account_id <> a.id
-           JOIN education_v30.canonical_account_grants native_grant
-             ON native_grant.person_id = person_link.canonical_principal_id
-            AND native_grant.site_id = public_site.id
-            AND native_grant.role_code = public_grant.role
-            AND native_grant.active AND native_grant.revoked_at IS NULL
-           JOIN education_v30.canonical_accounts native_account
-             ON native_account.id = native_grant.account_id
-           JOIN public.organizations native_org
-             ON native_org.id = native_grant.organization_id
-           JOIN public.people can_person
-             ON can_person.id = public_grant.person_id
-          WHERE a.disabled = false AND a.email_verified_at IS NOT NULL
-            AND a.person_id = public_grant.person_id
+            AND public_grant.site_id IS NOT NULL AND a.person_id=public_grant.person_id
+            AND can_person.active AND NOT a.disabled AND a.email_verified_at IS NOT NULL
             AND a.email_normalized NOT LIKE '%.demo'
-            AND native_account.disabled_at IS NULL
-            AND native_account.email_verified_at IS NOT NULL
-            AND native_org.lifecycle_status = 'active'
-            AND can_person.active = true
-            AND public_site.lifecycle_status IN ('planning','active')
+            AND site.lifecycle_status IN ('planning','active')
+            AND org.lifecycle_status='active'
             AND NOT EXISTS (
-              SELECT 1 FROM public.account_person_grants other_grant
-              WHERE other_grant.account_id = a.id AND other_grant.active = true
-                AND other_grant.person_id <> public_grant.person_id
-            )
-            AND NOT EXISTS (
-              SELECT 1 FROM public.access_account_canonical_principals other_link
-              WHERE other_link.canonical_principal_id = person_link.canonical_principal_id
-                AND other_link.account_id <> a.id AND other_link.revoked_at IS NULL
-            )
-            AND NOT EXISTS (
-              SELECT 1 FROM public.access_account_canonical_principals other_link
-              WHERE other_link.account_id = a.id
-                AND other_link.canonical_principal_id <> person_link.canonical_principal_id
-                AND other_link.revoked_at IS NULL
-            )
-            AND EXISTS (
-              SELECT 1 FROM education_v30.site_organization_roles rel
-              WHERE rel.site_id = native_grant.site_id
-                AND rel.organization_id = native_grant.organization_id
-                AND rel.role_code IN ('host','operator')
-                AND rel.valid_from <= now()
-                AND (rel.valid_through IS NULL OR rel.valid_through > now())
-            )
-          GROUP BY a.id, public_grant.id
-          HAVING count(*) = 1
-        ) uniquely_authorized_staff) AS eligible_staff_paths
+              SELECT 1 FROM public.account_person_grants conflicting
+              WHERE conflicting.account_id=a.id AND conflicting.active
+                AND conflicting.person_id<>a.person_id)
+        ) AS eligible_staff_paths
     `)).rows;
     await client.query("ROLLBACK");
-    // Mirrors the restricted staff-session reader's identity and scope gates.
-    // Exactly one canonical match per CAN active grant is mandatory.
+    // Mirrors the installed restricted CAN staff-session reader's current identity gates.
+    // Canonical identity links and duplicate native grants are never required.
     // An active browser session and role SET permission must still be tested.
     // Independent positive counters are NOT sufficient: they may belong to
     // different schools, people and grants. Require a complete joined path.
@@ -204,12 +183,12 @@ try {
       console.error("Do not bypass approval, use shared demo credentials, or seed a privileged grant.");
     }
     if (!ready) {
-      console.error("FAIL: no end-to-end, independently authorized, non-demo CAN staff path exists.");
-      console.error("Do not create duplicate Site identities or grant staff access automatically.");
+      console.error("BLOCKED: no currently eligible non-demo CAN staff session with an exact Site grant.");
+      console.error("Do not manufacture a session or staff grant for acceptance.");
       process.exitCode = 1;
     } else {
-      console.log("PASS: at least one matched CAN/canonical staff identity path exists.");
-      console.log("NEXT: verify restricted login permissions and complete same-session Blueprint browser acceptance.");
+      console.log("PASS: at least one verified CAN staff session has an exact public Person and Site grant.");
+      console.log("NEXT: verify restricted login permissions and same-session Blueprint browser acceptance.");
       console.log("A joined path alone does not prove that a specific browser session can author.");
     }
   }
