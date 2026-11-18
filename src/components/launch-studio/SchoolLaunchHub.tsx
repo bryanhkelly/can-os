@@ -103,7 +103,7 @@ export function SchoolModuleHome({ module, siteId }: {module:PlannedSchoolHubMod
           ] as const).map(([view,label]) => <a key={view}
             href={`/brand-preview?siteId=${encodeURIComponent(siteId)}&view=${view}`}
             target="_blank" rel="noopener noreferrer"
-            className="inline-flex min-h-12 items-center rounded-lg border bg-background px-4 py-3 text-sm font-semibold text-primary">
+            className="inline-flex min-h-12 items-center border bg-background px-4 py-3 text-sm font-semibold text-primary focus-visible:outline-2 focus-visible:outline-ring">
             {label} <ArrowRight className="ml-auto size-4"/>
           </a>)}
         </div>
