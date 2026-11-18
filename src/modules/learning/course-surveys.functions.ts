@@ -7,7 +7,7 @@ import { auditEvents, domainEvents, surveyDefinitions, surveyVersions, surveyQue
   surveyQuestionOptions, surveyQuestionBranchRules, surveyCampaigns, surveyInvitations,
   surveyResponses, surveyAnswers, surveyAnswerChoices,
   canonicalClassSurveyCampaigns, canonicalClassEnrollments, canonicalClasses,
-  learnerCourseAttempts } from "@/db/canonical-v301";
+  learnerCourseAttempts, offeringVersions } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { validateCourseSurveyAnswers, type SurveyQuestion } from "@/domain/course-survey";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
@@ -59,6 +59,20 @@ async function classSurveyCampaignIds(tx:Tx,context:CommandContext & {actorPerso
 
 
 /**
+ * Noncredit feedback belongs to an actual Offering, not every course
+ * sharing the same Deployment. This never creates a parallel survey system.
+ */
+async function noncreditSurveyOfferingId(tx:Tx,access:CanonicalParticipationAccess):Promise<string|null>{
+  if(access.source!=="noncredit")return null;
+  const [offering]=await tx.select({offeringId:offeringVersions.offeringId})
+    .from(learnerCourseAttempts)
+    .innerJoin(offeringVersions,eq(offeringVersions.id,learnerCourseAttempts.offeringVersionId))
+    .where(eq(learnerCourseAttempts.id,access.courseAttemptId)).limit(1);
+  if(!offering)throw new AuthorizationError("published noncredit Offering for feedback");
+  return offering.offeringId;
+}
+
+/**
  * Identified survey only: person-bound invitations, published versions, and
  * deployment-scoped campaign permissions. Anonymous/confidential surveys,
  * branching, matrix questions, and safeguarding intake require their distinct
@@ -69,6 +83,7 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   if(access.source!=="noncredit"&&access.source!=="class")
     throw new AuthorizationError("active registered Course or Class participant");
   const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
+  const noncreditOfferingId=await noncreditSurveyOfferingId(tx,access);
   if(allowedClassCampaigns&&!allowedClassCampaigns.includes(data.campaignId))
     throw new AuthorizationError("survey campaign is not attributed to this Class");
   if(access.source==="noncredit"){
@@ -81,7 +96,8 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
     .where(and(eq(surveyCampaigns.id,data.campaignId),
       eq(surveyCampaigns.deploymentId,access.deploymentId))).limit(1);
   const now=new Date();
-  if(!campaign||campaign.status!=="active"||campaign.responseMode!=="identified"||
+  if(!campaign||(noncreditOfferingId!==null&&campaign.offeringId!==noncreditOfferingId)||
+    campaign.status!=="active"||campaign.responseMode!=="identified"||
     campaign.startsAt>now||(campaign.endsAt&&campaign.endsAt<=now)||
     !campaign.surveyPermissionEvidenceId)throw new AuthorizationError("active authorized survey campaign");
   const [permission]=await tx.select().from(evidenceDocumentVersions)
@@ -145,6 +161,7 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
       if(access.source!=="noncredit"&&access.source!=="class")
         throw new AuthorizationError("authorized learner Course survey participation");
       const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
+  const noncreditOfferingId=await noncreditSurveyOfferingId(tx,access);
       if(allowedClassCampaigns?.length===0)return [];
       const now=new Date();
       const noncreditIsolation=access.source==="noncredit"?
@@ -173,6 +190,7 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
         eq(evidenceDocumentVersions.id,surveyCampaigns.surveyPermissionEvidenceId))
       .where(and(
         eq(surveyCampaigns.deploymentId,access.deploymentId),
+        noncreditOfferingId?eq(surveyCampaigns.offeringId,noncreditOfferingId):undefined,
         allowedClassCampaigns?inArray(surveyCampaigns.id,allowedClassCampaigns):undefined,
         noncreditIsolation,
         eq(surveyCampaigns.responseMode,"identified"),
