@@ -36,6 +36,7 @@ export function authorizeNetworkMetricScope(
   reader:VerifiedNetworkReader,
   grants:readonly NetworkReportGrant[],
   request:NetworkReportRequest,
+  now=new Date(),
 ):{hostOrganizationIds:string[];metricKeys:string[];grantIds:string[]}{
   if(!reader.actorPersonId||!reader.networkOrganizationId||
      !reader.currentNetworkReportCapability)
@@ -46,14 +47,19 @@ export function authorizeNetworkMetricScope(
      new Set(request.metricKeys).size!==request.metricKeys.length)
     throw new Error("Duplicate host or metric scope");
   const at=validDate(request.asOf);
+  // A historical reporting period must never revive a permission that has
+  // since expired or been revoked. Authorization is checked at request time
+  // as well as against the requested evidence period.
+  const current=now.getTime();
+  if(!Number.isFinite(current))throw new Error("Valid current reporting time required");
   const granted:string[]=[];
   for(const host of request.hostOrganizationIds){
     if(!host)throw new Error("Verified host Organization required");
     const authorized=grants.filter(g=>g.networkOrganizationId===reader.networkOrganizationId&&
       g.hostOrganizationId===host&&g.id&&g.evidenceVersionId&&
-      validDate(g.validFrom)<=at&&
-      (g.validThrough===null||validDate(g.validThrough)>at)&&
-      (g.revokedAt===null||validDate(g.revokedAt)>at));
+      validDate(g.validFrom)<=at&&validDate(g.validFrom)<=current&&
+      (g.validThrough===null||(validDate(g.validThrough)>at&&validDate(g.validThrough)>current))&&
+      g.revokedAt===null);
     for(const metric of request.metricKeys){
       if(!metric||!authorized.some(g=>g.allowedMetrics.includes(metric)))
         throw new Error("Current host-by-metric reporting grant missing");
@@ -79,17 +85,22 @@ export type PublicationDisclosureApproval={
 /** Private provider metrics are not automatically publishable. A trusted
  * governance service must supply a pre-approved disclosure artifact pinned
  * to an exact query digest and audience; never accept browser-supplied approval.
+ * Report asOf is an evidence-period selector, NOT the publication clock.
+ * Only a trusted server may supply the optional clock for deterministic tests.
  */
 export function assertPublishedReportDisclosure(
   approval:PublicationDisclosureApproval|null,
   request:{scopeDigest:string;audience:string;asOf:string},
+  now=new Date(),
 ):void{
-  const now=validDate(request.asOf);
-  if(!approval||!approval.approvalId||!approval.queryScopeDigest||
+  validDate(request.asOf);
+  const current=now.getTime();
+  if(!Number.isFinite(current))throw new Error("Valid current publication time required");
+  if(!approval||!approval.approvalId||!approval.queryScopeDigest||!request.audience||
     approval.queryScopeDigest!==request.scopeDigest||
     approval.approvedAudience!==request.audience||
-    validDate(approval.approvedAt)>now||
-    validDate(approval.expiresAt)<=now||
+    validDate(approval.approvedAt)>current||
+    validDate(approval.expiresAt)<=current||
     !approval.suppressSmallCells||
     !approval.reviewedOverlappingCuts||
     !approval.reviewedHistoricalDifferencing)
