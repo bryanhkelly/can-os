@@ -403,3 +403,43 @@ this preflight.
 The new checker and Vitest source contracts are committed but were not run
 as scripts in this pass; the database portions were verified directly
 through read-only SQL on production main.
+
+
+## November 18, 2026: Delete empty unused tables only after a usage check
+
+The cleanup goal is **not** to relocate every historical `education_v30`
+table. The goal is to retain only active and necessary contracts. An empty
+table is evidence of no persisted rows, not proof of no application usage.
+
+**Retired on production Neon main:** `education_v30.assurance_case_outcomes`
+(0 rows, no other table's inbound FK, no current `src/` consumer, no dependent
+view) and its trigger-only function
+`education_v30.v27_validate_case_outcome()`. The retirement used
+`DROP ... RESTRICT`, preserved `education_v30.assurance_cases` and
+`public.assurance_case_findings`, and was verified against the PostgreSQL
+catalog. Source migration:
+`database/production/2026-11-18-retire-unused-assurance-case-outcomes.sql`.
+
+**Three other zero-row, no-inbound-FK relations are *not* deletion
+candidates:**
+
+- `education_v30.class_staff_assignments`: actively referenced by
+  `src/modules/classes/class-staff.functions.ts`,
+  `src/modules/classes/native-class-session-host.server.ts`, and Class
+  room authorization and completion modules.
+- `education_v30.learning_session_events`: exported as
+  `canonicalLearningEvents` and referenced by
+  `src/modules/learning/canonical-learning-activity.functions.ts` and
+  `src/modules/learning/canonical-course-evidence.functions.ts`.
+- `education_v30.learning_completion_evidence_review_requests`:
+  referenced by `src/modules/learning/completion-evidence-review.functions.ts`
+  and the WS3 review model. Removing it would disable a live review contract.
+
+Retirement rule: validate zero rows, active source references (both SQL
+table names and Drizzle export symbols), runtime database routine references,
+dependent views, *all inbound foreign keys*, triggers and their function
+consumers. An obsolete function is dropped only if dedicated exclusively to
+the retired table. Do not use `CASCADE` or drop empty tables solely based on
+row count. Do not merge or delete populated existing `public` authorities
+without data and identity reconciliation. Application acceptance remains a
+separate requirement.
