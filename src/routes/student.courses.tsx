@@ -4,7 +4,8 @@ import { getCourseRegistration, requestCourseChange, decideCourseChange } from "
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
-import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, EmptyState } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, EmptyState, StatCard, WorkspaceNotice } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { useHydrated } from "@/lib/use-hydrated";
@@ -55,22 +56,22 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
    {role==="student"&&<Link to="/groups" className="text-xs font-semibold underline underline-offset-4">Study groups</Link>}
   </>} className="pb-20">
   <div className="mt-6 flex flex-wrap items-center gap-3">
-   <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">Signed in as {hasRegistrarAuthority(role)?"School Registrar":"Student"}</span>
-   <span className="rounded-full border border-border px-3 py-2 text-xs font-semibold">{connected?"School records connected":"School records unavailable"}</span>
+   <StatusBadge tone="neutral">Signed in as {hasRegistrarAuthority(role)?"School Registrar":"Student"}</StatusBadge>
+   <StatusBadge tone={connected?"success":"attention"}>{connected?"School records connected":"School records unavailable"}</StatusBadge>
   </div>
   <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving course request..."/>
   <div className="mt-8 grid gap-4 sm:grid-cols-3">
-   <div className="rounded-xl border border-border bg-card p-5"><p className="text-xs text-muted-foreground">Enrolled courses</p><p className="mt-2 font-serif text-4xl">{active.length}</p></div>
-   <div className="rounded-xl border border-border bg-card p-5"><p className="text-xs text-muted-foreground">Current credits</p><p className="mt-2 font-serif text-4xl">{credits}</p></div>
-   <div className="rounded-xl border border-border bg-card p-5"><p className="text-xs text-muted-foreground">Open requests</p><p className="mt-2 font-serif text-4xl">{requests.filter(r=>r.status==="open").length}</p></div>
+   <StatCard label="Enrolled courses" value={active.length}/>
+   <StatCard label="Current credits" value={credits}/>
+   <StatCard label="Open requests" value={requests.filter(r=>r.status==="open").length}/>
   </div>
   <h2 className="mt-9 font-serif text-3xl">Course catalog</h2>
   {section&&<Link to="/student/courses" search={{view:"catalog"}} className="mt-3 inline-block text-sm underline">View full course catalog</Link>}
-  {section&&!visibleSections.length&&<p role="alert" className="mt-4 rounded-xl border p-4">This course is unavailable in your current workspace.</p>}
+  {section&&!visibleSections.length&&<WorkspaceNotice tone="danger" className="mt-4">This course is unavailable in your current workspace.</WorkspaceNotice>}
   <div className="mt-4 space-y-3">{visibleSections.map(s=>{
    const enrolled=s.enrollmentStatus==="active";
    const pending=requests.find(r=>r.sectionId===s.id&&["open","in_progress","waiting"].includes(r.status));
-   return <article key={s.id} className="rounded-2xl border border-border bg-card p-5 sm:p-6">
+   return <article key={s.id} className=" border border-border bg-card p-5 sm:p-6">
     <div className="flex flex-wrap items-start justify-between gap-4">
      <div><p className="text-xs font-semibold text-muted-foreground">{s.code} · {s.subject} · {s.mode}</p>
       <h3 className="mt-2 font-serif text-2xl"><Link to="/student/courses" search={{section:s.id,view:"catalog"}} className="hover:underline">{s.title}</Link></h3><p className="mt-2 text-sm text-muted-foreground">{s.description??"Course delivered through the CAN learning model."}</p>
@@ -85,29 +86,29 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
       {s.policy.guardianApprovalRequired&&<p className="mt-1 text-xs text-amber-700">This class requires guardian permission. Your guardian can review your pending request under Family → Course approvals.</p>}
       {s.withdrawalNotation&&<p className="mt-1 text-xs font-semibold">Transcript notation: {String(s.withdrawalNotation)}</p>}
      </div>
-     {hasRegistrarAuthority(role)?<span className="rounded-lg border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
+     {hasRegistrarAuthority(role)?<span className=" border border-border px-3 py-2 text-xs font-semibold">Decision mode below</span>:
      <div className="flex flex-wrap gap-2">
-      {pending?<span className="rounded-lg bg-stone-warm px-3 py-2 text-xs font-semibold">
+      {pending?<span className=" bg-stone-warm px-3 py-2 text-xs font-semibold">
        Request pending - {pending.operation==="add"&&!s.contentReady?"school content setup needed":pending.operation==="add"&&s.policy.guardianApprovalRequired?"school review; guardian permission required":"registrar review needed"}
       </span>:enrolled?<>
-       {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn&&<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"drop"}}),"Drop request sent to the registrar.")} className="rounded-lg border border-border px-3 py-2 text-xs font-semibold disabled:opacity-50">Request drop</button>}
-       {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.withdrawalEndsOn&&<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"withdraw"}}),"Withdrawal request sent for review.")} className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">Request withdrawal</button>}
+       {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn&&<Button type="button" variant="outline" size="sm" disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"drop"}}),"Drop request sent to the registrar.")}>Request drop</Button>}
+       {dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.withdrawalEndsOn&&<Button type="button" size="sm" disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"withdraw"}}),"Withdrawal request sent for review.")}>Request withdrawal</Button>}
        {dateKeyInTimezone(today.toISOString(),s.timezone)>s.policy.withdrawalEndsOn&&<span className="text-xs text-muted-foreground">Change period closed</span>}
-      </>:dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn?<button disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"add"}}),"Course request sent to the registrar.")} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">{s.policy.guardianApprovalRequired?"Request guardian approval":"Request class"}</button>:<span className="text-xs text-muted-foreground">Registration closed</span>}
+      </>:dateKeyInTimezone(today.toISOString(),s.timezone)<=s.policy.addDropEndsOn?<Button type="button" size="sm" disabled={actionBusy} onClick={()=>run(()=>requestCourseChange({data:{sectionId:s.id,operation:"add"}}),"Course request sent to the registrar.")}>{s.policy.guardianApprovalRequired?"Request guardian approval":"Request class"}</Button>:<span className="text-xs text-muted-foreground">Registration closed</span>}
      </div>}
     </div>
    </article>;
   })}</div>
   <h2 className="mt-10 font-serif text-3xl">Course change requests</h2>
   <p className="mt-2 text-sm text-muted-foreground">Each request belongs to the signed-in student and an authorized school program. Registrar decisions update the enrollment record and notify the student.</p>
-  <div className="mt-4 space-y-3">{requests.map(r=><div key={r.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card p-4">
+  <div className="mt-4 space-y-3">{requests.map(r=><div key={r.id} className="flex flex-wrap items-center gap-3  border border-border bg-card p-4">
    <div className="flex-1"><p className="text-sm font-semibold">{r.title}</p><p className="mt-1 text-xs text-muted-foreground">{String(r.operation)} · {r.status}</p></div>
    {hasRegistrarAuthority(role)&&r.status==="open"&&<div className="flex flex-wrap gap-2">
     <Link to="/operations/course-requests" search={{siteId:undefined,programId:undefined}} className="px-3 py-2 text-xs underline">Review approval blockers</Link>
-    <button disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:false}}),"Request declined.")} className="rounded-lg border border-border px-3 py-2 text-xs">Decline</button>
-    <button disabled={actionBusy||(r.operation==="add"&&!sections.some(s=>s.id===r.sectionId&&s.contentReady))} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:true}}),"Enrollment decision recorded.")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background disabled:opacity-50">Approve</button>
+    <Button type="button" variant="outline" size="sm" disabled={actionBusy} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:false}}),"Request declined.")}>Decline</Button>
+    <Button type="button" size="sm" disabled={actionBusy||(r.operation==="add"&&!sections.some(s=>s.id===r.sectionId&&s.contentReady))} onClick={()=>run(()=>decideCourseChange({data:{requestId:r.id,approve:true}}),"Enrollment decision recorded.")}>Approve</Button>
    </div>}
-  </div>)}{!requests.length&&<p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">No course change requests yet.</p>}</div>
+  </div>)}{!requests.length&&<EmptyState title="No course change requests yet."/>}</div>
   <p className="mt-9 text-xs leading-6 text-muted-foreground">A withdrawal retains a W notation on the enrollment record. Class additions that require guardian permission remain pending until an authorized guardian approves and the registrar finalizes the change. Schedule conflicts, prerequisites, capacity and credits are rechecked by the enrollment service when adding a class.</p>
  </WorkspaceShell>;
 }
@@ -130,7 +131,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
    </nav>
   </WorkspacePanel>:undefined;
  const content=<>
-  {section&&!course?<p role="alert" className="mt-6 rounded-xl border p-5">This course is unavailable in your current workspace. Only actively enrolled classes appear here.</p>:
+  {section&&!course?<WorkspaceNotice tone="danger" className="mt-6">This course is unavailable in your current workspace. Only actively enrolled classes appear here.</WorkspaceNotice>:
    !course?<div className="mt-7 grid gap-4 md:grid-cols-2">
     {!enrolled.length&&<EmptyState title="Your classes will appear here after placement." description="Your school assigns classes after enrollment. You can also review available classes in the course catalog."/>}
     {enrolled.map(item=><WorkspacePanel key={item.id} title={item.title} description={`${item.code} · ${item.subject}`}
@@ -138,8 +139,8 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
      <p className="text-sm text-muted-foreground">{item.description??"Your classwork and feedback, in one place."}</p>
      <p className="mt-3 text-sm">Teaching team: {item.teachers?.length?item.teachers.map((teacher,index)=><span key={teacher.personId}>{index>0?", ":""}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></span>):"Not assigned"}</p>
      <div className="mt-5 flex flex-wrap gap-3 text-sm">
-      <Link to="/classes" search={{section:item.id,tab:"lessons"}} className="rounded-lg bg-foreground px-4 py-2 font-semibold text-background">Open class</Link>
-      <Link to="/student/assignments" search={{section:item.id}} className="rounded-lg border px-4 py-2">Classwork</Link>
+      <Link to="/classes" search={{section:item.id,tab:"lessons"}} className=" bg-foreground px-4 py-2 font-semibold text-background">Open class</Link>
+      <Link to="/student/assignments" search={{section:item.id}} className=" border px-4 py-2">Classwork</Link>
      </div>
     </WorkspacePanel>)}
    </div>:<>
@@ -151,8 +152,8 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
       <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map(teacher=>teacher.name).join(", ") : "Not assigned"}</p>
       <div className="mt-5 flex flex-wrap gap-3 text-sm">
-        <Link to="/classes" search={{section:course.id,tab:"lessons"}} className="rounded-lg bg-foreground px-4 py-2 font-semibold text-background">Open classroom</Link>
-        <Link to="/student/courses" search={{section:course.id,tab:"classwork"}} className="rounded-lg border px-4 py-2">View classwork</Link>
+        <Link to="/classes" search={{section:course.id,tab:"lessons"}} className=" bg-foreground px-4 py-2 font-semibold text-background">Open classroom</Link>
+        <Link to="/student/courses" search={{section:course.id,tab:"classwork"}} className=" border px-4 py-2">View classwork</Link>
       </div>
     </WorkspacePanel> : <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
@@ -172,7 +173,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
   <WorkspaceShell width="wide" eyebrow="Student learning" title="My classes"
    subtitle="Enter an enrolled class to see your work, feedback and next steps."
    breadcrumbs={<><Link to="/home" className="underline">Today</Link><span>/</span><span>My classes</span></>}
-   actions={<Link to="/student/courses" search={{view:"catalog"}} className="rounded-lg border bg-card px-4 py-2 text-sm font-semibold">Course catalog / registration</Link>}>
+   actions={<Link to="/student/courses" search={{view:"catalog"}} className=" border bg-card px-4 py-2 text-sm font-semibold">Course catalog / registration</Link>}>
    {content}
   </WorkspaceShell>;
 }
