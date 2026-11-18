@@ -43,7 +43,7 @@ INSERT INTO education_v30.program_deployments (id,operation_id,offering_id,code,
 VALUES ('ca270000-0000-4000-8000-000000000052','ca270000-0000-4000-8000-000000000049','ca270000-0000-4000-8000-000000000050','CLC-DEMO-DIGITAL-01','AI and Digital Skills · planning Deployment','planning')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO education_v30.deployment_sites (id,deployment_id,site_id,purpose)
+INSERT INTO public.deployment_sites (id,deployment_id,site_id,purpose)
 VALUES ('ca270000-0000-4000-8000-000000000055','ca270000-0000-4000-8000-000000000052','ca270000-0000-4000-8000-000000000002','instruction')
 ON CONFLICT (id) DO NOTHING;
 
