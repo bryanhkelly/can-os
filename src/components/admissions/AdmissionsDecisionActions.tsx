@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 export type AdmissionsDecision="application"|"eligibility"|"accept"|"decline"|"withdraw"|"waitlist"|"restore";
 
 const actions:Record<string,readonly (readonly [AdmissionsDecision,string])[]>={
@@ -18,8 +19,8 @@ export function AdmissionsDecisionActions({stage,disposition,busy,onDecision}:{
  const options=actions[key]??[];
  if(!options.length)return null;
  return <div className="mt-4 flex flex-wrap gap-2">
-  {options.map(([decision,label])=><button key={decision} type="button" disabled={busy}
+  {options.map(([decision,label])=><Button key={decision} type="button" variant="outline" size="sm" disabled={busy}
    onClick={()=>onDecision(decision,label)}
-   className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50">{label}</button>)}
+   >{label}</Button>)}
  </div>;
 }
