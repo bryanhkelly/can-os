@@ -8,6 +8,7 @@ import { exploreCanonicalBlueprintReferences } from "@/modules/blueprints/bluepr
 import { normalizeClientError } from "@/lib/client-error";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 const kindLabels: Record<BlueprintReferenceKind, string> = {
   program_model: "Program models",
@@ -52,7 +53,7 @@ export function BlueprintReferenceCatalogPanel({ siteId }: { siteId: string }) {
       These are planning references, not adopted Offerings or approved programs.
     </p>
     <div className="mt-4 flex flex-wrap items-end gap-3">
-      <label htmlFor="blueprint-reference-kind" className="min-w-48 flex-1 text-sm font-medium">
+      <Label htmlFor="blueprint-reference-kind" className="min-w-48 flex-1 text-sm font-medium">
         Library category
         <Select
           id="blueprint-reference-kind"
@@ -65,7 +66,7 @@ export function BlueprintReferenceCatalogPanel({ siteId }: { siteId: string }) {
             <option key={kind} value={kind}>{kindLabels[kind]}</option>,
           )}
         </Select>
-      </label>
+      </Label>
       <Button type="button" disabled={loading} onClick={() => void loadLibrary()}>
         {loading ? "Loading library..." : items ? "Refresh library" : "Browse reference library"}
       </Button>
