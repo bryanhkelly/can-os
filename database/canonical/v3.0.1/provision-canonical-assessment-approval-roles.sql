@@ -68,14 +68,14 @@ SELECT format('GRANT EXECUTE ON FUNCTION education_v30.v301_publish_objective_as
 \gexec
 -- Do NOT grant execution of the internal authorization function: it is
 -- SECURITY DEFINER and is invoked by the limited review/publish wrappers.
-INSERT INTO education_v30.database_role_organization_bindings(
+INSERT INTO public.database_role_organization_bindings(
  db_role,organization_id,purpose_code,valid_from,status)
 SELECT x.role_name,:'organization_id'::uuid,x.purpose,clock_timestamp(),'approved'
 FROM (VALUES
  (:'reviewer_role'::name,'assessment_reviewer'),
  (:'publisher_role'::name,'assessment_publisher')
 ) x(role_name,purpose)
-WHERE NOT EXISTS(SELECT 1 FROM education_v30.database_role_organization_bindings b
+WHERE NOT EXISTS(SELECT 1 FROM public.database_role_organization_bindings b
  WHERE b.db_role=x.role_name AND b.organization_id=:'organization_id'::uuid
  AND b.purpose_code=x.purpose AND b.status='approved'
  AND b.valid_from<=clock_timestamp()
