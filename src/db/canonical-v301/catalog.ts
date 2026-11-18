@@ -2,6 +2,7 @@ import {
   bigint,
   integer,
   numeric,
+  pgTable,
   text,
   timestamp,
   uniqueIndex,
@@ -43,10 +44,14 @@ export const geographicAreas = educationV30.table("geographic_areas", {
   parentId: uuid("parent_id"),
 });
 
-export const catalogSites = educationV30.table("sites", {
+/** The single authoritative Site row lives in public.sites.
+ * Keep a narrow read projection for native Course/Offering operations.
+ * The old native "status" field is public.lifecycle_status.
+ * No alternate Site ID, crosswalk or second table is created. */
+export const catalogSites = pgTable("sites", {
   id: id(),
   geographicAreaId: uuid("geographic_area_id"),
-  status: text("status").$type<"planning" | "active" | "closed">().notNull(),
+  status: text("lifecycle_status").$type<"planning" | "active" | "closed">(),
 });
 
 export const siteOrganizationRoles = educationV30.table("site_organization_roles", {
