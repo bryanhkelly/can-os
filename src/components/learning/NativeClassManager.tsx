@@ -309,9 +309,10 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
     if(busy||feedback.refreshFailed)return;
     setBusy(true);setError("");setNotice("");
     try{
-      await feedback.run(()=>kind==="publish"
-        ?publishUnifiedClassOffering({data:{classId,classOfferingVersionId}})
-        :closeUnifiedClassOffering({data:{classId,classOfferingVersionId}}),{
+      await feedback.run(async()=>{
+        if(kind==="publish") await publishUnifiedClassOffering({data:{classId,classOfferingVersionId}});
+        else await closeUnifiedClassOffering({data:{classId,classOfferingVersionId}});
+      },{
         successMessage:kind==="publish"
           ?"Class Offering published under existing Course and Site authorization."
           :"Class Offering closed. Existing learning records remain intact.",
