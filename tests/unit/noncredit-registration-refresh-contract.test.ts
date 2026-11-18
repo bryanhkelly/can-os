@@ -51,7 +51,7 @@ describe("noncredit self-registration decision and refresh contract",()=>{
   it("checks the selected release's exact invitation and fails closed when waitlist status is unavailable",()=>{
     expect(source).toContain("getMyNoncreditWaitlistByRelease({data:{releaseId:selected!.id}})");
     expect(source).not.toContain("getMyNoncreditWaitlist()");
-    expect(source).toContain('queryKey:["my-noncredit-waitlist",');
+    expect(source).toContain("queryKey:noncreditWaitlistQueryKeys.detail(");
     expect(source).toContain("const waitlistUnavailable=");
     expect(controller).toContain("waitlistLoading||waitlistUnavailable||");
     expect(confirmation).toContain("waitlistLoading||waitlistUnavailable||");
