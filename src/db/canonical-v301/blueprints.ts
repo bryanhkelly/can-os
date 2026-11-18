@@ -422,6 +422,22 @@ export const programDeployments = educationV30.table(
   ],
 );
 
+/** Existing native deployment readiness evidence; not a new table or approval system. */
+export const deploymentReadinessReviews = educationV30.table(
+  "deployment_readiness_reviews", {
+    id: id(),
+    deploymentId: uuid("deployment_id").notNull(),
+    reviewKind: text("review_kind").$type<"operating"|"registration"|"delivery">().notNull(),
+    outcome: text("outcome").$type<"ready"|"ready_with_conditions"|"not_ready">().notNull(),
+    evaluatedByPersonId: uuid("evaluated_by_person_id").notNull(),
+    evaluatedAt: timestamp("evaluated_at",{withTimezone:true}).notNull().defaultNow(),
+    policySnapshotVersionId: uuid("policy_snapshot_version_id"),
+    evidenceVersionId: uuid("evidence_version_id").notNull(),
+    expiresAt: timestamp("expires_at",{withTimezone:true}),
+    supersedesId: uuid("supersedes_id"),
+  },
+);
+
 export const deploymentOfferingAdoptions = educationV30.table(
   "deployment_offering_adoptions",
   {

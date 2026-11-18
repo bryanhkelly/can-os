@@ -4,7 +4,7 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  auditEvents, blueprintConfigurationOfferingIntents, blueprintExecutionBatches,
+  auditEvents, blueprintConfigurationOfferingIntents, blueprintConfigurationVersions, blueprintExecutionBatches,
   blueprintOutputs, canonicalOfferingCourses, catalogSites, configurationReviews,
   courseVersions, deploymentOfferingAdoptions, deploymentReadinessReviews,
   educationOperationOrganizationRoles, educationOperationSites, educationOperations,
@@ -233,17 +233,23 @@ export const approveNativeOfferingAdoption=createServerFn({method:"POST"})
       if(!latestReview||latestReview.id!==provenance.reviewId||
         latestReview.decision!=="approved")
         invalid("Current approved Blueprint execution review is required.");
+      const [configuration]=await tx.select({id:blueprintConfigurationVersions.configurationId})
+        .from(blueprintConfigurationVersions)
+        .where(eq(blueprintConfigurationVersions.id,provenance.configurationVersionId)).limit(1);
+      if(!configuration)invalid("Blueprint configuration provenance is incomplete.");
       const authorEvents=await tx.select({personId:auditEvents.actorPersonId})
         .from(auditEvents).where(and(
           eq(auditEvents.entityKind,"blueprint_configuration"),
+          eq(auditEvents.entityId,configuration.id),
           inArray(auditEvents.eventCode,[
             "blueprint.configuration.created","blueprint.configuration.saved",
             "blueprint.configuration.submitted",
           ]),
         )).limit(1001);
-      // Do not infer safety from a truncated author history.
-      if(authorEvents.length>1000||authorEvents.some(event=>event.personId===reviewerPersonId))
-        throw new AuthorizationError("reviewer must be independent of Blueprint authors");
+      // No self-approval, unverified origin, or truncated author evidence.
+      if(!authorEvents.length||authorEvents.length>1000||
+        authorEvents.some(event=>event.personId===reviewerPersonId))
+        throw new AuthorizationError("reviewer must be independent of all Blueprint authors");
       const readiness=await tx.select().from(deploymentReadinessReviews)
         .where(eq(deploymentReadinessReviews.deploymentId,deployment.id))
         .orderBy(desc(deploymentReadinessReviews.evaluatedAt),
