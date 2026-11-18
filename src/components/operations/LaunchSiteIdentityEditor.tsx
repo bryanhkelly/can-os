@@ -22,7 +22,7 @@ export function LaunchSiteIdentityEditor({
   const [error,setError]=useState("");
   const changes=useLaunchDraftChanges({name,timezone,reason});
   useLaunchUnsavedChanges(changes.dirty || (editing && busy));
-  return <section className="rounded-lg border p-3">
+  return <section className="border p-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-sm text-muted-foreground">School location name</p>
       <Button type="button" size="sm" variant="outline" onClick={()=>setEditing(value=>!value)}>
