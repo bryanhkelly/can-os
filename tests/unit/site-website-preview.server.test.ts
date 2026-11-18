@@ -141,8 +141,14 @@ describe("read-only church partner website", () => {
       "approvedAcademicCount", "approvedEnrichmentCount", "approvedPhotoCount", "canPrepareWebsite", "canPublish",
       "currentRevision", "demonstration", "draftStorageReady", "editingContent", "host", "localContentStatus",
       "localHistory", "mediaUploadsEnabled", "organizationName", "parentInformation", "previewHtml", "previewPages",
-      "publicInformationReadiness", "siteId", "siteInformation", "siteName", "status",
+      "publicInformationReadiness", "siteId", "siteInformation", "siteName", "sourceMapping", "status",
     ]);
+    expect(result.sourceMapping).toMatchObject({
+      physicalAddressSaved: false, publicAddressVisible: false,
+      contactSaved: false, publicContactVisible: false,
+      schoolContextSaved: false, learningIntentSaved: false,
+      contentChannelsPublished: false,
+    });
     expect(state.catalogSiteIds).toEqual(["site-a", "site-a"]);
   });
 
@@ -160,6 +166,26 @@ describe("read-only church partner website", () => {
     expect(draft.previewHtml).not.toContain("editorialBaseline");
     expect(draft.previewHtml).not.toContain("<script");
     // The private preview is read-only. Published local content is never updated.
+  });
+
+  it("never inserts a consent-unconfirmed logo into the website HTML", async () => {
+    const original = createSchoolWebsiteStarterContent("Partner Academy");
+    const proposed = {
+      ...original,
+      branding: {
+        ...original.branding,
+        logoImage: {
+          dataUrl: "data:image/png;base64,unapproved-content",
+          altText: "Unapproved private logo",
+          rightsConfirmed: false,
+          childImageConsent: "unconfirmed" as const,
+        },
+      },
+    };
+    const result = await getPartnerWebsitePreview(editor(), proposed);
+    expect(result.previewHtml).toBeTruthy();
+    expect(result.previewHtml).not.toContain("unapproved-content");
+    expect(result.previewHtml).not.toContain("Unapproved private logo");
   });
 
   it("allows viewing without local publish privilege, but hides publishing controls", async () => {
