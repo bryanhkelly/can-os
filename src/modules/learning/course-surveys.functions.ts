@@ -3,7 +3,8 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { auditEvents, domainEvents, surveyDefinitions, surveyVersions, surveyQuestions,
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
+import { surveyDefinitions, surveyVersions, surveyQuestions,
   surveyQuestionOptions, surveyQuestionBranchRules, surveyCampaigns, surveyInvitations,
   surveyResponses, surveyAnswers, surveyAnswerChoices,
   canonicalClassSurveyCampaigns, canonicalClassEnrollments, canonicalClasses,
@@ -276,11 +277,11 @@ export const submitCourseSurvey=createServerFn({method:"POST"})
       const metadata={courseAttemptId:survey.access.courseAttemptId,
         source:survey.access.source,
         campaignId:survey.campaign.id,questionCount:answers.length};
-      await tx.insert(auditEvents).values({actorPersonId:context.actorPersonId,
+      await writeCanonicalAudit(tx,{actorPersonId:context.actorPersonId,
         owningOrganizationId:survey.campaign.operatingOrganizationId,
         eventCode:"learning.survey.submitted",entityKind:"survey_response",
         entityId:response.id,payload:metadata});
-      await tx.insert(domainEvents).values({eventType:"LearningSurveySubmitted",
+      await emitCanonicalDomainEvent(tx,{eventType:"LearningSurveySubmitted",
         aggregateType:"survey_response",aggregateId:response.id,
         actorPersonId:context.actorPersonId,payload:metadata});
       return {responseId:response.id,alreadySubmitted:false};
