@@ -507,7 +507,7 @@ export const learnerProfiles = educationV30.table("learner_profiles", {
   metadata: jsonb("metadata").$type<JsonObject>().notNull().default({}),
 });
 
-export const guardianAuthorities = educationV30.table("guardian_authorities", {
+export const guardianAuthorities = pgTable("guardian_authorities", {
   id: id(),
   guardianPersonId: uuid("guardian_person_id").notNull(),
   learnerId: uuid("learner_id").notNull(),
@@ -609,7 +609,7 @@ export const noncreditRegistrations = educationV30.table("noncredit_registration
   consentEvidenceId: uuid("consent_evidence_id"),
 });
 
-export const learnerUnitProgress = educationV30.table(
+export const learnerUnitProgress = pgTable(
   "learner_unit_progress",
   {
     id: id(),
