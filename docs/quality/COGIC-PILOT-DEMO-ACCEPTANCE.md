@@ -20,12 +20,12 @@ Never present synthetic test records as COGIC participation or publish real pilo
 - Negative checks: wrong learner, expired grant, no media rights, unpublished check/survey, revoked invitation, cross-Course or cross-deployment result leakage and retry/save persistence.
 - Evidence: lesson version, presentation asset version, learner attempt, assessment attempt, final result revision, survey response reference, completion decision and a same-learner refresh.
 
-## 3. Four-week local delivery across 15–25 Sites (deck pages 11 and 31–32)
+## 3. Four-session local delivery across 15–25 Sites (deck pages 11 and 31–32)
 - An operator may batch-publish independently authorized releases to many Sites **within the same operating organization**. This is not national cross-organization delegation.
-- Each local authorized facilitator schedules four weekly classroom meetings atomically from the approved Site/Course. An authorized provider then associates four meetings atomically to the exact enrollment release. Validate scheduled dates in the learner calendar.
+- Each local authorized facilitator schedules four distinct, nonoverlapping meetings atomically from the approved Site/Course. The dates may be weekly, twice per week (2×2), or spread across five or more weeks around holidays. An authorized provider explicitly selects and associates one to four meetings at a time with the exact enrollment release. Validate all scheduled dates and changes in the learner calendar.
 - Exercise a facilitator projector session, learner pairing, registered-person roll call (including no-device participants), independently attested attendance and one real approved knowledge check and feedback invitation.
 - For each Site, reconcile registered, physically verified, assessed and completed learners without mixing those measures. Observe Site-level reports and operator-only aggregation, including small-cell disclosure rules.
-- Negative checks: unapproved Site, cross-release roster leakage, concurrent booking retry, duplicate schedule requests, same Course with different release, conflicting plan attachment and revoked Site authorization.
+- Negative checks: unapproved Site, cross-release roster leakage, concurrent booking retry, duplicate or overlapping dates, nonconsecutive/holiday dates wrongly rejected, same Course with different release, conflicting plan attachment and revoked Site authorization.
 - **Remaining program scope:** COGIC's independently run churches require approved cross-organization delegation, Site-specific authority and nationally scoped reporting before a true denominational 15–25-Site rollup is accepted.
 
 ## 4. Site readiness and device/internet needs (deck pages 20 and 31–32)
