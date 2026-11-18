@@ -70,7 +70,7 @@ export const noncreditEnrollmentWaitlist=pgTable("noncredit_enrollment_waitlist"
 
 /** A released seat does not erase an enrollment claim, the learner's history,
  * consent or completion evidence. The release is an audited one-time decision. */
-export const noncreditReleasedSeats=educationV30.table("noncredit_released_seats",{
+export const noncreditReleasedSeats=pgTable("noncredit_released_seats",{
   id:id(),
   releaseId:uuid("release_id").notNull().references(()=>noncreditSelfEnrollmentReleases.id),
   registrationId:uuid("registration_id").notNull(),
