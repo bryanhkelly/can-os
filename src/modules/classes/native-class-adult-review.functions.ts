@@ -61,7 +61,7 @@ export const approveAdultClassLearnerReview=createServerFn({method:"POST"})
        .from(accountPersonGrants).where(and(
          eq(accountPersonGrants.id,actor.grantId),
          eq(accountPersonGrants.accountId,actor.accountId),
-         eq(accountPersonGrants.personId,actor.actorPersonId),
+         eq(accountPersonGrants.personId,reviewerPersonId),
          eq(accountPersonGrants.role,"app_admin"),
          eq(accountPersonGrants.active,true),
          isNull(accountPersonGrants.organizationId),
@@ -226,7 +226,7 @@ export const revokeAdultClassLearnerReview=createServerFn({method:"POST"})
        .from(accountPersonGrants).where(and(
          eq(accountPersonGrants.id,actor.grantId),
          eq(accountPersonGrants.accountId,actor.accountId),
-         eq(accountPersonGrants.personId,actor.actorPersonId),
+         eq(accountPersonGrants.personId,reviewerPersonId),
          eq(accountPersonGrants.role,"app_admin"),
          eq(accountPersonGrants.active,true),
          isNull(accountPersonGrants.organizationId),
