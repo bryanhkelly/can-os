@@ -11,6 +11,8 @@ import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storag
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { WorkspacePanel, WorkspaceNotice } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
 
 type Resource = { documentId: string; fileName: string; mimeType: string | null };
 
@@ -71,23 +73,20 @@ export function AssessmentResourcesManager({ assessmentId, assessmentTitle }: {
       {resources.map(resource => <li key={resource.documentId} className="flex items-center justify-between gap-3 py-3 text-sm">
         <span className="min-w-0 font-semibold break-words">{resource.fileName}</span>
         <span className="flex shrink-0 gap-3">
-          <button type="button" className="text-sm font-semibold text-primary underline" disabled={busy}
+          <Button type="button" variant="ghost" size="sm" className="underline" disabled={busy}
             onClick={async () => {
               try {
                 const download = await getAssessmentResourceDownload({ data: { assessmentId, documentId: resource.documentId } });
                 window.location.assign(download.downloadUrl);
               } catch (cause) { setError(mutationErrorMessage(cause, "Unable to open this resource")); }
-            }}>View</button>
+            }}>View</Button>
           <Button type="button" variant="outline" size="sm" disabled={busy}
             onClick={() => void remove(resource.documentId)}>Remove</Button>
         </span>
       </li>)}
     </ul>}
     <div className="mt-4 flex flex-wrap items-end gap-3">
-      <label className="text-sm font-semibold">Attach resource files
-        <input ref={fileRef} type="file" multiple accept={attachmentAccept} disabled={busy}
-          className="mt-2 block w-full rounded-lg border p-2 text-xs" />
-      </label>
+      <Field label="Attach resource files"><Input ref={fileRef} type="file" multiple accept={attachmentAccept} disabled={busy} /></Field>
       <Button type="button" variant="outline" disabled={busy} onClick={() => void upload()}>
         {busy ? "Working..." : "Publish to class"}
       </Button>
