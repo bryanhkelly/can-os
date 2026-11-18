@@ -43,3 +43,20 @@ Verified on Neon `main`: seven `public` tables and nine updated SQL functions. T
 - Source contracts: `tests/unit/main-easy-native-consolidation-contract.test.ts`
 
 The migrations and SQL metadata checks succeeded. The added executable checks and browser workflows have **not** been run as part of this pass. Further quick moves need per-table routine/source reviews; avoid touching `education_v30_secure` or merging semantically different colliding tables under an "easy" cleanup.
+
+## Four additional learning tables in public (next safe batch)
+
+- `guardian_authorities` (2 validated outgoing FKs)
+- `enrollment_prospect_interests` (4 validated outgoing FKs)
+- `learner_unit_progress` (2 validated outgoing FKs)
+- `facilitated_pairing_rate_limits` (0 outgoing FKs)
+
+All four were verified empty before migration. The native tables had zero inbound FKs, zero custom triggers, no dependent SQL routines or views, no public name/index collision, and a single owner-only forced-RLS policy. The migration guarded these conditions and moved original objects with `ALTER TABLE ... SET SCHEMA public` in one Neon main transaction. All four Drizzle mappings were updated to `pgTable`.
+
+Afterward the database confirmed all four exist only in `public`, with unchanged OIDs, eight validated outgoing foreign keys, forced RLS and one policy apiece. Direct `authenticated` and `anonymous` SELECT remained unavailable.
+
+- Migration: `database/production/2026-11-17-consolidate-four-empty-learning-tables.sql`
+- Main-only read acceptance: `scripts/acceptance/check-main-learning-table-cutover.mjs`
+- Source regression tests: `tests/unit/main-learning-table-cutover.test.ts`
+
+The Neon transaction and direct metadata queries succeeded. New script and Vitest suite were committed, **not executed**. Last observed inventory: **351** `education_v30` tables, **320** `public` tables, **7** `education_v30_secure` tables. Counts include other concurrent updates to main. Do not treat these changes as browser-level acceptance or evidence that wider `education_v30` can be dropped.
