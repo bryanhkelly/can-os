@@ -3,8 +3,9 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents, evidenceDocuments, evidenceDocumentVersions,
+  evidenceDocuments, evidenceDocumentVersions,
   noncreditCompletionDecisions, noncreditRegistrations,
   noncreditTrainingVersions,
 } from "@/db/canonical-v301";
@@ -135,14 +136,14 @@ export const correctNoncreditCompletion = createServerFn({ method: "POST" })
       const payload = { registrationId: registration.id,
         previousDecisionId: current.id, evidenceVersionId: data.evidenceVersionId,
         reason: data.reason, outcome: data.outcome };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId: actor.actorPersonId!,
         owningOrganizationId: training.providerOrganizationId,
         eventCode: "learning.noncredit.completion_corrected",
         entityKind: "noncredit_completion_decision",
         entityId: created.id, payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId: actor.actorPersonId!,
         eventType: "NoncreditCompletionCorrected",
         aggregateType: "noncredit_completion_decision",
