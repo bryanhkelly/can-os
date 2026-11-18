@@ -4,6 +4,7 @@ import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { EmptyState, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { StudentSuccessPriorityPanel } from "./StudentSuccessPriorityPanel";
+import { StudentAssignmentLink } from "./StudentAssignmentLink";
 import { StudentSuccessSupportPanel } from "./StudentSuccessSupportPanel";
 import type { StudentSuccessSupportSummary } from "@/domain/student-success-support";
 import { StudentDashboard } from "./StudentDashboard";
@@ -40,7 +41,7 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
      <p className="mt-2 text-xs text-muted-foreground">{classroom.ready?"Lesson and submission work are available.":"Your school still needs to complete this class setup."}</p>
      {classroom.ready?<div className="mt-3 space-y-2 text-sm">
       <p>1. <Link to="/classes" search={{section:classroom.sectionId,tab:"lessons",lesson:classroom.firstWeek.lesson!.id}} className="underline focus-visible:outline-2">Study “{classroom.firstWeek.lesson!.title}”</Link></p>
-      <p>2. <Link to="/student/assignments" search={{section:classroom.sectionId,assessment:classroom.firstWeek.assessment!.id}} className="underline focus-visible:outline-2">Complete “{classroom.firstWeek.assessment!.title}”</Link></p>
+      <p>2. <StudentAssignmentLink assessmentId={classroom.firstWeek.assessment!.id} sectionId={classroom.sectionId} className="underline focus-visible:outline-2">Complete “{classroom.firstWeek.assessment!.title}”</StudentAssignmentLink></p>
      </div>:<ul className="mt-3 list-inside list-disc space-y-1 text-xs">{classroom.blockers.map(item=><li key={item.key}>{item.message}</li>)}</ul>}
     </article>;
    })}</div>
@@ -72,9 +73,9 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
      const tone=item.timeliness==="missing"||item.status==="returned"||item.timeliness==="late"
       ?"attention":item.status==="graded"?"success":"neutral";
      return <article key={item.assessmentId} className="rounded-xl border bg-background p-4">
-     <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold"><Link to="/student/assignments" search={{assessment:item.assessmentId}} className="hover:underline focus-visible:outline-2">{item.assessmentTitle}</Link></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions."}</p></div><StatusBadge tone={tone}>{status}</StatusBadge></div>
+     <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-semibold"><StudentAssignmentLink assessmentId={item.assessmentId} sectionId={item.sectionId} className="hover:underline focus-visible:outline-2">{item.assessmentTitle}</StudentAssignmentLink></h3><p className="mt-1 text-sm text-muted-foreground">{item.instructions??"Review course instructions."}</p></div><StatusBadge tone={tone}>{status}</StatusBadge></div>
      <p className="mt-3 text-xs text-muted-foreground">{item.dueAt?"Due "+format(item.dueAt,liveData.sections.find(section=>section.sectionId===item.sectionId)?.timezone):"No due date"}</p>
-     <Link to="/student/assignments" search={{assessment:item.assessmentId}} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Open assignment →</Link>
+     <StudentAssignmentLink assessmentId={item.assessmentId} sectionId={item.sectionId} className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline focus-visible:outline-2">Open assignment →</StudentAssignmentLink>
     </article>;
     })}
     {!liveData.coursework.length&&<EmptyState title="No published coursework in your current classes." description="Published work will appear here when it is assigned to one of your classes."/>}</div>
@@ -95,12 +96,12 @@ export function StudentExperience({ liveData, success, support, dashboard }: {
     <WorkspacePanel title="Other open actions" description="Support or follow-ups outside your assignment list.">
     <div className="space-y-3">{otherOpenActions.map(action=><article key={action.id} className="rounded-xl border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-       <h3 className="min-w-0 font-semibold">{action.subjectType==="assessment"?<Link to="/student/assignments" search={{assessment:action.subjectId}} className="hover:underline focus-visible:outline-2">{action.title}</Link>:<Link to="/student/experiences" search={{action:action.id}} className="hover:underline focus-visible:outline-2">{action.title}</Link>}</h3>
+       <h3 className="min-w-0 font-semibold">{action.subjectType==="assessment"&&action.subjectId?<StudentAssignmentLink assessmentId={action.subjectId} className="hover:underline focus-visible:outline-2">{action.title}</StudentAssignmentLink>:<Link to="/student/experiences" search={{action:action.id}} className="hover:underline focus-visible:outline-2">{action.title}</Link>}</h3>
        <StatusBadge tone={action.priority==="urgent"||action.priority==="high"?"attention":"neutral"}>{action.priority==="urgent"?"Urgent":action.priority==="high"?"High priority":"Open"}</StatusBadge>
       </div>
       {action.description&&<p className="mt-1 text-sm text-muted-foreground">{action.description}</p>}
-      {action.subjectType==="assessment"?
-       <Link to="/student/assignments" search={{assessment:action.subjectId}} className="mt-2 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">Review assignment →</Link>:
+      {action.subjectType==="assessment"&&action.subjectId?
+       <StudentAssignmentLink assessmentId={action.subjectId} className="mt-2 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">Review assignment →</StudentAssignmentLink>:
        <Link to="/student/experiences" search={{action:action.id}} className="mt-2 inline-flex min-h-11 items-center text-sm underline focus-visible:outline-2">Review action →</Link>}
     </article>)}
     {!otherOpenActions.length&&<EmptyState title="No additional open actions outside your learning support list."/>}</div>
