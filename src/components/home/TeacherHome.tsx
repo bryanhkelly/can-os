@@ -2,7 +2,7 @@ import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { TeacherGradeResponsesPanel, type TeacherGradeResponseItem } from "@/components/learning/TeacherGradeResponsesPanel";
 import { Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle, School } from "lucide-react";
+import { ArrowUpRight, BookOpen, ClipboardList, CalendarDays, MessageCircle, School, Users } from "lucide-react";
 import { getTeacherToday } from "@/modules/learning/teacher-today.functions";
 import { getTeacherLearningEvidence } from "@/modules/learning/teacher-learning-evidence.functions";
 import { TeacherLearningFollowUpForm } from "@/components/learning/TeacherLearningFollowUpForm";
@@ -63,6 +63,12 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
     <DashboardShortcut title="My classes" description="Open your assigned sections" icon={<BookOpen className="size-5" />}>
      <Link to="/classes" />
     </DashboardShortcut>
+    <DashboardShortcut title="Study groups" description="Facilitate sessions and group discussion" icon={<Users className="size-5" />}>
+     <Link to="/groups" />
+    </DashboardShortcut>
+    <DashboardShortcut title="Class discussions" description="Respond to students and moderate class discussions" icon={<MessageCircle className="size-5" />}>
+     <Link to="/teacher/discussions" />
+    </DashboardShortcut>
     <DashboardShortcut title="Gradebook" description={ready ? `${data.ungradedCount} submitted items to review` : "Review student work"} icon={<ClipboardList className="size-5" />}>
      <Link to="/teacher/gradebook" />
     </DashboardShortcut>
@@ -94,7 +100,7 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
       {data.ungradedCount>0 ? <div className="mt-3">
         <p className="font-semibold">{data.ungradedCount} submitted work item{data.ungradedCount===1?"":"s"} to review</p>
         <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
-        <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId}}
+        <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId,student:data.ungraded[0]!.studentProfileId}}
           className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Grade next submission <ArrowUpRight className="ml-2 size-4"/></Link>
       </div> : data.missingWorkCount>0 ? <div className="mt-3">
         <p className="font-semibold">{data.missingWorkCount} missing-work follow-up{data.missingWorkCount===1?"":"s"}</p>
