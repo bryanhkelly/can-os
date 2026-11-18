@@ -60,3 +60,31 @@ Afterward the database confirmed all four exist only in `public`, with unchanged
 - Source regression tests: `tests/unit/main-learning-table-cutover.test.ts`
 
 The Neon transaction and direct metadata queries succeeded. New script and Vitest suite were committed, **not executed**. Last observed inventory: **351** `education_v30` tables, **320** `public` tables, **7** `education_v30_secure` tables. Counts include other concurrent updates to main. Do not treat these changes as browser-level acceptance or evidence that wider `education_v30` can be dropped.
+
+## Continued: learning asset reviews and noncredit waitlist receipts
+
+A main-only transaction moved `published_asset_reviews` and
+`noncredit_waitlist_email_deliveries` to `public` without copying or deleting
+records. Both were empty at cutover. Their original table OIDs remain
+`403743` and `540672` respectively. The first retains its
+`published_asset_reviews_decision_order_seq` owned identity sequence, now
+physically in `public`.
+
+Verified afterward on Neon production `main`:
+- Both tables exist only in `public` and retain `ENABLE` and `FORCE` row-level security.
+- Existing owner-only policies are unchanged.
+- Their four outgoing foreign keys are validated and no others are unvalidated.
+- Direct `authenticated` and `anonymous` SELECT privileges remain denied.
+- The asset-review identity sequence resolves through `pg_get_serial_sequence`.
+- The current application Drizzle models use `pgTable`; the existing native
+  learning RLS/policy check includes the moved review relation from `public`.
+
+Migration: `database/production/2026-11-17-consolidate-learning-reviews-and-waitlist-receipts.sql`.
+Read-only main acceptance gate: `scripts/acceptance/check-main-learning-reviews-receipts.mjs`.
+Regression tests: `tests/unit/main-learning-reviews-receipts-cutover.test.ts`.
+
+At the last check there were **346 `education_v30` base tables**,
+**324 `public` base tables**, and **7 `education_v30_secure` base tables**.
+Other work on main is concurrent, so inventory changes do not all belong to
+this migration. SQL transaction and metadata verification passed; the new
+automated check and Vitest suite have been committed but not executed.
