@@ -261,14 +261,14 @@ export const reviewCanonicalCredentialIssuerApproval=createServerFn({method:"POS
       const nativeAuthority=await tx.execute(sql`
         SELECT 1
         FROM education_v30.canonical_accounts native_account
-        JOIN education_v30.organizations native_org
+        JOIN public.organizations native_org
           ON native_org.id=${grant.organizationId}::uuid
         JOIN public.sites native_site
           ON native_site.id=${grant.siteId}::uuid
         WHERE native_account.id=${grant.accountId}::uuid
           AND native_account.disabled_at IS NULL
           AND native_account.email_verified_at IS NOT NULL
-          AND native_org.status='active'
+          AND native_org.lifecycle_status='active'
           AND native_site.lifecycle_status IN ('planning','active')
           AND EXISTS (
             SELECT 1 FROM education_v30.site_organization_roles operator_role
