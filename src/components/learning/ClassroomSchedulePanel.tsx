@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { MutationFeedback, StatusBadge } from "@/components/workspace";
+import { MutationFeedback, StatusBadge, ActionDialog } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { fourSessionSchedulePreset, validClassroomScheduleWindow, validClassroomSessionWindows, type FourSessionCadence } from "@/domain/classroom-scheduling";
 
@@ -46,6 +46,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
   const [error,setError]=useState("");
   const feedback=useMutationFeedback(()=>schedule.refetch({throwOnError:true}));
   const blocked=Boolean(busy)||feedback.refreshFailed;
+  const [cancelPlanId,setCancelPlanId]=useState<string|null>(null);
   const [edit,setEdit]=useState<{
     planId:string;start:string;end:string;
   }|null>(null);
@@ -237,8 +238,12 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
                 row.deploymentId===plan.deploymentId &&
                 row.courseVersionId===plan.courseVersionId &&
                 row.siteId===plan.siteId)?.courseTitle??"Authorized Course"}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {scheduled} · {plan.state} · Site {plan.siteId.slice(0,8)}
+              <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>{scheduled}</span>
+                <StatusBadge tone={plan.state==="started"?"success":plan.state==="cancelled"?"neutral":"info"}>
+                  {plan.state}
+                </StatusBadge>
+                <span>Site {plan.siteId.slice(0,8)}</span>
               </p>
             </div>
             {plan.state==="scheduled"&&!plan.nativeClassId&&<div className="flex flex-wrap gap-2">
@@ -257,10 +262,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
                   end:localTime(new Date(plan.endsAt)),
                 })}>Reschedule</Button>
               <Button type="button" size="sm" variant="outline" disabled={blocked}
-                onClick={()=>{if(window.confirm("Cancel this classroom meeting?"))
-                  void run(plan.id+":cancel",async()=>{
-                    await cancelClassroomPlan({data:{planId:plan.id}});
-                  });}}>Cancel</Button>
+                onClick={()=>setCancelPlanId(plan.id)}>Cancel meeting</Button>
             </div>}
             {plan.nativeClassId&&<Link
               to="/class/$classId" params={{classId:plan.nativeClassId}}
@@ -304,5 +306,20 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     </div>
     {error&&<p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
     <MutationFeedback state={feedback} pendingMessage="Updating classroom calendar…" className="mt-4"/>
+    <ActionDialog open={cancelPlanId!==null} title="Cancel classroom meeting?"
+      description="Cancel this scheduled meeting without changing the Course, enrollment or learner history."
+      confirmLabel="Cancel meeting" destructive pending={feedback.pending||Boolean(busy)}
+      confirmDisabled={feedback.refreshFailed}
+      onClose={()=>setCancelPlanId(null)}
+      onConfirm={()=>{
+        const planId=cancelPlanId;
+        if(!planId)return;
+        void run(planId+":cancel",async()=>{
+          await cancelClassroomPlan({data:{planId}});
+          setCancelPlanId(null);
+        });
+      }}>
+      {feedback.error&&!feedback.refreshFailed&&<p role="alert" className="text-sm text-destructive">{feedback.error}</p>}
+    </ActionDialog>
   </section>;
 }
