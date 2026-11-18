@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -225,8 +225,14 @@ function ReleaseReview({item}:{item:Item}){
 }
 
 export function NativeOfferingReleaseReviewPanel(){
-  const queue=useQuery({queryKey:["native-offering-release-review-queue"],
-    queryFn:()=>getNativeOfferingReleaseReviewQueue(),retry:false});
+  const queue=useInfiniteQuery({
+    queryKey:["native-offering-release-review-queue"],
+    initialPageParam:null as {createdAt:string;id:string}|null,
+    queryFn:({pageParam})=>getNativeOfferingReleaseReviewQueue({data:{cursor:pageParam}}),
+    getNextPageParam:last=>last.nextCursor??undefined,
+    retry:false,
+  });
+  const items=queue.data?.pages.flatMap(page=>page.items)??[];
   return <WorkspacePanel title="Native Course and Offering release"
     className="mt-6"
     description="Exact-version publisher review, without a parallel curriculum publisher or local adoption shortcut.">
@@ -234,15 +240,19 @@ export function NativeOfferingReleaseReviewPanel(){
     {queue.isError&&<WorkspaceNotice tone="danger">
       The native Course review queue is unavailable for this verified reviewer account.
     </WorkspaceNotice>}
-    {queue.data?.limited&&<WorkspaceNotice tone="attention">
-      Review results are limited. Do not assume this queue is complete.
+    {queue.isFetchNextPageError&&<WorkspaceNotice tone="danger">
+      Older review submissions could not be loaded. Retry without repeating approval actions.
     </WorkspaceNotice>}
-    {queue.isSuccess&&queue.data.items.length===0&&<EmptyState
+    {queue.isSuccess&&items.length===0&&!queue.hasNextPage&&<EmptyState
       title="No eligible native Offering submissions"
       description="Only Course-appointed reviewers can see submitted versions. A general Organization role does not grant Course review authority."
     />}
     <div className="mt-4 grid gap-4">
-      {queue.data?.items.map(item=><ReleaseReview item={item} key={item.id}/>)}
+      {items.map(item=><ReleaseReview item={item} key={item.id}/>)}
+      {queue.hasNextPage&&<Button type="button" variant="outline"
+        disabled={queue.isFetchingNextPage} onClick={()=>void queue.fetchNextPage()}>
+        {queue.isFetchingNextPage?"Loading older submissions…":"Load older review submissions"}
+      </Button>}
     </div>
   </WorkspacePanel>;
 }
