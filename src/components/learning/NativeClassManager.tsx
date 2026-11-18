@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { normalizeClientError } from "@/lib/client-error";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import {
   getUnifiedClassCourseOptions, getNativeClassOperatorSites,
   getMyUnifiedClassDrafts, createUnifiedClassDraft,
@@ -48,6 +49,7 @@ function utc(value:string):string|null{return value?new Date(value).toISOString(
 
 export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,navigation}: {preferredSiteId?: string;preferredOfferingVersionId?:string;navigation?:ReactNode}) {
   const client=useQueryClient();
+  const feedback=useMutationFeedback(refresh);
   const [searchDraft,setSearchDraft]=useState("");
   const [search,setSearch]=useState("");
   const options=useInfiniteQuery({
@@ -227,16 +229,17 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   async function refresh(){
     await Promise.all([
       invalidateNativeClassAvailability(client),
-      client.invalidateQueries({queryKey:nativeClassOperatorQueryKeys.root}),
+      client.invalidateQueries({queryKey:nativeClassOperatorQueryKeys.root},
+        {throwOnError:true}),
     ]);
   }
   async function create(event:FormEvent<HTMLFormElement>){
     event.preventDefault();
-    setCreatedClassId(null);
-    if(!selected||busy||(createWithOffering&&(methods.length===0||creditModes.length===0)))return;
-    setBusy(true);setError("");setNotice("");
+    if(!selected||busy||feedback.refreshFailed||
+      (createWithOffering&&(methods.length===0||creditModes.length===0)))return;
+    setBusy(true);setError("");setNotice("");setCreatedClassId(null);
     try{
-      const result=await createUnifiedClassDraft({data:{
+      const outcome=await feedback.run(()=>createUnifiedClassDraft({data:{
         definition:{
           deploymentId:selected.deploymentId,adoptionId:selected.adoptionId,
           offeringVersionId:selected.offeringVersionId,courseVersionId:selected.courseVersionId,
@@ -251,16 +254,19 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
           consentVersion:methods.includes("self")?consentVersion.trim():null,
           consentText:methods.includes("self")?consentText.trim():null,
         }:null,
-      }});
-      setNotice(result.classOfferingVersionId
-        ?"Class and optional draft Class Offering created. Class ID: "+result.classId
-        :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId);
-      setCreatedClassId(result.classId);
-      setChoice("");setTitle("");setSiteId("");setClassCapacity("");
-      setRecipeCourseId(null);
-      await refresh();
-    }catch(e){setError(normalizeClientError(e,"Could not create the native Class.").message)}
-    finally{setBusy(false)}
+      }}),{
+        successMessage:result=>result.classOfferingVersionId
+          ?"Class and optional draft Class Offering created. Class ID: "+result.classId
+          :"Class created without any Class Offering. Activate it to use internal assignment. Class ID: "+result.classId,
+        commandErrorMessage:"Could not create the native Class. Verify adopted Course and current Site authority.",
+        refreshErrorMessage:"The Class was saved, but current Class or Course lists could not refresh. Retry refresh without creating another Class.",
+      });
+      if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+        setCreatedClassId(outcome.value.classId);
+        setChoice("");setTitle("");setSiteId("");setClassCapacity("");
+        setRecipeCourseId(null);
+      }
+    }finally{setBusy(false)}
   }
   function currentTerms():ClassOfferingTerms{
     return {
@@ -272,36 +278,43 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
     };
   }
   async function activate(classId:string){
-    if(busy)return;setBusy(true);setError("");setNotice("");
+    if(busy||feedback.refreshFailed)return;
+    setBusy(true);setError("");setNotice("");
     try{
-      await activateUnifiedClass({data:{classId}});
-      await refresh();
-      setNotice("Class activated independently of registration publication.");
-    }catch(e){setError(normalizeClientError(e,"Could not activate Class.").message)}
-    finally{setBusy(false)}
+      await feedback.run(()=>activateUnifiedClass({data:{classId}}),{
+        successMessage:"Class activated independently of registration publication.",
+        commandErrorMessage:"Could not activate Class. Check the current approved Course and authorized Site.",
+        refreshErrorMessage:"Class activation was saved, but current Class lists could not refresh. Retry refresh without activating again.",
+      });
+    }finally{setBusy(false)}
   }
   async function addOffering(classId:string){
-    if(busy)return;setBusy(true);setError("");setNotice("");
+    if(busy||feedback.refreshFailed)return;
+    setBusy(true);setError("");setNotice("");
     try{
-      await createNextUnifiedClassOfferingVersion({data:{classId,terms:currentTerms()}});
-      await refresh();
-      setNotice("Optional Class Offering draft created. Publish it when ready.");
-    }catch(e){setError(normalizeClientError(e,"Could not create Class Offering.").message)}
-    finally{setBusy(false)}
+      await feedback.run(()=>createNextUnifiedClassOfferingVersion({
+        data:{classId,terms:currentTerms()},
+      }),{
+        successMessage:"Optional Class Offering draft created. Publish it when ready.",
+        commandErrorMessage:"Could not create Class Offering. Verify authorized Class and valid terms.",
+        refreshErrorMessage:"Class Offering draft was saved, but current lists could not refresh. Retry refresh without creating another version.",
+      });
+    }finally{setBusy(false)}
   }
   async function action(classId:string,classOfferingVersionId:string,kind:"publish"|"close"){
-    if(busy)return;setBusy(true);setError("");setNotice("");
+    if(busy||feedback.refreshFailed)return;
+    setBusy(true);setError("");setNotice("");
     try{
-      if(kind==="publish"){
-        await publishUnifiedClassOffering({data:{classId,classOfferingVersionId}});
-        setNotice("Class Offering published under existing Course and Site authorization.");
-      }else{
-        await closeUnifiedClassOffering({data:{classId,classOfferingVersionId}});
-        setNotice("Class Offering closed. Existing learning records remain intact.");
-      }
-      await refresh();
-    }catch(e){setError(normalizeClientError(e,"Class Offering update failed.").message)}
-    finally{setBusy(false)}
+      await feedback.run(()=>kind==="publish"
+        ?publishUnifiedClassOffering({data:{classId,classOfferingVersionId}})
+        :closeUnifiedClassOffering({data:{classId,classOfferingVersionId}}),{
+        successMessage:kind==="publish"
+          ?"Class Offering published under existing Course and Site authorization."
+          :"Class Offering closed. Existing learning records remain intact.",
+        commandErrorMessage:"Class Offering update failed. Verify current release and Site authority.",
+        refreshErrorMessage:"The Class Offering change was saved, but current lists could not refresh. Retry refresh without repeating the command.",
+      });
+    }finally{setBusy(false)}
   }
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Classes" title="Class management"
     subtitle="Create a Class from an adopted Course. Class Offerings are optional: school and private assignment do not require a public or private registration listing."
@@ -663,7 +676,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             </div>}
             </div>}
           </div>
-          <Button disabled={busy||!selected||!siteId||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
+          <Button disabled={busy||feedback.refreshFailed||!selected||!siteId||(createWithOffering&&(methods.length===0||creditModes.length===0))} type="submit">
             {busy?"Working…":"Create draft Class"}
           </Button>
         </form>
@@ -678,16 +691,16 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
             <Link to="/class/$classId" params={{classId:item.classId}} search={{view:"manage",tab:"reports"}}
               aria-label={`Class evidence for ${item.title}`}
               className="mt-2 ml-3 inline-block text-sm font-semibold underline">Class evidence</Link>
-            {item.state!=="active"&&<Button disabled={busy||!item.siteId} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
+            {item.state!=="active"&&<Button disabled={busy||feedback.refreshFailed||!item.siteId} className="mt-3 mr-2" onClick={()=>void activate(item.classId)}>Activate Class</Button>}
             {!item.siteId&&<p className="mt-2 text-xs text-muted-foreground">No assigned canonical Site. This draft cannot be activated or published.</p>}
-            {!item.classOfferingVersionId&&<Button disabled={busy||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
+            {!item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed||methods.length===0||creditModes.length===0} className="mt-3 mr-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Create draft Offering from form terms</Button>}
-            {item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3"
+            {item.offeringState==="draft"&&item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed} className="mt-3"
               onClick={()=>void action(item.classId,item.classOfferingVersionId!,"publish")}>Publish Class Offering</Button>}
-            {item.offeringState==="published"&&item.classOfferingVersionId&&<Button disabled={busy} className="mt-3" variant="outline"
+            {item.offeringState==="published"&&item.classOfferingVersionId&&<Button disabled={busy||feedback.refreshFailed} className="mt-3" variant="outline"
               onClick={()=>void action(item.classId,item.classOfferingVersionId!,"close")}>Close enrollment</Button>}
             {item.offeringState==="closed"&&item.classOfferingVersionId&&<Button
-              disabled={busy||methods.length===0||creditModes.length===0}
+              disabled={busy||feedback.refreshFailed||methods.length===0||creditModes.length===0}
               className="mt-3 ml-2" variant="outline"
               onClick={()=>void addOffering(item.classId)}>Draft new Offering terms</Button>}
           </NativeClassSummary>)}
@@ -695,6 +708,8 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
         </div>
       </section>
     </div>
+    <MutationFeedback state={feedback} className="mt-5"
+      pendingMessage="Saving Class changes and reconciling authorized Class records…"/>
     {notice&&<p role="status" className="mt-5 border border-border bg-card p-4 text-sm">{notice}</p>}
     {createdClassId&&<Link to="/class/$classId" params={{classId:createdClassId}}
       search={{view:"manage",tab:"overview"}}
