@@ -273,18 +273,23 @@ describe("single My Activity training workspace", () => {
     const commands = readFileSync(join(repoRoot, "src/components/learning/NoncreditEnrollmentManagement.tsx"), "utf8");
     expect(activity).toContain("<NoncreditEnrollmentManagement/>");
     expect(legacy).toContain("<NoncreditEnrollmentManagement/>");
-    for (const method of ["openMyNoncreditCourse", "withdrawMyNoncreditRegistration", "cancelMyNoncreditWaitlist"]) {
+    for (const method of ["withdrawMyNoncreditRegistration", "cancelMyNoncreditWaitlist"]) {
       expect(commands).toContain(method);
       expect(activity).not.toContain(method);
       expect(legacy).not.toContain(method);
     }
+    // Course opening is now owned by the route so deep links and My Activity
+    // always restore the same verified canonical session.
+    const courseRoute = readFileSync(join(routesDir, "learn.course.$courseAttemptId.tsx"), "utf8");
+    expect(courseRoute).toContain("openMyNoncreditCourse({data:{courseAttemptId:course.courseAttemptId}})");
+    expect(commands).not.toContain("await openMyNoncreditCourse(");
     expect(commands).not.toContain("window.location.assign");
     expect(activity).toContain('id="noncredit-management"');
     expect(activity).toContain('registrationId={item.refs.registrationId}');
     expect(activity).toContain('releaseId={item.releaseId}');
     expect(activity).toContain('showAllTraining&&<NoncreditEnrollmentManagement/>');
-    expect(commands).toContain('enabled:!releaseId');
-    expect(commands).toContain('enabled:!registrationId');
+    expect(commands).toContain('enabled:authorized&&!releaseId');
+    expect(commands).toContain('enabled:authorized&&!registrationId');
   });
 });
 
