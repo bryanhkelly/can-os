@@ -2,6 +2,21 @@
 
 **Decision:** One CAN login and one authoritative Person identity. There is no requirement to preserve native-v3 browser login, account-to-account bridges, or old identity endpoints during the cutover. This is an architecture decision, **not** evidence that the cutover is implemented or tested.
 
+## Latest main checkpoint: One CAN staff identity and 36 native Person FKs remaining
+
+**Database, November 17, 2026:** 142 existing `public.people`, no native Person/account/session rows, **352 validated Person FKs targeting `public.people` and 36 targeting `education_v30.persons`**. Current schema inventory: 324 `public` base tables, 346 `education_v30` base tables and 7 tables in the separate restricted safeguarding schema. There are no active Person/grant conflicts; five historically conflicting inactive grants remain unchanged.
+
+Two further guarded, committed and applied Neon-`main` migrations:
+
+- `database/production/2026-11-17-rebind-22-public-operational-person-fks.sql` repoints every operational public-schema Person FK directly to `public.people`. Only three transitional correspondence/adult-review FKs remain in `public` and must not be remapped while their readers exist.
+- `database/production/2026-11-17-rebind-5-secure-actor-person-fks.sql` repoints safeguarding case openers, reporters, evidence contributors and custodians directly to the authoritative Person. It **preserves forced RLS and the separate restricted safeguarding schema**. All affected tables were verified empty before the change.
+
+The single CAN Site-staff authorization read is now sourced from `public.access_sessions`, `public.account_person_grants`, `public.people`, `public.sites` and `public.organizations`. SQL: `database/production/2026-11-17-single-can-staff-projection.sql`. It no longer reads `access_account_canonical_principals`, native staff grants or native accounts, and refuses invalid/revoked/ambiguous sessions. The application verifies the **same account, session, grant, Person, Organization, Site and role** against the restricted SQL result. The former bridge module and unused native-grant selection helpers have been retired. Grant creation and independent high-risk reviewer approvals remain separate governed decisions.
+
+The existing `scripts/acceptance/check-canonical-staff-readiness.mjs` was updated to check this architecture on **Neon main only**. Its SQL was validated directly on Neon main; there are presently **zero qualifying non-demo, currently active Site-staff sessions**, so successful authenticated production access is **not yet demonstrated**. No test grant, second Person, staff correspondence or live session was manufactured.
+
+**Not released:** The remaining 36-FK migration remains staged behind independent runtime/approval flags and must not run yet. Noncredit and reviewed native-Class onboarding still create native Persons and native accounts and can issue a separate learner cookie. Completing that conversion requires coordinated Course release, consent, learner participation, guardian relationship, sensitive-data, RLS and application acceptance. Do not drop the empty correspondence and native identity tables independently of those consumers.
+
 ## Current verified main checkpoint: November 17, 2026
 
 The ongoing, guarded One-Person FK convergence has now redirected **175 reviewed staff/actor attribution constraints** to `public.people`, across the following committed Neon-main migrations:
