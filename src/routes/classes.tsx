@@ -30,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { classResources, type ClassContent } from "@/domain/class-content";
 import { isLearnerFacingInstruction } from "@/domain/first-class-lesson";
 import { getClassDirectory, getClassWorkspace, getClassResourceDownload, getClassSupplementDownload, setLessonCompletion } from "@/modules/learning/class-workspace.functions";
@@ -214,10 +216,10 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     } }));
   }
   function resources(items: ClassContent["resources"]) {
-    return <ul className="space-y-3">{items.map(item => <li key={item.id} className="rounded-lg border p-3 text-sm">
+    return <ul className="space-y-3">{items.map(item => <li key={item.id} className=" border p-3 text-sm">
       {item.url && resolveClassVideo(item.url) ? <ClassVideoPlayer title={item.title} url={item.url} resourceId={item.id} declaredVideo={false}/> :
         item.url ? <SafeClassExternalLink url={item.url} title={item.title} kind="external" resourceId={item.id}/> :
-        <button type="button" data-learning-resource-id={item.id} disabled={busy || downloading} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</button>}
+        <Button variant="ghost" size="sm" type="button" data-learning-resource-id={item.id} disabled={busy || downloading} onClick={() => void download(item.id)} className="underline disabled:opacity-50">{item.title}</Button>}
     </li>)}</ul>;
   }
   function supplementContent(item: typeof supplements[number], presentation: "standard" | "classroom" = "standard") {
@@ -233,8 +235,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
     if (item.url) return <SafeClassExternalLink url={item.url} title={item.title} kind={item.kind}/>;
     if (item.kind === "html" && item.resourceId) return <CommonCartridgeStaticLesson
       programId={data.section.programId} sectionId={data.section.id} resourceId={item.resourceId}/>;
-    if (item.kind === "pdf") return <button type="button" disabled={busy || downloading}
-      onClick={() => void downloadSupplement(item.id)} className="underline disabled:opacity-50">{item.title} (private PDF)</button>;
+    if (item.kind === "pdf") return <Button variant="ghost" size="sm" type="button" disabled={busy || downloading}
+      onClick={() => void downloadSupplement(item.id)} className="underline disabled:opacity-50">{item.title} (private PDF)</Button>;
     return <span>{item.title} (unavailable document)</span>;
   }
   function supplementActions(item:typeof supplements[number]){
@@ -261,20 +263,20 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
           onChange={e=>setResourceEditKind(e.target.value as typeof resourceEditKind)}>
           {(["link","video","pdf","image","audio","document"] as const).map(kind=><option key={kind} value={kind}>{kind}</option>)}
         </Select></Field>
-        <div className="flex gap-3"><button type="submit" disabled={busy} className="text-xs underline">Save replacement</button>
-          <button type="button" onClick={()=>setEditingResource(null)} className="text-xs underline">Cancel</button></div>
-      </form>:<button type="button" disabled={busy} className="text-xs underline"
+        <div className="flex gap-3"><Button variant="ghost" size="sm" type="submit" disabled={busy} className="text-xs underline">Save replacement</Button>
+          <Button variant="ghost" size="sm" type="button" onClick={()=>setEditingResource(null)} className="text-xs underline">Cancel</Button></div>
+      </form>:<Button variant="ghost" size="sm" type="button" disabled={busy} className="text-xs underline"
         onClick={()=>{setEditingResource(item.id);setRetireCandidate(null);
           setResourceEditTitle(item.title);setResourceEditUrl(item.url??"");
-          setResourceEditKind(item.kind as typeof resourceEditKind);}}>Replace resource</button>}
+          setResourceEditKind(item.kind as typeof resourceEditKind);}}>Replace resource</Button>}
       {retireCandidate===item.id?<div className="flex gap-3 text-xs">
         <span>Retire this teacher resource from the class?</span>
-        <button type="button" disabled={busy} className="underline" onClick={()=>void run(async()=>{
+        <Button variant="ghost" size="sm" type="button" disabled={busy} className="underline" onClick={()=>void run(async()=>{
           await manageClassSupplement({data:{action:"retire",sectionId:data.section.id,supplementId:item.id}});
           setRetireCandidate(null);
-        },"Teacher resource retired from this class.")}>Confirm retirement</button>
-        <button type="button" className="underline" onClick={()=>setRetireCandidate(null)}>Cancel</button>
-      </div>:<button type="button" disabled={busy} className="text-xs underline" onClick={()=>{setRetireCandidate(item.id);setEditingResource(null);}}>Retire resource</button>}
+        },"Teacher resource retired from this class.")}>Confirm retirement</Button>
+        <Button variant="ghost" size="sm" type="button" className="underline" onClick={()=>setRetireCandidate(null)}>Cancel</Button>
+      </div>:<Button variant="ghost" size="sm" type="button" disabled={busy} className="text-xs underline" onClick={()=>{setRetireCandidate(item.id);setEditingResource(null);}}>Retire resource</Button>}
     </div>;
   }
   const classwork = data.role === "teacher" ? <Link to="/teacher/gradebook" search={{ section: data.section.id }} className="underline">Gradebook and submission review</Link> :
@@ -362,14 +364,14 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
       {data.content?.blueprint && <ClassCourseRoadmap blueprint={data.content.blueprint} />}
       <ClassTeachingTeam teachers={data.teachers} />
     </div>}
-    {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5 rounded-lg border p-4 text-sm">
+    {data.curriculumAccess?.available===false&&<p role="alert" className="mt-5  border p-4 text-sm">
       {data.curriculumAccess.reason} Your assignments and academic records remain available in their usual workspaces.
     </p>}
     {tab === "lessons" && <div className="grid grid-cols-1 gap-5">
       <ClassroomMediaStage key={`media:${lesson?.id ?? "class"}`} sectionId={data.section.id} timezone={data.section.timezone}
         role={data.role} meetings={meetings} studentPersonId={search.student} commands={meetingCommands} recorded={recorded}/>
-      {!data.content && <p role="status" className="rounded-xl border p-5 text-sm">No published learning content is configured for this class.</p>}
-      {lessonId && !lesson && <p role="alert" className="rounded-xl border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
+      {!data.content && <p role="status" className=" border p-5 text-sm">No published learning content is configured for this class.</p>}
+      {lessonId && !lesson && <p role="alert" className=" border p-4 text-sm">This lesson is unavailable in the published course version.</p>}
       {lesson ? <div>
         {data.role === "student" && <LearningActivityTracker sectionId={data.section.id} lessonId={lesson.id} />}
 
@@ -379,7 +381,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
           {supplements.some(item=>item.lessonId===lesson.id && item.id !== mainVideoSupplement?.id) && <div className="mt-5 space-y-2">
           <h3 className="font-semibold">Publisher, school and teacher resources</h3>
           <ul className="space-y-2">{supplements.filter(item=>item.lessonId===lesson.id && item.id !== mainVideoSupplement?.id).map(item=>
-            <li key={item.id} className="rounded border p-3 text-sm">{supplementContent(item)} <span className="text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}</li>)}</ul>
+            <li key={item.id} className=" border p-3 text-sm">{supplementContent(item)} <span className="text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}</li>)}</ul>
           </div>}
           {mainVideoSupplement && <div className="mt-3 text-xs text-muted-foreground">{mainVideoSupplement.title} · {mainVideoSupplement.source}{supplementActions(mainVideoSupplement)}</div>}
         </>} transcript={lesson.transcript?.trim() ? <section aria-label="Published lesson transcript" data-learning-content>
@@ -410,7 +412,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
             } });
             setResourceTitle(""); setResourceUrl("");
           }, "Teacher resource attached to this lesson.")} />}
-        {relatedWork.length > 0 && <section className="mt-6 space-y-3 rounded-lg border p-4" aria-label="Assignments for this lesson">
+        {relatedWork.length > 0 && <section className="mt-6 space-y-3  border p-4" aria-label="Assignments for this lesson">
           <h3 className="text-sm font-semibold">Assignments for this lesson</h3>
           <ul className="divide-y">{relatedWork.map(work => <li key={work.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
             <div>
@@ -428,21 +430,21 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
               <Link to="/student/assignments" search={{section:data.section.id,assessment:work.id}} className="text-sm underline">Open assignment</Link> : null}
           </li>)}</ul>
         </section>}
-        {data.role === "teacher" && <section className="mt-6 rounded-lg border p-4" aria-label="Assign from this lesson">
+        {data.role === "teacher" && <section className="mt-6  border p-4" aria-label="Assign from this lesson">
           <h3 className="text-sm font-semibold">Assign work from this lesson</h3>
           <p className="mt-1 text-xs text-muted-foreground">Create teacher-owned work linked to this published lesson. Publisher content remains unchanged.</p>
           <div className="mt-3 flex flex-wrap gap-3">{(["homework","classwork","quiz","test","project"] as const).map(kind=>
             <Link key={kind} to="/teacher/gradebook" search={{section:data.section.id,lesson:lesson.id,kind}}
-              className="rounded border px-3 py-2 text-sm capitalize">Create {kind}</Link>
+              className=" border px-3 py-2 text-sm capitalize">Create {kind}</Link>
           )}
             <Link to="/teacher/discussions" search={{section:data.section.id,lesson:lesson.id}}
-              className="rounded border px-3 py-2 text-sm">Start discussion</Link>
+              className=" border px-3 py-2 text-sm">Start discussion</Link>
           </div>
         </section>}
-        {data.role === "student" && <button type="button" disabled={busy} onClick={() => void run(() => setLessonCompletion({ data: {
+        {data.role === "student" && <Button variant="outline" size="sm" type="button" disabled={busy} onClick={() => void run(() => setLessonCompletion({ data: {
           sectionId: data.section.id, versionId: data.section.versionId, lessonId: lesson.id, completed: !completed.has(lesson.id),
         } }), completed.has(lesson.id) ? "Lesson marked incomplete." : "Lesson completion saved.")}
-          className="mt-5 rounded-lg border px-4 py-2 text-sm disabled:opacity-50">{completed.has(lesson.id) ? "Mark incomplete" : "Mark lesson complete"}</button>}
+          className="mt-5  border px-4 py-2 text-sm disabled:opacity-50">{completed.has(lesson.id) ? "Mark incomplete" : "Mark lesson complete"}</Button>}
         <div className="mt-5"><PublishedLessonNavigation search={search} lessonIndex={lessonIndex} lessonCount={lessons.length} completedCount={completed.size} isStudent={data.role==="student"} previousLesson={previousLesson} nextLesson={nextLesson}/></div>
       </div> : data.content?.modules.filter(module=>module.lessons.some(isLearnerFacingInstruction)).map(module => <WorkspacePanel key={module.id} title={module.title}>
         <ul className="divide-y">{module.lessons.filter(isLearnerFacingInstruction).map(item => <li key={item.id} className="flex items-center justify-between gap-3 py-3">
@@ -465,8 +467,8 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         notes={data.role !== "guardian" ? <section className="space-y-4" aria-label="Private lesson notes unavailable">
           <h3 className="font-serif text-2xl font-normal">Your notes</h3>
           <p role="status" className="text-sm text-muted-foreground">Private notes require a published lesson. This class has no lesson selected yet; no notes can be saved here.</p>
-          <label className="block text-xs font-semibold">Lesson notes<textarea disabled rows={5}
-            className="mt-2 w-full border bg-muted p-3" placeholder="Select a published lesson to take notes."/></label>
+          <Label className="block text-xs font-semibold">Lesson notes<Textarea disabled rows={5}
+            className="mt-2 w-full border bg-muted p-3" placeholder="Select a published lesson to take notes."/></Label>
         </section> : undefined}
         discussion={data.role !== "guardian" ? <div className="space-y-3">
           <p className="text-sm text-muted-foreground">Open your class discussion workspace for teacher-moderated conversations.</p>
@@ -496,7 +498,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         lessons={lessons} enabled={data.videoUploadsEnabled}/>}
       {data.content && resources(classResources(data.content))}
       {supplements.length>0 && <section className="mt-5 space-y-2"><h3 className="font-semibold">Publisher, school and teacher resources</h3>
-        <ul className="space-y-2">{supplements.map(item=><li key={item.id} className="rounded border p-3 text-sm">
+        <ul className="space-y-2">{supplements.map(item=><li key={item.id} className=" border p-3 text-sm">
           {supplementContent(item)}
           <span className="ml-2 text-xs text-muted-foreground">· {item.source}</span>{supplementActions(item)}
         </li>)}</ul>
@@ -515,12 +517,12 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
         {teacherGuides?.units.map(unit=><WorkspacePanel key={unit.unitId} title={`Teacher guide · ${unit.unitId}`}
           description={`Teacher review: ${unit.reviewStatus.replaceAll("_"," ")}. These worked answers are not student-facing instructional content.`}>
           <p className="whitespace-pre-wrap text-sm leading-7">{unit.teacherOverview}</p>
-          <div className="mt-4 grid gap-3">{unit.lessons.map(item=><details key={item.lessonId} className="rounded-lg border p-3">
+          <div className="mt-4 grid gap-3">{unit.lessons.map(item=><details key={item.lessonId} className=" border p-3">
             <summary className="cursor-pointer text-sm font-semibold">Lesson: {data.content?.modules.flatMap(module=>module.lessons).find(lesson=>lesson.id===item.lessonId)?.title ?? item.lessonId}</summary>
             <div className="mt-3 space-y-4 text-sm">
               <p className="whitespace-pre-wrap">{item.preparation}</p>
               <section><h3 className="font-semibold">Worked solutions</h3>
-                <ul className="mt-2 space-y-2">{item.workedAnswers.map((a,i)=><li key={i} className="rounded border p-3"><p className="font-semibold">{a.prompt}</p><p className="mt-1 whitespace-pre-wrap">{a.answer}</p></li>)}</ul>
+                <ul className="mt-2 space-y-2">{item.workedAnswers.map((a,i)=><li key={i} className=" border p-3"><p className="font-semibold">{a.prompt}</p><p className="mt-1 whitespace-pre-wrap">{a.answer}</p></li>)}</ul>
               </section>
               <section><h3 className="font-semibold">Common misconceptions</h3>
                 <ul className="mt-2 list-disc space-y-2 pl-5">{item.misconceptions.map((t,i)=><li key={i}>{t}</li>)}</ul>
@@ -534,10 +536,10 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
             </div>
           </details>)}</div>
           <h3 className="mt-5 text-sm font-semibold">Assessment answer guides</h3>
-          <div className="mt-2 grid gap-3">{unit.assessments.map(item=><details key={item.assessmentKey} className="rounded-lg border p-3">
+          <div className="mt-2 grid gap-3">{unit.assessments.map(item=><details key={item.assessmentKey} className=" border p-3">
             <summary className="cursor-pointer text-sm font-semibold">{item.title}</summary>
             <div className="mt-3 space-y-3 text-sm">
-              {item.answerGuide.map(q=><div key={q.item} className="rounded border p-3">
+              {item.answerGuide.map(q=><div key={q.item} className=" border p-3">
                 <p className="font-semibold">Item {q.item}</p>
                 <p className="mt-1 whitespace-pre-wrap">{q.correctResponse}</p>
                 <p className="mt-2 text-muted-foreground">{q.evidenceToLookFor}</p>
@@ -547,7 +549,7 @@ export function ClassWorkspace({ data, tab = data.role === "student" ? "lessons"
           </details>)}</div>
         </WorkspacePanel>)}
       </div>
-    ) : <p role="alert" className="rounded-lg border p-4 text-sm">Teacher-only materials are unavailable to this account.</p>)}
+    ) : <p role="alert" className=" border p-4 text-sm">Teacher-only materials are unavailable to this account.</p>)}
     {tab === "announcements" && <div className="grid gap-5">
       {data.role === "teacher" && <ClassAnnouncementComposer title={title} body={body} busy={busy}
         onTitleChange={setTitle}
