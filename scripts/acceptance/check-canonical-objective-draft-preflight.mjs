@@ -79,7 +79,7 @@ try{
       }catch(error){problems.push("missing function grant: "+error.message);}
     }
     const {rows:bindings}=await pool.query(
-      `SELECT 1 FROM education_v30.database_role_organization_bindings
+      `SELECT 1 FROM public.database_role_organization_bindings
        WHERE db_role=$1 AND organization_id=$2::uuid
          AND purpose_code='assessment_draft_author' AND status='approved'
          AND valid_from<=clock_timestamp()
