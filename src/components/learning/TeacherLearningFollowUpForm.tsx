@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { WorkspaceNotice } from "@/components/workspace";
 import { createTeacherLearningFollowUp } from "@/modules/learning/teacher-learning-followup.functions";
 import { followUpApproachLabels, type TeacherLearningFollowUpInput } from "@/domain/teacher-learning-followup";
 
@@ -25,9 +26,9 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
   const [attempted, setAttempted] = useState(false);
 
   return <div className="mt-3 text-sm">
-    {!expanded && <button type="button" className="underline" onClick={() => setExpanded(true)}>
+    {!expanded && <Button type="button" variant="outline" size="sm" onClick={() => setExpanded(true)}>
       Plan a teacher follow-up
-    </button>}
+    </Button>}
     {expanded && <form noValidate className="grid gap-3 border border-border p-3"
       onSubmit={async event => {
         event.preventDefault();
@@ -73,7 +74,7 @@ export function TeacherLearningFollowUpForm({ sectionId, studentProfileId, learn
         </Button>
         <Button type="button" variant="ghost" onClick={() => setExpanded(false)} disabled={busy}>Cancel</Button>
       </div>}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <WorkspaceNotice tone={created ? "success" : "danger"}>{notice}</WorkspaceNotice>}
       {actionId && <Link to="/actions/$actionId" params={{ actionId }} className="font-semibold underline">Open follow-up Action</Link>}
     </form>}
   </div>;
