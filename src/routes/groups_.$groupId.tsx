@@ -11,6 +11,8 @@ import {
   WorkspacePanel, secondaryActionClassName,
 } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -587,13 +589,13 @@ function MembersPanel({ group, availability, busy, run }: {
         {inviteeLoad.error && <p role="alert" className="text-xs text-destructive">{inviteeLoad.error}</p>}
         {inviteeLoad.loaded && !inviteeLoad.error && inviteeLoad.invitees.length === 0 &&
           <p className="text-xs text-muted-foreground">No eligible students are available to invite.</p>}
-        {inviteeLoad.invitees.map(student => <label key={student.personId} className="flex items-center gap-2 text-sm">
-          <input type="checkbox" disabled={busy} checked={selectedInviteeIds.includes(student.personId)}
+        {inviteeLoad.invitees.map(student => <Label key={student.personId} className="flex min-h-10 items-center gap-3 border border-border bg-card px-3 py-2">
+          <Checkbox disabled={busy} checked={selectedInviteeIds.includes(student.personId)}
             onChange={event => setSelectedInviteeIds(ids => event.target.checked
               ? [...ids, student.personId]
               : ids.filter(id => id !== student.personId))} />
-          {student.firstName} {student.lastName}
-        </label>)}
+          <span>{student.firstName} {student.lastName}</span>
+        </Label>)}
         {inviteAttempted && !selectedInviteeIds.length &&
           <FieldError>Select at least one student to invite.</FieldError>}
         <Button type="submit" disabled={busy || !inviteeLoad.loaded}>
