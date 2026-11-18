@@ -92,7 +92,7 @@ export const programPublicationClaims = educationV30.table("program_publication_
   reviewedByPersonId: uuid("reviewed_by_person_id").notNull(),
 });
 
-export const sitePublicationBindings = educationV30.table("site_publication_bindings", {
+export const sitePublicationBindings = pgTable("site_publication_bindings", {
   siteId: uuid("site_id").primaryKey(),
   publicSlug: text("public_slug").notNull().unique(),
   status: text("status").$type<"draft" | "published">().notNull().default("draft"),
