@@ -12,7 +12,7 @@ describe("single-Site native Class handoff",()=>{
     expect(panel).not.toContain("getSiteIdentityLinkStatus");
     expect(panel).not.toContain("resolveSiteClassLink");
     expect(scope).toContain("export const getLaunchSiteClassScope");
-    expect(scope).toContain("resolveLaunchSiteCatalogContext(getRequest(),data.siteId)");
+    expect(scope).toContain('resolveLaunchSiteCatalogContext(getRequest(),data.siteId,"class.manage")');
   });
 
   it("queries authorized Site Classes before limiting results",()=>{
