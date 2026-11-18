@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace";
@@ -95,27 +96,24 @@ export function ClassroomFacilitatorConsole({
       <p className="mt-1 text-xs text-muted-foreground">
         Learners respond privately on their own devices. Responses are formative.
       </p>
-      <label className="mt-3 block text-sm font-medium">
-        Question or discussion prompt
+      <Field className="mt-3" label="Question or discussion prompt">
         <Textarea className="mt-1"
           rows={3} maxLength={1000} value={prompt}
           onChange={e => setPrompt(e.target.value)}
           placeholder="What is one responsible way to use AI at work?"/>
-      </label>
-      <label className="mt-3 block text-sm font-medium">
-        Response format
+      </Field>
+      <Field className="mt-3" label="Response format">
         <Select className="mt-1"
           value={kind} onChange={e => setKind(e.target.value as "single_choice" | "text")}>
           <option value="single_choice">Multiple choice</option>
           <option value="text">Short written response</option>
         </Select>
-      </label>
-      {kind === "single_choice" && <label className="mt-3 block text-sm font-medium">
-        Options, one per line (2–8)
+      </Field>
+      {kind === "single_choice" && <Field className="mt-3" label="Options, one per line (2–8)">
         <Textarea className="mt-1"
           rows={4} maxLength={1600} value={choicesText}
           onChange={e => setChoicesText(e.target.value)}/>
-      </label>}
+      </Field>}
       <Button className="mt-3" type="button" disabled={busy || !canRelease}
         onClick={() => void run(async () => {
           const normalizedPrompt = prompt.trim();
