@@ -5,6 +5,7 @@ import { LoaderFailure } from "@/lib/loader-failure";
 import { EmptyState, StatCard, WorkspaceNotice, WorkspaceShell, StatusBadge } from "@/components/workspace";
 import { useStudentDisplayPreferences } from "@/components/shell/WorkspaceSession";
 import { formatTimestamp } from "@/modules/calendar/timezone";
+import { assignmentSummaryForSection } from "@/domain/student-assignment-work";
 
 const loadAssignments = () => getAssignments();
 export const Route = createFileRoute("/student/assignments")({
@@ -39,7 +40,8 @@ function StudentAssignments() {
 function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData; showCompleted: boolean }) {
  const { connected, assignments } = data;
  const { filter = "all", section } = Route.useSearch();
- const items = assignments.filter(item => (!section || item.sectionId === section) &&
+ const summary = assignmentSummaryForSection(assignments, section);
+ const items = summary.assignments.filter(item =>
   (filter !== "all" || showCompleted || !["submitted", "graded"].includes(item.status ?? "")) && (
   filter === "all" ||
   (filter === "todo" && (!item.status || item.status === "assigned" || item.status === "returned")) ||
@@ -53,9 +55,9 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
   actions={<Link to="/calendar-export" className=" border bg-card px-4 py-2 text-sm font-semibold">Export deadlines (.ics)</Link>}>
   {!connected && <WorkspaceNotice tone="attention" className="mt-5">School records are currently unavailable.</WorkspaceNotice>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
-   <StatCard label="Assignments" value={assignments.length}/>
-   <StatCard label="Awaiting feedback" value={assignments.filter(item => item.status === "submitted").length}/>
-   <StatCard label="Graded" value={assignments.filter(item => item.status === "graded").length}/>
+   <StatCard label="Assignments" value={summary.total}/>
+   <StatCard label="Awaiting feedback" value={summary.awaitingFeedback}/>
+   <StatCard label="Graded" value={summary.graded}/>
   </div>
   <nav aria-label="Assignment filters" className="mt-7 flex flex-wrap gap-2">
    {([["all", "All"], ["todo", "To do / revise"], ["missing", "Missing work"], ["submitted", "Submitted"], ["feedback", "Feedback"]] as const)
