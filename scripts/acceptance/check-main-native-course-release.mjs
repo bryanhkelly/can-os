@@ -196,14 +196,23 @@ async function main(){
       (SELECT count(*)::int FROM education_v30.blueprint_outputs bo
         WHERE bo.offering_version_id=(SELECT id FROM target)
       ) AS offering_blueprint_outputs,
-      (SELECT count(*)::int FROM education_v30.deployment_readiness_reviews rr
-        JOIN education_v30.deployment_offering_adoptions a
-          ON a.deployment_id=rr.deployment_id
-        WHERE a.offering_version_id=(SELECT id FROM target)
-          AND rr.review_kind IN ('operating','registration','delivery')
-          AND rr.outcome='ready'
-          AND (rr.expires_at IS NULL OR rr.expires_at>clock_timestamp())
-      ) AS current_ready_deployment_reviews
+      (SELECT count(*)::int FROM (
+        SELECT latest.deployment_id
+        FROM (
+          SELECT DISTINCT ON (rr.deployment_id,rr.review_kind)
+            rr.deployment_id,rr.review_kind,rr.outcome,rr.expires_at
+          FROM education_v30.deployment_readiness_reviews rr
+          JOIN education_v30.deployment_offering_adoptions a
+            ON a.deployment_id=rr.deployment_id
+          WHERE a.offering_version_id=(SELECT id FROM target)
+            AND rr.review_kind IN ('operating','registration','delivery')
+          ORDER BY rr.deployment_id,rr.review_kind,rr.evaluated_at DESC,rr.id DESC
+        ) latest
+        WHERE latest.outcome='ready'
+          AND (latest.expires_at IS NULL OR latest.expires_at>clock_timestamp())
+        GROUP BY latest.deployment_id
+        HAVING count(DISTINCT latest.review_kind)=3
+      ) complete) AS candidate_ready_deployments
   `;
   if(!upstream)throw new Error("Publisher release preflight returned no upstream status");
 
@@ -248,7 +257,7 @@ async function main(){
     publisherAssetVersions:Number(upstream.publisher_asset_versions),
     approvedPublisherCapabilityAssignments:Number(upstream.approved_publisher_capability_assignments),
     offeringBlueprintOutputs:Number(upstream.offering_blueprint_outputs),
-    currentReadyDeploymentReviews:Number(upstream.current_ready_deployment_reviews),
+    candidateReadyDeployments:Number(upstream.candidate_ready_deployments),
   };
   const setupActions=[];
   if(!upstreamCounts.verifiedCreatorGrants||!upstreamCounts.verifiedReviewerGrants)
@@ -261,8 +270,8 @@ async function main(){
     setupActions.push("Create immutable publisher-owned content asset versions and verify content rights before submitting the exact release manifest.");
   if(!upstreamCounts.offeringBlueprintOutputs)
     setupActions.push("Execute a genuinely reviewed Blueprint configuration for the exact Offering and local Deployment.");
-  if(upstreamCounts.currentReadyDeploymentReviews<3)
-    setupActions.push("Complete independent, unexpired operating, registration and delivery readiness reviews for the Deployment.");
+  if(!upstreamCounts.candidateReadyDeployments)
+    setupActions.push("Complete all three latest, unexpired operating, registration and delivery readiness reviews on the same Deployment; evidence and reviewer independence are checked by the approval command.");
 
   const blockers=[];
 
@@ -278,8 +287,8 @@ async function main(){
     blockers.push("Publisher has no content asset versions for an asset-backed release.");
   if(!upstreamCounts.offeringBlueprintOutputs)
     blockers.push("No exact-Offering local Blueprint output exists; the proposed adoption cannot be independently approved.");
-  if(upstreamCounts.currentReadyDeploymentReviews<3)
-    blockers.push("Fewer than three current ready Deployment review records (operating, registration, delivery); validate each independently.");
+  if(!upstreamCounts.candidateReadyDeployments)
+    blockers.push("No Deployment has all three latest current-ready review categories (operating, registration, delivery).");
 
   if(!courses.length||courses.length>50)
     blockers.push("Offering composition must have 1-50 bounded native Course versions.");
@@ -312,6 +321,13 @@ async function main(){
   }
   if(!deployments.some(row=>row.approval_status==="approved"))
     blockers.push("No independently approved local Offering adoption exists.");
+  // Course publication and adoption are not the last gate. The live Class
+  // discovery query requires BOTH the deployment and its Operation active.
+  if(!deployments.some(row=>row.approval_status==="approved"&&
+      row.deployment_status==="active"&&row.operation_status==="active")){
+    blockers.push("No approved adoption has both an active Deployment and active Education Operation; Class discovery remains blocked.");
+    setupActions.push("After independent adoption approval, complete the separate authorized Deployment and Education Operation activation workflow. Do not set statuses in SQL.");
+  }
   const report={
     target:"CAN OS Neon main",readOnly:true,offeringVersionId,
     offering:{title:offering.title,lifecycle:offering.lifecycle,versionNo:offering.version_no},
