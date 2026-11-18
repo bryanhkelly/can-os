@@ -15,8 +15,12 @@ const state=vi.hoisted(()=>({
 
 vi.mock("@tanstack/react-router",async importOriginal=>({
  ...await importOriginal<typeof import("@tanstack/react-router")>(),
- Link:({to,search,children,...props}:{to:string;search?:Record<string,string>;children:ReactNode})=>
-  <a href={to+(search?"?"+new URLSearchParams(search).toString():"")} {...props}>{children}</a>,
+ Link:({to,search,params,children,...props}:{to:string;search?:Record<string,string|undefined>;params?:Record<string,string>;children:ReactNode})=>{
+  const path=to.replace(/\$([^/]+)/g,(_,key:string)=>encodeURIComponent(params?.[key]??key));
+  const query=new URLSearchParams(Object.entries(search??{}).filter((pair):pair is [string,string]=>pair[1]!==undefined)).toString();
+  return <a href={path+(query?"?"+query:"")} {...props}>{children}</a>;
+ },
+ useBlocker:vi.fn(),
  createFileRoute:()=>(options:object)=>({
   options,
   useSearch:()=>({}),
@@ -43,8 +47,8 @@ describe("student support action navigation",()=>{
 
  it("links assessment-backed recovery titles and review controls to the exact assignment",()=>{
   const html=renderSupport();
-  expect(html).toMatch(/href="\/student\/assignments\?assessment=essay"[^>]*>Revise your essay<\/a>/);
-  expect(html).toMatch(/href="\/student\/assignments\?assessment=essay"[^>]*>Review assignment/);
+  expect(html).toMatch(/href="\/student\/assignments\/essay"[^>]*>Revise your essay<\/a>/);
+  expect(html).toMatch(/href="\/student\/assignments\/essay"[^>]*>Review assignment/);
   expect(html).not.toContain('href="/student/experiences?action=recovery"');
  });
 
