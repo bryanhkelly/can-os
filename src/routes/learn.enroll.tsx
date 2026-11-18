@@ -70,7 +70,10 @@ function PublicSelfEnrollment() {
   const returnTo="/learn/enroll"+(searchParams.size?"?"+searchParams.toString():"");
   return <WorkspaceShell eyebrow="Learning" width="wide" title="Register for learning"
     subtitle="Choose an approved training, confirm your participation, and use your own CAN account. A school application is a separate experience."
-    actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}>
+    actions={<nav aria-label="Adult learning navigation" className="flex flex-wrap items-center gap-4">
+      <Link to="/class" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Browse Classes</Link>
+      <Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>
+    </nav>}>
     <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(17rem,.55fr)]">
       <div className="space-y-5">
         <section className="border border-border bg-card p-5">
