@@ -14,6 +14,7 @@ import {
 import { assertCapability, AuthorizationError, type CommandContext } from
   "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
+import { publisherReleaseAvailableForAdoption } from "@/domain/native-offering-adoption-publication";
 import { isVerifiedEvidenceCurrent } from "@/domain/instructional-tracks";
 import { canonicalSessionRowSchema, projectCanonicalCommandContext } from
   "@/domain/canonical-access";
@@ -138,7 +139,10 @@ export const approveNativeOfferingAdoption=createServerFn({method:"POST"})
         .where(eq(offerings.id,adoption.offeringId)).limit(1);
       if(!deployment||!version||!offering||
         deployment.offeringId!==offering.id||version.offeringId!==offering.id||
-        offering.status!=="active"||version.lifecycle!=="published"||!version.publishedAt||
+        !publisherReleaseAvailableForAdoption({
+          lifecycle:version.lifecycle,publishedAt:version.publishedAt,
+          offeringStatus:offering.status,
+        })||
         ["suspended","closed"].includes(deployment.status))
         invalid("Only the exact published Offering may be considered for adoption.");
       if(adoption.validThrough&&adoption.validThrough<=new Date())
