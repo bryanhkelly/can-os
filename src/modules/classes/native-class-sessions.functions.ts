@@ -8,7 +8,7 @@ import { db } from "@/db/client";
 import {
   canonicalClasses, canonicalClassSessions,
   canonicalClassEnrollments, learnerCourseAttempts, canonicalDeliverySessions,
-  facilitatedClassroomPlans, facilitatedLearningSessions, 
+  facilitatedClassroomPlans, facilitatedLearningSessions, domainEvents, 
 } from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { assertCapability, AuthorizationError } from "@/domain/command-context";
