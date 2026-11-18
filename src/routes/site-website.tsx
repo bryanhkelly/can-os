@@ -489,8 +489,15 @@ function LocalWebsiteCopyEditor({
     setError("");
   }
 
-  function markSaved(submitted: SiteLocalContent, revision: number) {
-    setEditor(previous => ({ ...previous, content: submitted, saved: submitted, revision }));
+  function markSaved(submitted: SiteLocalContent, revision: number, replaceContent = false) {
+    // A save can finish after more typing. Advance the saved baseline and
+    // revision without silently replacing changes made while the request ran.
+    // An explicitly confirmed restore is different: replace the editor copy.
+    setEditor(previous => ({
+      ...previous,
+      content: replaceContent || previous.content === submitted ? submitted : previous.content,
+      saved: submitted, revision,
+    }));
     setDraftPreview(null);
     setShareMessage("");
   }
@@ -562,7 +569,7 @@ function LocalWebsiteCopyEditor({
       // only after the mutation succeeded so a failed restore never discards
       // unsaved copy, even when the route refresh was unable to complete.
       const restored = outcome.value.restoredContent;
-      if (restored) markSaved(prepareWebsiteEditorContent(restored, data.siteName), outcome.value.revision);
+      if (restored) markSaved(prepareWebsiteEditorContent(restored, data.siteName), outcome.value.revision, true);
     } else if (outcome.status === "failed" &&
       normalizeClientError(outcome.error).code === "CONFLICT") {
       await router.invalidate().catch(() => undefined);
