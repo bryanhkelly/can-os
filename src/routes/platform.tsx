@@ -10,6 +10,7 @@ import { approveAdultClassLearnerReview, revokeAdultClassLearnerReview } from "@
 import { DirectoryTable, StatCard, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { safeLoader } from "@/lib/safe-loader";
 import { readPlatformAdminOverview } from "@/modules/identity/platform-admin.functions";
+import { NativePublisherReleaseReadinessPanel } from "@/components/learning/NativePublisherReleaseReadinessPanel";
 
 export const Route = createFileRoute("/platform")({
   loader: () => safeLoader(() => readPlatformAdminOverview())(),
@@ -61,6 +62,8 @@ function PlatformAdministration() {
           Showing the first 100 Sites. Use the authorized reporting workflow for a complete inventory.
         </p>}
     </section>
+    <NativePublisherReleaseReadinessPanel records={summary.publisherReleaseReadiness}
+      limited={summary.publisherReleasesLimited}/>
     <AdultLearnerReviewSection ready={summary.reviewedAdultIdentityReady} cases={summary.reviewCases}/>
     <section className="mt-6 border border-border bg-card p-5">
       <h2 className="font-serif text-xl">Administration boundaries</h2>
