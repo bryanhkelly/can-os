@@ -95,6 +95,14 @@ the exact production schema is ready.
 
 **Release gate:** Until both schema and application paths are migrated and verified together, main cannot be represented as having completed the identity cutover. Partial removal of the old session path is unsafe because existing guarded workflows still invoke it.
 
+## Main-only security checkpoint, November 17, 2026
+
+The authoritative `public.people` table now has **forced row-level security** and a restrictive direct-client deny policy. The inherited unscoped `authenticated` and `anonymous` read/write permissions have been revoked without changing any of the 142 existing People, access accounts, guardian relationships, grants or audit records. SQL: `database/production/2026-11-17-protect-authoritative-people.sql`.
+
+The same restrictions now apply to `public.sites` and `public.organizations`, both of which are the only surviving Site and Organization identity tables. The native Person/account model has **not** been dropped; its 239 foreign keys remain pending coordinated application, authorization, evidence and release acceptance.
+
+This is a database privilege hardening milestone, **not** proof that privileged server commands use least-privilege connections, that a single CAN login works across all native Class/learner flows, or that guardian separation has passed live testing. Existing historical Person/grant disagreement is not resolved by the RLS change. Work must continue on Neon **main** only, not test01.
+
 ## P0 main production checkpoint (2026-11-17)
 
 The read-only Neon **main** inspection supersedes earlier test01 counts for
