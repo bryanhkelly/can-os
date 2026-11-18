@@ -20,7 +20,7 @@ export const loadCurriculum=(programId?:string)=>safeLoader(async()=>{
   const programs=await getCurriculumAdopterPrograms();
   const programIds=programId?[programId]:programs.map(program=>program.id);
   const marketplaces=await Promise.all(programIds.map(programId=>getCurriculumMarketplace({data:{programId}})));
-  const publisherProgram=marketplaces.length===1&&marketplaces[0].canPublish?marketplaces[0]:null;
+  const publisherProgram=marketplaces.length===1&&marketplaces[0]?.canPublish?marketplaces[0]:null;
   const [studio,publisherPacks]=publisherProgram?await Promise.all([
    getCurriculumStudio({data:{programId:publisherProgram.program.id}}),
    getPublisherPackStudio({data:{programId:publisherProgram.program.id}}),
