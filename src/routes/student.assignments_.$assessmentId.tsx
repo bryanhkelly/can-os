@@ -9,7 +9,10 @@ import { createSubmissionAttachmentUpload, attachDocumentToSubmission, listSubmi
 import { listAssessmentResources, getAssessmentResourceDownload } from "@/modules/learning/assessment-resources.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { PageFrame, RecordHeader, RecordLayout, WorkspacePanel, StatusBadge, WorkspaceNotice } from "@/components/workspace";
+import { PageFrame, RecordHeader, RecordLayout, WorkspacePanel, StatusBadge, WorkspaceNotice, useUnsavedChangesGuard } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useHydrated } from "@/lib/use-hydrated";
 import { createPrivateUploadTask, documentUploadPolicy } from "@/platform/storage/private-upload";
@@ -117,9 +120,13 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
   if (error || notice || mutation.error) feedbackRef.current?.focus();
  }, [error, notice, mutation.error]);
  const [draft, setDraft] = useState(() => assignment.responseText ?? "");
+ const [savedDraft, setSavedDraft] = useState(() => assignment.responseText ?? "");
  const nextAttempt = assignment.status === "returned" ? (assignment.attemptNumber ?? 1) + 1 : assignment.attemptNumber ?? 1;
  const attemptLimitReached = Boolean(assignment.metadata.maxAttempts !== null && nextAttempt > assignment.metadata.maxAttempts);
  const editable = assignment.canEdit === true && !submittedReceipt;
+ // Autosave is delayed; prevent navigation from silently discarding typed work
+ // or attachments that have not reached the authorized submission record.
+ useUnsavedChangesGuard(editable && (draft !== savedDraft || pendingFiles.length > 0));
  const canSubmit = draft.trim().length >= 3 || pendingFiles.length > 0 ||
   (assignment.status === "assigned" && attachments.length > 0);
  useEffect(() => {
@@ -141,6 +148,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
     await previous?.catch(() => undefined);
     if (generation !== saveGeneration.current || saving.current) return;
     await saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } });
+    if (generation === saveGeneration.current) setSavedDraft(draft);
    })();
    autosaveInFlight.current = request;
    void request.then(() => { if (generation === saveGeneration.current) setDraftStatus("saved"); })
@@ -169,7 +177,11 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
    await mutation.run(async () => {
     const work = {
      files: pendingFiles,
-     saveDraft: () => saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } }),
+     saveDraft: async () => {
+      const receipt = await saveAssignmentDraft({ data: { assessmentId: assignment.assessmentId, text: draft } });
+      setSavedDraft(draft);
+      return receipt;
+     },
      attach: async (file: File) => {
       setProgress("Uploading " + file.name + "...");
       const contentType = attachmentMime(file.name);
@@ -199,6 +211,7 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
       return saveAssignmentResponse({ data: { assessmentId: assignment.assessmentId, text: draft } });
      } });
      setSubmittedReceipt(receipt.submissionId);
+     setSavedDraft(draft);
      return receipt.submissionId;
     } else {
      await saveAssignmentWork(work);
@@ -331,20 +344,37 @@ function AssignmentDetailView({ assignment, instructorNames, filter, section }: 
       }}>{file.fileName}</button>)}</div>}
      {editable ? <div className="mt-5" aria-busy={busy}>
       <label className="text-sm font-semibold">Your response (optional when submitting a file)
-       <textarea disabled={!hydrated || busy} rows={8} value={draft} maxLength={20000} onChange={event => { setDraft(event.target.value); setDraftStatus("idle"); }}
-        className="mt-2 block w-full rounded-xl border bg-background p-3 text-sm" placeholder="Write your response…" />
+       <Textarea disabled={!hydrated || busy} rows={8} value={draft} maxLength={20000} onChange={event => { setDraft(event.target.value); setDraftStatus("idle"); }}
+        className="mt-2 min-h-44" placeholder="Write your response…" />
       </label>
       <p aria-live="polite" className="mt-2 text-xs text-muted-foreground">Draft: {draftStatus === "saving" ? "Saving…" : draftStatus === "saved" ? "Saved" : draftStatus === "error" ? "Could not autosave" : "Ready"}</p>
       <label className="mt-4 block text-sm font-semibold">Attachments (PDF, PNG or JPEG; maximum 10 MB each)
-       <input type="file" multiple accept={attachmentAccept} disabled={!hydrated || busy}
-        onChange={event => setPendingFiles(Array.from(event.target.files ?? []))}
-        className="mt-2 block w-full rounded-lg border p-2 text-xs" />
+       <Input type="file" multiple accept={attachmentAccept} disabled={!hydrated || busy}
+        onChange={event => {
+         const chosen = Array.from(event.currentTarget.files ?? []);
+         const valid = chosen.filter(file => file.size > 0 && file.size <= MAX_ATTACHMENT_BYTES && attachmentMime(file.name));
+         if (valid.length !== chosen.length) setError("Choose PDF, PNG, or JPEG files no larger than 10 MB each.");
+         setPendingFiles(current => [...current, ...valid].filter((file, index, all) =>
+          all.findIndex(candidate => candidate.name === file.name && candidate.size === file.size && candidate.lastModified === file.lastModified) === index));
+         event.currentTarget.value = "";
+        }}
+        className="mt-2 min-h-11 w-full" />
       </label>
-      {pendingFiles.length > 0 && <p className="mt-2 text-xs text-muted-foreground">Not yet uploaded: {pendingFiles.map(file => file.name).join(", ")}. Choose Save draft or Submit assignment to save these files.</p>}
-      <button type="button" disabled={!hydrated || busy} onClick={() => saveWork(false)}
-       className="mr-3 mt-4 rounded-lg border px-5 py-3 text-sm font-semibold disabled:opacity-40">Save draft</button>
-      <button type="button" disabled={!hydrated || busy || !canSubmit} onClick={() => saveWork(true)}
-       className="mt-4 rounded-lg bg-foreground px-5 py-3 text-sm font-semibold text-background disabled:opacity-40">{busy ? "Saving assignment..." : "Submit assignment"}</button>
+      {pendingFiles.length > 0 && <div className="mt-3 space-y-2 text-sm">
+       <p className="text-xs text-muted-foreground">Files waiting to upload. Save draft or submit to attach them to this attempt.</p>
+       <ul aria-label="Files waiting to upload" className="divide-y divide-border border border-border">
+        {pendingFiles.map(file => <li key={`${file.name}:${file.size}:${file.lastModified}`} className="flex items-center justify-between gap-3 px-3 py-2">
+         <span className="min-w-0 break-all">{file.name}</span>
+         <Button type="button" variant="ghost" size="sm" disabled={busy} aria-label={`Remove ${file.name}`}
+          onClick={() => setPendingFiles(current => current.filter(item => item !== file))}>Remove</Button>
+        </li>)}
+       </ul>
+      </div>}
+      <div className="mt-4 flex flex-wrap gap-3">
+       <Button type="button" variant="outline" disabled={!hydrated || busy} onClick={() => void saveWork(false)}>Save draft</Button>
+       <Button type="button" disabled={!hydrated || busy || !canSubmit} loading={busy}
+        loadingLabel="Saving assignment…" onClick={() => void saveWork(true)}>Submit assignment</Button>
+      </div>
      </div> : !submittedReceipt && !["submitted", "graded"].includes(assignment.status ?? "") && assignment.workAvailability.actionable && !attemptLimitReached
       ? <p className="mt-5 bg-muted p-4 text-sm">Your submission is not currently editable. Review its status and feedback above.</p> : null}
      {error && <WorkspaceNotice ref={feedbackRef} tone="danger" className="mt-4">{error}</WorkspaceNotice>}
