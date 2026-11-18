@@ -57,6 +57,11 @@ const sourceGuarded = new Set([
   "guardian.native-classes.tsx",
   "class_.$classId.tsx",
   "classes.tsx",
+  "guardian.group-permissions.tsx",
+  "student.assignments_.$assessmentId.tsx",
+  "student.field-trips.tsx",
+  "guardian.admission-offers.tsx",
+  "guardian.enrollment-changes.tsx",
 ]);
 
 function resolveSource(from, specifier) {
