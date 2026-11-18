@@ -2,6 +2,22 @@
 
 **Decision:** One CAN login and one authoritative Person identity. There is no requirement to preserve native-v3 browser login, account-to-account bridges, or old identity endpoints during the cutover. This is an architecture decision, **not** evidence that the cutover is implemented or tested.
 
+## Current verified main checkpoint: November 17, 2026
+
+The ongoing, guarded One-Person FK convergence has now redirected **175 reviewed staff/actor attribution constraints** to `public.people`, across the following committed Neon-main migrations:
+
+- `database/production/2026-11-17-rebind-30-actor-person-fks.sql`
+- `database/production/2026-11-17-rebind-30-more-actor-person-fks.sql`
+- `database/production/2026-11-17-rebind-actor-person-fks-batch-3.sql`
+- `database/production/2026-11-17-rebind-final-18-actor-person-fks.sql`
+- `database/production/2026-11-17-rebind-67-audit-facilitator-reviewer-person-fks.sql`
+
+Each migration verified the exact main branch, current FK definition, referential behavior and existence of any actor IDs in the authoritative public Person table, and ran in a rollback-on-failure transaction. No Person, learner, grant, credential or native session record was copied or reidentified. Audit events, domain events, and Class facilitator attribution now directly reference `public.people`.
+
+**Latest read-only Neon main inspection:** 142 `public.people`, zero native Persons, **63 remaining native Person foreign keys**, 325 FKs to `public.people`, 322 public tables, 348 `education_v30` tables, and zero currently active CAN grant/Person conflicts. Five historically conflicting **inactive** grants remain as audit evidence, not as authority. Concurrent schema changes account for a separate change in the overall FK inventory; numbers are based on the live database rather than assumed batch totals.
+
+**Release restriction remains in effect.** The still-staged `2026-11-17-stage-unified-person-fk-rebind.sql` has been rebased to the observed **63 outstanding foreign keys**, but has **not** been run. It requires explicit independent authorization and full code, RLS, guardian, learner, consent, native-cookie, and browser acceptance. Noncredit and reviewed-Class onboarding still contain native Person/account creation and native-cookie issuance. Those writes must be changed together before the remaining relationships or duplicate native identity tables can be retired. The `verify:person:runtime-main -- --strict` gate remains blocked by those source dependencies.
+
 ## Authoritative identity choice
 
 **Chosen target:** `public.access_accounts` is the sole login account; its immutable
@@ -103,9 +119,9 @@ The facilitated classroom attendance name projection now reads `public.people`, 
 
 A guarded main-only transaction moved empty `course_sections` and `foundations` into `public`, retaining their original table objects and **seven incoming FKs**. SQL: `database/production/2026-11-17-relocate-course-sections-and-foundations.sql`.
 
-The opt-in, read-only `verify:person:runtime-main` command now evaluates both the live Neon main database and checked-out source files. It explicitly reports active blockers such as native Person/account creation in noncredit and reviewed-Class enrollment, native learner session issuance, dual-cookie fallbacks, and historical Person grant differences. The verifier has a strict failing mode; **it does not approve or run the staged 239-FK Person migration**.
+The opt-in, read-only `verify:person:runtime-main` command evaluates both the live Neon main database and checked-out source files. It explicitly reports active blockers such as native Person/account creation in noncredit and reviewed-Class enrollment, native learner session issuance, dual-cookie fallbacks, and historical Person grant differences. The verifier has a strict failing mode; **it does not approve or run the staged remaining Person FK migration**.
 
-At the most recent concurrent main snapshot: **311 public tables, 360 remaining `education_v30` tables, seven secure-schema tables, 142 platform People, zero native Person rows, and 239 outstanding native Person FKs**. There are **five historically mismatched inactive grant rows**. These are evidence to preserve and reconcile, not permission to remap Persons or reactivate revoked grants. Counts may advance independently as other workstreams commit to main.
+At this historical snapshot (superseded by the current checkpoint above): **311 public tables, 360 remaining `education_v30` tables, seven secure-schema tables, 142 platform People, zero native Person rows, and 239 original native Person FKs**. There are **five historically mismatched inactive grant rows**. These are evidence to preserve and reconcile, not permission to remap Persons or reactivate revoked grants. Counts may advance independently as other workstreams commit to main.
 
 The full Person/account/native session cutover remains **blocked** until all relevant writers, sensitive authorization, guardian and learner readers, release acceptance, and rollback checks agree on the one Person UUID.
 
@@ -196,7 +212,7 @@ the other references remain native. There are zero native Person records and
 zero native accounts on main. The staged SQL preserves each FK name and
 referential action, rejects unexpected graph or source records, and requires
 an explicitly approved, independently verified runtime release before it can
-execute. **No FK rebinding has been applied to production.**
+execute. **Historical checkpoint only:** FK rebinding had not yet begun at this point. See the current checkpoint above for the independently verified incremental actor migrations.
 
 The read-only inventory script is callable as:
 
