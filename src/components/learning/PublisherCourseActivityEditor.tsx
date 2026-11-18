@@ -159,7 +159,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
             setQuizDraft(null);setQuiz(freshQuiz());setQuizKey("");
             setQuizTitle("Course knowledge check");setSurveyDraft(null);
             setNotice("");setError("");
-          }} className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
+          }} className="mt-2">
           <option value="">Select a publisher-owned Course</option>
           {courses.data.courses.map(row=><option key={row.courseVersionId}
             value={row.courseVersionId}>{row.title} · {row.courseCode}</option>)}
@@ -228,7 +228,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           <Input value={quizTitle} minLength={5} maxLength={160} required
             disabled={quizBusy||!!quizDraft}
             onChange={e=>setQuizTitle(e.target.value)}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+            className="mt-1"
             placeholder="AI skills knowledge check"/>
         </Label>
         <Label className="text-sm font-semibold">
@@ -237,13 +237,13 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
             maxLength={64} disabled={quizBusy||!!quizDraft}
             onChange={e=>setQuizKey(e.target.value.toLowerCase())}
             placeholder="ai_skills_check_01"
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            className="mt-1"/>
         </Label>
         <Label className="text-sm font-semibold">
           Passing threshold
           <Select value={passing} disabled={quizBusy||!!quizDraft}
             onChange={e=>setPassing(Number(e.target.value))}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="mt-1">
             {[0.6,0.7,0.8,0.9,1].map(v=><option key={v} value={v}>
               {Math.round(v*100)}%
             </option>)}
@@ -253,7 +253,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           Maximum attempts
           <Select value={maxAttempts} disabled={quizBusy||!!quizDraft}
             onChange={e=>setMaxAttempts(Number(e.target.value))}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="mt-1">
             {[1,2,3,4,5].map(v=><option key={v} value={v}>{v} attempt{v>1?"s":""}</option>)}
           </Select>
         </Label>
@@ -267,7 +267,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           <Input id={"quiz-prompt-"+question.key} value={question.prompt} maxLength={500}
             disabled={quizBusy||!!quizDraft}
             onChange={e=>editQuiz(question.key,{prompt:e.target.value})}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"
+            className="mt-1"
             placeholder="Enter an original knowledge-check question"/>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {question.choices.map((choice,i)=><Label key={i} className="text-sm">
@@ -277,7 +277,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
                 onChange={e=>editQuiz(question.key,{choices:question.choices.map(
                   (value,j)=>j===i?e.target.value:value,
                 )})}
-                className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+                className="mt-1"/>
             </Label>)}
           </div>
           <Label className="mt-3 block text-sm font-semibold" htmlFor={"quiz-answer-"+question.key}>
@@ -286,7 +286,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           <Select id={"quiz-answer-"+question.key} value={question.correctIndex}
             disabled={quizBusy||!!quizDraft}
             onChange={e=>editQuiz(question.key,{correctIndex:Number(e.target.value)})}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm">
+            className="mt-1">
             {question.choices.map((choice,i)=><option value={i} key={i}>
               Answer {i+1}{choice?" · "+choice:""}
             </option>)}
@@ -355,14 +355,14 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
           Survey title
           <Input value={surveyTitle} minLength={5} maxLength={160} required
             onChange={e=>setSurveyTitle(e.target.value)}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            className="mt-1"/>
         </Label>
         <Label className="text-sm font-semibold">
           Unique survey code
           <Input value={surveyCode} required pattern="[a-z][a-z0-9_-]{2,63}"
             maxLength={64} placeholder="ai_skills_feedback_2027"
             onChange={e=>setSurveyCode(e.target.value.toLowerCase())}
-            className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+            className="mt-1"/>
         </Label>
       </div>
       <div className="mt-4 space-y-3">
@@ -373,7 +373,7 @@ export function PublisherCourseActivityEditor({navigation,preferredCourseVersion
             <Input value={question.prompt} minLength={5} maxLength={1000} required
               placeholder="What was most useful in this session?"
               onChange={e=>editFeedback(question.key,{prompt:e.target.value})}
-              className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
+              className="mt-1"/>
           </Label>
           <Label className="text-sm font-semibold">
             Response
