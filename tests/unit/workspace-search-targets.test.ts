@@ -48,7 +48,7 @@ describe("workspace search result destinations",()=>{
     expect(result.messages[0]?.to).toBe("/messages?thread=conversation");
     if(role==="student"){
       expect(result.courses[0]?.to).toBe("/classes?section=english");
-      expect(result.assignments[0]?.to).toBe("/student/assignments?section=english&assessment=essay");
+      expect(result.assignments[0]?.to).toBe("/student/assignments/essay?section=english");
       expect(result.students).toEqual([]);
     }else if(role==="teacher"){
       expect(result.courses[0]?.to).toBe("/classes?section=english");
