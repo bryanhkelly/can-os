@@ -1,4 +1,9 @@
-import { QueryState, WorkspaceShell } from "@/components/workspace";
+import { QueryState, WorkspaceShell, WorkspaceNotice } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { normalizeClientError, type ClientError } from "@/lib/client-error";
 import { WorkflowIntro } from "@/components/workspace/workflow-intro";
@@ -231,31 +236,31 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
   const marked = students.filter(student => student.status !== "unmarked" && student.status !== "expected").length;
 
   return <WorkspaceShell width="standard" eyebrow="Attendance" title="Daily attendance" subtitle={selectedProgram.name + " · " + selectedProgram.timezone}>
-      <label className="mt-4 block text-sm font-semibold">School Program
-        <select value={programId} onChange={event => void navigate({ search: { programId: event.target.value } })} className="mt-2 w-full rounded border bg-background p-3">
+      <Label className="mt-4 block text-sm font-semibold">School Program
+        <Select value={programId} onChange={event => void navigate({ search: { programId: event.target.value } })} className="mt-2 w-full  border bg-background p-3">
           {workspace.programs.map(program => <option key={program.id} value={program.id}>{program.name}</option>)}
-        </select>
-      </label>
-      {programId && <div role="status" className="mt-4 rounded-lg border p-3 text-sm">
+        </Select>
+      </Label>
+      {programId && <div role="status" className="mt-4  border p-3 text-sm">
         Showing the expected onsite roster for the selected Program. {workspace.canReviewExcuses
           ? "Pending guardian excuses still cover all students in your authorized review queue."
           : "Guardian excuse review is not available in this workspace."}
       </div>}
       <WorkflowIntro eyebrow="School day · Attendance" title="A reliable record of who is here." description="Mark observed attendance, review excuses and reconcile changes without replacing the underlying history. Offline entries remain pending until synchronized." />
-      <label className="mt-8 block max-w-sm text-sm font-semibold">
+      <Label className="mt-8 block max-w-sm text-sm font-semibold">
         Attendance date
-        <input
+        <Input
           type="date"
-          className="mt-2 w-full rounded-lg border bg-background p-3"
+          className="mt-2 w-full  border bg-background p-3"
           value={date}
           onChange={event => setDate(event.target.value)}
         />
-      </label>
-      {notice && <p role="status" className="mt-4 rounded-lg border p-3 text-sm">{notice}</p>}
+      </Label>
+      {notice && <p role="status" className="mt-4  border p-3 text-sm">{notice}</p>}
       {excusesError && <QueryState error={excusesError.message}
         onRetry={excusesError.retryable ? () => void rosterQuery.refetch() : undefined}
         retrying={rosterQuery.isFetching} />}
-      {conflicts.length>0&&<div className="mt-4 rounded-lg border border-amber-500 p-3 text-sm">
+      {conflicts.length>0&&<div className="mt-4  border border-amber-500 p-3 text-sm">
         <strong>Attendance conflicts require review</strong>
         <p className="mt-1">A newer school record exists for {conflicts.length} offline
           {conflicts.length===1?" entry":" entries"}. Refresh attendance before deciding
@@ -263,21 +268,21 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
         {conflicts.map(item=><div key={item.mutationId} className="mt-3 flex flex-wrap items-center gap-2 border-t pt-2">
          <span className="text-xs">{students.find(s=>s.studentProfileId===item.studentProfileId&&s.programId===item.programId)?.studentName??item.studentProfileId}
           {" · "}{item.date}{" · pending "}{item.status}</span>
-         <button type="button" onClick={()=>discardConflict(item)} className="rounded border px-2 py-1 text-xs">Discard local change</button>
-         <button type="button" onClick={()=>void overrideConflict(item)} className="rounded border px-2 py-1 text-xs">Apply as reasoned correction</button>
+         <Button variant="outline" size="sm" type="button" onClick={()=>discardConflict(item)} className=" border px-2 py-1 text-xs">Discard local change</Button>
+         <Button variant="outline" size="sm" type="button" onClick={()=>void overrideConflict(item)} className=" border px-2 py-1 text-xs">Apply as reasoned correction</Button>
         </div>)}
-        <button type="button" onClick={()=>{setConflicts([]);void load();}}
-          className="mt-2 rounded border px-3 py-2 text-xs">Refresh school records</button>
+        <Button variant="outline" size="sm" type="button" onClick={()=>{setConflicts([]);void load();}}
+          className="mt-2  border px-3 py-2 text-xs">Refresh school records</Button>
       </div>}
-      {queued.length>0&&<div className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border p-3 text-sm">
+      {queued.length>0&&<div className="mt-4 flex flex-wrap items-center gap-3  border p-3 text-sm">
         <span>{queued.length} attendance {queued.length===1?"entry":"entries"} stored on this device pending synchronization.</span>
-        <button type="button" disabled={syncing||!navigator.onLine} onClick={()=>void synchronize()}
-          className="rounded border px-3 py-2 text-xs font-semibold disabled:opacity-50">
+        <Button variant="outline" size="sm" type="button" disabled={syncing||!navigator.onLine} onClick={()=>void synchronize()}
+          className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50">
           {syncing?"Synchronizing…":"Synchronize now"}
-        </button>
+        </Button>
       </div>}
 
-      {error && <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">{error}</p>}
+      {error && <p role="alert" className="mt-8  border p-4 text-sm">{error}</p>}
       <QueryState loading={rosterQuery.isPending && !error ? "Loading attendance roster..." : undefined}
         error={!error && rosterQuery.error
           ? normalizeClientError(rosterQuery.error, "Unable to load attendance roster.").message : undefined}
@@ -286,39 +291,39 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
         retrying={rosterQuery.isFetching} />
       {!rosterQuery.isPending && !rosterQuery.isError && !error && <>
         {search.student&&<Link to="/staff/attendance" search={{programId,date}} className="mt-4 inline-block text-sm underline">Full attendance roster</Link>}
-        {search.student&&!students.length&&<p role="status" className="mt-4 rounded border p-4 text-sm">This student is unavailable in your authorized attendance roster for this date.</p>}
+        {search.student&&!students.length&&<p role="status" className="mt-4  border p-4 text-sm">This student is unavailable in your authorized attendance roster for this date.</p>}
         <AttendanceConfigurationNotice programs={programs} canConfigure={canConfigureAcademicYear} date={date}/>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Roster summary">
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Expected onsite</p><p className="mt-1 text-2xl font-semibold">{students.length}</p></div>
-          <div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Marked</p><p className="mt-1 text-2xl font-semibold">{marked}</p></div>
-          {workspace.canReviewExcuses&&<div className="rounded-xl border bg-card p-4"><p className="text-xs text-muted-foreground">Pending excuses</p><p className="mt-1 text-2xl font-semibold">{excuses.length}</p></div>}
+          <div className=" border bg-card p-4"><p className="text-xs text-muted-foreground">Expected onsite</p><p className="mt-1 text-2xl font-semibold">{students.length}</p></div>
+          <div className=" border bg-card p-4"><p className="text-xs text-muted-foreground">Marked</p><p className="mt-1 text-2xl font-semibold">{marked}</p></div>
+          {workspace.canReviewExcuses&&<div className=" border bg-card p-4"><p className="text-xs text-muted-foreground">Pending excuses</p><p className="mt-1 text-2xl font-semibold">{excuses.length}</p></div>}
         </div>
         {students.length === 0 && <p className="mt-8 text-sm">No students have a configured onsite attendance expectation for this date and your verified staff assignments.</p>}
         {students.length > 0 && <div className="mt-8 grid gap-4">
-          {students.map(student => <section key={student.programId+":"+student.studentProfileId} className="rounded-xl border bg-card p-5">
+          {students.map(student => <section key={student.programId+":"+student.studentProfileId} className=" border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold"><Link to="/staff/attendance" search={{programId,date,student:student.studentProfileId}} className="underline">{student.studentName}</Link></h2>
                 <p className="text-xs text-muted-foreground">{student.programName} · {student.sectionTitle ?? "Program enrollment"}</p>
               </div>
-              <span className="rounded-full border px-3 py-1 text-xs capitalize">{student.status}</span>
+              <span className=" border px-3 py-1 text-xs capitalize">{student.status}</span>
             </div>
-            {student.status!=="unmarked" && <label className="mt-3 block text-xs text-muted-foreground">Correction note (required to override an approved excuse)
-              <input value={correctionNotes[student.programId+":"+student.studentProfileId]??""}
+            {student.status!=="unmarked" && <Label className="mt-3 block text-xs text-muted-foreground">Correction note (required to override an approved excuse)
+              <Input value={correctionNotes[student.programId+":"+student.studentProfileId]??""}
                 onChange={e=>setCorrectionNotes(current=>({...current,[student.programId+":"+student.studentProfileId]:e.target.value}))}
                 placeholder="Reason for correction"
-                className="mt-1 w-full rounded-lg border bg-background p-2 text-sm"/>
-            </label>}
+                className="mt-1 w-full  border bg-background p-2 text-sm"/>
+            </Label>}
             <div className="mt-4 flex flex-wrap gap-2">
-              {statusOptions.map(option => <button
+              {statusOptions.map(option => <Button variant={student.status === option ? "default" : "outline"} size="sm"
                 key={option}
                 type="button"
                 disabled={busy !== ""}
-                className={`rounded-lg border px-3 py-2 text-xs font-semibold capitalize disabled:opacity-50 ${student.status === option ? "bg-primary text-primary-foreground" : ""}`}
+                className="capitalize"
                 onClick={() => mark(student, option)}
               >
                 {option}
-              </button>)}
+              </Button>)}
             </div>
           </section>)}
         </div>}
@@ -326,7 +331,7 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
         <h2 className="mt-10 font-serif text-2xl">Pending excuses</h2>
         {!excusesError&&excuses.length === 0 && <p className="mt-4 text-sm text-muted-foreground">No guardian excuses are waiting for review.</p>}
         {!excusesError&&excuses.length > 0 && <div className="mt-4 grid gap-4">
-          {excuses.map(excuse => <section key={excuse.excuseId} className="rounded-xl border bg-card p-5">
+          {excuses.map(excuse => <section key={excuse.excuseId} className=" border bg-card p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold">{excuse.studentName}</h3>
@@ -334,37 +339,37 @@ function StaffAttendanceWorkspace({ workspace }: { workspace: Awaited<ReturnType
                   Marked {excuse.eventStatus} on {formatTimestamp(excuse.expectedAt,excuse.timezone,{dateStyle:"medium"})} · submitted {formatTimestamp(excuse.submittedAt,excuse.timezone,{dateStyle:"medium"})} ({excuse.timezone})
                 </p>
               </div>
-              <span className="rounded-full border px-3 py-1 text-xs">Submitted</span>
+              <span className=" border px-3 py-1 text-xs">Submitted</span>
             </div>
-            <p className="mt-3 rounded-lg bg-muted p-3 text-sm">{excuse.reason}</p>
+            <p className="mt-3  bg-muted p-3 text-sm">{excuse.reason}</p>
             <ExcuseAttachments attendanceEventId={excuse.attendanceEventId}
               attachments={excuse.attachments} disabled={busy !== ""} />
             {!excuse.canReview && <p role="alert" className="mt-2 text-xs text-amber-700 dark:text-amber-400">Attendance was subsequently corrected. This earlier excuse cannot change the current mark. A registrar can close it with a reason.</p>}
             {excuse.canClose && excuse.currentAttendanceEventId &&
               <ObsoleteExcuseClosure excuse={excuse} onSaved={() => load()} />}
-            <label className="mt-3 block text-sm font-semibold">
+            <Label className="mt-3 block text-sm font-semibold">
               Review note
-              <textarea
-                className="mt-2 w-full rounded-lg border bg-background p-3 text-sm"
+              <Textarea
+                className="mt-2 w-full  border bg-background p-3 text-sm"
                 rows={2}
                 value={notes[excuse.excuseId] ?? ""}
                 onChange={event => setNotes(current => ({ ...current, [excuse.excuseId]: event.target.value }))}
                 placeholder="Optional note recorded with the decision"
               />
-            </label>
+            </Label>
             <div className="mt-3 flex gap-2">
-              <button
+              <Button variant="outline" size="sm"
                 type="button"
                 disabled={busy !== "" || !excuse.canReview}
-                className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 onClick={() => review(excuse, "approved")}
-              >Approve excuse</button>
-              <button
+              >Approve excuse</Button>
+              <Button variant="outline" size="sm"
                 type="button"
                 disabled={busy !== "" || !excuse.canReview}
-                className="rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                className=" border px-3 py-2 text-xs font-semibold disabled:opacity-50"
                 onClick={() => review(excuse, "rejected")}
-              >Reject</button>
+              >Reject</Button>
             </div>
           </section>)}
         </div>}
