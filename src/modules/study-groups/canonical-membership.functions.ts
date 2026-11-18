@@ -11,6 +11,7 @@ import { and,asc,desc,eq,inArray,isNull,sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { z } from "zod";
 import { assertGroupScope,eligibleStudent,facilitatedGroup } from "./canonical-membership.server";
+import { authorizeClass } from "@/modules/learning/class-access.server";
 
 import { EventTypes } from "@/domain/event-types";
 const uuid = z.string().uuid();
@@ -155,15 +156,20 @@ export const createFacilitatedGroup = createServerFn({ method: "POST" })
             data.programId ? eq(s.sections.programId, data.programId) : undefined),
           eq(s.sectionTeachers.personId, actor.actorPersonId),
           eq(s.sections.active, true),
-          inArray(s.sections.siteId, actor.scope.siteIds ?? []),
-          inArray(s.sections.programId, actor.scope.programIds ?? []))).limit(1);
+          "sectionId" in data ? undefined : inArray(s.sections.siteId, actor.scope.siteIds ?? []),
+          "sectionId" in data ? undefined : inArray(s.sections.programId, actor.scope.programIds ?? []))).limit(1);
       if (!section || !section.siteId) throw new AuthorizationError("active teaching assignment");
       const scope = {
         id: section.id, siteId: section.siteId,
         programId: "sectionId" in data ? section.programId : data.programId ?? null,
         sectionId: "sectionId" in data ? section.id : null,
       };
-      assertGroupScope(actor, scope);
+      if ("sectionId" in data) {
+        // Reuse the exact qualified teaching authority from the class and gradebook.
+        await authorizeClass(actor, section.id, undefined, tx);
+      } else {
+        assertGroupScope(actor, scope);
+      }
       const [group] = await tx.insert(s.studyGroups).values({
         ...valid, sectionId: scope.sectionId, siteId: scope.siteId, programId: scope.programId,
         facilitatorPersonId: actor.actorPersonId, visibility: "site", requiresApproval: true,
@@ -221,7 +227,9 @@ export const listCanonicalGroupInvitees = createServerFn({ method: "GET" })
             eq(s.sections.programId, programEnrollment.programId),
           ))
           .where(and(
-            inArray(programEnrollment.programId, actor.scope.programIds ?? []),
+            group.sectionId
+              ? eq(programEnrollment.programId, group.programId!)
+              : inArray(programEnrollment.programId, actor.scope.programIds ?? []),
             group.programId ? eq(programEnrollment.programId, group.programId) : undefined,
           ))
           .orderBy(asc(s.people.legalFirstName), asc(s.people.legalLastName)).limit(500)
@@ -263,7 +271,8 @@ export const inviteCanonicalGroupMembers = createServerFn({ method: "POST" })
       for (const studentPersonId of data.studentPersonIds) {
         if (studentPersonId === actor.actorPersonId)
           throw new Error("You cannot invite yourself to a study group.");
-        await eligibleStudent(tx, studentPersonId, group, actor.scope.programIds ?? []);
+        await eligibleStudent(tx, studentPersonId, group,
+          group.sectionId ? [group.programId!] : actor.scope.programIds ?? []);
         const [membership] = await tx.select({ status: s.studyGroupMemberships.status })
           .from(s.studyGroupMemberships)
           .where(and(
