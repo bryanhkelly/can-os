@@ -76,8 +76,10 @@ describe("Site-owned content source and publication contract",()=>{
     const config=read("src/domain/site-content-channels.ts");
     const editor=read("src/components/launch-studio/SiteContentChannelEditor.tsx");
     expect(config).toContain('feeds.mode !== "private"');
-    expect(config).toContain("noncreditEnrollmentOrigin(feeds.enrollmentOrigin)");
-    expect(config).toContain('feeds.mode === "public" && origin');
+    expect(config).toContain("const opportunities = projectSiteEnrollmentOpportunities(feeds)");
+    expect(config).toContain('opportunityByTarget.get("program:"+item.seasonId)');
+    expect(config).toContain('opportunityByTarget.get("course:"+item.releaseId)');
+    expect(config).toContain('feeds.mode==="public" && opportunity.action');
     expect(editor).toContain('saveSiteContentChannels({data:');
     expect(editor).toContain('publishSiteContentChannels({data:');
     expect(editor).not.toContain("dangerouslySetInnerHTML");
