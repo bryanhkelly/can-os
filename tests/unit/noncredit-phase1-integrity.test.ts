@@ -105,6 +105,8 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(pilotReport).toContain('currentNoncreditCompletionStates(registrationIds,decisions)');
     expect(pilotReport).toContain('completion.states.get(reg.id)==="completed"');
     expect(pilotReport).toContain("completion.invalidRegistrations.length");
+    expect(pilotReport).toContain("distinctLearners:countDistinctNoncreditLearners(");
+    expect(pilotReport).toContain("distinctLearners:0");
     expect(pilotReport).not.toContain("currentDecisions.find(");
   });
 
