@@ -2,6 +2,8 @@ import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedba
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { useEffect, useRef, useState } from "react";
 import { Link, useRouter } from "@tanstack/react-router";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { WorkspaceNotice } from "@/components/workspace";
 import {
   invitePublicAdmissionsInterestToApply, listPublicAdmissionsInterests,
   setPublicAdmissionsInterestStatus,
@@ -64,7 +66,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
     });
   }
 
-  return <section className="mt-8 rounded-xl border bg-card p-5">
+  return <section className="mt-8  border bg-card p-5">
     <h2 className="font-serif text-2xl">Family recruitment and inquiries</h2>
     <p className="mt-2 text-sm text-muted-foreground">
       Track family-initiated requests from pre-opening invitations and published school pages.
@@ -74,7 +76,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
     </p>
     <MutationFeedback state={mutation} pendingMessage="Saving interest..." className="mt-3"/>
     <div className="mt-4 grid gap-3">
-      {items.map(row => <article key={row.id} className="rounded-lg border p-4">
+      {items.map(row => <article key={row.id} className=" border p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h3 className="font-semibold">{row.firstName} {row.lastName}</h3>
@@ -88,34 +90,34 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
             {row.applicationId ? <Link to="/admissions/intake"
               search={{siteId:row.siteId,programId:row.programId,
                 application:row.applicationId,interest:undefined}}
-              className="rounded-lg border px-3 py-2 text-xs font-semibold">
+              className={buttonVariants({ variant: "outline", size: "sm" })}>
               View linked inquiry
             </Link> : row.status !== "closed" && row.admissionsAuthorized && <Link to="/admissions/intake/new"
               search={{siteId:row.siteId,programId:row.programId,
                 interest:row.id}}
-              className="rounded-lg border px-3 py-2 text-xs font-semibold">
+              className={buttonVariants({ variant: "outline", size: "sm" })}>
               Review and create inquiry
             </Link>}
             {!row.applicationId && ["new","contacted"].includes(row.status) &&
               row.canSendApplicationInvitation &&
-              <button type="button" disabled={busy}
+              <Button type="button" size="sm" disabled={busy}
                 onClick={() => void inviteToApply(row)}
-                className="rounded-lg bg-foreground px-3 py-2 text-xs font-semibold text-background disabled:opacity-50">
+                >
                 {row.familyStartRequestId ? "Resend expired application link" : "Invite to apply"}
-              </button>}
-            {row.status === "new" && <button type="button" disabled={busy}
+              </Button>}
+            {row.status === "new" && <Button type="button" size="sm" disabled={busy}
               onClick={() => void changeStatus(row, "contacted")}
-              className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
+              variant="outline">
               Mark contacted
-            </button>}
-            {["new", "contacted"].includes(row.status) && <button type="button" disabled={busy}
+            </Button>}
+            {["new", "contacted"].includes(row.status) && <Button type="button" size="sm" disabled={busy}
               onClick={() => void changeStatus(row, "closed")}
-              className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50">
+              variant="outline">
               Close
-            </button>}
+            </Button>}
           </div>
         </div>
-        <div className="mt-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+        <div className="mt-3  border bg-muted/30 p-3 text-sm" role="status">
           <p className="font-semibold">Next family step · {row.nextStep.owner}</p>
           <p className="mt-1">{row.nextStep.message}</p>
         </div>
@@ -156,7 +158,7 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
               ? "Student access consent awaiting independent registrar review"
               : "Guardian student access authorization still required"}</li>}
         </ol>
-        {row.applicationId && <div className="mt-3 rounded-lg border bg-background p-3 text-sm">
+        {row.applicationId && <div className="mt-3  border bg-background p-3 text-sm">
           <p className="font-semibold">Next school handoff</p>
           {!row.activeEnrollment
             ? <p className="mt-1">{row.latestOfferStatus === "accepted"
@@ -191,10 +193,10 @@ export function PublicInterestInbox({ initialPage, siteId, programId }: {
           : "No family interest requests in your authorized programs yet."}
       </p>}
     </div>
-    {loadError&&<p role="alert" className="mt-3 text-sm">{loadError}</p>}
-    {nextCursor&&<button type="button" disabled={loadingMore||busy}
-      onClick={()=>void loadMore()} className="mt-4 rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+    {loadError&&<WorkspaceNotice tone="danger" className="mt-3">{loadError}</WorkspaceNotice>}
+    {nextCursor&&<Button type="button" size="sm" disabled={loadingMore||busy}
+      onClick={()=>void loadMore()} variant="outline" className="mt-4">
       {loadingMore?"Loading older inquiries…":"Load older inquiries"}
-    </button>}
+    </Button>}
   </section>;
 }
