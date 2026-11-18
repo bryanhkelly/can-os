@@ -41,11 +41,11 @@ export function ClassTeacherPlanningPanel({ data, lessons, search }: {
           </div>
           {assigned.length>0&&<div className="flex flex-wrap gap-2">{assigned.map(work=>
             <Link key={work.id} to="/teacher/gradebook" search={{section:data.section.id,assessment:work.id}}
-             className="rounded border px-2 py-1 text-xs underline">{work.title}</Link>)}</div>}
+             className=" border px-2 py-1 text-xs underline">{work.title}</Link>)}</div>}
         </li>;
       })}</ol>
       {!module.lessons.length&&<p className="text-sm text-muted-foreground">No published lessons in this unit.</p>}
     </WorkspacePanel>)}
-    {!data.content&&<p className="rounded border p-4 text-sm">No published curriculum is available to plan this class.</p>}
-  </div> : <p role="alert" className="rounded border p-4 text-sm">Teacher planning is available only to the assigned teaching team.</p>;
+    {!data.content&&<p className=" border p-4 text-sm">No published curriculum is available to plan this class.</p>}
+  </div> : <p role="alert" className=" border p-4 text-sm">Teacher planning is available only to the assigned teaching team.</p>;
 }
