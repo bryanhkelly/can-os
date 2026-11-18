@@ -16,7 +16,8 @@ try{
       EXISTS(SELECT 1 FROM aclexplode(coalesce(c.relacl,acldefault('r',c.relowner))) a
         WHERE a.grantee=0) AS grants_public
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='education_v30' AND c.relname=ANY($1::text[])`,[tables]),
+      WHERE (n.nspname='education_v30' OR (n.nspname='public' AND c.relname='network_member_identifiers'))
+        AND c.relname=ANY($1::text[])`,[tables]),
     pool.query(`SELECT table_name,column_name,is_nullable FROM information_schema.columns
       WHERE table_schema='education_v30'
         AND table_name IN ('noncredit_self_enrollment_releases','noncredit_self_enrollment_claims')
@@ -24,13 +25,15 @@ try{
     pool.query(`SELECT c.relname,t.tgname FROM pg_trigger t
       JOIN pg_class c ON c.oid=t.tgrelid
       JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='education_v30' AND NOT t.tgisinternal
+      WHERE (n.nspname='education_v30' OR (n.nspname='public' AND c.relname='network_member_identifiers'))
+        AND NOT t.tgisinternal
       AND t.tgname IN ('network_unit_parent_guard','network_membership_path_guard',
         'participation_attribution_scope_guard','participation_attribution_history_guard',
         'network_member_identifier_guard','v301_noncredit_attribution_required',
         'v301_class_attribution_required')`),
     pool.query(`SELECT tablename,policyname FROM pg_policies
-      WHERE schemaname='education_v30' AND tablename=ANY($1::text[])`,[tables]),
+      WHERE (schemaname='education_v30' OR (schemaname='public' AND tablename='network_member_identifiers'))
+        AND tablename=ANY($1::text[])`,[tables]),
   ]);
   assert.equal(catalog.rows.length,tables.length,"Network tables missing");
   for(const row of catalog.rows){
