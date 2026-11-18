@@ -8,7 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 
 const grades = ["TK", "K", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
-const inputClass = "mt-1 block w-full rounded-lg border bg-background p-2 text-sm";
+const inputClass = "mt-1 block w-full";
 const selectClass = inputClass;
 
 export function LaunchProgramIdentityFields({ type, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }: {
