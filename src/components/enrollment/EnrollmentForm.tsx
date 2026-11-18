@@ -18,7 +18,7 @@ export function EnrollmentFormSnapshot({ record }: { record: EnrollmentFormRecor
   return <div className="space-y-2 text-sm">
     <p>School form version: {record.form.version}</p>
     <p className="whitespace-pre-wrap">{record.form.instructions}</p>
-    <p className="whitespace-pre-wrap rounded border p-3">{record.form.consent}</p>
+    <p className="whitespace-pre-wrap  border p-3">{record.form.consent}</p>
     {record.submission && <>
       <dl>{record.form.fields.map(field => <div key={field.key} className="mt-2">
         <dt className="font-semibold">{field.label}</dt>
