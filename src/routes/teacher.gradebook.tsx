@@ -25,7 +25,8 @@ import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { parseAssignmentContentDraft } from "@/domain/assignment-content";
 import { assessmentClockToUtc, assessmentDueAtForDate } from "@/domain/assessment-local-schedule";
-import { QueryState, WorkspaceShell, WorkspacePanel } from "@/components/workspace";
+import { QueryState, WorkspaceShell, WorkspacePanel, WorkspaceNotice } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { SubmissionEvidence } from "@/components/student/SubmissionEvidence";
 import { AssignmentConversation } from "@/components/learning/AssignmentConversation";
 import { liveRubricTotal } from "@/components/learning/live-rubric-total";
@@ -331,9 +332,9 @@ function TeacherGradebookPage() {
    </div>}
   <QueryState loading={loading?"Loading gradebook...":undefined} error={error||undefined}
    onRetry={retryQuery} retrying={sectionsQuery.isFetching||gradebookQuery.isFetching}/>
-   {notice && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">{notice}</p>}
+   {notice && <WorkspaceNotice tone="info" className="mt-8">{notice}</WorkspaceNotice>}
    <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving gradebook changes..."/>
-   {!loading && !error && sections.length === 0 && <p className="mt-8 rounded-lg border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
+   {!loading && !error && sections.length === 0 && <p className="mt-8  border p-4 text-sm" role="status">No currently authorized teaching sections. A delegation, assignment, qualification or school agreement may be missing, revoked or expired. Historical grades and issued transcripts are unchanged; contact your school administrator if you believe access should continue.</p>}
 
    {!loading && !error && gradebook?.connected && gradebook.section && <>
     <GradebookOverview studentCount={gradebook.students.length} assessmentCount={gradebook.assessments.length} submittedCount={gradebook.cells.filter(cell=>cell.status==="submitted").length} showQueueEmpty={!reviewCell&&reviewQueue.length===0} />
@@ -377,7 +378,7 @@ function TeacherGradebookPage() {
       assessmentTitle={gradebook.assessments.find(item=>item.id===search.assessment)?.title??""} />}
 
     {gradebook.assessments.length === 0 && <p className="mt-8 text-sm">No assessments yet. Create one above to begin.</p>}
-    {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto rounded-xl border bg-card">
+    {gradebook.assessments.length > 0 && <div ref={gridRef} className="mt-8 overflow-x-auto  border bg-card">
      <table className="w-full border-collapse text-sm">
       <thead>
        <tr className="border-b text-left">
@@ -400,16 +401,16 @@ function TeacherGradebookPage() {
          const gradeable = cell?.status === "submitted";
          const reviewable = !!cell && (cell.status === "graded" || cell.status === "returned");
          return <td key={assessment.id} className="p-3 align-top">
-          {cell && (gradeable||reviewable) ? <button
+          {cell && (gradeable||reviewable) ? <Button type="button" variant="outline" size="sm"
            data-cell={`${rowIndex}:${colIndex}`}
            onKeyDown={event => onCellKeyDown(event, rowIndex, colIndex)}
            aria-label={`${student.displayName}, ${assessment.title}: ${label.text}${gradeable ? ". Open grading" : reviewable ? ". View grade" : ""}`}
-           className={`rounded-lg border px-3 py-1 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${label.tone}`}
+           className={`h-auto min-h-0 shrink-0 justify-start px-3 py-1 text-xs ${label.tone}`}
            onClick={() => {
             void navigate({search:{section:selected,assessment:assessment.id,student:student.studentProfileId}});
            }}
-          >{label.text}{gradeable ? " · Grade" : reviewable ? " · View" : ""}</button>
-           : <span data-cell={`${rowIndex}:${colIndex}`} tabIndex={-1} className={`inline-block rounded-lg px-3 py-1 text-xs ${label.tone}`}>{label.text}</span>}
+          >{label.text}{gradeable ? " · Grade" : reviewable ? " · View" : ""}</Button>
+           : <span data-cell={`${rowIndex}:${colIndex}`} tabIndex={-1} className={`inline-block  px-3 py-1 text-xs ${label.tone}`}>{label.text}</span>}
          </td>;
         })}
        </tr>)}
