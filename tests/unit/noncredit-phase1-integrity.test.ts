@@ -14,6 +14,7 @@ const activities=readFileSync("src/components/learning/NoncreditCourseActivities
 const assessment=readFileSync("src/components/learning/CourseAssessmentPanel.tsx","utf8");
 const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.functions.ts","utf8");
 const surveyDisplay=readFileSync("src/components/learning/NoncreditCourseSurveys.tsx","utf8");
+const providerEnrollment=readFileSync("src/routes/programs.noncredit.enrollment.tsx","utf8");
 
 describe("noncredit pilot correctness boundaries",()=>{
   it("enforces verified, current, unsuperseded attendance before completion",()=>{
@@ -47,6 +48,7 @@ describe("noncredit pilot correctness boundaries",()=>{
       expect(sql).toContain("rule.enabled");
       expect(sql).toContain("permission.verified_by_person_id IS NOT NULL");
       expect(sql).toContain("c.deployment_id=participant.deployment_id");
+      if(sql===feedbackPatch)expect(sql).toContain("c.offering_id=participant.offering_id");
       expect(sql).toContain("ON CONFLICT (campaign_id,invited_person_id) DO NOTHING");
     }
   });
@@ -64,6 +66,9 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(surveys).toContain("surveyInvitations.invitedPersonId");
     expect(surveys).toContain("evidenceDocumentVersions.verifiedByPersonId");
     expect(surveys).toContain("current verified permission for identifiable feedback");
+    expect(surveys).toContain("noncreditSurveyOfferingId");
+    expect(surveys).toContain("surveyCampaigns.offeringId,noncreditOfferingId");
+    expect(surveys).toContain("campaign.offeringId!==noncreditOfferingId");
     expect(activities).toContain("NoncreditCourseSurveys");
     expect(activities).toContain("CourseAssessmentPanel");
   });
@@ -89,5 +94,21 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(pilotReport).toContain('inArray(learnerCourseAttempts.status,["active","completed","withdrawn","cancelled"])');
     expect(pilotReport).not.toContain('eq(learnerCourseAttempts.status,"active")');
     expect(pilotReport).toContain('currentDecision?.outcome==="completed"');
+  });
+
+  it("does not report another Site's private noncredit training evidence",()=>{
+    expect(pilotReport).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
+    expect(pilotReport).toContain("noncreditSelfEnrollmentClaims.registrationId");
+    expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.siteId,siteIds");
+    expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.providerOrganizationId");
+    expect(providerEnrollment).toContain("<NoncreditPilotOutcomesPanel/>");
+  });
+
+  it("credits feedback only to the matching Offering and operating Organization",()=>{
+    expect(pilotReport).toContain("surveyCampaigns.offeringId,offeringIds");
+    expect(pilotReport).toContain("surveyCampaigns.operatingOrganizationId");
+    expect(pilotReport).toContain("registrationCounts.get(surveyKey)");
+    expect(pilotReport).toContain("attributableNoncreditFeedback");
+    expect(feedbackPatch).toContain("JOIN offering_versions ov ON ov.id=r.offering_version_id");
   });
 });
