@@ -4,7 +4,7 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  noncreditRegistrations,noncreditTrainingVersions,learnerCourseAttempts,
+  noncreditRegistrations,noncreditTrainingVersions,learnerCourseAttempts,offeringVersions,
   learnerLessonProgress,courseLessons,assessmentAccess,
   assessmentExecutionAttempts,assessmentExecutionResults,
   assessmentFormAdministrations,noncreditCompletionDecisions,
@@ -41,6 +41,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       throw new Error("Pilot reporting must use a positive range of no more than 366 days");
     const trainings=await db.select({
       id:noncreditTrainingVersions.id,title:noncreditTrainingVersions.title,
+      offeringVersionId:noncreditTrainingVersions.offeringVersionId,
       finalAssessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
       baselineAssessmentVersionId:noncreditTrainingVersions.baselineAssessmentVersionId,
     }).from(noncreditTrainingVersions)
@@ -57,6 +58,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       status:noncreditRegistrations.status,
       participantPersonId:noncreditRegistrations.participantPersonId,
       deploymentId:noncreditRegistrations.deploymentId,
+      offeringVersionId:noncreditRegistrations.offeringVersionId,
+      registeredAt:noncreditRegistrations.registeredAt,
     }).from(noncreditRegistrations)
       .where(and(
         inArray(noncreditRegistrations.trainingVersionId,trainings.map(t=>t.id)),
@@ -138,27 +141,54 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       }).from(assessmentFormAdministrations)
         .where(inArray(assessmentFormAdministrations.id,adminIds)):[],
     ]);
+    // A deployment may contain multiple independent training Offerings.
+    // An identified response is attributable only when its approved campaign
+    // explicitly names the same Offering as the participant's registration.
+    // Deployment-wide or unrelated campaigns are not course feedback.
+    const offeringVersionIds=uuidSet(registrations.map(r=>r.offeringVersionId));
+    const offeringRows=offeringVersionIds.length?await db.select({
+      id:offeringVersions.id,offeringId:offeringVersions.offeringId,
+    }).from(offeringVersions).where(inArray(offeringVersions.id,offeringVersionIds)):[];
+    const offeringByVersion=new Map(offeringRows.map(row=>[row.id,row.offeringId]));
+    const offeringIds=uuidSet(offeringRows.map(row=>row.offeringId));
     const people=uuidSet(registrations.map(r=>r.participantPersonId));
     const deployments=uuidSet(registrations.map(r=>r.deploymentId));
-    const surveys=people.length&&deployments.length?await db.select({
+    const surveys=people.length&&deployments.length&&offeringIds.length?await db.select({
       personId:surveyInvitations.invitedPersonId,
       deploymentId:surveyCampaigns.deploymentId,
+      offeringId:surveyCampaigns.offeringId,
+      submittedAt:surveyResponses.submittedAt,
     }).from(surveyResponses)
-      .innerJoin(surveyInvitations,eq(surveyResponses.invitationId,surveyInvitations.id))
+      .innerJoin(surveyInvitations,and(
+        eq(surveyResponses.invitationId,surveyInvitations.id),
+        eq(surveyResponses.campaignId,surveyInvitations.campaignId),
+      ))
       .innerJoin(surveyCampaigns,eq(surveyInvitations.campaignId,surveyCampaigns.id))
       .where(and(
         inArray(surveyInvitations.invitedPersonId,people),
         inArray(surveyCampaigns.deploymentId,deployments),
+        inArray(surveyCampaigns.offeringId,offeringIds),
         eq(surveyResponses.respondentMode,"identified"),
       )):[];
-    // If one person has multiple registrations in the same deployment,
-    // survey attribution is ambiguous; do not double-count as course feedback.
+    // Only one in-window registration for a Person, Deployment and Offering
+    // may claim an invited response. A retake or duplicate registration needs
+    // explicit registration-to-invitation provenance rather than guesswork.
     const registrationCounts=new Map<string,number>();
+    const feedbackKey=(personId:string,deploymentId:string,offeringId:string)=>
+      [personId,deploymentId,offeringId].join(":");
     for(const r of registrations){
-      const key=r.deploymentId+":"+r.participantPersonId;
+      const offeringId=offeringByVersion.get(r.offeringVersionId);
+      if(!offeringId)continue;
+      const key=feedbackKey(r.participantPersonId,r.deploymentId,offeringId);
       registrationCounts.set(key,(registrationCounts.get(key)??0)+1);
     }
-    const surveyedKeys=new Set(surveys.map(s=>s.deploymentId+":"+s.personId));
+    const surveyTimestamps=new Map<string,Date>();
+    for(const s of surveys){
+      if(!s.offeringId)continue;
+      const key=feedbackKey(s.personId,s.deploymentId!,s.offeringId);
+      const previous=surveyTimestamps.get(key);
+      if(!previous||previous<s.submittedAt)surveyTimestamps.set(key,s.submittedAt);
+    }
     const attemptById=new Map(attempts.map(a=>[a.id,a]));
     const grantsById=new Map(grants.map(g=>[g.id,g]));
     const adminById=new Map(administrations.map(a=>[a.id,a]));
@@ -209,7 +239,9 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         checkById.get(firstFinal.attemptId)!.submittedAt!;
       const passed=finalResults.find(r=>r.outcome==="pass");
       const currentDecision=currentDecisions.find(d=>d.registrationId===reg.id);
-      const surveyKey=reg.deploymentId+":"+reg.participantPersonId;
+      const offeringId=offeringByVersion.get(reg.offeringVersionId);
+      const surveyKey=offeringId?feedbackKey(reg.participantPersonId,reg.deploymentId,offeringId):null;
+      const feedbackSubmittedAt=surveyKey?surveyTimestamps.get(surveyKey):undefined;
       const hasSubmitted=finalCheck.some(c=>c.submittedAt!==null);
       return {
         registrationId:reg.id,trainingVersionId:reg.trainingVersionId,registered:true,
@@ -218,7 +250,8 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         completedLessonCount:doneLessons.size,totalLessonCount:relevantLessons.size,
         knowledgeSubmitted:hasSubmitted,
         knowledgeResult:passed?"pass":finalResults[0]?.outcome??null,
-        surveySubmitted:registrationCounts.get(surveyKey)===1&&surveyedKeys.has(surveyKey),
+        surveySubmitted:surveyKey!==null&&registrationCounts.get(surveyKey)===1&&
+          !!feedbackSubmittedAt&&feedbackSubmittedAt>=reg.registeredAt,
         completionRecorded:currentDecision?.outcome==="completed",
         baselineFraction:paired?Number(firstBaseline.earned)/Number(firstBaseline.possible):null,
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
