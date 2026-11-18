@@ -146,7 +146,7 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(service).toContain('eq(blueprintExecutionBatches.executionStatus,"executed")');
     expect(service).toContain('latestReview.decision!=="approved"');
     expect(service).toContain('eq(auditEvents.entityId,configuration.id)');
-    expect(service).toContain('["operating","registration","delivery"]');
+    expect(service).toContain("for(const kind of nativeAdoptionReviewKinds)");
     expect(service).toContain('approvalStatus:"approved"');
     expect(service).not.toContain('status:"active"');
   });
