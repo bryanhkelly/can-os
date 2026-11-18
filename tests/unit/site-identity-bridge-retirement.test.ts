@@ -27,12 +27,15 @@ describe("one Site UUID; retired identity bridge",()=>{
   expect(read(files[0])).not.toContain("catalogSites");
   expect(read(files[3])).toContain("native.id=s.id");
   expect(read(files[4])).toContain("eq(accountPersonGrants.siteId,grant.siteId)");
-  expect(read(files[5])).toContain("const canonicalSiteId = site.id;");
+  expect(read(files[5])).toContain("retired native Person correspondence");
+  expect(read(files[5])).not.toContain("tx.insert(accessAccountCanonicalPrincipals)");
  });
  it("has no Site-link request, confirm, or review service",()=>{
   const ui=read("src/routes/site-identity.tsx");
   expect(ui).toContain("Staff identity review");
-  expect(ui).toContain("verifyCANStaffCanonicalPrincipal");
+  expect(ui).not.toContain("verifyCANStaffCanonicalPrincipal");
+  expect(ui).toContain("Staff Person correspondence retired");
+  expect(ui).toContain("public Person");
   expect(ui).not.toContain("requestSiteIdentityLink");
   expect(ui).not.toContain("confirmCanonicalSiteIdentityLink");
   expect(ui).not.toContain("reviewSiteIdentityLink");
