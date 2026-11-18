@@ -3,7 +3,7 @@
 **Product capability specification and Phase 2 pilot plan**  
 **Status:** Releases 1–2 source integrated on `main`; runtime/browser acceptance and production deployment remain unverified  
 **Date:** November 13, 2026
-**Scheduling clarification (November 17, 2026):** Four sessions do not require four consecutive weeks. Each Site may use a 2×2 cadence, weekly meetings, or skip holidays and extend across five or more weeks. Central course approval, per-Site scheduling, cohort linkage and independently verified attendance remain separate.  
+**Scheduling clarification (November 17, 2026):** Four sessions do not require four consecutive weeks. Each Site may use a Monday–Thursday intensive, a 2×2 cadence, weekly meetings, or skip holidays and extend across five or more weeks. Central course approval, per-Site scheduling, cohort linkage and independently verified attendance remain separate.  
 **Primary use case:** COGIC Phase 2 four-session training pilot, scheduled over flexible dates  
 **Broader applicability:** Churches, microschools, community learning centers, afterschool and summer programs, adult/workforce education, and grades 6–12
 
