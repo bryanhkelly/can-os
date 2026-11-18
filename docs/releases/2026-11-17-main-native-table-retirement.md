@@ -163,3 +163,47 @@ At this cutover checkpoint: **322** tables in `education_v30` and **348** in
 a current snapshot across concurrent main work, not an exclusive workstream
 attribution. The transaction and SQL metadata/negative-projection checks
 succeeded; full automated and browser acceptance have not been run.
+
+## Continued: learner login and qualification consent withdrawal records
+
+On production Neon `main`, two more original empty tables moved in place:
+
+| Table | Preserved OID | Validated outgoing FKs |
+|---|---|---:|
+| `instructional_learner_login_bindings` | `418949` | 1 |
+| `qualification_person_consent_withdrawals` | `416894` | 3 |
+
+The migration used `ALTER TABLE ... SET SCHEMA public`, preserving the
+original objects and their owner-only, forced-RLS policies, relationships,
+indexes and privileges. The preflight required zero source records,
+zero inbound FKs, no custom triggers, no name/index collisions, and
+exactly the two expected SECURITY DEFINER SQL consumers.
+
+The two original functions, without changing names, signatures, execute
+privileges, SQL logic or SECURITY DEFINER status, now read the matching
+`public` relations:
+
+- `education_v30.v301_instructional_login_can_read_attempt` validates the
+  learner's recorded-instruction login and Course attempt binding in
+  `public.instructional_learner_login_bindings`.
+- `education_v30.v29_guard_subject` rejects a personal qualification
+  when a valid consent is withdrawn, checking
+  `public.qualification_person_consent_withdrawals`.
+
+The restricted recorded-learner role provisioning script was updated to
+insert/read `public.instructional_learner_login_bindings`.
+Direct database checks confirmed both retained OIDs, one policy each,
+forced RLS, four validated FKs, no client SELECT access, and original
+security-definer function OIDs. An invalid learner attempt still returns
+false. No positive authorization or personal-consent insert was attempted.
+
+- Migration: `database/production/2026-11-17-consolidate-learner-login-and-qualification-consent.sql`
+- Main-only, read-only check: `scripts/acceptance/check-main-protected-identity-table-cutover.mjs`
+- Regression contracts: `tests/unit/main-protected-identity-table-cutover.test.ts`
+
+Current snapshot at verification: **320** `education_v30` tables,
+**350** `public` tables, seven `education_v30_secure` tables. Other agents
+may be making concurrent changes. The database migration and direct SQL
+verification passed; the new executable script, Vitest and browser
+acceptance remain unexecuted. The safeguarding queue, session records
+and database-role organization bindings are not part of this pass.
