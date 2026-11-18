@@ -8,7 +8,7 @@ const source=readFileSync(
 
 describe("noncredit registration and waitlist management reconciliation",()=>{
   it("uses the shared V6.1 mutation feedback component instead of bespoke saved-state flags",()=>{
-    expect(source).toContain('import { MutationFeedback } from "@/components/workspace"');
+    expect(source).toMatch(/import \{[^}]*MutationFeedback[^}]*\} from "@\/components\/workspace"/);
     expect(source).toContain('useMutationFeedback(async()=>');
     expect(source).toContain('const changeBusy=mutation.pending||mutation.refreshFailed');
     expect(source).toContain('MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}');
@@ -47,8 +47,15 @@ describe("noncredit registration and waitlist management reconciliation",()=>{
   it("blocks stale enrollment actions while refreshing saved decisions",()=>{
     expect(source).toContain("disabled={busy!==null||changeBusy}");
     expect(source).toContain("disabled={changeBusy||busy!==null}");
-    expect(source).toContain('onClick={()=>void leaveWaitlist(item.releaseId)}');
-    expect(source).toContain('onClick={()=>void withdraw(course.registrationId)}');
+    expect(source).toContain('onConfirm={()=>{if(cancelWaitlist)void leaveWaitlist(cancelWaitlist);}}');
+    expect(source).toContain('onConfirm={()=>{if(withdrawConfirm)void withdraw(withdrawConfirm);}}');
     expect(source).not.toContain("setBusy(item.releaseId)");
+    expect(source).toContain('confirmDisabled={changeBusy||busy!==null}');
+    expect(source).toContain('pending={mutation.pending}');
+    expect(source).toContain('destructive');
+    expect(source).toContain('onClose={()=>setWithdrawConfirm(null)}');
+    expect(source).toContain('onClose={()=>setCancelWaitlist(null)}');
+    expect(source).not.toContain('withdrawConfirm===course.registrationId?');
+    expect(source).not.toContain('cancelWaitlist===item.releaseId?');
   });
 });
