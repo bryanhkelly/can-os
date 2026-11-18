@@ -41,8 +41,14 @@ export function NativeClassLaunchReadiness({state}:{state:ClassLaunchReadState})
         <Link to="/class" search={{view:"content"}} className="font-semibold underline underline-offset-4">
           Native Course drafts (authorized creator)
         </Link>
+        <Link to="/class" search={{view:"reviews"}} className="font-semibold underline underline-offset-4">
+          Publisher release review (independently appointed reviewer)
+        </Link>
         <Link to="/canonical/program-operations" className="font-semibold underline underline-offset-4">
           Program Operations and adoption inspection (staging)
+        </Link>
+        <Link to="/canonical/blueprints" className="font-semibold underline underline-offset-4">
+          Local adoption review (independently appointed Blueprint reviewer)
         </Link>
       </div>
       <p className="text-xs text-muted-foreground">
