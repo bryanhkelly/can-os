@@ -23,6 +23,10 @@ import { readOptionalSiteNoncreditReleases } from "@/modules/sites/site-noncredi
 import { readOptionalSitePublishedClasses } from "@/modules/sites/site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
 import { projectSiteEnrollmentOpportunities } from "@/domain/site-enrollment-opportunities";
+import { projectApprovedParentInformation, withVerifiedPublicApplications } from "@/domain/parent-information";
+import { readApprovedPublicParentExtras } from "@/modules/sites/public-parent-extras.server";
+import { readApprovedSchoolSitePhotos } from "@/modules/sites/site-media-folder.server";
+import { projectApprovedSchoolSiteMedia } from "@/domain/school-site-media-public";
 
 function failure(status:number,title:string,message:string){
   return new Response(privateWebsitePreviewErrorPage(title,message), {
@@ -85,13 +89,30 @@ export const Route=createFileRoute("/launch/site-preview")({
             logoImage:siteLocalImagePublicationGaps(copy.branding.logoImage??null).length?null:copy.branding.logoImage??null,
           },
         };
+        // Share the same reviewed parent-facing and school-media projections
+        // as Website & Brand Studio and the live publisher. The Site-first
+        // route must not silently omit approved address, contact, schedules,
+        // family services or licensed photography from its preview.
+        const publicOfferings=enrichment.map(toPublicSiteEnrichment);
+        const parentExtras=await readApprovedPublicParentExtras(site.id,
+          academics.map(program=>program.programId),site.metadata);
+        const authorizedPrograms=withVerifiedPublicApplications(academics,parentExtras.admissions);
+        const parentInformation=projectApprovedParentInformation({
+          site:{name:site.name,organizationName:site.organizationName},
+          academicPrograms:authorizedPrograms,offerings:publicOfferings,
+          localContent,...parentExtras,
+        });
+        const approvedPhotos=await readApprovedSchoolSitePhotos(site.id);
+        const media=projectApprovedSchoolSiteMedia(site.id,
+          publicSiteHost(publication.slug),approvedPhotos);
         const noncreditReleases=await readOptionalSiteNoncreditReleases(site.id);
         const classes=await readOptionalSitePublishedClasses(site.id);
         const page:PublicSitePage={
           host:publicSiteHost(publication.slug),
           site:{name:site.name,organizationName:site.organizationName},
-          academicPrograms:academics,
-          offerings:enrichment.map(toPublicSiteEnrichment),
+          academicPrograms:authorizedPrograms,
+          offerings:publicOfferings,
+          parentInformation,media,
           ...(noncreditReleases.length?{
             noncreditReleases,
             enrollmentAppOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
@@ -115,7 +136,7 @@ export const Route=createFileRoute("/launch/site-preview")({
             : []) ?? null;
         const config=safeReadSiteContentChannelConfig(site.metadata.websiteContentChannels);
         page.enrollmentOpportunities=projectSiteEnrollmentOpportunities({
-          academicPrograms:academics,enrichment:page.offerings,
+          academicPrograms:authorizedPrograms,enrichment:page.offerings,
           noncredit:noncreditReleases,classes,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
@@ -126,7 +147,7 @@ export const Route=createFileRoute("/launch/site-preview")({
             city:location.success?location.data.city:null,
             state:location.success?location.data.state:null,timezone:site.timezone},
           networkAffiliations,networkStatusKnown:networkRows!==null,
-          academicPrograms:academics, enrichment:page.offerings,
+          academicPrograms:authorizedPrograms, enrichment:page.offerings,
           noncredit:noncreditReleases,classes,classTimezone:site.timezone,
           enrollmentOrigin:noncreditEnrollmentOrigin(process.env.CAN_ACCESS_PUBLIC_ORIGIN),
         });
