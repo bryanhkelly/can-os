@@ -178,6 +178,9 @@ export function TeacherConferencePanel() {
           }, "Office-hour window published for guardians.");
         }}>
         <fieldset disabled={busy} aria-busy={mutation.pending} className="contents">
+        <p className="text-sm text-muted-foreground sm:col-span-2">
+          Enter times in your device's local timezone. Guardians will see appointments in their own timezone.
+        </p>
         <Field label="Title" required className="sm:col-span-2">
           <Input required minLength={3} value={title} onChange={event => setTitle(event.target.value)} />
         </Field>
@@ -217,6 +220,8 @@ export function TeacherConferencePanel() {
         </article>)}
       </div>
 
+      {data.bookings.length === 0 && <EmptyState className="mt-6" title="No conference bookings yet."
+        description="When guardians book a published office-hour window, their appointments will appear here."/>}
       {data.bookings.length > 0 && <div className="mt-6 grid gap-3" aria-label="Conference bookings">
         <p className="text-xs text-muted-foreground">Up to 50 appointments, with pending bookings first; includes the past 30 days.
           Record held appointments only after they start, and no-shows after they end.</p>
