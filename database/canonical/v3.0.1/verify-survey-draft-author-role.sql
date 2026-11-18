@@ -11,7 +11,7 @@ SELECT (
  EXISTS(SELECT 1 FROM pg_roles r WHERE r.rolname=:'draft_role'
    AND NOT r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
    AND NOT r.rolinherit AND NOT r.rolcreatedb AND NOT r.rolcreaterole)
- AND EXISTS(SELECT 1 FROM education_v30.database_role_organization_bindings b
+ AND EXISTS(SELECT 1 FROM public.database_role_organization_bindings b
    WHERE b.db_role=:'draft_role'::name
      AND b.organization_id=:'organization_id'::uuid
      AND b.purpose_code='survey_draft_author' AND b.status='approved'
