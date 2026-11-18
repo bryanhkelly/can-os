@@ -42,7 +42,7 @@ export const authorizeNativeClassRepeat=createServerFn({method:"POST"})
   if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
    throw new AuthorizationError("current Class repeat reviewer");
   assertCapability(actor,"class.manage");
-  const approvingPersonId=actor.actorPersonId!;
+  const approvingPersonId=actor.actorPersonId;
    return db.transaction(async tx=>{
    const [source]=await tx.select({
     classId:canonicalClassEnrollments.classId,
