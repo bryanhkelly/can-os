@@ -37,6 +37,7 @@ async function authorizeContentChannelEditor(
 export async function readAuthorizedSiteContentChannels(siteId: string) {
   const actor = await getCommandContext(getRequest());
   const [site] = await db.select().from(sites).where(eq(sites.id, siteId)).limit(1);
+  if (!site) throw new AuthorizationError("Site content channel scope");
   await authorizeContentChannelEditor(actor, site, db, "read");
   return readSiteContentChannelConfig(site.metadata.websiteContentChannels);
 }
@@ -52,6 +53,7 @@ export async function saveAuthorizedSiteContentChannels(input: {
   return db.transaction(async tx => {
     const [site] = await tx.select().from(sites)
       .where(eq(sites.id, input.siteId)).for("update").limit(1);
+    if (!site) throw new AuthorizationError("Site content channel scope");
     await authorizeContentChannelEditor(actor, site, tx, "write");
     const current = readSiteContentChannelConfig(site.metadata.websiteContentChannels);
     if (current.revision !== input.expectedRevision)
