@@ -8,7 +8,7 @@ import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getMyNoncreditSelfEnrollmentHistoryPage, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
 import { normalizeClientError } from "@/lib/client-error";
-import {getMyNoncreditWaitlist,getMyNoncreditWaitlistByRelease,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
+import {getMyNoncreditWaitlistPage,getMyNoncreditWaitlistByRelease,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 
 export function NoncreditEnrollmentManagement({registrationId,releaseId}:{registrationId?:string;releaseId?:string}={}){
   const navigate=useNavigate();
@@ -35,11 +35,19 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     enabled:authorized&&!releaseId,retry:false,staleTime:15_000,
   });
   const [busy,setBusy]=useState<string|null>(null);
-  const waiting=useQuery({queryKey:["my-noncredit-waitlist",scopeKey,releaseId??"all"],queryFn:async()=>{
-    if(!releaseId)return getMyNoncreditWaitlist();
-    const entry=await getMyNoncreditWaitlistByRelease({data:{releaseId}});
-    return entry?[entry]:[];
-  },enabled:authorized&&!registrationId,retry:false,staleTime:15_000});
+  const waiting=useInfiniteQuery({
+    queryKey:["my-noncredit-waitlist",scopeKey,releaseId??"all"],
+    initialPageParam:null as {joinedAt:string;waitlistId:string}|null,
+    queryFn:async({pageParam})=>{
+      if(releaseId){
+        const entry=await getMyNoncreditWaitlistByRelease({data:{releaseId}});
+        return {items:entry?[entry]:[],nextCursor:null};
+      }
+      return getMyNoncreditWaitlistPage({data:{cursor:pageParam}});
+    },
+    getNextPageParam:last=>last.nextCursor??undefined,
+    enabled:authorized&&!registrationId,retry:false,staleTime:15_000,
+  });
   const [error,setError]=useState("");
   const mutation=useMutationFeedback(async()=>{
     await Promise.all([
@@ -89,7 +97,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       setCancelWaitlist(null);
   }
   const visibleCourses=releaseId ? [] : query.data?.pages.flatMap(page=>page.items);
-  const visibleWaitlist=registrationId ? [] : waiting.data;
+  const visibleWaitlist=registrationId ? [] : waiting.data?.pages.flatMap(page=>page.items);
   if(!authorized)return <p role="status" className="border border-border p-4 text-sm">Sign in with your CAN account to manage training.</p>;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
@@ -124,6 +132,18 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
           </div>
         </article>)}
       </div>
+      {waiting.hasNextPage&&!releaseId&&<div className="mt-4">
+        <Button type="button" variant="outline" loading={waiting.isFetchingNextPage}
+          disabled={waiting.isFetchingNextPage||changeBusy}
+          onClick={()=>void waiting.fetchNextPage()}>
+          {waiting.isFetchingNextPage?"Loading older invitations…":"Load older waiting-list entries"}
+        </Button>
+      </div>}
+      {waiting.isFetchNextPageError&&<WorkspaceNotice tone="attention" className="mt-4">
+        <span>Older waiting-list entries could not be retrieved. Current entries remain visible.</span>
+        <Button type="button" variant="outline" size="sm" className="ml-3"
+          onClick={()=>void waiting.fetchNextPage()}>Retry older invitations</Button>
+      </WorkspaceNotice>}
     </section>}
     {visibleCourses && <div className="mt-6 space-y-3">
       {visibleCourses.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className={registrationId?"p-2":"border border-border bg-card p-5"}>
