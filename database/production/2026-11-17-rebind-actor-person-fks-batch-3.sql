@@ -14,8 +14,8 @@ BEGIN
  (SELECT count(*) FROM education_v30.persons)<>0
  THEN RAISE EXCEPTION 'Native Person identity has changed'; END IF;
  IF (SELECT count(*) FROM pg_constraint WHERE contype='f'
- AND confrelid='education_v30.persons'::regclass)<>179
- THEN RAISE EXCEPTION 'Expected 179 native Person FKs before this batch'; END IF;
+ AND confrelid='education_v30.persons'::regclass)<>178
+ THEN RAISE EXCEPTION 'Expected 178 native Person FKs before this batch'; END IF;
  FOR x IN SELECT * FROM (VALUES
     ('learning_completion_evidence_review_requests','learning_completion_evidence_review_submitted_by_person_id_fkey','submitted_by_person_id',''),
     ('network_member_identifiers','network_member_identifiers_verified_by_person_id_fkey','verified_by_person_id',' ON DELETE RESTRICT'),
@@ -140,6 +140,6 @@ BEGIN
  END LOOP;
  SELECT count(*) INTO left_count FROM pg_constraint WHERE contype='f'
  AND confrelid='education_v30.persons'::regclass;
- IF left_count<>149 THEN RAISE EXCEPTION 'Unexpected native FK remainder: %',left_count; END IF;
+ IF left_count<>148 THEN RAISE EXCEPTION 'Unexpected native FK remainder: %',left_count; END IF;
 END $verify$;
 COMMIT;
