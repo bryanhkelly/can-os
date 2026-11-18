@@ -208,8 +208,15 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
   const result = { base, checked: 0, errors: [], warning: null };
   let paths;
   try {
-    paths = git(src, ["diff", "--name-only", "--diff-filter=ACMR",
-      base + "..HEAD", "--", "src"]).split("\n").filter(Boolean);
+    // Include committed changes and the developer's current working tree.
+    // A pre-commit lint run must detect staged, unstaged and new files too.
+    const names = [
+      git(src, ["diff", "--name-only", "--diff-filter=ACMR", base + "..HEAD", "--", "src"]),
+      git(src, ["diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--", "src"]),
+      git(src, ["diff", "--cached", "--name-only", "--diff-filter=ACMR", "--", "src"]),
+      git(src, ["ls-files", "--others", "--exclude-standard", "--", "src"]),
+    ];
+    paths = [...new Set(names.join("\n").split("\n").filter(Boolean))];
   } catch {
     result.warning = "Git base unavailable; incremental regression check not run. Use --base=<commit> to compare a known base.";
     return result;
