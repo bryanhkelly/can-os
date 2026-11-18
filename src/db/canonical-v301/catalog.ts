@@ -69,7 +69,7 @@ export const educationOperations = pgTable("education_operations", {
   status: text("status").$type<"planning" | "active" | "paused" | "closed">().notNull(),
 });
 
-export const educationOperationSites = educationV30.table("education_operation_sites", {
+export const educationOperationSites = pgTable("education_operation_sites", {
   id: id(),
   operationId: uuid("operation_id").notNull(),
   siteId: uuid("site_id").notNull(),
