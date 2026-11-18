@@ -13,6 +13,7 @@ import {
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { isVerifiedEvidenceCurrent } from "@/domain/instructional-tracks";
+import { nativeOfferingReviewPageSize, pageNativeOfferingReviewCandidates } from "@/domain/native-offering-review-page";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { auditEvents as platformAuditEvents } from "@/db/schema";
 import { assertTrackProvider, type TrackProviderCapability } from
@@ -489,12 +490,10 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
           ):undefined,
         ))
         .orderBy(desc(contentPublicationManifests.createdAt),desc(contentPublicationManifests.id))
-        .limit(61);
-      // Scan all scoped candidate pages, not just the newest 60.
+        .limit(nativeOfferingReviewPageSize+1);
+      // Scan all scoped candidate pages, not just the newest ones.
       // Independent Course appointments remain required for each visible item.
-      const page=rows.slice(0,60);
-      const last=rows.length>60?page[page.length-1]:null;
-      const nextCursor=last?{createdAt:last.createdAt.toISOString(),id:last.id}:null;
+      const {page,nextCursor}=pageNativeOfferingReviewCandidates(rows);
       const items=[];
       for(const row of page){
         if(!row.offeringVersionId||row.createdByPersonId===actor.actorPersonId)continue;
