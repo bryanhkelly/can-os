@@ -23,9 +23,14 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-router", async (importOriginal) => ({
   ...await importOriginal<typeof import("@tanstack/react-router")>(),
-  Link: ({ to, search, children, ...props }: {
-    to: string; search?: Record<string, string>; children: ReactNode;
-  }) => <a href={to + (search ? "?" + new URLSearchParams(Object.entries(search).filter(([,value])=>value!==undefined)).toString() : "")} {...props}>{children}</a>,
+  Link: ({ to, search, params, children, ...props }: {
+    to: string; search?: Record<string, string | undefined>;
+    params?: Record<string, string>; children?: ReactNode;
+  }) => {
+    const path = to.replace(/\$([^/]+)/g, (_, key: string) => encodeURIComponent(params?.[key] ?? key));
+    const query = new URLSearchParams(Object.entries(search ?? {}).filter((pair): pair is [string,string] => pair[1] !== undefined)).toString();
+    return <a href={path + (query ? "?" + query : "")} {...props}>{children}</a>;
+  },
   createFileRoute: () => (options: object) => ({
     options,
     useSearch: () => state.search,
@@ -169,7 +174,7 @@ describe("Student Today summary navigation", () => {
         {id:"help",title:"Check in with mentor",description:null,dueAt:null,priority:"normal",subjectType:"student_profile",subjectId:"student"},
       ],
     }} />);
-    expect(html).toContain('href="/student/assignments?assessment=returned"');
+    expect(html).toContain('href="/student/assignments/returned"');
     expect(html).toContain('href="/student/experiences?action=help"');
     expect(html).not.toContain('href="/student/experiences?action=revision"');
   });
@@ -185,7 +190,7 @@ describe("Student Today summary navigation", () => {
     }} />);
     expect(html).toContain("Your first week");
     expect(html).toContain("Ready to start");
-    expect(html).toContain('href="/student/assignments?section=section-1&amp;assessment=assessment-1"');
+    expect(html).toContain('href="/student/assignments/assessment-1?section=section-1"');
     expect(html).toContain('href="/classes?section=section-1&amp;tab=lessons&amp;lesson=investigate"');
     expect(html).toContain("Investigate cells");
     expect(html).toContain("Cell observations");
@@ -252,31 +257,32 @@ describe("assignment navigation filters", () => {
     expect(validate({ filter: "invalid", assessment: 42 })).toEqual({ filter: undefined, assessment: undefined });
   });
 
-  it("opens the requested returned assignment with its saved response on first render", () => {
+  it("links returned work to its authoritative detail route rather than an inline editor", () => {
     state.search={assessment:"returned"};
     const html=renderAssignments();
-    expect(html).toMatch(/aria-label="Assignment details"[\s\S]*>Returned essay<\/h2>/);
-    expect(html).toContain("Saved draft for Returned essay</textarea>");
-    expect(html).toContain('href="/student/assignments?filter=all&amp;assessment=returned" aria-current="page"');
-  });
-
-  it("does not silently substitute another assignment for an unavailable deep link", () => {
-    state.search={assessment:"not-visible"};
-    const html=renderAssignments();
-    expect(html).toContain("This assignment is unavailable in the current view.");
-    expect(html).toContain("Select an assignment");
+    expect(html).toContain('href="/student/assignments/returned"');
     expect(html).not.toContain("<textarea");
   });
 
-  it("does not select a requested assignment outside the current filter", () => {
+  it("keeps old assignment-query links as an explicit redirect", () => {
+    const beforeLoad = Route.options.beforeLoad;
+    expect(typeof beforeLoad).toBe("function");
+    expect(() => beforeLoad?.({search:{assessment:"returned", filter:"todo"}} as never)).toThrow();
+    expect(renderAssignments()).not.toContain("<textarea");
+  });
+
+  it("does not display out-of-filter work as inline content", () => {
     state.search={assessment:"returned",filter:"missing"};
     const html=renderAssignments();
-    expect(html).toContain("This assignment is unavailable in the current view.");
+    expect(html).toContain("Missing essay");
+    expect(html).not.toContain("Returned essay");
     expect(html).not.toContain("<textarea");
   });
 
-  it("initializes the default selection with its saved draft", () => {
-    expect(renderAssignments()).toContain("Saved draft for Upcoming essay</textarea>");
+  it("keeps draft editing in the individual assignment page", () => {
+    const html=renderAssignments();
+    expect(html).toContain('href="/student/assignments/upcoming"');
+    expect(html).not.toContain("<textarea");
   });
 });
 
@@ -293,7 +299,7 @@ describe("individual student actions",()=>{
   });
   it("links saved-action titles and review controls to their exact destinations",()=>{
     const html=renderToStaticMarkup(<LiveQuickWins connected actions={actions}/>);
-    expect(html).toContain('href="/student/assignments?assessment=returned" class="hover:underline">Revise English essay</a>');
+    expect(html).toContain('href="/student/assignments/returned" class="hover:underline">Revise English essay</a>');
     expect(html).toContain('href="/student/experiences?action=help" class="hover:underline">Check in with mentor</a>');
     expect(html).toContain('href="/student/experiences?action=help" class="text-xs font-semibold underline">Review action</a>');
   });
@@ -301,7 +307,7 @@ describe("individual student actions",()=>{
     const html=renderToStaticMarkup(<LiveQuickWins connected actions={actions} actionId="revision"/>);
     expect(html).toContain("Revise English essay");
     expect(html).not.toContain("Check in with mentor");
-    expect(html).toContain('href="/student/assignments?assessment=returned"');
+    expect(html).toContain('href="/student/assignments/returned"');
     expect(html).toContain("View all saved actions");
   });
   it("reports an unavailable action without displaying unrelated actions",()=>{
@@ -330,7 +336,7 @@ describe("individual student actions",()=>{
   });
   it("disables completion when the database connection is unavailable",()=>{
     const html=renderToStaticMarkup(<LiveQuickWins connected={false} actions={[actions[1]!]}/>);
-    expect(html).toMatch(/<button disabled=""[^>]*>Mark complete<\/button>/);
+    expect(html).toMatch(/<button[^>]*disabled=""[^>]*>Mark complete<\/button>/);
   });
 });
 
