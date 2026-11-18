@@ -14,11 +14,13 @@ import { AuthorizationError, type CommandContext } from "@/domain/command-contex
  * established by getCommandContext before entering this service.
  *
  * The restricted SQL function independently revalidates the SAME hashed
- * session, the original active CAN grant and Person, the independently reviewed Person mapping, exact shared Site UUID,
- * canonical staff grant and effective operating relationship.
+ * CAN session, active CAN grant, immutable public Person and exact owning
+ * Site/Organization. No separate canonical staff Person, grant or link exists.
+ * Sensitive publication and independent reviewer approvals are governed
+ * separately; a Site grant never implies those additional authorities.
  *
- * This service MUST NOT read canonical identities with the general/owner
- * DATABASE_URL, infer authorization from email or issue a second login.
+ * This service MUST NOT read identity records with the owner DATABASE_URL,
+ * infer authorization from email or issue a second login.
  */
 export async function resolveCanonicalSiteStaffFromCan(
   actor: AccessContext,
@@ -45,9 +47,14 @@ export async function resolveCanonicalSiteStaffFromCan(
   // The restricted projection must describe this exact verified CAN session.
   // A new selected role or logged-out session may not reuse another context.
   if (native.session_id !== actor.sessionId ||
+      native.account_id !== actor.accountId ||
+      native.grant_id !== actor.activeGrantId ||
+      native.person_id !== actor.actorPersonId ||
       native.role_code !== actor.role ||
-      !native.site_id || !actor.actorPersonId || !actor.grantSiteId) {
-    throw new AuthorizationError("current active CAN membership");
+      native.organization_id !== actor.scope.organizationIds?.[0] ||
+      native.site_id !== actor.grantSiteId ||
+      !actor.grantSiteId) {
+    throw new AuthorizationError("current exact CAN Site staff membership");
   }
   return projectCanonicalCommandContext(native);
 }
