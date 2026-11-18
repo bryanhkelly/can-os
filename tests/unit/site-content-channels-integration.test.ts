@@ -27,6 +27,23 @@ describe("Site-owned content source and publication contract",()=>{
     expect(service).toContain("if (current.revision !== input.expectedRevision)");
   });
 
+  it("keeps Site-first previews on the same approved parent, admissions and photo sources as Website Studio",()=>{
+    const launch=read("src/routes/launch.site-preview.ts");
+    const editor=read("src/modules/sites/site-website-preview.server.ts");
+    const publicReader=read("src/modules/sites/site-public-catalog.server.ts");
+    for(const source of [launch,editor,publicReader]){
+      expect(source).toContain("readApprovedPublicParentExtras(");
+      expect(source).toContain("withVerifiedPublicApplications(");
+      expect(source).toContain("projectApprovedParentInformation(");
+      expect(source).toContain("readApprovedSchoolSitePhotos(");
+      expect(source).toContain("projectApprovedSchoolSiteMedia(");
+      expect(source).toContain("projectSiteEnrollmentOpportunities(");
+    }
+    expect(launch).toContain("parentInformation,media");
+    expect(editor).toContain("parentInformation, media");
+    expect(publicReader).toContain("publishedWebsiteContentChannels");
+  });
+
   it("uses source-bound blocks rather than arbitrary URLs or approved-Program writes",()=>{
     const config=read("src/domain/site-content-channels.ts");
     const editor=read("src/components/launch-studio/SiteContentChannelEditor.tsx");
