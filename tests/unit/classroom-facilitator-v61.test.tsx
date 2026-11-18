@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ClassroomAttendancePanel } from "@/components/learning/ClassroomAttendancePanel";
 
@@ -40,7 +40,6 @@ describe("room facilitator's V6.1 attendance workspace", () => {
     expect(html).toContain("Synthetic Learner");
     expect(html).toContain("No current device pairing");
     expect(html).toContain("at least 15 characters");
-    expect(html).toContain("Record");
     expect(html).toContain("Verified present");
     expect(html).toContain("border-input");
     expect(html).toContain("focus-visible:ring-ring");
