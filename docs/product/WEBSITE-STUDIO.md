@@ -126,6 +126,50 @@ CAN OS forms and publishing gates remain authoritative.
 - Published page HTML must use the canonical public-safe Site/Program projection and shared renderer, not student/guardian private information.
 - Public host reachability requires separate HTTPS/DNS/TLS verification. In-app published status alone does **not** imply public reachability, functioning inquiry/admissions or authority to operate a school.
 
+## Launch configuration to public website mapping (November 17, 2026)
+
+The Website Studio school-story step now reuses the existing
+`SiteContentChannelEditor` from Launch Studio. Both entry points edit the same
+`sites.metadata.websiteContentChannels` document. No second CMS, enrollment
+store, or copy of Program/Class information is created.
+
+- **Canonical school profile:** the Site name and responsible organization
+  come from `sites` / `organizations`. Address and school contact remain
+  withheld until their source-revision-checked identity review is approved.
+- **Private setup:** site classification, host-church reference, planned
+  location, intended delivery and learning interests are available only
+  to authorized setup/editor preview surfaces. They do not become public
+  Program, affiliation or opening claims.
+- **Approved learning:** the academic, enrichment, noncredit Course and
+  native Class readers supply independently eligible listings and verified
+  next actions. A publisher changes the display, not enrollment authority.
+- **Website-local content:** templates, palettes, typography, copy, rights-
+  checked photographs and their revisions remain in the versioned Site
+  content record. Private and held-for-review versions are not live content.
+- **Content layout:** a private channel save is distinct from publishing
+  `sites.metadata.publishedWebsiteContentChannels`. Reentry can publish
+  an already-saved layout, but not unsaved local edits; step changes warn
+  when channel configuration is dirty.
+- **All approved previews:** the Site-first Launch, authorized Website Studio,
+  and institutional publisher previews use the same approved public parent
+  information, media, enrollment opportunity and published content sources
+  as their corresponding public view. Preview-only setup cards do not leak
+  into anonymous pages.
+
+The Website Studio review screen exposes a read-only source-mapping panel with
+source, saved/review status, public eligibility and configuration revisions,
+using the existing V6.1 workspace primitives.
+
+A published Class link is `/class?classId=<UUID>` under the validated
+CAN application origin; the renderer now recognizes that exact service route
+rather than the retired `/learn/classes` path.
+
+**Validation scope:** Source changes and focused regression assertions are
+committed on `main`. There has been no successful local typecheck, Vitest,
+Cloudflare build or authenticated browser acceptance in this pass. GitHub
+Actions and Netlify are not considered evidence of release readiness while
+account billing blocks them. Verify a specific deployed commit independently.
+
 ## Current implementation pointers
 
 - Studio route: `src/routes/launch.website.tsx` delegates to the same Website Home as `src/routes/site-website.tsx`.
