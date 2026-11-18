@@ -22,14 +22,31 @@ export function canOpenScheduledClassroom(start:Date,end:Date,now:Date):boolean{
 /** Four classroom meetings at the same local wall-clock time, including across DST.
  * The browser converts these local dates to instants; the server rechecks each.
  */
-export function fourWeeklyClassroomWindows(startLocal:string,endLocal:string){
-  const start=new Date(startLocal),end=new Date(endLocal);
-  if(!Number.isFinite(start.getTime())||!Number.isFinite(end.getTime())||
-    end.getTime()<=start.getTime())throw new Error("Invalid first classroom meeting");
-  return Array.from({length:4},(_,week)=>{
-    const startsAt=new Date(start),endsAt=new Date(end);
-    startsAt.setDate(start.getDate()+7*week);
-    endsAt.setDate(end.getDate()+7*week);
-    return {startsAt:startsAt.toISOString(),endsAt:endsAt.toISOString()};
+export type FourSessionCadence = "weekly" | "twice-weekly";
+
+/**
+ * Convenience dates, not an authoritative cadence requirement. Operators can
+ * edit each session afterward to skip holidays or change meeting times.
+ * Calendar-date addition preserves local wall-clock time across DST.
+ */
+export function fourSessionSchedulePreset(
+  startLocal: string, endLocal: string, cadence: FourSessionCadence,
+) {
+  const start = new Date(startLocal);
+  const end = new Date(endLocal);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) ||
+    end.getTime() <= start.getTime()) throw new Error("Invalid first classroom meeting");
+  const offsets = cadence === "weekly" ? [0, 7, 14, 21] : [0, 3, 7, 10];
+  return offsets.map(days => {
+    const startsAt = new Date(start);
+    const endsAt = new Date(end);
+    startsAt.setDate(start.getDate() + days);
+    endsAt.setDate(end.getDate() + days);
+    return { startsAt: startsAt.toISOString(), endsAt: endsAt.toISOString() };
   });
+}
+
+/** Backward-compatible weekly convenience for existing callers and tests. */
+export function fourWeeklyClassroomWindows(startLocal: string, endLocal: string) {
+  return fourSessionSchedulePreset(startLocal, endLocal, "weekly");
 }
