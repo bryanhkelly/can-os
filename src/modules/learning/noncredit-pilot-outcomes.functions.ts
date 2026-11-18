@@ -12,7 +12,7 @@ import {
   noncreditSelfEnrollmentClaims,noncreditSelfEnrollmentReleases,
 } from "@/db/canonical-v301";
 import {
-  summarizeNoncreditPilot,publicationSafePilotSummary,
+  summarizeNoncreditPilot,publicationSafePilotSummary,attributableNoncreditFeedback,
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
@@ -270,8 +270,12 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         completedLessonCount:doneLessons.size,totalLessonCount:relevantLessons.size,
         knowledgeSubmitted:hasSubmitted,
         knowledgeResult:passed?"pass":finalResults[0]?.outcome??null,
-        surveySubmitted:surveyKey!==null&&registrationCounts.get(surveyKey)===1&&
-          !!feedbackSubmittedAt&&feedbackSubmittedAt>=reg.registeredAt,
+        surveySubmitted:attributableNoncreditFeedback({
+          offeringId:offeringId??null,
+          registrationsForPersonOffering:surveyKey?registrationCounts.get(surveyKey)??0:0,
+          registeredAt:reg.registeredAt,
+          latestSubmittedAt:feedbackSubmittedAt??null,
+        }),
         completionRecorded:currentDecision?.outcome==="completed",
         baselineFraction:paired?Number(firstBaseline.earned)/Number(firstBaseline.possible):null,
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
