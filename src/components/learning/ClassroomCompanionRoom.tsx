@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { accessClientInstance } from "@/domain/session-client";
 import {
   getClassroomLearnerActivities, recordClassroomPresence,
@@ -123,9 +124,9 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
           </fieldset>
           :<label className="block text-sm">
             Your response
-            <textarea maxLength={1000} value={answers[activity.id]??""}
+            <Textarea maxLength={1000} value={answers[activity.id]??""}
               onChange={e=>setAnswers(prev=>({...prev,[activity.id]:e.target.value}))}
-              className="mt-1 w-full border border-border bg-background p-3" rows={3}/>
+              className="mt-1" rows={3}/>
           </label>}
         <Button disabled={!online||!!busy||!(answers[activity.id]??"").trim()}>
           {busy===activity.id?"Saving…":"Submit response"}
