@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
-import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
+import { WorkspaceShell, MutationFeedback, QueryState, EmptyState, WorkspaceNotice, RecordFacts } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import {
@@ -93,15 +93,19 @@ function PublicSelfEnrollment() {
               placeholder="Digital skills, church, city…"
               className="mt-2 min-h-11"/>
           </Label>
-          {catalog.isPending && <p role="status" className="mt-5 text-sm">Loading published enrollment opportunities…</p>}
-          {catalog.isError && <p role="alert" className="mt-5 text-sm">Enrollment availability is temporarily unavailable. <Button type="button" variant="ghost" size="sm" onClick={()=>void catalog.refetch()} className="font-semibold text-primary underline">Try again</Button></p>}
-          {catalog.data && catalog.data.items.length===0 && <p role="status" className="mt-5 border border-border bg-muted/30 p-4 text-sm">
-            {catalog.data.nextCursor
-              ? "No available training was found in this segment. Select More training to continue browsing approved opportunities."
-              : term
-                ? "No available training matches this search. Try another program, provider or location."
-                : "No noncredit programs are accepting self-registration right now. Providers must publish their courses and enrollment releases before registration can open."}
-          </p>}
+          <QueryState
+            loading={catalog.isPending?"Loading published enrollment opportunities…":undefined}
+            error={catalog.isError?"Enrollment availability is temporarily unavailable.":undefined}
+            onRetry={()=>void catalog.refetch()} retrying={catalog.isFetching}/>
+          {catalog.data && catalog.data.items.length===0 && <EmptyState kind="matches" className="mt-5"
+            title={term?"No matching training":"No training accepting registration"}
+            description={catalog.data.nextCursor
+              ?"No available training in this segment. Select More training to continue."
+              :term?"Try a different program, provider or location."
+              :"Providers must publish an approved enrollment release before registration opens."}
+            actions={<Link to="/class" search={{}} className="font-semibold text-primary underline underline-offset-4">
+              Browse published Classes
+            </Link>}/>} 
           {catalog.data && catalog.data.items.length>0 && <div className="mt-4">
             <Label className="block text-sm font-semibold" htmlFor="noncredit-release">Published training</Label>
             <Select id="noncredit-release" value={search.release??""}
@@ -135,8 +139,17 @@ function PublicSelfEnrollment() {
               }}>More training</Button>
           </nav>}
           {search.release&&linkedRelease.isError&&
-            <p role="alert" className="mt-4 text-sm">This specific training could not be checked for current availability.</p>}
+            <WorkspaceNotice tone="attention" className="mt-4">
+              <span>Unable to verify this training's current published terms.</span>
+              <Button type="button" size="sm" variant="outline" className="ml-3"
+                onClick={()=>void linkedRelease.refetch()}>Retry training lookup</Button>
+            </WorkspaceNotice>
         </section>
+        {waitlistUnavailable&&<WorkspaceNotice tone="attention">
+          <span>Your waiting-list or reserved-invitation status could not be verified. Enrollment is paused to prevent an incorrect request.</span>
+          <Button type="button" size="sm" variant="outline" className="ml-3"
+            onClick={()=>void waiting.refetch()}>Retry status check</Button>
+        </WorkspaceNotice>}
         {selected && <SelfEnrollmentActionForm
           key={selected.id+":"+selected.consentSha256}
           release={selected} signedIn={session?.authenticated===true}
@@ -250,12 +263,13 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
   return <section className="border border-border bg-card p-5" aria-labelledby="enroll-course-heading">
     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Enrollment confirmation</p>
     <h2 id="enroll-course-heading" className="mt-2 font-serif text-2xl">{release.title}</h2>
-    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-      <div><dt className="text-xs text-muted-foreground">Provider</dt><dd className="font-medium">{release.provider}</dd></div>
-      <div><dt className="text-xs text-muted-foreground">Delivery</dt><dd className="font-medium">{release.deliveryMode==="facilitated"?"Facilitated group · "+(release.siteName??"Site"):"Independent online"}</dd></div>
-      <div><dt className="text-xs text-muted-foreground">Instruction</dt><dd className="font-medium">{release.requiredMinutes} minutes</dd></div>
-      <div><dt className="text-xs text-muted-foreground">Remaining places</dt><dd className="font-medium">{release.seatsRemaining}</dd></div>
-    </dl>
+    <RecordFacts label="Training enrollment details" className="mt-4" items={[
+      {label:"Provider",value:release.provider},
+      {label:"Delivery",value:release.deliveryMode==="facilitated"
+        ?"Facilitated group · "+(release.siteName??"approved Site"):"Independent online"},
+      {label:"Instruction",value:release.requiredMinutes+" minutes"},
+      {label:"Unreserved places",value:String(release.seatsRemaining)},
+    ]}/>
     {release.deliveryMode==="facilitated"&&<section className="mt-5 border-t border-border pt-4" aria-label="Class schedule">
       <h3 className="text-sm font-semibold">Scheduled class meetings</h3>
       <p className="mt-2 text-xs text-muted-foreground">Meeting times are shown in your device\'s timezone. Confirm the onsite schedule with the hosting location.</p>
@@ -267,7 +281,9 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
             <time dateTime={meeting.endsAt}>{hydrated?new Date(meeting.endsAt).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}):"Loading local end time…"}</time>
           </li>)}
         </ol>:
-        <p className="mt-2 text-sm text-muted-foreground">No dated meetings have been attached to this cohort. Ask the hosting Site for its schedule before registering.</p>}
+        <WorkspaceNotice tone="attention" className="mt-2">
+          No dated meetings have been published for this cohort. Confirm the schedule with the hosting Site before registering.
+        </WorkspaceNotice>}
       {release.schedulePartial&&<p className="mt-2 text-xs text-muted-foreground">Additional meeting dates are available from the Site.</p>}
     </section>}
     {signedIn&&!isStudent&&<AffiliateAttributionSelector releaseId={release.id} onMembershipChange={onMembershipChange}/>}
@@ -337,7 +353,7 @@ function AffiliateAttributionSelector({releaseId,onMembershipChange}:{
     <p className="mt-2 text-xs leading-5 text-muted-foreground">
       You can credit a participating church or community organization while taking this
       course online. This is your own statement, not proof of individual membership.
-      Leave this blank to record your participation at the provider's Site.
+      Leave this blank to credit the provider by default; a location is not inferred.
     </p>
     <Label htmlFor="affiliate-search" className="mt-3 block text-sm font-medium">
       Search approved participating organizations
