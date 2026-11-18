@@ -22,7 +22,7 @@ import { activeRoleAssignmentPredicate } from "@/modules/identity/role-assignmen
 import { and, asc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import { EventTypes } from "@/domain/event-types";
-import { safeReadSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
+import { readPublishedSiteContentChannelConfig, resolveSiteContentBlocks } from "@/domain/site-content-channels";
 import { readOptionalSiteNoncreditReleases } from "./site-noncredit-releases.server";
 import { readOptionalSitePublishedClasses } from "./site-published-classes.server";
 import { noncreditEnrollmentOrigin } from "@/domain/site-noncredit-public";
@@ -124,7 +124,7 @@ export async function getSitePublicationDraft(actor: AccessContext, siteId: stri
     academicPrograms:authorizedPrograms,enrichment:publicOfferings,
     noncredit:noncreditReleases,classes,enrollmentOrigin:enrollmentAppOrigin,
   });
-  const contentConfig=safeReadSiteContentChannelConfig(
+  const contentConfig=readPublishedSiteContentChannelConfig(
     siteConfiguration?.metadata?.publishedWebsiteContentChannels);
   const contentBlocks=resolveSiteContentBlocks(contentConfig,{
     mode:"public",academicPrograms:authorizedPrograms,enrichment:publicOfferings,
