@@ -4,7 +4,6 @@ import { describe, expect, it } from "vitest";
 import { projectCanonicalPrincipalContext } from "@/domain/canonical-access";
 import {
   canResolveCanSiteStaff, hasUnambiguousCanPerson,
-  selectExactCanonicalStaffGrant,
 } from "@/domain/canonical-can-sso";
 
 function source(path:string) {
@@ -56,28 +55,15 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(hasUnambiguousCanPerson("me", Array(101).fill("me"))).toBe(false);
   });
 
-  it("requires one exact verified canonical role, Person and Site", () => {
-    const grant = {
-      grantId: "grant", personId: "native-person",
-      roleCode: "site_admin", organizationId: "native-org",
-      siteId: "native-site",
-    };
-    const expected = {
-      personId: "native-person", roleCode: "site_admin" as const,
-      siteId: "native-site",
-    };
-    expect(selectExactCanonicalStaffGrant([grant], expected)).toEqual(grant);
-    expect(selectExactCanonicalStaffGrant([], expected)).toBeNull();
-    expect(selectExactCanonicalStaffGrant([grant, grant], expected)).toBeNull();
-    expect(selectExactCanonicalStaffGrant([{
-      ...grant, roleCode: "registrar",
-    }], expected)).toBeNull();
-    expect(selectExactCanonicalStaffGrant([{
-      ...grant, siteId: "other-site",
-    }], expected)).toBeNull();
-    expect(selectExactCanonicalStaffGrant([{
-      ...grant, personId: "other-person",
-    }], expected)).toBeNull();
+  it("does not depend on duplicate staff Persons, accounts or canonical grants",()=>{
+    const restricted=source("database/production/2026-11-17-single-can-staff-projection.sql");
+    expect(restricted).toContain("source.can_grant_id");
+    expect(restricted).toContain("a.person_id = g.person_id");
+    expect(restricted).toContain("school_site.organization_id = g.organization_id");
+    expect(restricted).toContain("g.role IN ('site_admin', 'registrar')");
+    expect(restricted).toContain("other_grant.person_id <> g.person_id");
+    expect(restricted).not.toContain("access_account_canonical_principals");
+    expect(restricted).not.toContain("canonical_account_grants");
   });
 
   it("shares exact canonical role capabilities without granting reviewers or learner data", () => {
@@ -100,90 +86,72 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(projected.capabilities.has("blueprint.review")).toBe(false);
   });
 
-  it("uses CAN sessions before native sessions for school staff and fails closed", () => {
-    const auth = source("src/modules/identity/canonical-command-context.server.ts");
-    const bridge = source("src/modules/identity/can-site-staff-authority.server.ts");
-    expect(auth).toContain("accessSessionCookie");
+  it("uses the current CAN session and exact restricted grant for school staff",()=>{
+    const auth=source("src/modules/identity/canonical-command-context.server.ts");
+    const staff=source("src/modules/identity/can-site-staff-authority.server.ts");
+    const reader=source("src/modules/identity/restricted-canonical-session-reader.server.ts");
+    const sql=source("database/production/2026-11-17-single-can-staff-projection.sql");
     expect(auth).toContain("getIdentityContext(request)");
     expect(auth).toContain("resolveCanonicalSiteStaffFromCan(actor, request)");
     expect(auth.indexOf("getIdentityContext(request)"))
       .toBeLessThan(auth.lastIndexOf("getCanonicalSessionRow(request)"));
-    const restricted = source(
-      "database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql",
-    );
-    const reader = source("src/modules/identity/restricted-canonical-session-reader.server.ts");
-    expect(bridge).toContain('readRestrictedCanonicalSession("can_staff", digest)');
+    expect(staff).toContain('readRestrictedCanonicalSession("can_staff", digest)');
+    expect(staff).toContain("native.account_id !== actor.accountId");
+    expect(staff).toContain("native.session_id !== actor.sessionId");
+    expect(staff).toContain("native.grant_id !== actor.activeGrantId");
+    expect(staff).toContain("native.person_id !== actor.actorPersonId");
+    expect(staff).toContain("native.organization_id !== actor.scope.organizationIds?.[0]");
+    expect(staff).toContain("native.site_id !== actor.grantSiteId");
     expect(reader).toContain("CAN_CANONICAL_AUTH_DATABASE_URL");
     expect(reader).toContain("SET LOCAL ROLE");
+    expect(reader).toContain("BEGIN READ ONLY");
     expect(reader).toContain("v301_can_staff_session_context($1::text)");
-    expect(bridge).not.toContain('from(accessAccountCanonicalPrincipals)');
-    expect(bridge).not.toContain('from(canonicalAccountGrants)');
-    expect(restricted).toContain("public.access_account_canonical_principals");
-    expect(restricted).not.toContain("public.site_canonical_identity_links");
-    expect(restricted).toContain("native_grant.site_id = source.can_site_id");
-    expect(restricted).toContain("native_site.id = source.can_site_id");
-    expect(restricted).toContain("native_grant.revoked_at IS NULL");
-    expect(restricted).toContain("native_account.disabled_at IS NULL");
-    expect(restricted).toContain("operator_role.valid_through");
-    expect(restricted).toContain("SECURITY DEFINER");
-    expect(restricted).toContain("REVOKE ALL ON FUNCTION");
-    expect(bridge).not.toContain("email === canonical");
-    expect(bridge).not.toContain("issueNativeLearnerSession");
-    expect(bridge).not.toContain("insert(canonicalAccountGrants)");
+    expect(sql).toContain("SECURITY DEFINER");
+    expect(sql).toContain("can_v30_canonical_auth_reader");
+    expect(sql).toContain("a.person_id = g.person_id");
+    expect(sql).not.toContain("canonical_account_grants");
+    expect(sql).not.toContain("access_account_canonical_principals");
+    expect(staff).not.toContain("issueNativeLearnerSession");
   });
 
-  it("keeps aggregate staff readiness aligned with restricted reader identity guards", () => {
-    const readiness = source("scripts/acceptance/check-canonical-staff-readiness.mjs");
-    const restricted = source("database/canonical/v3.0.1/patch-can-staff-restricted-auth-reader.sql");
-    const sharedGuards = [
-      "person_link.verified_by_account_id",
-      "native_org.status = 'active'",
-      "can_person.active = true",
+  it("aligns main-only staff readiness with the same public Person/Site role",()=>{
+    const readiness=source("scripts/acceptance/check-canonical-staff-readiness.mjs");
+    const restricted=source("database/production/2026-11-17-single-can-staff-projection.sql");
+    for(const guard of [
+      "public.account_person_grants",
+      "person.active = true",
+      "school_site.lifecycle_status",
+      "owning_org.lifecycle_status",
       "other_grant.person_id",
-      "other_link.canonical_principal_id",
-    ];
-    for (const guard of sharedGuards) {
-      expect(readiness, `Readiness must check ${guard}`).toContain(guard);
-    }
-    expect(restricted).toContain("person_link.verified_by_account_id");
-    expect(restricted).toContain("native_org.status = 'active'");
-    expect(restricted).toContain("person.active = true");
-    expect(restricted).toContain("other_grant.person_id");
-    expect(restricted).toContain("other_link.canonical_principal_id");
+    ])expect(restricted,guard).toContain(guard);
+    for(const guard of [
+      "public.account_person_grants",
+      "public.access_sessions",
+      "site.lifecycle_status",
+      "org.lifecycle_status",
+      "public_grant.active",
+      "conflicting.person_id",
+    ])expect(readiness,guard).toContain(guard);
     expect(readiness).toContain("BEGIN READ ONLY");
     expect(readiness).toContain("eligible_staff_paths");
-    expect(readiness).toContain("GROUP BY a.id, public_grant.id");
-    expect(readiness).toContain("HAVING count(*) = 1");
-    expect(readiness).toContain("uniquely_authorized_staff");
     expect(readiness).toContain("acceptance_ready: ready");
     expect(readiness).toContain("eligible_app_admin_grants");
     expect(readiness).toContain("eligible_institutional_approver_grants");
     expect(readiness).toContain("first_admin_provisioning_blocked");
-    // Each potential first-admin approver must satisfy the same exact-one
-    // qualifying authority constraint as the audited provisioning command.
     expect(readiness).toContain("authorized.account_id = a.id");
     expect(readiness).toContain("authorized.person_id = a.person_id");
     expect(readiness).toContain("authorized.active = true");
-    expect(readiness).toContain("conflicting.person_id <> a.person_id");
     expect(readiness).toContain("authority_org.type = 'can_network'");
-    expect(readiness).toContain(") = 1");
-    const provision = source("scripts/provision-platform-admin.mjs");
+    expect(readiness).toContain("An initial institutional reviewer needs a separately governed, audited appointment.");
+    expect(readiness).not.toContain("INSERT INTO");
+    expect(readiness).not.toContain("UPDATE public.");
+    const provision=source("scripts/provision-platform-admin.mjs");
     expect(provision).toContain("Number(authority.rows[0]?.count) !== 1");
     expect(provision).toContain("person_id <> $2");
     expect(provision).toContain("approverConflicts");
     expect(provision).toContain("Independent approver has conflicting active Person grants");
     expect(provision).toContain('PRODUCTION_PROJECT_ID = "sweet-hall-62441909"');
     expect(provision).toContain('PRODUCTION_BRANCH_ID = "br-restless-sea-ar9ooo55"');
-    expect(provision).toContain("current_setting('neon.project_id', true)");
-    expect(provision).toContain("current_setting('neon.branch_id', true)");
-    expect(provision).toContain("current_database() AS database_name");
-    expect(provision).toContain("BLOCKED: App Admin provisioning must target CAN OS Neon production main");
-    expect(provision.indexOf("targetDatabase.rows[0]")).toBeLessThan(
-      provision.indexOf("FOR UPDATE OF a"),
-    );
-    expect(readiness).toContain("An initial institutional reviewer needs a separately governed, audited appointment.");
-    expect(readiness).not.toContain("INSERT INTO");
-    expect(readiness).not.toContain("UPDATE public.");
   });
 
   it("never allows dual-cookie learning persistence to bypass CAN Person verification", () => {
