@@ -11,6 +11,8 @@ import { TeacherConferencePanel } from "@/components/teacher/TeacherConferencePa
 import { TeacherFirstWeekCard } from "@/components/teacher/TeacherFirstWeekCard";
 import { TeacherDaySchedule } from "@/components/teacher/TeacherDaySchedule";
 import { StatCard, EmptyState } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { AttentionQueue } from "@/components/operations/AttentionQueue";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
@@ -95,23 +97,26 @@ function TeacherTodayView({ data, gradeAction }: { data: Today; gradeAction?: st
      <StatCard asChild label="Guardian questions" value={gradeQuestions===null?"…":gradeQuestions.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length}><a href="#grade-follow-ups" /></StatCard>
     </div>
 
-    <section className="mt-7 rounded-2xl border border-border/70 bg-card p-5 shadow-sm" aria-label="Teaching next actions">
-      <h2 className="font-serif text-2xl font-semibold">What needs you next</h2>
+    <DashboardPanel title="What needs you next" className="mt-7">
       {data.ungradedCount>0 ? <div className="mt-3">
         <p className="font-semibold">{data.ungradedCount} submitted work item{data.ungradedCount===1?"":"s"} to review</p>
         <p className="mt-1 text-sm text-muted-foreground">Start with a submission from your current assigned sections.</p>
-        <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId,student:data.ungraded[0]!.studentProfileId}}
-          className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Grade next submission <ArrowUpRight className="ml-2 size-4"/></Link>
+        <Button asChild size="lg" className="mt-3">
+          <Link to="/teacher/gradebook" search={{section:data.ungraded[0]!.sectionId,assessment:data.ungraded[0]!.assessmentId,student:data.ungraded[0]!.studentProfileId}}>
+            Grade next submission <ArrowUpRight aria-hidden="true" className="size-4"/>
+          </Link>
+        </Button>
       </div> : data.missingWorkCount>0 ? <div className="mt-3">
         <p className="font-semibold">{data.missingWorkCount} missing-work follow-up{data.missingWorkCount===1?"":"s"}</p>
         <p className="mt-1 text-sm text-muted-foreground">Review missing work and follow up with students through the existing teacher workflow.</p>
-        <Link to="/teacher/missing-work" className="mt-3 inline-flex min-h-11 items-center rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">Review missing work <ArrowUpRight className="ml-2 size-4"/></Link>
+        <Button asChild size="lg" className="mt-3">
+          <Link to="/teacher/missing-work">Review missing work <ArrowUpRight aria-hidden="true" className="size-4"/></Link>
+        </Button>
       </div> : <div className="mt-3">
         <p className="text-sm text-muted-foreground">No grading or missing-work items in the current snapshot. Review your schedule and prepare your next class.</p>
         <Link to="/classes" className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold underline">Open my classes →</Link>
       </div>}
-    </section>
-
+    </DashboardPanel>
 
     <section className="mt-10">
      <p className="text-xs font-bold uppercase tracking-eyebrow text-muted-foreground">My sections</p>
