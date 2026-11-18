@@ -140,7 +140,7 @@ try {
             AND native_grant.active AND native_grant.revoked_at IS NULL
            JOIN education_v30.canonical_accounts native_account
              ON native_account.id = native_grant.account_id
-           JOIN education_v30.organizations native_org
+           JOIN public.organizations native_org
              ON native_org.id = native_grant.organization_id
            JOIN public.people can_person
              ON can_person.id = public_grant.person_id
@@ -149,7 +149,7 @@ try {
             AND a.email_normalized NOT LIKE '%.demo'
             AND native_account.disabled_at IS NULL
             AND native_account.email_verified_at IS NOT NULL
-            AND native_org.status = 'active'
+            AND native_org.lifecycle_status = 'active'
             AND can_person.active = true
             AND public_site.lifecycle_status IN ('planning','active')
             AND NOT EXISTS (
