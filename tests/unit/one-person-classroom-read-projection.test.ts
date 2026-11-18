@@ -25,11 +25,12 @@ describe("one authoritative Person for classroom attendance",()=>{
     expect(ddl).not.toMatch(/DROP TABLE\s+|CASCADE\s*;/i);
   });
 
-  it("does not authorize activating the staged 239 Person FK cutover prematurely",()=>{
+  it("keeps the staged remaining Person FK cutover behind independent release approval",()=>{
     const ddl=source("database/production/2026-11-17-stage-unified-person-fk-rebind.sql");
     expect(ddl).toContain("can.one_person_runtime_cutover_verified");
     expect(ddl).toContain("can.one_person_fk_rebind_approved");
     expect(ddl).toContain("Native Person FK graph changed");
+    expect(ddl).toContain("IF old_count <> 63 THEN");
     expect(ddl).toContain("historical");
   });
   it("keeps guardian identity on the verified CAN Person and verifies child authority separately",()=>{
@@ -43,6 +44,29 @@ describe("one authoritative Person for classroom attendance",()=>{
     expect(guardian).toContain("guardianAuthorities.endsAt");
     expect(guardian).toContain("age<0||age>=18");
     expect(guardian).not.toContain("accessAccountCanonicalPrincipals");
+  });
+
+  it("preserves staff audit/approver FK semantics while moving actors to public People",()=>{
+    const files=[
+      "database/production/2026-11-17-rebind-30-actor-person-fks.sql",
+      "database/production/2026-11-17-rebind-30-more-actor-person-fks.sql",
+      "database/production/2026-11-17-rebind-actor-person-fks-batch-3.sql",
+      "database/production/2026-11-17-rebind-final-18-actor-person-fks.sql",
+      "database/production/2026-11-17-rebind-67-audit-facilitator-reviewer-person-fks.sql",
+    ];
+    for(const file of files){
+      const ddl=source(file);
+      expect(ddl).toContain("REFERENCES public.people(id)");
+      expect(ddl).toContain("current_setting('neon.branch_id',true)");
+      expect(ddl).toContain("education_v30.persons");
+      expect(ddl).not.toMatch(/DROP TABLE\\b|CASCADE\\s*;/i);
+    }
+    const final=source(files[4]);
+    expect(final).toContain("learner, guardian");
+    expect(final).toContain("ON DELETE");
+    const runtime=source("scripts/acceptance/check-main-one-person-runtime.mjs");
+    expect(runtime).toContain("critical_shared_actor_fks");
+    expect(runtime).toContain("public_people_rls_forced");
   });
 
   it("fails the main cutover until second Person writers and native cookie paths retire",()=>{
