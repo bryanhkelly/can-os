@@ -776,3 +776,39 @@ component TSX files were fetched from main and passed direct raw-control and
 rounded-utility scans. This is not a substitute for typecheck, accessibility,
 tests, visual comparison or role-based live acceptance. No production
 database records or schemas were modified by these UI changes.
+
+
+### November 17 continuation: publisher, attendance and admissions workflows
+
+Source migration now covers the composing publisher authoring components:
+`ProviderVideoUploadForm`, `PublisherCourseActivityEditor`,
+`PublisherTeacherGuideEditor`, `PublisherPackComposer` and `CurriculumEditor`.
+These now share Input, Select, Textarea, Label, Checkbox and Button rather
+than recreating browser controls or radius/spacing styles in each feature.
+Controls are tied to the existing publisher-owned drafts, immutable version
+releases, enrollment permissions, protected teacher-only guidance and
+publication approval. No alternate curriculum/publishing subsystem added.
+
+`/staff/attendance` now uses shared form controls and semantic attendance
+status Button variants for expected rosters, offline reconciliation,
+corrections and independently reviewed guardian excuses. The queue and
+attendance evidence commands were not changed.
+
+Admissions capacity, intake and invitation routes now use shared notices,
+empty states and outline action variants. The entire current 14-component
+`src/components/admissions/` family is directly source-clean for raw
+visible form controls and rounded geometry, including guardian-relationship
+verification, intake decisions, capacity, invitation retries, public
+interest and secure transfer transcripts. The transcript uses the canonical
+accessible Table and still relies on the receiving school's exact
+consent/issuer grant.
+
+New code required no route manifest or JSX-fragment assertions. The
+automatically discovered design audit remains the single source rule.
+
+**Verification:** The 23 changed/reviewed publisher, operations, admissions
+route and component source files were fetched from main; all passed direct
+native-control, rounded-class and basic JSX tag-shape checks. This is **not**
+the equivalent of TypeScript compilation, automated tests, visual or
+accessibility acceptance. Those execution checks remain outstanding,
+and no production database data or schema was modified.
