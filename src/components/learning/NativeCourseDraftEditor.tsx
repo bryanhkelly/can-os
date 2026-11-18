@@ -100,6 +100,10 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
     retry:false,
   });
   const [busy,setBusy]=useState(false);
+  const [assetUses,setAssetUses]=useState<Array<{
+    assetVersionId:string;
+    usageKind:"required_instruction"|"supporting"|"accessibility"|"assessment";
+  }>>([]);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
   async function submit(){
@@ -107,10 +111,12 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
     setBusy(true);setNotice("");setError("");
     try{
       const response=await submitNativeOfferingRelease({data:{
-        offeringVersionId,expectedHash:current.data.manuscriptHash,
+        offeringVersionId,expectedHash:current.data.manuscriptHash,assets:assetUses,
       }});
-      setNotice(response.created?"Submitted unchanged native Course composition for independent review.":
-        "This exact Course composition has already been submitted.");
+      setNotice(response.created?(assetUses.length
+        ?"Submitted exact published assets and native Course composition for independent release review."
+        :"Submitted native Course manuscript for independent review."): 
+        "This exact native release snapshot was already submitted.");
       await Promise.all([
         client.invalidateQueries({queryKey:["native-offering-release-overview",offeringVersionId]}),
         client.invalidateQueries({queryKey:["native-offering-release-review-queue"]}),
@@ -132,12 +138,68 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
           ? "Current manifest: "+current.data.manifest.status
           :current.data.manifest?"Previous review snapshot is stale.":"Not yet submitted for review."}
       </p>
-      {current.data.lifecycle==="draft"&&
+      {current.data.lifecycle==="draft"&&<>
+        <div className="mt-4 border border-border p-3">
+          <h4 className="font-semibold">Reviewed publisher assets</h4>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Optional while reviewing the Course manuscript. For final Offering release,
+            select immutable, published assets with current independent academic,
+            accessibility and rights approval. The server rechecks every asset.
+          </p>
+          {current.data.assetsLimited&&<p role="alert" className="mt-2 text-xs">
+            The published asset inventory is limited to 100 records. Do not treat this as complete.
+          </p>}
+          {current.data.availableAssets.length===0&&<p className="mt-2 text-xs">
+            No publisher-owned published assets are available. The Course manuscript may
+            still be submitted for independent review.
+          </p>}
+          <div className="mt-3 grid gap-2">
+            {current.data.availableAssets.map(asset=>{
+              const selected=assetUses.find(item=>item.assetVersionId===asset.id);
+              return <div key={asset.id} className="grid gap-2 border border-border p-3 sm:grid-cols-[1fr_auto]">
+                <div>
+                  <p className="font-medium">{asset.title}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {asset.kind} · {asset.sha256?.slice(0,12)??"Missing hash"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selected&&<Select aria-label={`Asset use for ${asset.title}`}
+                    value={selected.usageKind} onChange={event=>setAssetUses(current=>
+                      current.map(item=>item.assetVersionId===asset.id
+                        ?{...item,usageKind:event.target.value as typeof item.usageKind}:item))}>
+                    <option value="required_instruction">Required instruction</option>
+                    <option value="supporting">Supporting</option>
+                    <option value="accessibility">Accessibility</option>
+                    <option value="assessment">Assessment</option>
+                  </Select>}
+                  <Button type="button" variant="outline" aria-pressed={Boolean(selected)}
+                    disabled={busy||(!selected&&assetUses.length>=50)}
+                    onClick={()=>setAssetUses(current=>selected?
+                      current.filter(item=>item.assetVersionId!==asset.id):
+                      [...current,{assetVersionId:asset.id,usageKind:"required_instruction"}])}>
+                    {selected?"Remove":"Select"}
+                  </Button>
+                </div>
+              </div>;
+            })}
+          </div>
+        </div>
+        {assetUses.length>0&&!current.data.releasePoliciesComplete&&
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            An independent publisher reviewer must define the release requirements
+            for every Course before an asset-backed snapshot can be submitted.
+          </p>}
         <Button className="mt-3" type="button" variant="outline"
-          disabled={busy||Boolean(current.data.manifest?.current)}
+          disabled={busy||(assetUses.length>0&&!current.data.releasePoliciesComplete)||
+            Boolean(current.data.manifest?.current&&
+              (assetUses.length===0?current.data.manifest.assetCount===0:false))}
           onClick={()=>void submit()}>
-          {busy?"Submitting…":"Submit native Course and Offering for independent review"}
-        </Button>}
+          {busy?"Submitting…":assetUses.length?
+            `Submit ${assetUses.length} reviewed asset(s) for Offering release`:
+            "Submit native Course manuscript for independent review"}
+        </Button>
+      </>}
     </>}
     {notice&&<p role="status" className="mt-2">{notice}</p>}
     {error&&<p role="alert" className="mt-2 text-destructive">{error}</p>}
