@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { StudentAssignmentLink } from "./StudentAssignmentLink";
 import type { StudentSuccessPriorities } from "@/domain/student-success";
 import { WorkspacePanel } from "@/components/workspace";
 import { formatTimestamp } from "@/modules/calendar/timezone";
@@ -37,21 +38,17 @@ export function StudentSuccessPriorityPanel({ plan }: {
       {plan.steps.map(step => <li key={step.assessmentId} className="rounded-lg border p-4">
         <p className="text-xs text-muted-foreground">{step.course} · {step.label}</p>
         <p className="mt-1 font-semibold">
-          <Link to="/student/assignments" search={{
-            assessment: step.assessmentId,
-            section: step.sectionId ?? undefined,
-          }} className="underline">{step.title}</Link>
+          <StudentAssignmentLink assessmentId={step.assessmentId} sectionId={step.sectionId}
+            className="underline">{step.title}</StudentAssignmentLink>
         </p>
         <p className="mt-1 text-xs text-muted-foreground">{fmtDate(step.dueAt, step.timezone)}</p>
-        <Link to="/student/assignments" search={{
-          assessment: step.assessmentId,
-          section: step.sectionId ?? undefined,
-        }} className="mt-2 inline-block text-sm underline">
+        <StudentAssignmentLink assessmentId={step.assessmentId} sectionId={step.sectionId}
+          className="mt-2 inline-block text-sm underline">
           {step.kind === "revision" ? "Revise assignment" :
             step.kind === "review_feedback" ? "Review teacher feedback" :
             step.kind === "awaiting_feedback" ? "View submission" :
             "Open assignment"} →
-        </Link>
+        </StudentAssignmentLink>
       </li>)}
     </ol> : <p className="mt-4 text-sm text-muted-foreground">
       No published assignments currently need follow-up. Check your class schedule and lessons for other work.
