@@ -104,6 +104,8 @@ export function createInventory(projectRoot) {
   const componentsDir = join(src, "components");
   const routes = discoverTsx(routesDir);
   const components = discoverTsx(componentsDir);
+  const extraUi = discoverTsx(src).filter(file =>
+    !within(file, routesDir) && !within(file, componentsDir));
   const cache = new Map();
   function inspect(file) {
     if (!cache.has(file)) {
@@ -115,10 +117,11 @@ export function createInventory(projectRoot) {
   function resolveModule(origin, specifier) {
     const base = specifier.startsWith("@/") ? resolve(src, specifier.slice(2))
       : specifier.startsWith(".") ? resolve(dirname(origin), specifier) : null;
-    if (!base || (!within(base, componentsDir) && !within(base, routesDir))) return null;
+    if (!base || !within(base, src)) return null;
     for (const file of [base, base + ".tsx", base + ".ts",
       join(base, "index.ts"), join(base, "index.tsx")]) {
-      if (existsSync(file) && [".ts", ".tsx"].includes(extname(file))) return file;
+      if (existsSync(file) && (file.endsWith(".tsx") ||
+          (file.endsWith(".ts") && within(file, componentsDir)))) return file;
     }
     return null;
   }
@@ -185,10 +188,11 @@ export function createInventory(projectRoot) {
       directlyClean: rows.filter(row => row.sourceClean).length,
       composedClean: rows.filter(row => row.composedSourceClean).length,
       components: components.length,
+      extraUiFiles: extraUi.length,
       directlyCleanComponents: components.filter(file =>
         inspect(file).native.length === 0 && inspect(file).corners.length === 0).length,
     },
-    inspected: [...routes, ...components].map(file => ({
+    inspected: [...routes, ...components, ...extraUi].map(file => ({
       path: relative(root, file).replaceAll("\\", "/"),
       ...inspect(file),
     })),
