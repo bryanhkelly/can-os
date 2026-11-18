@@ -18,6 +18,9 @@ describe("RubricScoreFields", () => {
     expect(html).toContain("Total: ");
     expect(html).toContain("5.00");
     expect(html).toContain('value="3"');
+    expect(html).toMatch(/<label[^>]*for="[^"]+"[^>]*>Reasoning/);
+    expect(html).toMatch(/<input[^>]*id="[^"]+"[^>]*type="number"|<input[^>]*type="number"[^>]*id="[^"]+"/);
+    expect(html).toContain("required");
   });
 
   it("does not invent a total for incomplete scoring", () => {
