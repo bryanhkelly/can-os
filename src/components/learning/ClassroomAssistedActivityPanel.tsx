@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { getClassroomAttendanceRoster } from "@/modules/learning/classroom-attendance.functions";
 import { getClassroomHostActivity } from "@/modules/learning/classroom-evidence.functions";
 import { recordClassroomAssistedActivity } from "@/modules/learning/classroom-assisted-activity.functions";
@@ -76,50 +78,50 @@ export function ClassroomAssistedActivityPanel({facilitatedSessionId}:{
     </p>}
     {roster.isSuccess&&releases.isSuccess&&<div className="mt-4 grid gap-3 sm:grid-cols-2">
       <label className="text-sm font-medium">Registered learner
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={learner} onChange={e=>setLearner(e.target.value)}>
           <option value="">Choose a learner</option>
           {roster.data.members.map(x=><option key={x.courseAttemptId}
             value={x.courseAttemptId}>
             {x.displayName}{x.pairedDevice?"":" (no device)"}
           </option>)}
-        </select>
+        </Select>
       </label>
       <label className="text-sm font-medium">Released classroom activity
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={releaseId} onChange={e=>{setReleaseId(e.target.value);setAnswer("");}}>
           <option value="">Choose a question</option>
           {releases.data.releases.map(x=><option key={x.id} value={x.id}>
             {x.prompt.slice(0,80)}{x.closed?" (closed)":""}
           </option>)}
-        </select>
+        </Select>
       </label>
       <label className="text-sm font-medium">Evidence source
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={method} onChange={e=>setMethod(e.target.value as Method)}>
           <option value="paper">Paper response</option>
           <option value="shared_device">Shared device</option>
           <option value="verbal">Verbal response</option>
-        </select>
+        </Select>
       </label>
       {activity?.answerType==="single_choice"?<label className="text-sm font-medium">
         Recorded choice
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2"
           value={answer} onChange={e=>setAnswer(e.target.value)}>
           <option value="">Select reported choice</option>
           {activity.choices.map((choice,i)=><option key={i} value={i}>{choice}</option>)}
-        </select>
+        </Select>
       </label>:<label className="text-sm font-medium">Recorded short response
-        <textarea rows={2} maxLength={1000} value={answer}
+        <Textarea rows={2} maxLength={1000} value={answer}
           onChange={e=>setAnswer(e.target.value)}
-          className="mt-2 w-full border border-border bg-background p-2"/>
+          className="mt-2"/>
       </label>}
       <label className="text-sm font-medium sm:col-span-2">
         Required collection note (15–500 characters)
-        <textarea rows={2} minLength={15} maxLength={500} value={evidenceNote}
+        <Textarea rows={2} minLength={15} maxLength={500} value={evidenceNote}
           onChange={e=>setEvidenceNote(e.target.value)}
           placeholder="Collected this answer directly from the learner on a printed response sheet…"
-          className="mt-2 w-full border border-border bg-background p-2"/>
+          className="mt-2"/>
       </label>
       <div className="sm:col-span-2">
         <Button type="button" size="sm" disabled={busy||!chosen||!activity||
