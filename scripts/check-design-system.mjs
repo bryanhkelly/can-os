@@ -638,6 +638,22 @@ const migratedV61RouteControls = {
     "<CurriculumPdfPicker", "<OneRosterStudentReconciliation",
   ],
 
+  "routes/guardian.native-classes.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/label", "@/components/ui/choice", "<Checkbox",
+    "<Button type=\"submit\"",
+  ],
+  "routes/class_.$classId.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/textarea",
+    "@/components/ui/label", "@/components/ui/choice", "<Checkbox",
+    "<Textarea", "<Select",
+  ],
+  "routes/classes.tsx": [
+    "@/components/ui/button", "@/components/ui/textarea", "@/components/ui/label",
+    "<Button", "<WorkspacePanel", "<Textarea",
+  ],
+
+
 };
 for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
