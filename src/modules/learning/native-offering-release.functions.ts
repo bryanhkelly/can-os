@@ -280,7 +280,7 @@ export const submitNativeOfferingRelease=createServerFn({method:"POST"})
       if(data.assets.length)requireCompleteReleasePolicies(
         policies,bundle.courses.map(row=>row.courseVersionId));
       const items=data.assets.length?await prepareNativeReleaseAssetItems(
-        tx,bundle.offering.publisherOrganizationId,data.assets):[];
+        tx,bundle.offering.publisherOrganizationId,data.assets,actor.actorPersonId!):[];
       const snapshotHash=nativeReleaseSnapshotHash(bundle.hash,policies,items);
       const previous=await currentManifest(tx,data.offeringVersionId);
       if(previous?.manifestHash===snapshotHash)
@@ -567,7 +567,7 @@ export const approveNativeOfferingAssetManifest=createServerFn({method:"POST"})
       requireCompleteReleasePolicies(policies,bundle.courses.map(row=>row.courseVersionId));
       await requireApprovedSnapshot(tx,manifest);
       await assertNativeReleaseAssetEvidence(
-        tx,bundle.offering.publisherOrganizationId,items);
+        tx,bundle.offering.publisherOrganizationId,items,manifest.createdByPersonId);
       if(manifest.manifestStatus==="approved")
         return {manifestId:manifest.id,alreadyApproved:true};
       const [approved]=await tx.update(contentPublicationManifests)
@@ -605,7 +605,8 @@ export const publishNativeOfferingVersion=createServerFn({method:"POST"})
         invalid("Publish all independently reviewed native Courses before the Offering.");
       await requireApprovedSnapshot(tx,manifest);
       const items=await readNativeReleaseManifestItems(tx,manifest.id);
-      await assertNativeReleaseAssetEvidence(tx,bundle.offering.publisherOrganizationId,items);
+      await assertNativeReleaseAssetEvidence(
+        tx,bundle.offering.publisherOrganizationId,items,manifest.createdByPersonId);
       const policies=await readNativeReleasePolicies(tx,bundle.version.id);
       await assertNativeOfferingDistributionReady(
         tx,bundle.version.id,bundle.offering.id,policies);
