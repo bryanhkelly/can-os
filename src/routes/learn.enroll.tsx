@@ -52,7 +52,7 @@ function PublicSelfEnrollment() {
   });
   // The exact approved release read is authoritative for selection, consent
   // and remaining capacity. A cached discovery page is only a navigation list.
-  const selected=search.release?linkedRelease.data??undefined:undefined;
+  const selected=search.release&&linkedRelease.isSuccess?linkedRelease.data??undefined:undefined;
   // Select by exact release rather than scanning a bounded cross-course list.
   // Both the cache and server-side lookup remain scoped to this verified account.
   const waiting=useQuery({
@@ -129,7 +129,7 @@ function PublicSelfEnrollment() {
                 subtitle={item.deliveryMode==="facilitated"
                   ?"Facilitated at "+(item.siteName??"approved Site"):"Independent online learning"}
                 status={<StatusBadge tone={item.seatsRemaining>0?"success":"attention"}>
-                  {item.seatsRemaining>0?item.seatsRemaining+" places open":"Join waiting list"}
+                  {item.seatsRemaining>0?item.seatsRemaining+" places open":"No unreserved places"}
                 </StatusBadge>}
                 meta={item.provider} openLabel="View registration"
                 renderLink={({className,children})=><Link to="/learn/enroll"
