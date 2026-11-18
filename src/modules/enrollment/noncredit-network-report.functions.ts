@@ -11,6 +11,7 @@ import {
   canonicalEnrollmentOrganizations,
 } from "@/db/canonical-v301";
 import {decodeHistoricalNetworkPath,rollupAttributionEvidence} from "@/domain/network-attribution";
+import {currentNoncreditCompletionStates} from "@/domain/verified-completion-projection";
 
 /** Organization-scoped reporting. This must not infer a denomination-level
  * grant from a label, favorite Site, or marketing affiliation.
@@ -75,16 +76,20 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
     const attributionByRegistration=new Map(
       attributions.map(a=>[a.registrationId,a] as const));
     const decisions=registrationIds.length?await db.select({
+      id:noncreditCompletionDecisions.id,
       registrationId:noncreditCompletionDecisions.registrationId,
       outcome:noncreditCompletionDecisions.outcome,
+      supersedesId:noncreditCompletionDecisions.supersedesId,
       decidedAt:noncreditCompletionDecisions.decidedAt,
     }).from(noncreditCompletionDecisions)
       .where(inArray(noncreditCompletionDecisions.registrationId,registrationIds))
       .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(10001):[];
     if(decisions.length>10000)throw new Error("Completion decision report needs partitioning");
-    const lastDecision=new Map<string,string>();
-    for(const d of decisions)if(!lastDecision.has(d.registrationId))
-      lastDecision.set(d.registrationId,d.outcome);
+    // Use the governed source chain, never newest-row-wins. The operator
+    // report must fail closed if revisions conflict or a chain is incomplete.
+    const completion=currentNoncreditCompletionStates(registrationIds,decisions);
+    if(completion.invalidRegistrations.length)
+      throw new Error("Noncredit completion history requires reconciliation");
     const attempts=registrationIds.length?await db.select({
       registrationId:learnerCourseAttempts.noncreditRegistrationId,
       attemptId:learnerCourseAttempts.id,
@@ -141,7 +146,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
         registrations:local.length,
         active:local.filter(x=>["registered","active"].includes(x.status)).length,
         withdrawn:local.filter(x=>x.status==="withdrawn").length,
-        completed:local.filter(x=>lastDecision.get(x.registrationId)==="completed").length,
+        completed:local.filter(x=>completion.states.get(x.registrationId)==="completed").length,
         verifiedAttendees,linkedRooms:roomIds.length,
       };
     });
@@ -194,7 +199,7 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
           reportingUnitName:historicalLeaf?.name??null,
           basis:attribution.attributionBasis,
           path:historicalPath,
-          completed:lastDecision.get(claim.registrationId)==="completed",
+          completed:completion.states.get(claim.registrationId)==="completed",
           verifiedAttendee:attendanceFor(claim),
         };
       }),
@@ -215,5 +220,5 @@ export const getNoncreditOperatorNetworkSummary=createServerFn({method:"GET"})
           completed:a.completed>=minimumCell?a.completed:null,
           verifiedAttendees:a.verifiedAttendees>=minimumCell?a.verifiedAttendees:null,
         }))},
-      notice:"Provider-private totals. Each completion is a latest formal noncredit decision; attendance is facilitator-attested in explicitly linked rooms. Affiliate selection is self-reported; no inferred individual church membership, watch-time, funding or accreditation claims. Network-wide reporting across other providers requires independently approved grants. Published partner reports must use the suppressed publicationSafe projection."};
+      notice:"Provider-private totals. Each completion is a supersession-validated formal noncredit decision; attendance is facilitator-attested in explicitly linked rooms. Affiliate selection is self-reported; no inferred individual church membership, watch-time, funding or accreditation claims. Network-wide reporting across other providers requires independently approved grants. Published partner reports must use the suppressed publicationSafe projection."};
   });
