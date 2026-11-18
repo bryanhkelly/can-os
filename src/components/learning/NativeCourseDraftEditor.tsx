@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect,useState, type FormEvent } from "react";
 import { normalizeClientError } from "@/lib/client-error";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { WorkspacePanel,StatusBadge,MutationFeedback } from "@/components/workspace";
@@ -106,6 +106,15 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
   }>>([]);
   const [notice,setNotice]=useState("");
   const [error,setError]=useState("");
+  useEffect(()=>{
+    setAssetUses(current.data?.manifest?.assetUses??[]);
+  },[current.data?.manifest?.id]);
+  const manifest=current.data?.manifest;
+  const sameSelection=Boolean(manifest?.current&&
+    manifest.assetUses.length===assetUses.length&&
+    manifest.assetUses.every(item=>assetUses.some(selected=>
+      selected.assetVersionId===item.assetVersionId&&
+      selected.usageKind===item.usageKind)));
   async function submit(){
     if(!current.data||current.data.lifecycle!=="draft"||busy)return;
     setBusy(true);setNotice("");setError("");
@@ -190,10 +199,15 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
             An independent publisher reviewer must define the release requirements
             for every Course before an asset-backed snapshot can be submitted.
           </p>}
+        {assetUses.length===0&&manifest?.current&&manifest.assetCount>0&&
+          <p role="status" className="mt-2 text-xs">
+            A current asset-backed release is already submitted. To revise it,
+            select replacement assets for another independent review.
+          </p>}
         <Button className="mt-3" type="button" variant="outline"
-          disabled={busy||(assetUses.length>0&&!current.data.releasePoliciesComplete)||
-            Boolean(current.data.manifest?.current&&
-              (assetUses.length===0?current.data.manifest.assetCount===0:false))}
+          disabled={busy||sameSelection||
+            (assetUses.length>0&&!current.data.releasePoliciesComplete)||
+            Boolean(assetUses.length===0&&manifest?.current&&manifest.assetCount>0)}
           onClick={()=>void submit()}>
           {busy?"Submitting…":assetUses.length?
             `Submit ${assetUses.length} reviewed asset(s) for Offering release`:

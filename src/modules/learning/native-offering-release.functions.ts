@@ -257,6 +257,7 @@ export const getNativeOfferingReleaseOverview=createServerFn({method:"GET"})
       const bundle=await loadBundle(tx,data.offeringVersionId,false);
       await requireAppointments(tx,actor,bundle,"instructional_track.author");
       const manifest=await currentManifest(tx,data.offeringVersionId);
+      const manifestItems=manifest?await readNativeReleaseManifestItems(tx,manifest.id):[];
       const policies=await readNativeReleasePolicies(tx,data.offeringVersionId);
       const availableAssets=await tx.select({
         id:contentAssetVersions.id,
@@ -280,7 +281,10 @@ export const getNativeOfferingReleaseOverview=createServerFn({method:"GET"})
         manifest:manifest?{
           id:manifest.id,hash:manifest.manifestHash,
           status:manifest.manifestStatus,
-          assetCount:(await readNativeReleaseManifestItems(tx,manifest.id)).length,
+          assetCount:manifestItems.length,
+          assetUses:manifestItems.map(item=>({
+            assetVersionId:item.assetVersionId,usageKind:item.usageKind,
+          })),
           current:manifest.manifestHash===await currentReleaseSnapshotHash(
             tx,bundle.version.id,bundle.hash,manifest.id),
         }:null,
