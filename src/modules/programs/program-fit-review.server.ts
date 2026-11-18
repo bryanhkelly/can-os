@@ -1,8 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents,
-  domainEvents,
   qualificationApplications,
   qualificationProgramFitAssessments,
   qualificationProgramFitPolicies,
@@ -182,7 +181,7 @@ export async function createProgramFitReview(
     }).returning({ id: qualificationProgramFitReviews.id });
     if (!review) throw new Error("Program-fit review was not created.");
 
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId,
       owningOrganizationId: assessment.policyOwnerOrganizationId,
       eventCode: "program_fit.review.created",
@@ -195,7 +194,7 @@ export async function createProgramFitReview(
         requestId: context.requestId ?? null,
       },
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType: "ProgramFitReviewCreated",
       aggregateType: "ProgramFitAssessment",
       aggregateId: assessment.id,
