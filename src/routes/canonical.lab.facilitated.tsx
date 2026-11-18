@@ -152,7 +152,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       {rehearsalScope&&<ClassroomRehearsalPlayer
         scope={rehearsalScope} onClose={()=>setRehearsalScope(null)}/>}
     </section>
-    <ClassroomSchedulePanel choices={rehearsalOptions?.choices??[]}
+    <ClassroomSchedulePanel choices={data.choices}
       onRoomStarted={async value=>{
         setCode({roomId:value.roomId,code:value.pairingCode,expiresAt:value.pairingExpiresAt});
         await router.invalidate();
