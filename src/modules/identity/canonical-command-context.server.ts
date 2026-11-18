@@ -99,7 +99,7 @@ export async function probeCanonicalAuthReader(): Promise<boolean> {
 
 /**
  * One sign-in for CAN school staff. Resolve the verified CAN session first
- * when its active grant is Site Admin or Registrar, then independently
+ * when its active grant is Site Admin, Registrar or Room Facilitator, then independently
  * revalidate the same CAN session, immutable public Person, exact active grant,
  * Organization and Site through the restricted SQL reader. No native staff
  * Person, parallel grant or correspondence table is consulted.
