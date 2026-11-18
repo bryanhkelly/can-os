@@ -1,4 +1,4 @@
-import { integer, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
@@ -42,7 +42,7 @@ export const learningAwardIssuanceEvents = educationV30.table("learning_award_is
   decidedByPersonId: uuid("decided_by_person_id").notNull(),
   occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
 });
-export const learningAwardArtifacts = educationV30.table("learning_award_artifacts", {
+export const learningAwardArtifacts = pgTable("learning_award_artifacts", {
   id: id(), issuanceId: uuid("issuance_id").notNull(),
   format: text("format").$type<"pdf" | "badge_json" | "png" | "svg">().notNull(),
   artifactVersion: integer("artifact_version").notNull(),
