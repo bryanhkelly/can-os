@@ -41,6 +41,7 @@ const checks = [
     "tests/unit/native-class-session-refresh-contract.test.ts",
     "tests/unit/noncredit-waitlist-query-isolation.test.ts",
     "tests/unit/launch-class-cache-integration.test.ts",
+    "tests/unit/native-class-availability-cache.test.ts",
     "tests/unit/my-activity-v61-state-composition.test.ts"] },
   { id: "unit-suite", name: "Complete nonintegration unit suite", cmd: npm, args: ["test"] },
   { id: "storybook-build", name: "Static Storybook build", cmd: npm, args: ["run", "build-storybook"] },
