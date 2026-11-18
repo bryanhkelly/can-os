@@ -35,14 +35,18 @@ export interface ButtonProps extends React.ComponentProps<"button">, VariantProp
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, type, loading = false, loadingLabel, disabled, children, ...props }, ref) => {
-    const Comp = asChild ? Slot : "button";
-    return <Comp ref={ref} type={asChild ? undefined : type ?? "button"}
-      disabled={asChild ? undefined : disabled || loading}
-      aria-busy={loading || undefined}
-      className={cn(buttonVariants({ variant, size }), className)} {...props}>
-      {!asChild && loading && <LoaderCircle aria-hidden="true" className="animate-spin" />}
-      {loading && loadingLabel && !asChild ? loadingLabel : children}
-    </Comp>;
+    const classes = cn(buttonVariants({ variant, size }), className);
+    // Radix Slot requires exactly one React element, not an array containing
+    // a false conditional spinner and the intended child link.
+    if (asChild) {
+      return <Slot ref={ref} aria-busy={loading || undefined}
+        className={classes} {...props}>{children}</Slot>;
+    }
+    return <button ref={ref} type={type ?? "button"} disabled={disabled || loading}
+      aria-busy={loading || undefined} className={classes} {...props}>
+      {loading && <LoaderCircle aria-hidden="true" className="animate-spin" />}
+      {loading && loadingLabel ? loadingLabel : children}
+    </button>;
   },
 );
 Button.displayName = "Button";
