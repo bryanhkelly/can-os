@@ -56,7 +56,7 @@ export const getMyNativeGuardianLearners=createServerFn({method:"GET"})
       or(isNull(guardianAuthorities.endsAt),gt(guardianAuthorities.endsAt,now)),
       lte(guardianAuthorities.verifiedAt,now),
     )).orderBy(asc(canonicalPersons.legalFirstName)).limit(100);
-   const learners=[];
+   const learners: Array<{learnerPersonId:string;name:string}>=[];
    for(const row of rows){
     try{
      await requireNativeGuardianChild(tx,guardian.personId,row.learnerPersonId,now);
