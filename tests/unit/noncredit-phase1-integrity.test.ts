@@ -100,7 +100,9 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(pilotReport).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
     expect(pilotReport).toContain("noncreditSelfEnrollmentClaims.registrationId");
     expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.siteId,siteIds");
-    expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.providerOrganizationId");
+    expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.registeringOrganizationId");
+    expect(pilotReport).toContain("db.selectDistinct");
+    expect(pilotReport).toContain("noncreditSelfEnrollmentReleases.trainingVersionId,noncreditTrainingVersions.id");
     expect(providerEnrollment).toContain("<NoncreditPilotOutcomesPanel/>");
   });
 
