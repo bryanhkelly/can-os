@@ -1,4 +1,4 @@
-import { boolean, check, foreignKey, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, check, foreignKey, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { educationV30 } from "./core";
 import { learnerCourseAttempts, courseVersions } from "./learning";
@@ -28,7 +28,7 @@ export const canonicalLearningSessions = educationV30.table("learning_sessions",
 ]);
 
 /** Append-only, deduplicated client observations. Never proves attendance, grades or credit. */
-export const canonicalLearningEvents = educationV30.table("learning_session_events", {
+export const canonicalLearningEvents = pgTable("learning_session_events", {
   id: uuid("id").defaultRandom().primaryKey(),
   learningSessionId: uuid("learning_session_id").notNull().references(() => canonicalLearningSessions.id, { onDelete: "restrict" }),
   courseAttemptId: uuid("course_attempt_id").notNull().references(() => learnerCourseAttempts.id, { onDelete: "restrict" }),
