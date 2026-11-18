@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * Main-only, read-only FK convergence check. This is a safe milestone,
- * NOT a Site/Organization table retirement or RLS release certificate.
+ * Confirms Site/Organization retirement and forced core-identity RLS.
+ * It is NOT an application authorization or one-Person release certificate.
  *
  * CAN_MAIN_CORE_IDENTITY_CHECK=1 DATABASE_URL=<CAN OS Neon main URL>
  *   node scripts/acceptance/check-main-core-identity-fks.mjs
@@ -42,6 +43,10 @@ async function run(){
        WHERE oid='public.organizations'::regclass) AS platform_org_rls_forced,
       has_table_privilege('authenticated','public.sites','SELECT') AS client_can_read_sites,
       has_table_privilege('authenticated','public.organizations','SELECT') AS client_can_read_orgs,
+      (SELECT relrowsecurity AND relforcerowsecurity FROM pg_class
+       WHERE oid='public.people'::regclass) AS platform_person_rls_forced,
+      has_table_privilege('authenticated','public.people','SELECT') AS client_can_read_people,
+      has_table_privilege('authenticated','public.people','UPDATE') AS client_can_update_people,
       (SELECT count(*)::int FROM public.sites) AS platform_sites,
       (SELECT count(*)::int FROM public.organizations) AS platform_organizations,
       (SELECT count(*)::int FROM education_v30.persons) AS native_persons,
@@ -53,6 +58,8 @@ async function run(){
      summary.duplicate_site_table_exists||summary.duplicate_org_table_exists||
      !summary.platform_site_rls_forced||!summary.platform_org_rls_forced||
      summary.client_can_read_sites||summary.client_can_read_orgs||
+     !summary.platform_person_rls_forced||
+     summary.client_can_read_people||summary.client_can_update_people||
      summary.platform_site_fk_count<94||summary.platform_org_fk_count<229)
     throw new Error("Shared Site/Organization retirement or security regressed");
 
