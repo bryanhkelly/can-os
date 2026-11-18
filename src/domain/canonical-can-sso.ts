@@ -10,7 +10,8 @@ export function canResolveCanSiteStaff(
   actor: Pick<AccessContext, "role" | "accountId" | "actorPersonId" |
     "grantSiteId" | "sessionAccountId" | "scope" | "capabilities">,
 ): boolean {
-  return (actor.role === "site_admin" || actor.role === "registrar") &&
+  return (actor.role === "site_admin" || actor.role === "registrar" ||
+    actor.role === "room_facilitator") &&
     Boolean(actor.accountId && actor.actorPersonId && actor.grantSiteId) &&
     // Synthetic demo delegation never proves the human owns the selected Person.
     !actor.sessionAccountId &&
