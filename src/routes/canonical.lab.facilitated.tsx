@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { ClassroomConnectQr } from "@/components/learning/ClassroomConnectQr";
 import { ClassroomRehearsalPlayer } from "@/components/learning/ClassroomRehearsalPlayer";
@@ -91,7 +92,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="min-w-72 flex-1 text-sm font-medium">
           Deployment and course
-          <select className="mt-2 min-h-10 w-full border border-border bg-background px-3 py-2"
+          <Select className="mt-2"
             value={selected} onChange={event=>setSelected(event.target.value)}>
             <option value="">Choose an authorized course</option>
             {data.choices.map(choice=><option
@@ -99,7 +100,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               value={choice.deploymentId+":"+choice.courseVersionId+":"+choice.siteId}>
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
             </option>)}
-          </select>
+          </Select>
         </label>
         <Button disabled={busy||!available} type="button" onClick={()=>void run(async()=>{
           if(!available)return;
@@ -126,7 +127,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       <div className="mt-4 flex flex-wrap items-end gap-3">
         <label className="min-w-72 flex-1 text-sm font-medium">
           Approved Site course
-          <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+          <Select className="mt-2"
             value={rehearsalChoice}
             onChange={e=>{setRehearsalChoice(e.target.value);setRehearsalScope(null);}}>
             <option value="">Choose a course to rehearse</option>
@@ -135,7 +136,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
               value={choice.deploymentId+":"+choice.adoptionId+":"+choice.courseVersionId+":"+choice.siteId}>
               {choice.deploymentName} · {choice.courseTitle} · Site {choice.siteId.slice(0,8)}
             </option>)}
-          </select>
+          </Select>
         </label>
         <Button type="button" variant="outline" disabled={!rehearsal}
           onClick={()=>{if(rehearsal)setRehearsalScope({
