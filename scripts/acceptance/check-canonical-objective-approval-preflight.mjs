@@ -75,7 +75,7 @@ try{
       }
       const {rows:bindings}=await client.query(
         `SELECT purpose_code,db_role::text
-         FROM education_v30.database_role_organization_bindings
+         FROM public.database_role_organization_bindings
          WHERE organization_id=$1::uuid AND status='approved'
            AND purpose_code=ANY($2::text[])
            AND valid_from<=clock_timestamp()
