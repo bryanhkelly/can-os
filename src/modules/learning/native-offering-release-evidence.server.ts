@@ -28,7 +28,14 @@ export const nativeReleasePolicySchema=z.object({
   accessibilityReviewRequired:z.literal(true),
 }).strict();
 export type NativeReleaseAsset=z.infer<typeof nativeReleaseAssetSchema>;
-export type NativeReleasePolicy=z.infer<typeof nativeReleasePolicySchema>;
+export type NativeReleasePolicy={
+  courseVersionId:string;
+  minimumApprovedPrimaryTracks:number;
+  completeLessonCoverageRequired:boolean;
+  independentAcademicReviewRequired:boolean;
+  rightsClearanceRequired:boolean;
+  accessibilityReviewRequired:boolean;
+};
 export type AssetEvidenceRow={
   assetVersionId:string,usageKind:NativeReleaseAsset["usageKind"],
   contentHash:string,rightsEvidenceVersionId:string|null,
