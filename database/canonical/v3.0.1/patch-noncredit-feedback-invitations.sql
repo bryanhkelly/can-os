@@ -15,13 +15,17 @@ CREATE OR REPLACE FUNCTION v301_invite_noncredit_knowledge_feedback(p_attempt uu
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=education_v30,pg_catalog AS $feedback$
 DECLARE participant record; at timestamptz:=clock_timestamp();
 BEGIN
- SELECT r.participant_person_id,r.deployment_id
+ -- The knowledge-check event belongs to one published Offering, not every
+ -- training sharing the Deployment. A campaign without Offering scope is
+ -- intentionally ineligible for an automatic course-feedback invitation.
+ SELECT r.participant_person_id,r.deployment_id,ov.offering_id
  INTO participant
  FROM assessment_attempts a
  JOIN assessment_access_grants g ON g.id=a.access_grant_id
    AND g.learner_id=a.learner_id AND g.administration_id=a.administration_id
  JOIN learner_course_attempts ca ON ca.id=g.course_attempt_id
  JOIN noncredit_registrations r ON r.id=ca.noncredit_registration_id
+ JOIN offering_versions ov ON ov.id=r.offering_version_id
  JOIN noncredit_training_versions t ON t.id=r.training_version_id
  JOIN assessment_administrations ad ON ad.id=a.administration_id
  WHERE a.id=p_attempt AND a.state IN ('scored','finalized')
@@ -44,6 +48,7 @@ BEGIN
    AND d.intended_audience IN ('learner','any')
  JOIN evidence_document_versions permission ON permission.id=c.survey_permission_evidence_id
  WHERE c.deployment_id=participant.deployment_id
+   AND c.offering_id=participant.offering_id
    AND c.status='active' AND c.response_mode='identified'
    AND c.starts_at<=at AND (c.ends_at IS NULL OR c.ends_at>at)
    AND permission.verified_by_person_id IS NOT NULL AND permission.verified_at IS NOT NULL
