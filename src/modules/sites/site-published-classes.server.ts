@@ -72,7 +72,7 @@ export async function readLinkedSitePublishedClasses(
           AND (role.valid_through IS NULL OR role.valid_through>CURRENT_TIMESTAMP)
       )
       AND EXISTS (
-        SELECT 1 FROM education_v30.education_operation_sites os
+        SELECT 1 FROM public.education_operation_sites os
         WHERE os.operation_id=pd.operation_id AND os.site_id=c.site_id
           AND os.valid_from<=CURRENT_TIMESTAMP
           AND (os.valid_through IS NULL OR os.valid_through>CURRENT_TIMESTAMP)
