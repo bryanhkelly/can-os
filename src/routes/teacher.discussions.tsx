@@ -7,7 +7,7 @@ import { createCourseDiscussion, setCourseDiscussionLock, moderateDiscussionMess
 import { postDiscussionMessage } from "@/modules/learning/discussion-post.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { WorkspaceShell, WorkspacePanel, StatusBadge } from "@/components/workspace";
+import { WorkspaceShell, WorkspacePanel, StatusBadge, EmptyState, WorkspaceNotice } from "@/components/workspace";
 import { z } from "zod";
 import { selectTeacherDiscussionThreads } from "@/domain/course-discussions";
 import { Button } from "@/components/ui/button";
@@ -53,7 +53,7 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
     subtitle="Discuss classwork with enrolled students. The assigned teaching team can respond, lock discussions and moderate posts."
     breadcrumbs={<Link to="/classes" search={{ section }} className="underline">Back to classes</Link>}>
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Updating class discussion..."/>
-    {section && !sections.length && <p role="alert" className="mt-5  border p-4 text-sm">This class is unavailable in your current teaching membership.</p>}
+    {section && !sections.length && <WorkspaceNotice tone="danger" className="mt-5">This class is unavailable in your current teaching membership.</WorkspaceNotice>}
     {sections.length > 0 && <details className="mt-6  border bg-card p-5" open={lesson?true:undefined}>
       <summary className="cursor-pointer font-semibold">Start a class discussion</summary>
       <form noValidate className="mt-4 grid gap-3" onSubmit={event => {
@@ -125,9 +125,12 @@ export function TeacherDiscussionsView({ data }: { data: Awaited<ReturnType<type
       </form>}
     </WorkspacePanel>)}</div>
     {selectedThread && <p className="mt-4 text-sm"><Link to="/teacher/discussions" search={{ section, lesson }} className="underline">Show all class discussions</Link></p>}
-    {!threads.length && <p role="status" className="mt-5  border p-5 text-sm text-muted-foreground">
-      {selectedThread ? "This discussion is not available in your selected class or lesson." :
-        lesson ? "No discussions are linked to this lesson yet." : "No class discussions yet."}
-    </p>}
+    {!threads.length && <div className="mt-5">
+      <EmptyState title={selectedThread ? "Discussion unavailable" :
+        lesson ? "No lesson discussions yet" : "No class discussions yet"}
+        description={selectedThread ? "This discussion is not available in your selected class or lesson." :
+          lesson ? "No discussions are linked to this lesson yet." :
+          "Create a discussion for one of your authorized classes to get started."}/>
+    </div>}
   </WorkspaceShell>;
 }
