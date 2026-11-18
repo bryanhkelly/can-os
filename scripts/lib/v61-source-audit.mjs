@@ -209,7 +209,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
   let paths;
   try {
     paths = git(src, ["diff", "--name-only", "--diff-filter=ACMR",
-      base + "..HEAD", "--", "src/routes", "src/components"]).split("\n").filter(Boolean);
+      base + "..HEAD", "--", "src"]).split("\n").filter(Boolean);
   } catch {
     result.warning = "Git base unavailable; incremental regression check not run. Use --base=<commit> to compare a known base.";
     return result;
