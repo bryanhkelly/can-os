@@ -99,9 +99,10 @@ export async function probeCanonicalAuthReader(): Promise<boolean> {
 
 /**
  * One sign-in for CAN school staff. Resolve the verified CAN session first
- * when its active grant is Site Admin or Registrar, then require independent
- * Person + Site bridges and a live matching canonical grant. This projection
- * creates no second bearer cookie and grants no rights for unmapped schools.
+ * when its active grant is Site Admin or Registrar, then independently
+ * revalidate the same CAN session, immutable public Person, exact active grant,
+ * Organization and Site through the restricted SQL reader. No native staff
+ * Person, parallel grant or correspondence table is consulted.
  *
  * Other canonical roles retain their existing native session handling until
  * their separately reviewed identity/role mappings are supported. A broken
