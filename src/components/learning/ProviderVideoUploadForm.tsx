@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/choice";
 import { MutationFeedback } from "@/components/workspace";
 import { ClassVideoPlayer } from "@/components/learning/ClassVideoPlayer";
@@ -90,12 +91,12 @@ export function ProviderVideoUploadForm({
       onSubmit={event=>{event.preventDefault();void upload();}}>
       <Field label="Published Course" required className="sm:col-span-2"
         error={validationAttempted&&!courseVersionId?"Choose an assigned published Course.":undefined}>
-        <select value={courseVersionId} required
+        <Select value={courseVersionId} required
           onChange={event=>{reset();setCourseVersionId(event.target.value);}}
           className="min-h-11 w-full border border-border bg-background px-3 text-sm">
           <option value="">Choose an authorized Course version</option>
           {versions.map(item=><option value={item.id} key={item.id}>{item.label}</option>)}
-        </select>
+        </Select>
       </Field>
       <Field label="Recording title" required
         error={validationAttempted&&title.trim().length<3?"Enter at least 3 characters.":undefined}>
