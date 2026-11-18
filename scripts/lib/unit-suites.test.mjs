@@ -8,6 +8,7 @@ describe("unit-suite auto-discovery", () => {
     assert.ok(inUnitSuite("classes", "tests/unit/class-download.test.ts"));
     assert.ok(inUnitSuite("classes", "src/domain/native-class-lifecycle.test.ts"));
     assert.ok(inUnitSuite("classes", "tests/unit/unified-classroom-player.test.tsx"));
+    assert.ok(inUnitSuite("classes", "tests/unit/launch-class-cache-integration.test.ts"));
     assert.ok(inUnitSuite("safety", "tests/unit/safeguarding-extra-check.test.ts"));
     assert.ok(inUnitSuite("family", "tests/unit/guardian-experiences.test.tsx"));
     assert.ok(inUnitSuite("classroom", "tests/unit/noncredit-waitlist-delivery-contract.test.ts"));
