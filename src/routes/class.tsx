@@ -81,42 +81,41 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
   const [mode,setMode]=useState<CreditMode>((item.allowedCreditModes[0]??"not_applicable") as CreditMode);
   const [adult,setAdult]=useState(false);
   const [consent,setConsent]=useState(false);
-  const [busy,setBusy]=useState(false);
-  const [message,setMessage]=useState("");
-  const [error,setError]=useState("");
+  const mutation=useMutationFeedback(onJoined);
+  const busy=mutation.pending||mutation.refreshFailed;
   const self=item.enrollmentMethods.includes("self");
   const approvalRequired=!self&&item.enrollmentMethods.includes("approval");
   const full=item.remainingSeats===0;
   async function requestApproval(){
     if(!approvalRequired||busy)return;
-    setBusy(true);setMessage("");setError("");
-    try{
-      const result=await requestNativeClassApproval({data:{
+    await mutation.run(
+      ()=>requestNativeClassApproval({data:{
         classOfferingVersionId:item.classOfferingVersionId,requestId:crypto.randomUUID(),
-      }});
-      setMessage(result.duplicate?"Your request was already received.":
-        "Request submitted for independent review. No seat is reserved until approval is accepted.");
-      await onJoined();
-    }catch(e){setError(normalizeClientError(e,"Class approval request was not submitted.").message)}
-    finally{setBusy(false)}
+      }}),
+      {
+        successMessage:result=>result.duplicate?"Your request was already received.":
+          "Request submitted for independent review. No seat is reserved until approval is accepted.",
+        commandErrorMessage:"Class approval request was not submitted.",
+        refreshErrorMessage:"The request was received, but your Class list could not refresh. Retry refresh before submitting again.",
+      },
+    );
   }
   async function enroll(){
     if(!self||full||!adult||!consent||busy)return;
-    setBusy(true);setMessage("");setError("");
-    try{
-      // A verified, previously bound adult should not need to discover a
-      // separate native-login recovery action before joining a Class.
-      // The server independently validates the CAN account, native Person,
-      // adulthood and current learner grant before issuing the cookie.
-      // Never silently create or impersonate a native account here.
-      const result=await enrollCurrentPersonInClass({data:{
+    // Server independently validates the CAN account, canonical Person,
+    // adulthood, and current learner grant. Never create another identity.
+    await mutation.run(
+      ()=>enrollCurrentPersonInClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
-      }});
-      setMessage(result.alreadyEnrolled?"You are already enrolled.":"Enrollment confirmed. Your Course Attempt is ready.");
-      await onJoined();
-    }catch(e){setError(normalizeClientError(e,"Class enrollment was not completed.").message)}
-    finally{setBusy(false)}
+      }}),
+      {
+        successMessage:result=>result.alreadyEnrolled?"You are already enrolled.":
+          "Enrollment confirmed. Your Course Attempt is ready.",
+        commandErrorMessage:"Class enrollment was not completed.",
+        refreshErrorMessage:"Enrollment was saved, but your Class list could not refresh. Retry refresh before submitting again.",
+      },
+    );
   }
   return <article className="border border-border bg-card p-5">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -162,8 +161,8 @@ function OfferingCard({item,onJoined}:{item:Item;onJoined:()=>Promise<void>}){
     </div>:<p className="mt-4 text-sm text-muted-foreground">
       This Class is available by {item.enrollmentMethods.join(", ")}. Self-enrollment is not enabled.
     </p>}
-    {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
+      pendingMessage="Saving Class request…" className="mt-3"/>
   </article>;
 }
 type NativeApproval=Awaited<ReturnType<typeof getMyNativeClassApprovals>>[number];
@@ -171,23 +170,23 @@ function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>P
   const [mode,setMode]=useState<CreditMode>((item.allowedCreditModes[0]??"not_applicable") as CreditMode);
   const [adult,setAdult]=useState(false);
   const [consent,setConsent]=useState(false);
-  const [busy,setBusy]=useState(false);
-  const [notice,setNotice]=useState("");
-  const [error,setError]=useState("");
+  const mutation=useMutationFeedback(onChanged);
+  const busy=mutation.pending||mutation.refreshFailed;
   const eligible=item.state==="approved"&&!item.acceptedEnrollmentId;
   async function accept(){
     if(!eligible||!adult||!consent||busy)return;
-    setBusy(true);setNotice("");setError("");
-    try{
-      await enrollCurrentPersonInClass({data:{
+    await mutation.run(
+      ()=>enrollCurrentPersonInClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         approvalRequestId:item.approvalRequestId,
         creditMode:mode,adultAttested:true,consentAccepted:true,
-      }});
-      setNotice("Approved Class enrollment accepted. Your Course Attempt is ready.");
-      await onChanged();
-    }catch(e){setError(normalizeClientError(e,"Could not accept Class approval.").message)}
-    finally{setBusy(false)}
+      }}),
+      {
+        successMessage:"Approved Class enrollment accepted. Your Course Attempt is ready.",
+        commandErrorMessage:"Could not accept Class approval.",
+        refreshErrorMessage:"Your approved place was accepted, but the list could not refresh. Retry refresh rather than accepting again.",
+      },
+    );
   }
   return <article className="border border-border bg-card p-5">
     <h3 className="font-serif text-lg">{item.title}</h3>
@@ -208,44 +207,43 @@ function ApprovedClassCard({item,onChanged}:{item:NativeApproval;onChanged:()=>P
       <Button className="mt-4" disabled={!adult||!consent||busy}
         onClick={()=>void accept()}>{busy?"Accepting…":"Accept approved place"}</Button>
     </>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm">{error}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
+      pendingMessage="Accepting approved place…" className="mt-3"/>
   </article>;
 }
 type NativeInvitation=Awaited<ReturnType<typeof getMyNativeClassInvitations>>[number];
 function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Promise<void>}){
   const [adult,setAdult]=useState(false);
   const [consent,setConsent]=useState(false);
-  const [busy,setBusy]=useState(false);
-  const [notice,setNotice]=useState("");
-  const [error,setError]=useState("");
+  const mutation=useMutationFeedback(onChanged);
+  const busy=mutation.pending||mutation.refreshFailed;
   const pending=item.state==="pending";
   const expires=new Date(item.expiresAt).toLocaleString();
   async function accept(){
-    if(!pending||!adult||!consent||busy)return;
-    setBusy(true);setError("");setNotice("");
-    try{
-      await enrollCurrentPersonInClass({data:{
+    if(!pending||!adult||!consent||!item.consentText||busy)return;
+    await mutation.run(
+      ()=>enrollCurrentPersonInClass({data:{
         classOfferingVersionId:item.classOfferingVersionId,
         invitationId:item.invitationId,
         creditMode:item.creditMode,adultAttested:true,consentAccepted:true,
-      }});
-      setNotice("Invitation accepted. Your Class and learning record are ready.");
-      await onChanged();
-    }catch(e){
-      setError(normalizeClientError(e,"The invitation could not be accepted.").message);
-    }finally{setBusy(false);}
+      }}),
+      {
+        successMessage:"Invitation accepted. Your Class and learning record are ready.",
+        commandErrorMessage:"The invitation could not be accepted.",
+        refreshErrorMessage:"The invitation was accepted, but the Class list could not refresh. Retry refresh before another action.",
+      },
+    );
   }
   async function decline(){
     if(!pending||busy)return;
-    setBusy(true);setError("");setNotice("");
-    try{
-      await declineNativeClassInvitation({data:{invitationId:item.invitationId}});
-      setNotice("Invitation declined. No Enrollment was created.");
-      await onChanged();
-    }catch(e){
-      setError(normalizeClientError(e,"Unable to decline this invitation.").message);
-    }finally{setBusy(false);}
+    await mutation.run(
+      ()=>declineNativeClassInvitation({data:{invitationId:item.invitationId}}),
+      {
+        successMessage:"Invitation declined. No Enrollment was created.",
+        commandErrorMessage:"Unable to decline this invitation.",
+        refreshErrorMessage:"The invitation was declined, but the list could not refresh. Retry refresh before another action.",
+      },
+    );
   }
   return <article className="border border-border bg-card p-5">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -281,8 +279,8 @@ function InvitationCard({item,onChanged}:{item:NativeInvitation;onChanged:()=>Pr
         </Button>
       </div>
     </>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
+      pendingMessage="Saving invitation decision…" className="mt-3"/>
   </article>;
 }
 
