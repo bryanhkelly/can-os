@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { normalizeClientError } from "@/lib/client-error";
 import { useQuery,useQueryClient } from "@tanstack/react-query";
 import { WorkspacePanel,StatusBadge,MutationFeedback } from "@/components/workspace";
 import { Field } from "@/components/ui/field";
@@ -12,6 +13,9 @@ import {
   getNativeCourseDraftLessons,getNativeCourseReleaseReadiness,
   saveNativeCourseLessonDraft,
 } from "@/modules/learning/native-course-draft.functions";
+import {
+  getNativeOfferingReleaseOverview,submitNativeOfferingRelease,
+} from "@/modules/learning/native-offering-release.functions";
 
 type DraftVersion={id:string;label:string};
 type DraftLesson=Awaited<ReturnType<typeof getNativeCourseDraftLessons>>["lessons"][number];
@@ -36,7 +40,11 @@ function DraftLessonForm({courseVersionId,lesson}:{
       segment.title+" | "+segment.minutes).join("\n"));
   const [attempted,setAttempted]=useState(false);
   const feedback=useMutationFeedback(async()=>{
-    await client.invalidateQueries({queryKey:["native-course-draft-lessons",courseVersionId]});
+    await Promise.all([
+      client.invalidateQueries({queryKey:["native-course-draft-lessons",courseVersionId]}),
+      client.invalidateQueries({queryKey:["native-offering-release-overview"]}),
+      client.invalidateQueries({queryKey:["native-course-release-readiness",courseVersionId]}),
+    ]);
   });
   if(!lesson.editable)return <p role="status" className="text-sm text-muted-foreground">
     This draft uses a different lesson content format. It cannot be modified
@@ -82,6 +90,58 @@ function DraftLessonForm({courseVersionId,lesson}:{
     <MutationFeedback state={feedback}
       pendingMessage="Checking current Course ownership and saving the draft…"/>
   </form>;
+}
+
+function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}){
+  const client=useQueryClient();
+  const current=useQuery({
+    queryKey:["native-offering-release-overview",offeringVersionId],
+    queryFn:()=>getNativeOfferingReleaseOverview({data:{offeringVersionId}}),
+    retry:false,
+  });
+  const [busy,setBusy]=useState(false);
+  const [notice,setNotice]=useState("");
+  const [error,setError]=useState("");
+  async function submit(){
+    if(!current.data||current.data.lifecycle!=="draft"||busy)return;
+    setBusy(true);setNotice("");setError("");
+    try{
+      const response=await submitNativeOfferingRelease({data:{
+        offeringVersionId,expectedHash:current.data.manuscriptHash,
+      }});
+      setNotice(response.created?"Submitted unchanged native Course composition for independent review.":
+        "This exact Course composition has already been submitted.");
+      await Promise.all([
+        client.invalidateQueries({queryKey:["native-offering-release-overview",offeringVersionId]}),
+        client.invalidateQueries({queryKey:["native-offering-release-review-queue"]}),
+      ]);
+    }catch(cause){
+      setError(normalizeClientError(cause,
+        "Release submission denied. Verify current Course creator appointments and the unchanged draft.").message);
+    }finally{setBusy(false)}
+  }
+  return <div className="mt-3 border-t border-border pt-3 text-sm">
+    {current.isPending&&<p role="status">Checking Course release manifest…</p>}
+    {current.isError&&<p role="alert">
+      This publisher Offering cannot be submitted under the current verified Course appointments.
+    </p>}
+    {current.data&&<>
+      <p>{current.data.courseCount} Course(s), {current.data.lessonCount} lesson(s).
+        {" "}Snapshot {current.data.manuscriptHash.slice(0,12)}.
+        {" "}{current.data.manifest?.current
+          ? "Current manifest: "+current.data.manifest.status
+          :current.data.manifest?"Previous review snapshot is stale.":"Not yet submitted for review."}
+      </p>
+      {current.data.lifecycle==="draft"&&
+        <Button className="mt-3" type="button" variant="outline"
+          disabled={busy||Boolean(current.data.manifest?.current)}
+          onClick={()=>void submit()}>
+          {busy?"Submitting…":"Submit native Course and Offering for independent review"}
+        </Button>}
+    </>}
+    {notice&&<p role="status" className="mt-2">{notice}</p>}
+    {error&&<p role="alert" className="mt-2 text-destructive">{error}</p>}
+  </div>;
 }
 
 /** Native Course editor in the existing publisher content workspace.
@@ -165,6 +225,7 @@ export function NativeCourseDraftEditor({versions}:{versions:readonly DraftVersi
             className="border border-border p-3">
             <strong>{item.offeringTitle} · Offering v{item.versionNo}:</strong>
             {" "}{item.published?"published":"not published"} ({item.lifecycle}).
+            {!item.published&&<NativeOfferingSubmission offeringVersionId={item.offeringVersionId}/>}
           </li>)}
           {!readiness.data.offerings.length&&<li className="border border-border p-3">
             No Offering version is linked to this exact native Course version.
