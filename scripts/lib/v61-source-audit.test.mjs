@@ -60,3 +60,18 @@ test("changed route cannot introduce new unshared controls", () => temp(({ root,
   assert.equal(result.checked, 1);
   assert.match(result.errors.join("\n"), /native increased/);
 }));
+
+
+test("new TSX files compare against an empty base without parser fallback errors", () => temp(({ root, write }) => {
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
+  git("init", "-q");
+  git("config", "user.name", "V61 test");
+  git("config", "user.email", "test@example.invalid");
+  write("src/routes/existing.tsx", "export const Existing = () => <Button/>;");
+  git("add", "."); git("commit", "-qm", "initial");
+  write("src/routes/new.tsx", "export const New = () => <input/>;");
+  git("add", "."); git("commit", "-qm", "new route");
+  const result = checkChangedFiles(root, "HEAD^");
+  assert.equal(result.checked, 1);
+  assert.match(result.errors.join("\n"), /native increased \(input\)/);
+}));
