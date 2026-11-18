@@ -63,7 +63,7 @@ export const siteOrganizationRoles = educationV30.table("site_organization_roles
   validThrough: timestamp("valid_through", { withTimezone: true }),
 });
 
-export const educationOperations = educationV30.table("education_operations", {
+export const educationOperations = pgTable("education_operations", {
   id: id(),
   name: text("name").notNull(),
   status: text("status").$type<"planning" | "active" | "paused" | "closed">().notNull(),
