@@ -8,12 +8,14 @@ export function RubricScoreFields({
   onChange,
   total,
   pointsPossible,
+  disabled = false,
 }: {
   criteria: readonly RubricCriterion[];
   values: Readonly<Record<string, string>>;
   onChange: (criterionId: string, value: string) => void;
   total: number | null;
   pointsPossible: string | number | null | undefined;
+  disabled?: boolean;
 }) {
   return (
     <fieldset className="space-y-3">
@@ -22,7 +24,7 @@ export function RubricScoreFields({
         <Field key={criterion.id} label={<>{criterion.label}{" "}
           <span className="font-normal text-muted-foreground">(0–{criterion.maxPoints})</span></>}
           description={criterion.description || undefined} required className="max-w-md">
-          <Input type="number" min={0} max={criterion.maxPoints} step="any"
+          <Input type="number" min={0} max={criterion.maxPoints} step="any" disabled={disabled}
             className="max-w-32" value={values[criterion.id] ?? ""}
             onChange={(event) => onChange(criterion.id, event.target.value)}/>
         </Field>
