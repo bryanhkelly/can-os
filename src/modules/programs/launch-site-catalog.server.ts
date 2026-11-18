@@ -16,6 +16,7 @@ export type LaunchSiteCatalogScope =
 
 export async function resolveLaunchSiteCatalogContext(
   request:Request,publicSiteId:string,
+  requiredCapability:"program.launch.start"|"class.manage"="program.launch.start",
 ):Promise<LaunchSiteCatalogScope>{
   const publicActor=await getCommandContext(request);
   const [site]=await db.select({
@@ -40,7 +41,7 @@ export async function resolveLaunchSiteCatalogContext(
   if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??"")||
      !actor.scope.siteIds?.includes(site.id)||
      actor.scope.organizationIds?.length!==1||
-     !actor.capabilities.has("program.launch.start"))
+     !actor.capabilities.has(requiredCapability))
     return {kind:"blocked"};
 
   return {kind:"ready",canonicalSiteId:site.id,actor};
