@@ -6,6 +6,7 @@ import { and, asc, count, eq, inArray, or, isNull, desc } from "drizzle-orm";
 import { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { actorSiteIds, requireActor } from "@/modules/identity/actors.server";
+import { accessibleClasses } from "@/modules/learning/class-access.server";
 
 /** Deployment feature flags for the study-group pages. */
 export const getStudyGroupAvailability = createServerFn({ method: "GET" }).handler(async () => ({
@@ -17,15 +18,19 @@ export const getStudyGroupAvailability = createServerFn({ method: "GET" }).handl
 export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).handler(async () => {
   const actor = await requireActor(["student", "teacher"]);
   setResponseHeader("Cache-Control", "private, no-store");
-  const sites = actorSiteIds(actor);
+  // CAN provider teachers can hold exact delegated Section grants without
+  // a host Site or Program grant. Reuse the class authorization projection.
+  const sites = actor.role === "student" ? actorSiteIds(actor) : actor.scope.siteIds ?? [];
   const programs = actor.scope.programIds ?? [];
+  const authorizedSections = actor.role === "teacher" ? await accessibleClasses(actor) : [];
+  const sectionIds = authorizedSections.map(section => section.id);
   const studentGuardianRows = actor.role === "student" ? await db.select({
     id: s.guardianRelationships.id,
   }).from(s.guardianRelationships).where(guardianRelationshipPredicate({
     studentPersonId: actor.actorPersonId, access: "enrollment",
   })).limit(1) : [];
   const hasEnrollmentGuardian = actor.role === "student" ? studentGuardianRows.length > 0 : null;
-  if (!programs.length) return {
+  if (!programs.length && !sectionIds.length) return {
     role: actor.role, groups: [], sections: [], hasEnrollmentGuardian,
   };
   const groups = await db.select({
@@ -36,8 +41,22 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     maxMembers: s.studyGroups.maxMembers,
     timezone: s.sites.timezone,
   }).from(s.studyGroups).innerJoin(s.sites, eq(s.sites.id, s.studyGroups.siteId)).where(and(
-    eq(s.studyGroups.status, "active"), inArray(s.studyGroups.siteId, sites),
-    or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs)),
+    eq(s.studyGroups.status, "active"),
+    actor.role === "teacher"
+      ? and(
+          eq(s.studyGroups.facilitatorPersonId, actor.actorPersonId),
+          or(
+            sectionIds.length ? inArray(s.studyGroups.sectionId, sectionIds) : undefined,
+            sites.length && programs.length ? and(
+              inArray(s.studyGroups.siteId, sites),
+              or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs)),
+            ) : undefined,
+          ),
+        )
+      : and(
+          inArray(s.studyGroups.siteId, sites),
+          or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs)),
+        ),
   )).orderBy(desc(s.studyGroups.createdAt)).limit(100);
 
   const teaching = actor.role === "teacher" ? await db.select({
@@ -46,8 +65,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
   }).from(s.sectionTeachers)
     .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
     .where(and(eq(s.sectionTeachers.personId, actor.actorPersonId),
-      eq(s.sections.active, true), inArray(s.sections.siteId, sites),
-      inArray(s.sections.programId, programs)))
+      eq(s.sections.active, true), inArray(s.sections.id, sectionIds)))
     .orderBy(asc(s.sections.title)).limit(100) : [];
 
   const studentPrograms = actor.role === "student" ? await db.select({
@@ -67,7 +85,10 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
       .map(x => x.sectionId)) : new Set<string | null>();
   const allowed = groups.filter(g => actor.role === "teacher"
     ? g.facilitatorPersonId === actor.actorPersonId &&
-      (!g.sectionId || teaching.some(section => section.id === g.sectionId))
+      (g.sectionId
+        ? teaching.some(section => section.id === g.sectionId &&
+          section.siteId === g.siteId && section.programId === g.programId)
+        : sites.includes(g.siteId!) && (!g.programId || programs.includes(g.programId)))
     : studentPrograms.some(p => p.siteId === g.siteId &&
       (!g.programId || p.programId === g.programId)) &&
       (!g.sectionId || studentSectionIds.has(g.sectionId)));
