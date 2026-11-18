@@ -17,17 +17,17 @@ function GradeResponse({ item, onSaved, selected }: { item: Item; onSaved: (id: 
   const mutation=useMutationFeedback(async()=>{});
   const busy=mutation.pending||mutation.refreshFailed;
   const [savedResponse, setSavedResponse] = useState<string | null>(null);
-  return <article id={"grade-action-"+item.id} className={"rounded-xl border p-4"+(selected?" ring-2 ring-primary":"")}>
+  return <article id={"grade-action-"+item.id} className={" border p-4"+(selected?" ring-2 ring-primary":"")}>
     <p className="font-semibold"><Link to="/teacher/gradebook" search={{ section: item.sectionId, assessment: item.assessmentId, student: item.studentProfileId }} className="underline">{item.studentName} · {item.assessmentTitle}</Link></p>
     <p className="mt-2 text-xs font-semibold text-muted-foreground">Released attempt {item.attemptNumber}</p>
-    <div className="mt-2 rounded-lg border bg-muted/40 p-3 text-sm">
+    <div className="mt-2  border bg-muted/40 p-3 text-sm">
       <p className="font-semibold">Grade being discussed: {item.score ?? "Not scored"}{item.score === null ? "" : " / " + item.pointsPossible}</p>
       <p className="mt-2 whitespace-pre-wrap">Released teacher feedback: {item.teacherFeedback || "No written comment recorded."}</p>
     </div>
     <p className="mt-3 text-sm font-semibold">Guardian's question</p>
     <p className="mt-1 whitespace-pre-wrap text-sm">{item.message}</p>
     <p className="mt-2 text-xs capitalize">{item.status.replaceAll("_", " ")}</p>
-    <details className="mt-3 rounded-lg border p-3">
+    <details className="mt-3  border p-3">
       <summary className="cursor-pointer text-sm font-semibold">Review original submitted work and attachments · attempt {item.attemptNumber}</summary>
       <div className="mt-3"><SubmissionEvidence submissionId={item.submissionId} historical/></div>
     </details>
@@ -97,14 +97,14 @@ export function TeacherGradeResponsesPanel({ selectedAction, onQuestionsChange }
   return <section id="grade-follow-ups" aria-label="Guardian grade questions" className="mt-10">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-lg font-semibold">Guardian grade questions</h2>
-      <button type="button" className="rounded-lg border px-3 py-2 text-sm font-semibold"
-        onClick={load}>Refresh questions</button>
+      <Button type="button" variant="outline" size="sm"
+        onClick={load}>Refresh questions</Button>
     </div>
     {data && <p className="mt-2 text-sm text-muted-foreground">
       {data.items.filter(item=>item.status!=="resolved" && item.status!=="cancelled").length} awaiting your school's response
     </p>}
     {!data && !error && <p role="status" className="mt-3 text-sm">Loading academic follow-ups…</p>}
-    {error && <p role="alert" className="mt-3 text-sm">{error} <button type="button" onClick={load} className="underline">Retry</button></p>}
+    {error && <p role="alert" className="mt-3 text-sm">{error} <Button type="button" variant="ghost" size="sm" onClick={load} className="underline">Retry</Button></p>}
     {data && !data.items.length && <p className="mt-3 text-sm">No open or recently resolved guardian questions in your authorized classes.</p>}
     {data && selectedAction && !data.items.some(item=>item.id===selectedAction) &&
       <p role="alert" className="mt-3 text-sm">This guardian question is unavailable in your current academic queue.</p>}
