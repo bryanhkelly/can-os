@@ -18,7 +18,8 @@ import type { z } from "zod";
 type Reader = Pick<typeof db, "select">;
 export async function siteUsesRoomCoverage(tx: Reader, siteId: string) {
   const [row] = await tx.select({ id: roomCoverageSchedules.id }).from(roomCoverageSchedules)
-    .where(eq(roomCoverageSchedules.siteId, siteId)).limit(1);
+    .where(and(eq(roomCoverageSchedules.siteId, siteId),
+      isNull(roomCoverageSchedules.retiredAt))).limit(1);
   return !!row;
 }
 export async function loadRoomCoverageSchedules(tx: Reader, siteId: string) {
