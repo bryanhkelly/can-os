@@ -7,7 +7,7 @@ import { auditEvents, domainEvents, surveyDefinitions, surveyVersions, surveyQue
   surveyQuestionOptions, surveyQuestionBranchRules, surveyCampaigns, surveyInvitations,
   surveyResponses, surveyAnswers, surveyAnswerChoices,
   canonicalClassSurveyCampaigns, canonicalClassEnrollments, canonicalClasses,
-  learnerCourseAttempts, offeringVersions } from "@/db/canonical-v301";
+  learnerCourseAttempts, noncreditRegistrations, offeringVersions } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability, type CommandContext } from "@/domain/command-context";
 import { validateCourseSurveyAnswers, type SurveyQuestion } from "@/domain/course-survey";
 import { getInstructionalLearnerContext } from "@/modules/identity/learning-command-context.server";
@@ -59,17 +59,32 @@ async function classSurveyCampaignIds(tx:Tx,context:CommandContext & {actorPerso
 
 
 /**
- * Noncredit feedback belongs to an actual Offering, not every course
- * sharing the same Deployment. This never creates a parallel survey system.
+ * Return the exact registered noncredit Offering AND operating Organization.
+ * A shared Deployment/Offering does not authorize another operator's survey.
+ * The Course Attempt, Registration and Person must agree in this transaction.
  */
-async function noncreditSurveyOfferingId(tx:Tx,access:CanonicalParticipationAccess):Promise<string|null>{
+async function noncreditSurveyScope(tx:Tx,access:CanonicalParticipationAccess):
+  Promise<{offeringId:string;operatingOrganizationId:string}|null>{
   if(access.source!=="noncredit")return null;
-  const [offering]=await tx.select({offeringId:offeringVersions.offeringId})
-    .from(learnerCourseAttempts)
-    .innerJoin(offeringVersions,eq(offeringVersions.id,learnerCourseAttempts.offeringVersionId))
-    .where(eq(learnerCourseAttempts.id,access.courseAttemptId)).limit(1);
-  if(!offering)throw new AuthorizationError("published noncredit Offering for feedback");
-  return offering.offeringId;
+  if(!access.noncreditRegistrationId)throw new AuthorizationError("registered noncredit learner");
+  const [row]=await tx.select({
+    offeringId:offeringVersions.offeringId,
+    operatingOrganizationId:noncreditRegistrations.registeringOrganizationId,
+  }).from(learnerCourseAttempts)
+    .innerJoin(noncreditRegistrations,and(
+      eq(noncreditRegistrations.id,learnerCourseAttempts.noncreditRegistrationId),
+      eq(noncreditRegistrations.deploymentId,learnerCourseAttempts.deploymentId),
+      eq(noncreditRegistrations.offeringVersionId,learnerCourseAttempts.offeringVersionId),
+      eq(noncreditRegistrations.participantPersonId,access.participantPersonId),
+    ))
+    .innerJoin(offeringVersions,
+      eq(offeringVersions.id,learnerCourseAttempts.offeringVersionId))
+    .where(and(
+      eq(learnerCourseAttempts.id,access.courseAttemptId),
+      eq(noncreditRegistrations.id,access.noncreditRegistrationId),
+    )).limit(1);
+  if(!row)throw new AuthorizationError("current registered noncredit survey scope");
+  return row;
 }
 
 /**
@@ -83,7 +98,7 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
   if(access.source!=="noncredit"&&access.source!=="class")
     throw new AuthorizationError("active registered Course or Class participant");
   const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
-  const noncreditOfferingId=await noncreditSurveyOfferingId(tx,access);
+  const noncreditScope=await noncreditSurveyScope(tx,access);
   if(allowedClassCampaigns&&!allowedClassCampaigns.includes(data.campaignId))
     throw new AuthorizationError("survey campaign is not attributed to this Class");
   if(access.source==="noncredit"){
@@ -96,7 +111,9 @@ async function loadCourseSurvey(tx:Tx,context:CommandContext & {actorPersonId:st
     .where(and(eq(surveyCampaigns.id,data.campaignId),
       eq(surveyCampaigns.deploymentId,access.deploymentId))).limit(1);
   const now=new Date();
-  if(!campaign||(noncreditOfferingId!==null&&campaign.offeringId!==noncreditOfferingId)||
+  if(!campaign||(noncreditScope!==null&&
+    (campaign.offeringId!==noncreditScope.offeringId||
+     campaign.operatingOrganizationId!==noncreditScope.operatingOrganizationId))||
     campaign.status!=="active"||campaign.responseMode!=="identified"||
     campaign.startsAt>now||(campaign.endsAt&&campaign.endsAt<=now)||
     !campaign.surveyPermissionEvidenceId)throw new AuthorizationError("active authorized survey campaign");
@@ -161,7 +178,7 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
       if(access.source!=="noncredit"&&access.source!=="class")
         throw new AuthorizationError("authorized learner Course survey participation");
       const allowedClassCampaigns=await classSurveyCampaignIds(tx,context,access);
-  const noncreditOfferingId=await noncreditSurveyOfferingId(tx,access);
+      const noncreditScope=await noncreditSurveyScope(tx,access);
       if(allowedClassCampaigns?.length===0)return [];
       const now=new Date();
       const noncreditIsolation=access.source==="noncredit"?
@@ -190,7 +207,8 @@ export const listNoncreditCourseSurveys=createServerFn({method:"GET"})
         eq(evidenceDocumentVersions.id,surveyCampaigns.surveyPermissionEvidenceId))
       .where(and(
         eq(surveyCampaigns.deploymentId,access.deploymentId),
-        noncreditOfferingId?eq(surveyCampaigns.offeringId,noncreditOfferingId):undefined,
+        noncreditScope?eq(surveyCampaigns.offeringId,noncreditScope.offeringId):undefined,
+        noncreditScope?eq(surveyCampaigns.operatingOrganizationId,noncreditScope.operatingOrganizationId):undefined,
         allowedClassCampaigns?inArray(surveyCampaigns.id,allowedClassCampaigns):undefined,
         noncreditIsolation,
         eq(surveyCampaigns.responseMode,"identified"),
