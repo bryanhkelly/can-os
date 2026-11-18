@@ -84,6 +84,9 @@ export function ClassTeacherPlanningPanel({ data, lessons, search }: {
         : <EmptyState title="No published lessons in this unit."
             description="Published instructional content will appear here when the publisher releases it."/>}
     </WorkspacePanel>)}
+    {data.content && data.content.modules.length === 0 && <EmptyState
+      title="No published units yet."
+      description="The publisher has not released a course sequence for this class. Teacher assignments remain separate from publisher curriculum."/>}
     {!data.content && <WorkspaceNotice tone="attention">
       No published curriculum is available to plan this class.
     </WorkspaceNotice>}
