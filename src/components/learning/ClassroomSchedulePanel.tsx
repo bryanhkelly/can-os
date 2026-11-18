@@ -46,7 +46,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
   const [busy,setBusy]=useState("");
   const [error,setError]=useState("");
   const feedback=useMutationFeedback(()=>schedule.refetch({throwOnError:true}));
-  const blocked=Boolean(busy)||feedback.refreshFailed;
+  const blocked=Boolean(busy)||feedback.pending||feedback.refreshFailed;
   const [cancelPlanId,setCancelPlanId]=useState<string|null>(null);
   const [edit,setEdit]=useState<{
     planId:string;start:string;end:string;
