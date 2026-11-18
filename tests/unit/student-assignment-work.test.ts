@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canSubmitAssignmentWork,
   shouldAutosaveAssignmentDraft,
+  assignmentSummaryForSection,
 } from "@/domain/student-assignment-work";
 
 describe("student assignment work state", () => {
@@ -26,6 +27,17 @@ describe("student assignment work state", () => {
       hydrated: true, editable: true, busy: false,
       draft: "initial text", lastSaved: "initial text",
     })).toBe(false);
+  });
+
+  it("counts only assignments from the selected class without losing cross-class totals", () => {
+    const work = [
+      { sectionId: "english", status: "submitted", title: "Essay" },
+      { sectionId: "english", status: "graded", title: "Journal" },
+      { sectionId: "math", status: "assigned", title: "Worksheet" },
+    ];
+    expect(assignmentSummaryForSection(work, "english")).toMatchObject({total: 2, awaitingFeedback: 1, graded: 1});
+    expect(assignmentSummaryForSection(work)).toMatchObject({total: 3, awaitingFeedback: 1, graded: 1});
+    expect(assignmentSummaryForSection(work, "science")).toMatchObject({total: 0, awaitingFeedback: 0, graded: 0});
   });
 
   it("does not autosave while busy, unauthenticated in the browser, or read-only", () => {
