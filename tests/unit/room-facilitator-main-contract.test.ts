@@ -43,6 +43,10 @@ describe("room facilitator main workflow contract", () => {
     expect(ui).toContain("dayQuery.refetch({throwOnError:true})");
     expect(ui).toContain("attendanceFeedback.refreshFailed");
     expect(ui).toContain('<MutationFeedback state={attendanceFeedback}');
+    expect(ui).toContain("date < addCalendarDays(context.date, -30)");
+    expect(ui).toContain("historicalAttendanceReadOnly || !date");
+    expect(ui).toContain('<WorkspaceNotice tone="attention"');
+    expect(ui).toContain("30-day staff attendance correction window");
     expect(server).toContain('"manual-revision:" + data.mutationId');
     expect(server).toContain("replay.status !== data.status");
   });
