@@ -33,8 +33,8 @@ export function NoncreditCompletionQueuePanel(){
         <p className="text-sm text-muted-foreground">No current registrations for this authorized Site.</p>:
         <div className="divide-y divide-border border border-border">
           {query.data.participants.map(record=>
-            <button key={record.registrationId} type="button"
-              className="flex w-full items-start justify-between gap-4 p-3 text-left hover:bg-muted"
+            <Button key={record.registrationId} type="button" variant="ghost"
+              className="h-auto w-full items-start justify-between gap-4 p-3 text-left whitespace-normal"
               aria-pressed={registrationId===record.registrationId}
               onClick={()=>setRegistrationId(record.registrationId)}>
               <span className="space-y-1">
@@ -50,7 +50,7 @@ export function NoncreditCompletionQueuePanel(){
               </span>
               <span className="text-xs">{registrationId===record.registrationId?
                 "Selected":"Review"}</span>
-            </button>)}
+            </Button>)}
         </div>}
       <div className="flex items-center gap-3">
         <Button variant="outline" disabled={page===0}
