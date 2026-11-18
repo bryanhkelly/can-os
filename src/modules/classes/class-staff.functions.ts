@@ -1,12 +1,12 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
-import { and, eq, isNotNull, isNull, lte } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { accessAccounts, accountPersonGrants, people } from "@/db/schema";
+import { isDemoAccountEmail } from "@/domain/local-demo-access";
 import {
   canonicalClasses, canonicalClassStaffAssignments,
-  canonicalAccountGrants, canonicalAccounts, canonicalPersons,
-  
 } from "@/db/canonical-v301";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
@@ -62,25 +62,33 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
     guarded();
     const manager=await requireClassManager();
     return db.transaction(async tx=>{
-      const instance=await lockedManagedClass(tx,manager,data.classId);
-      const [person]=await tx.select({id:canonicalPersons.id}).from(canonicalPersons)
-        .where(eq(canonicalPersons.id,data.personId)).limit(1);
-      if(!person)throw new AuthorizationError("verified Class staff Person");
-      const [grant]=await tx.select({id:canonicalAccountGrants.id})
-        .from(canonicalAccountGrants)
-        .innerJoin(canonicalAccounts,eq(canonicalAccounts.id,canonicalAccountGrants.accountId))
+         // A Class assignment uses the already verified, immutable CAN Person
+      // and the EXACT current room-facilitator grant at this Class Site.
+      // Native canonical Persons/accounts/grants and email-only identity
+      // matching cannot create a second Person or silently grant staff power.
+      const staffGrants=await tx.select({
+        personId:people.id,
+        grantId:accountPersonGrants.id,
+        email:accessAccounts.emailNormalized,
+      }).from(accountPersonGrants)
+        .innerJoin(accessAccounts,and(
+          eq(accessAccounts.id,accountPersonGrants.accountId),
+          eq(accessAccounts.personId,accountPersonGrants.personId),
+        ))
+        .innerJoin(people,eq(people.id,accountPersonGrants.personId))
         .where(and(
-          eq(canonicalAccountGrants.personId,data.personId),
-          eq(canonicalAccountGrants.organizationId,instance.operatingOrganizationId),
-          eq(canonicalAccountGrants.siteId,instance.siteId!),
-          eq(canonicalAccountGrants.roleCode,"room_facilitator"),
-          eq(canonicalAccountGrants.active,true),
-          isNull(canonicalAccountGrants.revokedAt),
-          isNull(canonicalAccounts.disabledAt),
-          isNotNull(canonicalAccounts.emailVerifiedAt),
-          lte(canonicalAccountGrants.grantedAt,new Date()),
-        )).limit(1);
-      if(!grant)throw new AuthorizationError("current verified room-facilitator grant at this Site");
+          eq(people.id,data.personId),
+          eq(people.active,true),
+          eq(accountPersonGrants.organizationId,instance.operatingOrganizationId),
+          eq(accountPersonGrants.siteId,instance.siteId!),
+          eq(accountPersonGrants.role,"room_facilitator"),
+          eq(accountPersonGrants.active,true),
+          eq(accessAccounts.disabled,false),
+          isNotNull(accessAccounts.emailVerifiedAt),
+        )).for("share").limit(2);
+      if(staffGrants.length!==1 || isDemoAccountEmail(staffGrants[0]!.email))
+        throw new AuthorizationError("current verified CAN room-facilitator grant at exact Site");
+zationError("current verified room-facilitator grant at this Site");
       const [prior]=await tx.select({
         id:canonicalClassStaffAssignments.id,
         attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
