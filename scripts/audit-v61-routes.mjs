@@ -44,6 +44,9 @@ const sourceGuarded = new Set([
   "admissions.index.tsx",
   "teacher.gradebook.tsx",
   "calendar.tsx",
+  "sites.$siteId.publish.tsx",
+  "canonical.blueprint-reviews.tsx",
+  "site-website.tsx",
 ]);
 
 function resolveSource(from, specifier) {
