@@ -36,7 +36,8 @@ describe("Teacher Today schedule", () => {
       startsAt: "2026-10-30T16:00:00Z", endsAt: null, timezone: "America/Los_Angeles",
       description: null, cancelled: false, manageable: false, sectionId: "english" }] });
     expect(html).toContain("/teacher/gradebook?section=english&amp;assessment=essay");
-    expect(html).toContain(" · Due");
+    expect(html).toContain("Due");
+    expect(html).toContain("border-warning/50");
   });
   it("uses the authorized feed's Section even when the dashboard class summary omits it", () => {
     const html = render({ ...feed, items: [{ id: "assessment:essay", title: "Essay", type: "due_date", source: "assessment",
