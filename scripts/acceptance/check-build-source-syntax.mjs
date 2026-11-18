@@ -9,6 +9,7 @@
 import {readdir, readFile} from "node:fs/promises";
 import {join, relative, resolve, extname} from "node:path";
 import ts from "typescript";
+import { duplicateImportBindings } from "../lib/import-binding-conflicts.mjs";
 
 const root=resolve(process.cwd());
 // Only runtime and build-tool source blocks a production build. Test suites
@@ -49,10 +50,18 @@ for(const filename of files){
       " TS"+diagnostic.code+" "+message);
     errors++;
   }
+  // Parser diagnostics alone do not catch two imports declaring the same
+  // local name. Report this deterministic binding collision before building.
+  for(const conflict of duplicateImportBindings(parsed)){
+    const {line,character}=parsed.getLineAndCharacterOfPosition(conflict.start);
+    console.error(relative(root,filename)+":"+(line+1)+":"+(character+1)+
+      " Duplicate import binding: "+conflict.name);
+    errors++;
+  }
 }
 if(errors){
   console.error("Source syntax gate blocked build: "+errors+
-    " parser errors across "+files.length+" files. Fix the first syntax error, then retry.");
+    " syntax/import errors across "+files.length+" files. Fix the first error, then retry.");
   process.exitCode=1;
 }else{
   console.log("Source syntax gate: "+files.length+
