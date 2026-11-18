@@ -74,6 +74,43 @@ describe("Private Site preview pulls data channels through the actual template",
     }
   });
 
+  it("never promises Program or Course enrollment without a verified action across the seven templates",()=>{
+    const release="11111111-1111-4111-8111-111111111111";
+    const season="22222222-2222-4222-8222-222222222222";
+    const blocks=[
+      {id:"programs",channel:"learning.enrichment" as const,
+       placement:"learning" as const,layout:"cards" as const,enabled:true,
+       eyebrow:"Programs",title:"Community Programs",description:""},
+      {id:"courses",channel:"learning.noncredit" as const,
+       placement:"learning" as const,layout:"cards" as const,enabled:true,
+       eyebrow:"Courses",title:"Independent Courses",description:""},
+    ];
+    const feeds={
+      mode:"public" as const,
+      enrichment:[{seasonId:season,title:"Summer Lab",programName:"Community",registrationOpen:true}],
+      noncredit:[{releaseId:release,title:"Digital Skills",siteName:"Learning Center",
+        seatsRemaining:8,waitlistAvailable:false}],
+    };
+    const config={version:2 as const,revision:1,blocks};
+    const withoutActions=resolveSiteContentBlocks(config,feeds);
+    const withActions=resolveSiteContentBlocks(config,{
+      ...feeds,enrollmentOrigin:"https://app.example.org",
+    });
+    for(const templateId of siteTemplateIds){
+      const site=base(templateId);
+      const privateState=renderPublicSiteHtml({...site,contentBlocks:withoutActions});
+      expect(privateState).toContain("Program information only");
+      expect(privateState).toContain("Enrollment information only");
+      expect(privateState).not.toContain("/learn/enroll?release=");
+      expect(privateState).not.toContain("/enrichment/"+season);
+      const publicState=renderPublicSiteHtml({...site,contentBlocks:withActions});
+      expect(publicState).toContain("Published program · enrollment available");
+      expect(publicState).toContain("Enrollment available");
+      expect(publicState).toContain("https://app.example.org/enrichment/"+season);
+      expect(publicState).toContain("https://app.example.org/learn/enroll?release="+release);
+    }
+  });
+
   it("keeps a dark modern theme for programs instead of a mismatched white insert", () => {
     const html = renderPublicSiteHtml({...base("modern"), contentBlocks: channels}, {localPreview: true});
     expect(html).toContain("body.template-modern .site-content-block .site-channel-card");
