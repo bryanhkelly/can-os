@@ -23,7 +23,7 @@ export function StaffClassVideos({ sections, videos }: {
     catch (failure) { setError(normalizeClientError(failure, "Unable to load video management for this class.").message); }
     finally { setPending(false); }
   }
-  return <section className="space-y-4 rounded-xl border p-5" aria-label="Staff class videos">
+  return <section className="space-y-4  border p-5" aria-label="Staff class videos">
     <h2 className="font-serif text-2xl">Class videos</h2>
     <p className="text-sm text-muted-foreground">Upload classwide or lesson-linked videos for students. Staff can preview before sharing the class page.</p>
     <form noValidate className="flex flex-wrap items-end gap-3" onSubmit={event => {
@@ -44,7 +44,7 @@ export function StaffClassVideos({ sections, videos }: {
     {error && <p role="alert" className="text-sm">{error}</p>}
     {options && <ClassVideoUploadForm key={sectionId} sectionId={sectionId} lessons={options.lessons} enabled={options.enabled}/>}
     {options && <ul className="space-y-3">{videos.filter(video => video.kind === "video" && video.sectionId === sectionId)
-      .map(video => <li key={video.id} className="rounded border p-3">
+      .map(video => <li key={video.id} className=" border p-3">
         <ClassVideoPlayer title={video.title} url={video.url} loadUrl={!video.url ? async () =>
           (await getStaffClassVideoPreview({ data: { sectionId, supplementId: video.id } })).downloadUrl : undefined}/>
       </li>)}</ul>}
