@@ -70,7 +70,7 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
   <section aria-label="Assignments" className="mt-5 grid items-start gap-4 lg:grid-cols-2">
    {!items.length && <EmptyState kind="matches" title="No assignments in this view."/>}
    {items.map(item => <StudentAssignmentLink key={item.assessmentId} assessmentId={item.assessmentId}
-    sectionId={section} filter={filter}
+    sectionId={section} filter={filter==="all"?undefined:filter}
     className="block w-full border border-border bg-card p-5 text-left hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
     <div className="flex items-start justify-between gap-3">
      <p className="text-xs text-muted-foreground">{item.course}</p>
