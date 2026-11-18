@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   classroomAttendanceNeedsExplanation,classroomAttestationOpen,
+  summarizeVerifiedRoomAttendance,
 } from "@/domain/classroom-attendance";
 import {
   canOpenScheduledClassroom,validClassroomScheduleWindow,
@@ -129,5 +130,44 @@ describe("Release 3 governed survey delivery",()=>{
     expect(safe).not.toContain("facilitatedRoomAttendanceAssertions");
     expect(safe).not.toContain("facilitatedRoomAssistedActivityEvidence");
     expect(safe).not.toContain("surveyAnswers");
+  });
+});
+
+describe("Phase 2 linked-room attendance reconciliation",()=>{
+  it("counts only latest verified presence by exact room and Course attempt",()=>{
+    const summary=summarizeVerifiedRoomAttendance([
+      {roomId:"church-a-session-1",attemptId:"adult-a",status:"absent"},
+      {roomId:"church-a-session-2",attemptId:"adult-a",status:"present"},
+      {roomId:"church-a-session-1",attemptId:"adult-a",status:"present"},
+      {roomId:"church-b-session-1",attemptId:"adult-b",status:"present"},
+      {roomId:"church-b-session-1",attemptId:"adult-b",status:"absent"},
+    ]);
+    expect(summary.presentPairs.has("church-a-session-1:adult-a")).toBe(false);
+    expect(summary.presentPairs.has("church-a-session-2:adult-a")).toBe(true);
+    expect(summary.presentPairs.has("church-b-session-1:adult-b")).toBe(true);
+    expect(summary.verifiedAttendeesByRoom.get("church-a-session-1")).toBe(0);
+    expect(summary.verifiedAttendeesByRoom.get("church-a-session-2")).toBe(1);
+    expect(summary.verifiedAttendeesByRoom.get("church-b-session-1")).toBe(1);
+    expect([...summary.presentAttemptIds].sort()).toEqual(["adult-a","adult-b"]);
+  });
+  it("does not count a no-device or unknown assertion as independently verified present",()=>{
+    const summary=summarizeVerifiedRoomAttendance([
+      {roomId:"room",attemptId:"adult",status:"unknown"},
+    ]);
+    expect(summary.presentPairs.size).toBe(0);
+    expect(summary.verifiedAttendeesByRoom.get("room")).toBe(0);
+  });
+  it("keeps cohort and provider Site reporting on the same correction projector",()=>{
+    const cohort=read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
+    const network=read("src/modules/enrollment/noncredit-network-report.functions.ts");
+    const operator=read("src/components/enrollment/NoncreditReleaseOperations.tsx");
+    for(const source of [cohort,network]){
+      expect(source).toContain("summarizeVerifiedRoomAttendance(");
+      expect(source).toContain("currentNoncreditCompletionStates(");
+    }
+    expect(cohort).toContain("verifiedAttendeesByRoom.get(p.roomId)");
+    expect(operator).toContain("session.verifiedAttendees");
+    expect(operator).toContain("session.roomOpened");
+    expect(network).toContain("const {presentPairs:present}=summarizeVerifiedRoomAttendance(asserted)");
   });
 });
