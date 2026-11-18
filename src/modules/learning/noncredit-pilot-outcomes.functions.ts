@@ -42,14 +42,22 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const from=data.from?new Date(data.from):new Date(to.getTime()-90*86400000);
     if(!(to>from)||to.getTime()-from.getTime()>366*86400000)
       throw new Error("Pilot reporting must use a positive range of no more than 366 days");
-    const trainings=await db.select({
+    // The operator may deliver a Course published by a different authorized
+    // provider. Scope through the operator's approved Site releases, never
+    // by assuming the training publisher equals the local organization.
+    const trainings=await db.selectDistinct({
       id:noncreditTrainingVersions.id,title:noncreditTrainingVersions.title,
-      offeringVersionId:noncreditTrainingVersions.offeringVersionId,
       finalAssessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
       baselineAssessmentVersionId:noncreditTrainingVersions.baselineAssessmentVersionId,
     }).from(noncreditTrainingVersions)
-      .where(eq(noncreditTrainingVersions.providerOrganizationId,organizationId))
-      .orderBy(asc(noncreditTrainingVersions.title));
+      .innerJoin(noncreditSelfEnrollmentReleases,eq(
+        noncreditSelfEnrollmentReleases.trainingVersionId,noncreditTrainingVersions.id))
+      .where(and(
+        eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,organizationId),
+        inArray(noncreditSelfEnrollmentReleases.siteId,siteIds),
+      ))
+      .orderBy(asc(noncreditTrainingVersions.title)).limit(take);
+    checkBound(trainings.length,"Published pilot training versions");
     if(!trainings.length)return {
       from:from.toISOString(),to:to.toISOString(),participantCount:0,
       totals:summarizeNoncreditPilot([]),byTraining:[],
@@ -78,7 +86,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         eq(noncreditSelfEnrollmentReleases.trainingVersionId,noncreditRegistrations.trainingVersionId),
       ))
       .where(and(
-        eq(noncreditSelfEnrollmentReleases.providerOrganizationId,organizationId),
+        eq(noncreditSelfEnrollmentReleases.registeringOrganizationId,organizationId),
         inArray(noncreditSelfEnrollmentReleases.siteId,siteIds),
         inArray(noncreditRegistrations.trainingVersionId,trainings.map(t=>t.id)),
         gte(noncreditRegistrations.registeredAt,from),
