@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { StatusBadge } from "@/components/workspace";
+import { StatusBadge, MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import {
   attestClassroomParticipation, getClassroomAttendanceRoster,
@@ -25,11 +26,13 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
   const [method,setMethod]=useState<Method>("in_person_roll_call");
   const [notes,setNotes]=useState<Record<string,string>>({});
   const [busy,setBusy]=useState("");
+  const feedback=useMutationFeedback(()=>roster.refetch({throwOnError:true}));
+  const blocked=Boolean(busy)||feedback.refreshFailed;
   const [error,setError]=useState("");
   const [message,setMessage]=useState("");
   const retries=useRef<Record<string,string>>({});
   async function attest(courseAttemptId:string,status:Status){
-    if(busy)return;
+    if(blocked)return;
     const note=notes[courseAttemptId]?.trim()||null;
     const participant=roster.data?.members.find(member=>member.courseAttemptId===courseAttemptId);
     if(!participant || !roster.data?.attestationsOpen){
@@ -54,22 +57,20 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
     retries.current[key]=requestId;
     setBusy(courseAttemptId);setError("");setMessage("");
     try {
-      const result=await attestClassroomParticipation({data:{
+      const outcome=await feedback.run(()=>attestClassroomParticipation({data:{
         facilitatedSessionId,courseAttemptId,requestId,
         status,method,evidenceNote:note,
-      }});
-      delete retries.current[key];
-      setNotes(current=>({...current,[courseAttemptId]:""}));
-      try {
-        await roster.refetch({throwOnError:true});
-        setMessage(result.noDeviceEvidence?
-          "Direct facilitator verification recorded without adding a device pairing.":
-          "Facilitator verification recorded independently of device activity.");
-      } catch {
-        setMessage("Facilitator verification was saved, but the roster could not be refreshed. Refresh the room before making another correction.");
+      }}),{
+        successMessage:result=>result.noDeviceEvidence
+          ?"Direct facilitator verification recorded without adding a device pairing."
+          :"Facilitator verification recorded independently of device activity.",
+        commandErrorMessage:"Attendance verification could not be confirmed. Check Site access and observation evidence, then retry with the same details.",
+        refreshErrorMessage:"Facilitator verification was saved, but the roster could not be refreshed. Retry the refresh before recording another correction.",
+      });
+      if(outcome.status==="saved"||outcome.status==="refresh-failed"){
+        delete retries.current[key];
+        setNotes(current=>({...current,[courseAttemptId]:""}));
       }
-    }catch{
-      setError("Attendance verification could not be confirmed. Check current Site access and observation evidence, then refresh before retrying with the same details.");
     }finally{setBusy("");}
   }
   return <section className="mt-4 border border-border bg-card p-4"
@@ -127,7 +128,7 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
         {(["present","absent","unknown"] as const).map(status=>
           <Button type="button" size="sm" key={status}
             variant={person.latestStatus===status?"default":"outline"}
-            disabled={!!busy||!roster.data.attestationsOpen||
+            disabled={blocked||!roster.data.attestationsOpen||
               Boolean(person.lastAssertedAt && person.latestStatus===status && person.latestMethod===method)}
             onClick={()=>void attest(person.courseAttemptId,status)}>
             {busy===person.courseAttemptId?"Saving…":
@@ -139,5 +140,6 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       className="mt-4 text-sm">The 48-hour correction window has closed.</p>}
     {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
     {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
+    <MutationFeedback state={feedback} pendingMessage="Saving verified room participation…" className="mt-3"/>
   </section>;
 }
