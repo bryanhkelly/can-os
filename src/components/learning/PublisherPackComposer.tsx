@@ -4,6 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field, FieldError } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { WorkspaceNotice } from "@/components/workspace";
 import {
  createAuthoredPublisherPack, getPublisherPackStudio, publishAuthoredPublisherPack,
  saveAuthoredPublisherPack, startPublisherPackDraft,
@@ -30,14 +34,14 @@ function PackDraftEditor({programId,release,courses,onSaved}:{
   catch(e){setError(mutationErrorMessage(e, "Unable to save publisher pack draft."));}
   finally{setBusy(false);}
  }
- return <section className="mt-3 space-y-3 rounded border p-4" aria-label="Publisher pack draft composer">
+ return <section className="mt-3 space-y-3  border p-4" aria-label="Publisher pack draft composer">
   <p className="text-sm">Choose the published, publisher-owned course release for each course. A pack release is immutable after publication and does not upgrade existing school adoptions.</p>
-  {error&&<p role="alert" className="rounded border p-2 text-sm">{error}</p>}
+  {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
   {notice&&<p role="status" className="text-sm">{notice}</p>}
   <fieldset disabled={busy} className="space-y-2">
    <legend className="text-sm font-semibold">Published courses for this pack</legend>
-   {courses.map(course=><label key={course.courseVersionId} className="flex items-start gap-2 rounded border p-2 text-sm">
-    <input type="checkbox" checked={selected.includes(course.courseVersionId)}
+   {courses.map(course=><Label key={course.courseVersionId} className="flex items-start gap-2  border p-2 text-sm">
+    <Checkbox checked={selected.includes(course.courseVersionId)}
      onChange={e=>{
       const versionsOfSameCourse=courses.filter(c=>c.courseId===course.courseId).map(c=>c.courseVersionId);
       setSelected(old=>e.target.checked
@@ -45,17 +49,17 @@ function PackDraftEditor({programId,release,courses,onSaved}:{
        : old.filter(id=>id!==course.courseVersionId));
      }}/>
     <span>{course.code}: {course.title} · v{course.version} · {course.subject}</span>
-   </label>)}
+   </Label>)}
    {!courses.length&&<p className="text-sm">Publish at least one publisher-owned course before composing the pack.</p>}
   </fieldset>
   {dirty&&<p className="text-xs">Unsaved composition changes</p>}
-  <button type="button" disabled={busy||!dirty||selected.length<1} className="rounded border px-3 py-2 text-sm disabled:opacity-50"
+  <Button type="button" variant="outline" disabled={busy||!dirty||selected.length<1} className=" border px-3 py-2 text-sm disabled:opacity-50"
    onClick={()=>void act(async()=>{
     const result=await saveAuthoredPublisherPack({data:{
      programId,versionId:release.id,expectedRevision:revision,courseVersionIds:selected,
     }});
     setRevision(result.revision);setCommitted([...selected]);setConfirmed(false);
-   },"Pack draft saved. Not yet available to adopting schools.")}>Save course selection</button>
+   },"Pack draft saved. Not yet available to adopting schools.")}>Save course selection</Button>
   <form noValidate className="mt-3 space-y-3 border-t pt-3" onSubmit={e=>{
    e.preventDefault();
    setAttempted(true);
@@ -91,12 +95,12 @@ export function PublisherPackComposer({studio,onSaved}:{studio:Studio;onSaved:()
   catch(e){setError(mutationErrorMessage(e, "Unable to manage publisher pack."));}
   finally{setBusy(false);}
  }
- return <section className="space-y-4 rounded border p-5" aria-label="Publisher curriculum packs">
+ return <section className="space-y-4  border p-5" aria-label="Publisher curriculum packs">
   <h2 className="text-xl font-semibold">Publisher Packs</h2>
   <p className="text-sm">Compose immutable packs from your own published courses. Separate license entitlements and school adoption determine which institutions can use them. Commercial licenses require verified agreements before a school can install.</p>
-  {error&&<p role="alert" className="rounded border p-2 text-sm">{error}</p>}
+  {error&&<WorkspaceNotice tone="danger">{error}</WorkspaceNotice>}
   {notice&&<p role="status" className="text-sm">{notice}</p>}
-  <form className="grid gap-3 rounded border p-4 sm:grid-cols-2" onSubmit={e=>{
+  <form className="grid gap-3  border p-4 sm:grid-cols-2" onSubmit={e=>{
    e.preventDefault();requestId.current??=crypto.randomUUID();
    void act(async()=>{
     await createAuthoredPublisherPack({data:{
@@ -106,35 +110,34 @@ export function PublisherPackComposer({studio,onSaved}:{studio:Studio;onSaved:()
    },"Publisher pack created. Select the included published course releases below.");
   }}>
    <h3 className="font-semibold sm:col-span-2">Create curriculum pack</h3>
-   <label className="text-sm">Pack name<input required minLength={3} maxLength={160} value={name}
-    onChange={e=>{requestId.current=null;setName(e.target.value);}} className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">URL slug<input required minLength={3} maxLength={80} pattern="[a-z0-9-]+"
+   <Field label="Pack name"><Input required minLength={3} maxLength={160} value={name}
+    onChange={e=>{requestId.current=null;setName(e.target.value);}} className="mt-1 block w-full  border bg-background p-2"/></Field>
+   <Field label="URL slug"><Input required minLength={3} maxLength={80} pattern="[a-z0-9-]+"
     value={slug} onChange={e=>{requestId.current=null;setSlug(e.target.value);}}
-    className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm sm:col-span-2">Publisher description<textarea required minLength={10} maxLength={2000}
+    className="mt-1 block w-full  border bg-background p-2"/></Field>
+   <Field label="Publisher description"><Textarea required minLength={10} maxLength={2000}
     value={description} onChange={e=>{requestId.current=null;setDescription(e.target.value);}}
-    className="mt-1 block w-full rounded border bg-background p-2"/></label>
-   <label className="text-sm">Visibility<select value={visibility} onChange={e=>{requestId.current=null;setVisibility(e.target.value as typeof visibility);}}
-    className="mt-1 block w-full rounded border bg-background p-2">
+    className="mt-1 block w-full  border bg-background p-2"/></Field>
+   <Field label="Visibility"><Select value={visibility} onChange={e=>{requestId.current=null;setVisibility(e.target.value as typeof visibility);}}
+    className="mt-1 block w-full  border bg-background p-2">
     <option value="private">Private</option><option value="public">Public discovery</option>
-   </select></label>
-   <label className="text-sm">License type<select value={licenseCode} onChange={e=>{requestId.current=null;setLicenseCode(e.target.value as typeof licenseCode);}}
-    className="mt-1 block w-full rounded border bg-background p-2">
+   </Select></Field>
+   <Field label="License type"><Select value={licenseCode} onChange={e=>{requestId.current=null;setLicenseCode(e.target.value as typeof licenseCode);}}
+    className="mt-1 block w-full  border bg-background p-2">
     <option value="CC0">CC0</option><option value="CC-BY-4.0">CC-BY 4.0</option>
     <option value="COMMERCIAL">Commercial (verified agreement required)</option>
-   </select></label>
-   <button disabled={busy} className="justify-self-start rounded border px-4 py-2 text-sm disabled:opacity-50">Create pack</button>
+   </Select></Field>
+   <Button type="submit" disabled={busy} className="justify-self-start">Create pack</Button>
   </form>
-  {studio.packs.map(pack=><section key={pack.id} className="space-y-2 rounded border p-4">
+  {studio.packs.map(pack=><section key={pack.id} className="space-y-2  border p-4">
    <h3 className="font-semibold">{pack.name}</h3>
    <p className="text-xs">{pack.visibility} · {pack.licenseCode} · {pack.slug}</p>
    <p className="text-sm">{pack.description}</p>
-   {!pack.releases.some(r=>r.status==="draft")&&<button disabled={busy}
-    className="rounded border px-3 py-2 text-sm disabled:opacity-50" onClick={()=>void act(()=>{
+   {!pack.releases.some(r=>r.status==="draft")&&<Button type="button" variant="outline" disabled={busy} onClick={()=>void act(()=>{
      const requestId=nextDraftRequests.current.get(pack.id)??crypto.randomUUID();
      nextDraftRequests.current.set(pack.id,requestId);
      return startPublisherPackDraft({data:{programId:studio.programId,packId:pack.id,requestId}});
-    },"A new editable pack version was created; existing school adoptions remain unchanged.")}>Create next pack draft</button>}
+    },"A new editable pack version was created; existing school adoptions remain unchanged.")}>Create next pack draft</Button>}
    {pack.releases.map(release=><details key={release.id} open={release.status==="draft"} className="border-t pt-2">
     <summary className="cursor-pointer text-sm">Pack v{release.version} · {release.status} · {release.courseVersionIds.length} courses</summary>
     {release.status==="draft"?<PackDraftEditor key={release.id} programId={studio.programId}
