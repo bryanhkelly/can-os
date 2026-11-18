@@ -605,6 +605,22 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "@/components/ui/select", "@/components/ui/input",
     "@/components/ui/choice", "<WorkspaceNotice",
   ],
+  "routes/operations.family-alerts.tsx": [
+    "@/components/ui/button", "@/components/ui/input", "@/components/ui/field",
+    "<Button", "<Field",
+  ],
+  "routes/operations.teacher-marketplace.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/field",
+    "<Button", "<EmptyState",
+  ],
+  "routes/sites.$siteId.parent-information.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
+    "<Button", "<Field",
+  ],
+  "routes/operations.health-review.tsx": [
+    "@/components/ui/button", "@/components/ui/textarea", "@/components/ui/field",
+    "<WorkspaceNotice", "<EmptyState",
+  ],
 };
 for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
