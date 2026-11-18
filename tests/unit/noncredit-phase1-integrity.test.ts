@@ -110,5 +110,9 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(pilotReport).toContain("registrationCounts.get(surveyKey)");
     expect(pilotReport).toContain("attributableNoncreditFeedback");
     expect(feedbackPatch).toContain("JOIN offering_versions ov ON ov.id=r.offering_version_id");
+    expect(feedbackPatch).toContain("ALTER TABLE public.survey_trigger_rules");
+    expect(feedbackPatch).toContain("JOIN public.survey_trigger_rules rule");
+    expect(feedbackPatch).toContain("JOIN public.survey_definitions d");
+    expect(feedbackPatch).not.toContain("education_v30.survey_trigger_rules");
   });
 });
