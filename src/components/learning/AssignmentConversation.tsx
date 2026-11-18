@@ -4,6 +4,7 @@ import { Link } from "@tanstack/react-router";
 import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { WorkspaceNotice } from "@/components/workspace";
 import { startAssignmentConversation } from "@/modules/learning/class-communication.functions";
 
 export function AssignmentConversation({ assessmentId, studentPersonId }: { assessmentId: string; studentPersonId?: string }) {
@@ -30,10 +31,10 @@ function AssignmentConversationForm({ assessmentId, studentPersonId }: { assessm
     } catch (cause) { setError(mutationErrorMessage(cause, "Unable to send this assignment message.")); }
     finally { setBusy(false); }
   }
-  return <details className="mt-5 rounded-xl border p-4">
+  return <details className="mt-5 border p-4">
     <summary className="cursor-pointer text-sm font-semibold">Discuss this assignment</summary>
     <p className="mt-3 text-sm text-muted-foreground">Messages are shared with the student, academically authorized guardians, and the class teaching team—not a private teacher note.</p>
-    {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
+    {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
     {threadId && <p role="status" className="mt-3 text-sm">Message sent. <Link to="/messages" search={{ thread: threadId }} className="underline">Open assignment conversation</Link></p>}
     <form noValidate onSubmit={event => { event.preventDefault(); void send(); }} className="mt-3 grid gap-3">
       <Field label="Message" required error={validationError ? "Enter a message." : undefined}>
