@@ -32,9 +32,9 @@ function TeacherFollowUpResolution({ item, onSaved }: { item: QueueItem; onSaved
   if (item.status === "resolved") return item.resolutionNote
     ? <p className="mt-2 whitespace-pre-wrap text-xs">{item.resolutionNote}</p> : null;
   return <div className="mt-3">
-    {!expanded && <button type="button" className="text-sm underline"
-      onClick={() => setExpanded(true)}>Document follow-up and close</button>}
-    {expanded && <form noValidate className="mt-3 grid gap-3 rounded border p-3"
+    {!expanded && <Button variant="ghost" size="sm" type="button" className="text-sm underline"
+      onClick={() => setExpanded(true)}>Document follow-up and close</Button>}
+    {expanded && <form noValidate className="mt-3 grid gap-3  border p-3"
       onSubmit={async event => {
         event.preventDefault();
         setAttempted(true);
@@ -99,13 +99,13 @@ export function TeacherLearningFollowUpsPanel({ revision = 0 }: { revision?: num
       Teacher-owned support Actions in your currently assigned classes. Student work and teacher judgment, not activity counts, determine the outcome.
     </p>
     {!data && !error && <p role="status" className="mt-3 text-sm">Loading assigned follow-ups…</p>}
-    {error && <p role="status" className="mt-3 text-sm">{error} <button className="underline"
-      type="button" onClick={load}>Retry</button></p>}
+    {error && <p role="status" className="mt-3 text-sm">{error} <Button variant="ghost" size="sm" className="underline"
+      type="button" onClick={load}>Retry</Button></p>}
     {data && <>
       {data.truncated && <p className="mt-2 text-sm">Showing a limited set of follow-ups. Use the school Actions workspace for the full queue.</p>}
       {!data.items.length && <p className="mt-4 text-sm">No open or recently resolved learning follow-ups in your assigned classes.</p>}
       <div className="mt-4 grid gap-3">
-        {data.items.map(item => <article className="rounded-xl border p-4" key={item.id}>
+        {data.items.map(item => <article className=" border p-4" key={item.id}>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground"><span>{item.sectionTitle}</span>
             <StatusBadge tone={item.status === "resolved" ? "success" : item.status === "waiting" ? "attention" : item.status === "in_progress" ? "info" : "neutral"}>
               <span className="capitalize">{item.status.replaceAll("_", " ")}</span>
