@@ -462,7 +462,7 @@ async function readMyNoncreditHistoryPage(
         // Registration is one participation identity even with multiple
         // historical attempts. Select its latest original Course Attempt.
         sql`${learnerCourseAttempts.id} = (
-          SELECT attempt.id FROM education_v30.learner_course_attempts attempt
+          SELECT attempt.id FROM ${learnerCourseAttempts} attempt
           WHERE attempt.noncredit_registration_id=${noncreditRegistrations.id}
             AND attempt.enrollment_id IS NULL AND attempt.class_enrollment_id IS NULL
           ORDER BY attempt.attempt_no DESC,attempt.started_at DESC,attempt.id DESC
@@ -511,7 +511,7 @@ async function readMyNoncreditHistoryPage(
     }).from(noncreditCompletionDecisions).where(and(
       inArray(noncreditCompletionDecisions.registrationId,registrationIds),
       sql`NOT EXISTS(
-        SELECT 1 FROM education_v30.noncredit_completion_decisions later
+        SELECT 1 FROM ${noncreditCompletionDecisions} later
         WHERE later.supersedes_id=${noncreditCompletionDecisions.id}
       )`,
     )).orderBy(desc(noncreditCompletionDecisions.decidedAt),
