@@ -39,8 +39,10 @@ export function SiteContentChannelEditor({siteId,initialConfig,canPublish=false,
     revision:initial.revision,blocks:initial.blocks,
   }));
   const unsavedChanges = JSON.stringify({revision,blocks})!==savedSnapshot;
+  // This editor lives inside step-based Launch and Website Studio routes.
+  // Moving to another step unmounts it, so block only truly unsaved changes.
   useLaunchUnsavedChanges(unsavedChanges,
-    "Leave Site content setup? Unsaved block edits will be lost.");
+    "Leave Site content setup? Unsaved block edits will be lost.", true);
   const [addChannel,setAddChannel]=useState<SiteContentChannelId| "">("");
   const [saving,setSaving]=useState(false);
   const [error,setError]=useState("");
