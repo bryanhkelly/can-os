@@ -189,7 +189,7 @@ SELECT format(
 )
 \gexec
 
-INSERT INTO education_v30.database_role_organization_bindings (
+INSERT INTO public.database_role_organization_bindings (
   db_role, organization_id, purpose_code, valid_from, status
 )
 SELECT
@@ -200,7 +200,7 @@ SELECT
   'approved'
 WHERE NOT EXISTS (
   SELECT 1
-  FROM education_v30.database_role_organization_bindings b
+  FROM public.database_role_organization_bindings b
   WHERE b.db_role = :'program_catalog_role'::name
     AND b.organization_id = :'organization_id'::uuid
     AND b.purpose_code = 'program_catalog'
