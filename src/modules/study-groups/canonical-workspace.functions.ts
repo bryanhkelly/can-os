@@ -22,7 +22,9 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
   // a host Site or Program grant. Reuse the class authorization projection.
   const sites = actor.role === "student" ? actorSiteIds(actor) : actor.scope.siteIds ?? [];
   const programs = actor.scope.programIds ?? [];
-  const authorizedSections = actor.role === "teacher" ? await accessibleClasses(actor) : [];
+  // Reuse the same current Program/Section/school-year authority as the
+  // classroom. A stale Section enrollment never grants study-group visibility.
+  const authorizedSections = await accessibleClasses(actor);
   const sectionIds = authorizedSections.map(section => section.id);
   const studentGuardianRows = actor.role === "student" ? await db.select({
     id: s.guardianRelationships.id,
@@ -82,12 +84,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     .where(and(eq(s.studentProfiles.personId, actor.actorPersonId),
       eq(s.enrollments.status, "active"), eq(s.enrollments.kind, "program"),
       inArray(s.programs.siteId, sites), inArray(s.programs.id, programs))) : [];
-  const studentSectionIds = actor.role === "student" && studentPrograms.length
-    ? new Set((await db.select({ sectionId: s.enrollments.sectionId })
-      .from(s.enrollments).where(and(
-        inArray(s.enrollments.studentProfileId, studentPrograms.map(x => x.id)),
-        eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"))))
-      .map(x => x.sectionId)) : new Set<string | null>();
+  const studentSectionIds = new Set(sectionIds);
   const allowed = groups.filter(g => actor.role === "teacher"
     ? g.facilitatorPersonId === actor.actorPersonId &&
       (g.sectionId
