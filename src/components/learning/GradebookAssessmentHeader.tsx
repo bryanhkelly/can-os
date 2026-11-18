@@ -4,6 +4,8 @@ import { Link } from "@tanstack/react-router";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ActionDialog } from "@/components/workspace/action-dialog";
 import type { getGradebook } from "@/modules/learning/gradebook.functions";
 import { dateKeyInTimezone, formatDateOnly, formatTimestamp } from "@/modules/calendar/timezone";
 
@@ -31,6 +33,7 @@ export function GradebookAssessmentHeader({
   onDraftSaved: () => Promise<unknown>;
   onScheduleSaved: () => Promise<unknown>;
 }) {
+  const [pendingAction, setPendingAction] = useState<"publish" | "close" | null>(null);
   return (
     <th className="min-w-32 p-3 font-semibold">
       <Link to="/teacher/gradebook" search={{section:sectionId,assessment:assessment.id}} className="block underline">{assessment.title}</Link>
@@ -64,11 +67,24 @@ export function GradebookAssessmentHeader({
           onChange={event => onDueDateChange(event.target.value)}/>
       </Field>
       <div className="mt-2 flex flex-wrap gap-1">
-        {assessment.status === "draft" && <Button size="sm" disabled={busy} onClick={() => onAction("publish")}>Publish</Button>}
-        {assessment.status === "published" && <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("close")}>Close</Button>}
+        {assessment.status === "draft" && <Button size="sm" disabled={busy} onClick={() => setPendingAction("publish")}>Publish</Button>}
+        {assessment.status === "published" && <Button size="sm" variant="outline" disabled={busy} onClick={() => setPendingAction("close")}>Close</Button>}
         {assessment.status === "closed" && <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("reopen")}>Reopen</Button>}
         {assessment.status !== "draft" && <Button size="sm" variant="outline" disabled={busy || !dueDate} onClick={() => onAction("reschedule")}>Change deadline</Button>}
       </div>
+      <ActionDialog open={pendingAction !== null}
+        title={pendingAction === "publish" ? "Publish this assessment?" : "Close submissions?"}
+        description={pendingAction === "publish"
+          ? `Publishing "${assessment.title}" assigns this assessment to actively enrolled students. Review the due date and directions before continuing.`
+          : `Closing "${assessment.title}" stops new submissions until it is reopened. Existing submissions and grades remain available.`}
+        confirmLabel={pendingAction === "publish" ? "Publish assessment" : "Close submissions"}
+        pending={busy} confirmDisabled={busy}
+        onClose={() => setPendingAction(null)}
+        onConfirm={() => {
+          const action = pendingAction;
+          setPendingAction(null);
+          if (action) onAction(action);
+        }}/>
     </th>
   );
 }
