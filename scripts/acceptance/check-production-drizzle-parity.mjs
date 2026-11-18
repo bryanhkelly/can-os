@@ -105,8 +105,8 @@ const [check] = await query`
    to_regclass('public.access_site_contact_share_revisions') IS NOT NULL AS contact_consents,
    to_regclass('public.access_session_signals') IS NOT NULL AS session_signals,
    to_regclass('public.session_device_retention_state') IS NOT NULL AS device_retention,
-   to_regclass('education_v30.site_device_policies') IS NOT NULL AS device_policies,
-   to_regclass('education_v30.site_device_registrations') IS NOT NULL AS device_registrations,
+   to_regclass('public.site_device_policies') IS NOT NULL AS device_policies,
+   to_regclass('public.site_device_registrations') IS NOT NULL AS device_registrations,
    to_regclass('education_v30.noncredit_self_enrollment_releases') IS NOT NULL AS noncredit_releases,
    to_regclass('public.site_canonical_identity_links') IS NULL AS site_identity_bridge_retired,
    EXISTS (SELECT 1 FROM pg_indexes
