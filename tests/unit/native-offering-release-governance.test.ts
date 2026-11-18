@@ -25,8 +25,70 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(coursePublish).not.toContain('set({manifestStatus:"approved"})');
     expect(service).toContain("separately approved asset-bearing publication manifest");
     expect(service).toContain("explicitly reviewed Offering release policy");
-    expect(service).toContain("education_v30.offering_release_requirements");
+    expect(service).toContain("assertNativeOfferingDistributionReady");
+    expect(service).toContain("assertNativeReleaseAssetEvidence");
   });
+  it("binds publisher-owned immutable assets, rights proofs and exact review snapshot",()=>{
+    const service=source("src/modules/learning/native-offering-release.functions.ts");
+    const evidence=source("src/modules/learning/native-offering-release-evidence.server.ts");
+    expect(service).toContain("prepareNativeReleaseAssetItems");
+    expect(service).toContain("nativeReleaseSnapshotHash(bundle.hash,policies,items)");
+    expect(service).toContain("currentReleaseSnapshotHash");
+    expect(service).toContain("contentPublicationManifestItems");
+    expect(service).toContain("approveNativeOfferingAssetManifest");
+    expect(service).toContain('manifestStatus:"approved"');
+    expect(evidence).toContain("assertInstructionalTrackAssetsEligible(tx,ids)");
+    expect(evidence).toContain("contentAssets.ownerOrganizationId,organizationId");
+    expect(evidence).toContain("contentWithdrawals.effectiveAt,at");
+    expect(evidence).toContain("rightsEvidenceVersionId");
+    expect(evidence).toContain("row.contentHash!==items[i]?.contentHash");
+  });
+  it("requires explicit independently reviewed full release policy and actual track coverage",()=>{
+    const service=source("src/modules/learning/native-offering-release.functions.ts");
+    const evidence=source("src/modules/learning/native-offering-release-evidence.server.ts");
+    expect(service).toContain("getNativeOfferingReleasePolicyReview");
+    expect(service).toContain("saveNativeOfferingReleasePolicy");
+    expect(service).toContain("expectedPolicyRevision");
+    expect(service).toContain("policyRevision(previous)!==data.expectedPolicyRevision");
+    expect(service).toContain('NativeOfferingReleasePolicyReviewed');
+    expect(service).toContain('requireVerifiedEvidence(tx,data.reviewEvidenceVersionId,"academic")');
+    expect(evidence).toContain("requireCompleteReleasePolicies");
+    expect(evidence).toContain("nativeReleasePolicySchema.safeParse(row)");
+    expect(evidence).toContain("trackDistributionAuthorizations.status");
+    expect(evidence).toContain('eq(instructionalTrackVersions.trackKind,"primary")');
+    expect(evidence).toContain("byTrack.get(id)?.has(lesson.id)");
+    expect(evidence).toContain("Withdrawn primary tracks");
+    expect(service).not.toContain("minimum_approved_primary_tracks>0 OR complete_lesson_coverage_required");
+  });
+  it("separates manuscript publication from asset-manifest and Offering approval",()=>{
+    const service=source("src/modules/learning/native-offering-release.functions.ts");
+    const courseBlock=service.split("export const publishNativeOfferingCourses=")[1]
+      ?.split("export const approveNativeOfferingAssetManifest=")[0]??"";
+    const assetBlock=service.split("export const approveNativeOfferingAssetManifest=")[1]
+      ?.split("export const publishNativeOfferingVersion=")[0]??"";
+    expect(courseBlock).toContain('lifecycle:"published"');
+    expect(courseBlock).not.toContain('manifestStatus:"approved"');
+    expect(assetBlock).toContain("readNativeReleaseManifestItems");
+    expect(assetBlock).toContain("requireApprovedSnapshot");
+    expect(assetBlock).toContain("assertNativeReleaseAssetEvidence");
+    expect(assetBlock).toContain('manifestStatus:"approved"');
+  });
+  it("exposes the existing 6.1 author and reviewer workflows with policy and asset gates",()=>{
+    const creator=source("src/components/learning/NativeCourseDraftEditor.tsx");
+    const reviewer=source("src/components/learning/NativeOfferingReleaseReviewPanel.tsx");
+    const policy=source("src/components/learning/NativeOfferingReleasePolicyEditor.tsx");
+    expect(creator).toContain("assetUses");
+    expect(creator).toContain("releasePoliciesComplete");
+    expect(creator).toContain("submitNativeOfferingRelease");
+    expect(reviewer).toContain("Inspect exact submitted Course material");
+    expect(reviewer).toContain("Pinned publisher asset versions");
+    expect(reviewer).toContain("approveNativeOfferingAssetManifest");
+    expect(reviewer).toContain("item.status!==\"approved\"");
+    expect(policy).toContain("saveNativeOfferingReleasePolicy");
+    expect(policy).toContain("reviewEvidenceVersionId");
+    expect(policy).toContain("expectedPolicyRevision");
+  });
+
   it("requires independent canonical Blueprint and current readiness before adoption",()=>{
     const service=source("src/modules/programs/native-offering-adoption-review.functions.ts");
     expect(service).toContain('actor.role!=="blueprint_reviewer"');
