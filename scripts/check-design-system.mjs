@@ -638,3 +638,37 @@ for (const [file, required] of Object.entries(v61KeyboardGridContracts)) {
     process.exitCode = 1;
   }
 }
+
+ 
+// Launch Studio is used by multiple school setup routes. Protect the shared
+// composition family rather than copying route-specific forms or approval logic.
+const migratedLaunchStudioControls = {
+  "launch-studio/CanonicalBlueprintWorkspace.tsx": [
+    "@/components/ui/input", "@/components/ui/select",
+    "@/components/ui/choice", "@/components/ui/label",
+    "<Checkbox", "<Label", "<StatusBadge",
+  ],
+  "launch-studio/WebsiteTemplateGallery.tsx": [
+    "@/components/ui/button", "@/components/ui/select",
+    "@/components/ui/label", "<Select", "<Label",
+  ],
+  "launch-studio/SiteInformationConfiguration.tsx": [
+    "@/components/ui/button", "@/components/ui/choice",
+    "@/components/ui/label", "<Checkbox", "<Label", "<Field",
+  ],
+  "launch-studio/SchoolLaunchHub.tsx": [
+    "<PageFrame", "<PageHeader",
+  ],
+};
+for (const [file, required] of Object.entries(migratedLaunchStudioControls)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of required) if (!source.includes(fragment)) {
+    console.error(file + " lost V6.1 shared Launch Studio control: " + fragment);
+    process.exitCode = 1;
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " reintroduced native controls or non-square geometry");
+    process.exitCode = 1;
+  }
+}
