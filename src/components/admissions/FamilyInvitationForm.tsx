@@ -23,8 +23,8 @@ export function FamilyInvitationForm({programs,draft,busy,onChange,onSubmit}:{
    setAttempted(false);
     onSubmit(event);
  }
- if(!programs.length)return <p className="mt-6 rounded border p-4 text-sm">No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations.</p>;
- return <form noValidate onSubmit={submit} className="mt-6 max-w-3xl space-y-4 rounded-xl border bg-card p-5">
+ if(!programs.length)return <p className="mt-6  border p-4 text-sm">No operating school Programs with admissions authority are available to this registrar. Complete institutional authorization before sending application invitations.</p>;
+ return <form noValidate onSubmit={submit} className="mt-6 max-w-3xl space-y-4  border bg-card p-5">
   <h2 className="font-semibold">Send a private receiving-school application invitation</h2>
     <Field label="Authorized school Program" required error={errors.program}>
      <Select value={draft.programId} onChange={e=>onChange({programId:e.target.value})}>
