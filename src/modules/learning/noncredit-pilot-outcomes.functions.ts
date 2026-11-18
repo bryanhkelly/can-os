@@ -62,6 +62,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       participantPersonId:noncreditRegistrations.participantPersonId,
       deploymentId:noncreditRegistrations.deploymentId,
       offeringVersionId:noncreditRegistrations.offeringVersionId,
+      registeringOrganizationId:noncreditRegistrations.registeringOrganizationId,
       registeredAt:noncreditRegistrations.registeredAt,
     }).from(noncreditRegistrations)
       // A local Site operator cannot see registrations from unrelated Sites.
@@ -174,6 +175,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       personId:surveyInvitations.invitedPersonId,
       deploymentId:surveyCampaigns.deploymentId,
       offeringId:surveyCampaigns.offeringId,
+      operatingOrganizationId:surveyCampaigns.operatingOrganizationId,
       submittedAt:surveyResponses.submittedAt,
     }).from(surveyResponses)
       .innerJoin(surveyInvitations,and(
@@ -186,23 +188,24 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         inArray(surveyCampaigns.deploymentId,deployments),
         inArray(surveyCampaigns.offeringId,offeringIds),
         eq(surveyResponses.respondentMode,"identified"),
-      )):[];
+      )).limit(take):[];
+    checkBound(surveys.length,"Survey responses");
     // Only one in-window registration for a Person, Deployment and Offering
     // may claim an invited response. A retake or duplicate registration needs
     // explicit registration-to-invitation provenance rather than guesswork.
     const registrationCounts=new Map<string,number>();
-    const feedbackKey=(personId:string,deploymentId:string,offeringId:string)=>
-      [personId,deploymentId,offeringId].join(":");
+    const feedbackKey=(personId:string,deploymentId:string,offeringId:string,organizationId:string)=>
+      [personId,deploymentId,offeringId,organizationId].join(":");
     for(const r of registrations){
       const offeringId=offeringByVersion.get(r.offeringVersionId);
       if(!offeringId)continue;
-      const key=feedbackKey(r.participantPersonId,r.deploymentId,offeringId);
+      const key=feedbackKey(r.participantPersonId,r.deploymentId,offeringId,r.registeringOrganizationId);
       registrationCounts.set(key,(registrationCounts.get(key)??0)+1);
     }
     const surveyTimestamps=new Map<string,Date>();
     for(const s of surveys){
       if(!s.offeringId)continue;
-      const key=feedbackKey(s.personId,s.deploymentId!,s.offeringId);
+      const key=feedbackKey(s.personId,s.deploymentId!,s.offeringId,s.operatingOrganizationId);
       const previous=surveyTimestamps.get(key);
       if(!previous||previous<s.submittedAt)surveyTimestamps.set(key,s.submittedAt);
     }
@@ -257,7 +260,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       const passed=finalResults.find(r=>r.outcome==="pass");
       const currentDecision=currentDecisions.find(d=>d.registrationId===reg.id);
       const offeringId=offeringByVersion.get(reg.offeringVersionId);
-      const surveyKey=offeringId?feedbackKey(reg.participantPersonId,reg.deploymentId,offeringId):null;
+      const surveyKey=offeringId?feedbackKey(reg.participantPersonId,reg.deploymentId,offeringId,reg.registeringOrganizationId):null;
       const feedbackSubmittedAt=surveyKey?surveyTimestamps.get(surveyKey):undefined;
       const hasSubmitted=finalCheck.some(c=>c.submittedAt!==null);
       return {
