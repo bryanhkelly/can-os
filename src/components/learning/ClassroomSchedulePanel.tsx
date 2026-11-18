@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { fourWeeklyClassroomWindows } from "@/domain/classroom-scheduling";
 import {
   cancelClassroomPlan, getClassroomSchedule, openScheduledClassroom,
@@ -71,7 +73,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
       <label className="block text-sm font-medium sm:col-span-2">
         Authorized Site and Course
-        <select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
+        <Select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
           value={selected} onChange={e=>setSelected(e.target.value)}>
           <option value="">Choose an approved Course</option>
           {choices.map(row=><option
@@ -79,15 +81,15 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
             value={row.deploymentId+":"+row.courseVersionId+":"+row.siteId}>
             {row.deploymentName} · {row.courseTitle} · Site {row.siteId.slice(0,8)}
           </option>)}
-        </select>
+        </Select>
       </label>
       <label className="block text-sm font-medium">Starts (your local time)
-        <input type="datetime-local" value={startsAt}
+        <Input type="datetime-local" value={startsAt}
           onChange={e=>setStartsAt(e.target.value)}
           className="mt-2 min-h-10 w-full border border-border bg-background p-2"/>
       </label>
       <label className="block text-sm font-medium">Ends (your local time)
-        <input type="datetime-local" value={endsAt}
+        <Input type="datetime-local" value={endsAt}
           onChange={e=>setEndsAt(e.target.value)}
           className="mt-2 min-h-10 w-full border border-border bg-background p-2"/>
       </label>
@@ -192,12 +194,12 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
           </div>
           {edit?.planId===plan.id&&!plan.nativeClassId&&<div className="mt-3 grid gap-3 border border-border p-4 sm:grid-cols-2">
             <label className="text-sm font-medium">New start
-              <input type="datetime-local" value={edit.start}
+              <Input type="datetime-local" value={edit.start}
                 onChange={e=>setEdit(current=>current?{...current,start:e.target.value}:null)}
                 className="mt-2 w-full border border-border bg-background p-2"/>
             </label>
             <label className="text-sm font-medium">New end
-              <input type="datetime-local" value={edit.end}
+              <Input type="datetime-local" value={edit.end}
                 onChange={e=>setEdit(current=>current?{...current,end:e.target.value}:null)}
                 className="mt-2 w-full border border-border bg-background p-2"/>
             </label>
