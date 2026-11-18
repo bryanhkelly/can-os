@@ -27,19 +27,21 @@ The authoritative Neon `main` database now has **no duplicate Site or Organizati
 
 | Metric | Public | Remaining native |
 | --- | ---: | ---: |
-| Base tables | 270 | 401 in `education_v30` |
+| Base tables | 322 | 348 in `education_v30` |
 | Sites | 9 | 0; `education_v30.sites` absent |
 | Organizations | 17 | 0; `education_v30.organizations` absent |
 | Foreign keys pointing to duplicate Site/Organization tables | n/a | 0 |
 | Foreign keys pointing to `public.sites` / `public.organizations` | 94 / 229 | n/a |
-| Native Person FKs still requiring review | n/a | 239 |
+| Native Person FKs still requiring review | n/a | 63 |
 | Separate sensitive-schema tables | n/a | 7 in `education_v30_secure` |
 
 The authoritative `public.people`, `public.sites`, and `public.organizations` tables now all have **enabled and forced row-level security**, restrictive client-denial policies, and no direct `authenticated` or `anonymous` SELECT permissions. The Person security migration preserved all 142 People and did not alter identity ownership. The server's privileged connection still requires application authorization; forced RLS does not replace command-level membership checks.
 
+The Person consolidation has also redirected 175 reviewed auditor, author, facilitator, teacher and reviewer attribution FKs directly to `public.people`. The remaining 63 native Person FKs still include learner, guardian, account, session, professional and sensitive-data relationships; their migrations remain independently gated. No Person data or grants were duplicated.
+
 The native staff-reader and five additional governed SQL functions were updated in place to reference `public.organizations`. An invalid synthetic staff/native session returned zero grants. `catalogSites`, `canonicalEnrollmentSites`, and `canonicalEnrollmentOrganizations` are now public-schema Drizzle projections, not new identities. A regression check and read-only acceptance command were committed on GitHub `main`.
 
-**Remaining:** public Person cutover, native account/session and correspondence retirement, 401 additional canonical tables and 7 sensitive tables at this verification snapshot, all associated routines/permissions, and an authenticated build/browser acceptance run. Other workstreams can advance the table counts independently. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
+**Remaining:** public Person cutover, native account/session and correspondence retirement, 348 additional canonical tables and 7 sensitive tables at this verification snapshot, all associated routines/permissions, and an authenticated build/browser acceptance run. Other workstreams can advance the table counts independently. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
 
 ## Historical pre-retirement Neon main inventory
 
