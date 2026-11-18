@@ -121,7 +121,7 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
         })),
     }).map(({lifecycle,...rest})=>rest)), // Lifecycle changes do not alter content.
   });
-  return {offering,version,courses:rows,hash,unitCount:units.length,lessonCount:lessons.length};
+  return {offering,version,courses:rows,units,lessons,hash,unitCount:units.length,lessonCount:lessons.length};
 }
 
 async function requireAppointments(tx:Tx,actor:Actor,
@@ -296,6 +296,46 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
         }catch(error){if(!(error instanceof AuthorizationError))throw error;}
       }
       return {limited:rows.length>60,items};
+    });
+  });
+
+/** Restricted publisher-reviewer inspection of the exact submitted
+ * native Course material. A reviewer should not approve a hash blind.
+ * The server returns the actual immutable-snapshot syllabus, unit and lesson
+ * content only after exact-version Course appointments are revalidated. */
+export const getNativeOfferingReviewContent=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>publishInput.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      const bundle=await loadBundle(tx,data.offeringVersionId,true);
+      await requireAppointments(tx,actor,bundle,"instructional_track.review");
+      const manifest=await exactManifest(tx,data,bundle);
+      if(manifest.createdByPersonId===actor.actorPersonId)
+        throw new AuthorizationError("independent Course reviewer");
+      return {
+        offeringTitle:bundle.offering.title,offeringVersionId:bundle.version.id,
+        reviewedManifestHash:manifest.manifestHash,
+        productDefinition:bundle.version.productDefinition,
+        courseCount:bundle.courses.length,lessonCount:bundle.lessonCount,
+        courses:bundle.courses.map(row=>({
+          courseVersionId:row.courseVersionId,courseTitle:row.courseTitle,
+          courseCode:row.courseCode,isRequired:row.isRequired,
+          syllabus:row.syllabus,
+          units:bundle.units.filter(unit=>unit.courseVersionId===row.courseVersionId)
+            .map(unit=>({
+              id:unit.id,title:unit.title,sequenceNo:unit.sequenceNo,
+              content:unit.content,
+              lessons:bundle.lessons.filter(lesson=>lesson.courseUnitId===unit.id)
+                .map(lesson=>({
+                  id:lesson.id,lessonKey:lesson.lessonKey,
+                  title:lesson.title,lessonOrder:lesson.lessonOrder,
+                  content:lesson.content,
+                })),
+            })),
+        })),
+      };
     });
   });
 
