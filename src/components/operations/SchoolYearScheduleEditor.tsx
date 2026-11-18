@@ -20,7 +20,7 @@ export function SchoolYearScheduleEditor({schedule,busy,run}:{
  function change(index:number,key:keyof (typeof periods)[number],value:string|number){
   setPeriods(items=>items.map((p,i)=>i===index?{...p,[key]:value}:p));
  }
- return <div className="mt-4 rounded-lg border p-3">
+ return <div className="mt-4  border p-3">
   <h5 className="font-semibold">{schedule.name}</h5>
   <p className="mt-1 text-xs text-muted-foreground">Edit the actual recurring periods. Changes affect the school's bell schedule.</p>
   <div className="mt-3 space-y-2">{periods.map((p,i)=><div key={i} className="flex flex-wrap items-end gap-2 border-t pt-2">
