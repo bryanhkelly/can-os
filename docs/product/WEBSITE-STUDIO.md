@@ -160,6 +160,15 @@ The Website Studio review screen exposes a read-only source-mapping panel with
 source, saved/review status, public eligibility and configuration revisions,
 using the existing V6.1 workspace primitives.
 
+The public Program and Course channel cards now take their availability
+labels and actions from the same `projectSiteEnrollmentOpportunities`
+read model as the unified directory. A positive seat count or open
+marketing flag alone is not enough to claim registration is available:
+without the validated application origin, the card is informational.
+Invalid noncredit release IDs are not rendered as public Course cards.
+Regression cases cover both source-level projections and rendered HTML
+for the seven native Site templates.
+
 A published Class link is `/class?classId=<UUID>` under the validated
 CAN application origin; the renderer now recognizes that exact service route
 rather than the retired `/learn/classes` path.
