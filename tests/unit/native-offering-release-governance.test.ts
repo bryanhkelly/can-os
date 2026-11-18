@@ -12,7 +12,7 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(service).toContain('"instructional_track.review"');
     expect(service).toContain('"instructional_track.publish"');
     expect(service).toContain("contentManifestReviewDecisions");
-    expect(service).toContain("manifest.manifestHash!==bundle.hash");
+    expect(service).toContain("manifest.manifestHash!==await currentReleaseSnapshotHash");
     expect(service).toContain("manifest.createdByPersonId===actor.actorPersonId");
     expect(service).toContain("requireApprovedSnapshot(tx,manifest)");
   });
@@ -24,7 +24,7 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(coursePublish).toContain('lifecycle:"published"');
     expect(coursePublish).not.toContain('set({manifestStatus:"approved"})');
     expect(service).toContain("separately approved asset-bearing publication manifest");
-    expect(service).toContain("explicitly reviewed Offering release policy");
+    expect(service).toContain("requireAuditedReleasePolicy");
     expect(service).toContain("assertNativeOfferingDistributionReady");
     expect(service).toContain("assertNativeReleaseAssetEvidence");
   });
@@ -109,6 +109,17 @@ describe("native Course review and separate Offering adoption governance",()=>{
     expect(service).toContain('["operating","registration","delivery"]');
     expect(service).toContain('approvalStatus:"approved"');
     expect(service).not.toContain('status:"active"');
+  });
+  it("fails closed on main-only reviewer appointment and Person cutover evidence",()=>{
+    const probe=source("scripts/acceptance/check-main-native-course-release.mjs");
+    expect(probe).toContain("CAN_MAIN_NATIVE_RELEASE_CHECK");
+    expect(probe).toContain('const MAIN="br-restless-sea-ar9ooo55"');
+    expect(probe).toContain("Refusing any database other than the verified CAN OS Neon main.");
+    expect(probe).toContain("legacy_provider_person_fks");
+    expect(probe).toContain("independentReviewerAvailable");
+    expect(probe).toContain("DATA_PREFLIGHT_ONLY");
+    expect(probe).not.toContain("INSERT INTO");
+    expect(probe).not.toContain("ALTER TABLE");
   });
   it("renders author, publisher reviewer, and local adoption reviewer separately",()=>{
     const editor=source("src/components/learning/NativeCourseDraftEditor.tsx");
