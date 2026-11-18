@@ -18,7 +18,7 @@ const launches: Launch[] = [
     name: "Synthetic Academy",
     slug: "synthetic-academy",
     type: "full_school",
-    gradeRange: "6-12",
+    gradeRange: { min: "6", max: "12" },
     status: "launching",
     organizationId: "synthetic-organization",
     academicProviderOrganizationId: "synthetic-provider",
