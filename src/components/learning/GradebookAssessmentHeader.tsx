@@ -1,6 +1,9 @@
 import { AssessmentDraftEditor } from "@/components/learning/AssessmentDraftEditor";
 import { AssessmentScheduleEditor } from "@/components/learning/AssessmentScheduleEditor";
 import { Link } from "@tanstack/react-router";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import type { getGradebook } from "@/modules/learning/gradebook.functions";
 import { dateKeyInTimezone, formatDateOnly, formatTimestamp } from "@/modules/calendar/timezone";
 
@@ -56,21 +59,15 @@ export function GradebookAssessmentHeader({
           onSaved={onScheduleSaved}
         />
       )}
-      <label className="mt-2 block text-xs font-normal">
-        New due date
-        <input
-          aria-label={"Due date for " + assessment.title}
-          type="date"
-          value={dueDate}
-          onChange={(event) => onDueDateChange(event.target.value)}
-          className="mt-1 w-full rounded border bg-background p-1.5 text-xs"
-        />
-      </label>
+      <Field className="mt-2 text-left" label={`New due date for ${assessment.title}`}>
+        <Input type="date" disabled={busy} value={dueDate} className="min-w-36 text-xs"
+          onChange={event => onDueDateChange(event.target.value)}/>
+      </Field>
       <div className="mt-2 flex flex-wrap gap-1">
-        {assessment.status === "draft" && <button disabled={busy} onClick={() => onAction("publish")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Publish</button>}
-        {assessment.status === "published" && <button disabled={busy} onClick={() => onAction("close")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Close</button>}
-        {assessment.status === "closed" && <button disabled={busy} onClick={() => onAction("reopen")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Reopen</button>}
-        {assessment.status !== "draft" && <button disabled={busy || !dueDate} onClick={() => onAction("reschedule")} className="rounded border px-2 py-1 text-xs disabled:opacity-40">Change deadline</button>}
+        {assessment.status === "draft" && <Button size="sm" disabled={busy} onClick={() => onAction("publish")}>Publish</Button>}
+        {assessment.status === "published" && <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("close")}>Close</Button>}
+        {assessment.status === "closed" && <Button size="sm" variant="outline" disabled={busy} onClick={() => onAction("reopen")}>Reopen</Button>}
+        {assessment.status !== "draft" && <Button size="sm" variant="outline" disabled={busy || !dueDate} onClick={() => onAction("reschedule")}>Change deadline</Button>}
       </div>
     </th>
   );
