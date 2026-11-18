@@ -3,6 +3,10 @@ import {useInfiniteQuery,useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import {WorkspaceShell} from "@/components/workspace";
 import {Button} from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 import {normalizeClientError} from "@/lib/client-error";
 import {getNativePublicClassCatalogPage} from "@/modules/classes/native-class-enrollment.functions";
 import {
@@ -86,30 +90,30 @@ function GuardianNativeClasses(){
    </p>}
    <form className="mt-4 flex gap-2" role="search"
     onSubmit={e=>{e.preventDefault();setSearch(searchText.trim());}}>
-    <label className="sr-only" htmlFor="guardian-native-class-search">Search Classes</label>
-    <input id="guardian-native-class-search" type="search" maxLength={100}
+    <Label className="sr-only" htmlFor="guardian-native-class-search">Search Classes</Label>
+    <Input id="guardian-native-class-search" type="search" maxLength={100}
      value={searchText} onChange={e=>setSearchText(e.target.value)}
      placeholder="Search available Classes"
      className="min-h-11 flex-1 border border-border bg-background px-3 text-sm"/>
     <Button type="submit">Search</Button>
    </form>
    <div className="mt-4 grid gap-4 md:grid-cols-2">
-    <label className="text-sm font-semibold">Learner
-     <select value={learner} onChange={e=>setLearner(e.target.value)}
+    <Label className="text-sm font-semibold">Learner
+     <Select value={learner} onChange={e=>setLearner(e.target.value)}
       className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
       <option value="">Choose verified learner</option>
       {children.data?.map(row=><option key={row.learnerPersonId}
        value={row.learnerPersonId}>{row.name}</option>)}
-     </select>
-    </label>
-    <label className="text-sm font-semibold">Class
-     <select value={target} onChange={e=>setTarget(e.target.value)}
+     </Select>
+    </Label>
+    <Label className="text-sm font-semibold">Class
+     <Select value={target} onChange={e=>setTarget(e.target.value)}
       className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
       <option value="">Choose published Class</option>
       {eligible.map(row=><option key={row.classOfferingVersionId}
        value={row.classOfferingVersionId}>{row.classTitle}</option>)}
-     </select>
-    </label>
+     </Select>
+    </Label>
    </div>
    {catalog.hasNextPage&&<Button className="mt-3" variant="outline"
     disabled={catalog.isFetchingNextPage} onClick={()=>void catalog.fetchNextPage()}>
@@ -173,19 +177,19 @@ function GuardianClassApprovalCard({item,onChanged}:{
     "Approved, but not yet enrolled. A place is not reserved.":"Independent review or closure applies."}
   </p>
   {eligible&&<>
-   <label className="mt-3 block text-sm font-semibold">Participation
-    <select value={credit} onChange={e=>setCredit(e.target.value as typeof credit)}
+   <Label className="mt-3 block text-sm font-semibold">Participation
+    <Select value={credit} onChange={e=>setCredit(e.target.value as typeof credit)}
      className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm">
      {item.allowedCreditModes.map(mode=><option key={mode} value={mode}>{mode}</option>)}
-    </select>
-   </label>
+    </Select>
+   </Label>
    <p className="mt-3 whitespace-pre-wrap border border-border bg-muted/20 p-3 text-sm">
     {item.consentText}
    </p>
-   <label className="mt-3 flex items-start gap-2 text-sm">
-    <input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
+   <Label className="mt-3 flex items-start gap-2 text-sm">
+    <Checkbox checked={consent} onChange={e=>setConsent(e.target.checked)}/>
     I am this learner's verified guardian and accept these current Class participation terms.
-   </label>
+   </Label>
    <Button className="mt-4" disabled={!consent||busy||
      !item.allowedCreditModes.includes(credit)}
     onClick={()=>void accept()}>{busy?"Processing…":"Accept approved place"}</Button>
