@@ -197,7 +197,8 @@ async function main() {
       SELECT count(*)::integer AS table_count
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'education_v30'
+      WHERE (n.nspname = 'education_v30'
+          OR (n.nspname = 'public' AND c.relname='database_role_organization_bindings'))
         AND c.relname = ANY($1::text[])
         AND c.relrowsecurity
         AND c.relforcerowsecurity
@@ -231,7 +232,8 @@ async function main() {
       FROM pg_policy p
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'education_v30'
+      WHERE (n.nspname = 'education_v30'
+          OR (n.nspname = 'public' AND c.relname='database_role_organization_bindings'))
         AND c.relname = ANY($1::text[])
     `, [[
       "database_role_organization_bindings",
@@ -422,7 +424,7 @@ async function main() {
       TO ${catalogRole}
     `);
     await client.query(`
-      INSERT INTO education_v30.database_role_organization_bindings (
+      INSERT INTO public.database_role_organization_bindings (
         db_role, organization_id, purpose_code, valid_from, status
       ) VALUES ($1, $2, 'program_catalog', clock_timestamp(), 'approved')
     `, [catalogRole, catalogOrganizationId]);
@@ -601,7 +603,7 @@ async function main() {
 
     await client.query("RESET ROLE");
     await client.query(`
-      UPDATE education_v30.database_role_organization_bindings
+      UPDATE public.database_role_organization_bindings
       SET valid_through = clock_timestamp() - interval '1 second'
       WHERE db_role = $1 AND organization_id = $2 AND purpose_code = 'program_catalog'
     `, [catalogRole, catalogOrganizationId]);
@@ -628,7 +630,7 @@ async function main() {
 
     await client.query("RESET ROLE");
     await client.query(`
-      UPDATE education_v30.database_role_organization_bindings
+      UPDATE public.database_role_organization_bindings
       SET valid_through = NULL, status = 'revoked'
       WHERE db_role = $1 AND organization_id = $2 AND purpose_code = 'program_catalog'
     `, [catalogRole, catalogOrganizationId]);
