@@ -5,9 +5,10 @@ import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
 import {
-  canonicalOfferingCourses, contentManifestReviewDecisions,
-  contentPublicationManifests, courseLessons, courses, courseUnits, courseVersions,
-  evidenceDocuments, evidenceDocumentVersions, offeringVersions, offerings,
+  canonicalOfferingCourses, contentManifestReviewDecisions, contentAssets,
+  contentAssetVersions, contentPublicationManifests, contentPublicationManifestItems,
+  courseLessons, courses, courseUnits, courseVersions,
+  evidenceDocuments, evidenceDocumentVersions, offeringReleaseRequirements, offeringVersions, offerings,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -17,6 +18,13 @@ import { assertTrackProvider, type TrackProviderCapability } from
   "@/modules/learning/instructional-track-access.server";
 import { writeCanonicalAudit, emitCanonicalDomainEvent } from
   "@/platform/canonical-mutation.server";
+import {
+  nativeReleaseAssetSchema,nativeReleasePolicySchema,
+  type NativeReleasePolicy, readNativeReleasePolicies,readNativeReleaseManifestItems,
+  requireCompleteReleasePolicies,policyRevision,prepareNativeReleaseAssetItems,
+  nativeReleaseSnapshotHash,currentReleaseSnapshotHash,assertNativeReleaseAssetEvidence,
+  assertNativeOfferingDistributionReady,
+} from "./native-offering-release-evidence.server";
 
 const uuid = z.string().uuid();
 const releaseInput = z.object({ offeringVersionId: uuid }).strict();
@@ -31,6 +39,17 @@ const publishInput = releaseInput.extend({
   manifestId: uuid, expectedHash: z.string().regex(/^[a-f0-9]{64}$/),
 }).strict();
 const kinds = decisionInput.shape.reviewKind.options;
+const assetSubmissionInput=releaseInput.extend({
+  expectedHash:z.string().regex(/^[a-f0-9]{64}$/),
+  assets:z.array(nativeReleaseAssetSchema).max(50).default([]),
+}).strict();
+const policyInput=releaseInput.extend({
+  expectedManuscriptHash:z.string().regex(/^[a-f0-9]{64}$/),
+  expectedPolicyRevision:z.string().regex(/^[a-f0-9]{64}$/),
+  requirements:z.array(nativeReleasePolicySchema).min(1).max(50),
+  reviewEvidenceVersionId:uuid,
+  rationale:z.string().trim().min(10).max(2000),
+}).strict();
 const noStore = () => setResponseHeader("Cache-Control","private, no-store");
 const invalid = (message:string):never => { throw new DomainError("VALIDATION_FAILED",message); };
 const conflict = (message:string):never => { throw new DomainError("CONFLICT",message); };
@@ -145,7 +164,8 @@ async function exactManifest(tx:Tx,input:z.infer<typeof publishInput>,
   const manifest=await currentManifest(tx,input.offeringVersionId);
   if(!manifest||manifest.id!==input.manifestId||
     manifest.manifestHash!==input.expectedHash||
-    manifest.manifestHash!==bundle.hash||
+    manifest.manifestHash!==await currentReleaseSnapshotHash(
+      tx,bundle.version.id,bundle.hash,manifest.id)||
     manifest.ownerOrganizationId!==bundle.offering.publisherOrganizationId)
     conflict("The exact submitted native content snapshot changed. Submit and review again.");
   return manifest;
@@ -210,15 +230,32 @@ export const getNativeOfferingReleaseOverview=createServerFn({method:"GET"})
       const bundle=await loadBundle(tx,data.offeringVersionId,false);
       await requireAppointments(tx,actor,bundle,"instructional_track.author");
       const manifest=await currentManifest(tx,data.offeringVersionId);
+      const policies=await readNativeReleasePolicies(tx,data.offeringVersionId);
+      const availableAssets=await tx.select({
+        id:contentAssetVersions.id,
+        title:contentAssets.title,kind:contentAssets.kind,
+        sha256:contentAssetVersions.sha256,
+      }).from(contentAssetVersions)
+        .innerJoin(contentAssets,eq(contentAssets.id,contentAssetVersions.assetId))
+        .where(and(eq(contentAssets.ownerOrganizationId,bundle.offering.publisherOrganizationId),
+          eq(contentAssetVersions.lifecycle,"published")))
+        .orderBy(asc(contentAssets.title)).limit(101);
       return {
         offeringVersionId:bundle.version.id,offeringTitle:bundle.offering.title,
         lifecycle:bundle.version.lifecycle,
         courseCount:bundle.courses.length,lessonCount:bundle.lessonCount,
-        manuscriptHash:bundle.hash,
+        manuscriptHash:bundle.hash,policies,
+        releasePoliciesComplete:policies.length===bundle.courses.length &&
+          bundle.courses.every(row=>policies.some(policy=>
+            policy.courseVersionId===row.courseVersionId)),
+        availableAssets:availableAssets.slice(0,100),
+        assetsLimited:availableAssets.length>100,
         manifest:manifest?{
           id:manifest.id,hash:manifest.manifestHash,
           status:manifest.manifestStatus,
-          current:manifest.manifestHash===bundle.hash,
+          assetCount:(await readNativeReleaseManifestItems(tx,manifest.id)).length,
+          current:manifest.manifestHash===await currentReleaseSnapshotHash(
+            tx,bundle.version.id,bundle.hash,manifest.id),
         }:null,
       };
     });
@@ -227,9 +264,7 @@ export const getNativeOfferingReleaseOverview=createServerFn({method:"GET"})
 /** Submission creates an existing native content manifest. No new Course,
  * approval role, publisher, or local authorization is created. */
 export const submitNativeOfferingRelease=createServerFn({method:"POST"})
-  .validator((raw:unknown)=>releaseInput.extend({
-    expectedHash:z.string().regex(/^[a-f0-9]{64}$/),
-  }).strict().parse(raw))
+  .validator((raw:unknown)=>assetSubmissionInput.parse(raw))
   .handler(async({data})=>{
     noStore();
     const actor=await getCommandContext(getRequest());
@@ -238,19 +273,85 @@ export const submitNativeOfferingRelease=createServerFn({method:"POST"})
       await requireAppointments(tx,actor,bundle,"instructional_track.author");
       if(bundle.version.lifecycle!=="draft"||bundle.hash!==data.expectedHash)
         conflict("Only an unchanged draft Offering may be submitted.");
+      // A manuscript-only snapshot is reviewable before recorded content is
+      // produced. An asset-bearing version must pin reviewed native policies
+      // and immutable asset hashes, without reusing an old approval.
+      const policies=data.assets.length?await readNativeReleasePolicies(tx,data.offeringVersionId):[];
+      if(data.assets.length)requireCompleteReleasePolicies(
+        policies,bundle.courses.map(row=>row.courseVersionId));
+      const items=data.assets.length?await prepareNativeReleaseAssetItems(
+        tx,bundle.offering.publisherOrganizationId,data.assets):[];
+      const snapshotHash=nativeReleaseSnapshotHash(bundle.hash,policies,items);
       const previous=await currentManifest(tx,data.offeringVersionId);
-      if(previous?.manifestHash===bundle.hash)
-        return {manifestId:previous.id,manifestHash:bundle.hash,created:false};
+      if(previous?.manifestHash===snapshotHash)
+        return {manifestId:previous.id,manifestHash:snapshotHash,created:false};
       const [manifest]=await tx.insert(contentPublicationManifests).values({
         ownerOrganizationId:bundle.offering.publisherOrganizationId,
-        offeringVersionId:bundle.version.id,manifestHash:bundle.hash,
+        offeringVersionId:bundle.version.id,manifestHash:snapshotHash,
         createdByPersonId:actor.actorPersonId!,
       }).returning({id:contentPublicationManifests.id});
       if(!manifest)throw new DomainError("UNEXPECTED","Submission did not create a manifest.");
+      if(items.length)await tx.insert(contentPublicationManifestItems).values(
+        items.map(item=>({
+          manifestId:manifest.id,contentAssetVersionId:item.assetVersionId,
+          usageKind:item.usageKind,contentHash:item.contentHash,
+          rightsEvidenceVersionId:item.rightsEvidenceVersionId,
+        })));
       await log(tx,actor,bundle.offering.publisherOrganizationId,bundle.version.id,
-        "NativeOfferingReviewSubmitted",{manifestId:manifest.id,manifestHash:bundle.hash,
+        "NativeOfferingReviewSubmitted",{manifestId:manifest.id,manifestHash:snapshotHash,
+          manuscriptHash:bundle.hash,assetUses:items.length,
           courseVersionIds:bundle.courses.map(row=>row.courseVersionId)});
-      return {manifestId:manifest.id,manifestHash:bundle.hash,created:true};
+      return {manifestId:manifest.id,manifestHash:snapshotHash,created:true};
+    });
+  });
+
+/** Publisher reviewer declares the release policy for every Course.
+ * Explicit evidence, CAS revision and a distinct author/reviewer role prevent
+ * silently treating missing primary-track requirements as zero. */
+export const saveNativeOfferingReleasePolicy=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>policyInput.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      const bundle=await loadBundle(tx,data.offeringVersionId,true);
+      await requireAppointments(tx,actor,bundle,"instructional_track.review");
+      if(bundle.version.lifecycle!=="draft"||
+        bundle.hash!==data.expectedManuscriptHash)
+        conflict("The native Offering draft changed. Reload before editing release policy.");
+      const manifest=await currentManifest(tx,data.offeringVersionId);
+      if(manifest?.createdByPersonId===actor.actorPersonId)
+        throw new AuthorizationError("independent release-policy reviewer");
+      requireCompleteReleasePolicies(data.requirements,
+        bundle.courses.map(row=>row.courseVersionId));
+      const previous=await readNativeReleasePolicies(tx,bundle.version.id);
+      if(policyRevision(previous)!==data.expectedPolicyRevision)
+        conflict("The release policy changed. Refresh before saving.");
+      await requireVerifiedEvidence(tx,data.reviewEvidenceVersionId,"academic");
+      const changed=policyRevision(previous)!==policyRevision(data.requirements);
+      if(changed){
+        for(const policy of data.requirements)
+          await tx.insert(offeringReleaseRequirements).values({
+            offeringVersionId:bundle.version.id,...policy,
+          }).onConflictDoUpdate({
+            target:[offeringReleaseRequirements.offeringVersionId,
+              offeringReleaseRequirements.courseVersionId],
+            set:{
+              minimumApprovedPrimaryTracks:policy.minimumApprovedPrimaryTracks,
+              completeLessonCoverageRequired:policy.completeLessonCoverageRequired,
+              independentAcademicReviewRequired:true,
+              rightsClearanceRequired:true,accessibilityReviewRequired:true,
+            },
+          });
+        await log(tx,actor,bundle.offering.publisherOrganizationId,bundle.version.id,
+          "NativeOfferingReleasePolicyReviewed",{
+            before:previous,after:data.requirements,
+            policyRevision:policyRevision(data.requirements),
+            evidenceVersionId:data.reviewEvidenceVersionId,rationale:data.rationale,
+          });
+      }
+      return {offeringVersionId:bundle.version.id,
+        policyRevision:policyRevision(data.requirements),changed};
     });
   });
 
@@ -282,10 +383,18 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
           await requireAppointments(tx,actor,bundle,"instructional_track.review");
           const latest=await currentManifest(tx,row.offeringVersionId);
           if(latest?.id!==row.id)continue;
+          const manifestItems=await readNativeReleaseManifestItems(tx,row.id);
+          const current=latest.manifestHash===await currentReleaseSnapshotHash(
+            tx,bundle.version.id,bundle.hash,row.id);
+          const policies=await readNativeReleasePolicies(tx,bundle.version.id);
           items.push({
             id:row.id,offeringVersionId:row.offeringVersionId,
             offeringTitle:bundle.offering.title,manifestHash:row.manifestHash,
-            status:row.manifestStatus,current:row.manifestHash===bundle.hash,
+            status:row.manifestStatus,current,
+            assetCount:manifestItems.length,
+            releasePoliciesComplete:policies.length===bundle.courses.length &&
+              bundle.courses.every(course=>policies.some(policy=>
+                policy.courseVersionId===course.courseVersionId)),
             courseCount:bundle.courses.length,
             allCoursesPublished:bundle.courses.every(c=>c.lifecycle==="published"),
             offeringPublished:bundle.version.lifecycle==="published",
@@ -314,9 +423,11 @@ export const getNativeOfferingReviewContent=createServerFn({method:"GET"})
       const manifest=await exactManifest(tx,data,bundle);
       if(manifest.createdByPersonId===actor.actorPersonId)
         throw new AuthorizationError("independent Course reviewer");
+      const policies=await readNativeReleasePolicies(tx,bundle.version.id);
+      const assetItems=await readNativeReleaseManifestItems(tx,manifest.id);
       return {
         offeringTitle:bundle.offering.title,offeringVersionId:bundle.version.id,
-        reviewedManifestHash:manifest.manifestHash,
+        reviewedManifestHash:manifest.manifestHash,policies,assetItems,
         productDefinition:bundle.version.productDefinition,
         courseCount:bundle.courses.length,lessonCount:bundle.lessonCount,
         courses:bundle.courses.map(row=>({
@@ -408,6 +519,43 @@ export const publishNativeOfferingCourses=createServerFn({method:"POST"})
     });
   });
 
+/** Asset manifest approval is a distinct governed stage from the native
+ * Course manuscript review. The existing database trigger refuses empty
+ * manifests and independently checks academic/rights/accessibility decisions. */
+export const approveNativeOfferingAssetManifest=createServerFn({method:"POST"})
+  .validator((raw:unknown)=>publishInput.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      const bundle=await loadBundle(tx,data.offeringVersionId,true);
+      await requireAppointments(tx,actor,bundle,"instructional_track.publish");
+      const manifest=await exactManifest(tx,data,bundle);
+      if(manifest.createdByPersonId===actor.actorPersonId)
+        throw new AuthorizationError("independent asset-backed release approval");
+      const items=await readNativeReleaseManifestItems(tx,manifest.id);
+      const policies=await readNativeReleasePolicies(tx,bundle.version.id);
+      requireCompleteReleasePolicies(policies,bundle.courses.map(row=>row.courseVersionId));
+      await requireApprovedSnapshot(tx,manifest);
+      await assertNativeReleaseAssetEvidence(
+        tx,bundle.offering.publisherOrganizationId,items);
+      if(manifest.manifestStatus==="approved")
+        return {manifestId:manifest.id,alreadyApproved:true};
+      const [approved]=await tx.update(contentPublicationManifests)
+        .set({manifestStatus:"approved"})
+        .where(and(eq(contentPublicationManifests.id,manifest.id),
+          eq(contentPublicationManifests.manifestStatus,"draft")))
+        .returning({id:contentPublicationManifests.id});
+      if(!approved)conflict("Content manifest changed before release approval.");
+      await log(tx,actor,bundle.offering.publisherOrganizationId,bundle.version.id,
+        "NativeOfferingAssetManifestApproved",{
+          manifestId:manifest.id,manifestHash:manifest.manifestHash,
+          assetUses:items.length,policyRevision:policyRevision(policies),
+        });
+      return {manifestId:manifest.id,alreadyApproved:false};
+    });
+  });
+
 /** Offering release checks a separately approved immutable manifest and
  * published constituent Courses. Local adoption remains an independent
  * governed operation, never an implicit side effect of publication. */
@@ -427,28 +575,11 @@ export const publishNativeOfferingVersion=createServerFn({method:"POST"})
       if(bundle.courses.some(row=>row.lifecycle!=="published"))
         invalid("Publish all independently reviewed native Courses before the Offering.");
       await requireApprovedSnapshot(tx,manifest);
-      // Mirror the database release gate for an actionable error, never
-      // create or silently relax publisher-defined release requirements.
-      const missing=await tx.execute(sql`
-        SELECT oc.course_version_id
-        FROM education_v30.offering_courses oc
-        LEFT JOIN education_v30.offering_release_requirements r
-          ON r.offering_version_id=oc.offering_version_id
-         AND r.course_version_id=oc.course_version_id
-        WHERE oc.offering_version_id=${data.offeringVersionId}::uuid
-          AND oc.is_required AND r.id IS NULL
-        LIMIT 1
-      `);
-      if(missing.rows.length)
-        invalid("Every required Course needs an explicitly reviewed Offering release policy before publication.");
-      const extra=await tx.execute(sql`
-        SELECT course_version_id FROM education_v30.offering_release_requirements
-        WHERE offering_version_id=${data.offeringVersionId}::uuid
-          AND (minimum_approved_primary_tracks>0 OR complete_lesson_coverage_required)
-        LIMIT 1
-      `);
-      if(extra.rows.length)
-        invalid("This Offering requires separately verified recorded-teacher coverage before publication.");
+      const items=await readNativeReleaseManifestItems(tx,manifest.id);
+      await assertNativeReleaseAssetEvidence(tx,bundle.offering.publisherOrganizationId,items);
+      const policies=await readNativeReleasePolicies(tx,bundle.version.id);
+      await assertNativeOfferingDistributionReady(
+        tx,bundle.version.id,bundle.offering.id,policies);
       if(bundle.version.lifecycle==="published")
         return {offeringVersionId:bundle.version.id,alreadyPublished:true};
       const [published]=await tx.update(offeringVersions)
