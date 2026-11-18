@@ -75,3 +75,21 @@ test("new TSX files compare against an empty base without parser fallback errors
   assert.equal(result.checked, 1);
   assert.match(result.errors.join("\n"), /native increased \(input\)/);
 }));
+
+
+test("unstaged and untracked TSX regressions are detected before commit", () => temp(({ root, write }) => {
+  const git = (...args) => execFileSync("git", args, { cwd: root, stdio: "pipe" });
+  git("init", "-q");
+  git("config", "user.name", "V61 test");
+  git("config", "user.email", "test@example.invalid");
+  write("src/routes/page.tsx", "export const Page = () => <Button/>;");
+  git("add", "."); git("commit", "-qm", "initial");
+  write("src/routes/other.tsx", "export const Other = () => <Button/>;");
+  git("add", "."); git("commit", "-qm", "clean second");
+  write("src/routes/page.tsx", "export const Page = () => <button/>;");
+  write("src/routes/new.tsx", "export const New = () => <textarea/>;");
+  const result = checkChangedFiles(root, "HEAD^");
+  assert.equal(result.checked, 3);
+  assert.match(result.errors.join("\n"), /page\.tsx: native increased \(button\)/);
+  assert.match(result.errors.join("\n"), /new\.tsx: native increased \(textarea\)/);
+}));
