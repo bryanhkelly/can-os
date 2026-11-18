@@ -45,7 +45,7 @@ AS $function$
          AND reviewer_link.revoked_at IS NULL
      )
  );
-$function$
+$function$;
 
 DO $verify$
 DECLARE fn text;
