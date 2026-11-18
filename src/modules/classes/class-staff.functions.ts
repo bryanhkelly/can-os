@@ -62,7 +62,8 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
     guarded();
     const manager=await requireClassManager();
     return db.transaction(async tx=>{
-         // A Class assignment uses the already verified, immutable CAN Person
+      const instance=await lockedManagedClass(tx,manager,data.classId);
+      // A Class assignment uses the already verified, immutable CAN Person
       // and the EXACT current room-facilitator grant at this Class Site.
       // Native canonical Persons/accounts/grants and email-only identity
       // matching cannot create a second Person or silently grant staff power.
@@ -88,7 +89,6 @@ export const assignNativeClassStaff=createServerFn({method:"POST"})
         )).for("share").limit(2);
       if(staffGrants.length!==1 || isDemoAccountEmail(staffGrants[0]!.email))
         throw new AuthorizationError("current verified CAN room-facilitator grant at exact Site");
-zationError("current verified room-facilitator grant at this Site");
       const [prior]=await tx.select({
         id:canonicalClassStaffAssignments.id,
         attendanceAuthorized:canonicalClassStaffAssignments.attendanceAuthorized,
