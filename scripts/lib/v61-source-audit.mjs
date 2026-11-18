@@ -24,12 +24,15 @@ function isNativeHiddenInput(node) {
   return !!type && ts.isStringLiteral(type) && type.text === "hidden";
 }
 function importNames(clause) {
-  if (!clause) return ["*"];
+  if (!clause) return []; // Side-effect-only imports do not compose UI.
+  if (clause.isTypeOnly) return [];
   const names = [];
   if (clause.name) names.push("default");
   if (clause.namedBindings) {
     if (ts.isNamespaceImport(clause.namedBindings)) names.push("*");
-    else names.push(...clause.namedBindings.elements.map(el => el.propertyName?.text ?? el.name.text));
+    else names.push(...clause.namedBindings.elements
+      .filter(el => !el.isTypeOnly)
+      .map(el => el.propertyName?.text ?? el.name.text));
   }
   return names;
 }
@@ -58,10 +61,11 @@ export function analyzeSource(source, path, options = {}) {
     }
     if (ts.isExportDeclaration(node) && node.moduleSpecifier &&
         ts.isStringLiteral(node.moduleSpecifier)) {
-      const exported = node.exportClause && ts.isNamedExports(node.exportClause)
-        ? node.exportClause.elements.map(el => ({
-            name: el.name.text, origin: el.propertyName?.text ?? el.name.text,
-          })) : [{ name: "*", origin: "*" }];
+      const exported = node.isTypeOnly ? []
+        : node.exportClause && ts.isNamedExports(node.exportClause)
+          ? node.exportClause.elements.filter(el => !el.isTypeOnly).map(el => ({
+              name: el.name.text, origin: el.propertyName?.text ?? el.name.text,
+            })) : [{ name: "*", origin: "*" }];
       imports.push({ kind: "export", from: node.moduleSpecifier.text, exported });
     }
     ts.forEachChild(node, walk);
