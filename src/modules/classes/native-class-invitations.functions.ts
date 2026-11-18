@@ -42,9 +42,10 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
   privateResponse();
   const request=getRequest();
   const actor=await getCanonicalCommandContext(request);
-  if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
+  if(!inviterPersonId||!["site_admin","registrar"].includes(actor.role??""))
     throw new AuthorizationError("current Class manager");
   assertCapability(actor,"class.manage");
+  const inviterPersonId=actor.actorPersonId;
   return db.transaction(async tx=>{
     const [locator]=await tx.select({classId:canonicalClassOfferingVersions.classId})
       .from(canonicalClassOfferingVersions)
@@ -97,7 +98,7 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
     if(alreadyEnrolled)throw new AuthorizationError("learner is already participating");
     const [retry]=await tx.select().from(canonicalClassEnrollmentInvitations)
       .where(and(eq(canonicalClassEnrollmentInvitations.classId,cls.id),
-        eq(canonicalClassEnrollmentInvitations.invitedByPersonId,actor.actorPersonId),
+        eq(canonicalClassEnrollmentInvitations.invitedByPersonId,inviterPersonId),
         eq(canonicalClassEnrollmentInvitations.requestId,data.requestId))).limit(1);
     if(retry){
       if(retry.classOfferingVersionId!==version.id||
@@ -119,14 +120,14 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
       )).returning({id:canonicalClassEnrollmentInvitations.id});
     for(const item of expired){
       await writeCanonicalAudit(tx,{
-        actorPersonId:actor.actorPersonId,
+        actorPersonId:inviterPersonId,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"class.invitation.expired",entityKind:"class_invitation",
         entityId:item.id,payload:{classId:cls.id,siteId:cls.siteId,
           recipientPersonId:data.learnerPersonId,reason:"expired_before_reissue"},
       });
       await emitCanonicalDomainEvent(tx,{
-        actorPersonId:actor.actorPersonId,eventType:"ClassInvitationExpired",
+        actorPersonId:inviterPersonId,eventType:"ClassInvitationExpired",
         aggregateType:"class_invitation",aggregateId:item.id,
         payload:{classId:cls.id,siteId:cls.siteId,
           recipientPersonId:data.learnerPersonId},
@@ -142,7 +143,7 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
     const [saved]=await tx.insert(canonicalClassEnrollmentInvitations).values({
       classId:cls.id,classOfferingVersionId:version.id,
       operatingOrganizationId:cls.operatingOrganizationId,siteId:cls.siteId,
-      learnerPersonId:data.learnerPersonId,invitedByPersonId:actor.actorPersonId,
+      learnerPersonId:data.learnerPersonId,invitedByPersonId:inviterPersonId,
       requestId:data.requestId,creditMode:data.creditMode,
       invitedAt:now,expiresAt,
     }).returning({id:canonicalClassEnrollmentInvitations.id});
@@ -151,13 +152,13 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
       invitationId:saved.id,learnerPersonId:data.learnerPersonId,
       siteId:cls.siteId,expiresAt:expiresAt.toISOString(),seatReserved:false};
     await writeCanonicalAudit(tx,{
-      actorPersonId:actor.actorPersonId,
+      actorPersonId:inviterPersonId,
       owningOrganizationId:cls.operatingOrganizationId,
       eventCode:"class.invitation.issued",entityKind:"class_invitation",
       entityId:saved.id,payload,
     });
     await emitCanonicalDomainEvent(tx,{
-      actorPersonId:actor.actorPersonId,eventType:"ClassInvitationIssued",
+      actorPersonId:inviterPersonId,eventType:"ClassInvitationIssued",
       aggregateType:"class_invitation",aggregateId:saved.id,payload,
     });
     return {invitationId:saved.id,expiresAt:expiresAt.toISOString(),duplicate:false};
