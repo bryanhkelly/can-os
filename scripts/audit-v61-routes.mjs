@@ -51,6 +51,9 @@ const sourceGuarded = new Set([
   "operations.teacher-marketplace.tsx",
   "sites.$siteId.parent-information.tsx",
   "operations.health-review.tsx",
+  "operations.field-trips.tsx",
+  "operations.transfer-records.tsx",
+  "operations.curriculum-marketplace.tsx",
 ]);
 
 function resolveSource(from, specifier) {
