@@ -281,7 +281,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
       This school day is outside the 30-day staff attendance correction window.
       You can review the recorded history, but staff attendance changes are disabled.
       Contact the registrar if an older record needs review.
-    </WorkspaceNotice>
+    </WorkspaceNotice>}
     {(error || workspaceError) && <p role="alert" className="mt-4 border p-3 text-sm">{error || workspaceError}</p>}
     <QueryState loading={!context && contextQuery.isPending ? "Loading your verified site workspace…" : undefined}
       error={!context && contextFailure?.message}
