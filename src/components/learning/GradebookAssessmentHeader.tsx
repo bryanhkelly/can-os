@@ -78,7 +78,7 @@ export function GradebookAssessmentHeader({
           ? `Publishing "${assessment.title}" assigns this assessment to actively enrolled students. Review the due date and directions before continuing.`
           : `Closing "${assessment.title}" stops new submissions until it is reopened. Existing submissions and grades remain available.`}
         confirmLabel={pendingAction === "publish" ? "Publish assessment" : "Close submissions"}
-        pending={busy} confirmDisabled={busy}
+        pending={busy} pendingLabel="Updating assessment…" confirmDisabled={busy}
         onClose={() => setPendingAction(null)}
         onConfirm={() => {
           const action = pendingAction;
