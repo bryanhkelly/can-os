@@ -10,6 +10,7 @@ const dialogConsumers = [
   "src/components/student/LiveSchoolExperiences.tsx",
   "src/routes/groups_.$groupId.tsx",
   "src/routes/operations.jurisdiction-profiles.tsx",
+  "src/components/learning/NoncreditEnrollmentManagement.tsx",
 ] as const;
 
 function parsedDialogs(path: string) {
@@ -40,6 +41,19 @@ function parsedDialogs(path: string) {
 }
 
 describe("V6.1 ActionDialog consumers", () => {
+  it("requires two noncredit destructive confirmations with the shared accessible dialog", () => {
+    const path = "src/components/learning/NoncreditEnrollmentManagement.tsx";
+    const source = readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
+    const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    expect((file as ts.SourceFile & {parseDiagnostics: ts.Diagnostic[]}).parseDiagnostics).toHaveLength(0);
+    const dialogs = parsedDialogs(path);
+    expect(dialogs).toHaveLength(2);
+    for (const dialog of dialogs) {
+      expect(dialog.attributes).toContain("destructive");
+      expect(dialog.attributes).toContain("confirmDisabled");
+    }
+  });
+
   it.each(dialogConsumers)("%s uses shared pending and decision contracts", path => {
     const dialogs = parsedDialogs(path);
     expect(dialogs.length).toBeGreaterThan(0);
