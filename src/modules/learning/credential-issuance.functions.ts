@@ -4,9 +4,10 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, learningAwardDefinitions, learningAwardDefinitionVersions,
-  learningAwardIssuanceEvents, learningAwardIssuances, domainEvents, learnerAchievementDecisions,
+  learningAwardDefinitions, learningAwardDefinitionVersions,
+  learningAwardIssuanceEvents, learningAwardIssuances, learnerAchievementDecisions,
   noncreditCompletionCertificates, noncreditCompletionDecisions,
   noncreditRegistrations, noncreditTrainingVersions,
 } from "@/db/canonical-v301";
@@ -183,12 +184,12 @@ export const issueNoncreditAchievement = createServerFn({ method: "POST" })
         completionDecisionId: completion.id,
         kind: definition.definitionKind,
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId: actor.actorPersonId!, owningOrganizationId: definition.issuerOrganizationId,
         eventCode: "learning.credential.issued", entityKind: "credential_issuance",
         entityId: issuance.id, payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId: actor.actorPersonId!,
         eventType: "CredentialIssued", aggregateType: "credential_issuance",
         aggregateId: issuance.id, payload,
