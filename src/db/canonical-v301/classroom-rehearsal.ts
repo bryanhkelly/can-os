@@ -1,6 +1,5 @@
-import { index, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
-import { educationV30 } from "./core";
-export const facilitatedRehearsalEvents=educationV30.table("facilitated_rehearsal_events",{
+import { index, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+export const facilitatedRehearsalEvents=pgTable("facilitated_rehearsal_events",{
   id:uuid("id").defaultRandom().primaryKey(),
   deploymentId:uuid("deployment_id").notNull(),
   courseVersionId:uuid("course_version_id").notNull(),
