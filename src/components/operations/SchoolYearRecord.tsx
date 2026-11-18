@@ -101,7 +101,7 @@ function OverviewSection({ year, busy, run, tabLink }: SectionProps & { tabLink:
     <section aria-labelledby="school-year-summary">
       <h2 id="school-year-summary" className="text-lg font-semibold">Summary</h2>
       <dl className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{facts.map(([label, value, target]) =>
-        <div key={label} className="rounded-lg border bg-card p-4">
+        <div key={label} className=" border bg-card p-4">
           <dt className="text-sm text-muted-foreground">{label}</dt>
           <dd className="mt-1 text-lg font-semibold">{tabLink(target, value, "hover:underline")}</dd>
         </div>)}</dl>
@@ -160,7 +160,7 @@ function TermsSection({ year, busy, run }: SectionProps) {
     <section aria-labelledby="school-year-terms">
       <h2 id="school-year-terms" className="text-lg font-semibold">Terms and grading periods <span className="font-normal text-muted-foreground">({year.terms.length})</span></h2>
       {year.terms.length
-        ? <ul className="mt-4 divide-y rounded-lg border bg-card">{year.terms.map(term => <li key={term.id} className="flex flex-wrap items-start justify-between gap-3 p-4 text-sm">
+        ? <ul className="mt-4 divide-y  border bg-card">{year.terms.map(term => <li key={term.id} className="flex flex-wrap items-start justify-between gap-3 p-4 text-sm">
           <div>
             <p className="font-semibold">{term.name}</p>
             <p className="text-muted-foreground">{term.startsOn} to {term.endsOn}</p>
@@ -222,13 +222,13 @@ function CalendarRecord({ year, calendar, busy, run }: SectionProps & { calendar
     <section aria-labelledby={`exceptions-${calendar.id}`}>
       <h3 id={`exceptions-${calendar.id}`} className="font-semibold">Holidays, closures and special days</h3>
       {exceptions.length
-        ? <ul className="mt-2 divide-y rounded-lg border bg-card px-4">{exceptions.map(entry => <DayRow key={entry.id} day={entry} busy={busy} run={run} />)}</ul>
+        ? <ul className="mt-2 divide-y  border bg-card px-4">{exceptions.map(entry => <DayRow key={entry.id} day={entry} busy={busy} run={run} />)}</ul>
         : <p className="mt-2 text-sm text-muted-foreground">{year.status === "active" ? "None recorded." : "None recorded yet. Add local holidays before activation."}</p>}
     </section>
     <section aria-labelledby={`months-${calendar.id}`}>
       <h3 id={`months-${calendar.id}`} className="font-semibold">Instructional days by month</h3>
       {months.size
-        ? <ul className="mt-2 divide-y rounded-lg border bg-card">{[...months].map(([month, days]) => <li key={month}>
+        ? <ul className="mt-2 divide-y  border bg-card">{[...months].map(([month, days]) => <li key={month}>
           <details className="group px-4 py-2">
             <summary className="flex cursor-pointer items-center justify-between gap-3 py-1 text-sm">
               <span className="font-medium">{monthLabel(month)}</span><span className="text-muted-foreground">{plural(days.length, "day")}</span>
