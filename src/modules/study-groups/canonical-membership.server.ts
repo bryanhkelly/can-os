@@ -1,4 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { db } from "@/db/client";
 import * as s from "@/db/schema";
 import { AuthorizationError } from "@/domain/command-context";
@@ -32,17 +33,31 @@ export async function eligibleStudent(tx: Pick<Tx, "select">, studentPersonId: s
     )).limit(1);
   if (!membership) throw new AuthorizationError("active student program enrollment");
   if (group.sectionId) {
+    // Match the classroom's live same-program, same-year enrollment rule.
+    // A student's active Program in a later year must not reactivate a stale
+    // Section from an earlier year, including when invited by a facilitator.
+    const currentProgram = alias(s.enrollments, "group_current_program_enrollment");
     const [section] = await tx.select({ id: s.enrollments.id }).from(s.enrollments)
       .innerJoin(s.sections, eq(s.sections.id, s.enrollments.sectionId))
+      .innerJoin(s.terms, eq(s.terms.id, s.sections.termId))
+      .innerJoin(currentProgram, and(
+        eq(currentProgram.studentProfileId, s.enrollments.studentProfileId),
+        eq(currentProgram.programId, s.sections.programId),
+        eq(currentProgram.schoolYearId, s.terms.schoolYearId),
+        eq(currentProgram.kind, "program"),
+        eq(currentProgram.status, "active"),
+      ))
       .where(and(
         eq(s.enrollments.studentProfileId, membership.studentProfileId),
         eq(s.enrollments.sectionId, group.sectionId),
+        eq(s.enrollments.programId, s.sections.programId),
+        eq(s.enrollments.schoolYearId, s.terms.schoolYearId),
         eq(s.enrollments.kind, "section"), eq(s.enrollments.status, "active"),
         eq(s.sections.active, true), eq(s.sections.siteId, group.siteId),
         group.programId ? eq(s.sections.programId, group.programId) : undefined,
         inArray(s.sections.programId, grantedPrograms),
       )).limit(1);
-    if (!section) throw new AuthorizationError("active course section enrollment at this group school");
+    if (!section) throw new AuthorizationError("active current-year course enrollment at this group school");
   }
   return membership.studentProfileId;
 }
