@@ -19,6 +19,7 @@ const flags = new Set(process.argv.slice(2));
 
 const checks = [
   { id: "dependencies", name: "Install exact lockfile dependencies", cmd: npm, args: ["ci"] },
+  { id: "import-bindings", name: "Production source syntax and import binding preflight", cmd: "node", args: ["scripts/acceptance/check-build-source-syntax.mjs"] },
   { id: "design-contracts", name: "V6.1 design contract checker", cmd: "node", args: ["scripts/check-design-system.mjs"] },
   { id: "adoption-inventory", name: "Diagnostic component adoption inventory", cmd: npm, args: ["run", "design:inventory"] },
   { id: "cloudflare-build", name: "Cloudflare target build (no deployment)", cmd: npm, args: ["run", "build:cloudflare"] },
@@ -35,7 +36,9 @@ const checks = [
     "src/domain/native-class-transfer-choices.test.ts",
     "tests/unit/native-class-entry-refresh-contract.test.ts",
     "tests/unit/noncredit-registration-refresh-contract.test.ts",
-    "tests/unit/noncredit-management-refresh-contract.test.ts"] },
+    "tests/unit/noncredit-management-refresh-contract.test.ts",
+    "tests/unit/import-binding-conflicts.test.ts",
+    "tests/unit/native-class-session-refresh-contract.test.ts"] },
   { id: "unit-suite", name: "Complete nonintegration unit suite", cmd: npm, args: ["test"] },
   { id: "storybook-build", name: "Static Storybook build", cmd: npm, args: ["run", "build-storybook"] },
   { id: "storybook-tests", name: "Storybook browser tests", cmd: npm, args: ["run", "test:storybook"] },
