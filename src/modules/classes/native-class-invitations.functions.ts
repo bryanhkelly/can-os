@@ -42,7 +42,7 @@ export const issueNativeClassInvitation=createServerFn({method:"POST"})
   privateResponse();
   const request=getRequest();
   const actor=await getCanonicalCommandContext(request);
-  if(!inviterPersonId||!["site_admin","registrar"].includes(actor.role??""))
+  if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
     throw new AuthorizationError("current Class manager");
   assertCapability(actor,"class.manage");
   const inviterPersonId=actor.actorPersonId;
