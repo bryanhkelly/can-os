@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import type { AccessContext } from "@/domain/access-context";
 import { sites } from "@/db/schema";
-import { siteContentChannelConfigSchema, readSiteContentChannelConfig,
-  safeReadSiteContentChannelConfig, type SiteContentBlock } from "@/domain/site-content-channels";
+import { readSiteContentChannelConfig, planSiteContentChannelSave,
+  requireSavedSiteContentChannelDraft, safeReadSiteContentChannelConfig,
+  type SiteContentBlock } from "@/domain/site-content-channels";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { writeAudit } from "@/platform/mutation";
@@ -56,13 +57,9 @@ export async function saveAuthorizedSiteContentChannels(input: {
     if (!site) throw new AuthorizationError("Site content channel scope");
     await authorizeContentChannelEditor(actor, site, tx, "write");
     const current = readSiteContentChannelConfig(site.metadata.websiteContentChannels);
-    if (current.revision !== input.expectedRevision)
-      throw new Error("Site content channels have changed. Reload before saving.");
-    const next = siteContentChannelConfigSchema.parse({
-      version: 2, revision: current.revision + 1, blocks: input.blocks,
-    });
-    if (JSON.stringify(current.blocks) === JSON.stringify(next.blocks))
-      return current;
+    const {config: next, changed} = planSiteContentChannelSave(
+      site.metadata.websiteContentChannels, input.expectedRevision, input.blocks);
+    if (!changed) return next;
     const [updated] = await tx.update(sites).set({
       metadata: {...site.metadata, websiteContentChannels: next},
       updatedAt: new Date(),
@@ -94,7 +91,8 @@ export async function publishAuthorizedSiteContentChannels(input: {
     const [site] = await tx.select().from(sites)
       .where(eq(sites.id, input.siteId)).for("update").limit(1);
     if (!site) throw new AuthorizationError("own Site website");
-    const draft = readSiteContentChannelConfig(site.metadata.websiteContentChannels);
+    const draft = requireSavedSiteContentChannelDraft(
+      site.metadata.websiteContentChannels);
     if (draft.revision !== input.expectedRevision)
       throw new Error("Website channel revision has changed. Reload before publishing.");
     const published = site.metadata.publishedWebsiteContentChannels == null ? null :
