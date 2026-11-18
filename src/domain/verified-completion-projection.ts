@@ -110,6 +110,42 @@ export function countCurrentNoncreditCompletions(
 }
 
 
+
+/** Reconcile a bounded operator report against the same complete correction
+ * chain used by the canonical completion-review workflow. Any ambiguous
+ * chain must stop publication of counts rather than guessing by timestamp.
+ */
+export function currentNoncreditCompletionStates(
+  registrationIds: readonly string[],
+  source: readonly NoncreditCompletionDecisionRef[],
+): {
+  states: ReadonlyMap<string, CurrentCompletionReference["state"]>;
+  invalidRegistrations: string[];
+} {
+  const registrationSet = new Set(registrationIds);
+  const grouped = new Map<string, NoncreditCompletionDecisionRef[]>();
+  const invalidRegistrations: string[] = [];
+  for (const row of source) {
+    if (!registrationSet.has(row.registrationId)) {
+      invalidRegistrations.push(row.registrationId);
+      continue;
+    }
+    const own = grouped.get(row.registrationId) ?? [];
+    own.push(row);
+    grouped.set(row.registrationId, own);
+  }
+  const states = new Map<string, CurrentCompletionReference["state"]>();
+  for (const registrationId of registrationSet) {
+    const projected = projectCurrentNoncreditCompletion(
+      registrationId, grouped.get(registrationId) ?? [],
+    );
+    states.set(registrationId, projected.state);
+    if (projected.state === "unavailable")
+      invalidRegistrations.push(registrationId);
+  }
+  return { states, invalidRegistrations };
+}
+
 /**
  * WS1 v1 native Class outcome extension. The authoritative boolean is computed
  * by the canonical SQL function v301_ws3_class_completion_is_current, which
