@@ -3,9 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents, evidenceDocumentVersions, evidenceDocuments,
-  learningCompletionEvidenceBindings, learningCompletionEvidenceReviewRequests,
+  evidenceDocumentVersions,
+  evidenceDocuments,
+  learningCompletionEvidenceBindings,
+  learningCompletionEvidenceReviewRequests,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -249,13 +252,13 @@ export const requestCompletionEvidenceReview=createServerFn({method:"POST"})
         sourceScope:{
           organizationId:source.providerOrganizationId,siteId:source.deliverySiteId,
         }};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,
         owningOrganizationId:source.providerOrganizationId,
         eventCode:"learning.completion_evidence.review_requested",
         entityKind:"completion_evidence_review_request",entityId:created.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId!,
         eventType:"CompletionEvidenceReviewRequested",
         aggregateType:"completion_evidence_review_request",aggregateId:created.id,payload,
@@ -371,13 +374,13 @@ export const decideCompletionEvidenceReview=createServerFn({method:"POST"})
       const payload={requestId:record.id,purpose:record.purpose,
         decision:data.decision,siteId:source.deliverySiteId,
         evidenceVersionId:record.evidenceVersionId};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,
         owningOrganizationId:source.providerOrganizationId,
         eventCode:"learning.completion_evidence.review_decided",
         entityKind:"completion_evidence_review_request",entityId:record.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId!,
         eventType:"CompletionEvidenceReviewDecided",
         aggregateType:"completion_evidence_review_request",aggregateId:record.id,payload,
