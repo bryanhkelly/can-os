@@ -36,8 +36,9 @@ describe("noncredit self-registration decision and refresh contract",()=>{
   it("keeps a saved enrollment from being reported as a command failure when refresh fails",()=>{
     expect(controller).toContain("useMutationFeedback(async()=>");
     expect(controller).toContain("await Promise.all([");
-    expect(controller.match(/throwOnError:true/g)).toHaveLength(2);
+    expect(controller.match(/throwOnError:true/g)).toHaveLength(3);
     expect(controller).toContain("client.invalidateQueries({queryKey:[\"my-noncredit-waitlist\"]}");
+    expect(controller).toContain("client.invalidateQueries({queryKey:[\"my-noncredit-self-enrollments\"]}");
     expect(controller).toContain("client.invalidateQueries({queryKey:[\"my-activity\"]}");
     expect(controller).toContain("const busy=feedback.pending||feedback.refreshFailed");
     expect(controller).toContain("const outcome=await feedback.run(");
@@ -47,10 +48,29 @@ describe("noncredit self-registration decision and refresh contract",()=>{
     expect(controller).not.toContain("catch(error)");
   });
 
+  it("checks the selected release's exact invitation and fails closed when waitlist status is unavailable",()=>{
+    expect(source).toContain("getMyNoncreditWaitlistByRelease({data:{releaseId:selected!.id}})");
+    expect(source).not.toContain("getMyNoncreditWaitlist()");
+    expect(source).toContain('queryKey:["my-noncredit-waitlist",');
+    expect(source).toContain("const waitlistUnavailable=");
+    expect(controller).toContain("waitlistLoading||waitlistUnavailable||");
+    expect(confirmation).toContain("waitlistLoading||waitlistUnavailable||");
+    expect(source).toContain("Retry status check");
+  });
+
+  it("reuses V6.1 discovery, error, and record patterns and exposes the saved Course Attempt",()=>{
+    expect(source).toContain("<QueryState");
+    expect(source).toContain("<EmptyState");
+    expect(source).toContain("<RecordFacts");
+    expect(source).toContain("<WorkspaceNotice");
+    expect(confirmation).toContain('to="/learn/course/$courseAttemptId"');
+    expect(confirmation).toContain("params={{courseAttemptId:enrolled.courseAttemptId}}");
+  });
+
   it("shows shared V6.1 feedback and refresh-only retry without resubmitting the command",()=>{
     expect(confirmation).toContain("feedback:ReturnType<typeof useMutationFeedback>");
     expect(confirmation).toContain("<MutationFeedback state={feedback}");
-    expect(confirmation).toContain("disabled={!accepted||!adult||busy||waitlisted||waitlistLoading||");
+    expect(confirmation).toContain("disabled={!accepted||!adult||busy||waitlisted||waitlistLoading||waitlistUnavailable||");
     expect(confirmation).not.toContain("messageError?");
   });
 });
