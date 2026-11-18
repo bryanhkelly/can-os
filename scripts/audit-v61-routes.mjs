@@ -66,6 +66,12 @@ const sourceGuarded = new Set([
   "guardian.watching.tsx",
   "operations.jurisdiction-profiles.tsx",
   "operations.curriculum.tsx",
+  "operations.course-policies.tsx",
+  "guardian.health.tsx",
+  "operations.interest-events.tsx",
+  "operations.workflows.tsx",
+  "student.my-school.tsx",
+  "guardian.experiences.tsx",
 ]);
 
 function resolveSource(from, specifier) {
