@@ -593,6 +593,18 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/label",
     "<Button", "<Checkbox", "<Select",
   ],
+  "routes/sites.$siteId.publish.tsx": [
+    "@/components/ui/button", "@/components/ui/textarea", "@/components/ui/choice",
+    "@/components/ui/label", "<StatusBadge", "<WorkspaceNotice",
+  ],
+  "routes/canonical.blueprint-reviews.tsx": [
+    "@/components/ui/select", "@/components/ui/textarea", "@/components/ui/label",
+    "<StatusBadge", "<Label",
+  ],
+  "routes/site-website.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/input",
+    "@/components/ui/choice", "<WorkspaceNotice",
+  ],
 };
 for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
@@ -669,6 +681,32 @@ for (const [file, required] of Object.entries(migratedLaunchStudioControls)) {
   if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
       radiusUtility.test(source)) {
     console.error(file + " reintroduced native controls or non-square geometry");
+    process.exitCode = 1;
+  }
+}
+
+
+// Launch setup and publication paths compose these components; their visual
+// controls are part of the V6.1 surface even where the route has no JSX inputs.
+const migratedLaunchStudioExtendedControls = {
+  "launch-studio/BlueprintOfferingAdoptionPicker.tsx": ["<Label", "<Select", "<Button"],
+  "launch-studio/BlueprintReferenceCatalogPanel.tsx": ["<Label", "<Select", "<Button"],
+  "launch-studio/ProgramDiscoveryPanel.tsx": ["<Label", "<Select", "<Button"],
+  "launch-studio/SiteContentChannelEditor.tsx": ["<Label", "<Checkbox", "<Button", "<Field"],
+  "operations/LaunchWizardPage.tsx": ["<WorkspaceShell", "<WorkspaceNotice", "<Button"],
+  "operations/LaunchSiteIdentityEditor.tsx": ["<Field", "<Button"],
+  "operations/LaunchSiteAddressEditor.tsx": ["<Field", "<Button"],
+  "operations/LaunchSiteContactEditor.tsx": ["<Field", "<Button"],
+};
+for (const [file, fragments] of Object.entries(migratedLaunchStudioExtendedControls)) {
+  const source = readFileSync(join(root, file), "utf8");
+  for (const fragment of fragments) if (!source.includes(fragment)) {
+    console.error(file + " lost a required shared V6.1 component: " + fragment);
+    process.exitCode = 1;
+  }
+  if (/<(?:button|input|select|textarea|label)\b/.test(source) ||
+      radiusUtility.test(source)) {
+    console.error(file + " reintroduced noncanonical controls or rounded geometry");
     process.exitCode = 1;
   }
 }
