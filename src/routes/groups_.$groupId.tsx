@@ -11,6 +11,7 @@ import {
   WorkspacePanel, secondaryActionClassName, useUnsavedChangesGuard,
 } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { DiscussionComposer } from "@/components/learning/DiscussionComposer";
 import { Checkbox } from "@/components/ui/choice";
 import { Label } from "@/components/ui/label";
 import { Field, FieldError } from "@/components/ui/field";
@@ -455,7 +456,6 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
   mutation: ReturnType<typeof useMutationFeedback>;
 }) {
   const [draft, setDraft] = useState("");
-  const [postAttempted, setPostAttempted] = useState(false);
   const [report, setReport] = useState<{ postId: string; body: string } | null>(null);
   const [reportReason, setReportReason] = useState("");
   // This panel remains mounted across tabs; preserve typed messages and
@@ -478,23 +478,13 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
           Report</Button>}
       </div>)}
       {group.posts.length === 0 && <p className="text-sm text-muted-foreground">No posts yet.</p>}
-      <form noValidate className="flex flex-col gap-2" onSubmit={event => {
-        event.preventDefault();
-        setPostAttempted(true);
-        if (!draft.trim()) return;
-        void run(async () => {
-          await createCanonicalGroupPost({ data: { groupId: group.id, body: draft } });
-          setDraft(""); setPostAttempted(false);
-        }, "Post shared with your group.");
-      }}>
-        <Field label="New post" className="text-xs" required
-          error={postAttempted && !draft.trim() ? "Enter a post before sending." : undefined}>
-          <Textarea value={draft} maxLength={3000} disabled={busy || !availability.contentEnabled}
-            onChange={event => setDraft(event.target.value)}
-            placeholder="Share a question or a study tip" />
-        </Field>
-        <Button type="submit" disabled={busy || !availability.contentEnabled} className="w-fit">Post message</Button>
-      </form>
+      <DiscussionComposer value={draft} onChange={setDraft} label="New post"
+        placeholder="Share a question or a study tip" maxLength={3000}
+        submitLabel="Post message" pending={mutation.pending} disabled={busy || !availability.contentEnabled}
+        onSubmit={body => void run(async () => {
+          await createCanonicalGroupPost({ data: { groupId: group.id, body } });
+          setDraft(previous => previous === body ? "" : previous);
+        }, "Post shared with your group.")} />
     </div>
     {report && <ActionDialog open title="Report study group post"
       description="Explain why this post needs facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly."
