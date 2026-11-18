@@ -11,6 +11,9 @@ describe("room facilitator main workflow contract", () => {
     expect(server).toContain("const day = date ?? siteDate(new Date(), site.timezone)");
     expect(server).toContain("row.startsOn <= day && row.endsOn >= day && roomCoverageOccurs(row, day)");
     expect(server).not.toContain("roomCoverageOccurs(row, date ?? day)");
+    // The Site-level gate must not remain active merely because a retired plan exists.
+    expect(server).toContain("export async function siteUsesRoomCoverage");
+    expect(server).toContain("isNull(roomCoverageSchedules.retiredAt))).limit(1)");
   });
 
   it("reuses request identities for uncertain activity release and distinguishes saved writes from refresh failure", () => {
