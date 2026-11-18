@@ -13,6 +13,7 @@ import {
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {validClassroomSessionWindows} from "@/domain/classroom-scheduling";
+import {currentNoncreditCompletionStates} from "@/domain/verified-completion-projection";
 
 const id=z.string().uuid();
 const releaseInput=z.object({releaseId:id}).strict();
@@ -107,15 +108,21 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
       const roster=[...unique.values()];
       const registrationIds=roster.map(x=>x.registrationId);
       const decisions=registrationIds.length?await tx.select({
+        id:noncreditCompletionDecisions.id,
         registrationId:noncreditCompletionDecisions.registrationId,
         outcome:noncreditCompletionDecisions.outcome,
+        supersedesId:noncreditCompletionDecisions.supersedesId,
         decidedAt:noncreditCompletionDecisions.decidedAt,
       }).from(noncreditCompletionDecisions)
         .where(inArray(noncreditCompletionDecisions.registrationId,registrationIds))
         .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(2001):[];
-      const latestDecision=new Map<string,string>();
-      for(const item of decisions)if(!latestDecision.has(item.registrationId))
-        latestDecision.set(item.registrationId,item.outcome);
+      // Completion history must be complete before displaying a count.
+      // A voided or conflicting correction is never a verified completion.
+      if(decisions.length>2000)
+        throw new Error("Cohort completion history exceeds safe reporting bounds");
+      const completion=currentNoncreditCompletionStates(registrationIds,decisions);
+      if(completion.invalidRegistrations.length)
+        throw new Error("Cohort completion history requires reconciliation");
       const roomIds=plans.filter(p=>p.linkedReleaseId===release.id && p.roomId!==null)
         .map(p=>p.roomId!);
       const attemptIds=roster.map(p=>p.courseAttemptId).filter((v):v is string=>!!v);
@@ -150,14 +157,14 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           seatReleased:x.releasedSeatId!==null,
           registeredAt:x.registeredAt.toISOString(),
           attendedLinkedSession:x.courseAttemptId?present.has(x.courseAttemptId):false,
-          completionOutcome:latestDecision.get(x.registrationId)??null,
+          completionOutcome:completion.states.get(x.registrationId)??"not_decided",
         })),
         metrics:{
           registrations:roster.length,
           active:roster.filter(x=>["registered","active"].includes(x.status)).length,
           withdrawn:roster.filter(x=>x.status==="withdrawn").length,
           seatsReleased:roster.filter(x=>x.releasedSeatId!==null).length,
-          completed:roster.filter(x=>latestDecision.get(x.registrationId)==="completed").length,
+          completed:roster.filter(x=>completion.states.get(x.registrationId)==="completed").length,
           verifiedAttendees:roster.filter(x=>x.courseAttemptId && present.has(x.courseAttemptId)).length,
           linkedSessions:plans.filter(p=>p.linkedReleaseId===release.id && p.state!=="cancelled").length,
           waiting:waitingEntries.filter(p=>p.status==="waiting"||
@@ -169,8 +176,8 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           emailSuppressed:currentDeliveries.filter(d=>d.status==="suppressed").length,
         },
         partial:claims.length>500||plans.length>300||waitingEntries.length>1000||deliveryRows.length>3000||
-          decisions.length>2000||attestations.length>3000,
-        evidenceNote:"Facilitator-attested presence covers linked rooms only; pairing, video playback and enrollment are not attendance. Completion uses the latest noncredit decision, not a certificate claim.",
+          attestations.length>3000,
+        evidenceNote:"Facilitator-attested presence covers linked rooms only; pairing, video playback and enrollment are not attendance. Completion uses the unambiguous, supersession-validated noncredit decision chain, not a certificate claim.",
       };
     });
   });
