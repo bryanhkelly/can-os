@@ -529,3 +529,65 @@ theme and accessibility reviews, and authorized browser journeys on the exact
 `main` commit. GitHub Actions and Netlify are not prerequisites for this
 migration, and their known billing blocks must not be counted as code failures.
 No database schema or production data was modified for these presentation edits.
+
+
+### November 17 continuation: field trips, curriculum, transfers, and Class workspaces
+
+The source-controlled route manifest now covers **46 of the 180 TSX route
+files** identified in the Git tree (routes are not all equally complex).
+Additional source-migrated pages this cycle:
+
+| Workflow | Route | Canonical V6.1 adoption |
+| --- | --- | --- |
+| School trip operations | `/operations/field-trips` | Input, Label, Select, Textarea, Button, rectangular roster/permission records |
+| Secure academic records | `/operations/transfer-records` | Select, Input, Checkbox, Label, Button, EmptyState, WorkspaceNotice |
+| Curriculum packages | `/operations/curriculum-marketplace` | Button, Input/file, Checkbox, Label, Select, Textarea for licensing, Common Cartridge and OneRoster workflows |
+| Guardian Class enrollment | `/guardian/native-classes` | Search, verified learner and Class selectors, guardian consent |
+| Native Class operations | `/class/$classId` | Independent review reasons, assignment selectors, staff responsibility and attendance grants |
+| Learner/teacher classroom | `/classes` | Resource download, lesson completion, private notes and teacher resource controls |
+| Guardian study group | `/guardian/group-permissions` | Consent, actions, notice and empty state |
+| Student assignment | `/student/assignments/$assessmentId` | Download buttons, response and attachment field labels |
+| Student trip view | `/student/field-trips` | Rectangular trip records |
+| Guardian admissions | `/guardian/admission-offers` | Rectangular offer/decision records |
+| Family transfer requests | `/guardian/enrollment-changes` | Shared receiving-school select, explicit consent and request actions |
+
+The curriculum feature components **also** migrated:
+`CurriculumPdfPicker`, `OneRosterClassMappingFields`,
+`CommonCartridgeValidationSummary`, `CurriculumCourseOutline`,
+`StaffClassVideos`, `OneRosterStudentReconciliation`, and
+`ClassVideoUploadForm`. Their source checks are included in
+`scripts/check-design-system.mjs`, not only in route-level audit results.
+
+Specific sensitive gates retained in the same workflows:
+
+- Field-trip departure check-in requires current guardian permission;
+  boarding and return transitions remain governed by the existing server
+  commands. Trip creation is still a real `type="submit"` button.
+- Transcripts still require the authorized registrar's selected official
+  issuance, independently confirmed destination and secure-delivery record.
+  Internal CAN handoff remains tied to the receiving application and
+  guardian's approved release.
+- Pack license adoption and external link uploads still require explicit
+  rights acceptance. OneRoster cannot infer a student's CAN identity or
+  enroll students based solely on external CSV identifiers.
+- Class approval and repeat decisions remain distinct from learner
+  placement and independently scoped staff/attendance responsibilities.
+- Assignment autosave, attachment authorization and saved drafts retain
+  existing business commands.
+
+**Scope of verification:** Each newly changed route and imported shared
+component was retrieved from `main` and checked for direct native visible
+controls and legacy corner utilities. The manifest now source-gates 46
+routes and the audit/checker membership is kept in sync. The resulting
+application has **not** been proven fully V6.1 compliant: imported components
+outside the documented subset, responsive layout, keyboard focus, screen
+reader labeling, real role-based journeys, code compilation, Storybook and
+visual testing require further validation. Do not treat source-gated routes
+as live-production acceptance.
+
+**Next priorities:** Resolve remaining legacy controls in
+`/student/support`, `/guardian/watching`,
+`/operations/jurisdiction-profiles`, the remaining curriculum editor,
+and the imported classroom and administrative components. Confirm static
+checks and live journeys on the same exact `main` SHA without relying on
+currently billing-blocked GitHub Actions or Netlify.
