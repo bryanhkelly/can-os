@@ -120,12 +120,16 @@ export async function publishPartnerLocalContentWithinTransaction(
     // Protected claims are screened again when the editor requests publication.
     const decision = input.operation === "draft"
       ? { status: "draft" as const, flaggedFields: [] as string[] } : classified;
+    // Return the exact normalized restored snapshot to this already-authorized
+    // editor. A router refresh alone cannot safely replace dirty local form
+    // state, and a restore may need independent claim review before publication.
+    const restored = input.operation === "restore" ? { restoredContent: content } : {};
     if (latest && canonicalJson(latest.content) === canonicalJson(content) &&
       latest.status === decision.status) {
       if(actor.role === "site_admin" && decision.status === "published")
         await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
       return { changed: false, revision: currentRevision, status: latest.status,
-        flaggedFields: latest.flaggedFields };
+        flaggedFields: latest.flaggedFields, ...restored };
     }
 
     const revision = currentRevision + 1;
@@ -179,7 +183,7 @@ export async function publishPartnerLocalContentWithinTransaction(
     if(actor.role === "site_admin" && decision.status === "published")
       await changeSitePublicationWithinTransaction(actor, {siteId:site.id,action:"publish",expectedRevision:sitePublication.updatedAt.toISOString(),reason:"Site Administrator published reviewed school website content.",contentReviewed:true}, tx);
     return { changed: true, revision, status: decision.status,
-      flaggedFields: decision.flaggedFields };
+      flaggedFields: decision.flaggedFields, ...restored };
 }
 
 /** Detect the deployed database's historic check rejecting immutable drafts.
