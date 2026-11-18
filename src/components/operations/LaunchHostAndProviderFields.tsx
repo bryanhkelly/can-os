@@ -89,7 +89,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, jur
                   {selectedSite && <LaunchSiteContactEditor key={"contact-"+selectedSite.id+"-"+selectedSite.updatedAt}
                     initial={selectedSite.contactDraft} revision={selectedSite.updatedAt}
                     busy={busy} save={saveSiteContact}/> }
-                  {selectedSite && <details className="rounded-lg border px-4 py-3 text-sm">
+                  {selectedSite && <details className=" border px-4 py-3 text-sm">
                     <summary className="cursor-pointer">Website access &amp; saved address</summary>
                     {selectedSite.websiteDraft && <p className="mt-2 text-xs text-muted-foreground">
                       {selectedSite.websiteDraft.status==="published"?"Published website":"Private website draft"}
@@ -107,7 +107,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, jur
                       </Link>
                     </div>
                   </details>}
-                  {options.canCreateSite && <details className="rounded-lg border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
+                  {options.canCreateSite && <details className=" border p-3" open={!hostSites.length||Boolean(createdSiteDraft)}>
                     <summary className="cursor-pointer text-sm font-semibold">
                       {hostSites.length ? "Add another school location" : "Create your school location"}
                     </summary>
@@ -134,7 +134,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, jur
                       “{duplicateNewSite.name}” is already saved. Choose it above instead of adding the same location again.
                     </p>}
                     <Button type="button" variant="outline" size="sm" disabled={busy||!hostOrganizationId||!newSiteName.trim()||!newSiteSlug.trim()||!newSiteTimezone||Boolean(duplicateNewSite)} onClick={addSite} className="mt-3">Save school location</Button>
-                    {createdSiteDraft && <div role="status" className="mt-3 rounded-lg border p-3 text-sm">
+                    {createdSiteDraft && <div role="status" className="mt-3  border p-3 text-sm">
                       <p className="font-semibold">{createdSiteDraft.status==="published"?"Your saved school website is already published":createdSiteDraft.replayed?"Resumed your existing school Site and private website draft":"Your private school website draft is prepared"}</p>
                       <p className="mt-1 font-mono">{createdSiteDraft.host}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
@@ -165,7 +165,7 @@ export function LaunchHostAndProviderFields({ options, jurisdictionResearch, jur
                   <LaunchFieldHelp label="Why we ask for your state or region">School requirements depend on where students meet. Choosing a state records your plans; it is not legal approval to open.</LaunchFieldHelp>
                   {selectedSite&&!siteJurisdictionId&&!jurisdictionIssue&&
                     <p role="status" className="text-sm text-muted-foreground">We couldn't match your address to a supported state. Confirm the address and country, or ask CAN to review support for your location.</p>}
-                  {jurisdictionId&&<details className="rounded-lg border p-4">
+                  {jurisdictionId&&<details className=" border p-4">
                     <summary className="cursor-pointer text-sm">View state setup guidance</summary>
                     <JurisdictionLaunchResearch research={jurisdictionResearch[jurisdictionId]}/>
                   </details>}
