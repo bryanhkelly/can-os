@@ -23,7 +23,11 @@ export async function listInstitutionallyAuthorizedAcademicProgramIds(
   requiredServices: readonly OperatingService[],
   at = new Date(),
 ): Promise<Set<string>> {
-  // This projection is exclusively for verified provider-wide teachers.\n  // Other roles must use their own resource authorization policy.\n  if (actor.role !== "teacher" || actor.grantSiteId !== null)\n    throw new AuthorizationError("provider-wide teaching context");\n  const unique = [...new Set(programIds)];
+  // This projection is exclusively for verified provider-wide teachers.
+  // Other roles must use their own resource authorization policy.
+  if (actor.role !== "teacher" || actor.grantSiteId !== null)
+    throw new AuthorizationError("provider-wide teaching context");
+  const unique = [...new Set(programIds)];
   const permitted = new Set<string>();
   if (!unique.length) return permitted;
   normalizeOperatingServices(requiredServices);
@@ -52,7 +56,10 @@ export async function listInstitutionallyAuthorizedAcademicProgramIds(
   const churchPrograms = new Map<string, OperatingProgramIdentity>();
   for (const row of rows) {
     const hostId = row.hostOrganizationId ?? row.organizationId;
-    // An unrelated caller cannot turn a permissive same-host/non-church\n    // Program into an arbitrary authorization result.\n    if (!actor.scope.organizationIds?.includes(row.institutionOrganizationId)) continue;\n    if (row.hostType !== "church" || row.institutionOrganizationId === hostId) {
+    // An unrelated caller cannot turn a permissive same-host/non-church
+    // Program into an arbitrary authorization result.
+    if (!actor.scope.organizationIds?.includes(row.institutionOrganizationId)) continue;
+    if (row.hostType !== "church" || row.institutionOrganizationId === hostId) {
       permitted.add(row.id);
       continue;
     }
