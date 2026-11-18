@@ -3,7 +3,8 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { getTeacherMissingWork, createMissingWorkFollowUp } from "@/modules/learning/teacher-missing-work.functions";
-import { WorkspaceShell, StatCard, EmptyState } from "@/components/workspace";
+import { WorkspaceShell, StatCard, EmptyState, WorkspaceNotice } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
 import { dateKeyInTimezone, formatDateOnly } from "@/modules/calendar/timezone";
@@ -37,14 +38,14 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
       subtitle="Overdue missing submissions and returned revisions for actively enrolled students in your classes."
     >
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating follow-up..."/>
-      {!connected && <p role="status" className="mt-4 rounded-xl border p-4">Neon is not connected. The queue cannot load.</p>}
+      {!connected && <WorkspaceNotice tone="attention" className="mt-4">The school data service is unavailable. The queue cannot load.</WorkspaceNotice>}
       <div className="mt-6 grid gap-3 sm:grid-cols-2">
         <StatCard value={items.length} label="Overdue student-assignment items" />
         <StatCard value={studentCount} label="Students needing follow-up" />
       </div>
       <section className="mt-6 space-y-3">
         {items.map(x => (
-          <article key={x.assessmentId + ":" + x.studentProfileId} className="rounded-xl border bg-card p-5">
+          <article key={x.assessmentId + ":" + x.studentProfileId} className=" border bg-card p-5">
             <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {formatDateOnly(dateKeyInTimezone(x.dueAt,x.timezone))}</p>
             <h2 className="mt-2 font-semibold"><Link to="/teacher/gradebook" search={{section:x.sectionId,assessment:x.assessmentId}} className="underline">{x.title}</Link></h2>
             <p className="mt-2 text-xs"><Link to="/teacher/gradebook" search={{section:x.sectionId}} className="underline">Open class gradebook</Link></p>
@@ -53,14 +54,14 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
             {(followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId) ? (
               <Link to="/actions/$actionId"
                 params={{actionId: followedUp[x.assessmentId + ":" + x.studentProfileId] || x.followUpActionId!}}
-                className="ml-4 inline-block rounded-lg border px-3 py-2 text-xs font-semibold underline">
+                className="ml-4 inline-block  border px-3 py-2 text-xs font-semibold underline">
                 Open follow-up
               </Link>
             ) : handledElsewhere[x.assessmentId + ":" + x.studentProfileId] ? (
               <p role="status" className="ml-4 inline-block text-xs text-muted-foreground">A colleague is handling this follow-up</p>
             ) : (
-              <button type="button" disabled={busy}
-                className="ml-4 rounded-lg border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+              <Button type="button" variant="outline" size="sm" disabled={busy}
+                className="ml-4"
                 onClick={async () => {
                   const result=await mutation.run(
                     () => createMissingWorkFollowUp({data:{
@@ -82,7 +83,7 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
                   }
                 }}>
                 Create follow-up
-              </button>
+              </Button>
             )}
 
           </article>
