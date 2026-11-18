@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents,
-  domainEvents,
   instructionalTrackCommandReceipts,
   type JsonObject,
 } from "@/db/canonical-v301";
@@ -89,7 +88,7 @@ export async function runInstructionalTrackCommand(
     fingerprint,
     result,
   });
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
     actorPersonId: context.actorPersonId,
     owningOrganizationId: input.owningOrganizationId,
     eventCode: input.action,
@@ -97,7 +96,7 @@ export async function runInstructionalTrackCommand(
     entityId: input.entityId,
     payload: evidence,
   });
-  await tx.insert(domainEvents).values({
+  await emitCanonicalDomainEvent(tx,{
     eventType: input.eventType,
     aggregateType: input.entityKind,
     aggregateId: input.entityId,
