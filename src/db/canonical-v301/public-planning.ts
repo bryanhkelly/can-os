@@ -78,7 +78,7 @@ export const publicationWithdrawals = pgTable("publication_withdrawals", {
   authorizedByPersonId: uuid("authorized_by_person_id").notNull(),
 });
 
-export const programPublicationClaims = educationV30.table("program_publication_claims", {
+export const programPublicationClaims = pgTable("program_publication_claims", {
   id: id(),
   publicationSnapshotId: uuid("publication_snapshot_id").notNull(),
   operationId: uuid("operation_id").notNull(),
