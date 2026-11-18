@@ -50,8 +50,16 @@ async function readCanonicalSessionRow(request: Request): Promise<CanonicalSessi
 
   if (records.length !== 1) throw new AuthorizationError("authenticated session");
   const native=canonicalSessionRowSchema.parse(records[0]);
-  if(native.role_code==="learner")
+  if(native.role_code==="learner"){
+    // Even callers of this low-level native session reader must supply a
+    // real CAN login. Its presence alone does not authorize participation:
+    // canonical command contexts still verify the active CAN account/grant,
+    // independently reviewed identity, and exact native Person binding.
+    const can = readCookie(request, accessSessionCookie);
+    if(!can || !/^[A-Za-z0-9_-]{40,}$/.test(can))
+      throw new AuthorizationError("current CAN learner login required");
     await assertCurrentReviewedNativeLearner(native.account_id,native.person_id);
+  }
   return native;
 }
 
