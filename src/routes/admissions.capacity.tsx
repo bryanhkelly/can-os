@@ -1,4 +1,4 @@
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -70,14 +70,14 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
    {successMessage:"Seat capacity saved.",commandErrorMessage:"Unable to save capacity"});
  }
  return <WorkspaceShell width="standard" eyebrow="Admissions" title="Program capacity" subtitle="Live, school-year seat pools from Neon. Reservations include unexpired issued offers and accepted offers that have not yet activated enrollment. Changes cannot reduce capacity below existing commitments." breadcrumbs={<Link to="/admissions" search={{siteId:undefined,programId:undefined}} className="text-xs underline">← Admissions command center</Link>}>
- <div className="mt-5 flex flex-wrap gap-4 rounded-xl border p-4">
+ <div className="mt-5 flex flex-wrap gap-4  border p-4">
   <SiteProgramFields sites={schools} programs={programs} siteId={selection.siteId??""}
    programId={selection.programId??""} labelPrefix="Capacity" sitePlaceholder="All permitted schools"
    programPlaceholder="All permitted programs" onChange={(site,program)=>filterTo(site||undefined,program||undefined)}/>
  </div>
- {error&&<p role="alert" className="mt-4 rounded-lg border border-red-400 p-3">{error}</p>}
+ {error&&<WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}
  <MutationFeedback state={mutation} pendingMessage="Saving capacity..." className="mt-4"/>
- {candidates.length>0&&<section aria-label="Create seat pool" className="mt-6 rounded-xl border p-5">
+ {candidates.length>0&&<section aria-label="Create seat pool" className="mt-6  border p-5">
   <h2 className="font-serif text-xl">Create seat pool</h2>
   <p className="mt-1 text-sm text-muted-foreground">Offers can only be issued for a program and school year with a configured seat pool.</p>
   <form noValidate className="mt-4 flex flex-wrap items-end gap-3" onSubmit={event=>{event.preventDefault();void create();}}>
@@ -107,6 +107,6 @@ function CapacityView({data}:{data:Awaited<ReturnType<typeof loadCapacity>>}){
   value={edits[r.id]??String(r.capacity)} busy={busy}
   onChange={value=>setEdits(previous=>({...previous,[r.id]:value}))}
   onSave={()=>void save(r.id,r.capacity)}/>)}
- {!rows.length&&<p className="rounded-xl border p-5 text-sm text-muted-foreground">No school-year seat pools are configured for the programs in your current authorization scope.</p>}
+ {!rows.length&&<EmptyState title="No seat pools configured" description="No school-year seat pools are configured for the programs in your current authorization scope."/>}
  </div></WorkspaceShell>;
 }
