@@ -83,7 +83,12 @@ function ReleaseReview({item}:{item:Item}){
       },
       releasePoliciesComplete:item.releasePoliciesComplete,
       offeringPublished:item.offeringPublished,
-      reviews:item.reviews,
+      reviews:item.reviews.map(review=>({
+        kind:review.kind,
+        decision:review.decision==="approved"?"approved" as const:
+          review.decision==="rejected"?"rejected" as const:
+          review.decision==="withdrawn"?"withdrawn" as const:"not_reviewed" as const,
+      })),
     }}/>
     <div className="mt-3">
       <Button type="button" variant="outline" disabled={!item.current}
