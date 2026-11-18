@@ -30,7 +30,9 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
     studentPersonId: actor.actorPersonId, access: "enrollment",
   })).limit(1) : [];
   const hasEnrollmentGuardian = actor.role === "student" ? studentGuardianRows.length > 0 : null;
-  if (!programs.length && !sectionIds.length) return {
+  // A Site-wide group can be facilitated under a Site grant without a Program.
+  // Keep exact Section grants working for provider teachers.
+  if (!sites.length && !sectionIds.length) return {
     role: actor.role, groups: [], sections: [], hasEnrollmentGuardian,
   };
   const groups = await db.select({
@@ -47,9 +49,11 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
           eq(s.studyGroups.facilitatorPersonId, actor.actorPersonId),
           or(
             sectionIds.length ? inArray(s.studyGroups.sectionId, sectionIds) : undefined,
-            sites.length && programs.length ? and(
+            sites.length ? and(
               inArray(s.studyGroups.siteId, sites),
-              or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs)),
+              programs.length
+                ? or(isNull(s.studyGroups.programId), inArray(s.studyGroups.programId, programs))
+                : isNull(s.studyGroups.programId),
             ) : undefined,
           ),
         )
@@ -234,7 +238,7 @@ export const getCanonicalGroupWorkspace = createServerFn({ method: "GET" }).hand
           attendance: actor.role === "teacher" ? attendance.filter(a => a.sessionId === row.id) : [],
         })) : [];
       return {
-        id: g.id, title: g.title, description: g.description,
+        id: g.id, sectionId: g.sectionId, title: g.title, description: g.description,
         timezone: g.timezone,
         kind: g.kind,
         maxMembers: g.maxMembers,
