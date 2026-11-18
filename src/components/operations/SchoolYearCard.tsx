@@ -9,7 +9,7 @@ export function SchoolYearCard({ year, siteName, scope }: { year: SchoolYear; si
   const counts = schoolYearCounts(year);
   const status = schoolYearStatus(year.status);
   return <article id={`school-year-${year.id}`} aria-labelledby={`school-year-${year.id}-name`}
-    className="flex flex-wrap items-start justify-between gap-4 rounded-xl border bg-card p-5">
+    className="flex flex-wrap items-start justify-between gap-4  border bg-card p-5">
     <div className="min-w-0">
       <div className="flex flex-wrap items-center gap-3">
         <h3 id={`school-year-${year.id}-name`} className="text-lg font-semibold">
