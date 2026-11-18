@@ -6,11 +6,13 @@ import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspacePanel } from "@/components/workspace";
+import { NativeOfferingReleasePolicyEditor } from "@/components/learning/NativeOfferingReleasePolicyEditor";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativeOfferingReleaseReviewQueue, getNativeOfferingReviewContent,
   decideNativeOfferingRelease,
-  publishNativeOfferingCourses, publishNativeOfferingVersion,
+  publishNativeOfferingCourses, approveNativeOfferingAssetManifest,
+  publishNativeOfferingVersion,
 } from "@/modules/learning/native-offering-release.functions";
 
 type Item=Awaited<ReturnType<typeof getNativeOfferingReleaseReviewQueue>>["items"][number];
@@ -91,6 +93,18 @@ function ReleaseReview({item}:{item:Item}){
             {JSON.stringify(content.data.productDefinition,null,2)}
           </pre>
         </details>
+        <div className="border border-border p-3 text-sm">
+          <h4 className="font-semibold">Pinned publisher asset versions</h4>
+          {content.data.assetItems.length===0&&
+            <p className="mt-2 text-xs text-muted-foreground">
+              No reviewed asset uses were attached. This is a manuscript-only review.
+            </p>}
+          {content.data.assetItems.map(item=><p key={item.assetVersionId+item.usageKind}
+            className="mt-2 break-all text-xs">
+            {item.usageKind}: {item.assetVersionId} · SHA-256 {item.contentHash.slice(0,16)}
+            {" "}· rights evidence {item.rightsEvidenceVersionId??"missing"}
+          </p>)}
+        </div>
         {content.data.courses.map(course=><article key={course.courseVersionId}
           className="border border-border p-3">
           <h4 className="font-semibold">{course.courseTitle} · {course.courseCode}</h4>
@@ -131,6 +145,8 @@ function ReleaseReview({item}:{item:Item}){
         </p>
       </div>)}
     </div>
+    {!item.offeringPublished&&
+      <NativeOfferingReleasePolicyEditor offeringVersionId={item.offeringVersionId}/>}
     {item.status==="draft"&&!item.offeringPublished&&<form className="mt-4 grid gap-3 sm:grid-cols-2"
       onSubmit={submit}>
       <Field label="Review category"><Select value={category}
@@ -159,12 +175,30 @@ function ReleaseReview({item}:{item:Item}){
         disabled={!item.current||!fullyApproved||busy}
         onClick={()=>void run(()=>publishNativeOfferingCourses({data:release}),
           "Approved native Course versions published.")}>Publish reviewed Courses</Button>}
+      {!item.offeringPublished&&item.assetCount>0&&item.status==="draft"&&
+        <Button variant="outline" type="button"
+          disabled={!item.current||!fullyApproved||!item.releasePoliciesComplete||
+            !content.isSuccess||busy}
+          onClick={()=>void run(()=>approveNativeOfferingAssetManifest({data:release}),
+            "Exact asset-backed manifest approved after independent review.")}>
+          Approve reviewed asset manifest
+        </Button>}
       {!item.offeringPublished&&<Button variant="outline" type="button"
-        disabled={!item.current||!fullyApproved||!item.allCoursesPublished||busy}
+        disabled={!item.current||!fullyApproved||item.status!=="approved"||
+          !item.releasePoliciesComplete||!item.allCoursesPublished||busy}
         onClick={()=>void run(()=>publishNativeOfferingVersion({data:release}),
           "Offering published. Local adoption still requires independent approval.")}>
         Publish reviewed Offering</Button>}
     </div>
+    {item.assetCount===0&&<p className="mt-3 text-xs text-muted-foreground">
+      This submission covers the Course manuscript only. The publisher must
+      attach currently approved immutable assets and resubmit for independent
+      Offering release review.
+    </p>}
+    {!item.releasePoliciesComplete&&<p role="alert" className="mt-3 text-xs text-destructive">
+      Release policy is incomplete. An independent publisher reviewer must save
+      explicit requirements for every native Course before Offering release.
+    </p>}
     {!fullyApproved&&<p className="mt-3 text-xs text-muted-foreground">
       Publication requires the latest independent academic, rights, accessibility,
       coverage and safety approvals with current verified evidence for this exact manifest.
