@@ -2,7 +2,8 @@ import {Link} from "@tanstack/react-router";
 import {useQuery,useQueryClient} from "@tanstack/react-query";
 import {useState} from "react";
 import {Button} from "@/components/ui/button";
-import {DirectoryTable} from "@/components/workspace";
+import {DirectoryTable, StatCard} from "@/components/workspace";
+import {chooseFourWeekCohortPlans} from "@/domain/noncredit-cohort-schedule";
 import {
   attachClassroomPlanToNoncreditRelease,getNoncreditReleaseOperations,
   releaseWithdrawnNoncreditSeat,inviteNextNoncreditWaitlist,
@@ -22,6 +23,8 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
     queryFn:()=>getNoncreditReleaseOperations({data:{releaseId}}),
     retry:false,staleTime:15_000,
   });
+  const fourWeekPlanIds=chooseFourWeekCohortPlans(query.data?.sessions??[]);
+  const linkedMeetingCount=query.data?.sessions.filter(row=>row.linked&&row.state!=="cancelled").length??0;
   async function attach(planId:string){
     if(busy)return;setBusy(planId);setMessage("");
     try{
@@ -88,10 +91,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
           ["Active",query.data.metrics.active],
           ["Verified attendees",query.data.metrics.verifiedAttendees],
           ["Completed",query.data.metrics.completed],
-        ].map(([label,value])=><div key={label} className="border border-border p-3">
-          <div className="font-serif text-3xl">{value}</div>
-          <div className="text-xs text-muted-foreground">{label}</div>
-        </div>)}
+        ].map(([label,value])=><StatCard key={label} label={label} value={value}/>)}
       </div>
       <div className="mt-5 border-t border-border pt-4">
         <h3 className="text-base font-semibold">Waiting list</h3>
@@ -117,16 +117,21 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
         Attach a scheduled meeting here to include it in this cohort's learner-facing calendar.
       </p>
       {query.data.deliveryMode==="independent"&&<p className="mt-3 text-sm">Self-paced training has no required in-person cohort.</p>}
-      {query.data.deliveryMode==="facilitated"&&query.data.sessions.some(s=>!s.linked&&s.state==="scheduled")&&
-        <div className="mt-3 border border-border bg-muted/20 p-3">
-          <p className="text-sm">Assign up to four upcoming, unallocated meetings to this cohort in one operation. Each meeting must belong to this exact approved Site and Course.</p>
-          <Button type="button" className="mt-3" variant="outline" disabled={busy!==null}
-            onClick={()=>void attachFourWeeks(query.data.sessions
-              .filter(s=>!s.linked&&s.state==="scheduled"&&Date.parse(s.startsAt)>Date.now())
-              .slice(0,4).map(s=>s.planId))}>
-            {busy==="attach-four"?"Assigning meetings…":"Attach next four meetings"}
-          </Button>
-        </div>}
+      {query.data.deliveryMode==="facilitated"&&<div className="mt-3 border border-border bg-muted/20 p-4">
+        <p className="text-sm font-medium">Four-session delivery readiness: {linkedMeetingCount} linked meeting{linkedMeetingCount===1?"":"s"}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Four weekly dates are needed for the planned pilot. These are calendar links only;
+          attendance, learning and completion require their own verified evidence.
+        </p>
+        {fourWeekPlanIds.length===4?<Button type="button" className="mt-3" variant="outline" disabled={busy!==null}
+          onClick={()=>void attachFourWeeks(fourWeekPlanIds)}>
+          {busy==="attach-four"?"Assigning four meetings…":"Attach four weekly meetings"}
+        </Button>:<p role="status" className="mt-2 text-sm text-muted-foreground">
+          No complete set of four unassigned weekly meetings is available.
+          Schedule all four dates in <Link to="/canonical/lab/facilitated" className="text-primary underline">Facilitated learning</Link>,
+          or attach individual eligible meetings below.
+        </p>}
+      </div>}
       <div className="mt-3 divide-y divide-border border border-border">
         {query.data.sessions.map(session=><div key={session.planId} className="flex flex-wrap items-center justify-between gap-3 p-3">
           <div><p className="text-sm font-medium">{new Date(session.startsAt).toLocaleString()}</p>
