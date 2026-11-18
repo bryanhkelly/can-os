@@ -134,7 +134,8 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
  const content=<>
   {section&&!course?<WorkspaceNotice tone="danger" className="mt-6">This course is unavailable in your current workspace. Only actively enrolled classes appear here.</WorkspaceNotice>:
    !course?<div className="mt-7 grid gap-4 md:grid-cols-2">
-    {!enrolled.length&&<EmptyState title="Your classes will appear here after placement." description="Your school assigns classes after enrollment. You can also review available classes in the course catalog."/>}
+    {!data.connected&&<WorkspaceNotice tone="attention" className="md:col-span-2">School records are currently unavailable. Do not assume your classes or pending requests have been cleared. Try again when the connection is restored.</WorkspaceNotice>}
+    {!enrolled.length&&data.connected&&<EmptyState title="Your classes will appear here after placement." description="Your school assigns classes after enrollment. You can also review available classes in the course catalog."/>}
     {enrolled.map(item=><WorkspacePanel key={item.id} title={item.title} description={`${item.code} · ${item.subject}`}
      actions={<StatusBadge tone="success">Enrolled</StatusBadge>}>
      <p className="text-sm text-muted-foreground">{item.description??"Your classwork and feedback, in one place."}</p>
