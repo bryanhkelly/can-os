@@ -2,6 +2,7 @@ import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { invalidateRouterAndCheck } from "@/lib/router-refresh";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
@@ -62,7 +63,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
     rehearsalChoice===choice.deploymentId+":"+choice.adoptionId+":"+
     choice.courseVersionId+":"+choice.siteId);
   const [selected,setSelected]=useState("");
-  const feedback=useMutationFeedback(()=>router.invalidate());
+  const feedback=useMutationFeedback(()=>invalidateRouterAndCheck(router));
   const busy=feedback.pending||feedback.refreshFailed;
   const [message,setMessage]=useState("");
   const [expandedRoomId,setExpandedRoomId]=useState<string|null>(null);
@@ -159,7 +160,7 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
       onRoomStarted={value=>{
         setCode({roomId:value.roomId,code:value.pairingCode,expiresAt:value.pairingExpiresAt});
         setExpandedRoomId(value.roomId);
-        void router.invalidate().catch(()=>setMessage(
+        void invalidateRouterAndCheck(router).catch(()=>setMessage(
           "The scheduled room started, but the room list could not be refreshed. Refresh this page before continuing."
         ));
       }}/>
