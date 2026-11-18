@@ -57,7 +57,7 @@ export async function createSchoolRoom(actor: AccessContext, value: z.infer<type
     authenticate: async () => actor,
     capability: "program.launch.start",
     validate: input => createSiteRoomSchema.parse(input),
-    transaction: work => db.transaction(work),
+    transaction: <T>(work: (tx: Tx) => Promise<T>) => db.transaction(work),
     auditOwnedByExecute: true,
     execute: async (tx: Tx, context, input) => {
       const school = await roomSchool(tx, context as AccessContext, input.programId);
@@ -72,7 +72,7 @@ export async function createRoomAtSite(actor: AccessContext, value: z.infer<type
     authenticate: async () => actor,
     capability: "admin.manage",
     validate: input => createRoomAtSiteSchema.parse(input),
-    transaction: work => db.transaction(work),
+    transaction: <T>(work: (tx: Tx) => Promise<T>) => db.transaction(work),
     auditOwnedByExecute: true,
     execute: async (tx: Tx, context, input) => {
       const verifiedActor = context as AccessContext;
@@ -116,7 +116,7 @@ export async function assignSchoolSectionRoom(actor: AccessContext, value: z.inf
     authenticate: async () => actor,
     capability: "program.launch.start",
     validate: input => assignSectionRoomSchema.parse(input),
-    transaction: work => db.transaction(work),
+    transaction: <T>(work: (tx: Tx) => Promise<T>) => db.transaction(work),
     auditOwnedByExecute: true,
     execute: async (tx: Tx, context, input) => {
       const actor = context as AccessContext;
@@ -157,7 +157,7 @@ export async function updateSchoolRoom(actor: AccessContext, value: z.infer<type
     authenticate: async () => actor,
     capability: "program.launch.start",
     validate: input => updateSiteRoomSchema.parse(input),
-    transaction: work => db.transaction(work),
+    transaction: <T>(work: (tx: Tx) => Promise<T>) => db.transaction(work),
     auditOwnedByExecute: true,
     execute: async (tx: Tx, context, input) => {
       const actor = context as AccessContext;
@@ -192,7 +192,7 @@ export async function retireSchoolRoom(actor: AccessContext, value: z.infer<type
     authenticate: async () => actor,
     capability: "program.launch.start",
     validate: input => retireSiteRoomSchema.parse(input),
-    transaction: work => db.transaction(work),
+    transaction: <T>(work: (tx: Tx) => Promise<T>) => db.transaction(work),
     auditOwnedByExecute: true,
     execute: async (tx: Tx, context, input) => {
       const actor = context as AccessContext;
