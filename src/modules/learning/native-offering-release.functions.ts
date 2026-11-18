@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -463,7 +463,10 @@ export const saveNativeOfferingReleasePolicy=createServerFn({method:"POST"})
 /** Only a current Course-appointed publisher reviewer sees submitted items.
  * Publisher Organization membership alone is never enough. */
 export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
-  .handler(async()=>{
+  .validator((raw:unknown)=>z.object({
+    cursor:z.object({createdAt:z.string().datetime({offset:true}),id:uuid}).strict().nullable(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
     noStore();
     const actor=await getCommandContext(getRequest());
     if(!actor.actorPersonId||actor.role!=="academic_content_reviewer"||
@@ -471,17 +474,29 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
     return db.transaction(async tx=>{
       const rows=await tx.select({
         id:contentPublicationManifests.id,
+        createdAt:contentPublicationManifests.createdAt,
         offeringVersionId:contentPublicationManifests.offeringVersionId,
         manifestHash:contentPublicationManifests.manifestHash,
         manifestStatus:contentPublicationManifests.manifestStatus,
         createdByPersonId:contentPublicationManifests.createdByPersonId,
       }).from(contentPublicationManifests)
-        .where(inArray(contentPublicationManifests.ownerOrganizationId,
-          actor.scope.organizationIds))
-        .orderBy(desc(contentPublicationManifests.createdAt))
+        .where(and(
+          inArray(contentPublicationManifests.ownerOrganizationId,actor.scope.organizationIds),
+          data.cursor?or(
+            lt(contentPublicationManifests.createdAt,new Date(data.cursor.createdAt)),
+            and(eq(contentPublicationManifests.createdAt,new Date(data.cursor.createdAt)),
+              lt(contentPublicationManifests.id,data.cursor.id)),
+          ):undefined,
+        ))
+        .orderBy(desc(contentPublicationManifests.createdAt),desc(contentPublicationManifests.id))
         .limit(61);
+      // Scan all scoped candidate pages, not just the newest 60.
+      // Independent Course appointments remain required for each visible item.
+      const page=rows.slice(0,60);
+      const last=rows.length>60?page[page.length-1]:null;
+      const nextCursor=last?{createdAt:last.createdAt.toISOString(),id:last.id}:null;
       const items=[];
-      for(const row of rows.slice(0,60)){
+      for(const row of page){
         if(!row.offeringVersionId||row.createdByPersonId===actor.actorPersonId)continue;
         try{
           const bundle=await loadBundle(tx,row.offeringVersionId,false);
@@ -509,7 +524,7 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
           });
         }catch(error){if(!(error instanceof AuthorizationError))throw error;}
       }
-      return {limited:rows.length>60,items};
+      return {items,nextCursor};
     });
   });
 
