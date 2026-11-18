@@ -10,6 +10,8 @@ import { DashboardProgress, DashboardMediaTile } from "@/components/workspace/da
 import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
 import { StatusBadge } from "@/components/workspace";
 import type { DashboardAssignment, StudentDashboardData } from "./student-dashboard-data";
+import { StudentAssignmentLink } from "./StudentAssignmentLink";
+import { Button } from "@/components/ui/button";
 import { DashboardHero, homeGreeting } from "@/components/workspace/dashboard-home";
 
 type Today = Awaited<ReturnType<typeof getMyStudentToday>>;
@@ -65,11 +67,10 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
       <DashboardShortcut title="Continue Learning" description={learning?.lesson?.title ?? nextWork?.title ?? "Open your enrolled classes"}
         icon={<BookOpen className="size-5" />}>{learning?.lesson
           ? <Link to="/classes" search={{section:learning.sectionId,tab:"lessons",lesson:learning.lesson.id}} />
-          : nextWork ? <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}} />
+          : nextWork ? <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId} />
           : <Link to="/classes" />}</DashboardShortcut>
       <DashboardShortcut title="View Assignments" description={assignmentsError ? "Assignments unavailable" : `${plan.requiresAction} ready for your attention`}
-        icon={<FileText className="size-5" />}><Link to="/student/assignments"
-          search={{section:nextWork?.sectionId ?? undefined,assessment:nextWork?.assessmentId}} /></DashboardShortcut>
+        icon={<FileText className="size-5" />}><Link to="/student/assignments" /></DashboardShortcut>
       <DashboardShortcut title="Today's Schedule" description={`${classesToday.length} class events scheduled`}
         icon={<CalendarDays className="size-5" />}><Link to="/calendar" search={{date:localDate}} /></DashboardShortcut>
       <DashboardShortcut title="School Life" description="School events and community"
@@ -108,8 +109,8 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
               ? "Your lesson progress could not be loaded. Open your class to retry."
               : liveData.sections.length ? "Open a class to review its published lessons and next steps." : "No enrolled classes are available yet."}</p>
             {nextWork && <><p className="text-sm font-semibold">{nextWork.title}</p>
-              <Link to="/student/assignments" search={{section:nextWork.sectionId ?? undefined,assessment:nextWork.assessmentId}}
-                className="student-resume-action">Continue assignment →</Link></>}
+              <StudentAssignmentLink assessmentId={nextWork.assessmentId} sectionId={nextWork.sectionId}
+                className="student-resume-action">Continue assignment →</StudentAssignmentLink></>}
             <Link to="/classes" className={textLink}>View my classes →</Link>
           </div>}
         </DashboardPanel>
@@ -126,18 +127,18 @@ export function StudentDashboard({ liveData, data }: { liveData: Today; data?: S
         <DashboardPanel id="student-assignments" title="Upcoming Assignments"
           action={<Link to="/student/assignments" className={textLink}>View all →</Link>}>
           <div className="student-assignment-filters" role="group" aria-label="Filter dashboard assignments">
-            {(["all","due","progress"] as const).map(value => <button key={value} type="button" aria-pressed={filter === value}
-              onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "due" ? "Due soon" : "In progress"}</button>)}
+            {(["all","due","progress"] as const).map(value => <Button key={value} type="button" size="sm" variant={filter === value ? "secondary" : "outline"} aria-pressed={filter === value}
+              onClick={() => setFilter(value)}>{value === "all" ? "All" : value === "due" ? "Due soon" : "In progress"}</Button>)}
           </div>
           {assignmentsError ? <p role="alert" className="p-3 text-xs">{assignmentsError} <Link to="/student/assignments" className="underline">Open assignments to retry.</Link></p>
-            : <div>{visible.slice(0,5).map(item => <Link key={item.assessmentId} to="/student/assignments"
-              search={{section:item.sectionId ?? undefined,assessment:item.assessmentId}} className="student-assignment-row">
+            : <div>{visible.slice(0,5).map(item => <StudentAssignmentLink key={item.assessmentId} assessmentId={item.assessmentId}
+              sectionId={item.sectionId} className="student-assignment-row">
               <FileText aria-hidden="true" className="size-4 text-muted-foreground" />
               <span className="min-w-0"><b className="block text-xs font-semibold">{item.title}</b><small className="text-muted-foreground">{item.course}</small></span>
               <span className="text-3xs text-muted-foreground">{item.dueAt ? `Due ${format(item.dueAt,liveData.sections.find(section => section.sectionId === item.sectionId)?.timezone ?? timezone)}` : "No due date"}</span>
               <StatusBadge tone={item.timeliness === "missing" || item.status === "returned" || item.timeliness === "late" ? "attention" : "neutral"}>{assignmentState(item)}</StatusBadge>
               <strong className="text-xs text-primary">{item.canEdit ? "Continue →" : "View →"}</strong>
-            </Link>)}
+            </StudentAssignmentLink>)}
             {!visible.length && <p role="status" className="p-3 text-xs text-muted-foreground">{assignments.length
               ? "No assignments match this filter." : "No published coursework in your current classes."}</p>}
             {visible.length > 5 && <p className="p-3 text-xs text-muted-foreground">Showing 5 of {visible.length}. Open all assignments for the complete list.</p>}
