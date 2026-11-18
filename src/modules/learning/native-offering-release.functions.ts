@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
@@ -20,7 +20,7 @@ import { writeCanonicalAudit, emitCanonicalDomainEvent } from
   "@/platform/canonical-mutation.server";
 import {
   nativeReleaseAssetSchema,nativeReleasePolicySchema,
-  type NativeReleasePolicy, readNativeReleasePolicies,readNativeReleaseManifestItems,
+  readNativeReleasePolicies,readNativeReleaseManifestItems,
   requireCompleteReleasePolicies,policyRevision,prepareNativeReleaseAssetItems,
   nativeReleaseSnapshotHash,currentReleaseSnapshotHash,assertNativeReleaseAssetEvidence,
   assertNativeOfferingDistributionReady,
@@ -305,6 +305,34 @@ export const submitNativeOfferingRelease=createServerFn({method:"POST"})
     });
   });
 
+/** Reviewer-only current policy inventory, readable even when a previous
+ * asset-backed release manuscript has become stale. Release policy editing
+ * must never depend on untrusted or copied manifest state. */
+export const getNativeOfferingReleasePolicyReview=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>releaseInput.parse(raw))
+  .handler(async({data})=>{
+    noStore();
+    const actor=await getCommandContext(getRequest());
+    return db.transaction(async tx=>{
+      const bundle=await loadBundle(tx,data.offeringVersionId,false);
+      await requireAppointments(tx,actor,bundle,"instructional_track.review");
+      const manifest=await currentManifest(tx,bundle.version.id);
+      if(manifest?.createdByPersonId===actor.actorPersonId)
+        throw new AuthorizationError("independent publisher release-policy reviewer");
+      const policies=await readNativeReleasePolicies(tx,bundle.version.id);
+      return {
+        offeringVersionId:bundle.version.id,offeringTitle:bundle.offering.title,
+        lifecycle:bundle.version.lifecycle,manuscriptHash:bundle.hash,
+        revision:policyRevision(policies),
+        courses:bundle.courses.map(row=>({
+          courseVersionId:row.courseVersionId,courseTitle:row.courseTitle,
+          isRequired:row.isRequired,
+        })),
+        policies,
+      };
+    });
+  });
+
 /** Publisher reviewer declares the release policy for every Course.
  * Explicit evidence, CAS revision and a distinct author/reviewer role prevent
  * silently treating missing primary-track requirements as zero. */
@@ -427,7 +455,8 @@ export const getNativeOfferingReviewContent=createServerFn({method:"GET"})
       const assetItems=await readNativeReleaseManifestItems(tx,manifest.id);
       return {
         offeringTitle:bundle.offering.title,offeringVersionId:bundle.version.id,
-        reviewedManifestHash:manifest.manifestHash,policies,assetItems,
+        reviewedManifestHash:manifest.manifestHash,manuscriptHash:bundle.hash,
+        policyRevision:policyRevision(policies),policies,assetItems,
         productDefinition:bundle.version.productDefinition,
         courseCount:bundle.courses.length,lessonCount:bundle.lessonCount,
         courses:bundle.courses.map(row=>({
