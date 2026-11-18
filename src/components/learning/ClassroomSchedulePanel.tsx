@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { fourSessionSchedulePreset, type FourSessionCadence } from "@/domain/classroom-scheduling";
+import { fourSessionSchedulePreset, validClassroomScheduleWindow, type FourSessionCadence } from "@/domain/classroom-scheduling";
 import {validCohortSessionWindows} from "@/domain/noncredit-cohort-schedule";
 import {
   cancelClassroomPlan, getClassroomSchedule, openScheduledClassroom,
@@ -56,7 +56,9 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     row.deploymentId+":"+row.courseVersionId+":"+row.siteId);
   const batchReady=batchMeetings.length===4&&
     validCohortSessionWindows(batchMeetings.map(row=>({startsAt:row.start,endsAt:row.end})))&&
-    batchMeetings.every(row=>Date.parse(row.start)>=Date.now()+5*60_000);
+    batchMeetings.every(row=>validClassroomScheduleWindow(
+      new Date(row.start),new Date(row.end),new Date(),
+    ));
   function fillSessionDates(cadence:FourSessionCadence){
     try{
       const windows=fourSessionSchedulePreset(startsAt,endsAt,cadence);
@@ -94,7 +96,11 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       <label className="block text-sm font-medium sm:col-span-2">
         Authorized Site and Course
         <Select className="mt-2 min-h-10 w-full border border-border bg-background p-2"
-          value={selected} onChange={e=>setSelected(e.target.value)}>
+          value={selected} onChange={e=>{
+            setSelected(e.target.value);
+            setShowSessionPlanner(false);
+            setBatchMeetings([]);
+          }}>
           <option value="">Choose an approved Course</option>
           {choices.map(row=><option
             key={row.deploymentId+":"+row.courseVersionId+":"+row.siteId}
@@ -174,7 +180,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
             })).sort((a,b)=>Date.parse(a.startsAt??"")-Date.parse(b.startsAt??""));
             if(sorted.some(row=>!row.startsAt||!row.endsAt))
               throw new Error("Invalid meeting dates");
-            const meetings=sorted.map((row,index)=>{
+            const meetings=sorted.map(row=>{
               const key=[choice.deploymentId,choice.courseVersionId,
                 choice.siteId,row.startsAt,row.endsAt].join(":");
               const requestId=requestIds.current[key]??crypto.randomUUID();
