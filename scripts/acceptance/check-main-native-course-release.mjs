@@ -179,6 +179,9 @@ async function main(){
         JOIN target t ON t.publisher_organization_id=d.owning_organization_id
         WHERE v.verified_at IS NOT NULL
           AND v.verified_by_person_id IS NOT NULL
+          AND v.verified_at<=clock_timestamp()
+          AND (v.valid_from IS NULL OR v.valid_from<=CURRENT_DATE)
+          AND (v.valid_through IS NULL OR v.valid_through>=CURRENT_DATE)
       ) AS verified_publisher_evidence,
       (SELECT count(*)::int FROM education_v30.content_asset_versions v
         JOIN public.content_assets a ON a.id=v.asset_id
@@ -194,7 +197,13 @@ async function main(){
         WHERE ca.decision='approved'
       ) AS approved_publisher_capability_assignments,
       (SELECT count(*)::int FROM education_v30.blueprint_outputs bo
-        WHERE bo.offering_version_id=(SELECT id FROM target)
+        JOIN education_v30.blueprint_execution_batches batch
+          ON batch.id=bo.execution_batch_id
+        JOIN education_v30.blueprint_configuration_offering_intents intent
+          ON intent.configuration_version_id=batch.configuration_version_id
+        JOIN target t ON intent.offering_version_id=t.id
+        WHERE batch.execution_status='executed'
+          AND bo.deployment_id IS NOT NULL
       ) AS offering_blueprint_outputs,
       (SELECT count(*)::int FROM (
         SELECT latest.deployment_id
