@@ -45,7 +45,7 @@ async function run(){
     SELECT
       to_regclass('education_v30.class_completion_policy_versions') IS NOT NULL AS ws3_policy,
       to_regclass('education_v30.class_enrollment_completion_pins') IS NOT NULL AS ws3_pins,
-      to_regclass('education_v30.learning_completion_evidence_review_requests') IS NOT NULL AS ws3_review,
+      to_regclass('public.learning_completion_evidence_review_requests') IS NOT NULL AS ws3_review,
       to_regclass('education_v30.class_session_agenda_revisions') IS NOT NULL AS ws4_agendas
   `;
   if(!schema || Object.values(schema).some(value=>value!==true))
