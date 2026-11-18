@@ -34,6 +34,7 @@ const repoFiles=[
   "database/production/2026-11-18-batch-03-eight-empty-unmapped-tables.sql",
   "database/production/2026-11-18-consolidate-three-active-empty-leaf-tables.sql",
   "database/production/2026-11-18-consolidate-education-operation-sites.sql",
+  "database/production/2026-11-18-consolidate-three-active-view-backed-tables.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -46,6 +47,7 @@ const referenceRowCounts={
   survey_definitions:0,
   education_operations:1,
   education_operation_sites:1,
+  facilitated_learning_participants:0,facilitated_learning_playback:0,program_publication_claims:0,
   publication_withdrawals:0,learner_outcomes:0,qualification_resource_fulfillments:0,
   noncredit_enrollment_waitlist:0,
   instructional_track_command_receipts:0,learning_award_artifacts:0,official_course_requirement_versions:0,noncredit_released_seats:0,network_member_identifiers:0,
@@ -130,6 +132,12 @@ async function run(){
             THEN (SELECT count(*) FROM public.education_operations)
         WHEN c.relname='education_operation_sites'
             THEN (SELECT count(*) FROM public.education_operation_sites)
+        WHEN c.relname='facilitated_learning_participants'
+            THEN (SELECT count(*) FROM public.facilitated_learning_participants)
+        WHEN c.relname='facilitated_learning_playback'
+            THEN (SELECT count(*) FROM public.facilitated_learning_playback)
+        WHEN c.relname='program_publication_claims'
+            THEN (SELECT count(*) FROM public.program_publication_claims)
         WHEN c.relname='publication_withdrawals'
             THEN (SELECT count(*) FROM public.publication_withdrawals)
         WHEN c.relname='learner_outcomes'
@@ -262,8 +270,10 @@ async function run(){
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-18-consolidate-education-operation-sites.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-18-consolidate-three-active-view-backed-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==83)throw new Error("Expected 83 reviewed protected table relocations");
+  if(protectedNames.length!==86)throw new Error("Expected 86 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
