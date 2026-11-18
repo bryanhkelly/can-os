@@ -41,7 +41,7 @@ describe("P0 public Person FK cutover without correspondence",()=>{
    expect(sql).toContain("NOT c.condeferrable");
    expect(sql).toContain("c.confdeltype='a'");
    expect(sql).toContain("c.confupdtype='a'");
-   expect(sql).toContain("c.relrowsecurity AND t.relforcerowsecurity");
+   expect(sql).toContain("t.relrowsecurity AND t.relforcerowsecurity");
    expect(sql).not.toContain("INSERT INTO public.people");
    expect(sql).not.toContain("DROP TABLE public.account_person_grants");
  });
