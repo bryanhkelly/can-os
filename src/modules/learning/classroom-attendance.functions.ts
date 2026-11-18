@@ -4,8 +4,9 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, classroomPersons, domainEvents, enrollments,
+  classroomPersons, enrollments,
   noncreditSelfEnrollmentClaims,
   facilitatedLearningParticipants, facilitatedRoomAttendanceAssertions,
   learnerCourseAttempts, learnerProfiles, noncreditRegistrations,
@@ -206,7 +207,7 @@ export const attestClassroomParticipation=createServerFn({method:"POST"})
         status:data.status,method:data.method,noDevice:!paired,
         correction,
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:host.actor.actorPersonId!,
         owningOrganizationId:host.organizationId,
         eventCode:correction?"learning.classroom.attendance.corrected":
@@ -214,7 +215,7 @@ export const attestClassroomParticipation=createServerFn({method:"POST"})
         entityKind:"facilitated_room_attendance_assertion",entityId:saved.id,
         payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:correction?"ClassroomAttendanceCorrected":"ClassroomAttendanceAttested",
         aggregateType:"facilitated_room_attendance_assertion",aggregateId:saved.id,
         actorPersonId:host.actor.actorPersonId!,payload,
