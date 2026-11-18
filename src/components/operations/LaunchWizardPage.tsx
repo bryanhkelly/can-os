@@ -31,7 +31,7 @@ import { launchGradeRangeIsOrdered } from "@/domain/launch-grade-range";
 import { programTypes, isExtendedLearningType } from "@/domain/program-offerings";
 import { suggestedSchoolYear } from "@/domain/school-year-defaults";
 import { Link, useRouter } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { WorkspaceShell, WorkspaceNotice } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { LaunchPortfolio } from "@/components/operations/LaunchPortfolio";
 import { ExtendedLearningSeasonPlanner } from "@/components/operations/ExtendedLearningSeasonPlanner";
@@ -284,9 +284,9 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
   if (authError || !options || !launches) {
     return (
       <WorkspaceShell width="standard" eyebrow="Program launch" title="Host / program launch">
-          <p role="alert" className="mt-8 rounded-lg border p-4 text-sm">
+          <WorkspaceNotice tone="danger" className="mt-8">
             {authError || "Launch data is unavailable."}
-          </p>
+          </WorkspaceNotice>
       </WorkspaceShell>
     );
   }
@@ -297,12 +297,12 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
   if(selectionIssue)return <WorkspaceShell width="wide" eyebrow="Program launch"
     title="School selection needs attention"
     subtitle="Your requested school context was not changed or replaced with another campus.">
-    <p role="alert" className="rounded-lg border p-4 text-sm">
+    <WorkspaceNotice tone="danger">
       {selectionIssue==="site_program_mismatch"
         ?"The Site and Program in this link belong to different school contexts."
         :"The saved Site or Program in this link is unavailable to your verified account."}
       {" "}Open a permitted school from Operations, or start a new setup without carrying over this link.
-    </p>
+    </WorkspaceNotice>
     <div className="mt-4 flex flex-wrap gap-4 text-sm">
       <Link to="/home" className="underline">Return to Operations</Link>
       <Link to="/launch/school" search={{}} className="underline">Start a new school setup</Link>
@@ -402,7 +402,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
           {!readinessAvailable && <Button type="button" variant="ghost" className="mt-2 underline" onClick={() => void router.invalidate()}>Retry launch information</Button>}
         </details>}
         {error && (
-          <p role="alert" className="mt-4 rounded-lg border border-destructive p-3">{error}</p>
+          <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>
         )}
         {siteMutation.refreshError&&<Button type="button" variant="outline" size="sm" disabled={siteMutation.isSubmitting}
           onClick={()=>void retrySiteRefresh()} className="mt-2">
@@ -425,7 +425,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
           Retry launch refresh
         </Button>}
         {!hubMode && <SchoolPreparationNavigation schools={schoolChoices} selected={schoolChoices.find(school=>school.id===currentProgram?.id)??null} onSelect={school=>void router.navigate({to:"/launch/school",search:{siteId:school.siteId??undefined,programId:school.id,step}})}/> }
-        {(step === "welcome" || step === "readiness" || step === "next") && <section aria-label="Your next school launch action" className="mt-5 rounded-2xl border border-primary/20 bg-card p-5">
+        {(step === "welcome" || step === "readiness" || step === "next") && <section aria-label="Your next school launch action" className="mt-5  border border-primary/20 bg-card p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-primary">Your school · Next action</p>
           <h2 className="mt-2 font-serif text-2xl font-semibold">{nextTitle}</h2>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{nextDescription}</p>
@@ -471,7 +471,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
           </div>}
         </section>}
         <LaunchPreparationWorkspace focus={step} currentLaunch={currentLaunch} currentProgram={currentProgram} currentSchoolStatus={currentSchool?.status} launches={launches.launches} selection={selection} schoolSelection={schoolSelection} hasSchoolPreparation={hasSchoolPreparation} admissionsCounts={admissionsCounts} enrollmentCounts={enrollmentCounts} familyInvitations={familyInvitations} />
-        {step === "next" && <details id="launch-portfolio" className="mt-7 rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
+        {step === "next" && <details id="launch-portfolio" className="mt-7  border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Saved launches · Journey and academic records</summary>
           <p className="mt-3 text-sm text-muted-foreground">Continue a saved launch in the guided view, or open its academic setup. Journey requirements remain the canonical source; this summary does not duplicate or grant opening approval.</p>
           <LaunchPortfolio launches={launches.launches} sites={options.sites} siteId={selection.siteId} programId={selection.programId}/>
         </details>}
@@ -488,7 +488,7 @@ export function LaunchWizardPage({ selection, data, hubMode = false }: { hubMode
             value={() => ({ audience: "school", fields: draftFields })} />
           <LaunchConfigurationForm created={created} hasSchoolPreparation={hasSchoolPreparation} modelPresets={{onSchoolModel:applySchoolModelPreset,onNinthGradeHybrid:applyNinthGradeHybridPreset,onExtendedLearning:applyExtendedLearningPreset}} identity={{ type, setType, summerCreditBearing, setSummerCreditBearing, name, setName, targetOpeningDate, setTargetOpeningDate, slug, setSlug, slugEdited, setSlugEdited, gradeMin, setGradeMin, gradeMax, setGradeMax }} delivery={{ onsite, setOnsite, liveOnline, setLiveOnline, asynchronous, setAsynchronous, onsiteDaysPerWeek, setOnsiteDaysPerWeek }} hostAndProvider={{ options, jurisdictionGuidance, jurisdictionResearch, jurisdictionResearchUnavailable:data.jurisdictionResearchUnavailable, hostOrganizationId, setHostOrganizationId, siteId, setSiteId, setCreatedSiteDraft, hostSites, newSiteName, setNewSiteName, newSiteSlug, setNewSiteSlug, newSiteTimezone, setNewSiteTimezone, newSiteAddress, setNewSiteAddress, saveSiteAddress, saveSiteContact, saveSiteIdentity, duplicateNewSite, createdSiteDraft, busy, addSite, jurisdictionId, setJurisdictionId, academicProviderOrganizationId, setAcademicProviderOrganizationId, creditMode, creditIssuingOrganizationId, setCreditIssuingOrganizationId }} submitLaunch={submitLaunch} busy={busy} />
 
-          <details className="rounded-xl border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
+          <details className=" border bg-card p-5"><summary className="cursor-pointer text-sm font-semibold">Optional summer and after-school programs</summary>
            {extendedPlanning?<ExtendedLearningSeasonPlanner planning={extendedPlanning} siteId={selection.siteId}/>:<p role="status" className="mt-3 text-sm">Additional program planning is temporarily unavailable. You can continue setting up your school.</p>}
           </details>
         </div></div>
