@@ -215,7 +215,17 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
     try { previous = analyzeSource(git(src, ["show", base + ":" + path]), file); }
     catch { previous = { native: [], corners: [] }; }
     result.checked += 1;
-    for (const key of ["native", "corners", "syntaxErrors"]) {
+    // Compare semantic control categories separately. Replacing one legacy
+    // label with a new native button must not be mistaken for progress.
+    for (const tag of nativeTags) {
+      const before = previous.native.filter(node => node.tag === tag).length;
+      const after = current.native.filter(node => node.tag === tag).length;
+      if (after > before) {
+        result.errors.push(path + ": native increased (" + tag + ") from " +
+          before + " to " + after);
+      }
+    }
+    for (const key of ["corners", "syntaxErrors"]) {
       if (current[key].length > previous[key].length) {
         result.errors.push(path + ": " + key + " increased from " +
           previous[key].length + " to " + current[key].length);
