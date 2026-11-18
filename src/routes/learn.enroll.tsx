@@ -15,7 +15,7 @@ import {
 } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { noncreditRegistrationRoute } from "@/domain/noncredit-seat-policy";
 import { useHydrated } from "@/lib/use-hydrated";
-import {getMyNoncreditWaitlist,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
+import {getMyNoncreditWaitlistByRelease,joinNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
 import {findNoncreditEnrollmentAffiliates} from "@/modules/enrollment/noncredit-affiliate-directory.functions";
 
 export const Route=createFileRoute("/learn/enroll")({
@@ -49,20 +49,25 @@ function PublicSelfEnrollment() {
     queryFn:()=>getOpenNoncreditSelfEnrollmentById({data:{releaseId:search.release!}}),
     enabled:!!search.release,retry:false,staleTime:30_000,
   });
+  const selected=catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data??undefined;
+  // Select by exact release rather than scanning a bounded cross-course list.
+  // Both the cache and server-side lookup remain scoped to this verified account.
   const waiting=useQuery({
-    queryKey:["my-noncredit-waitlist"],queryFn:()=>getMyNoncreditWaitlist(),
-    enabled:session?.authenticated===true&&session.role!=="student",
+    queryKey:["my-noncredit-waitlist",
+      session?.authenticated===true?session.activeGrantId:"signed-out",selected?.id??null],
+    queryFn:()=>getMyNoncreditWaitlistByRelease({data:{releaseId:selected!.id}}),
+    enabled:!!selected&&session?.authenticated===true&&session.role!=="student",
     retry:false,staleTime:15_000,
   });
-  const selected=catalog.data?.items.find(item=>item.id===search.release)??linkedRelease.data??undefined;
-  const myWaitlist=waiting.data?.find(entry=>entry.releaseId===selected?.id);
+  const myWaitlist=waiting.data??undefined;
   const invited=myWaitlist?.invitationActive===true;
   const joinQueue=selected?noncreditRegistrationRoute({
     seatsRemaining:selected.seatsRemaining,
     hasWaitingQueue:selected.hasWaitingQueue,
     hasValidInvitation:invited,
   })==="join_waitlist":false;
-  const waitlistLoading=session?.authenticated===true&&session.role!=="student"&&waiting.isPending;
+  const waitlistLoading=!!selected&&session?.authenticated===true&&session.role!=="student"&&waiting.isPending;
+  const waitlistUnavailable=!!selected&&session?.authenticated===true&&session.role!=="student"&&waiting.isError;
 
   const searchParams=new URLSearchParams();
   if(selected)searchParams.set("release",selected.id);
@@ -136,7 +141,8 @@ function PublicSelfEnrollment() {
           key={selected.id+":"+selected.consentSha256}
           release={selected} signedIn={session?.authenticated===true}
           returnTo={returnTo} referralCode={search.ref}
-          waitlistLoading={waitlistLoading} isStudent={session?.authenticated===true&&session.role==="student"}
+          waitlistLoading={waitlistLoading} waitlistUnavailable={waitlistUnavailable}
+          isStudent={session?.authenticated===true&&session.role==="student"}
           joinQueue={joinQueue} invited={invited} waitlistStatus={myWaitlist?.status??null}/>}
       </div>
       <aside className="border border-border bg-card p-5 self-start">
@@ -164,9 +170,9 @@ function PublicSelfEnrollment() {
  * never a stale confirmation or a reusable consent attestation.
  */
 function SelfEnrollmentActionForm({release,signedIn,returnTo,referralCode,
-  waitlistLoading,isStudent,joinQueue,invited,waitlistStatus}:{
+  waitlistLoading,waitlistUnavailable,isStudent,joinQueue,invited,waitlistStatus}:{
   release:Release;signedIn:boolean;returnTo:string;referralCode?:string;
-  waitlistLoading:boolean;isStudent:boolean;joinQueue:boolean;invited:boolean;
+  waitlistLoading:boolean;waitlistUnavailable:boolean;isStudent:boolean;joinQueue:boolean;invited:boolean;
   waitlistStatus:string|null;
 }) {
   const client=useQueryClient();
@@ -178,13 +184,14 @@ function SelfEnrollmentActionForm({release,signedIn,returnTo,referralCode,
   const feedback=useMutationFeedback(async()=>{
     await Promise.all([
       client.invalidateQueries({queryKey:["my-noncredit-waitlist"]},{throwOnError:true}),
+      client.invalidateQueries({queryKey:["my-noncredit-self-enrollments"]},{throwOnError:true}),
       client.invalidateQueries({queryKey:["my-activity"]},{throwOnError:true}),
     ]);
   });
   const busy=feedback.pending||feedback.refreshFailed;
   async function submit() {
     if(!signedIn||isStudent||!accepted||!adult||busy||enrolled||waitlisted||
-       waitlistLoading||(joinQueue&&waitlistStatus==="waiting"))return;
+       waitlistLoading||waitlistUnavailable||(joinQueue&&waitlistStatus==="waiting"))return;
     const outcome=await feedback.run(
       async()=>{
         if(joinQueue){
@@ -226,16 +233,16 @@ function SelfEnrollmentActionForm({release,signedIn,returnTo,referralCode,
   return <SelfEnrollmentConfirmation release={release} signedIn={signedIn}
     returnTo={returnTo} accepted={accepted} adult={adult} busy={busy}
     enrolled={enrolled} feedback={feedback} waitlisted={waitlisted}
-    waitlistLoading={waitlistLoading} isStudent={isStudent}
+    waitlistLoading={waitlistLoading} waitlistUnavailable={waitlistUnavailable} isStudent={isStudent}
     joinQueue={joinQueue} invited={invited} waitlistStatus={waitlistStatus}
     onAccepted={setAccepted} onAdult={setAdult} onMembershipChange={setNetworkMembershipId}
     onSubmit={()=>void submit()}/>;
 }
 
-function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,feedback,waitlisted,waitlistLoading,isStudent,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onMembershipChange,onSubmit}:{
+function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,busy,enrolled,feedback,waitlisted,waitlistLoading,waitlistUnavailable,isStudent,joinQueue,invited,waitlistStatus,onAccepted,onAdult,onMembershipChange,onSubmit}:{
   release:Release;signedIn:boolean;returnTo:string;accepted:boolean;adult:boolean;busy:boolean;
   enrolled:{courseAttemptId:string;alreadyEnrolled:boolean}|null;feedback:ReturnType<typeof useMutationFeedback>;
-  waitlisted:boolean;waitlistLoading:boolean;isStudent:boolean;joinQueue:boolean;invited:boolean;waitlistStatus:string|null;
+  waitlisted:boolean;waitlistLoading:boolean;waitlistUnavailable:boolean;isStudent:boolean;joinQueue:boolean;invited:boolean;waitlistStatus:string|null;
   onAccepted:(value:boolean)=>void;onAdult:(value:boolean)=>void;
   onMembershipChange:(value:string)=>void;onSubmit:()=>void;
 }) {
@@ -295,17 +302,21 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
     </p>}
     {isStudent&&<p role="status" className="mt-4 text-sm text-muted-foreground">Adult self-registration requires an independently verified adult CAN account. Switch to an eligible account to enroll.</p>}
     {signedIn && !enrolled && !isStudent && <Button type="button" className="mt-5 min-h-11"
-      disabled={!accepted||!adult||busy||waitlisted||waitlistLoading||
+      disabled={!accepted||!adult||busy||waitlisted||waitlistLoading||waitlistUnavailable||
         (!!waitlistStatus&&joinQueue&&waitlistStatus==="waiting")}
       onClick={onSubmit}>
       {busy?"Saving…":waitlistLoading?"Checking your waitlist…":joinQueue?"Join waiting list":invited?"Claim my reserved place":"Confirm my registration"}
     </Button>}
     <MutationFeedback state={feedback} pendingMessage="Saving enrollment decision…" className="mt-4"/>
-    {enrolled && <div className="mt-4 space-y-2">
-      <Link to="/learn/my-activity" className="inline-block font-semibold text-primary underline underline-offset-4">
-        Go to my courses
+    {enrolled && <nav aria-label="After enrollment" className="mt-4 flex flex-wrap items-center gap-4 text-sm">
+      <Link to="/learn/course/$courseAttemptId" params={{courseAttemptId:enrolled.courseAttemptId}}
+        className="inline-flex min-h-11 items-center border border-primary bg-primary px-4 py-2 font-semibold text-primary-foreground">
+        Start learning
       </Link>
-    </div>}
+      <Link to="/learn/my-activity" className="font-semibold text-primary underline underline-offset-4">
+        View My Activity
+      </Link>
+    </nav>
   </section>;
 }
 
