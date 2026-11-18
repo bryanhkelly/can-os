@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/choice";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/workspace";
 import { BlueprintReviewHistoryPanel } from "./BlueprintReviewHistoryPanel";
@@ -325,7 +327,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
       </p>}
       {workspace.templates.length > 0 && <div className="mt-5 space-y-4">
         <div className="flex flex-wrap gap-3">
-          <label htmlFor="canonical-blueprint-template" className="min-w-52 flex-1 text-sm">
+          <Label htmlFor="canonical-blueprint-template" className="min-w-52 flex-1 text-sm">
             Published Blueprint recipe
             <Select id="canonical-blueprint-template" className="mt-2"
               value={templateId} disabled={busy || Boolean(detail)}
@@ -340,18 +342,18 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                   {template.title} (v{template.versionNo})
                 </option>)}
             </Select>
-          </label>
-          <label htmlFor="canonical-blueprint-name" className="min-w-52 flex-1 text-sm">
+          </Label>
+          <Label htmlFor="canonical-blueprint-name" className="min-w-52 flex-1 text-sm">
             Configuration name
             <Input id="canonical-blueprint-name" className="mt-2" maxLength={120}
               value={name} disabled={busy || Boolean(detail)}
               onChange={event => setName(event.currentTarget.value)}
               placeholder="Example: Summer and Afterschool Plan"/>
-          </label>
+          </Label>
         </div>
         {selectedTemplate && <>
           <div className="flex flex-wrap gap-3">
-            <label htmlFor="canonical-blueprint-identity" className="min-w-52 flex-1 text-sm">
+            <Label htmlFor="canonical-blueprint-identity" className="min-w-52 flex-1 text-sm">
               Educational identity
               <Select id="canonical-blueprint-identity" className="mt-2"
                 value={editorialIdentity} disabled={editingDisabled}
@@ -361,8 +363,8 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 {blueprintEditorialIdentityKeys.map(key =>
                   <option value={key} key={key}>{readable(key)}</option>)}
               </Select>
-            </label>
-            <label htmlFor="canonical-blueprint-affiliation" className="min-w-52 flex-1 text-sm">
+            </Label>
+            <Label htmlFor="canonical-blueprint-affiliation" className="min-w-52 flex-1 text-sm">
               Religious affiliation (optional)
               <Select id="canonical-blueprint-affiliation" className="mt-2"
                 value={religiousAffiliationCode} disabled={editingDisabled}
@@ -371,14 +373,14 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                 {workspace.affiliations.map(option =>
                   <option key={option.code} value={option.code}>{option.label}</option>)}
               </Select>
-            </label>
+            </Label>
           </div>
           <fieldset className="border p-4" disabled={editingDisabled}>
             <legend className="px-2 font-semibold">Blueprint components</legend>
             <div className="mt-2 grid gap-3 sm:grid-cols-2">
               {selectedTemplate.components.map(component =>
-                <label key={component.id} className="flex items-center gap-3 text-sm">
-                  <input type="checkbox" checked={selectedComponents.includes(component.id)}
+                <Label key={component.id} className="flex items-center gap-3 text-sm">
+                  <Checkbox checked={selectedComponents.includes(component.id)}
                     disabled={component.requirementMode === "required" || editingDisabled}
                     onChange={event => setSelectedComponents(current =>
                       event.target.checked
@@ -387,7 +389,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                     )}/>
                   <span>{readable(component.key)}
                     {component.requirementMode === "required" ? " · required" : ""}</span>
-                </label>)}
+                </Label>)}
             </div>
           </fieldset>
           {enableReferences && referenceCatalog.length > 0 && selectedTemplate.components
@@ -402,9 +404,9 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                   {readable(component.key)} · curated references
                 </legend>
                 <div className="mt-2 grid max-h-52 gap-3 overflow-y-auto sm:grid-cols-2">
-                  {available.map(reference => <label key={reference.versionId}
+                  {available.map(reference => <Label key={reference.versionId}
                     className="flex items-start gap-3 text-sm">
-                    <input type="checkbox" className="mt-1"
+                    <Checkbox className="mt-1"
                       checked={(selectedReferences[component.id] ?? []).includes(reference.versionId)}
                       onChange={event => setSelectedReferences(current => {
                         const before = current[component.id] ?? [];
@@ -415,7 +417,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                     <span><strong className="block">{reference.title}</strong>
                       <span className="text-muted-foreground">{reference.summary}</span>
                     </span>
-                  </label>)}
+                  </Label>)}
                 </div>
               </fieldset>;
             })}
@@ -441,7 +443,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
               A proposal is not an approved activity.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm" htmlFor="canonical-local-component">
+              <Label className="text-sm" htmlFor="canonical-local-component">
                 Category
                 <Select id="canonical-local-component" className="mt-2"
                   value={localComponentId}
@@ -454,17 +456,17 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                       {readable(component.key)}
                     </option>)}
                 </Select>
-              </label>
-              <label className="text-sm" htmlFor="canonical-local-title">
+              </Label>
+              <Label className="text-sm" htmlFor="canonical-local-title">
                 Name
                 <Input id="canonical-local-title" className="mt-2" maxLength={160}
                   value={localTitle} onChange={event => setLocalTitle(event.currentTarget.value)}/>
-              </label>
-              <label className="text-sm" htmlFor="canonical-local-summary">
+              </Label>
+              <Label className="text-sm" htmlFor="canonical-local-summary">
                 Summary
                 <Input id="canonical-local-summary" className="mt-2" maxLength={4000}
                   value={localSummary} onChange={event => setLocalSummary(event.currentTarget.value)}/>
-              </label>
+              </Label>
             </div>
             <Button type="button" variant="outline" className="mt-3"
               disabled={!localComponentId || localTitle.trim().length < 2 || localExperiences.length >= 200}
@@ -555,7 +557,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                     enroll learners, or begin instruction.
                   </p>
                   {workspace.operations.length > 0 ? <>
-                    <label htmlFor="canonical-blueprint-operation" className="block">
+                    <Label htmlFor="canonical-blueprint-operation" className="block">
                       Authorized Operation
                       <Select id="canonical-blueprint-operation" className="mt-2"
                         value={operationId}
@@ -564,7 +566,7 @@ export function CanonicalBlueprintWorkspace({ siteId, enableReferences = false }
                         {workspace.operations.map(operation =>
                           <option key={operation.id} value={operation.id}>{operation.name}</option>)}
                       </Select>
-                    </label>
+                    </Label>
                     <Button type="button" className="mt-3" disabled={busy || !operationId}
                       onClick={() => void createPlanningDeployment()}>
                       {busy ? "Recording planning Deployment…" : "Create planning Deployment"}
