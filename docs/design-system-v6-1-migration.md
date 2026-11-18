@@ -693,3 +693,29 @@ workflow. Role scoping, loading/error states, responsive behavior and
 authenticated browser journeys still need execution on an exact commit.
 The new scripts and test suite are committed to main but have **not** been
 executed end-to-end in this session.
+
+### Next implementation pass: shared classroom components
+
+The dynamically discovered audit continues without route-name or JSX-fragment
+manifests. The V6.1 source analyzer now follows lazy `import()` dependencies
+and checks parse diagnostics across application TSX, rather than assuming
+that a visually clean route cannot compose legacy feature controls.
+
+This pass applied shared control patterns to private facilitator sessions,
+verified attendance, projector commands, lesson/session agendas, learner
+surveys/assessment questions, public-safe questions, assisted-device practice,
+learner companion responses, booking and rescheduling, joining and QR retry.
+The reused components include Field, Label, Input, Select, Textarea, Checkbox,
+Radio, Button and WorkspaceNotice. Existing domain commands and evidence
+boundaries remain in the feature modules.
+
+Source-only validation retrieved the 14 touched classroom/enrollment TSX
+components from `main`. None contained raw visible button/input/select/
+textarea/label elements or a legacy rounded utility at the source level.
+This does not prove full type, visual, accessibility or browser acceptance.
+No production database changes were performed.
+
+Future work should improve remaining composed UI through the same reusable
+controls, then run the AST audit and actual TypeScript/lint/component tests,
+followed by authorized role journeys. Never introduce fixed route enumerations
+or exact JSX source-text contracts as a substitute for behavior verification.
