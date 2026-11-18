@@ -19,9 +19,10 @@ describe("Neon main public-schema consolidation safety",()=>{
   expect(sql).not.toContain("INSERT INTO");
  });
 
- it("must not move active pairing limiter before source code and runtime cutover",()=>{
+ it("pairing limiter migration is idempotent and old-runtime cutover remains gated",()=>{
   const sql=read("database/production/2026-11-17-stage-pairing-rate-limit-public-relocation.sql");
   expect(sql).toContain("can.pairing_public_runtime_verified");
+  expect(sql).toContain("Pairing limiter already consolidated to public");
   expect(sql).toContain("ALTER TABLE education_v30.facilitated_pairing_rate_limits SET SCHEMA public");
   expect(sql).toContain("relforcerowsecurity");
   expect(sql).toContain("pg_index");
@@ -29,8 +30,8 @@ describe("Neon main public-schema consolidation safety",()=>{
   expect(sql).not.toContain("DROP TABLE");
   expect(sql).not.toContain("CASCADE");
   expect(sql).not.toContain("INSERT INTO");
-  // This is still the live runtime owner and must not be moved early.
+  // The canonical table mapping now uses the authoritative public table.
   const owner=read("src/db/canonical-v301/facilitated-learning.ts");
-  expect(owner).toContain('facilitatedPairingRateLimits = educationV30.table("facilitated_pairing_rate_limits"');
+  expect(owner).toContain('facilitatedPairingRateLimits = pgTable("facilitated_pairing_rate_limits"');
  });
 });
