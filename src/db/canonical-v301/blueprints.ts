@@ -400,6 +400,26 @@ export const offeringVersions = educationV30.table(
   ],
 );
 
+/** Existing publisher-defined, immutable-after-publication release policy.
+ * Each required Course needs an explicit record before Offering release. */
+export const offeringReleaseRequirements = educationV30.table(
+  "offering_release_requirements",
+  {
+    id: id(),
+    offeringVersionId: uuid("offering_version_id").notNull(),
+    courseVersionId: uuid("course_version_id").notNull(),
+    minimumApprovedPrimaryTracks: integer("minimum_approved_primary_tracks").notNull(),
+    completeLessonCoverageRequired: boolean("complete_lesson_coverage_required").notNull(),
+    independentAcademicReviewRequired: boolean("independent_academic_review_required").notNull(),
+    rightsClearanceRequired: boolean("rights_clearance_required").notNull(),
+    accessibilityReviewRequired: boolean("accessibility_review_required").notNull(),
+  },
+  (table) => [
+    uniqueIndex("offering_release_requirements_version_course_uq")
+      .on(table.offeringVersionId, table.courseVersionId),
+  ],
+);
+
 export const programDeployments = educationV30.table(
   "program_deployments",
   {
