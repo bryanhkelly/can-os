@@ -40,7 +40,13 @@ async function main() {
       (SELECT count(*)::int FROM pg_namespace n
        WHERE n.nspname IN ('education_v30','education_v30_secure')) AS old_schemas,
       (SELECT c.relrowsecurity AND c.relforcerowsecurity FROM pg_class c
-       WHERE c.oid='public.sites'::regclass) AS public_site_rls_enforced
+       WHERE c.oid='public.sites'::regclass) AS public_site_rls_enforced,
+      (to_regclass('education_v30.assurance_case_outcomes') IS NULL
+        AND to_regprocedure('education_v30.v27_validate_case_outcome()') IS NULL)
+        AS retired_unused_assurance_leaf_absent,
+      (to_regclass('education_v30.assurance_cases') IS NOT NULL
+        AND to_regclass('public.assurance_case_findings') IS NOT NULL)
+        AS retained_assurance_relations_present
   `;
   const [collision]=await sql`
     SELECT count(*)::int AS count FROM pg_class a
@@ -58,7 +64,8 @@ async function main() {
   console.log(JSON.stringify(result,null,2));
   const safe=inventory.old_relations===0&&inventory.old_routines===0&&
     inventory.old_types===0&&inventory.crossing_fks===0&&
-    collision.count===0&&inventory.public_site_rls_enforced===true;
+    collision.count===0&&inventory.public_site_rls_enforced===true&&
+    inventory.retired_unused_assurance_leaf_absent===true;
   if(!safe){
     console.error("NOT READY: preserve old schemas. Resolve all dependencies and validate live flows before guarded DROP SCHEMA RESTRICT.");
     process.exitCode=2;
