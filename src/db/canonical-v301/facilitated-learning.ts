@@ -30,7 +30,7 @@ export const facilitatedLearningSessions = educationV30.table("facilitated_learn
 ]);
 
 /** Self-pairing only proves that an authenticated course learner joined a room. */
-export const facilitatedLearningParticipants = educationV30.table("facilitated_learning_participants", {
+export const facilitatedLearningParticipants = pgTable("facilitated_learning_participants", {
   id: uuid("id").defaultRandom().primaryKey(),
   facilitatedSessionId: uuid("facilitated_session_id").notNull().references(() => facilitatedLearningSessions.id),
   courseAttemptId: uuid("course_attempt_id").notNull().references(() => learnerCourseAttempts.id),
@@ -44,7 +44,7 @@ export const facilitatedLearningParticipants = educationV30.table("facilitated_l
 ]);
 
 /** Controls from the host screen. Do not copy them to learner grades or watch time. */
-export const facilitatedLearningPlayback = educationV30.table("facilitated_learning_playback", {
+export const facilitatedLearningPlayback = pgTable("facilitated_learning_playback", {
   id: uuid("id").defaultRandom().primaryKey(),
   facilitatedSessionId: uuid("facilitated_session_id").notNull().references(() => facilitatedLearningSessions.id),
   courseVersionId: uuid("course_version_id").notNull().references(() => courseVersions.id),
