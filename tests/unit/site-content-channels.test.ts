@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   defaultSiteContentChannelConfig, readSiteContentChannelConfig,
+  readPublishedSiteContentChannelConfig,
   planSiteContentChannelSave, requireSavedSiteContentChannelDraft,
   resolveSiteContentBlocks, siteContentChannelConfigSchema,
   siteContentChannelDescriptions,
@@ -9,6 +10,23 @@ import {
 const proposed = {delivery: "both" as const, interestIds: ["afterschool", "adult"] as const};
 
 describe("Site-owned website content channels", () => {
+  it("never publishes implicit starter blocks when no public layout is configured", () => {
+    const privateDefault = readSiteContentChannelConfig(undefined);
+    expect(privateDefault.blocks.length).toBeGreaterThan(0);
+    const unavailable = readPublishedSiteContentChannelConfig(undefined);
+    const invalid = readPublishedSiteContentChannelConfig({
+      version: 2, revision: 999, blocks: [{invalid: "not an approved snapshot"}],
+    });
+    expect(unavailable).toEqual({version: 2,revision: 0,blocks: []});
+    expect(invalid).toEqual(unavailable);
+    expect(resolveSiteContentBlocks(unavailable,{mode:"public",
+      classes:[{classId:"11111111-1111-4111-8111-111111111111",
+        title:"Approved Class",deliveryMode:"facilitated",nextStartsAt:null}],
+    })).toEqual([]);
+    const persisted=planSiteContentChannelSave(undefined,0,privateDefault.blocks).config;
+    expect(readPublishedSiteContentChannelConfig(persisted)).toEqual(persisted);
+  });
+
   it("persists first default layout save, preserves idempotency and requires explicit publication", () => {
     const blocks = defaultSiteContentChannelConfig.blocks;
     const first = planSiteContentChannelSave(undefined, 0, blocks);
