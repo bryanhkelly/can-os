@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ActionDialog, EmptyState, MutationFeedback, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { noncreditWaitlistQueryKeys } from "@/domain/noncredit-waitlist-query-keys";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getMyNoncreditSelfEnrollmentHistoryPage, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
@@ -36,7 +37,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   });
   const [busy,setBusy]=useState<string|null>(null);
   const waiting=useInfiniteQuery({
-    queryKey:["my-noncredit-waitlist",scopeKey,releaseId??"all"],
+    queryKey:noncreditWaitlistQueryKeys.pages(scopeKey,releaseId),
     initialPageParam:null as {joinedAt:string;waitlistId:string}|null,
     queryFn:async({pageParam})=>{
       if(releaseId){
