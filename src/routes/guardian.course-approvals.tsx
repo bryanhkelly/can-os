@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { EmptyState, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -61,18 +63,18 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
       title="Course approvals"
       subtitle="Review student requests to add classes that require your permission. Your decision is recorded with the request for the school registrar."
       actions={<div className="flex flex-wrap gap-2">
-        <Link to="/guardian/group-permissions" className="rounded-lg border px-3 py-2 text-sm">Group permissions</Link>
-        <Link to="/guardian/field-trips" className="rounded-lg border px-3 py-2 text-sm">Field trip permissions</Link>
-        <Link to="/home" className="rounded-lg border px-3 py-2 text-sm">Family home</Link>
+        <Link to="/guardian/group-permissions" className=" border px-3 py-2 text-sm">Group permissions</Link>
+        <Link to="/guardian/field-trips" className=" border px-3 py-2 text-sm">Field trip permissions</Link>
+        <Link to="/home" className=" border px-3 py-2 text-sm">Family home</Link>
       </div>}
     >
       <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving your course decision..." />
       {action && <Link to="/guardian/course-approvals" className="mt-5 inline-block text-sm underline">View all course approvals</Link>}
       {action && !items.some(item=>item.id===action) &&
-        <p role="alert" className="mt-5 rounded-lg border p-4 text-sm">This request is unavailable in your authorized course approvals.</p>}
+        <WorkspaceNotice tone="danger" className="mt-5">This request is unavailable in your authorized course approvals.</WorkspaceNotice>}
       <div className="mt-7 space-y-4">
         {items.filter(item=>!action||item.id===action).map(item => (
-          <article key={item.id} className="rounded-xl border bg-card p-5">
+          <article key={item.id} className=" border bg-card p-5">
             <p className="text-xs uppercase tracking-wide text-muted-foreground">
               {item.studentName} · {item.sectionCode}
             </p>
@@ -81,7 +83,7 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
               Registration deadline: {item.deadline}. Your response does not enroll the student automatically;
               the registrar must still approve the schedule change.
             </p>
-            {!item.contentReady && <p className="mt-3 rounded-lg border p-3 text-sm">
+            {!item.contentReady && <p className="mt-3  border p-3 text-sm">
               School content setup is pending. The school must provide published student-accessible lessons for this class before enrollment can be approved.
               You may record your permission now; it does not reserve a seat or complete enrollment.
             </p>}
@@ -95,9 +97,9 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
                 Your current decision: {item.myDecision === "approve" ? "Approved" : "Declined"}.
                 You can change it while this request remains pending.
               </p>}
-            <label className="mt-4 flex items-start gap-3 text-sm">
-              <input
-                type="checkbox"
+            <Label className="mt-4 flex items-start gap-3 text-sm">
+              <Checkbox
+                
                 checked={acknowledged[item.id] === coursePermissionContext(item)}
                 onChange={event => setAcknowledged(previous => ({
                   ...previous, [item.id]: event.target.checked ? coursePermissionContext(item) : "",
@@ -106,7 +108,7 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
               />
               <span>I understand that I am authorizing this class addition for {item.studentName},
                 subject to final school approval and the published registration policy.</span>
-            </label>
+            </Label>
             <div className="mt-4 flex flex-wrap gap-3">
               <Button
                 type="button"
@@ -127,9 +129,7 @@ function CourseApprovalList({ items }: { items: Approval[] }) {
           </article>
         ))}
         {items.length === 0 && !action &&
-          <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
-            There are no pending course requests that need your approval.
-          </p>}
+          <EmptyState title="No pending course approvals" description="There are no pending course requests that need your approval."/>}
       </div>
     </WorkspaceShell>
   );
