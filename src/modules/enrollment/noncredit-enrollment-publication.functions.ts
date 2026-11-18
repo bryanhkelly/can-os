@@ -37,6 +37,8 @@ async function listReleaseCandidates(provider:Provider, executor:Executor=db) {
     trainingVersionId:noncreditTrainingVersions.id,
     trainingTitle:noncreditTrainingVersions.title,
     courseVersionId:courseVersions.id,
+    offeringId:offerings.id,
+    assessmentVersionId:noncreditTrainingVersions.assessmentVersionId,
     providerOrganizationId:noncreditTrainingVersions.providerOrganizationId,
     providerName:canonicalEnrollmentOrganizations.displayName,
   }).from(programDeployments)
@@ -187,6 +189,35 @@ export const getNoncreditEnrollmentPublisher = createServerFn({method:"GET"})
       ))
       .orderBy(noncreditSelfEnrollmentReleases.createdAt).limit(100);
     return {candidates,published};
+  });
+
+/**
+ * Read-only content preparation, independent of the enrollment publication
+ * command. An incomplete pilot checklist must not break other noncredit
+ * offerings or become an unreviewed authorization shortcut.
+ */
+const noncreditReadinessSelection=z.object({
+  deploymentId:z.string().uuid(),
+  adoptionId:z.string().uuid(),
+  trainingVersionId:z.string().uuid(),
+  courseVersionId:z.string().uuid(),
+}).strict();
+export const getNoncreditTrainingReadiness=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>noncreditReadinessSelection.parse(raw))
+  .handler(async({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const {requireCanonicalLabProvider}=await import(
+      "@/modules/operations/canonical-capability-lab-access.server");
+    const provider=await requireCanonicalLabProvider("noncredit.enrollment.read");
+    const candidates=await listReleaseCandidates(provider);
+    const selected=candidates.find(row=>
+      row.deploymentId===data.deploymentId&&
+      row.adoptionId===data.adoptionId&&
+      row.trainingVersionId===data.trainingVersionId&&
+      row.courseVersionId===data.courseVersionId);
+    if(!selected)throw new AuthorizationError("authorized published training selection");
+    const {readNoncreditTrainingReadiness}=await import("./noncredit-training-readiness.server");
+    return readNoncreditTrainingReadiness(selected,provider.organizationId);
   });
 
 /** A publisher can only release an independently approved, live adoption
