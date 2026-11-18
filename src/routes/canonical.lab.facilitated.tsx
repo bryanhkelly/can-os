@@ -1,6 +1,6 @@
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback } from "@/components/workspace";
+import { WorkspaceShell, StatusBadge, ActionDialog, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { invalidateRouterAndCheck } from "@/lib/router-refresh";
 import { Button } from "@/components/ui/button";
@@ -115,10 +115,14 @@ function FacilitatedLabContent({data}:{data:Workspace}) {
           setExpandedRoomId(created.facilitatedSessionId);
         })}>Start facilitator room</Button>
       </div>
-      {!data.choices.length&&<p role="status" className="mt-3 text-sm text-muted-foreground">
-        No active published courses are currently available to this Site. Check deployment
-        and learner participation authority before starting a room.
-      </p>}
+      {!data.choices.length&&<WorkspaceNotice tone="attention" className="mt-4">
+        <p>No published Course with an active learner attempt is authorized for
+          delivery at this Site. A Site administrator must confirm the active
+          deployment, Course publication and current participation.</p>
+        <p className="mt-2">This learning room is separate from physical room coverage,
+          staff presence, verified attendance and student release. None of those
+          safeguards may be inferred from enrollment or device pairing.</p>
+      </WorkspaceNotice>
     </section>
     <section className="mt-5 border border-border bg-card p-5" aria-label="Practice a course before opening a room">
       <h2 className="font-serif text-xl font-semibold">Facilitator rehearsal</h2>
