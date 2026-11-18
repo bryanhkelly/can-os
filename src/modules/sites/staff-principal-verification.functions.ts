@@ -8,6 +8,7 @@ import { getCommandContext } from "@/modules/identity/command-context.server";
 import { AuthorizationError } from "@/domain/command-context";
 import { writeAudit } from "@/platform/mutation";
 import { assertCANIdentityReviewer } from "@/domain/site-identity-review";
+import { assertCurrentCANGrantForMutation } from "@/modules/identity/current-can-grant-transaction.server";
 
 /**
  * P0 one-Person retirement. There is ONE public.people identity.
@@ -49,6 +50,12 @@ export const revokeCANStaffCanonicalPrincipal = createServerFn({ method: "POST" 
       throw new AuthorizationError("independent CAN identity reviewer");
     }
     return db.transaction(async tx => {
+      const orgId=reviewer.scope.organizationIds?.length===1
+        ? reviewer.scope.organizationIds[0]! : null;
+      await assertCurrentCANGrantForMutation(tx,getRequest(),reviewer,{
+        roles:["can_network_steward"],organizationId:orgId,siteId:null,
+        organizationType:"can_network",
+      });
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${"canonical-staff-source:" + data.publicAccountId}))`);
       const [current] = await tx.select({
         id: accessAccountCanonicalPrincipals.id,
