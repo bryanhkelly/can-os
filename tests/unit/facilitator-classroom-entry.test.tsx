@@ -6,6 +6,7 @@ import { FacilitatedClassroomEntry } from "@/components/operations/FacilitatedCl
 const state = vi.hoisted(() => ({
   kind: "error" as "error" | "pending" | "success",
   roomSiteId: "site-a",
+  hasCourse: true,
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
@@ -16,7 +17,7 @@ vi.mock("@tanstack/react-query", () => ({
     refetch: vi.fn(),
     data: {
       siteId: state.roomSiteId,
-      choices: [{ siteId: state.roomSiteId }],
+      choices: state.hasCourse ? [{ siteId: state.roomSiteId }] : [],
       rooms: [{ siteId: state.roomSiteId, state: "live" }],
     },
   }),
@@ -25,6 +26,8 @@ vi.mock("@/components/workspace", () => ({
   WorkspacePanel: ({ title, description, children }: {
     title: string; description?: string; children: ReactNode;
   }) => <section aria-label={title}><p>{description}</p>{children}</section>,
+  WorkspaceNotice: ({ children }: { children: ReactNode }) => <aside>{children}</aside>,
+  StatusBadge: ({ children }: { children: ReactNode }) => <span>{children}</span>,
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ to, children }: { to: string; children: ReactNode }) => <a href={to}>{children}</a>,
@@ -32,7 +35,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/modules/learning/facilitated-learning.functions", () => ({
   getFacilitatedHostWorkspace: vi.fn(),
 }));
-beforeEach(() => { state.kind = "error"; state.roomSiteId = "site-a"; });
+beforeEach(() => { state.kind = "error"; state.roomSiteId = "site-a"; state.hasCourse = true; });
 
 describe("facilitator classroom entry", () => {
   it("never offers a classroom action when current authorization fails", () => {
@@ -53,6 +56,16 @@ describe("facilitator classroom entry", () => {
     expect(html).toContain("Open facilitated classrooms");
     expect(html).toContain("1</strong> live rooms");
     expect(html).toContain("1</strong> available course choices");
+  });
+  it("distinguishes an authorized identity from a deployable Course", () => {
+    state.kind = "success";
+    state.hasCourse = false;
+    const html = renderToStaticMarkup(<FacilitatedClassroomEntry siteId="site-a" />);
+    expect(html).toContain("No Course eligible to start");
+    expect(html).toContain("active learner attempt");
+    expect(html).toContain("Physical room coverage");
+    expect(html).toContain("verified onsite attendance remain separate requirements");
+    expect(html).toContain("Open facilitated classrooms");
   });
   it("does not show an actionable link while checking authority", () => {
     state.kind = "pending";
