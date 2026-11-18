@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Radio } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
+import { Field } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
 import { accessClientInstance } from "@/domain/session-client";
 import {
@@ -114,20 +117,19 @@ export function ClassroomCompanionRoom({courseAttemptId,facilitatedSessionId}:{
         {activity.answerType==="single_choice"?
           <fieldset className="space-y-2">
             <legend className="sr-only">{activity.prompt}</legend>
-            {activity.choices.map((choice,i)=><label key={i}
+            {activity.choices.map((choice,i)=><Label key={i}
               className="flex items-center gap-2 border border-border p-3 text-sm">
-              <input type="radio" name={"answer-"+activity.id} value={String(i)}
+              <Radio name={"answer-"+activity.id} value={String(i)}
                 checked={answers[activity.id]===String(i)}
                 onChange={()=>setAnswers(prev=>({...prev,[activity.id]:String(i)}))}/>
               {choice}
-            </label>)}
+            </Label>)}
           </fieldset>
-          :<label className="block text-sm">
-            Your response
+          :<Field label="Your response">
             <Textarea maxLength={1000} value={answers[activity.id]??""}
               onChange={e=>setAnswers(prev=>({...prev,[activity.id]:e.target.value}))}
               className="mt-1" rows={3}/>
-          </label>}
+          </Field>}
         <Button disabled={!online||!!busy||!(answers[activity.id]??"").trim()}>
           {busy===activity.id?"Saving…":"Submit response"}
         </Button>
