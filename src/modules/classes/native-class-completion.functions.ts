@@ -3,17 +3,29 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents, canonicalPersons,
-  canonicalClasses, canonicalClassEnrollments, canonicalClassOutcomes,
+  canonicalPersons,
+  canonicalClasses,
+  canonicalClassEnrollments,
+  canonicalClassOutcomes,
   participationAttributions,
-  canonicalClassSessions, canonicalClassStaffAssignments,
-  classEnrollmentCompletionPins, classCompletionPolicyVersions,
-  courseVersions, courseLessons, learnerLessonProgress, learnerCourseAttempts,
-  facilitatedClassroomPlans, facilitatedLearningSessions,
+  canonicalClassSessions,
+  canonicalClassStaffAssignments,
+  classEnrollmentCompletionPins,
+  classCompletionPolicyVersions,
+  courseVersions,
+  courseLessons,
+  learnerLessonProgress,
+  learnerCourseAttempts,
+  facilitatedClassroomPlans,
+  facilitatedLearningSessions,
   facilitatedRoomAttendanceAssertions,
-  learnerProfiles, assessmentAccess, assessmentFormAdministrations,
-  assessmentExecutionAttempts, assessmentExecutionResults,
+  learnerProfiles,
+  assessmentAccess,
+  assessmentFormAdministrations,
+  assessmentExecutionAttempts,
+  assessmentExecutionResults,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import {
@@ -467,7 +479,7 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
         outcome:data.outcome,
         occurredAt:new Date().toISOString(),
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,
         owningOrganizationId:authorized.cls.operatingOrganizationId,
         eventCode:"learning.class.completion_decided",
@@ -475,7 +487,7 @@ export const decideNativeClassCompletion=createServerFn({method:"POST"})
           ...payload,reason:data.reason,
         },
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId!,
         eventType:current?"ClassCompletionCorrected":"ClassCompletionDecided",
         aggregateType:"class_outcome",aggregateId:created.id,payload,
