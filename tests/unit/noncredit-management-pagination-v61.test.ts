@@ -20,6 +20,16 @@ describe("adult learner registration management",()=>{
     expect(history).toContain("export const getMyNoncreditSelfEnrollmentHistoryPage");
   });
 
+  it("makes older owned waiting-list invitations reachable without double enrollment",()=>{
+    expect(management).toContain("getMyNoncreditWaitlistPage({data:{cursor:pageParam}})");
+    expect(management).toContain('["my-noncredit-waitlist",scopeKey,releaseId??"all"]');
+    expect(management).toContain("getMyNoncreditWaitlistByRelease({data:{releaseId}})");
+    expect(management).toContain("waiting.data?.pages.flatMap(page=>page.items)");
+    expect(management).toContain("Load older waiting-list entries");
+    expect(management).toContain("waiting.isFetchNextPageError");
+    expect(management).not.toContain("getMyNoncreditWaitlist()");
+  });
+
   it("keeps exact Person-bound registration reads for embedded My Activity controls",()=>{
     expect(management).toContain("getMyNoncreditRegistrationById({data:{registrationId}})");
     expect(management).toContain('["my-noncredit-self-enrollments",scopeKey,registrationId??"all"]');
