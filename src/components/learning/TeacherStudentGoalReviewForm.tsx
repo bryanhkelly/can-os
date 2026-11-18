@@ -39,10 +39,10 @@ export function TeacherStudentGoalReviewForm({
     } finally { setBusy(false); }
   }
   return <div className="mt-3">
-    {!open && <button type="button" className="text-sm underline" onClick={() => {
+    {!open && <Button type="button" variant="ghost" size="sm" className="underline" onClick={() => {
       setOpen(true); void loadEvidence();
-    }}>Review student learning goal</button>}
-    {open && <form noValidate className="grid gap-3 rounded-lg border p-3"
+    }}>Review student learning goal</Button>}
+    {open && <form noValidate className="grid gap-3  border p-3"
       onSubmit={async event => {
         event.preventDefault();
         setAttempted(true);
@@ -101,7 +101,7 @@ export function TeacherStudentGoalReviewForm({
           {busy ? "Saving…" : "Save teacher-reviewed outcome"}
         </Button>
       </>}
-      <button type="button" className="text-sm underline" disabled={busy} onClick={() => setOpen(false)}>Cancel</button>
+      <Button type="button" variant="ghost" size="sm" className="underline" disabled={busy} onClick={() => setOpen(false)}>Cancel</Button>
       {message && <p role="status" className="text-sm">{message}</p>}
     </form>}
   </div>;
