@@ -21,7 +21,8 @@ import {
  getGradebookSections,
  gradeSubmission,
 } from "@/modules/learning/gradebook.functions";
-import { scoreRubric, type CriterionGrade } from "@/modules/learning/rubric";
+import type { CriterionGrade } from "@/modules/learning/rubric";
+import { validateTeacherGradeInput } from "@/domain/teacher-grade-input";
 import { validateAssessmentRubric } from "@/domain/teacher-assessment-rubric";
 import { parseAssignmentContentDraft } from "@/domain/assignment-content";
 import { assessmentClockToUtc, assessmentDueAtForDate } from "@/domain/assessment-local-schedule";
@@ -154,28 +155,19 @@ function TeacherGradebookPage() {
   gradebook?.cells.find(cell => cell.studentProfileId === studentProfileId && cell.assessmentId === assessmentId);
 
  const submitGrade = async (cell: Cell, assessment: Assessment, draftOnly=false) => {
-  const payload: { submissionId: string; score?: number; feedbackComment: string; rubricScores?: CriterionGrade[]; draftOnly?:boolean } = {
-   submissionId: cell.submissionId,
-   feedbackComment: comment,
+  const validation=validateTeacherGradeInput({
+   pointsPossible:assessment.pointsPossible,
+   rubric:assessment.rubric,
+   score,
+   rubricInputs,
+  });
+  if(!validation.valid){setNotice(validation.message);return;}
+  const payload: {submissionId:string;score?:number;feedbackComment:string;rubricScores?:CriterionGrade[];draftOnly?:boolean}={
+   submissionId:cell.submissionId,
+   feedbackComment:comment,
+   ...(draftOnly?{draftOnly:true}:{}),
+   ...validation.grading,
   };
-  if(draftOnly)payload.draftOnly=true;
-  if (assessment.rubric.length) {
-   if(assessment.rubric.some(criterion=>!rubricInputs[criterion.id]?.trim())){
-    setNotice("Enter a score for every rubric criterion.");return;
-   }
-   const grades = assessment.rubric.map(criterion => ({ id: criterion.id, points: Number(rubricInputs[criterion.id]) }));
-   try {
-   scoreRubric(assessment.rubric, grades);
-   } catch (cause) {
-   setNotice(mutationErrorMessage(cause, "Enter a valid score for every criterion."));
-   return;
-   }
-   payload.rubricScores = grades;
-  } else {
-   const value = Number(score);
-   if (!score.trim() || !Number.isFinite(value)) { setNotice("Enter a numeric score."); return; }
-   payload.score = value;
-  }
   setNotice("");
   let refreshed:Gradebook|undefined;
   const result=await mutation.run(()=>gradeSubmission({data:payload}),{
