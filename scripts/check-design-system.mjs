@@ -490,6 +490,13 @@ if (nativeCardStart < 0 || !nativeCard.includes("<StatusBadge") ||
 // No curated page lists, fixed route counts, or brittle JSX text snippets.
 const inventory = createInventory(fileURLToPath(new URL("../", import.meta.url)));
 console.log("V6.1 source inventory: " + JSON.stringify(inventory.totals));
+for (const file of inventory.inspected) {
+  for (const diagnostic of file.syntaxErrors) {
+    console.error("V6.1 source syntax: " + file.path + ":" +
+      diagnostic.line + ":" + diagnostic.column + " " + diagnostic.message);
+    process.exitCode = 1;
+  }
+}
 const regression = checkChangedFiles(inventory.root);
 if (regression.warning) {
   console.warn("V6.1 incremental comparison: " + regression.warning);
