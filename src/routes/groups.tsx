@@ -241,7 +241,7 @@ function GroupsView({ data }: { data: Data }) {
                   </Link>
                 </p>
                 <p className="mt-2 text-sm">Reason: {report.reason}</p>
-                <blockquote className="mt-2 rounded border bg-muted p-3 text-sm whitespace-pre-wrap">
+                <blockquote className="mt-2 border bg-muted p-3 text-sm whitespace-pre-wrap">
                   {report.postBody ?? "The reported post is unavailable."}
                 </blockquote>
                 {report.postHidden && (
