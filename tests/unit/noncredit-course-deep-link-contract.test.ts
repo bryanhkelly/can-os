@@ -44,8 +44,22 @@ describe("adult learner bookmarked Course Attempt access",()=>{
     expect(courseRoute).toContain("openMyNoncreditCourse({data:{courseAttemptId:course.courseAttemptId}})");
     expect(courseRoute).toContain("if(request.current?.key!==key)");
     expect(courseRoute).toContain("setStatus(\"error\")");
-    expect(courseRoute).toContain("Retry course access");
+    expect(courseRoute).toContain("<QueryState");
+    expect(courseRoute).toContain('error={status==="error"?error:undefined}');
+    expect(courseRoute).toContain("onRetry={() =>");
     expect(management).not.toContain("await openMyNoncreditCourse({data:{courseAttemptId}})");
     expect(management).toContain('to:"/learn/course/$courseAttemptId"');
+    expect(management).toContain("}finally{");
+    expect(management).toContain("setBusy(null)");
+  });
+
+  it("retries noncredit activity signals only after genuine learner interaction",()=>{
+    expect(courseRoute).toContain("event.isTrusted");
+    expect(courseRoute).toContain('document.visibilityState!=="visible"');
+    expect(courseRoute).toContain("let inFlight=false");
+    expect(courseRoute).toContain("nextAttemptAt=now+60_000");
+    expect(courseRoute).toContain("nextAttemptAt=Date.now()+30_000");
+    expect(courseRoute).toContain('document.addEventListener("pointerdown",touch');
+    expect(courseRoute).not.toContain("let unavailable=false");
   });
 });
