@@ -15,6 +15,7 @@ import { assertCapability, AuthorizationError, type CommandContext } from
   "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
 import { publisherReleaseAvailableForAdoption } from "@/domain/native-offering-adoption-publication";
+import { nativeAdoptionReviewKinds } from "@/domain/native-adoption-readiness";
 import { isVerifiedEvidenceCurrent } from "@/domain/instructional-tracks";
 import { canonicalSessionRowSchema, projectCanonicalCommandContext } from
   "@/domain/canonical-access";
@@ -153,9 +154,8 @@ export const getNativeOfferingAdoptionReviewQueue=createServerFn({method:"GET"})
       const key=item.deploymentId+":"+item.kind;
       if(!latestReview.has(key))latestReview.set(key,item);
     }
-    const reviewKinds=["operating","registration","delivery"] as const;
     const items=visible.map(item=>{
-      const reviewStates=reviewKinds.map(kind=>{
+      const reviewStates=nativeAdoptionReviewKinds.map(kind=>{
         const review=latestReview.get(item.deploymentId+":"+kind);
         return {kind,
           recordedReady:Boolean(review&&review.outcome==="ready"&&
@@ -318,7 +318,7 @@ export const approveNativeOfferingAdoption=createServerFn({method:"POST"})
           desc(deploymentReadinessReviews.id)).limit(61);
       if(readiness.length>60)
         invalid("Deployment review history requires explicit reconciliation.");
-      for(const kind of ["operating","registration","delivery"]){
+      for(const kind of nativeAdoptionReviewKinds){
         const review=readiness.find(item=>item.reviewKind===kind);
         if(!review||review.outcome!=="ready"||
           review.evaluatedByPersonId===reviewerPersonId||
