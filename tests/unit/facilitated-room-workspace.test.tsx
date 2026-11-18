@@ -1,9 +1,10 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import type { ComponentType, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route } from "@/routes/canonical.lab.facilitated";
 
 const fixtures = vi.hoisted(() => ({
+  hasChoice: true,
   room: {
     id: "11111111-1111-4111-8111-111111111111",
     state: "live", deploymentId: "deploy-a", courseVersionId: "course-a",
@@ -21,7 +22,9 @@ vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (config: Record<string, unknown>) => ({
     ...config, useLoaderData: () => ({
       ok: true,
-      data: {siteId: "site-a", choices: [fixtures.choice], rooms: [fixtures.room]},
+      data: {siteId: "site-a",
+        choices: fixtures.hasChoice ? [fixtures.choice] : [],
+        rooms: fixtures.hasChoice ? [fixtures.room] : []},
     }),
   }),
   useRouter: () => ({invalidate: vi.fn()}),
@@ -31,6 +34,7 @@ vi.mock("@/components/workspace", () => ({
   StatusBadge: ({children}: {children: ReactNode}) => <span>{children}</span>,
   ActionDialog: () => null,
   MutationFeedback: () => null,
+  WorkspaceNotice: ({children}: {children: ReactNode}) => <aside>{children}</aside>,
 }));
 vi.mock("@/lib/mutation-feedback", () => ({
   useMutationFeedback: () => ({
@@ -75,7 +79,18 @@ vi.mock("@/modules/learning/facilitated-learning.functions", () => ({
   renewFacilitatedLearningPairing: vi.fn(),
 }));
 
+afterEach(() => { fixtures.hasChoice = true; });
+
 describe("facilitator room workspace", () => {
+  it("explains missing Course authority without inventing a meeting or attendance", () => {
+    fixtures.hasChoice = false;
+    const Page = (Route as unknown as {component: ComponentType}).component;
+    const html = renderToStaticMarkup(<Page />);
+    expect(html).toContain("No published Course with an active learner attempt");
+    expect(html).toContain("separate from physical room coverage");
+    expect(html).toContain("No facilitated learning rooms have been started");
+    expect(html).not.toContain("Mounted playback controls");
+  });
   it("shows room status and a single explicit entry without mounting all live data readers", () => {
     const Page = (Route as unknown as {component: ComponentType}).component;
     const html = renderToStaticMarkup(<Page />);
