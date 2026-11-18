@@ -42,7 +42,8 @@ export const authorizeNativeClassRepeat=createServerFn({method:"POST"})
   if(!actor.actorPersonId||!["site_admin","registrar"].includes(actor.role??""))
    throw new AuthorizationError("current Class repeat reviewer");
   assertCapability(actor,"class.manage");
-  return db.transaction(async tx=>{
+  const approvingPersonId=actor.actorPersonId!;
+   return db.transaction(async tx=>{
    const [source]=await tx.select({
     classId:canonicalClassEnrollments.classId,
    }).from(canonicalClassEnrollments)
@@ -99,7 +100,7 @@ export const authorizeNativeClassRepeat=createServerFn({method:"POST"})
    const [saved]=await tx.insert(canonicalClassEnrollmentRepeatAuthorizations).values({
     classId:cls.id,learnerPersonId:prior.learnerPersonId,priorEnrollmentId:prior.id,
     completionOutcomeId:completion.id,evidenceVersionId:data.evidenceVersionId,
-    approvedByPersonId:actor.actorPersonId,approvedAt:now,expiresAt,
+    approvedByPersonId:approvingPersonId,approvedAt:now,expiresAt,
    }).returning({id:canonicalClassEnrollmentRepeatAuthorizations.id});
    if(!saved)throw new Error("repeat authorization was not saved");
    await writeCanonicalAudit(tx,{
