@@ -194,23 +194,19 @@ describe("one CAN login for authorized canonical Site staff", () => {
     expect(sourceCode).toContain("one verified learning Person");
   });
 
-  it("only an independent institutional reviewer can link or revoke principals", () => {
+  it("retired native staff Person creation cannot issue new correspondence", () => {
     const ops = source("src/modules/sites/staff-principal-verification.functions.ts");
     const ui = source("src/routes/site-identity.tsx");
-    const patch = source("database/canonical/v3.0.1/patch-can-staff-single-login.sql");
     expect(ops).toContain("verifyCANStaffCanonicalPrincipal");
+    expect(ops).toContain("retired native Person correspondence");
+    expect(ops).not.toContain("tx.insert(accessAccountCanonicalPrincipals)");
     expect(ops).toContain("revokeCANStaffCanonicalPrincipal");
     expect(ops).toContain("await requireCANReviewer()");
-    expect(ops).toContain("reviewer.accountId === data.publicAccountId");
-    expect(ops).toContain("identity.canonical_staff.verified");
     expect(ops).toContain("identity.canonical_staff.revoked");
-    expect(ops).toContain("const canonicalSiteId = site.id;");
-    expect(ops).not.toContain("site_canonical_identity_links");
-    expect(ui).not.toContain("Request a verified Site connection");
-    expect(ui).toContain("Staff identity review");
-    expect(ui).toContain("I independently verified");
-    expect(patch).toContain("access_account_canonical_principals_active_person_uq");
-    expect(patch).toContain("FORCE ROW LEVEL SECURITY");
-    expect(patch).toContain("REFERENCES education_v30.persons(id)");
+    expect(ui).toContain("Staff Person correspondence retired");
+    expect(ui).not.toContain("verifyCANStaffCanonicalPrincipal");
+    expect(ui).not.toContain("canonicalPersonId");
+    expect(ui).toContain('href="/admin"');
+
   });
 });
