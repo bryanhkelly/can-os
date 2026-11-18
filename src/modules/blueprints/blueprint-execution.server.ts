@@ -1,7 +1,7 @@
 import { and, desc, eq, gt, inArray, isNull, isNotNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents,
   blueprintComponentApprovalDecisions,
   blueprintConfigurationComponents,
   blueprintConfigurationOfferingIntents,
@@ -12,7 +12,6 @@ import {
   blueprintVersions,
   configurationReviews,
   deploymentOfferingAdoptions,
-  domainEvents,
   educationOperationOrganizationRoles,
   educationOperations,
   educationOperationSites,
@@ -369,7 +368,7 @@ export async function executeBlueprintConfiguration(
       });
     }
 
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId,
       owningOrganizationId: configurationVersion.owningOrganizationId,
       eventCode: "blueprint.configuration.executed",
@@ -382,7 +381,7 @@ export async function executeBlueprintConfiguration(
         requestId: context.requestId ?? null,
       },
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType: "BlueprintConfigurationExecuted",
       aggregateType: "BlueprintExecutionBatch",
       aggregateId: batch.id,
