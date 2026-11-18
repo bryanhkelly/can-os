@@ -63,10 +63,10 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
   <div className="space-y-8 pt-6">
   {data.programs.length>1&&<nav aria-label="Curriculum program scope" className="flex flex-wrap gap-3">
    <Link to="/operations/curriculum" search={{}} aria-current={data.marketplaces.length>1?"page":undefined}
-    className="rounded border px-3 py-2 text-sm">All programs</Link>
+    className=" border px-3 py-2 text-sm">All programs</Link>
    {data.programs.map(program=>
    <Link key={program.id} to="/operations/curriculum" search={{programId:program.id}} aria-current={data.marketplaces.length===1&&data.marketplaces[0]?.program.id===program.id?"page":undefined}
-    className="rounded border px-3 py-2 text-sm">{program.name}</Link>)}</nav>}
+    className=" border px-3 py-2 text-sm">{program.name}</Link>)}</nav>}
   {!data.programs.length&&<p role="status">No curriculum access grants are available in this membership. An administrator must assign institutional curriculum authority.</p>}
   {mode==="library"&&data.marketplaces.length>1&&data.marketplaces.some(market=>market.canPublish)&&
    <p className="text-sm text-muted-foreground">Select a program to create courses or manage publishing.</p>}
@@ -109,8 +109,8 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
     <Link to="/operations/curriculum/$courseId" params={{courseId:course.id}} search={{programId:studio.programId}} className="text-sm underline">Author course</Link>
     <Link to="/operations/curriculum/publishing" search={{programId:studio.programId,course:course.id}} className="text-sm underline">Review publication</Link>
    </div>
-   {mode==="author"&&!course.releases.some(release=>release.status==="draft")&&<button disabled={busy}
-     className="mt-3 rounded border px-3 py-2 text-sm" onClick={async()=>{
+   {mode==="author"&&!course.releases.some(release=>release.status==="draft")&&<Button type="button" variant="outline" disabled={busy}
+     className="mt-3" onClick={async()=>{
       const source=course.releases.find(release=>release.status==="published");
       const key=course.id+":"+(source?.id??"empty");
       const id=draftRequests.current.get(key)??crypto.randomUUID();draftRequests.current.set(key,id);
@@ -118,7 +118,7 @@ export function CurriculumView({data,mode="library",courseId}:{mode?:"library"|"
        ()=>startCurriculumDraft({data:{programId:studio.programId,courseId:course.id,sourceVersionId:source?.id,requestId:id}}),
        {successMessage:"Curriculum draft created.",commandErrorMessage:"Unable to create draft."},
       );
-     }}>Create next draft{course.releases.length?" from latest release":""}</button>}
+     }}>Create next draft{course.releases.length?" from latest release":""}</Button>}
     {(mode==="author"||mode==="publish")&&course.releases.map(release=><details key={release.id} open={release.status==="draft"} className="mt-4 border-t pt-3">
      <summary>Version {release.version} · {release.status}{release.publishedAt?" · "+new Date(release.publishedAt).toLocaleDateString():""}</summary>
     {release.status==="draft"?<CurriculumEditor key={release.id} programId={studio.programId} courseCode={course.code} release={release} mode={mode==="publish"?"publish":"author"}
