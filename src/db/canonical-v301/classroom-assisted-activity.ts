@@ -1,6 +1,5 @@
-import { check, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { check, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
-import { educationV30 } from "./core";
 import { facilitatedLearningSessions } from "./facilitated-learning";
 import { facilitatedRoomActivityReleases } from "./facilitated-room-evidence";
 import { learnerCourseAttempts } from "./learning";
@@ -10,7 +9,7 @@ import { learnerCourseAttempts } from "./learning";
  * Do not write these into learner-submitted activity responses or grades.
  */
 export const facilitatedRoomAssistedActivityEvidence =
-  educationV30.table("facilitated_room_assisted_activity_evidence", {
+  pgTable("facilitated_room_assisted_activity_evidence", {
     id:uuid("id").defaultRandom().primaryKey(),
     facilitatedSessionId:uuid("facilitated_session_id").notNull()
       .references(()=>facilitatedLearningSessions.id),
