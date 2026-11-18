@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { normalizeClientError } from "@/lib/client-error";
 import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
 import type { JsonObject } from "@/db/canonical-v301";
@@ -60,7 +61,7 @@ export function BlueprintOfferingAdoptionPicker({
       Its availability is advisory. Independent review is required before execution.
     </p>
     <div className="mt-4 flex flex-wrap items-end gap-3">
-      <label htmlFor="blueprint-offering-delivery" className="min-w-44 flex-1 text-sm">
+      <Label htmlFor="blueprint-offering-delivery" className="min-w-44 flex-1 text-sm">
         Delivery model
         <Select id="blueprint-offering-delivery" className="mt-2" value={deliveryContext}
           onChange={event => {
@@ -72,7 +73,7 @@ export function BlueprintOfferingAdoptionPicker({
           <option value="remote">Remote</option>
           <option value="hybrid">Hybrid</option>
         </Select>
-      </label>
+      </Label>
       <Button type="button" variant="outline" onClick={() => void discover()} disabled={loading}>
         {loading ? "Checking availability…" : "Find published Offerings"}
       </Button>
@@ -81,7 +82,7 @@ export function BlueprintOfferingAdoptionPicker({
     {offerings && offerings.length === 0 && <p role="status" className="mt-3 text-sm">
       No published Offerings were found for this Site and delivery model.
     </p>}
-    {available.length > 0 && <label htmlFor="blueprint-offering-component"
+    {available.length > 0 && <Label htmlFor="blueprint-offering-component"
       className="mt-4 block text-sm">
       Add to Blueprint component
       <Select id="blueprint-offering-component" className="mt-2"
@@ -93,7 +94,7 @@ export function BlueprintOfferingAdoptionPicker({
             {component.key.replaceAll("_", " ")}
           </option>)}
       </Select>
-    </label>}
+    </Label>}
     {offerings && offerings.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-2">
       {offerings.map(item => {
         const selectable = canPlanOffering(item);
