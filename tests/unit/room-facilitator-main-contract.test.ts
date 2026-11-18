@@ -17,10 +17,12 @@ describe("room facilitator main workflow contract", () => {
     const host = source("src/components/learning/ClassroomFacilitatorConsole.tsx");
     const attendance = source("src/components/learning/ClassroomAttendancePanel.tsx");
     expect(host).toContain("activityRequests.current.set(requestKey, requestId)");
-    expect(host).toContain("await room.refetch({ throwOnError: true })");
+    expect(host).toContain("useMutationFeedback(() => room.refetch({throwOnError:true}))");
+    expect(host).toContain("feedback.refreshFailed");
     expect(host).toContain("Classroom action saved, but the current room state could not be refreshed");
     expect(attendance).toContain("classroomAttendanceNeedsExplanation({");
-    expect(attendance).toContain("await roster.refetch({throwOnError:true})");
+    expect(attendance).toContain("useMutationFeedback(()=>roster.refetch({throwOnError:true}))");
+    expect(attendance).toContain("blocked=Boolean(busy)||feedback.refreshFailed");
     expect(attendance).toContain("Facilitator verification was saved, but the roster could not be refreshed");
   });
 
