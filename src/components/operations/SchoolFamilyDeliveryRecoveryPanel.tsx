@@ -66,7 +66,7 @@ export function SchoolFamilyDeliveryRecoveryPanel({onRecovered}:{onRecovered?:()
     {results.isPending&&<p role="status" className="mt-3 text-sm">Loading delivery receipts…</p>}
     {results.isError&&<WorkspaceNotice tone="danger" className="mt-3">
       Delivery history is unavailable for your current Site and Organization scope.
-    </WorkspaceNotice>
+    </WorkspaceNotice>}
     {results.data&&<>
       {results.data.items.length===0&&<EmptyState title="No delivery receipts in this view." className="mt-3"/>}
       <div className="mt-3 divide-y border">
