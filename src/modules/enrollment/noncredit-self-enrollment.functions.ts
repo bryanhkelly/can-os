@@ -406,6 +406,7 @@ const personalNoncreditCursor=z.object({
 async function readMyNoncreditHistoryPage(
   cursor:z.infer<typeof personalNoncreditCursor>|null,
   registrationId?:string,
+  courseAttemptId?:string,
 ){
     setResponseHeader("Cache-Control","private, no-store");
     // Read-only personal history follows the original explicitly bound CAN
@@ -475,6 +476,7 @@ async function readMyNoncreditHistoryPage(
         eq(noncreditSelfEnrollmentClaims.participantPersonId,link.canonicalPersonId),
         eq(noncreditRegistrations.participantPersonId,link.canonicalPersonId),
         registrationId?eq(noncreditRegistrations.id,registrationId):undefined,
+        courseAttemptId?eq(learnerCourseAttempts.id,courseAttemptId):undefined,
         cursor?or(
           sql`${noncreditRegistrations.registeredAt} < ${cursor.registeredAt}::timestamptz`,
           and(sql`${noncreditRegistrations.registeredAt} = ${cursor.registeredAt}::timestamptz`,
@@ -545,6 +547,19 @@ export const getMyNoncreditRegistrationById=createServerFn({method:"GET"})
   .validator((raw:unknown)=>z.object({registrationId:z.string().uuid()}).strict().parse(raw))
   .handler(async({data})=>{
     const page=await readMyNoncreditHistoryPage(null,data.registrationId);
+    return page.items[0]??null;
+  });
+
+/** Exact learner-owned Course Attempt lookup for bookmarked learning URLs.
+ * The authorized CAN Account + canonical Person/claim join still determines
+ * ownership. A bookmark never widens Person, Site, or Organization scope.
+ * Never scan the first 100 registrations to guess whether an attempt exists. */
+export const getMyNoncreditCourseByAttemptId=createServerFn({method:"GET"})
+  .validator((raw:unknown)=>z.object({
+    courseAttemptId:z.string().uuid(),
+  }).strict().parse(raw))
+  .handler(async({data})=>{
+    const page=await readMyNoncreditHistoryPage(null,undefined,data.courseAttemptId);
     return page.items[0]??null;
   });
 
