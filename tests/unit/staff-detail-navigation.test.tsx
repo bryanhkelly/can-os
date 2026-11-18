@@ -189,6 +189,13 @@ describe("read-only staff Action detail",()=>{
     expect(html).toContain("Open follow-up");
     expect(html).not.toContain("Create follow-up");
   });
+  it("does not misreport disconnected missing-work data as an empty queue",()=>{
+    state.data={ok:true,data:{connected:false,items:[]}};
+    const html=render(MissingWork);
+    expect(html).toContain("The school data service is unavailable");
+    expect(html).not.toContain("No overdue missing work");
+    expect(html).not.toContain("Overdue student-assignment items");
+  });
   function action(canManageOperations:boolean,status="open"){
     state.data={ok:true,data:{
       id:"action",title:"Review missing work",description:"Meet the student",type:"academic_intervention",
