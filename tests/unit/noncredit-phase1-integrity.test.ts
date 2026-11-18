@@ -97,7 +97,10 @@ describe("noncredit pilot correctness boundaries",()=>{
   it("retains historical assessment evidence when noncredit attempts close",()=>{
     expect(pilotReport).toContain('inArray(learnerCourseAttempts.status,["active","completed","withdrawn","cancelled"])');
     expect(pilotReport).not.toContain('eq(learnerCourseAttempts.status,"active")');
-    expect(pilotReport).toContain('currentDecision?.outcome==="completed"');
+    expect(pilotReport).toContain('currentNoncreditCompletionStates(registrationIds,decisions)');
+    expect(pilotReport).toContain('completion.states.get(reg.id)==="completed"');
+    expect(pilotReport).toContain("completion.invalidRegistrations.length");
+    expect(pilotReport).not.toContain("currentDecisions.find(");
   });
 
   it("does not report another Site's private noncredit training evidence",()=>{
