@@ -47,6 +47,10 @@ const sourceGuarded = new Set([
   "sites.$siteId.publish.tsx",
   "canonical.blueprint-reviews.tsx",
   "site-website.tsx",
+  "operations.family-alerts.tsx",
+  "operations.teacher-marketplace.tsx",
+  "sites.$siteId.parent-information.tsx",
+  "operations.health-review.tsx",
 ]);
 
 function resolveSource(from, specifier) {
