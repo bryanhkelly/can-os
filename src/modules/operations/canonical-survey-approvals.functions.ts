@@ -2,11 +2,17 @@ import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lte, or, sq
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
-import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  surveyDefinitions, surveyVersions, surveyQuestions, surveyQuestionOptions,
-  surveyVersionReviews, evidenceDocuments, evidenceDocumentVersions,
-  } from "@/db/canonical-v301";
+  domainEvents,
+  auditEvents,
+  surveyDefinitions,
+  surveyVersions,
+  surveyQuestions,
+  surveyQuestionOptions,
+  surveyVersionReviews,
+  evidenceDocuments,
+  evidenceDocumentVersions,
+} from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import {
   recordSurveyReviewInput, publishSurveyInput,
@@ -222,13 +228,13 @@ export const recordCanonicalSurveyReview=createServerFn({method:"POST"})
         decision:data.decision,reviewId:saved.id,
         evidenceVersionId:data.evidenceVersionId,rationale:data.rationale,
       };
-      await writeCanonicalAudit(tx,{
+      await tx.insert(auditEvents).values({
         actorPersonId:authority.actorPersonId,
         owningOrganizationId:authority.organizationId,
         eventCode:"survey.review.recorded",
         entityKind:"survey_version",entityId:data.surveyVersionId,payload,
       });
-      await emitCanonicalDomainEvent(tx,{
+      await tx.insert(domainEvents).values({
         eventType:"SurveyReviewRecorded",aggregateType:"survey_version",
         aggregateId:data.surveyVersionId,actorPersonId:authority.actorPersonId,payload,
       });
@@ -275,13 +281,13 @@ export const publishCanonicalSurveyVersion=createServerFn({method:"POST"})
       if(!published)throw new Error("Survey version was not published");
       const payload={surveyVersionId:data.surveyVersionId,
         requiredApprovals:gate.required.map(x=>x.kind)};
-      await writeCanonicalAudit(tx,{
+      await tx.insert(auditEvents).values({
         actorPersonId:authority.actorPersonId,
         owningOrganizationId:authority.organizationId,
         eventCode:"survey.version.published",
         entityKind:"survey_version",entityId:data.surveyVersionId,payload,
       });
-      await emitCanonicalDomainEvent(tx,{
+      await tx.insert(domainEvents).values({
         eventType:"SurveyVersionPublished",aggregateType:"survey_version",
         aggregateId:data.surveyVersionId,actorPersonId:authority.actorPersonId,payload,
       });
