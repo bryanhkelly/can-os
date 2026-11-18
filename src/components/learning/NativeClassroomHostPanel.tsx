@@ -2,6 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Radio } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
+import { WorkspaceNotice } from "@/components/workspace";
 import { ClassroomFacilitatorConsole } from "@/components/learning/ClassroomFacilitatorConsole";
 import { ClassroomAttendancePanel } from "@/components/learning/ClassroomAttendancePanel";
 import { getNativeClassSessionAgenda } from "@/modules/classes/native-class-session-agenda.functions";
@@ -84,13 +87,13 @@ export function NativeClassroomHostPanel({
           ["dual","Laptop + television","Keep private controls on the laptop and open the public display on the second screen."],
           ["distributed","TV + tablet + phones","The TV needs its own authorized presenter session; the tablet retains private controls."],
         ] as const).map(([value,title,description])=>
-          <label key={value} className={"block border p-3 text-sm cursor-pointer "+
+          <Label key={value} className={"block border p-3 text-sm cursor-pointer "+
             (layout===value?"border-primary bg-primary/5":"border-border")}>
-            <input type="radio" className="mr-2" checked={layout===value}
+            <Radio className="mr-2" checked={layout===value}
               onChange={()=>setLayout(value)} name={"classroom-layout-"+roomId}/>
             <strong>{title}</strong>
             <span className="mt-2 block text-xs text-muted-foreground">{description}</span>
-          </label>
+          </Label>
         )}
       </fieldset>
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -151,8 +154,8 @@ export function NativeClassroomHostPanel({
             Keep Session open
           </Button>
         </div>}
-      {message&&<p role="status" className="mt-3 text-sm">{message}</p>}
-      {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+      {message&&<WorkspaceNotice tone="info" className="mt-3">{message}</WorkspaceNotice>}
+      {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
     </section>
   </div>;
 }
