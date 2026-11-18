@@ -3,7 +3,7 @@ import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorks
 import { FacilitatedClassroomEntry } from "@/components/operations/FacilitatedClassroomEntry";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
-import { QueryState, StatCard, StatusBadge, MutationFeedback } from "@/components/workspace";
+import { QueryState, StatCard, StatusBadge, MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import { DashboardHome } from "@/components/workspace/dashboard-home";
 import { DashboardShortcut } from "@/components/workspace/dashboard-layout";
 import { DashboardCalendar } from "@/components/workspace/dashboard-calendar";
@@ -107,6 +107,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
   const [preparing,setPreparing]=useState(false);
   const siteSelectionMismatch = Boolean(context && selection?.siteId && selection.siteId !== context.siteId);
   const futureAttendanceDate = Boolean(context && !preparing && date > context.date);
+  const historicalAttendanceReadOnly = Boolean(context && date && date < addCalendarDays(context.date, -30));
   const workspaceError = siteSelectionMismatch
     ? "This school does not match your verified onsite membership. Select the matching membership before operating the day."
     : futureAttendanceDate
@@ -155,7 +156,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
   };
 
   async function mark(student: Student, status: (typeof marks)[number]) {
-    if (!context || attendanceBlocked || !roster || date > context.date || siteSelectionMismatch) return;
+    if (!context || attendanceBlocked || !roster || historicalAttendanceReadOnly || date > context.date || siteSelectionMismatch) return;
     const key = student.programId + ":" + student.studentProfileId;
     const note = notes[key]?.trim() ?? "";
     if (student.attendanceEventId && note.length < 10) {
@@ -276,6 +277,11 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
     </Label>}
     {(notice || noProgramNotice) && <p role="status" className="mt-4 border p-3 text-sm">{notice || noProgramNotice}</p>}
     <MutationFeedback state={attendanceFeedback} pendingMessage="Recording observed attendance…" className="mt-4"/>
+    {context?.hasPrograms && !preparing && historicalAttendanceReadOnly && <WorkspaceNotice tone="attention" className="mt-4">
+      This school day is outside the 30-day staff attendance correction window.
+      You can review the recorded history, but staff attendance changes are disabled.
+      Contact the registrar if an older record needs review.
+    </WorkspaceNotice>
     {(error || workspaceError) && <p role="alert" className="mt-4 border p-3 text-sm">{error || workspaceError}</p>}
     <QueryState loading={!context && contextQuery.isPending ? "Loading your verified site workspace…" : undefined}
       error={!context && contextFailure?.message}
@@ -368,7 +374,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
             <div className="mt-4 flex flex-wrap gap-2">
               {marks.map(status => <Button key={status} type="button" size="sm"
                 variant={student.status===status ? "secondary" : "outline"}
-                disabled={attendanceBlocked || !date || date > (context?.date ?? "")}
+                disabled={attendanceBlocked || historicalAttendanceReadOnly || !date || date > (context?.date ?? "")}
                 className="capitalize"
                 onClick={() => void mark(student, status)}>
                 Record {status}
