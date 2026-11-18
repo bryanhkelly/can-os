@@ -103,3 +103,20 @@ test("synthetic approved student can post in a study group and RSVP for an upcom
   await panel.getByRole("button", { name: /^going$/i }).click();
   await expect(panel).toContainText(/Your RSVP: going/i);
 });
+
+test("unsent study-group discussion survives tab changes without posting", async ({ page, context }) => {
+  test.skip(!cookie || !groupId, "Requires an approved synthetic student study group");
+  await studentSession(context);
+  await open(page, `/groups/${encodeURIComponent(groupId)}`);
+  await page.getByRole("tab", { name: /Discussion/ }).click();
+  const draft = `Unsent synthetic discussion ${groupId}`;
+  const editor = page.getByRole("textbox", { name: "New post" });
+  await editor.fill(draft);
+  await page.getByRole("tab", { name: /Sessions/ }).click();
+  await page.getByRole("tab", { name: /Discussion/ }).click();
+  await expect(editor).toHaveValue(draft);
+  // The form was not submitted. Navigating away should show the shared guard.
+  page.once("dialog", dialog => void dialog.dismiss());
+  await page.getByRole("link", { name: "All study groups" }).click();
+  await expect(editor).toHaveValue(draft);
+});
