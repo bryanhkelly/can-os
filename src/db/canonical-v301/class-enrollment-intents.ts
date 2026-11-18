@@ -1,9 +1,9 @@
-import {index,text,timestamp,uniqueIndex,uuid} from "drizzle-orm/pg-core";
+import {index,pgTable,text,timestamp,uniqueIndex,uuid} from "drizzle-orm/pg-core";
 import {educationV30} from "./core";
 const id=()=>uuid("id").defaultRandom().primaryKey();
 
 /** Issued to a verified native Person, not an Enrollment or reserved seat. */
-export const canonicalClassEnrollmentInvitations=educationV30.table(
+export const canonicalClassEnrollmentInvitations=pgTable(
   "class_enrollment_invitations",{
     id:id(),classId:uuid("class_id").notNull(),
     classOfferingVersionId:uuid("class_offering_version_id").notNull(),
@@ -25,7 +25,7 @@ export const canonicalClassEnrollmentInvitations=educationV30.table(
   ]);
 
 /** Review intent. A pending request never establishes guardian consent. */
-export const canonicalClassEnrollmentApprovalRequests=educationV30.table(
+export const canonicalClassEnrollmentApprovalRequests=pgTable(
   "class_enrollment_approval_requests",{
     id:id(),classId:uuid("class_id").notNull(),
     classOfferingVersionId:uuid("class_offering_version_id").notNull(),
@@ -50,7 +50,7 @@ export const canonicalClassEnrollmentApprovalRequests=educationV30.table(
   ]);
 
 /** A transfer must end the source and create a new destination Enrollment. */
-export const canonicalClassEnrollmentTransferRequests=educationV30.table(
+export const canonicalClassEnrollmentTransferRequests=pgTable(
   "class_enrollment_transfer_requests",{
     id:id(),sourceEnrollmentId:uuid("source_enrollment_id").notNull(),
     targetClassId:uuid("target_class_id").notNull(),
@@ -73,7 +73,7 @@ export const canonicalClassEnrollmentTransferRequests=educationV30.table(
   ]);
 
 /** Independent permission for a new Attempt after an official completed Class. */
-export const canonicalClassEnrollmentRepeatAuthorizations=educationV30.table(
+export const canonicalClassEnrollmentRepeatAuthorizations=pgTable(
   "class_enrollment_repeat_authorizations",{
     id:id(),classId:uuid("class_id").notNull(),
     learnerPersonId:uuid("learner_person_id").notNull(),
