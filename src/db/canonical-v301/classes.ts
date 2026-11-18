@@ -1,4 +1,4 @@
-import { boolean, index, integer, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, integer, pgTable, text, timestamp, uniqueIndex, uuid } from "drizzle-orm/pg-core";
 import { educationV30 } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 
@@ -34,7 +34,7 @@ export const canonicalClassSurveyCampaigns = educationV30.table("class_survey_ca
   linkedAt:timestamp("linked_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[index("class_survey_campaign_class_idx").on(t.classId)]);
 
-export const canonicalClassOfferings = educationV30.table("class_offerings", {
+export const canonicalClassOfferings = pgTable("class_offerings", {
   id:id(),classId:uuid("class_id").notNull(),
   createdAt:timestamp("created_at",{withTimezone:true}).notNull().defaultNow(),
 },t=>[uniqueIndex("canonical_class_offerings_class_uq").on(t.classId)]);
@@ -96,7 +96,7 @@ export const canonicalClassOutcomes = educationV30.table("class_outcomes", {
 },t=>[uniqueIndex("canonical_class_outcome_source_uq").on(t.classEnrollmentId,t.outcomeKind,t.sourceKind,t.sourceId)]);
 
 /** No issuer may grant credit solely from completion or stated credit intent. */
-export const canonicalClassAwards = educationV30.table("class_awards", {
+export const canonicalClassAwards = pgTable("class_awards", {
   id:id(),classOutcomeId:uuid("class_outcome_id").notNull(),
   awardKind:text("award_kind").$type<"academic_credit"|"certificate"|"credential"|"participation">().notNull(),
   issuingOrganizationId:uuid("issuing_organization_id").notNull(),
