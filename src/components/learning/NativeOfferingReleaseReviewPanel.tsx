@@ -247,6 +247,9 @@ export function NativeOfferingReleaseReviewPanel(){
       title="No eligible native Offering submissions"
       description="Only Course-appointed reviewers can see submitted versions. A general Organization role does not grant Course review authority."
     />}
+    {queue.isSuccess&&items.length===0&&queue.hasNextPage&&<p role="status" className="mt-3 text-sm text-muted-foreground">
+      No independently authorized submissions appeared in the loaded page. Older records may still contain eligible work.
+    </p>}
     <div className="mt-4 grid gap-4">
       {items.map(item=><ReleaseReview item={item} key={item.id}/>)}
       {queue.hasNextPage&&<Button type="button" variant="outline"
