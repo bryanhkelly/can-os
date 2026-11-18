@@ -54,13 +54,15 @@ export function analyzeSource(source, path, options = {}) {
       }
     }
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      imports.push({ from: node.moduleSpecifier.text, names: importNames(node.importClause) });
+      imports.push({ kind: "import", from: node.moduleSpecifier.text, names: importNames(node.importClause) });
     }
     if (ts.isExportDeclaration(node) && node.moduleSpecifier &&
         ts.isStringLiteral(node.moduleSpecifier)) {
-      const names = node.exportClause && ts.isNamedExports(node.exportClause)
-        ? node.exportClause.elements.map(el => el.propertyName?.text ?? el.name.text) : ["*"];
-      imports.push({ from: node.moduleSpecifier.text, names });
+      const exported = node.exportClause && ts.isNamedExports(node.exportClause)
+        ? node.exportClause.elements.map(el => ({
+            name: el.name.text, origin: el.propertyName?.text ?? el.name.text,
+          })) : [{ name: "*", origin: "*" }];
+      imports.push({ kind: "export", from: node.moduleSpecifier.text, exported });
     }
     ts.forEachChild(node, walk);
   }
@@ -117,19 +119,39 @@ export function createInventory(projectRoot) {
     return null;
   }
   function composed(entry) {
-    const visited = new Set(), stack = [entry];
+    const seen = new Map(), files = new Set(), stack = [{ file: entry, names: ["*"] }];
     while (stack.length) {
-      const file = stack.pop();
-      if (!file || visited.has(file)) continue;
-      visited.add(file);
+      const next = stack.pop();
+      if (!next) continue;
+      const { file, names } = next;
+      const prior = seen.get(file) ?? new Set();
+      const requested = names.filter(name => !prior.has(name) && !prior.has("*"));
+      if (!requested.length) continue;
+      for (const name of requested) prior.add(name);
+      seen.set(file, prior);
+      files.add(file);
       for (const item of inspect(file).imports) {
         const dep = resolveModule(file, item.from);
-        if (dep && !visited.has(dep)) stack.push(dep);
+        if (!dep) continue;
+        if (item.kind === "import") {
+          // A TypeScript barrel is resolved through its named exports; a TSX
+          // implementation follows its real component dependencies.
+          if (file.endsWith(".tsx")) stack.push({ file: dep, names: item.names });
+        } else {
+          const matching = item.exported.filter(
+            binding => prior.has("*") || binding.name === "*" || prior.has(binding.name)
+          );
+          if (matching.length) {
+            stack.push({ file: dep, names: matching.map(binding =>
+              binding.name === "*" ? (prior.has("*") ? "*" : [...prior]) : binding.origin
+            ).flat() });
+          }
+        }
       }
     }
-    // A barrel may re-export more components than this route actually renders.
-    // These totals describe reachable source, not exact runtime rendering.
-    const feature = [...visited].filter(file =>
+    // Barrel exports are resolved by requested symbols. These totals remain
+    // static dependencies, not proof that a component renders at runtime.
+    const feature = [...files].filter(file =>
       file !== entry && file.endsWith(".tsx") && !within(file, join(componentsDir, "ui")));
     return {
       files: feature.length,
