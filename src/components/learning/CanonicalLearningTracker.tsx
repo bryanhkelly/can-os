@@ -7,7 +7,7 @@ import {
   startCanonicalLearningSession,
 } from "@/modules/learning/canonical-learning-activity.functions";
 import type { CanonicalLearningEvent } from "@/domain/canonical-learning-activity";
-import { pruneLearningOutbox, type LearningOutboxItem } from "@/domain/canonical-learning-outbox";
+import { acknowledgeLearningOutboxEvent, pruneLearningOutbox, type LearningOutboxItem } from "@/domain/canonical-learning-outbox";
 import {accessClientInstance} from "@/domain/session-client";
 
 type Kind = CanonicalLearningEvent["kind"];
@@ -76,16 +76,22 @@ export function CanonicalLearningActivityProvider({
       !document.hasFocus())return;
     pending.current=pruneLearningOutbox(pending.current,id,new Date());
     persist();
-    while(pending.current.length && alive.current && session.current===id){
+    while(pending.current.length && alive.current && session.current===id &&
+      document.visibilityState==="visible" && document.hasFocus()){
       const next=pending.current[0]!;
       try {
         await recordCanonicalLearningEvent({
           data:{courseAttemptId,learningSessionId:id,event:next.event},
         });
-        pending.current.shift();
+        // Another interaction can append/prune the queue during this await.
+        // Do not consume a different event when the head has changed.
+        // Likewise, an unmounted provider must not overwrite a new one's
+        // tab storage after its HTTP request finally settles.
+        if(!alive.current || session.current!==id)return;
+        pending.current=acknowledgeLearningOutboxEvent(pending.current,next);
         persist();
       }catch {
-        setSyncPending(true);
+        if(alive.current && session.current===id)setSyncPending(true);
         return;
       }
     }

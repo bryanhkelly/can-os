@@ -25,6 +25,19 @@ export function pruneLearningOutbox(
   });
 }
 
+/** An HTTP acknowledgment applies to exactly the event that was sent.
+ * An observation recorded while the request was in flight may have changed
+ * the queue head, so removing index zero can silently discard unsent evidence.
+ * Keep unrelated events, even when the acknowledged event has already aged
+ * out or been evicted by the bounded queue. */
+export function acknowledgeLearningOutboxEvent(
+  items: readonly LearningOutboxItem[],
+  acknowledged: Pick<LearningOutboxItem,"learningSessionId"|"event">,
+): LearningOutboxItem[] {
+  return items.filter(item=>item.learningSessionId!==acknowledged.learningSessionId ||
+    item.event.clientEventId!==acknowledged.event.clientEventId);
+}
+
 /** Retry reuses the exact event UUID; the server deduplicates it. */
 export async function drainLearningOutbox(
   items: LearningOutboxItem[],

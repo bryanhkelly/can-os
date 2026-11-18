@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  drainLearningOutbox,pruneLearningOutbox,MAX_LEARNING_OUTBOX_EVENTS,
+  acknowledgeLearningOutboxEvent,drainLearningOutbox,pruneLearningOutbox,
+  MAX_LEARNING_OUTBOX_EVENTS,
 } from "@/domain/canonical-learning-outbox";
 
 const sessionId="11111111-1111-4111-8111-111111111111";
@@ -27,6 +28,28 @@ describe("canonical tab-scoped activity retry",()=>{
     );
     expect(result).toHaveLength(MAX_LEARNING_OUTBOX_EVENTS);
     expect(result[0]!.event.clientEventId).toBe(item(53).event.clientEventId);
+  });
+  it("acknowledges the sent event without dropping observations appended in flight",()=>{
+    const original=[item(1),item(2)];
+    const afterConcurrentAppend=[...original,item(3)];
+    expect(acknowledgeLearningOutboxEvent(afterConcurrentAppend,original[0]!))
+      .toEqual([item(2),item(3)]);
+  });
+  it("does not discard a new queue head when an in-flight event was pruned",()=>{
+    const inFlight=item(1);
+    // Time-based expiration or the 48-event queue cap can remove an item
+    // before its request returns. A blind shift would discard item(2).
+    const changedQueue=[item(2),item(3)];
+    expect(acknowledgeLearningOutboxEvent(changedQueue,inFlight))
+      .toEqual(changedQueue);
+    expect(acknowledgeLearningOutboxEvent([],inFlight)).toEqual([]);
+  });
+  it("does not acknowledge another session's event with the same UUID",()=>{
+    const inFlight=item(1);
+    const otherSession=item(1,new Date(now.getTime()-20_000),
+      "33333333-3333-4333-8333-333333333333");
+    expect(acknowledgeLearningOutboxEvent([otherSession],inFlight))
+      .toEqual([otherSession]);
   });
   it("retains the original event UUID for deduplicated retries",async()=>{
     const list=[item(1),item(2),item(3)];
