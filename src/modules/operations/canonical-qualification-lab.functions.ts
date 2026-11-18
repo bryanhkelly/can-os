@@ -1,10 +1,11 @@
 import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { z } from "zod";
 import { AuthorizationError } from "@/domain/command-context";
-import { auditEvents, domainEvents } from "@/db/canonical-v301";
+
 import { createServerFn } from "@tanstack/react-start";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
   qualificationApplications, qualificationSubjects, qualificationProgramFitAssessments,
   qualificationProgramFitRequirementResults, qualificationProgramFitReviews,
@@ -171,13 +172,13 @@ export const recordSiteQualificationResourceNeed=createServerFn({method:"POST"})
       const payload={assessmentId:data.assessmentId,siteId:assessment.siteId,
         resourceCode:data.resourceCode,requiredQuantity:data.requiredQuantity,
         availableQuantity:data.availableQuantity,verified:false};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:provider.actor.actorPersonId!,
         owningOrganizationId:provider.organizationId,
         eventCode:"qualification.resource_need.reported",
         entityKind:"qualification_resource_need",entityId:saved.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:provider.actor.actorPersonId!,
         eventType:"QualificationResourceNeedReported",
         aggregateType:"qualification_resource_need",aggregateId:saved.id,payload,
