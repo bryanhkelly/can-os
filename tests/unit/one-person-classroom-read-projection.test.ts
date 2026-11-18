@@ -30,7 +30,7 @@ describe("one authoritative Person for classroom attendance",()=>{
     expect(ddl).toContain("can.one_person_runtime_cutover_verified");
     expect(ddl).toContain("can.one_person_fk_rebind_approved");
     expect(ddl).toContain("Native Person FK graph changed");
-    expect(ddl).toContain("IF old_count <> 63 THEN");
+    expect(ddl).toContain("IF old_count <> 36 THEN");
     expect(ddl).toContain("historical");
   });
   it("keeps guardian identity on the verified CAN Person and verifies child authority separately",()=>{
@@ -67,6 +67,19 @@ describe("one authoritative Person for classroom attendance",()=>{
     const runtime=source("scripts/acceptance/check-main-one-person-runtime.mjs");
     expect(runtime).toContain("critical_shared_actor_fks");
     expect(runtime).toContain("public_people_rls_forced");
+  });
+
+  it("rebinds operational and safeguarding Person references without a new identity bridge",()=>{
+    const publicDDL=source("database/production/2026-11-17-rebind-22-public-operational-person-fks.sql");
+    const secureDDL=source("database/production/2026-11-17-rebind-5-secure-actor-person-fks.sql");
+    expect(publicDDL).toContain("REFERENCES public.people(id)");
+    expect(publicDDL).toContain("remaining<>3");
+    expect(publicDDL).toContain("Operational Person records need review");
+    expect(publicDDL).toContain("public.guardian_authorities");
+    expect(secureDDL).toContain("REFERENCES public.people(id)");
+    expect(secureDDL).toContain("relrowsecurity AND relforcerowsecurity");
+    expect(secureDDL).toContain("Sensitive records require review");
+    expect(secureDDL).not.toMatch(/DROP TABLE\b|CASCADE\s*;/i);
   });
 
   it("fails the main cutover until second Person writers and native cookie paths retire",()=>{
