@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { Select } from "@/components/ui/select";
+import { WorkspaceNotice } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import {
   getNativeClassSessionAgenda, publishNativeClassSessionAgenda,
@@ -13,7 +16,7 @@ const labels:Record<Kind,string>={
   study:"Study",watch:"Watch",practice:"Practice",
   assignment:"Complete assignment",assessment:"Take assessment",
 };
-const selectClass="min-h-10 w-full border border-border bg-background px-3 text-sm";
+
 
 /**
  * One Session's published Course-linked plan. Class/Session identity is supplied
@@ -145,22 +148,16 @@ export function NativeClassSessionAgenda({
               </li>)}
             </ol>
             <div className="mt-3 grid gap-2 sm:grid-cols-[10rem_minmax(0,1fr)_auto]">
-              <label className="text-xs font-semibold">
-                Activity
-                <select className={selectClass+" mt-1"} value={kind}
+              <Field label="Activity"><Select value={kind}
                   onChange={event=>{setKind(event.target.value as Kind);setReferenceId("");}}>
                   {(Object.keys(labels) as Kind[]).map(value=>
                     <option key={value} value={value}>{labels[value]}</option>)}
-                </select>
-              </label>
-              <label className="text-xs font-semibold">
-                Publisher-owned content
-                <select className={selectClass+" mt-1"} value={referenceId}
+                </Select></Field>
+              <Field label="Publisher-owned content"><Select value={referenceId}
                   onChange={event=>setReferenceId(event.target.value)}>
                   <option value="">Select approved content</option>
                   {(options??[]).map(item=><option key={item.id} value={item.id}>{item.title}</option>)}
-                </select>
-              </label>
+                </Select></Field>
               <Button type="button" size="sm" variant="outline" disabled={!referenceId||busy||draft.length>=24}
                 onClick={add}>Add</Button>
             </div>
@@ -179,8 +176,8 @@ export function NativeClassSessionAgenda({
           </div>
         </>}
       </div>}
-      {notice&&<p role="status" className="mt-2 text-sm">{notice}</p>}
-      {error&&<p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
+      {notice&&<WorkspaceNotice tone="info" className="mt-2">{notice}</WorkspaceNotice>}
+      {error&&<WorkspaceNotice tone="danger" className="mt-2">{error}</WorkspaceNotice>}
     </>}
   </section>;
 }
