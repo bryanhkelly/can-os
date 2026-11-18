@@ -9,6 +9,7 @@ import {
   contentAssetVersions, contentPublicationManifests, contentPublicationManifestItems,
   courseLessons, courses, courseUnits, courseVersions,
   evidenceDocuments, evidenceDocumentVersions, offeringReleaseRequirements, offeringVersions, offerings,
+  type JsonObject,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { DomainError } from "@/domain/errors";
@@ -53,8 +54,8 @@ const policyInput=releaseInput.extend({
   rationale:z.string().trim().min(10).max(2000),
 }).strict();
 const noStore = () => setResponseHeader("Cache-Control","private, no-store");
-const invalid = (message:string):never => { throw new DomainError("VALIDATION_FAILED",message); };
-const conflict = (message:string):never => { throw new DomainError("CONFLICT",message); };
+function invalid(message:string):never { throw new DomainError("VALIDATION_FAILED",message); }
+function conflict(message:string):never { throw new DomainError("CONFLICT",message); }
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type Actor = Awaited<ReturnType<typeof getCommandContext>>;
 
@@ -134,13 +135,13 @@ async function loadBundle(tx:Tx,offeringVersionId:string,lock:boolean) {
     nativeOfferingVersionId:version.id,offeringId:offering.id,
     publisherOrganizationId:offering.publisherOrganizationId,
     productDefinition:version.productDefinition,
-    courses:rows.map(row=>({
+    courses:rows.map(({lifecycle,...row})=>({
       ...row,
       units:units.filter(unit=>unit.courseVersionId===row.courseVersionId)
         .map(unit=>({
           ...unit,lessons:lessons.filter(lesson=>lesson.courseUnitId===unit.id),
         })),
-    }).map(({lifecycle,...rest})=>rest)), // Lifecycle changes do not alter content.
+    })), // Lifecycle changes do not alter content.
   });
   return {offering,version,courses:rows,units,lessons,hash,unitCount:units.length,lessonCount:lessons.length};
 }
@@ -266,7 +267,7 @@ async function requireAuditedReleasePolicy(
     current.payload.evidenceVersionId as string,"academic");
 }
 async function log(tx:Tx,actor:Actor,organizationId:string,
-  versionId:string,eventCode:string,details:Record<string,unknown>){
+  versionId:string,eventCode:string,details:JsonObject){
   await writeCanonicalAudit(tx,{
     actorPersonId:actor.actorPersonId,
     owningOrganizationId:organizationId,
@@ -473,6 +474,7 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
     const reviewerPersonId=actor.actorPersonId;
     if(!reviewerPersonId||actor.role!=="academic_content_reviewer"||
       !actor.scope.organizationIds?.length)throw new AuthorizationError("publisher reviewer");
+    const organizationIds=actor.scope.organizationIds;
     return db.transaction(async tx=>{
       const rows=await tx.select({
         id:contentPublicationManifests.id,
@@ -483,7 +485,7 @@ export const getNativeOfferingReleaseReviewQueue=createServerFn({method:"GET"})
         createdByPersonId:contentPublicationManifests.createdByPersonId,
       }).from(contentPublicationManifests)
         .where(and(
-          inArray(contentPublicationManifests.ownerOrganizationId,actor.scope.organizationIds),
+          inArray(contentPublicationManifests.ownerOrganizationId,organizationIds),
           isNotNull(contentPublicationManifests.offeringVersionId),
           ne(contentPublicationManifests.createdByPersonId,reviewerPersonId),
           data.cursor?or(
