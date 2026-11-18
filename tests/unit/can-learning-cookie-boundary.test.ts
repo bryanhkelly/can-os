@@ -49,6 +49,9 @@ describe("single CAN login is required for instructional learning",()=>{
   expect(source).toContain("getCanonicalCommandContext(request)");
   expect(source).toContain("getCanonicalSessionRow(request)");
   expect(source).toContain("context.actorPersonId !== row.person_id");
+  expect(source).toContain("getDirectCANLearningContext(request)");
+  expect(source).toContain("actor.sessionAccountId");
+  expect(source).toContain("direct CAN Person learning session");
   expect(source).not.toContain("projectCanonicalCommandContext(row)");
   expect(source).not.toContain("canonicalSessionDigestFromRequest");
   expect(source).not.toContain("issueNativeLearnerSession");
