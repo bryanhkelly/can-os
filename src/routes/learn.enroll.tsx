@@ -165,7 +165,7 @@ function PublicSelfEnrollment() {
               <span>Unable to verify this training's current published terms.</span>
               <Button type="button" size="sm" variant="outline" className="ml-3"
                 onClick={()=>void linkedRelease.refetch()}>Retry training lookup</Button>
-            </WorkspaceNotice>
+            </WorkspaceNotice>}
         </section>
         {waitlistUnavailable&&<WorkspaceNotice tone="attention">
           <span>Your waiting-list or reserved-invitation status could not be verified. Enrollment is paused to prevent an incorrect request.</span>
@@ -357,7 +357,7 @@ function SelfEnrollmentConfirmation({release,signedIn,returnTo,accepted,adult,bu
       <Link to="/learn/my-activity" className="font-semibold text-primary underline underline-offset-4">
         View My Activity
       </Link>
-    </nav>
+    </nav>}
   </section>;
 }
 
