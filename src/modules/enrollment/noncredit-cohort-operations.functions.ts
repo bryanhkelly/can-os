@@ -14,6 +14,7 @@ import {
 import {AuthorizationError} from "@/domain/command-context";
 import {validClassroomSessionWindows} from "@/domain/classroom-scheduling";
 import {currentNoncreditCompletionStates} from "@/domain/verified-completion-projection";
+import {summarizeVerifiedRoomAttendance} from "@/domain/classroom-attendance";
 
 const id=z.string().uuid();
 const releaseInput=z.object({releaseId:id}).strict();
@@ -73,11 +74,6 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
         )).orderBy(canonicalDeliverySessions.startsAt).limit(301):[];
       const visiblePlans=plans.filter(p=>p.linkedReleaseId===release.id||
         (p.linkedReleaseId===null&&p.state==="scheduled"&&p.startsAt>new Date()));
-      const sessions=visiblePlans.map(p=>({
-        planId:p.planId,linked:p.linkedReleaseId===release.id,
-        state:p.state,startsAt:p.startsAt.toISOString(),
-        endsAt:p.endsAt.toISOString(),
-      }));
       const claims=await tx.select({
         registrationId:noncreditSelfEnrollmentClaims.registrationId,
         participantPersonId:noncreditSelfEnrollmentClaims.participantPersonId,
@@ -128,7 +124,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
       const attemptIds=roster.map(p=>p.courseAttemptId).filter((v):v is string=>!!v);
       const attestations=roomIds.length&&attemptIds.length?await tx.select({
         roomId:facilitatedRoomAttendanceAssertions.facilitatedSessionId,
-        courseAttemptId:facilitatedRoomAttendanceAssertions.courseAttemptId,
+        attemptId:facilitatedRoomAttendanceAssertions.courseAttemptId,
         status:facilitatedRoomAttendanceAssertions.status,
       }).from(facilitatedRoomAttendanceAssertions)
         .where(and(
@@ -136,14 +132,16 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
           inArray(facilitatedRoomAttendanceAssertions.courseAttemptId,attemptIds),
         )).orderBy(desc(facilitatedRoomAttendanceAssertions.assertedAt),
           desc(facilitatedRoomAttendanceAssertions.id)).limit(3001):[];
-      const latestAttendance=new Map<string,string>();
-      for(const row of attestations){
-        const key=row.roomId+":"+row.courseAttemptId;
-        if(!latestAttendance.has(key))latestAttendance.set(key,row.status);
-      }
-      const present=new Set<string>();
-      for(const [key,status] of latestAttendance)if(status==="present")
-        present.add(key.split(":")[1]!);
+      const {presentAttemptIds:present,verifiedAttendeesByRoom}=
+        summarizeVerifiedRoomAttendance(attestations);
+      const sessions=visiblePlans.map(p=>({
+        planId:p.planId,linked:p.linkedReleaseId===release.id,
+        state:p.state,startsAt:p.startsAt.toISOString(),
+        endsAt:p.endsAt.toISOString(),
+        roomOpened:p.roomId!==null,
+        verifiedAttendees:p.roomId
+          ?verifiedAttendeesByRoom.get(p.roomId)??0:0,
+      }));
       return {
         releaseId:release.id,title:title?.title??"Approved training",
         deliveryMode:release.deliveryMode,
@@ -177,7 +175,7 @@ export const getNoncreditReleaseOperations=createServerFn({method:"GET"})
         },
         partial:claims.length>500||plans.length>300||waitingEntries.length>1000||deliveryRows.length>3000||
           attestations.length>3000,
-        evidenceNote:"Facilitator-attested presence covers linked rooms only; pairing, video playback and enrollment are not attendance. Completion uses the unambiguous, supersession-validated noncredit decision chain, not a certificate claim.",
+        evidenceNote:"Facilitator-attested presence counts only the latest assertion for each registered Course attempt in a linked room. Pairing, playback and enrollment are not attendance; an opened room alone does not prove a delivered session. Completion uses the unambiguous, supersession-validated noncredit decision chain, not a certificate claim.",
       };
     });
   });
