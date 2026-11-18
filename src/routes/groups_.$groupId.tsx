@@ -165,7 +165,7 @@ function GroupDetailView({ data, groupId }: { data: Data; groupId: string }) {
                 ? "inline-flex min-h-12 shrink-0 items-center gap-2 border-b-2 border-primary px-4 text-sm font-semibold text-primary"
                 : "inline-flex min-h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-4 text-sm font-medium text-muted-foreground hover:text-foreground"}>
               {tab.label}
-              {"count" in tab && <span className="rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums">{tab.count}</span>}
+              {"count" in tab && <span className="bg-muted px-2 py-0.5 text-xs tabular-nums">{tab.count}</span>}
             </button>)}
           </div>
         </div>
@@ -206,7 +206,7 @@ function GroupOverviewPanel({ group, next }: { group: Group; next: Group["sessio
   const month = dateParts.find(part => part.type === "month")?.value;
   const day = dateParts.find(part => part.type === "day")?.value;
   return <div className="space-y-5">
-    <WorkspacePanel className="rounded-sm shadow-none" title="Our focus this week"
+    <WorkspacePanel className="shadow-none" title="Our focus this week"
       description="Start with the facilitator's session agenda and group description.">
       <div className="border-l-2 border-primary pl-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Session focus</p>
@@ -215,7 +215,7 @@ function GroupOverviewPanel({ group, next }: { group: Group; next: Group["sessio
         </p>
       </div>
     </WorkspacePanel>
-    <WorkspacePanel className="rounded-sm shadow-none" title="Upcoming study sessions"
+    <WorkspacePanel className="shadow-none" title="Upcoming study sessions"
       description="Plan ahead and come prepared to contribute.">
       {next ? <div className="grid gap-3 border-b border-border py-2 sm:grid-cols-[5rem_minmax(0,1fr)] sm:items-center">
         <div className="border border-border px-3 py-2 text-center">
@@ -237,7 +237,7 @@ function GroupOverviewPanel({ group, next }: { group: Group; next: Group["sessio
 }
 
 function GroupDetailsPanel({ group }: { group: Group }) {
-  return <WorkspacePanel className="rounded-sm shadow-none" title="Study group details">
+  return <WorkspacePanel className="shadow-none" title="Study group details">
     <dl className="grid grid-cols-[minmax(6rem,0.8fr)_minmax(0,1.2fr)] gap-x-3 gap-y-3 text-sm">
       <dt className="text-muted-foreground">Group type</dt><dd className="m-0 font-medium">{groupKindLabel(group.kind)}</dd>
       <dt className="text-muted-foreground">Facilitator</dt><dd className="m-0 font-medium">{group.facilitatorName}</dd>
@@ -254,7 +254,7 @@ function GroupDetailsPanel({ group }: { group: Group }) {
 function ResourcesPanel({group, approvedMember, role}: {
   group: Group; approvedMember: boolean; role: Workspace["role"];
 }) {
-  return <WorkspacePanel className="rounded-sm shadow-none" title="Shared learning resources"
+  return <WorkspacePanel className="shadow-none" title="Shared learning resources"
     description="Open existing class materials instead of keeping a separate copy in study groups.">
     {approvedMember && group.sectionId ? <nav aria-label="Class learning resources" className="flex flex-wrap gap-3">
       <Button asChild variant="outline"><Link to="/classes" search={{section: group.sectionId, tab: "lessons"}}>
@@ -324,7 +324,7 @@ function SessionsPanel({ group, role, availability, busy, run, mutation, selecte
     <div className="space-y-3">
       {unknownSession && <WorkspaceNotice tone="danger">This session is unavailable in this study group.</WorkspaceNotice>}
       {role === "teacher" && scheduling && <form noValidate
-        className="grid gap-3 rounded-lg border p-4 sm:grid-cols-2"
+        className="grid gap-3 border p-4 sm:grid-cols-2"
         onSubmit={event => {
           event.preventDefault();
           setAttempted(true);
@@ -462,7 +462,7 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
   return <WorkspacePanel title="Group discussion"
     description="Posts are visible to approved group members. Report unsafe or inappropriate content for facilitator review. For urgent safety concerns, contact a trusted adult or school staff directly.">
     <div className="space-y-3">
-      {group.posts.map(post => <div key={post.id} className="rounded-lg border p-3">
+      {group.posts.map(post => <div key={post.id} className="border p-3">
         <p className="text-sm whitespace-pre-wrap">{post.body}</p>
         <p className="mt-2 text-xs text-muted-foreground">
           {formatTimestamp(post.createdAt, group.timezone)}
@@ -504,7 +504,7 @@ function DiscussionPanel({ group, role, availability, approvedMember, busy, run,
       }).then(outcome => {
         if (outcome.status === "saved" || outcome.status === "refresh-failed") setReport(null);
       })}>
-      <blockquote className="rounded border bg-muted p-3 text-sm whitespace-pre-wrap">{report.body}</blockquote>
+      <blockquote className="border bg-muted p-3 text-sm whitespace-pre-wrap">{report.body}</blockquote>
       <Field label="Reason for reporting" className="text-sm" required>
         <Textarea required minLength={5} maxLength={1000} value={reportReason}
           onChange={event => setReportReason(event.target.value)} />
@@ -548,7 +548,7 @@ function MembersPanel({ group, availability, busy, run }: {
       <div>
         <h3 className="text-sm font-semibold">Pending requests</h3>
         {group.pendingMembers.map(member => <div key={member.id}
-          className="mt-2 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
+          className="mt-2 flex flex-wrap items-center justify-between gap-3 border p-3">
           <div>
             <p className="text-sm font-medium">{member.studentName}</p>
             <p className="text-xs text-muted-foreground">
@@ -569,7 +569,7 @@ function MembersPanel({ group, availability, busy, run }: {
         {group.pendingMembers.length === 0 &&
           <p className="mt-2 text-xs text-muted-foreground">No pending memberships.</p>}
       </div>
-      {inviting && <form noValidate className="space-y-3 rounded-lg border p-4" onSubmit={event => {
+      {inviting && <form noValidate className="space-y-3 border p-4" onSubmit={event => {
         event.preventDefault();
         setInviteAttempted(true);
         if (!selectedInviteeIds.length) return;
@@ -617,9 +617,9 @@ function ReportsPanel({ group, availability, busy, run }: {
   return <WorkspacePanel title="Content reports"
     description="Open reports for this group's discussion.">
     <div className="space-y-3">
-      {group.reports.map(report => <div key={report.id} className="rounded-lg border p-3">
+      {group.reports.map(report => <div key={report.id} className="border p-3">
         <p className="text-sm">Reason: {report.reason}</p>
-        <blockquote className="mt-2 rounded border bg-muted p-3 text-sm whitespace-pre-wrap">
+        <blockquote className="mt-2 border bg-muted p-3 text-sm whitespace-pre-wrap">
           {report.postBody ?? "The reported post is unavailable."}
         </blockquote>
         {report.postHidden && <p className="mt-1 text-xs text-muted-foreground">Post already hidden</p>}
