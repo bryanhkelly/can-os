@@ -726,3 +726,29 @@ for (const [file, fragments] of Object.entries(migratedLaunchStudioExtendedContr
     process.exitCode = 1;
   }
 }
+
+
+// The route audit and lint gate must track the same page-by-page migration
+// inventory. A page is source-gated, not visually accepted, until real browser
+// and accessibility tests also pass.
+const sourceRouteAuditManifest = readFileSync(new URL("./audit-v61-routes.mjs", import.meta.url), "utf8");
+const auditManifestStart = sourceRouteAuditManifest.indexOf("const sourceGuarded = new Set([");
+const auditManifestEnd = sourceRouteAuditManifest.indexOf("]);", auditManifestStart);
+if (auditManifestStart < 0 || auditManifestEnd < 0) {
+  console.error("V6.1 audit manifest declaration is missing");
+  process.exitCode = 1;
+} else {
+  const listed = new Set(
+    [...sourceRouteAuditManifest.slice(auditManifestStart, auditManifestEnd).matchAll(/"([^"]+\.tsx)"/g)]
+      .map(match => "routes/" + match[1])
+  );
+  const checked = new Set(Object.keys(migratedV61RouteControls));
+  const missingFromChecker = [...listed].filter(path => !checked.has(path));
+  const missingFromAudit = [...checked].filter(path => !listed.has(path));
+  if (missingFromChecker.length || missingFromAudit.length) {
+    console.error("V6.1 route audit and checker must agree:", {
+      missingFromChecker, missingFromAudit,
+    });
+    process.exitCode = 1;
+  }
+}
