@@ -3,10 +3,12 @@ import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents,
-  canonicalClasses, classCompletionPolicyVersions,
-  evidenceDocuments,evidenceDocumentVersions,
+  canonicalClasses,
+  classCompletionPolicyVersions,
+  evidenceDocuments,
+  evidenceDocumentVersions,
 } from "@/db/canonical-v301";
 import { AuthorizationError, assertCapability } from "@/domain/command-context";
 import { getCanonicalCommandContext } from "@/modules/identity/canonical-command-context.server";
@@ -115,14 +117,14 @@ export const publishNativeClassCompletionPolicy=createServerFn({method:"POST"})
         siteId:cls.siteId,operatingOrganizationId:cls.operatingOrganizationId,
         appliesTo:"future_enrollments",
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:actor.actorPersonId!,
         owningOrganizationId:cls.operatingOrganizationId,
         eventCode:"learning.class.completion_policy_published",
         entityKind:"class_completion_policy_version",
         entityId:created.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         actorPersonId:actor.actorPersonId!,
         eventType:"ClassCompletionPolicyPublished",
         aggregateType:"class_completion_policy_version",
