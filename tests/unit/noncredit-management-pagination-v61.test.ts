@@ -22,7 +22,7 @@ describe("adult learner registration management",()=>{
 
   it("makes older owned waiting-list invitations reachable without double enrollment",()=>{
     expect(management).toContain("getMyNoncreditWaitlistPage({data:{cursor:pageParam}})");
-    expect(management).toContain('["my-noncredit-waitlist",scopeKey,releaseId??"all"]');
+    expect(management).toContain("noncreditWaitlistQueryKeys.pages(scopeKey,releaseId)");
     expect(management).toContain("getMyNoncreditWaitlistByRelease({data:{releaseId}})");
     expect(management).toContain("waiting.data?.pages.flatMap(page=>page.items)");
     expect(management).toContain("Load older waiting-list entries");
