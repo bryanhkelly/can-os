@@ -1,4 +1,6 @@
 import type { RubricCriterion } from "@/modules/learning/rubric";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 
 export function RubricScoreFields({
   criteria,
@@ -17,23 +19,13 @@ export function RubricScoreFields({
     <fieldset className="space-y-3">
       <legend className="font-semibold">Rubric</legend>
       {criteria.map((criterion) => (
-        <label key={criterion.id} className="block text-sm font-semibold">
-          {criterion.label}{" "}
-          <span className="font-normal text-muted-foreground">(0–{criterion.maxPoints})</span>
-          {criterion.description && (
-            <span className="mt-1 block text-sm font-normal text-muted-foreground">
-              {criterion.description}
-            </span>
-          )}
-          <input
-            className="mt-2 w-28 rounded-lg border bg-background p-2"
-            type="number"
-            min={0}
-            max={criterion.maxPoints}
-            value={values[criterion.id] ?? ""}
-            onChange={(event) => onChange(criterion.id, event.target.value)}
-          />
-        </label>
+        <Field key={criterion.id} label={<>{criterion.label}{" "}
+          <span className="font-normal text-muted-foreground">(0–{criterion.maxPoints})</span></>}
+          description={criterion.description || undefined} required className="max-w-md">
+          <Input type="number" min={0} max={criterion.maxPoints} step="any"
+            className="max-w-32" value={values[criterion.id] ?? ""}
+            onChange={(event) => onChange(criterion.id, event.target.value)}/>
+        </Field>
       ))}
       <p role="status" className="text-sm font-semibold">
         Total: {total ?? "—"} / {pointsPossible ?? "—"}
