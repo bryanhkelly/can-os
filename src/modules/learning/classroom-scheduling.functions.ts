@@ -11,9 +11,9 @@ import {
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import {
-  validClassroomScheduleWindow, canOpenScheduledClassroom,
+  validClassroomScheduleWindow, canOpenScheduledClassroom, validClassroomSessionWindows,
 } from "@/domain/classroom-scheduling";
-import {validCohortSessionWindows} from "@/domain/noncredit-cohort-schedule";
+
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
 import {
   authorizedHostDeployment, createFacilitatedRoomForHost,
@@ -168,7 +168,7 @@ export const scheduleFourClassroomSessions=createServerFn({method:"POST"})
       const startsAt=new Date(meeting.startsAt),endsAt=new Date(meeting.endsAt);
       validateClassroomTimes(startsAt,endsAt,now);
     }
-    if(!validCohortSessionWindows(data.meetings))
+    if(!validClassroomSessionWindows(data.meetings))
       throw new AuthorizationError("four distinct, nonoverlapping dated sessions");
     return db.transaction(async tx=>{
       const plans=[];
