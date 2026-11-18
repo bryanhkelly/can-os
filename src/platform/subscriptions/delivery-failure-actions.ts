@@ -20,9 +20,17 @@ export async function escalateTerminalDeliveryFailures(limit = 50): Promise<numb
   for (const candidate of candidates) {
     await db.transaction(async tx => {
       // Serialize reconciler runs for this delivery to prevent duplicate actions.
-      const [delivery] = await tx.select({ id: subscriptionDeliveries.id })
-        .from(subscriptionDeliveries)
-        .where(eq(subscriptionDeliveries.id, candidate.id)).limit(1).for("update");
+      // A candidate can recover between the initial scan and this row lock.
+      // Recheck terminal status under the lock before creating an action.
+      const [delivery] = await tx.select({
+        id: subscriptionDeliveries.id,
+        lastError: subscriptionDeliveries.lastError,
+      }).from(subscriptionDeliveries)
+        .where(and(
+          eq(subscriptionDeliveries.id, candidate.id),
+          eq(subscriptionDeliveries.status, "failed"),
+          isNull(subscriptionDeliveries.nextAttemptAt),
+        )).limit(1).for("update");
       if (!delivery) return;
       const [prior] = await tx.select({ id: actions.id }).from(actions)
         .where(and(eq(actions.subjectType, "subscription_delivery"),
@@ -33,7 +41,7 @@ export async function escalateTerminalDeliveryFailures(limit = 50): Promise<numb
         type: "outbound_notification_failed",
         status: "open", priority: "high",
         title: "Review failed CAN notification delivery",
-        description: candidate.lastError ?? "Delivery failed; inspect provider and recipient settings.",
+        description: delivery.lastError ?? "Delivery failed; inspect provider and recipient settings.",
         subjectType: "subscription_delivery", subjectId: candidate.id,
       });
       count++;
