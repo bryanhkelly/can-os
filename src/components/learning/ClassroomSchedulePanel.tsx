@@ -4,8 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import { fourSessionSchedulePreset, validClassroomScheduleWindow, type FourSessionCadence } from "@/domain/classroom-scheduling";
-import {validCohortSessionWindows} from "@/domain/noncredit-cohort-schedule";
+import { fourSessionSchedulePreset, validClassroomScheduleWindow, validClassroomSessionWindows, type FourSessionCadence } from "@/domain/classroom-scheduling";
+
 import {
   cancelClassroomPlan, getClassroomSchedule, openScheduledClassroom,
   rescheduleClassroom, scheduleClassroom, scheduleFourClassroomSessions,
@@ -55,7 +55,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
   const choice=choices.find(row=>selected===
     row.deploymentId+":"+row.courseVersionId+":"+row.siteId);
   const batchReady=batchMeetings.length===4&&
-    validCohortSessionWindows(batchMeetings.map(row=>({startsAt:row.start,endsAt:row.end})))&&
+    validClassroomSessionWindows(batchMeetings.map(row=>({startsAt:row.start,endsAt:row.end})))&&
     batchMeetings.every(row=>validClassroomScheduleWindow(
       new Date(row.start),new Date(row.end),new Date(),
     ));
