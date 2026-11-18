@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   primaryKey,
+  pgTable,
   text,
   timestamp,
   uniqueIndex,
@@ -15,7 +16,7 @@ import { educationV30, type JsonObject, type JsonValue } from "./core";
 const id = () => uuid("id").defaultRandom().primaryKey();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
 
-export const religiousAffiliationOptions = educationV30.table("religious_affiliation_options", {
+export const religiousAffiliationOptions = pgTable("religious_affiliation_options", {
   code: text("code").primaryKey(),
   label: text("label").notNull(),
   groupCode: text("group_code").notNull(),
@@ -274,7 +275,7 @@ export const blueprintExecutionBatches = educationV30.table(
   ],
 );
 
-export const blueprintReferenceItems = educationV30.table(
+export const blueprintReferenceItems = pgTable(
   "blueprint_reference_items",
   {
     id: id(),
@@ -296,7 +297,7 @@ export const blueprintReferenceItems = educationV30.table(
   ],
 );
 
-export const blueprintReferenceItemVersions = educationV30.table(
+export const blueprintReferenceItemVersions = pgTable(
   "blueprint_reference_item_versions",
   {
     id: id(),
