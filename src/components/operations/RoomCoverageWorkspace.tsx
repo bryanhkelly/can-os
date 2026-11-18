@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/choice";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { StatusBadge } from "@/components/workspace";
 
@@ -161,7 +162,7 @@ function RoomCoverageForm({ model, schedule, changed }: {
       </Field>
     </div>
     <fieldset disabled={busy} className="flex flex-wrap gap-3"><legend className="mb-2 text-sm font-semibold">Coverage weekdays</legend>
-      {days.map((day, value) => <label key={day} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={weekdays.includes(value)}
+      {days.map((day, value) => <label key={day} className="flex items-center gap-2 text-sm"><Checkbox checked={weekdays.includes(value)}
         onChange={event => setWeekdays(current => event.target.checked ? [...current, value].sort() : current.filter(item => item !== value))}/>{day}</label>)}
       {attempted&&!weekdays.length&&<FieldError className="w-full">Select at least one coverage weekday.</FieldError>}
     </fieldset>
@@ -169,7 +170,7 @@ function RoomCoverageForm({ model, schedule, changed }: {
       <p className="text-sm text-muted-foreground">Different simultaneous courses may share this room. Enrollment stays in the original classes; occupancy counts each student once.</p>
       {!model.classes.length && <p role="status" className="text-sm">No onsite classes exist yet. Save the room assignment now, then link classes after academic setup.</p>}
       {model.classes.map(section => <label key={section.id} className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={sectionIds.includes(section.id)} onChange={event => setSectionIds(current =>
+        <Checkbox checked={sectionIds.includes(section.id)} onChange={event => setSectionIds(current =>
           event.target.checked ? [...current, section.id] : current.filter(id => id !== section.id))}/>{section.title} · {section.programName}
       </label>)}
     </fieldset>
