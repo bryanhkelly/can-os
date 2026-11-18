@@ -1,10 +1,9 @@
 import { and, eq, gt, inArray, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents,
   catalogSites,
-  domainEvents,
   geographicAreas,
   offeringVersions,
   offerings,
@@ -220,7 +219,7 @@ export async function createProgramFitAssessment(
       throw new DomainError("CONFLICT", "The assessment identifier was concurrently used.");
     }
 
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId,
       owningOrganizationId: application.applicantOrganizationId,
       eventCode: "program_fit.assessment.created",
@@ -233,7 +232,7 @@ export async function createProgramFitAssessment(
         requestId: context.requestId ?? null,
       },
     });
-    await tx.insert(domainEvents).values({
+    await emitCanonicalDomainEvent(tx,{
       eventType: "ProgramFitAssessmentCreated",
       aggregateType: "ProgramFitAssessment",
       aggregateId: inserted.id,
