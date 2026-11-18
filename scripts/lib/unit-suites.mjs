@@ -17,7 +17,7 @@ export const UNIT_SUITE_PREFIXES = Object.freeze({
     "notification-delivery-state", "outbound-retry-policy",
     "site-noncredit-catalog-", "noncredit-waitlist-delivery-",
   ],
-  enrollment: ["noncredit-self-enrollment", "personal-can-", "one-account-"],
+  enrollment: ["noncredit-self-enrollment", "personal-can-", "one-account-", "one-person-", "core-identity-", "main-core-identity-"],
   site: [
     "site-content-", "site-first-preview", "website-studio-", "site-setup-",
     "site-enrollment-", "site-private-preview", "site-planning-",
