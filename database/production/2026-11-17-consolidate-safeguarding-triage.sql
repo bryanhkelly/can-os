@@ -12,7 +12,7 @@ SET LOCAL statement_timeout='75s';
 
 -- CAN_STEP 3
 DO $preflight$
-DECLARE src oid; n bigint; referenced bigint; f record; body text; hits int;
+DECLARE src oid; n bigint; referenced bigint; fn_row record; body text; hits int;
 BEGIN
  IF current_setting('neon.project_id',true) IS DISTINCT FROM 'sweet-hall-62441909'
   OR current_setting('neon.branch_id',true) IS DISTINCT FROM 'br-restless-sea-ar9ooo55'
@@ -47,20 +47,20 @@ BEGIN
  WHERE ns.nspname IN('education_v30','education_v30_secure','public') AND p.prokind IN ('f','p')
    AND pg_get_functiondef(p.oid) ILIKE '%safeguarding_triage_queue%';
  IF referenced<>3 THEN RAISE EXCEPTION 'Expected 3 safeguarding trigger functions; saw %',referenced; END IF;
- FOR f IN SELECT * FROM (VALUES
+ FOR fn_row IN SELECT * FROM (VALUES
    ('v27_open_safeguarding_case_triage',413547::oid),
    ('v27_open_safety_feedback_triage',413545::oid),
    ('v28_triage_feedback_reclassified',416145::oid)
  ) AS x(name,expected_oid) LOOP
   SELECT pg_get_functiondef(p.oid) INTO body FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
-  WHERE ns.nspname='education_v30' AND p.proname=f.name AND p.oid=f.expected_oid
+  WHERE ns.nspname='education_v30' AND p.proname=fn_row.name AND p.oid=fn_row.expected_oid
     AND p.proretset=false AND NOT p.prosecdef;
   hits:=(length(body)-length(replace(body,'INSERT INTO safeguarding_triage_queue(','')))
        /length('INSERT INTO safeguarding_triage_queue(');
   IF body IS NULL OR hits<>1
-    OR (SELECT count(*) FROM pg_depend d WHERE d.refobjid=f.expected_oid
+    OR (SELECT count(*) FROM pg_depend d WHERE d.refobjid=fn_row.expected_oid
       AND d.classid='pg_trigger'::regclass AND d.deptype='n')<>1
-  THEN RAISE EXCEPTION 'Unexpected safeguarding trigger routine: %',f.name; END IF;
+  THEN RAISE EXCEPTION 'Unexpected safeguarding trigger routine: %',fn_row.name; END IF;
  END LOOP;
 END $preflight$;
 
