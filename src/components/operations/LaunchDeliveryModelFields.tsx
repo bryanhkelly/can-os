@@ -15,15 +15,15 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                   How students will learn
                 </legend>
                 <div className="mt-2 flex flex-wrap gap-4 text-sm">
-                  <Label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
+                  <Label className="flex min-h-11 items-center gap-2  border px-3">
                     <Checkbox checked={onsite} onChange={(e) => setOnsite(e.target.checked)} />
                     In person
                   </Label>
-                  <Label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
+                  <Label className="flex min-h-11 items-center gap-2  border px-3">
                     <Checkbox checked={liveOnline} onChange={(e) => setLiveOnline(e.target.checked)} />
                     Scheduled live teaching (optional)
                   </Label>
-                  <Label className="flex min-h-11 items-center gap-2 rounded-lg border px-3">
+                  <Label className="flex min-h-11 items-center gap-2  border px-3">
                     <Checkbox checked={asynchronous} onChange={(e) => setAsynchronous(e.target.checked)} />
                     Recorded or self-paced learning
                   </Label>
@@ -35,7 +35,7 @@ export function LaunchDeliveryModelFields({ onsite, setOnsite, liveOnline, setLi
                         type="number"
                         min={1}
                         max={7}
-                        className="w-20 rounded-lg border bg-background p-2 text-sm"
+                        className="w-20  border bg-background p-2 text-sm"
                         value={onsiteDaysPerWeek}
                         onChange={(e) => setOnsiteDaysPerWeek(e.target.value)}
                       />
