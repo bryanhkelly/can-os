@@ -15,6 +15,9 @@ const repoFiles=[
   "database/production/2026-11-17-consolidate-static-reference-tables.sql",
   "database/production/2026-11-17-consolidate-36-empty-legacy-tables.sql",
   "database/production/2026-11-17-consolidate-8-empty-operational-tables.sql",
+  "database/production/2026-11-17-consolidate-four-empty-native-tables.sql",
+  "database/production/2026-11-17-consolidate-19-empty-protected-tables.sql",
+  "database/production/2026-11-17-consolidate-13-empty-protected-tables.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -90,6 +93,27 @@ async function run(){
     if(Number(row.total_rows)!==referenceRowCounts[row.name])
       throw new Error("Reference record count changed: "+row.name);
   }
+  // Security must not be weakened by a physical schema move. The two guarded
+  // protected-table batches retained their existing FORCE RLS and policies.
+  const protectedNames=[
+    ...readFileSync("database/production/2026-11-17-consolidate-19-empty-protected-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-17-consolidate-13-empty-protected-tables.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\\.([a-z_]+) SET SCHEMA public;$/gm),
+  ].map(match=>match[1]);
+  if(protectedNames.length!==32)throw new Error("Expected 32 reviewed protected table relocations");
+  const security=await sql`
+    SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
+      (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE n.nspname='public' AND c.relname=ANY(${protectedNames}::text[])
+  `;
+  const insecure=security.filter(row=>!row.rls||!row.forced||Number(row.policy_count)<1);
+  if(security.length!==protectedNames.length||insecure.length)
+    throw new Error("Protected-table RLS relocation incomplete: "+
+      insecure.map(row=>row.name).join(", "));
+
   const fk=await sql`
     SELECT count(*)::int AS count
     FROM pg_constraint c
@@ -110,6 +134,7 @@ async function run(){
   console.log(JSON.stringify({branch:target.branch,readOnly:true,verifiedMoves:names.length,
     referencesRetained:counts.reduce((n,row)=>n+Number(row.total_rows),0),
     fkReferencesToMovedTables:Number(fk[0]?.count??0),
+    protectedTablesWithRls:security.length,
     ...overall,fullyUnified:overall.canonical_tables===0},null,2));
   if(overall.canonical_tables!==0)process.exitCode=2;
 }
