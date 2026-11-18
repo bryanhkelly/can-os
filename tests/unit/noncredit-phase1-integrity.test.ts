@@ -15,6 +15,9 @@ const assessment=readFileSync("src/components/learning/CourseAssessmentPanel.tsx
 const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.functions.ts","utf8");
 const surveyDisplay=readFileSync("src/components/learning/NoncreditCourseSurveys.tsx","utf8");
 const providerEnrollment=readFileSync("src/routes/programs.noncredit.enrollment.tsx","utf8");
+const publisher=readFileSync("src/modules/enrollment/noncredit-enrollment-publication.functions.ts","utf8");
+const preflight=readFileSync("src/modules/enrollment/noncredit-training-readiness.server.ts","utf8");
+const preflightView=readFileSync("src/components/enrollment/NoncreditTrainingReadiness.tsx","utf8");
 
 describe("noncredit pilot correctness boundaries",()=>{
   it("enforces verified, current, unsuperseded attendance before completion",()=>{
@@ -123,5 +126,23 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(feedbackPatch).toContain("JOIN public.survey_trigger_rules rule");
     expect(feedbackPatch).toContain("JOIN public.survey_definitions d");
     expect(feedbackPatch).not.toContain("education_v30.survey_trigger_rules");
+  });
+
+  it("checks one authorized training before release without bypassing publication",()=>{
+    expect(publisher).toContain('getNoncreditTrainingReadiness=createServerFn({method:"GET"})');
+    expect(publisher).toContain('requireCanonicalLabProvider("noncredit.enrollment.read")');
+    expect(publisher).toContain('if(!selected)throw new AuthorizationError("authorized published training selection")');
+    expect(publisher).toContain('readNoncreditTrainingReadiness(selected,provider.organizationId)');
+    expect(preflight).toContain("courseLessons.courseVersionId");
+    expect(preflight).toContain("assessmentFormItems.formVersionId");
+    expect(preflight).toContain('row.status==="open"');
+    expect(preflight).toContain("surveyCampaigns.operatingOrganizationId,operatingOrganizationId");
+    expect(preflight).toContain("surveyCampaigns.offeringId,candidate.offeringId");
+    expect(preflight).toContain("permissionSet.has(row.permissionId)");
+    expect(preflightView).toContain("QueryState");
+    expect(preflightView).toContain("counts must match".toLowerCase().slice(0,1).toUpperCase()+"ounts must match".slice(1));
+    expect(providerEnrollment).toContain("<NoncreditTrainingReadiness");
+    expect(preflight).not.toContain("tx.insert(");
+    expect(preflight).not.toContain("tx.update(");
   });
 });
