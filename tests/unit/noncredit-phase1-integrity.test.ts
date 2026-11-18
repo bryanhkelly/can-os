@@ -12,6 +12,8 @@ const access=readFileSync("src/modules/learning/noncredit-assessment.server.ts",
 const surveys=readFileSync("src/modules/learning/course-surveys.functions.ts","utf8");
 const activities=readFileSync("src/components/learning/NoncreditCourseActivities.tsx","utf8");
 const assessment=readFileSync("src/components/learning/CourseAssessmentPanel.tsx","utf8");
+const pilotReport=readFileSync("src/modules/learning/noncredit-pilot-outcomes.functions.ts","utf8");
+const surveyDisplay=readFileSync("src/components/learning/NoncreditCourseSurveys.tsx","utf8");
 
 describe("noncredit pilot correctness boundaries",()=>{
   it("enforces verified, current, unsuperseded attendance before completion",()=>{
@@ -71,5 +73,21 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(progress).toContain('eventKind: "lesson_completed"');
     expect(progress).toContain("countedMinutes: 0");
     expect(activities).not.toContain("official_course_grades");
+  });
+
+  it("presents the complete noncredit learner sequence with recovery actions",()=>{
+    expect(activities).toContain('id="course-knowledge-check"');
+    expect(activities).toContain('id="course-feedback"');
+    expect(activities).toContain('id="course-progress"');
+    expect(activities).toContain("Retry learning activities");
+    expect(activities).toContain("Retry completion status");
+    expect(surveyDisplay).toContain("No feedback survey available");
+    expect(surveyDisplay).toContain("Retry feedback");
+  });
+
+  it("retains historical assessment evidence when noncredit attempts close",()=>{
+    expect(pilotReport).toContain('inArray(learnerCourseAttempts.status,["active","completed","withdrawn","cancelled"])');
+    expect(pilotReport).not.toContain('eq(learnerCourseAttempts.status,"active")');
+    expect(pilotReport).toContain('currentDecision?.outcome==="completed"');
   });
 });
