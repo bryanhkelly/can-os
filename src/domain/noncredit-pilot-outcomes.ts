@@ -5,6 +5,26 @@
  * Never infer a completed training from lesson ticks or a passed knowledge check.
  * Only the latest authoritative noncredit_completion_decision counts.
  */
+/**
+ * One completed feedback response can be credited to a training only when
+ * the server has verified its exact Person, Deployment, Offering and
+ * operating Organization. No deployment-wide survey or repeated registration
+ * can be inferred as course feedback.
+ */
+export function attributableNoncreditFeedback(input: {
+  offeringId: string | null;
+  registrationsForPersonOffering: number;
+  registeredAt: Date;
+  latestSubmittedAt: Date | null;
+}): boolean {
+  return !!input.offeringId &&
+    input.registrationsForPersonOffering === 1 &&
+    Number.isFinite(input.registeredAt.getTime()) &&
+    input.latestSubmittedAt !== null &&
+    Number.isFinite(input.latestSubmittedAt.getTime()) &&
+    input.latestSubmittedAt >= input.registeredAt;
+}
+
 export type PilotParticipantFact = {
   registrationId:string;
   trainingVersionId:string;
