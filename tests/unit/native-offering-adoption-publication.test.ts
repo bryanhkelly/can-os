@@ -29,7 +29,8 @@ describe("independently governed publisher release → local adoption",()=>{
   it("renders a V6.1 blocker and disables approval while publisher release is missing",()=>{
     const ui=read("src/components/launch-studio/NativeOfferingAdoptionReviewPanel.tsx");
     expect(ui).toContain("publisherReleaseAvailableForAdoption(item)");
-    expect(ui).toContain("!publisherReleaseReady||feedback.pending||feedback.refreshFailed");
+    expect(ui).toContain("!prerequisitesVisible||feedback.pending||feedback.refreshFailed");
+    expect(ui).toContain("<NativeAdoptionEvidenceChecklist state={item}/>");
     expect(ui).toContain('!publisherReleaseReady&&<WorkspaceNotice tone="attention"');
     expect(ui).toContain("<MutationFeedback state={feedback}");
     expect(ui).toContain("invalidateNativeClassAvailability(client)");
