@@ -40,6 +40,6 @@ export const getLaunchSiteClassScope=createServerFn({method:"GET"})
   .validator((input:unknown)=>z.object({siteId:z.string().uuid()}).strict().parse(input))
   .handler(async({data})=>{
     setResponseHeader("Cache-Control","private, no-store");
-    const result=await resolveLaunchSiteCatalogContext(getRequest(),data.siteId);
+    const result=await resolveLaunchSiteCatalogContext(getRequest(),data.siteId,"class.manage");
     return {kind:result.kind};
   });
