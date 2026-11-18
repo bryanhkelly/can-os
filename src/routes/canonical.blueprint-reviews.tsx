@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
 import { Select } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { WorkspaceShell, StatusBadge } from "@/components/workspace";
 import { CanonicalBlueprintLoadError } from "@/components/launch-studio/CanonicalBlueprintLoadError";
@@ -171,7 +172,7 @@ function ReviewEditor({ item }: { item: Item }) {
         {item.selectedComponents.map(component =>
           <li key={component.componentId} className="border p-3">
             {component.key.replaceAll("_", " ")} · {component.kind.replaceAll("_", " ")}
-            {decision === "approved" && <label className="mt-2 block" htmlFor={`evidence-${component.componentId}`}>
+            {decision === "approved" && <Label className="mt-2 block" htmlFor={`evidence-${component.componentId}`}>
               Component approval evidence version ID
               <Select id={`evidence-${component.componentId}`} className="mt-1"
                 value={componentEvidence[component.componentId] ?? ""}
@@ -184,10 +185,10 @@ function ReviewEditor({ item }: { item: Item }) {
                   {item.title} · {item.kind.replaceAll("_", " ")}
                 </option>)}
               </Select>
-            </label>}
+            </Label>}
           </li>)}
       </ul>
-      <label className="block text-sm" htmlFor={`decision-${item.configurationVersionId}`}>
+      <Label className="block text-sm" htmlFor={`decision-${item.configurationVersionId}`}>
         Review outcome
         <Select id={`decision-${item.configurationVersionId}`} className="mt-2"
           value={decision} disabled={busy}
@@ -196,8 +197,8 @@ function ReviewEditor({ item }: { item: Item }) {
           <option value="approved">Approve configuration and selected components</option>
           <option value="rejected">Reject configuration</option>
         </Select>
-      </label>
-      {decision === "approved" && <label className="block text-sm"
+      </Label>
+      {decision === "approved" && <Label className="block text-sm"
         htmlFor={`overall-evidence-${item.configurationVersionId}`}>
         Whole-configuration approval evidence version ID
         <Select id={`overall-evidence-${item.configurationVersionId}`} className="mt-2"
@@ -208,13 +209,13 @@ function ReviewEditor({ item }: { item: Item }) {
             {evidenceItem.title} · {evidenceItem.kind.replaceAll("_", " ")}
           </option>)}
         </Select>
-      </label>}
-      <label className="block text-sm" htmlFor={`review-rationale-${item.configurationVersionId}`}>
+      </Label>}
+      <Label className="block text-sm" htmlFor={`review-rationale-${item.configurationVersionId}`}>
         Review rationale
         <Textarea id={`review-rationale-${item.configurationVersionId}`} className="mt-2"
           value={rationale} disabled={busy} maxLength={4000}
           onChange={event => setRationale(event.currentTarget.value)}/>
-      </label>
+      </Label>
       {evidenceLoading && <p className="text-sm text-muted-foreground" role="status">
         Loading verified supporting evidence…
       </p>}
