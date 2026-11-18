@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { UnifiedCoursePlayer } from "@/components/learning/UnifiedCoursePlayer";
 import { RecordedInstructorWorkspace } from "@/components/learning/RecordedInstructorWorkspace";
-import { getMyNoncreditSelfEnrollments } from "@/modules/enrollment/noncredit-self-enrollment.functions";
+import { getMyNoncreditCourseByAttemptId } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { AuthorizationError } from "@/domain/command-context";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -10,8 +10,7 @@ import { touchMyNoncreditLearningSession } from "@/modules/enrollment/noncredit-
 
 export const Route=createFileRoute("/learn/course/$courseAttemptId")({
   loader:({params})=>safeLoader(async()=>{
-    const courses=await getMyNoncreditSelfEnrollments();
-    const course=courses.find(item=>item.courseAttemptId===params.courseAttemptId);
+    const course=await getMyNoncreditCourseByAttemptId({data:{courseAttemptId:params.courseAttemptId}});
     if(!course)throw new AuthorizationError("current owned noncredit course");
     return course;
   })(),
@@ -24,7 +23,7 @@ function MyNoncreditCourse(){
   const course=response.data;
   return <UnifiedCoursePlayer context="training" title={course.trainingTitle}
     subtitle="Your individual Course Attempt keeps lesson progress and practice across recorded instructors. Room pairing is not independently verified attendance."
-    actions={<Link to="/learn/my-courses" className="text-sm font-semibold text-primary underline underline-offset-4">My Classes</Link>}
+    actions={<Link to="/learn/my-activity" className="text-sm font-semibold text-primary underline underline-offset-4">My Activity</Link>}
     rail={<div className="space-y-4">
       <section className="border border-border bg-card p-4">
         <h3 className="text-sm font-semibold">Learning tools</h3>
