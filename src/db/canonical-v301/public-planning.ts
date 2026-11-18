@@ -100,7 +100,7 @@ export const sitePublicationBindings = educationV30.table("site_publication_bind
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const enrollmentProspects = educationV30.table("enrollment_prospects", {
+export const enrollmentProspects = pgTable("enrollment_prospects", {
   id: id(),
   owningOrganizationId: uuid("owning_organization_id").notNull(),
   contactPersonId: uuid("contact_person_id"),
