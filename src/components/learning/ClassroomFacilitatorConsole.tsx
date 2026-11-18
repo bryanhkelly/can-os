@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,9 @@ export function ClassroomFacilitatorConsole({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // Preserve one request identity across uncertain network failures.
+  // A new prompt/options payload receives its own activity identity.
+  const activityRequests = useRef(new Map<string, string>());
   const room = useQuery({
     queryKey: ["classroom-host-activities", facilitatedSessionId],
     queryFn: () => getClassroomHostActivity({ data: { facilitatedSessionId } }),
@@ -117,10 +120,15 @@ export function ClassroomFacilitatorConsole({
       </label>}
       <Button className="mt-3" type="button" disabled={busy || !canRelease}
         onClick={() => void run(async () => {
+          const normalizedPrompt = prompt.trim();
+          const requestKey = JSON.stringify([facilitatedSessionId, normalizedPrompt, kind, choices]);
+          const requestId = activityRequests.current.get(requestKey) ?? crypto.randomUUID();
+          activityRequests.current.set(requestKey, requestId);
           await releaseClassroomActivity({ data: {
-            facilitatedSessionId, requestId: crypto.randomUUID(), lessonId: null,
-            prompt: prompt.trim(), answerType: kind, choices,
+            facilitatedSessionId, requestId, lessonId: null,
+            prompt: normalizedPrompt, answerType: kind, choices,
           } });
+          activityRequests.current.delete(requestKey);
           setPrompt("");
         })}>
         {busy ? "Saving…" : "Release to learners"}
