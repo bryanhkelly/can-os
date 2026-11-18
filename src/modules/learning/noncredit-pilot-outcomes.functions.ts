@@ -105,10 +105,10 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       id:learnerCourseAttempts.id,registrationId:learnerCourseAttempts.noncreditRegistrationId,
       courseVersionId:learnerCourseAttempts.courseVersionId,
     }).from(learnerCourseAttempts)
-      // Completed, withdrawn and cancelled attempts retain historical evidence.
+      // Completed and withdrawn Course Attempts retain historical evidence.
       // Current writes still require active participation in the owning service.
       .where(and(inArray(learnerCourseAttempts.noncreditRegistrationId,registrationIds),
-        inArray(learnerCourseAttempts.status,["active","completed","withdrawn","cancelled"]))).limit(take);
+        inArray(learnerCourseAttempts.status,["active","completed","withdrawn"]))).limit(take);
     checkBound(attempts.length,"Course attempts");
     const courseIds=attempts.map(row=>row.id);
     const versions=uuidSet(attempts.map(row=>row.courseVersionId));
