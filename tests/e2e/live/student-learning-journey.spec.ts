@@ -6,6 +6,7 @@ const cookie = process.env.CAN_STUDENT_QA_CAN_SESSION ?? "";
 const assessmentId = process.env.CAN_STUDENT_QA_ASSESSMENT_ID ?? "";
 const groupId = process.env.CAN_STUDENT_QA_APPROVED_GROUP_ID ?? "";
 const sessionId = process.env.CAN_STUDENT_QA_GROUP_SESSION_ID ?? "";
+const requestSectionId = process.env.CAN_STUDENT_QA_REQUEST_SECTION_ID ?? "";
 const permitWrite = process.env.CAN_STUDENT_QA_WRITES === "1"
   && process.env.CAN_STUDENT_QA_SYNTHETIC_ATTESTATION === "synthetic-fixture";
 
@@ -70,4 +71,35 @@ test("synthetic learner saves a draft and submits through the existing assignmen
   await page.getByRole("button", { name: "Submit assignment" }).click();
   await expect(page.getByRole("main")).toContainText(/submitted|receipt/i);
   await expect(page.getByRole("button", { name: "Submit assignment" })).toHaveCount(0);
+});
+
+test("synthetic student can request a school class without silently enrolling", async ({ page, context }, info) => {
+  test.skip(info.project.name !== "desktop-chromium", "Mutating fixture runs once");
+  test.skip(!permitWrite || !cookie || !requestSectionId,
+    "Requires synthetic learner and an eligible unrequested class inside the add/drop window");
+  await studentSession(context);
+  await open(page, `/student/courses?view=catalog&section=${encodeURIComponent(requestSectionId)}`);
+  const request = page.getByRole("button", { name: /Request class|Request guardian approval/i });
+  await expect(request).toBeEnabled();
+  await request.click();
+  await expect(page.getByRole("main")).toContainText(/request sent|pending|guardian permission required/i);
+  await open(page, "/student/courses");
+  await expect(page.getByText("Pending class changes")).toBeVisible();
+});
+
+test("synthetic approved student can post in a study group and RSVP for an upcoming session", async ({ page, context }, info) => {
+  test.skip(info.project.name !== "desktop-chromium", "Mutating fixture runs once");
+  test.skip(!permitWrite || !cookie || !groupId || !sessionId,
+    "Requires approved synthetic study group membership and an upcoming session");
+  await studentSession(context);
+  await open(page, `/groups/${encodeURIComponent(groupId)}?session=${encodeURIComponent(sessionId)}`);
+  await page.getByRole("tab", { name: /Discussion/ }).click();
+  const post = `Synthetic student QA discussion ${groupId}`;
+  await page.getByRole("textbox", { name: "New post" }).fill(post);
+  await page.getByRole("button", { name: "Post message" }).click();
+  await expect(page.getByText(post, { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: /Sessions/ }).click();
+  const panel = page.locator("#group-panel-sessions");
+  await panel.getByRole("button", { name: /^going$/i }).click();
+  await expect(panel).toContainText(/Your RSVP: going/i);
 });
