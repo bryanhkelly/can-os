@@ -319,3 +319,49 @@ and are **not** an assertion that shared login, staff role switching,
 adult review or learner enrollment browser workflows have passed.
 Complete unified-session design and acceptance before deleting
 `canonical_sessions` or its related account/grant tables.
+
+
+## Four facility, shared resource and professional service tables consolidated
+
+Four further original, **empty** `education_v30` tables were moved in place
+to `public` on Neon production main. All preserved their original object
+identities, incoming/outgoing FKs, owner-only forced-RLS policy, indexes
+and direct-client SELECT denial. No records were copied or deleted:
+
+| Moved relation | Original OID | Incoming FKs | Outgoing FKs |
+|---|---|---:|---:|
+| `blueprint_facility_requirements` | `411738` | 1 | 2 |
+| `site_space_capability_assertions` | `411656` | 1 | 4 |
+| `shared_resource_pools` | `404988` | 1 | 2 |
+| `professional_service_delivery_records` | `407872` | 1 | 4 |
+
+All four inbound FKs were retained by PostgreSQL object identity, including
+links from `public.shared_resource_allocations`,
+`public.site_requirement_evaluations`,
+`public.workforce_earning_events`, and the existing
+`education_v30.site_space_capability_verifications` table.
+Twelve outgoing FKs remain validated.
+
+Six original database functions were rewritten within the SAME successful
+transaction to reference the relocated relations: the two facility
+verification guards, program-fit facility guard, qualification facility
+guard, shared resource capacity guard, and workforce earnings validator.
+The security-definer statuses were unchanged. The database was inspected
+afterward: all four original locations are absent, all original OIDs were
+preserved, forced RLS and existing policies are intact, and the six
+dependent functions contain explicit `public` relations.
+
+- SQL migration:
+  `database/production/2026-11-17-consolidate-four-facility-resource-evidence-tables.sql`
+- Read-only, main-only acceptance:
+  `scripts/acceptance/check-main-facility-resource-cutover.mjs`
+- Source regression:
+  `tests/unit/main-facility-resource-cutover.test.ts`
+
+The database metadata/SQL checks succeeded; the new executable script,
+Vitest and positive browser workflows remain unexecuted.
+At the last observed checkpoint, **300** `education_v30` base tables
+remained and **370** tables were in `public`. The seven
+`education_v30_secure` tables were unchanged. Concurrent updates to
+main may account for additional inventory changes; do not attribute all
+movement exclusively to this batch.
