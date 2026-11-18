@@ -7,6 +7,7 @@ const assessmentId = process.env.CAN_STUDENT_QA_ASSESSMENT_ID ?? "";
 const groupId = process.env.CAN_STUDENT_QA_APPROVED_GROUP_ID ?? "";
 const sessionId = process.env.CAN_STUDENT_QA_GROUP_SESSION_ID ?? "";
 const requestSectionId = process.env.CAN_STUDENT_QA_REQUEST_SECTION_ID ?? "";
+const classThreadId = process.env.CAN_STUDENT_QA_CLASS_THREAD_ID ?? "";
 const permitWrite = process.env.CAN_STUDENT_QA_WRITES === "1"
   && process.env.CAN_STUDENT_QA_SYNTHETIC_ATTESTATION === "synthetic-fixture";
 
@@ -119,4 +120,28 @@ test("unsent study-group discussion survives tab changes without posting", async
   page.once("dialog", dialog => void dialog.dismiss());
   await page.getByRole("link", { name: "All study groups" }).click();
   await expect(editor).toHaveValue(draft);
+});
+
+test("unsent class discussion reply cannot be silently discarded", async ({ page, context }) => {
+  test.skip(!cookie || !classThreadId,
+    "Requires an authorized synthetic student and an unlocked class discussion thread");
+  await studentSession(context);
+  await open(page, `/student/discussions?thread=${encodeURIComponent(classThreadId)}`);
+  const editor = page.getByRole("textbox", { name: "New post" });
+  const draft = "Unsent synthetic QA class discussion";
+  await editor.fill(draft);
+  page.once("dialog", dialog => void dialog.dismiss());
+  await page.getByRole("link", { name: /Back to (class|my classes)/i }).click();
+  await expect(editor).toHaveValue(draft);
+});
+
+test("student help request draft is guarded before submission", async ({ page, context }) => {
+  test.skip(!cookie, "Requires an authorized synthetic student session");
+  await studentSession(context);
+  await open(page, "/student/support");
+  const editor = page.getByRole("textbox", { name: /What do you need help with/i });
+  await editor.fill("Unsent synthetic QA help request");
+  page.once("dialog", dialog => void dialog.dismiss());
+  await page.getByRole("link", { name: "Student Today" }).click();
+  await expect(editor).toHaveValue("Unsent synthetic QA help request");
 });
