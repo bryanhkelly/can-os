@@ -140,7 +140,7 @@ describe("noncredit pilot correctness boundaries",()=>{
     expect(preflight).toContain("surveyCampaigns.offeringId,candidate.offeringId");
     expect(preflight).toContain("permissionSet.has(row.permissionId)");
     expect(preflightView).toContain("QueryState");
-    expect(preflightView).toContain("counts must match".toLowerCase().slice(0,1).toUpperCase()+"ounts must match".slice(1));
+    expect(preflightView).toContain("Counts must match");
     expect(providerEnrollment).toContain("<NoncreditTrainingReadiness");
     expect(preflight).not.toContain("tx.insert(");
     expect(preflight).not.toContain("tx.update(");
