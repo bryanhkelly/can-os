@@ -17,6 +17,7 @@ import {
   type PilotParticipantFact,
 } from "@/domain/noncredit-pilot-outcomes";
 import { requireCanonicalLabProvider } from "@/modules/operations/canonical-capability-lab-access.server";
+import { currentNoncreditCompletionStates } from "@/domain/verified-completion-projection";
 
 /**
  * Scoped operational reporting, not a public annual-report endpoint.
@@ -132,7 +133,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         decidedAt:noncreditCompletionDecisions.decidedAt,
       }).from(noncreditCompletionDecisions)
         .where(inArray(noncreditCompletionDecisions.registrationId,registrationIds))
-        .orderBy(desc(noncreditCompletionDecisions.decidedAt)),
+        .orderBy(desc(noncreditCompletionDecisions.decidedAt)).limit(20001),
       db.select({
         registrationId:noncreditParticipationEvents.registrationId,
         occurredAt:noncreditParticipationEvents.occurredAt,
@@ -140,6 +141,11 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
       }).from(noncreditParticipationEvents)
         .where(inArray(noncreditParticipationEvents.registrationId,registrationIds)),
     ]);
+    if(decisions.length>20000)
+      throw new Error("Completion decision history exceeds the safe report limit");
+    const completion=currentNoncreditCompletionStates(registrationIds,decisions);
+    if(completion.invalidRegistrations.length)
+      throw new Error("Noncredit completion history needs independent reconciliation");
     const grantIds=grants.map(g=>g.id);
     const checkAttempts=grantIds.length?await db.select({
       id:assessmentExecutionAttempts.id,grantId:assessmentExecutionAttempts.accessGrantId,
@@ -223,8 +229,6 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
     const adminById=new Map(administrations.map(a=>[a.id,a]));
     const supersededResults=new Set(results.flatMap(r=>r.supersedesId?[r.supersedesId]:[]));
     const latestResults=results.filter(r=>!supersededResults.has(r.id)&&r.status==="finalized");
-    const supersededDecisions=new Set(decisions.flatMap(d=>d.supersedesId?[d.supersedesId]:[]));
-    const currentDecisions=decisions.filter(d=>!supersededDecisions.has(d.id));
     const trainingById=new Map(trainings.map(t=>[t.id,t]));
     const facts:PilotParticipantFact[]=registrations.map(reg=>{
       const ownAttempts=attempts.filter(a=>a.registrationId===reg.id);
@@ -267,7 +271,6 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
         checkById.get(firstBaseline.attemptId)!.submittedAt!<
         checkById.get(firstFinal.attemptId)!.submittedAt!;
       const passed=finalResults.find(r=>r.outcome==="pass");
-      const currentDecision=currentDecisions.find(d=>d.registrationId===reg.id);
       const offeringId=offeringByVersion.get(reg.offeringVersionId);
       const surveyKey=offeringId?feedbackKey(reg.participantPersonId,reg.deploymentId,offeringId,reg.registeringOrganizationId):null;
       const feedbackSubmittedAt=surveyKey?surveyTimestamps.get(surveyKey):undefined;
@@ -285,7 +288,7 @@ export const getNoncreditPilotOutcomes=createServerFn({method:"GET"})
           registeredAt:reg.registeredAt,
           latestSubmittedAt:feedbackSubmittedAt??null,
         }),
-        completionRecorded:currentDecision?.outcome==="completed",
+        completionRecorded:completion.states.get(reg.id)==="completed",
         baselineFraction:paired?Number(firstBaseline.earned)/Number(firstBaseline.possible):null,
         finalFraction:paired?Number(firstFinal.earned)/Number(firstFinal.possible):null,
       };
