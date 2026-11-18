@@ -66,7 +66,7 @@ export function SiteFirstLaunch({options,selectedSiteId="",initialStep="site",in
   const [timezone,setTimezone] = useState("");
   const [siteKind,setSiteKind] = useState<"physical"|"virtual"|"mobile">("physical");
   const [delivery,setDelivery] = useState<Delivery>(initialPreferences?.delivery??"both");
-  const [chosen,setChosen] = useState<string[]>(initialPreferences?.interestIds??[]);
+  const [chosen,setChosen] = useState<SiteLaunchPreferences["interestIds"]>(initialPreferences?.interestIds??[]);
   const [savedPreferences,setSavedPreferences]=useState<SiteLaunchPreferences>(
     initialPreferences??{delivery:"both",interestIds:[]});
   const preferencesDirty=JSON.stringify({delivery,interestIds:chosen})!==JSON.stringify(savedPreferences);
