@@ -719,3 +719,32 @@ Future work should improve remaining composed UI through the same reusable
 controls, then run the AST audit and actual TypeScript/lint/component tests,
 followed by authorized role journeys. Never introduce fixed route enumerations
 or exact JSX source-text contracts as a substitute for behavior verification.
+
+
+### Design checker consolidation (November 17 continuation)
+
+The generic design-system checker is now the single entry point for
+**source-level** V6.1 enforcement. The previous checks that matched exact JSX
+fragments, page names, status copy and component-specific implementations
+have been removed from `scripts/check-design-system.mjs`.
+
+- It automatically discovers application TSX and follows component imports.
+- It reports any TypeScript/JSX parse diagnostics.
+- It enforces rectangular geometry across the stable shared component layers
+  (UI, workspace, workflow and evidence), including newly created files.
+- It rejects increases in each native-control category and rounded class
+  when files are changed, including staged, unstaged and new files, and fails
+  if CI cannot resolve its requested Git comparison base.
+- Outstanding feature-level design debt remains inventoried instead of being
+  disguised as a successful migration. `npm run design:routes -- --strict`
+  remains the explicit full source-debt gate.
+
+Domain authorization, grading, evidence and publication semantics must be
+validated through the existing dedicated domain/unit/integration tests,
+not exact string checks in a presentation script. No security or academic
+business logic was changed by this checker refactor.
+
+The design checker, the AST test suite, and the edited Class/assessment
+components are on `main`. Full local lint, TypeScript compilation, test
+execution and authenticated visual acceptance remain unverified in this
+session.
