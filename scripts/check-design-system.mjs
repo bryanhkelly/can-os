@@ -814,6 +814,10 @@ const migratedCurriculumSurfaceControls = {
     "<WorkspaceNotice", "!placementValidated||!placementApproved",
     "studentProfileId:studentId", "approved:true",
   ],
+  "learning/ClassVideoUploadForm.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/field",
+    "<Field", "<Select", "<Checkbox", "validationAttempted&&!rights",
+  ],
 };
 for (const [file, fragments] of Object.entries(migratedCurriculumSurfaceControls)) {
   const source = readFileSync(join(root, file), "utf8");
