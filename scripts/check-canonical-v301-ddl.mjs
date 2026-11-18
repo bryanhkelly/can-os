@@ -392,7 +392,7 @@ async function main() {
     await client.query("RESET ROLE");
 
     await client.query(`
-      INSERT INTO education_v30.site_publication_bindings (
+      INSERT INTO public.site_publication_bindings (
         site_id, public_slug, status, published_at
       ) VALUES
         ($1, 'canonical-public-reader-test', 'published', clock_timestamp()),
@@ -506,7 +506,7 @@ async function main() {
         has_function_privilege(current_user,
           'education_v30.v301_public_site_claims(text)', 'EXECUTE') AS can_execute_projection,
         has_table_privilege(current_user,
-          'education_v30.site_publication_bindings', 'SELECT') AS can_read_bindings,
+          'public.site_publication_bindings', 'SELECT') AS can_read_bindings,
         has_table_privilege(current_user,
           'education_v30.program_publication_claims', 'SELECT') AS can_read_claims
     `, [publicSiteReaderRole, "canonical-public-reader-test", "canonical-public-reader-draft"]);
@@ -523,7 +523,7 @@ async function main() {
     await expectQueryDenied(
       client,
       "public_site_direct_binding_read",
-      "SELECT site_id FROM education_v30.site_publication_bindings LIMIT 1",
+      "SELECT site_id FROM public.site_publication_bindings LIMIT 1",
       [],
       "42501",
     );
@@ -757,7 +757,7 @@ async function main() {
       SELECT count(*)::integer AS table_count
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'education_v30'
+      WHERE n.nspname = 'public'
       AND c.relname = 'site_publication_bindings'
       AND c.relrowsecurity
       AND c.relforcerowsecurity
