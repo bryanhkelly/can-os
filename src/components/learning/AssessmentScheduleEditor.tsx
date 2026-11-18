@@ -4,6 +4,10 @@ import { useState } from "react";
 import { manageAssessment } from "@/modules/learning/gradebook.functions";
 import { dateTimeInputValue } from "@/modules/calendar/timezone";
 import { assessmentClockToUtc } from "@/domain/assessment-local-schedule";
+import { Field } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { WorkspaceNotice } from "@/components/workspace";
 
 export function AssessmentScheduleEditor({assessment,timezone,onSaved}:{assessment:{id:string;title:string;availableAt:string|null;closesAt:string|null};timezone:string;onSaved:()=>Promise<unknown>}) {
   const local=(stamp:string|null)=>stamp?dateTimeInputValue(stamp,timezone):"";
@@ -31,15 +35,17 @@ export function AssessmentScheduleEditor({assessment,timezone,onSaved}:{assessme
   }
   return <details className="mt-3 text-xs font-normal">
     <summary className="cursor-pointer underline">Edit release and close times</summary>
-    <label className="mt-2 block">Release time for {assessment.title}
-      <input type="datetime-local" disabled={busy} value={release} onChange={event=>setRelease(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/>
-    </label>
-    <label className="mt-2 block">Close time for {assessment.title}
-      <input type="datetime-local" disabled={busy} value={close} onChange={event=>setClose(event.target.value)} className="mt-1 block w-full rounded border bg-background p-2"/>
-    </label>
+    <Field className="mt-3" label={`Release time for ${assessment.title}`}>
+      <Input type="datetime-local" disabled={busy} value={release}
+        onChange={event=>setRelease(event.target.value)}/>
+    </Field>
+    <Field className="mt-3" label={`Close time for ${assessment.title}`}>
+      <Input type="datetime-local" disabled={busy} value={close}
+        onChange={event=>setClose(event.target.value)}/>
+    </Field>
     <p className="mt-2">Times use the class timezone ({timezone}). Empty release means available once published; empty close leaves submissions open. The due date stays unchanged.</p>
-    <button type="button" disabled={busy} onClick={save} className="mt-2 rounded border px-2 py-1 disabled:opacity-40">Save schedule</button>
-    {dateError && <p role="alert" className="mt-2 text-destructive">{dateError}</p>}
+    <Button type="button" variant="outline" size="sm" disabled={busy} onClick={save} className="mt-3">Save schedule</Button>
+    {dateError && <WorkspaceNotice tone="danger" className="mt-2">{dateError}</WorkspaceNotice>}
     <MutationFeedback state={mutation} className="mt-2" pendingMessage="Saving schedule..."/>
   </details>;
 }
