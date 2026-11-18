@@ -8,6 +8,7 @@ const expected={
   facilitated_rehearsal_events:{oid:"483539",fks:5,indexes:3},
   facilitated_room_assisted_activity_evidence:{oid:"516166",fks:5,indexes:4},
   network_reporting_grants:{oid:"542349",fks:4,indexes:2},
+  site_publication_bindings:{oid:"402497",fks:1,indexes:2},
 };
 async function main(){
   if(process.env.CAN_MAIN_CLASSROOM_NETWORK_CHECK!=="1")
@@ -36,9 +37,10 @@ async function main(){
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     WHERE n.nspname IN ('public','education_v30') AND c.relkind='r'
       AND c.relname IN ('facilitated_rehearsal_events',
-        'facilitated_room_assisted_activity_evidence','network_reporting_grants')
+        'facilitated_room_assisted_activity_evidence','network_reporting_grants',
+        'site_publication_bindings')
   `;
-  if(rows.length!==3)throw Error("Missing or duplicate source tables");
+  if(rows.length!==4)throw Error("Missing or duplicate source tables");
   for(const row of rows){
     const spec=expected[row.name];
     if(!spec||row.schema_name!=="public"||row.oid!==spec.oid||
@@ -47,9 +49,19 @@ async function main(){
        row.invalid_fk_count!==0||row.index_count!==spec.indexes)
       throw Error("Location, RLS, grants, OID, index, or FK mismatch: "+row.name);
   }
+  const [projection]=await sql`
+    SELECT p.prosecdef AS security_definer,
+      pg_get_functiondef(p.oid) LIKE '%FROM public.site_publication_bindings b%'
+        AS reads_shared_site_bindings
+    FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace
+    WHERE ns.nspname='education_v30' AND p.proname='v301_public_site_claims'
+  `;
+  if(!projection?.security_definer||!projection?.reads_shared_site_bindings)
+    throw Error("Shared Site publication projection is not scoped to the public table");
   console.log(JSON.stringify({verified:true,branch:MAIN,readOnly:true,
     originalTablesPreserved:rows.length,
     validatedForeignKeys:rows.reduce((s,r)=>s+r.fk_count,0),
-    forcedRls:true,directClientTableReadDenied:true},null,2));
+    forcedRls:true,directClientTableReadDenied:true,
+    publicSiteProjectionVerified:true},null,2));
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1});
