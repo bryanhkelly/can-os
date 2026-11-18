@@ -5,10 +5,12 @@ import { db } from "@/db/client";
 import {
   canonicalOfferingCourses, contentAssets, contentAssetVersions,
   contentPublicationManifestItems, contentWithdrawals, courseLessons,
-  courseVersions, instructionalTrackVersions, offeringReleaseRequirements,
+  evidenceDocumentVersions, evidenceDocuments, instructionalTrackVersions,
+  offeringReleaseRequirements, publishedAssetReviews,
   trackDistributionAuthorizations, trackLessonPresentations,
 } from "@/db/canonical-v301";
 import { DomainError } from "@/domain/errors";
+import { isVerifiedEvidenceCurrent } from "@/domain/instructional-tracks";
 import { assertInstructionalTrackAssetsEligible } from
   "@/modules/learning/instructional-track-authoring.server";
 
@@ -131,6 +133,7 @@ export async function currentReleaseSnapshotHash(
  * merely by knowing its UUID or bypass a revoked license. */
 export async function prepareNativeReleaseAssetItems(
   tx:Tx,organizationId:string,requested:readonly NativeReleaseAsset[],
+  manuscriptAuthorPersonId:string,
 ):Promise<AssetEvidenceRow[]>{
   if(!requested.length||requested.length>50||
     new Set(requested.map(item=>item.assetVersionId+":"+item.usageKind)).size!==requested.length)
@@ -152,6 +155,25 @@ export async function prepareNativeReleaseAssetItems(
   if(revoked.length)
     invalid("A selected publisher asset has been withdrawn.");
   const validated=await assertInstructionalTrackAssetsEligible(tx,ids);
+  // An asset cannot be counted as independently approved for this release
+  // when its latest mandatory reviewer is also this manuscript's author.
+  const assetReviews=await tx.select({
+    assetVersionId:publishedAssetReviews.assetVersionId,
+    reviewKind:publishedAssetReviews.reviewKind,
+    reviewerPersonId:publishedAssetReviews.reviewerPersonId,
+  }).from(publishedAssetReviews)
+    .where(inArray(publishedAssetReviews.assetVersionId,ids))
+    .orderBy(desc(publishedAssetReviews.decisionOrder)).limit(1001);
+  if(assetReviews.length>1000)
+    invalid("Asset review history is too large to verify independently.");
+  for(const assetVersionId of ids){
+    for(const kind of ["academic","rights","accessibility"]){
+      const latest=assetReviews.find(review=>
+        review.assetVersionId===assetVersionId&&review.reviewKind===kind);
+      if(!latest||latest.reviewerPersonId===manuscriptAuthorPersonId)
+        invalid("The manuscript author cannot approve their own release assets.");
+    }
+  }
   return orderedAssets(requested.map(item=>{
     const verified=validated.get(item.assetVersionId);
     if(!verified)invalid("Every asset needs current independent academic, rights and accessibility approval.");
@@ -165,10 +187,12 @@ export async function prepareNativeReleaseAssetItems(
 
 export async function assertNativeReleaseAssetEvidence(
   tx:Tx,organizationId:string,items:readonly AssetEvidenceRow[],
+  manuscriptAuthorPersonId:string,
 ):Promise<void>{
   if(!items.length)invalid("Offering publication requires real, independently approved immutable assets.");
   const validated=await prepareNativeReleaseAssetItems(tx,organizationId,
-    items.map(({assetVersionId,usageKind})=>({assetVersionId,usageKind})));
+    items.map(({assetVersionId,usageKind})=>({assetVersionId,usageKind})),
+    manuscriptAuthorPersonId);
   if(validated.length!==items.length||validated.some((row,i)=>
     row.assetVersionId!==items[i]?.assetVersionId||
     row.usageKind!==items[i]?.usageKind||
@@ -198,6 +222,7 @@ export async function assertNativeOfferingDistributionReady(
       continue;
     const versions=await tx.select({
       id:instructionalTrackVersions.id,
+      rightsEvidenceVersionId:trackDistributionAuthorizations.rightsEvidenceVersionId,
     }).from(instructionalTrackVersions)
       .innerJoin(trackDistributionAuthorizations,and(
         eq(trackDistributionAuthorizations.trackVersionId,instructionalTrackVersions.id),
@@ -214,6 +239,23 @@ export async function assertNativeOfferingDistributionReady(
       )).limit(51);
     if(versions.length>50)invalid("Too many approved primary tracks to verify safely.");
     const unique=[...new Set(versions.map(row=>row.id))];
+    const rightsIds=[...new Set(versions.flatMap(row=>
+      row.rightsEvidenceVersionId?[row.rightsEvidenceVersionId]:[]))];
+    const rights=rightsIds.length?await tx.select({
+      id:evidenceDocumentVersions.id,
+      kind:evidenceDocuments.kindCode,
+      verifiedAt:evidenceDocumentVersions.verifiedAt,
+      verifiedByPersonId:evidenceDocumentVersions.verifiedByPersonId,
+      validFrom:evidenceDocumentVersions.validFrom,
+      validThrough:evidenceDocumentVersions.validThrough,
+    }).from(evidenceDocumentVersions)
+      .innerJoin(evidenceDocuments,eq(evidenceDocuments.id,evidenceDocumentVersions.documentId))
+      .where(inArray(evidenceDocumentVersions.id,rightsIds)):[];
+    const currentRights=new Set(rights.filter(item=>item.kind==="rights"&&
+      isVerifiedEvidenceCurrent({...item,at:now})).map(item=>item.id));
+    const rightsAuthorizedIds=new Set(versions.filter(row=>
+      row.rightsEvidenceVersionId&&currentRights.has(row.rightsEvidenceVersionId))
+      .map(row=>row.id));
     if(unique.length<policy.minimumApprovedPrimaryTracks)
       invalid("This Course requires more published, approved primary recorded-instruction tracks.");
     const withdrawn=unique.length?await tx.select({
@@ -222,7 +264,7 @@ export async function assertNativeOfferingDistributionReady(
       .where(and(inArray(contentWithdrawals.trackVersionId,unique),
         lte(contentWithdrawals.effectiveAt,now))):[];
     const withdrawnIds=new Set(withdrawn.map(row=>row.trackVersionId));
-    const available=unique.filter(id=>!withdrawnIds.has(id));
+    const available=unique.filter(id=>!withdrawnIds.has(id)&&rightsAuthorizedIds.has(id));
     if(available.length<policy.minimumApprovedPrimaryTracks)
       invalid("Withdrawn primary tracks cannot satisfy Offering release requirements.");
     if(policy.completeLessonCoverageRequired){
