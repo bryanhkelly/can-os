@@ -5,6 +5,7 @@ import {
   timestamp,
   uuid,
   uniqueIndex,
+  pgTable,
 } from "drizzle-orm/pg-core";
 import { educationV30, educationV30Secure, type JsonObject } from "./core";
 
@@ -135,7 +136,7 @@ export const enrollmentProspectContactDetails = educationV30Secure.table(
   },
 );
 
-export const enrollmentProspectInterests = educationV30.table(
+export const enrollmentProspectInterests = pgTable(
   "enrollment_prospect_interests",
   {
     id: id(),
