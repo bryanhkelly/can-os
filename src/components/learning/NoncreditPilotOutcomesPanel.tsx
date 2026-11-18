@@ -22,7 +22,8 @@ export function NoncreditPilotOutcomesPanel(){
         <h2 className="font-serif text-2xl font-semibold">Program evidence</h2>
         <p className="text-sm text-muted-foreground">
           Private provider-scoped outcomes for the previous 90 days.
-          Participation, understanding, feedback and completion are separately measured.
+          Unique learner reach is deduplicated across authorized Sites and training
+          registrations. Learning, feedback and completion are tracked per registration.
         </p>
         {report&&<p className="text-xs text-muted-foreground">
           Registration cohort: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
@@ -42,12 +43,13 @@ export function NoncreditPilotOutcomesPanel(){
     {summary&&summary.registrations>0&&<>
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {([
-          ["Registrations",summary.registrations],
-          ["Engaged learners",summary.engagedParticipants],
+          ["Unique learners",report.distinctLearners],
+          ["Training registrations",summary.registrations],
+          ["Engaged registrations",summary.engagedParticipants],
           ["Lessons marked complete",summary.lessonsMarkedComplete],
-          ["Learners submitting a knowledge check",summary.knowledgeCheckSubmissions],
+          ["Registrations with a knowledge check",summary.knowledgeCheckSubmissions],
           ["Passed final knowledge checks",summary.knowledgeCheckPasses],
-          ["Learners responding to feedback",summary.surveyRespondents],
+          ["Registrations with feedback",summary.surveyRespondents],
           ["Confirmed completions",summary.confirmedNoncreditCompletions],
           ["Paired before/after checks",summary.pairedKnowledgeChecks],
         ] as const).map(([label,value])=>
