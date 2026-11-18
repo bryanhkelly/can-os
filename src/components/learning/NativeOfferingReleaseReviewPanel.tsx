@@ -5,7 +5,9 @@ import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspacePanel } from "@/components/workspace";
+import { WorkspacePanel, WorkspaceNotice, EmptyState } from "@/components/workspace";
+import { NativeOfferingReleaseCheckpoints } from
+  "@/components/learning/NativeOfferingReleaseCheckpoints";
 import { NativeOfferingReleasePolicyEditor } from "@/components/learning/NativeOfferingReleasePolicyEditor";
 import { normalizeClientError } from "@/lib/client-error";
 import {
@@ -66,9 +68,19 @@ function ReleaseReview({item}:{item:Item}){
       {" "}{item.offeringPublished?"Offering published":item.allCoursesPublished?
         "Courses published, Offering pending":"Course publication pending"}
     </p>
-    {!item.current&&<p role="alert" className="mt-3 text-sm text-destructive">
+    {!item.current&&<WorkspaceNotice tone="attention" className="mt-3">
       Content changed after submission. The publisher must submit a new version for review.
-    </p>}
+    </WorkspaceNotice>}
+    <NativeOfferingReleaseCheckpoints state={{
+      courseCount:item.courseCount,
+      allCoursesPublished:item.allCoursesPublished,
+      manifest:{
+        current:item.current,status:item.status,assetCount:item.assetCount,
+      },
+      releasePoliciesComplete:item.releasePoliciesComplete,
+      offeringPublished:item.offeringPublished,
+      reviews:item.reviews,
+    }}/>
     <div className="mt-3">
       <Button type="button" variant="outline" disabled={!item.current}
         onClick={()=>setInspect(value=>!value)}>
@@ -77,9 +89,9 @@ function ReleaseReview({item}:{item:Item}){
       {inspect&&content.isPending&&<p role="status" className="mt-3 text-sm">
         Loading authorized syllabus and lesson evidence…
       </p>}
-      {inspect&&content.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
+      {inspect&&content.isError&&<WorkspaceNotice tone="danger" className="mt-3">
         Exact submitted Course content is unavailable. Do not approve a snapshot that cannot be inspected.
-      </p>}
+      </WorkspaceNotice>}
       {inspect&&content.isSuccess&&<section className="mt-3 grid gap-3 border border-border p-3"
         aria-label="Exact publisher Course manuscript">
         <p className="text-xs text-muted-foreground">
@@ -203,8 +215,8 @@ function ReleaseReview({item}:{item:Item}){
       Publication requires the latest independent academic, rights, accessibility,
       coverage and safety approvals with current verified evidence for this exact manifest.
     </p>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {notice&&<WorkspaceNotice tone="success" className="mt-3">{notice}</WorkspaceNotice>}
+    {error&&<WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
   </article>;
 }
 
@@ -215,11 +227,16 @@ export function NativeOfferingReleaseReviewPanel(){
     className="mt-6"
     description="Exact-version publisher review, without a parallel curriculum publisher or local adoption shortcut.">
     {queue.isPending&&<p role="status">Checking independently verified Course review appointments…</p>}
-    {queue.isError&&<p role="alert">The native Course review queue is unavailable for this account.</p>}
-    {queue.data?.limited&&<p role="alert">Review results are limited. Do not assume this queue is complete.</p>}
-    {queue.isSuccess&&queue.data.items.length===0&&<p role="status">
-      No submitted native Offering manifests are available under current reviewer appointments.
-    </p>}
+    {queue.isError&&<WorkspaceNotice tone="danger">
+      The native Course review queue is unavailable for this verified reviewer account.
+    </WorkspaceNotice>}
+    {queue.data?.limited&&<WorkspaceNotice tone="attention">
+      Review results are limited. Do not assume this queue is complete.
+    </WorkspaceNotice>}
+    {queue.isSuccess&&queue.data.items.length===0&&<EmptyState
+      title="No eligible native Offering submissions"
+      description="Only Course-appointed reviewers can see submitted versions. A general Organization role does not grant Course review authority."
+    />}
     <div className="mt-4 grid gap-4">
       {queue.data?.items.map(item=><ReleaseReview item={item} key={item.id}/>)}
     </div>

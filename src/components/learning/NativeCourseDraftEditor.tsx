@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { NativeOfferingReleaseCheckpoints } from
+  "@/components/learning/NativeOfferingReleaseCheckpoints";
 import { nativeCourseLessonEditableSchema } from "@/domain/native-course-lesson-draft";
 import {
   getNativeCourseDraftLessons,getNativeCourseReleaseReadiness,
@@ -147,6 +149,16 @@ function NativeOfferingSubmission({offeringVersionId}:{offeringVersionId:string}
           ? "Current manifest: "+current.data.manifest.status
           :current.data.manifest?"Previous review snapshot is stale.":"Not yet submitted for review."}
       </p>
+      <NativeOfferingReleaseCheckpoints state={{
+        courseCount:current.data.courseCount,lessonCount:current.data.lessonCount,
+        allCoursesPublished:current.data.allCoursesPublished,
+        manifest:current.data.manifest?{
+          current:current.data.manifest.current,status:current.data.manifest.status,
+          assetCount:current.data.manifest.assetCount,
+        }:null,
+        releasePoliciesComplete:current.data.releasePoliciesComplete,
+        offeringPublished:current.data.lifecycle==="published",
+      }}/>
       {current.data.lifecycle==="draft"&&<>
         <div className="mt-4 border border-border p-3">
           <h4 className="font-semibold">Reviewed publisher assets</h4>

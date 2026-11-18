@@ -304,6 +304,7 @@ export const getNativeOfferingReleaseOverview=createServerFn({method:"GET"})
         offeringVersionId:bundle.version.id,offeringTitle:bundle.offering.title,
         lifecycle:bundle.version.lifecycle,
         courseCount:bundle.courses.length,lessonCount:bundle.lessonCount,
+        allCoursesPublished:bundle.courses.every(row=>row.lifecycle==="published"),
         manuscriptHash:bundle.hash,policies,
         releasePoliciesComplete:policies.length===bundle.courses.length &&
           bundle.courses.every(row=>policies.some(policy=>
