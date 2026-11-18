@@ -1,5 +1,6 @@
 import { mutationErrorMessage } from "@/lib/mutation-feedback";
 import { RoomCoverageWorkspace } from "@/components/operations/RoomCoverageWorkspace";
+import { FacilitatedClassroomEntry } from "@/components/operations/FacilitatedClassroomEntry";
 import { SchoolDayPreparationPanel } from "@/components/operations/SchoolDayPreparationPanel";
 import { getOnsiteSchoolDayPreparation } from "@/modules/operations/onsite-day-preparation.functions";
 import { QueryState, StatCard, StatusBadge } from "@/components/workspace";
@@ -187,6 +188,7 @@ export function SiteDayPage({ selection }: { selection?: { siteId?: string; date
     actions={<><Link to="/safeguarding">Report a safety concern →</Link><Link to="/calendar">Open calendar →</Link></>}
     priority={<>
     {context?.canViewRoomCoverage && <RoomUpcomingEvents date={date || context.date} timezone={context.timeZone} />}
+    {context?.canViewRoomCoverage && <FacilitatedClassroomEntry siteId={context.siteId}/>}
     {context?.canViewRoomCoverage && <RoomCoverageWorkspace/>}
     <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
       <span>{date ? formatDateOnly(date) : "Loading school date"}</span>
