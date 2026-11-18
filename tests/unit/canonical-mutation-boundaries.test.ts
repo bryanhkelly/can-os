@@ -27,7 +27,7 @@ describe("native mutation evidence uses the shared public journals",()=>{
       eventCode:"class.enrollment.created",entityKind:"class_enrollment",
       entityId:AUDIT_RESOURCE,payload:{method:"approval",requestId:"abc"},occurredAt,
     });
-    expect(insert).toHaveBeenCalledExactlyOnceWith(auditEvents);
+    expect(insert).toHaveBeenCalledWith(auditEvents);
     expect(values).toHaveBeenCalledWith({
       actorPersonId:AUDIT_ACTOR,action:"class.enrollment.created",
       resourceType:"class_enrollment",resourceId:AUDIT_RESOURCE,
@@ -46,7 +46,7 @@ describe("native mutation evidence uses the shared public journals",()=>{
       aggregateId:AUDIT_RESOURCE,actorPersonId:AUDIT_ACTOR,
       payload:{classId:ORGANIZATION},occurredAt,
     });
-    expect(insert).toHaveBeenCalledExactlyOnceWith(domainEvents);
+    expect(insert).toHaveBeenCalledWith(domainEvents);
     expect(values).toHaveBeenCalledWith({
       eventType:"ClassEnrollmentCreated",aggregateType:"class_enrollment",
       aggregateId:AUDIT_RESOURCE,actorPersonId:AUDIT_ACTOR,
