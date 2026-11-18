@@ -2,7 +2,7 @@ import { useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useRef, useState, type FormEvent } from "react";
-import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
+import { WorkspaceShell, MutationFeedback, WorkspaceNotice, EmptyState, StatusBadge } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Select } from "@/components/ui/select";
@@ -24,20 +24,31 @@ export function ProviderInstructionReviews({navigation}:{navigation?:ReactNode})
     queryFn:()=>getProviderContentWorkspace(),retry:false,
   });
   if(queue.isPending)return <WorkspaceShell title="Instructional content reviews"><p role="status">Checking current review appointments…</p></WorkspaceShell>;
-  if(queue.isError||!queue.data)return <WorkspaceShell title="Content review unavailable"><p role="alert">Review inventory is unavailable under this current verified account.</p></WorkspaceShell>;
+  if(queue.isError||!queue.data)return <WorkspaceShell title="Content review unavailable">
+    <WorkspaceNotice tone="danger">Review inventory cannot be verified for this account. No publisher authority is inferred.</WorkspaceNotice>
+  </WorkspaceShell>;
   if(queue.data.role!=="academic_content_reviewer")return <WorkspaceShell title="Reviewer access required">
-    <p role="alert">Switch to your independently verified academic content reviewer membership. Author and reviewer powers are never combined by this page.</p>
+    <WorkspaceNotice tone="attention">Use your independently verified academic content reviewer membership. Author and reviewer powers are never combined by this page.</WorkspaceNotice>
   </WorkspaceShell>;
   const {courses,tracks,assignmentsLimited}=queue.data;
   return <WorkspaceShell width="wide" eyebrow="CAN OS · Independent publication review"
     title="Instructional content reviews"
     subtitle="Review exact submitted track manifests for courses under your verified review appointment. Every category requires an independent decision and appropriate evidence before publication.">
     {navigation}
-    {assignmentsLimited && <p role="alert" className="mt-5 border border-warning p-4 text-sm">Review inventory reached the safety limit. Work through a narrower verified course assignment before treating this queue as complete.</p>}
+    {assignmentsLimited&&<WorkspaceNotice tone="attention" className="mt-5">
+      Review inventory reached the safety limit. Narrow the verified Course assignment scope before treating this queue as complete.
+    </WorkspaceNotice>}
+    {!courses.length&&<EmptyState className="mt-5"
+      title="No independently verified Course review appointments"
+      description="An Organization reviewer membership alone does not authorize decisions. Your specific Course needs an active professional reviewer appointment and independently verified evidence."
+    />}
     <div className="mt-6 grid gap-4">
       {tracks.map(track => <ReviewEditor key={track.id} track={track}
         courseName={courses.find(course=>course.id===track.courseId)?.title??"Assigned Course"}/>)}
-      {!tracks.length && <p role="status" className="border border-border bg-card p-5 text-sm">There are no submitted track versions available under your current independent review appointments.</p>}
+      {!tracks.length&&<EmptyState
+        title="No submitted recorded-instructor tracks"
+        description="There are no eligible submitted track versions under your current independently verified Course appointments. Native Course and Offering releases appear in the separate review section below."
+      />}
     </div>
     <NativeOfferingReleaseReviewPanel/>
   </WorkspaceShell>;
@@ -90,7 +101,9 @@ function ReviewEditor({track,courseName}:{track:Track;courseName:string}) {
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><h2 className="font-serif text-xl">{track.title} · v{track.versionNo}</h2>
         <p className="mt-1 text-sm text-muted-foreground">{courseName} · {track.trackKind}</p></div>
-      <span className="border border-border px-3 py-1 text-xs font-semibold">{isPublished?"Published":"Submitted · pending review"}</span>
+      <StatusBadge tone={isPublished?"success":"attention"}>
+        {isPublished?"Published":"Submitted · pending review"}
+      </StatusBadge>
     </div>
     <div className="mt-4 grid gap-2 sm:grid-cols-5" aria-label="Independent review categories">
       {requiredKinds.map(kind=><div key={kind} className="border border-border p-3 text-xs">
