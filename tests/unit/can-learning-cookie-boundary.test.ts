@@ -62,4 +62,14 @@ describe("single CAN login is required for instructional learning",()=>{
   // Independently scoped non-learner native reviewers are not silently
   // converted into unverified CAN organization grants by this change.
  });
+ it("keeps native-only learner access as a missing-release-guard failure",()=>{
+  const preflight=readFileSync("scripts/acceptance/check-main-one-person-runtime.mjs","utf8");
+  expect(preflight).toContain("oneLoginGuards");
+  expect(preflight).toContain("canCookieRequired");
+  expect(preflight).toContain("instructionalResolverUsesCANBoundary");
+  expect(preflight).toContain("canonicalLearnerRefusesNativeOnly");
+  expect(preflight).toContain("Missing CAN-only learner guard");
+  expect(preflight).toContain("nativeLearnerPersonCreation");
+  expect(preflight).toContain("nativeReviewedLearnerCreation");
+ });
 });
