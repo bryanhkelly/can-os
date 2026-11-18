@@ -1,11 +1,11 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { MutationFeedback } from "@/components/workspace";
+import { EmptyState, MutationFeedback, QueryState, StatusBadge, WorkspaceNotice } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
-import { getMyNoncreditSelfEnrollments, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
+import { getMyNoncreditSelfEnrollmentHistoryPage, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {getMyNoncreditWaitlist,getMyNoncreditWaitlistByRelease,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
@@ -19,12 +19,21 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
   const [withdrawConfirm,setWithdrawConfirm]=useState<string|null>(null);
   const [cancelWaitlist,setCancelWaitlist]=useState<string|null>(null);
 
-  const query=useQuery({queryKey:["my-noncredit-self-enrollments",scopeKey,registrationId??"all"],
-    queryFn:async()=>{
-      if(!registrationId)return getMyNoncreditSelfEnrollments();
-      const record=await getMyNoncreditRegistrationById({data:{registrationId}});
-      return record?[record]:[];
-    },enabled:authorized&&!releaseId,retry:false,staleTime:15_000});
+  // Keep every registration reachable from its source-owned keyset history.
+  // Exact embedded records still use the server's Person-owned ID lookup.
+  const query=useInfiniteQuery({
+    queryKey:["my-noncredit-self-enrollments",scopeKey,registrationId??"all"],
+    initialPageParam:null as {registeredAt:string;registrationId:string}|null,
+    queryFn:async({pageParam})=>{
+      if(registrationId){
+        const record=await getMyNoncreditRegistrationById({data:{registrationId}});
+        return {items:record?[record]:[],nextCursor:null};
+      }
+      return getMyNoncreditSelfEnrollmentHistoryPage({data:{cursor:pageParam}});
+    },
+    getNextPageParam:last=>last.nextCursor??undefined,
+    enabled:authorized&&!releaseId,retry:false,staleTime:15_000,
+  });
   const [busy,setBusy]=useState<string|null>(null);
   const waiting=useQuery({queryKey:["my-noncredit-waitlist",scopeKey,releaseId??"all"],queryFn:async()=>{
     if(!releaseId)return getMyNoncreditWaitlist();
@@ -79,19 +88,19 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     if(outcome.status==="saved"||outcome.status==="refresh-failed")
       setCancelWaitlist(null);
   }
-  const visibleCourses=releaseId ? [] : query.data;
+  const visibleCourses=releaseId ? [] : query.data?.pages.flatMap(page=>page.items);
   const visibleWaitlist=registrationId ? [] : waiting.data;
   if(!authorized)return <p role="status" className="border border-border p-4 text-sm">Sign in with your CAN account to manage training.</p>;
   return <section aria-label="Manage noncredit training registrations" className="space-y-4">
     {!registrationId&&!releaseId&&<div className="flex flex-wrap items-center justify-between gap-3"><h3 className="font-serif text-xl">Training registrations and waiting lists</h3><Link to="/learn/enroll" search={{}} className="text-sm font-semibold text-primary underline underline-offset-4">Explore training</Link></div>}
-    {!releaseId&&query.isPending && <p role="status" className="mt-6 border border-border bg-card p-5 text-sm">Loading your courses…</p>}
-    {!releaseId&&query.isError && <p role="alert" className="mt-6 border border-border bg-card p-5 text-sm">
-      Your course records are temporarily unavailable. <button type="button" onClick={()=>void query.refetch()} className="font-semibold text-primary underline">Try again</button>
-    </p>}
-    {error && <p role="alert" className="mt-4 border border-border bg-card p-4 text-sm">{error}</p>}
+    {!releaseId&&<QueryState loading={query.isPending?"Loading your courses…":undefined}
+      error={query.isError?"Your course records are temporarily unavailable.":undefined}
+      onRetry={()=>void query.refetch()} retrying={query.isFetching}/>}
+    {error && <WorkspaceNotice tone="danger" className="mt-4">{error}</WorkspaceNotice>}}
     <MutationFeedback state={{...mutation,retryRefresh:mutation.retryRefresh}}
       pendingMessage="Saving enrollment change…" className="mt-4"/>
-    {waiting.isError&&<p role="alert" className="text-sm">Your waiting-list status is temporarily unavailable. <button type="button" className="font-semibold underline" onClick={()=>void waiting.refetch()}>Try again</button></p>}
+    {waiting.isError&&<QueryState error="Your waiting-list status is temporarily unavailable."
+      onRetry={()=>void waiting.refetch()} retrying={waiting.isFetching}/>} 
     {waiting.isPending&&!registrationId&&<p role="status" className="text-sm">Loading waiting-list controls…</p>}
     {releaseId&&waiting.isSuccess&&!visibleWaitlist?.length&&<p role="status" className="text-sm">This waiting-list entry is no longer available in your account.</p>}
     {registrationId&&query.isSuccess&&!visibleCourses?.length&&<p role="status" className="text-sm">This registration is no longer available in your account.</p>}
@@ -120,9 +129,14 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       {visibleCourses.map(course=><article key={course.courseAttemptId} data-course-attempt-id={course.courseAttemptId} className={registrationId?"p-2":"border border-border bg-card p-5"}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {course.registrationStatus} · {course.attemptStatus}
-            </p>
+            <div className="flex flex-wrap items-center gap-2" aria-label="Course status">
+              <StatusBadge tone={["registered","active"].includes(course.registrationStatus)?"success":"neutral"}>
+                Registration: {course.registrationStatus}
+              </StatusBadge>
+              <StatusBadge tone={course.attemptStatus==="active"?"info":"neutral"}>
+                Course: {course.attemptStatus}
+              </StatusBadge>
+            </div>
             {!registrationId&&<h2 className="mt-2 font-serif text-2xl">{course.trainingTitle}</h2>}
             <p className="mt-2 text-xs text-muted-foreground">
               {course.deliveryMode==="facilitated"
@@ -168,11 +182,26 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
           </div>
         </div>
       </article>)}
-      {!visibleCourses.length&&!registrationId&&!releaseId&&<div className="border border-border bg-card p-6">
-        <h2 className="font-serif text-2xl">Your learning starts here</h2>
-        <p className="mt-3 text-sm text-muted-foreground">You have no noncredit registrations yet. Find a published training and enroll when it opens.</p>
-        <Link to="/learn/enroll" search={{}} className="mt-4 inline-block font-semibold text-primary underline underline-offset-4">Explore courses</Link>
+      {!visibleCourses.length&&!registrationId&&!releaseId&&<EmptyState
+        title="Your learning starts here"
+        description="You have no noncredit registrations yet. Find a published training and enroll when it opens."
+        actions={<Link to="/learn/enroll" search={{}}
+          className="font-semibold text-primary underline underline-offset-4">Explore courses</Link>}/>}
+      {query.hasNextPage&&!registrationId&&<div className="flex flex-wrap items-center gap-3 pt-3">
+        <Button type="button" variant="outline" loading={query.isFetchingNextPage}
+          disabled={query.isFetchingNextPage||changeBusy}
+          onClick={()=>void query.fetchNextPage()}>
+          {query.isFetchingNextPage?"Loading older registrations…":"Load older registrations"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Earlier records remain attached to their original registrations.
+        </span>
       </div>}
+      {query.isFetchNextPageError&&<WorkspaceNotice tone="attention">
+        <span>Older registration records could not be loaded. Previously displayed records remain available.</span>
+        <Button type="button" variant="outline" size="sm" className="ml-3"
+          onClick={()=>void query.fetchNextPage()}>Retry older records</Button>
+      </WorkspaceNotice>}
     </div>}
   </section>;
 }
