@@ -3,8 +3,10 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, noncreditEnrollmentWaitlist, noncreditWaitlistEmailDeliveries,
+  noncreditEnrollmentWaitlist,
+  noncreditWaitlistEmailDeliveries,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { waitlistDeliveryView } from "@/domain/notification-delivery-state";
@@ -139,7 +141,7 @@ export const retryNoncreditDelivery=createServerFn({method:"POST"})
       isNull(noncreditWaitlistEmailDeliveries.providerFailedAt),
     )).returning({id:noncreditWaitlistEmailDeliveries.id});
     if(!updated)throw new AuthorizationError("delivery already recovered or changed");
-    await tx.insert(auditEvents).values({
+    await writeCanonicalAudit(tx,{
       actorPersonId:provider.actor.actorPersonId!,
       owningOrganizationId:provider.organizationId,
       eventCode:"noncredit.waitlist.email_retry_queued",
