@@ -86,7 +86,7 @@ export async function readLinkedSitePublishedClasses(
           AND (sr.valid_through IS NULL OR sr.valid_through>CURRENT_TIMESTAMP)
       )
       AND (c.delivery_mode='self_paced' OR EXISTS (
-        SELECT 1 FROM education_v30.deployment_sites ds
+        SELECT 1 FROM public.deployment_sites ds
         WHERE ds.deployment_id=c.deployment_id AND ds.site_id=c.site_id
       ))
     ORDER BY c.title,c.id
