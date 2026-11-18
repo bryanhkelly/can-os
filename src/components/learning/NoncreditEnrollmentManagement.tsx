@@ -66,6 +66,9 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
       await navigate({to:"/learn/course/$courseAttemptId",params:{courseAttemptId}});
     }catch(e){
       setError(normalizeClientError(e,"Could not open the current learner course.").message);
+    }finally{
+      // A route loader can refuse entry without unmounting this workspace.
+      // Do not leave the course action disabled after navigation settles.
       setBusy(null);
     }
   }
