@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { pairWithFacilitatedRoom, leaveFacilitatedRoom, getLearnerFacilitatedRoom } from "@/modules/learning/facilitated-learning.functions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type PairingStatus = Awaited<ReturnType<typeof getLearnerFacilitatedRoom>>;
 
@@ -77,7 +78,7 @@ export function FacilitatedLearnerPairing({courseAttemptId}:{courseAttemptId:str
       You remain enrolled in the same course with the same progress and assessments.
     </p>
     <form className="mt-3 flex flex-wrap gap-2" onSubmit={event=>{event.preventDefault();void join();}}>
-      <label htmlFor="facilitated-pair-code" className="sr-only">Facilitator pairing code</label>
+      <Label htmlFor="facilitated-pair-code" className="sr-only">Facilitator pairing code</Label>
       <Input id="facilitated-pair-code" aria-label="Facilitator pairing code"
         autoComplete="off" maxLength={11} placeholder="XXXXX-XXXXX"
         className="min-h-10 max-w-xs uppercase"
