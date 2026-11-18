@@ -1,3 +1,7 @@
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
+
 export function CurriculumPdfPicker({
   enabled, busy, fileKey, selectedFile, rightsConfirmed, onFileChange, onRightsChange,
 }: {
@@ -13,14 +17,14 @@ export function CurriculumPdfPicker({
     <p className="text-xs text-muted-foreground">
       Upload a PDF directly to CAN's private storage. It is visible only in the selected program, site or class and downloadable by authorized class members.
     </p>
-    <input key={fileKey} type="file" accept=".pdf,application/pdf" disabled={busy || !enabled}
+    <Input key={fileKey} type="file" accept=".pdf,application/pdf" disabled={busy || !enabled}
       onChange={event => onFileChange(event.currentTarget.files?.[0] ?? null)}
       className="block w-full text-sm" aria-label="Supplemental PDF"/>
-    <label className="flex items-start gap-2 text-xs">
-      <input type="checkbox" checked={rightsConfirmed} disabled={busy || !enabled}
+    <Label className="flex items-start gap-2 text-xs">
+      <Checkbox checked={rightsConfirmed} disabled={busy || !enabled}
         onChange={event => onRightsChange(event.currentTarget.checked)}/>
       <span>I have permission to share this material with authorized learners. Uploading does not authorize AI training or public redistribution.</span>
-    </label>
+    </Label>
     {selectedFile && <p className="text-xs text-muted-foreground">Selected: {selectedFile.name}</p>}
   </>;
 }
