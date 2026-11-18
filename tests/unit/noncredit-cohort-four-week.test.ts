@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { chooseFourWeekCohortPlans, isFourWeeklyCohort } from "@/domain/noncredit-cohort-schedule";
 
 const meeting = (id: string, start: string, linked = false) => ({
@@ -34,5 +36,27 @@ describe("COGIC-style four-session cohort scheduling", () => {
       meeting("c","2027-03-19T17:00:00Z"),
       meeting("d","2027-03-26T17:00:00Z"),
     ])).toBe(true);
+  });
+});
+
+describe("four-week operator journey integration", () => {
+  const read = (path: string) => readFileSync(resolve(process.cwd(),path),"utf8");
+  it("links facilitator calendar from authorized host courses, not the media rehearsal catalog", () => {
+    const host = read("src/routes/canonical.lab.facilitated.tsx");
+    expect(host).toContain("<ClassroomSchedulePanel choices={data.choices}");
+    expect(host).not.toContain("<ClassroomSchedulePanel choices={rehearsalOptions?.choices??[]}");
+    const calendar = read("src/components/learning/ClassroomSchedulePanel.tsx");
+    expect(calendar).toContain('import { Input } from "@/components/ui/input"');
+    expect(calendar).toContain('import { Select } from "@/components/ui/select"');
+  });
+  it("requires four dated meetings and locks the underlying calendar before assignment", () => {
+    const server = read("src/modules/enrollment/noncredit-cohort-operations.functions.ts");
+    expect(server).toContain("planIds:z.array(id).length(4)");
+    expect(server).toContain("!isFourWeeklyCohort(slots)");
+    expect(server).toContain('.for("update")');
+    expect(server).toContain("await assignCohortPlan(tx,scope,planId)");
+    const operator = read("src/components/enrollment/NoncreditReleaseOperations.tsx");
+    expect(operator).toContain("chooseFourWeekCohortPlans");
+    expect(operator).toContain("fourWeekPlanIds.length===4");
   });
 });
