@@ -20,6 +20,9 @@ const tables=[
 ];
 const publicTables=new Set([
   "facilitated_rehearsal_events","facilitated_room_assisted_activity_evidence",
+  "facilitated_room_activity_releases","facilitated_room_activity_responses",
+  "facilitated_room_control_commands","facilitated_room_feedback",
+  "facilitated_room_presence_events","facilitated_room_survey_campaigns",
 ]);
 const inExpectedSchema=(schema,name)=>
   publicTables.has(name)?schema==="public":schema==="education_v30";
@@ -57,27 +60,27 @@ try{
         WHERE a.grantee=0) AS grants_public
       FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
       WHERE n.nspname IN ('education_v30','public') AND c.relname=ANY($1::text[])
-        AND ((n.nspname='public' AND c.relname IN ('facilitated_rehearsal_events','facilitated_room_assisted_activity_evidence'))
-         OR (n.nspname='education_v30' AND c.relname NOT IN ('facilitated_rehearsal_events','facilitated_room_assisted_activity_evidence')))
-    `,[[...tables,...views]]),
+        AND ((n.nspname='public' AND c.relname=ANY($2::text[]))
+         OR (n.nspname='education_v30' AND NOT (c.relname=ANY($2::text[]))))
+    `,[[...tables,...views],[...publicTables]]),
     pool.query(`
       SELECT table_name,column_name FROM information_schema.columns
       WHERE table_schema IN ('education_v30','public') AND table_name=ANY($1::text[])
-        AND ((table_schema='public' AND table_name IN ('facilitated_rehearsal_events','facilitated_room_assisted_activity_evidence'))
-         OR (table_schema='education_v30' AND table_name NOT IN ('facilitated_rehearsal_events','facilitated_room_assisted_activity_evidence')))
-    `,[tables]),
+        AND ((table_schema='public' AND table_name=ANY($2::text[]))
+         OR (table_schema='education_v30' AND NOT (table_name=ANY($2::text[]))))
+    `,[tables,[...publicTables]]),
     pool.query(`
       SELECT tablename,policyname,roles FROM pg_policies
       WHERE schemaname IN ('education_v30','public') AND tablename=ANY($1::text[])
-        AND ((schemaname='public' AND tablename IN ('facilitated_rehearsal_events','facilitated_room_assisted_activity_evidence'))
-         OR (schemaname='education_v30' AND tablename NOT IN ('facilitated_rehearsal_events','facilitated_room_assisted_activity_evidence')))
-    `,[tables]),
+        AND ((schemaname='public' AND tablename=ANY($2::text[]))
+         OR (schemaname='education_v30' AND NOT (tablename=ANY($2::text[]))))
+    `,[tables,[...publicTables]]),
     pool.query(`
-      SELECT indexname FROM pg_indexes WHERE schemaname IN ('public','education_v30')
-      AND ((schemaname='public' AND indexname IN (
-        'facilitated_rehearsal_events_site_idx','facilitated_assisted_activity_room_idx','facilitated_assisted_activity_attempt_idx'))
-        OR (schemaname='education_v30' AND indexname NOT IN (
-        'facilitated_rehearsal_events_site_idx','facilitated_assisted_activity_room_idx','facilitated_assisted_activity_attempt_idx')))
+      SELECT indexname FROM pg_indexes
+      WHERE schemaname IN ('public','education_v30')
+      AND tablename=ANY($1::text[])
+      AND ((schemaname='public' AND tablename=ANY($2::text[]))
+        OR (schemaname='education_v30' AND NOT (tablename=ANY($2::text[]))))
       AND indexname IN (
         'facilitated_room_controls_recent_idx','facilitated_room_release_session_time_idx',
         'facilitated_room_responses_room_idx','facilitated_room_presence_room_recent_idx',
@@ -85,7 +88,7 @@ try{
         'facilitated_plans_facilitator_idx','facilitated_plans_site_course_idx',
         'facilitated_assisted_activity_room_idx','facilitated_assisted_activity_attempt_idx'
       )
-    `),
+    `,[tables,[...publicTables]]),
   ]);
   const names=new Map(objects.rows.map(r=>[r.relname,r]));
   assert.equal(objects.rows.length,tables.length+views.length,"Missing pilot evidence relation or view");
