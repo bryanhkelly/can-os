@@ -27,21 +27,23 @@ The authoritative Neon `main` database now has **no duplicate Site or Organizati
 
 | Metric | Public | Remaining native |
 | --- | ---: | ---: |
-| Base tables | 322 | 348 in `education_v30` |
+| Base tables | 324 | 346 in `education_v30` |
 | Sites | 9 | 0; `education_v30.sites` absent |
 | Organizations | 17 | 0; `education_v30.organizations` absent |
 | Foreign keys pointing to duplicate Site/Organization tables | n/a | 0 |
 | Foreign keys pointing to `public.sites` / `public.organizations` | 94 / 229 | n/a |
-| Native Person FKs still requiring review | n/a | 63 |
+| Native Person FKs still requiring review | n/a | 36 |
 | Separate sensitive-schema tables | n/a | 7 in `education_v30_secure` |
 
 The authoritative `public.people`, `public.sites`, and `public.organizations` tables now all have **enabled and forced row-level security**, restrictive client-denial policies, and no direct `authenticated` or `anonymous` SELECT permissions. The Person security migration preserved all 142 People and did not alter identity ownership. The server's privileged connection still requires application authorization; forced RLS does not replace command-level membership checks.
 
-The Person consolidation has also redirected 175 reviewed auditor, author, facilitator, teacher and reviewer attribution FKs directly to `public.people`. The remaining 63 native Person FKs still include learner, guardian, account, session, professional and sensitive-data relationships; their migrations remain independently gated. No Person data or grants were duplicated.
+The Person consolidation has redirected 202 reviewed actor, operational and safeguarding Person foreign keys to `public.people`. The remaining 36 native Person FKs include learner, guardian, account, session and professional relationships; those migrations remain independently gated. Restricted safeguarding data stays in its protected schema, now referencing the authoritative public Person directly. No Person data or grants were duplicated.
+
+The restricted Site Admin/Registrar projection now uses the **single CAN session, current public grant, immutable Person, Site and Organization**, without any canonical staff-grant or identity correspondence. Its replacement is recorded in `database/production/2026-11-17-single-can-staff-projection.sql`. The redundant staff bridge module was deleted; independent high-risk approvals remain separate. There are no verified active non-demo staff sessions yet, so an authenticated production workflow has not passed.
 
 The native staff-reader and five additional governed SQL functions were updated in place to reference `public.organizations`. An invalid synthetic staff/native session returned zero grants. `catalogSites`, `canonicalEnrollmentSites`, and `canonicalEnrollmentOrganizations` are now public-schema Drizzle projections, not new identities. A regression check and read-only acceptance command were committed on GitHub `main`.
 
-**Remaining:** public Person cutover, native account/session and correspondence retirement, 348 additional canonical tables and 7 sensitive tables at this verification snapshot, all associated routines/permissions, and an authenticated build/browser acceptance run. Other workstreams can advance the table counts independently. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
+**Remaining:** public Person cutover, native account/session and correspondence retirement, 346 additional canonical tables and 7 sensitive tables at this verification snapshot, all associated routines/permissions, and an authenticated build/browser acceptance run. Other workstreams can advance the table counts independently. Do not claim that a single application schema or the one-login experience is already fully delivered. A separately staged Person-FK migration has an explicit runtime/approval gate and must not be executed independently.
 
 ## Historical pre-retirement Neon main inventory
 
