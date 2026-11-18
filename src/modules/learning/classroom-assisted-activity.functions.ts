@@ -3,8 +3,9 @@ import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents, domainEvents, facilitatedRoomActivityReleases,
+  facilitatedRoomActivityReleases,
   facilitatedRoomAssistedActivityEvidence,
 } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
@@ -78,14 +79,14 @@ export const recordClassroomAssistedActivity=createServerFn({method:"POST"})
         courseAttemptId:data.courseAttemptId,method:data.method,
         facilitatorAttributed:true,
       };
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:host.actor.actorPersonId!,
         owningOrganizationId:host.organizationId,
         eventCode:"learning.classroom.assisted_activity.recorded",
         entityKind:"facilitated_room_assisted_activity_evidence",
         entityId:saved.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"ClassroomAssistedActivityRecorded",
         aggregateType:"facilitated_room_assisted_activity_evidence",
         aggregateId:saved.id,actorPersonId:host.actor.actorPersonId!,
