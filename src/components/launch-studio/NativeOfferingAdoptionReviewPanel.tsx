@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { WorkspacePanel } from "@/components/workspace";
-import { normalizeClientError } from "@/lib/client-error";
+import { WorkspacePanel, MutationFeedback } from "@/components/workspace";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { invalidateNativeClassAvailability } from "@/lib/native-class-availability-cache";
 import {
   approveNativeOfferingAdoption,getNativeOfferingAdoptionReviewQueue,
 } from "@/modules/programs/native-offering-adoption-review.functions";
@@ -16,22 +17,24 @@ function AdoptionReview({item}:{item:Adoption}){
   const client=useQueryClient();
   const [evidence,setEvidence]=useState("");
   const [reason,setReason]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
+  const feedback=useMutationFeedback(async()=>{
+    await Promise.all([
+      client.invalidateQueries({queryKey:["native-adoption-review-queue"]},
+        {throwOnError:true}),
+      invalidateNativeClassAvailability(client),
+    ]);
+  });
   async function approve(event:FormEvent){
-    event.preventDefault();setError("");setNotice("");setBusy(true);
-    try{
-      await approveNativeOfferingAdoption({data:{
-        adoptionId:item.adoptionId,evidenceVersionId:evidence.trim(),
-        rationale:reason.trim(),
-      }});
-      setNotice("Adoption approved after independent verification. Operation and Class remain separately gated.");
-      await client.invalidateQueries({queryKey:["native-adoption-review-queue"]});
-    }catch(cause){
-      setError(normalizeClientError(cause,
-        "Adoption was not approved. Verify Blueprint provenance, current Site grants and independent deployment readiness.").message);
-    }finally{setBusy(false)}
+    event.preventDefault();
+    if(feedback.pending||feedback.refreshFailed)return;
+    await feedback.run(()=>approveNativeOfferingAdoption({data:{
+      adoptionId:item.adoptionId,evidenceVersionId:evidence.trim(),
+      rationale:reason.trim(),
+    }}),{
+      successMessage:"Adoption approved after independent verification. Operation and Class remain separately gated.",
+      commandErrorMessage:"Adoption was not approved. Verify Blueprint provenance, current Site grants and independent deployment readiness.",
+      refreshErrorMessage:"Adoption approval was saved, but the review and Class availability views did not refresh. Retry refresh without approving again.",
+    });
   }
   return <article className="border border-border bg-card p-4">
     <h3 className="font-semibold">{item.title} · v{item.versionNo}</h3>
@@ -52,12 +55,12 @@ function AdoptionReview({item}:{item:Adoption}){
       <Field label="Verified adoption evidence version UUID">
         <Input required value={evidence} onChange={event=>setEvidence(event.target.value)}/>
       </Field>
-      <div><Button type="submit" disabled={busy||reason.trim().length<10||!evidence.trim()}>
-        {busy?"Checking approval…":"Approve verified adoption"}
+      <div><Button type="submit" disabled={feedback.pending||feedback.refreshFailed||reason.trim().length<10||!evidence.trim()}>
+        {feedback.pending?"Checking approval…":"Approve verified adoption"}
       </Button></div>
     </form>
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
+    <MutationFeedback state={feedback} className="mt-3"
+      pendingMessage="Verifying independent adoption, exact-version provenance, evidence and current Site authority…"/>
   </article>;
 }
 
