@@ -72,6 +72,10 @@ const sourceGuarded = new Set([
   "operations.workflows.tsx",
   "student.my-school.tsx",
   "guardian.experiences.tsx",
+  "operations.school-years.tsx",
+  "operations.school-years_.$yearId.tsx",
+  "operations.school-years_.new.tsx",
+  "launch.school.tsx",
 ]);
 
 function resolveSource(from, specifier) {
