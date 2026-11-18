@@ -591,3 +591,69 @@ as live-production acceptance.
 and the imported classroom and administrative components. Confirm static
 checks and live journeys on the same exact `main` SHA without relying on
 currently billing-blocked GitHub Actions or Netlify.
+
+
+### November 17 continuation: support, guardian preferences and operating setup
+
+The source-level migration manifest now covers **60 route TSX files** out
+of the 180-file Git tree route inventory. These are **source-adoption
+gates, not 60 production-accepted workflows**.
+
+Route coverage added in this increment:
+
+| Area | Page | Source-level changes |
+| --- | --- | --- |
+| Learner support | `/student/support` | Shared student help request, staff referral, service schedule, support-plan, and stage-transition controls |
+| Family watch instructions | `/guardian/watching` | Shared pause/resume/revoke controls, watch statuses, history refresh, and reminder settings |
+| Policy intelligence | `/operations/jurisdiction-profiles` | Rectangular policy reviews, funding program forms, sources and independent verification |
+| Curriculum authoring | `/operations/curriculum` | Shared next-draft Button and rectangular curriculum panels |
+| Registrar rules | `/operations/course-policies` | Shared course capacity, credit, add/drop/withdrawal, prerequisites and guardian-approval controls |
+| Guardian health | `/guardian/health` | Shared review refresh and pending-review notice; school-approved medical records stay authoritative |
+| Interest events | `/operations/interest-events` | Rectangular event and RSVP workspace |
+| Workflows | `/operations/workflows` | Shared connected-workflow dashboard now uses canonical actions, metric cards and notice/empty state |
+| School record | `/student/my-school`, `/guardian/experiences` | One shared SchoolProfile and LiveSchoolExperiences presentation |
+| School-year studio | `/operations/school-years`, `/operations/school-years/$yearId`, `/operations/school-years/new` | Canonical school-year record, calendar, scheduling and creation components |
+| Launch | `/launch/school` | Canonical LaunchWizardPage and reusable launch configuration fields |
+
+The following composed feature components were also directly migrated and
+source-gated:
+
+- `NotificationPreferences`: Input, Checkbox, Label, Button and WorkspaceNotice,
+  preserving explicit verified SMS opt-in, revoke action, quiet hours,
+  and refresh-failure retry.
+- `ConnectedWorkflowsWorkspace`: StatCard replaces its local metric-card
+  implementation; shared Button, WorkspaceNotice and EmptyState used.
+- `SchoolProfile` and `LiveSchoolExperiences`: square shared panels,
+  while preserving conference booking, rescheduling and cancellation.
+- `NativeClassSessionsPanel`: canonical Input, Textarea, Label, Checkbox,
+  and Radio for session schedules, readiness, audited reschedule and
+  emergency room revocation; existing timezone and schedule commands retained.
+- `NativeClassSurveyCampaignPanel`: canonical Select/Label for linking only
+  approved local survey campaigns to a Class.
+- `ClassSupplementForm`, `ClassTeacherPlanningPanel`,
+  `ClassCreationRequestForm`: square compositional Class panels.
+- `SchoolYearCard`, `SchoolYearRecord`, `SchoolYearCreateForm`,
+  `SchoolYearScheduleEditor`, `SchoolYearScheduleSetup`, and
+  `SchoolYearStudioWorkspace`: square panels with canonical controls.
+- `LaunchConfigurationForm`, `LaunchProgramIdentityFields`,
+  `LaunchDeliveryModelFields`, `LaunchHostAndProviderFields`:
+  square Site/program fields and fewer legacy Input class overrides.
+
+**Source verification:** New route and feature-component source lists were
+fetched from GitHub `main` and scanned for native visible controls,
+legacy corner classes and required shared components. The newest 14 route
+files and 19 shared components all passed the direct source comparison.
+The two checker/audit manifest sets were updated together, to cover
+exactly 60 routes. No database records or schemas were touched.
+
+**Release verification not done:** The local `npm run lint`, `npm run
+design:routes`, TypeScript compiler, build, Storybook/axe, authenticated
+journeys, keyboard/ARIA review, and responsive screenshots were **not run**
+on this `main` snapshot. Existing GitHub Actions and Netlify billing
+blocks are external operational restrictions, not proof of successful or
+failed code validation.
+
+**Continue page-by-page:** Audit composed Class and SchoolYear controls
+beyond the guarded subset, then tackle remaining learner, parent,
+admissions, operations, public and platform views. Do not infer
+completion merely because a route imports WorkspaceShell.
