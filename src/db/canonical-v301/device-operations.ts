@@ -1,9 +1,8 @@
-import {boolean,check,index,integer,text,timestamp,uniqueIndex,uuid} from "drizzle-orm/pg-core";
+import {boolean,check,index,integer,pgTable,text,timestamp,uniqueIndex,uuid} from "drizzle-orm/pg-core";
 import {sql} from "drizzle-orm";
-import {educationV30} from "./core";
 import {catalogSites} from "./catalog";
 /** Registry of site-owned, loaned and personal equipment. Not a browser fingerprint. */
-export const siteDeviceRegistrations=educationV30.table("site_device_registrations",{
+export const siteDeviceRegistrations=pgTable("site_device_registrations",{
  id:uuid("id").defaultRandom().primaryKey(),
  siteId:uuid("site_id").notNull().references(()=>catalogSites.id),
  assetId:uuid("asset_id"),label:text("label").notNull(),
@@ -17,7 +16,7 @@ export const siteDeviceRegistrations=educationV30.table("site_device_registratio
  uniqueIndex("site_device_registrations_asset_uq").on(t.siteId,t.assetId).where(sql`${t.assetId} IS NOT NULL`),
  index("site_device_registrations_site_status_idx").on(t.siteId,t.status),
 ]);
-export const siteDevicePolicies=educationV30.table("site_device_policies",{
+export const siteDevicePolicies=pgTable("site_device_policies",{
  siteId:uuid("site_id").primaryKey().references(()=>catalogSites.id),
  sharedDeviceRequired:boolean("shared_device_required").notNull().default(false),
  managedDeviceRequiredForAssessments:boolean("managed_device_required_for_assessments").notNull().default(false),
