@@ -245,7 +245,9 @@ describe("transactional church-local publication", () => {
     const oldCopy = { ...copy, welcomeMessage: "Earlier welcome" };
     state.rows.push([{ siteId: "site-a" }], [revision(3)], [{ content: oldCopy }]);
     await expect(publishPartnerLocalContent(actor, { operation: "restore", expectedRevision: 3, restoreRevision: 1 }))
-      .resolves.toMatchObject({ changed: true, revision: 4, status: "published" });
+      .resolves.toMatchObject({
+        changed: true, revision: 4, status: "published", restoredContent: oldCopy,
+      });
     expect(state.inserts.find(row => row.table === siteLocalContentVersions)?.value).toMatchObject({
       revision: 4, restoredFromRevision: 1, content: oldCopy,
     });
