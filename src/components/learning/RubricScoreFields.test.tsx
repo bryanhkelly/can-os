@@ -36,4 +36,13 @@ describe("RubricScoreFields", () => {
     expect(html).toContain("Total:");
     expect(html).toContain("—");
   });
+  it("blocks edits while an authorized grading operation saves", () => {
+    const html = renderToStaticMarkup(
+      <RubricScoreFields criteria={criteria} values={{ reasoning: "4" }}
+        onChange={() => {}} total={4} pointsPossible="5" disabled />,
+    );
+    expect(html).toContain('disabled=""');
+    expect(html).toContain('value="4"');
+  });
+
 });
