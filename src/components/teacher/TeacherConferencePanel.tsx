@@ -12,11 +12,11 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { QueryState } from "@/components/workspace/query-state";
 import { DashboardPanel } from "@/components/workspace/dashboard-layout";
 import { EmptyState, StatusBadge } from "@/components/workspace";
-import { FieldError } from "@/components/ui/field";
+import { Field, FieldError } from "@/components/ui/field";
 import { Checkbox } from "@/components/ui/choice";
 import { ActionDialog } from "@/components/workspace/action-dialog";
 import { Button } from "@/components/ui/button";
-import { Field } from "@/components/ui/field";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
