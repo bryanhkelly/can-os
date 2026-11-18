@@ -1,5 +1,6 @@
 import { siteFontCatalog, type SiteFontId, resolveSiteTheme, sitePaletteIds, siteTypographyIds, type SiteTypographyId, type SiteTemplateId } from "@/domain/site-theme";
 import { WebsiteTemplateGallery } from "@/components/launch-studio/WebsiteTemplateGallery";
+import { SiteContentChannelEditor } from "@/components/launch-studio/SiteContentChannelEditor";
 import { SchoolBrandPreview } from "@/components/launch-studio/SchoolBrandPreview";
 import { privateWebsitePreviewUrl } from "@/domain/private-website-preview";
 import { schoolBrandDesigns } from "@/domain/school-brand-identity";
@@ -708,6 +709,29 @@ function LocalWebsiteCopyEditor({
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">More optional church details</summary>
           <div className="mt-4 space-y-5">{additionalStoryFields.map(textField)}</div>
+        </details>
+        <details className="border p-4" id="website-content-layout">
+          <summary className="cursor-pointer text-sm font-semibold">
+            Arrange Programs, Courses, Classes and website sections
+          </summary>
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
+            These are the same Site-owned content blocks configured in Launch.
+            Each section reads its approved source when available. Saving a layout
+            changes only the private design; publishing the layout is a separate
+            authorized action and never approves a Program or opens enrollment.
+          </p>
+          {data.canPublish
+            ? <div className="mt-4"><SiteContentChannelEditor
+                key={data.siteId + ":" + data.contentChannelConfig.revision}
+                siteId={data.siteId}
+                initialConfig={data.contentChannelConfig}
+                canPublish={data.canPublish}
+                onSaved={() => { void router.invalidate(); }} />
+              </div>
+            : <WorkspaceNotice tone="attention" className="mt-4">
+                Your verified Site grant allows previewing but not editing website
+                sections. Ask a Site Administrator for local website publishing access.
+              </WorkspaceNotice>}
         </details>
       </div>}
       {step === 2 && <div className="space-y-5">
