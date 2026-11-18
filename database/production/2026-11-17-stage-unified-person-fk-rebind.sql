@@ -2,7 +2,7 @@
 --
 -- DO NOT APPLY independently of the single-login / one-Person application
 -- release, role and RLS migration, evidence retention and reviewer approval.
--- On 2026-11-17 Neon main now has 63 remaining validated references to
+-- On 2026-11-17 Neon main now has 36 remaining validated references to
 -- education_v30.persons and ZERO native Person/account records.
 --
 -- This migration does NOT copy People, infer identity by email, create an
@@ -65,8 +65,8 @@ BEGIN
   SELECT count(*) INTO old_count
     FROM pg_constraint
    WHERE contype='f' AND confrelid='education_v30.persons'::regclass;
-  IF old_count <> 63 THEN
-    RAISE EXCEPTION 'Native Person FK graph changed: expected 63, found %',old_count;
+  IF old_count <> 36 THEN
+    RAISE EXCEPTION 'Native Person FK graph changed: expected 36, found %',old_count;
   END IF;
 
   -- Any composite, unvalidated or non-id reference is outside this reviewed
