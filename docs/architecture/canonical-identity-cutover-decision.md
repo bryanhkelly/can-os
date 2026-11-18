@@ -1,5 +1,34 @@
 # Canonical identity cutover decision (main)
 
+## Learner session safety continuation (main, November 17, 2026)
+
+The instructional entrypoint and central canonical learner resolver now enforce
+the **existing CAN login as the primary Person identity**. A native learner
+cookie by itself is refused, including at the low-level native learner
+session reader. A malformed or duplicate cookie is rejected. CAN-only
+instructional reads use the current CAN context and reject delegated/demo
+Person switching; legacy dual-cookie participation is accepted only after
+the existing CAN-to-native verified identity checks.
+
+The following files are committed on GitHub `main`:
+
+- `src/domain/can-learning-cookie-boundary.ts`
+- `src/modules/identity/learning-command-context.server.ts`
+- `src/modules/identity/canonical-command-context.server.ts`
+- `tests/unit/can-learning-cookie-boundary.test.ts`
+- `scripts/acceptance/check-main-one-person-runtime.mjs`
+
+**This is defense in depth, not the complete one-login cutover.** The
+native learner account, Person and cookie creation commands remain in
+noncredit self-enrollment and reviewed Class onboarding. The last 11
+native learner Person FKs and three public correspondence/adult-review
+FKs cannot be retired until those writes, guardian/consent/evidence
+owners, exact Site authority, and the native-cookie transaction guards
+are replaced together. The read-only main runtime preflight must remain
+release-blocking until that coordination and actual acceptance pass.
+Source-level regression tests were added, but Vitest, TypeScript and live
+browser execution have not been verified for this change.
+
 ## Active main checkpoint: 14 remaining native Person references (November 17, 2026)
 
 **Live Neon main is authoritative.** The latest verified database scan shows **142
