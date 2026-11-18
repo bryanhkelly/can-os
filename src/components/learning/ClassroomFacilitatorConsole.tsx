@@ -39,10 +39,16 @@ export function ClassroomFacilitatorConsole({
     setBusy(true); setError(""); setNotice("");
     try {
       await action();
-      await room.refetch();
+    } catch {
+      setError("The classroom action could not be confirmed. Refresh the room before retrying the same action.");
+      setBusy(false);
+      return;
+    }
+    try {
+      await room.refetch({ throwOnError: true });
       setNotice("Classroom action saved.");
     } catch {
-      setError("The classroom action was not saved. Check current Site, room and course authority.");
+      setNotice("Classroom action saved, but the current room state could not be refreshed. Refresh the room before taking another action.");
     } finally { setBusy(false); }
   }
 
