@@ -40,7 +40,7 @@ export async function readLinkedSitePublishedClasses(
       ON pd.id=c.deployment_id AND pd.status='active'
     INNER JOIN public.education_operations op
       ON op.id=pd.operation_id AND op.status='active'
-    INNER JOIN education_v30.deployment_offering_adoptions adoption
+    INNER JOIN public.deployment_offering_adoptions adoption
       ON adoption.id=c.adoption_id
       AND adoption.deployment_id=c.deployment_id
       AND adoption.offering_version_id=c.offering_version_id
