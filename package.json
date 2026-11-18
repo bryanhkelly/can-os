@@ -115,7 +115,8 @@
     "verify:person:main-fk-inventory": "node scripts/acceptance/check-main-person-fk-inventory.mjs",
     "verify:identity:main-core-fks": "node scripts/acceptance/check-main-core-identity-fks.mjs",
     "verify:person:runtime-main": "node scripts/acceptance/check-main-one-person-runtime.mjs",
-    "db:check:main:native-release": "node scripts/acceptance/check-main-native-course-release.mjs"
+    "db:check:main:native-release": "node scripts/acceptance/check-main-native-course-release.mjs",
+    "verify:governance:main-consolidation": "node scripts/acceptance/check-main-governance-leaf-consolidation.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
