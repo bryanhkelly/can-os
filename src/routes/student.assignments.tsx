@@ -2,7 +2,9 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { getAssignments } from "@/modules/student-experience/assignments.functions";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
-import { EmptyState, StatCard, WorkspaceNotice, WorkspaceShell, StatusBadge } from "@/components/workspace";
+import { EmptyState, StatCard, WorkspaceNotice, WorkspaceShell, StatusBadge, DetailNavigation, SectionTab } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { StudentAssignmentLink } from "@/components/student/StudentAssignmentLink";
 import { useStudentDisplayPreferences } from "@/components/shell/WorkspaceSession";
 import { formatTimestamp } from "@/modules/calendar/timezone";
 import { assignmentSummaryForSection } from "@/domain/student-assignment-work";
@@ -52,24 +54,24 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
  return <WorkspaceShell width="wide" eyebrow="Student learning" title="Your assignments"
   subtitle="Read instructions, open an assignment to work on it, and follow through on feedback."
   breadcrumbs={<><Link to="/home" className="underline">Student Today</Link><span>/</span><Link to="/classes" search={section ? { section } : {}} className="underline">{section ? "Class" : "My classes"}</Link><span>/</span><span>Assignments</span></>}
-  actions={<Link to="/calendar-export" className=" border bg-card px-4 py-2 text-sm font-semibold">Export deadlines (.ics)</Link>}>
+  actions={<Button asChild variant="outline" size="sm"><Link to="/calendar-export">Export deadlines (.ics)</Link></Button>}>
   {!connected && <WorkspaceNotice tone="attention" className="mt-5">School records are currently unavailable.</WorkspaceNotice>}
   <div className="mt-6 grid gap-3 sm:grid-cols-3">
    <StatCard label="Assignments" value={summary.total}/>
    <StatCard label="Awaiting feedback" value={summary.awaitingFeedback}/>
    <StatCard label="Graded" value={summary.graded}/>
   </div>
-  <nav aria-label="Assignment filters" className="mt-7 flex flex-wrap gap-2">
+  <DetailNavigation label="Assignment filters">
    {([["all", "All"], ["todo", "To do / revise"], ["missing", "Missing work"], ["submitted", "Submitted"], ["feedback", "Feedback"]] as const)
-    .map(([key, label]) => <Link key={key} to="/student/assignments" search={{ filter: key, section }} aria-current={filter === key ? "page" : undefined}
-     className={" border px-4 py-2 text-xs font-semibold " + (filter === key ? "bg-foreground text-background" : "bg-card")}>{label}</Link>)}
-  </nav>
+    .map(([key, label]) => <SectionTab key={key} current={filter===key}
+     link={{to:"/student/assignments",search:{filter:key,section}}}>{label}</SectionTab>)}
+  </DetailNavigation>
   {!showCompleted && filter === "all" && <p role="status" className="mt-4 text-sm text-muted-foreground">Completed assignments are hidden by your display preference. Use Submitted or Feedback to review them; direct assignment links remain available.</p>}
   <section aria-label="Assignments" className="mt-5 grid items-start gap-4 lg:grid-cols-2">
    {!items.length && <EmptyState kind="matches" title="No assignments in this view."/>}
-   {items.map(item => <Link key={item.assessmentId} to="/student/assignments/$assessmentId"
-    params={{ assessmentId: item.assessmentId }} search={{ filter, section }}
-    className="block w-full  border bg-card p-5 text-left">
+   {items.map(item => <StudentAssignmentLink key={item.assessmentId} assessmentId={item.assessmentId}
+    sectionId={section} filter={filter}
+    className="block w-full border border-border bg-card p-5 text-left hover:border-primary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
     <div className="flex items-start justify-between gap-3">
      <p className="text-xs text-muted-foreground">{item.course}</p>
      <StatusBadge tone={item.timeliness === "missing" ? "attention" : item.status === "graded" ? "success" : item.status === "submitted" ? "info" : "neutral"}>{item.status ?? "not started"}</StatusBadge>
@@ -79,7 +81,7 @@ function StudentAssignmentsView({ data, showCompleted }: { data: AssignmentData;
     <p className="mt-2 text-xs text-muted-foreground">{item.dueAt ? "Due " + formatDate(item.dueAt, item.timezone) : "No due date"}</p>
     {item.score !== null && item.score !== undefined && <p className="mt-2 text-sm">Score: {item.score} / {item.pointsPossible ?? 100}</p>}
     <p className="mt-3 text-sm font-semibold text-primary">Open assignment →</p>
-   </Link>)}
+   </StudentAssignmentLink>)}
   </section>
  </WorkspaceShell>;
 }
