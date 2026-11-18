@@ -31,7 +31,8 @@ describe("Site-owned content source and publication contract",()=>{
     const launch=read("src/routes/launch.site-preview.ts");
     const editor=read("src/modules/sites/site-website-preview.server.ts");
     const publicReader=read("src/modules/sites/site-public-catalog.server.ts");
-    for(const source of [launch,editor,publicReader]){
+    const publisher=read("src/modules/sites/site-publication.server.ts");
+    for(const source of [launch,editor,publicReader,publisher]){
       expect(source).toContain("readApprovedPublicParentExtras(");
       expect(source).toContain("withVerifiedPublicApplications(");
       expect(source).toContain("projectApprovedParentInformation(");
@@ -42,6 +43,8 @@ describe("Site-owned content source and publication contract",()=>{
     expect(launch).toContain("parentInformation,media");
     expect(editor).toContain("parentInformation, media");
     expect(publicReader).toContain("publishedWebsiteContentChannels");
+    expect(publisher).toContain("publishedWebsiteContentChannels");
+    expect(publisher).toContain("mode:\"public\"");
   });
 
   it("uses source-bound blocks rather than arbitrary URLs or approved-Program writes",()=>{
