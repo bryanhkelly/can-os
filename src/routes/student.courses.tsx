@@ -113,6 +113,14 @@ function CourseRegistrationView({data}:{data:Awaited<ReturnType<typeof loadCours
  </WorkspaceShell>;
 }
 
+/** Same V6.1 class actions in every student context; no parallel navigation path. */
+function StudentClassActions({sectionId}:{sectionId:string}) {
+ return <nav aria-label="Class learning actions" className="mt-5 flex flex-wrap gap-3">
+  <Button asChild><Link to="/classes" search={{section:sectionId,tab:"lessons"}}>Open classroom</Link></Button>
+  <Button asChild variant="outline"><Link to="/student/assignments" search={{section:sectionId}}>Classwork</Link></Button>
+ </nav>;
+}
+
 function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistration>>}){
  const {section,tab="overview"}=Route.useSearch();
  const enrolled=data.sections.filter(item=>item.enrollmentStatus==="active");
@@ -140,10 +148,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
      actions={<StatusBadge tone="success">Enrolled</StatusBadge>}>
      <p className="text-sm text-muted-foreground">{item.description??"Your classwork and feedback, in one place."}</p>
      <p className="mt-3 text-sm">Teaching team: {item.teachers?.length?item.teachers.map((teacher,index)=><span key={teacher.personId}>{index>0?", ":""}<Link to="/profiles" search={{person:teacher.personId}} className="underline">{teacher.name}</Link></span>):"Not assigned"}</p>
-     <div className="mt-5 flex flex-wrap gap-3 text-sm">
-      <Link to="/classes" search={{section:item.id,tab:"lessons"}} className=" bg-foreground px-4 py-2 font-semibold text-background">Open class</Link>
-      <Link to="/student/assignments" search={{section:item.id}} className=" border px-4 py-2">Classwork</Link>
-     </div>
+     <StudentClassActions sectionId={item.id}/>
     </WorkspacePanel>)}
     {pendingRequests.length>0&&<WorkspacePanel title="Pending class changes"
      description="A request is not an enrollment. The registrar reviews class availability, and some additions also require guardian permission."
@@ -167,10 +172,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     </DetailNavigation>
     {tab==="overview" ? <WorkspacePanel title="Class overview" description={course.description??"Your classwork and feedback in one place."}>
       <p className="text-sm text-muted-foreground">Teaching team: {course.teachers?.length ? course.teachers.map(teacher=>teacher.name).join(", ") : "Not assigned"}</p>
-      <div className="mt-5 flex flex-wrap gap-3 text-sm">
-        <Link to="/classes" search={{section:course.id,tab:"lessons"}} className=" bg-foreground px-4 py-2 font-semibold text-background">Open classroom</Link>
-        <Link to="/student/courses" search={{section:course.id,tab:"classwork"}} className=" border px-4 py-2">View classwork</Link>
-      </div>
+      <StudentClassActions sectionId={course.id}/>
     </WorkspacePanel> : <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
      <div className="divide-y">{work.filter(item=>tab!=="grades"||item.status==="graded"||item.status==="returned").map(item=><article key={item.assessmentId} className="flex flex-wrap items-start justify-between gap-3 py-4 first:pt-0">
@@ -189,7 +191,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
   <WorkspaceShell width="wide" eyebrow="Student learning" title="My classes"
    subtitle="Enter an enrolled class to see your work, feedback and next steps."
    breadcrumbs={<><Link to="/home" className="underline">Today</Link><span>/</span><span>My classes</span></>}
-   actions={<Link to="/student/courses" search={{view:"catalog"}} className=" border bg-card px-4 py-2 text-sm font-semibold">Course catalog / registration</Link>}>
+   actions={<Button asChild variant="outline"><Link to="/student/courses" search={{view:"catalog"}}>Course catalog / registration</Link></Button>}>
    {content}
   </WorkspaceShell>;
 }
