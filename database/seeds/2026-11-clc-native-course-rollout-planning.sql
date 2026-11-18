@@ -5,9 +5,9 @@
 DO $clc_planning$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM education_v30.organizations WHERE id='ca270000-0000-4000-8000-000000000001'::uuid AND status='prospective'
+    SELECT 1 FROM public.organizations WHERE id='ca270000-0000-4000-8000-000000000001'::uuid AND lifecycle_status='prospective'
   ) OR NOT EXISTS (
-    SELECT 1 FROM education_v30.sites WHERE id='ca270000-0000-4000-8000-000000000002'::uuid AND status='planning'
+    SELECT 1 FROM public.sites WHERE id='ca270000-0000-4000-8000-000000000002'::uuid AND lifecycle_status='planning'
   ) OR NOT EXISTS (
     SELECT 1 FROM education_v30.courses c
       JOIN education_v30.course_versions v ON v.course_id=c.id
@@ -18,7 +18,7 @@ BEGIN
   END IF;
 END $clc_planning$;
 
-INSERT INTO education_v30.education_operations (id,code,name,kind_code,status,web_identity)
+INSERT INTO public.education_operations (id,code,name,kind_code,status,web_identity)
 VALUES ('ca270000-0000-4000-8000-000000000049','CLC-DEMO-EDU','CAN Community Learning Center (Demo)','learning_center','planning',
 '{"synthetic":true,"description":"After-school and summer learning operations under independent approval"}'::jsonb)
 ON CONFLICT (id) DO NOTHING;
