@@ -89,7 +89,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
     <p className="mt-2 text-sm text-muted-foreground">
       Schedule each teaching meeting against the existing CAN delivery calendar.
       Booking a meeting does not enroll learners or record attendance.
-      Meetings can be weekly, twice per week, or on individually selected dates with holiday breaks.
+      Meetings can be weekly, twice per week, Monday through Thursday, or on individually selected dates with holiday breaks.
       A schedule does not create a new Course or enroll anyone.
     </p>
     <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -140,7 +140,7 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
       <h3 className="text-base font-semibold">Plan four dated sessions</h3>
       <p className="mt-1 text-sm text-muted-foreground">
         Pick a starting pattern, then edit any of the four dates or times. This accommodates
-        two meetings in a week, holiday breaks, or a course spanning five or more weeks.
+        two meetings in a week, four consecutive weekdays, holiday breaks, or a course spanning five or more weeks.
         All four bookings are saved together, using the same authorized Course and Site.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -148,9 +148,15 @@ export function ClassroomSchedulePanel({choices,onRoomStarted}:{
           onClick={()=>fillSessionDates("weekly")}>Fill weekly dates</Button>
         <Button type="button" variant="outline" disabled={!!busy||!choice}
           onClick={()=>fillSessionDates("twice-weekly")}>Fill twice-weekly dates</Button>
+        <Button type="button" variant="outline" disabled={!!busy||!choice}
+          onClick={()=>fillSessionDates("monday-thursday")}>Fill Monday–Thursday</Button>
         {showSessionPlanner&&<Button type="button" variant="ghost" disabled={!!busy}
           onClick={()=>setShowSessionPlanner(false)}>Hide date editor</Button>}
       </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Monday–Thursday starts on the first Monday on or after the selected start date.
+        All generated times and dates can be adjusted before saving.
+      </p>
       {showSessionPlanner&&<div className="mt-4 space-y-3">
         {batchMeetings.map((meeting,index)=><fieldset key={index}
           className="grid gap-3 border border-border bg-card p-3 sm:grid-cols-2">
