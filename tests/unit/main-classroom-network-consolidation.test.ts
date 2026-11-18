@@ -36,7 +36,7 @@ describe("Neon main Classroom Connect and network grant migration",()=>{
     const schemaCheck=read("scripts/acceptance/check-classroom-pilot-schema.mjs");
     expect(schemaCheck).toContain('const publicTables=new Set([');
     expect(schemaCheck).toContain('inExpectedSchema(row?.schema_name,name)');
-    expect(schemaCheck).toContain('WHERE schemaname IN (\'public\',\'education_v30\')');
+    expect(schemaCheck).toContain('WHERE schemaname IN (\'education_v30\',\'public\')');
     const mainCheck=read("scripts/acceptance/check-main-classroom-network-consolidation.mjs");
     expect(mainCheck).toContain("CAN_MAIN_CLASSROOM_NETWORK_CHECK");
     expect(mainCheck).toContain('MAIN="br-restless-sea-ar9ooo55"');
