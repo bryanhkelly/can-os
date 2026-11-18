@@ -19,6 +19,7 @@ import {
   WorkspaceShell,
 } from "@/components/workspace";
 import { groupSessionSelectionSchema } from "@/lib/route-search";
+import { Button } from "@/components/ui/button";
 import {
   getCanonicalGroupWorkspace,
   getStudyGroupAvailability,
@@ -177,9 +178,8 @@ function GroupsView({ data }: { data: Data }) {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button
+                  <Button type="button" size="sm" variant="outline"
                     disabled={busy || !availability.membershipEnabled}
-                    className="rounded-lg border px-3 py-2 text-xs disabled:opacity-50"
                     onClick={() =>
                       void run(
                         () =>
@@ -193,16 +193,13 @@ function GroupsView({ data }: { data: Data }) {
                         "Membership declined.",
                       )
                     }
-                  >
-                    Decline
-                  </button>
-                  <button
+                  >Decline</Button>
+                  <Button type="button" size="sm" variant="default"
                     disabled={
                       busy ||
                       !availability.membershipEnabled ||
                       !member.guardianReady
                     }
-                    className="rounded-lg bg-foreground px-3 py-2 text-xs text-background disabled:opacity-50"
                     onClick={() =>
                       void run(
                         () =>
@@ -216,9 +213,7 @@ function GroupsView({ data }: { data: Data }) {
                         "Membership approved.",
                       )
                     }
-                  >
-                    Approve
-                  </button>
+                  >Approve</Button>
                 </div>
               </div>
             ))}
@@ -255,9 +250,8 @@ function GroupsView({ data }: { data: Data }) {
                   </p>
                 )}
                 <div className="mt-2 flex gap-2">
-                  <button
+                  <Button type="button" size="sm" variant="outline"
                     disabled={busy || !availability.moderationEnabled}
-                    className="rounded border px-3 py-2 text-xs disabled:opacity-50"
                     onClick={() =>
                       void run(
                         () =>
@@ -270,12 +264,9 @@ function GroupsView({ data }: { data: Data }) {
                         "Reported post hidden.",
                       )
                     }
-                  >
-                    Hide and resolve
-                  </button>
-                  <button
+                  >Hide and resolve</Button>
+                  <Button type="button" size="sm" variant="outline"
                     disabled={busy || !availability.moderationEnabled}
-                    className="rounded border px-3 py-2 text-xs disabled:opacity-50"
                     onClick={() =>
                       void run(
                         () =>
@@ -288,9 +279,7 @@ function GroupsView({ data }: { data: Data }) {
                         "Report reviewed; content retained.",
                       )
                     }
-                  >
-                    Resolve only
-                  </button>
+                  >Resolve only</Button>
                 </div>
               </div>
             ))}
