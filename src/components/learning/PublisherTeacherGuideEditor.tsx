@@ -88,7 +88,7 @@ export function PublisherTeacherGuideEditor({courseCode,content,guides,onChange}
       onChange={e=>{if(e.target.value)addLesson(module.id,e.target.value);}}>
       <option value="">Choose a lesson</option>
       {unassigned.map(lesson=><option key={lesson.id} value={lesson.id}>{lesson.title}</option>)}
-     </Select</Label>}
+     </Select></Label>}
    </section>;
   })}
   {guides?.units.length?<p className="text-xs">Teacher guide status: {guides.units.map(u=>u.reviewStatus).join(", ")}. Teacher or school approval is a separate institutional decision.</p>
