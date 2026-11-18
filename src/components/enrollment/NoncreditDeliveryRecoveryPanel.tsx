@@ -71,7 +71,7 @@ export function NoncreditDeliveryRecoveryPanel({releaseId}:{releaseId:string}){
   {history.isPending&&<p role="status" className="mt-4 text-sm">Loading invitation receipts…</p>}
   {history.isError&&<WorkspaceNotice tone="danger" className="mt-4">
    Delivery status is unavailable. Check your current provider and Site authorization.
-  </WorkspaceNotice>
+  </WorkspaceNotice>}
   {history.data&&<div className="mt-4 divide-y divide-border border border-border">
    {history.data.items.map(row=><article key={row.id} className="p-3 text-sm">
     <div className="flex flex-wrap items-center justify-between gap-3">
