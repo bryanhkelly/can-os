@@ -202,6 +202,26 @@ async function run(){
     if(Number(row.total_rows)!==referenceRowCounts[row.name])
       throw new Error("Reference record count changed: "+row.name);
   }
+  // The public-site projection is intentionally still an education_v30
+  // SECURITY DEFINER routine while the old function namespace is retired.
+  // Its single Operation-to-Site join must resolve the authoritative public
+  // relation, without widening the function's fixed search_path or grants.
+  const [siteProjection]=await sql`
+    SELECT p.prosecdef AS security_definer,
+      p.proconfig AS secure_path,
+      p.proacl::text AS acl,
+      (p.prosrc LIKE '%LEFT JOIN public.education_operation_sites os%')
+        AS reads_public_site_relation
+    FROM pg_proc p
+    WHERE p.oid='education_v30.v301_public_site_claims(text)'::regprocedure
+  `;
+  if(!siteProjection?.security_definer ||
+      !siteProjection?.reads_public_site_relation ||
+      siteProjection.acl!=='{neondb_owner=X/neondb_owner}' ||
+      JSON.stringify(siteProjection.secure_path)!==
+        JSON.stringify(['search_path=pg_catalog, education_v30, pg_temp']))
+    throw new Error("Public-site projection/security contract changed after Operation Site consolidation");
+
   // Security must not be weakened by a physical schema move. The two guarded
   // protected-table batches retained their existing FORCE RLS and policies.
   const protectedNames=[
