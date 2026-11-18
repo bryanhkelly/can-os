@@ -150,6 +150,9 @@ export async function getPartnerWebsitePreview(actor: AccessContext, proposedCon
     canPrepareWebsite: actor.role === "site_admin",
     demonstration: siteConfiguration?.metadata?.synthetic === true,
     siteInformation:siteInformation.success?siteInformation.data:null,
+    // Reuse the exact Site-owned layout document from Launch, not a cloned
+    // editor model or a second website configuration record.
+    contentChannelConfig: contentConfig,
     // Single-source mapping diagnostics for the authenticated Website & Brand
     // review step. Private setup facts never become public claims here.
     sourceMapping: {
