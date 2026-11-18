@@ -1,6 +1,9 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { classroomAttendanceNeedsExplanation } from "@/domain/classroom-attendance";
 import {
   attestClassroomParticipation, getClassroomAttendanceRoster,
 } from "@/modules/learning/classroom-attendance.functions";
@@ -27,6 +30,20 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
   async function attest(courseAttemptId:string,status:Status){
     if(busy)return;
     const note=notes[courseAttemptId]?.trim()||null;
+    const participant=roster.data?.members.find(member=>member.courseAttemptId===courseAttemptId);
+    if(!participant || !roster.data?.attestationsOpen){
+      setError("The current registered roster or correction window must be verified before saving.");
+      return;
+    }
+    if(classroomAttendanceNeedsExplanation({
+      pairedDevice:participant.pairedDevice,
+      previousStatus:participant.lastAssertedAt?participant.latestStatus:null,
+      previousMethod:participant.latestMethod,
+      nextStatus:status,nextMethod:method,
+    }) && (!note || note.length<15)){
+      setError("Add a direct-observation note of at least 15 characters for a learner without a paired device or a changed verification.");
+      return;
+    }
     const key=[courseAttemptId,status,method,note||""].join(":");
     const requestId=retries.current[key]??crypto.randomUUID();
     retries.current[key]=requestId;
@@ -38,6 +55,7 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       }});
       delete retries.current[key];
       await roster.refetch();
+      setNotes(current=>({...current,[courseAttemptId]:""}));
       setMessage(result.noDeviceEvidence?
         "Direct facilitator verification recorded without adding a device pairing.":
         "Facilitator verification recorded independently of device activity.");
@@ -54,11 +72,11 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       identity. This is operational verification, not official academic roll-call.
     </p>
     <label className="mt-4 block text-sm font-medium">How will you verify?
-      <select className="mt-2 w-full min-h-10 border border-border bg-background p-2"
+      <Select className="mt-2"
         value={method} onChange={e=>setMethod(e.target.value as Method)}>
         <option value="in_person_roll_call">Direct in-person roll call</option>
         <option value="remote_live_check">Direct remote-live check</option>
-      </select>
+      </Select>
     </label>
     {roster.isPending&&<p role="status" className="mt-3 text-sm">Checking current Site roster…</p>}
     {roster.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
@@ -87,12 +105,15 @@ export function ClassroomAttendancePanel({facilitatedSessionId}:{
       </div>
       <label className="mt-3 block text-xs font-medium">
         Verification note (required for no-device learners and changes)
-        <textarea className="mt-1 w-full border border-border bg-background p-2 text-sm"
+        <Textarea className="mt-1"
           rows={2} maxLength={250}
           value={notes[person.courseAttemptId]??""}
           placeholder="I spoke directly with the learner during the session…"
-          onChange={e=>setNotes(old=>({...old,[person.courseAttemptId]:e.target.value}))}/>
+          onChange={e=>{setError("");setNotes(old=>({...old,[person.courseAttemptId]:e.target.value}));}}/>
       </label>
+      {(!person.pairedDevice || person.lastAssertedAt) && <p className="mt-1 text-xs text-muted-foreground">
+        An explanation of at least 15 characters is required for unpaired learners or changes to a previous verification.
+      </p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {(["present","absent","unknown"] as const).map(status=>
           <Button type="button" size="sm" key={status}
