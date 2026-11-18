@@ -37,7 +37,7 @@ export function GradebookReviewedFeedback({
         : null}
     <ActionDialog open={confirmRevision} title="Return this submission for revision?"
       description="The existing grade remains in the student's grading history. The student can revise and resubmit subject to the configured attempt limit."
-      confirmLabel="Return for revision" pending={busy} confirmDisabled={busy}
+      confirmLabel="Return for revision" pending={busy} pendingLabel="Returning work…" confirmDisabled={busy}
       onClose={() => setConfirmRevision(false)}
       onConfirm={() => { setConfirmRevision(false); onReturnForRevision(); }}/>
   </div>;
