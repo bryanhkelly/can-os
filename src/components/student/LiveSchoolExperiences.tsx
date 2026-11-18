@@ -68,9 +68,9 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
   });
  }
  const format=(stamp:string,tz="America/Los_Angeles")=>new Intl.DateTimeFormat("en-US",{weekday:"short",month:"short",day:"numeric",hour:"numeric",minute:"2-digit",timeZone:tz}).format(new Date(stamp));
- const unavailable=!data.connected&&<span role="status" className="h-fit rounded-full border border-border px-3 py-2 text-xs font-semibold">School updates temporarily unavailable</span>;
+ const unavailable=!data.connected&&<span role="status" className="h-fit  border border-border px-3 py-2 text-xs font-semibold">School updates temporarily unavailable</span>;
  return <section {...(framed?{"aria-labelledby":"school-community-heading"}:{"aria-label":"School experiences"})} className={framed?"mt-6 w-full":"w-full"}>
-  <div className={framed?"rounded-2xl border bg-card p-5 sm:p-7":undefined}>
+  <div className={framed?" border bg-card p-5 sm:p-7":undefined}>
    {framed?<div className="flex flex-wrap justify-between gap-3">
     <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Student life</p><h2 id="school-community-heading" className="mt-2 font-serif text-3xl">School &amp; community</h2><p className="mt-2 text-sm text-muted-foreground">School calendar updates, announcements and teacher conferences.</p></div>
     {unavailable}
@@ -80,7 +80,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
     {show("calendar")&&<div className="space-y-3">
      <Heading className="font-semibold">School calendar</Heading>
      <p className="text-xs text-muted-foreground">Upcoming schedule changes and important dates.</p>
-     {bounded(data.events).map(event=><div key={event.id} className="rounded-xl border border-border bg-background p-4">
+     {bounded(data.events).map(event=><div key={event.id} className=" border border-border bg-background p-4">
       <p className="text-sm font-semibold"><Link to="/calendar" search={{date:dateKeyInTimezone(event.startsAt,event.timezone),event:event.id}} className="hover:underline focus-visible:outline-2">{event.title}</Link></p>
       <p className="mt-1 text-xs text-muted-foreground">{format(event.startsAt,event.timezone)}</p>
       <StatusBadge tone={event.status==="cancelled"?"attention":"neutral"}>{formatStatus(event.status)}</StatusBadge>
@@ -92,7 +92,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
     {show("announcements")&&<div className="space-y-3">
      <Heading className="font-semibold">Announcements</Heading>
      <p className="text-xs text-muted-foreground">Updates from your school and CAN.</p>
-     {bounded(data.notices).map(notice=><div key={notice.id} className="rounded-xl border border-border bg-background p-4">
+     {bounded(data.notices).map(notice=><div key={notice.id} className=" border border-border bg-background p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
        <p className="text-sm font-semibold"><Link to="/notifications" search={{notification:notice.id}} className="hover:underline focus-visible:outline-2">{notice.title}</Link></p>
        <StatusBadge tone={notice.acknowledged?"success":"info"}>{notice.acknowledged?"Read":"New"}</StatusBadge>
@@ -112,12 +112,12 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
       </Select>
      </Field>}
      {data.viewerRole==="guardian"&&studentsLoading&&<p role="status" className="text-xs text-muted-foreground">Loading eligible students…</p>}
-     {data.viewerRole==="guardian"&&studentsError&&<p role="alert" className="rounded-lg border border-destructive/40 p-3 text-sm text-destructive">{studentsError}</p>}
+     {data.viewerRole==="guardian"&&studentsError&&<p role="alert" className=" border border-destructive/40 p-3 text-sm text-destructive">{studentsError}</p>}
      {data.viewerRole==="guardian"&&!studentsLoading&&!studentsError&&children.length===0&&<p role="status" className="text-xs text-muted-foreground">No eligible students are currently available for conference booking.</p>}
      {data.viewerRole==="guardian"&&familySearch.student&&!studentsLoading&&!studentsError&&children.length>0&&!requestedChild&&!selectedChildOverride&&<p role="alert" className="text-sm text-destructive">The selected student is unavailable in this family account. Choose an eligible student before booking.</p>}
      {data.viewerRole==="guardian"&&data.bookings.length>0&&<div className="space-y-3">
       <h4 className="text-sm font-semibold">Your upcoming appointments</h4>
-      {data.bookings.map(booking=><div key={booking.id} className="rounded-xl border p-3">
+      {data.bookings.map(booking=><div key={booking.id} className=" border p-3">
        <p className="text-sm font-semibold">{booking.seriesTitle}</p>
        <p className="mt-1 text-xs">{booking.teacherName}</p>
        <p className="mt-1 text-sm">{format(booking.startsAt,booking.timezone)} – {format(booking.endsAt,booking.timezone)} · {booking.timezone}</p>
@@ -134,7 +134,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
      </div>}
      {data.viewerRole==="guardian"&&data.recentConferenceNotes.length>0&&<div className="space-y-3">
       <h4 className="text-sm font-semibold">Recent conference notes</h4>
-      {data.recentConferenceNotes.map(conference=><article key={conference.id} className="rounded-xl border p-3">
+      {data.recentConferenceNotes.map(conference=><article key={conference.id} className=" border p-3">
        <p className="text-sm font-semibold">{conference.seriesTitle}</p>
        <p className="mt-1 text-xs text-muted-foreground">
         {children.find(child=>child.studentPersonId===conference.studentPersonId)?.firstName??"Student"} · {conference.teacherName} · {format(conference.startsAt,conference.timezone)} · {conference.timezone}
@@ -144,7 +144,7 @@ export function LiveSchoolExperiences({data,view="all",moreLink}:{data:Data;view
       </article>)}
      </div>}
      <p className="text-xs text-muted-foreground">Book an available teacher office-hour appointment.</p>
-     {bounded(data.slots).map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border p-4">
+     {bounded(data.slots).map(slot=><div key={slot.id} className="flex flex-wrap items-center gap-3  border border-border p-4">
       <div className="flex-1"><p className="text-sm font-semibold">{slot.seriesTitle}</p>
        <p className="mt-1 text-xs">{slot.teacherName}</p>
        <p className="mt-1 text-sm">{format(slot.startsAt,slot.timezone)} – {format(slot.endsAt,slot.timezone)} · {slot.timezone}</p>
