@@ -149,7 +149,7 @@ export function TeacherConferencePanel() {
       error={!loading ? loadError || "Conference scheduling is unavailable for this account." : undefined}
       onRetry={() => void retryLoad()} retrying={loading}/>}
     {data?.connected && <>
-      <form className="mt-4 grid gap-3 rounded-xl border bg-card p-5 sm:grid-cols-2" aria-label="Open office-hour window"
+      <form className="mt-4 grid gap-3 border border-border bg-card p-5 sm:grid-cols-2" aria-label="Open office-hour window"
         onSubmit={event => {
           event.preventDefault();
           void perform(async () => {
@@ -193,10 +193,10 @@ export function TeacherConferencePanel() {
       </form>
 
       <div className="mt-6 grid gap-3">
-        {data.series.length === 0 && <p className="rounded-xl border bg-card p-5 text-sm text-muted-foreground">
+        {data.series.length === 0 && <p className="border border-border bg-card p-5 text-sm text-muted-foreground">
           No upcoming office-hour windows yet.
         </p>}
-        {data.series.map(series => <article key={series.id} className="rounded-xl border bg-card p-5">
+        {data.series.map(series => <article key={series.id} className="border border-border bg-card p-5">
           <h3 className="font-semibold">{series.title}</h3>
           <p className="mt-1 text-xs text-muted-foreground">
             {format(series.startsAt)} – {format(series.endsAt)} · {series.slotMinutes}-minute appointments ·{" "}
@@ -208,7 +208,7 @@ export function TeacherConferencePanel() {
       {data.bookings.length > 0 && <div className="mt-6 grid gap-3" aria-label="Conference bookings">
         <p className="text-xs text-muted-foreground">Up to 50 appointments, with pending bookings first; includes the past 30 days.
           Record held appointments only after they start, and no-shows after they end.</p>
-        {data.bookings.map(booking => <article key={booking.id} className="rounded-xl border bg-card p-5">
+        {data.bookings.map(booking => <article key={booking.id} className="border border-border bg-card p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-semibold">{booking.studentName}</h3>
@@ -242,7 +242,7 @@ export function TeacherConferencePanel() {
                 Cancel booking
               </Button>
             </div>}
-            {booking.notes.map(note => <p key={note.id} className="mt-3 rounded-lg border p-3 text-sm">
+            {booking.notes.map(note => <p key={note.id} className="mt-3 border border-border p-3 text-sm">
               <span className="font-semibold">{note.visibility === "family_visible" ? "Family-visible summary" : "Staff-private note"}</span>
               <span className="ml-2">{note.note}</span>
             </p>)}
