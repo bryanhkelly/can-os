@@ -1,4 +1,6 @@
 import type { getGradebook } from "@/modules/learning/gradebook.functions";
+import { Button } from "@/components/ui/button";
+import { WorkspaceNotice } from "@/components/workspace";
 
 type Gradebook = Awaited<ReturnType<typeof getGradebook>>;
 type Assessment = Gradebook["assessments"][number];
@@ -21,8 +23,9 @@ export function GradebookReviewedFeedback({
     </p>)}
     <p className="whitespace-pre-wrap">{cell.feedbackComment || "No feedback comment recorded."}</p>
     {cell.status === "graded" && assessment.maxAttempts !== null && cell.attemptNumber >= assessment.maxAttempts
-      ? <p className="text-sm">The configured attempt limit has been reached. This submission cannot be returned for another attempt.</p>
-      : cell.status === "graded" && <button type="button" disabled={busy} onClick={onReturnForRevision}
-          className="rounded-lg border px-4 py-2 font-semibold disabled:opacity-50">Return for revision</button>}
+      ? <WorkspaceNotice tone="attention">The configured attempt limit has been reached. This submission cannot be returned for another attempt.</WorkspaceNotice>
+      : cell.status === "graded" && <Button type="button" variant="outline" disabled={busy} onClick={onReturnForRevision}>
+          Return for revision
+        </Button>
   </div>;
 }
