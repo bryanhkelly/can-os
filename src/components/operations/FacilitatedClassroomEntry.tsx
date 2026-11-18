@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { WorkspacePanel } from "@/components/workspace";
+import { WorkspacePanel, WorkspaceNotice, StatusBadge } from "@/components/workspace";
 import { getFacilitatedHostWorkspace } from "@/modules/learning/facilitated-learning.functions";
 
 /**
@@ -28,7 +28,7 @@ export function FacilitatedClassroomEntry({ siteId }: { siteId: string }) {
     {workspace.isPending && <p role="status" className="text-sm text-muted-foreground">
       Verifying current classroom permissions…
     </p>}
-    {workspace.isError && <div className="space-y-3 text-sm">
+    {workspace.isError && <WorkspaceNotice tone="attention" className="mt-2">
       <p role="status">
         Classroom delivery access could not be verified for this login.
         Your onsite supervision and attendance tools remain separate.
@@ -37,22 +37,32 @@ export function FacilitatedClassroomEntry({ siteId }: { siteId: string }) {
       <Button type="button" variant="outline" size="sm"
         disabled={workspace.isFetching}
         onClick={() => void workspace.refetch()}>Recheck classroom access</Button>
-    </div>}
+    </WorkspaceNotice>}
     {workspace.isSuccess && !authorized && <p role="status" className="text-sm">
       The classroom membership does not match your currently selected Site.
       Use the authorized Site membership rather than switching classroom identities.
     </p>}
-    {authorized && <div className="flex flex-wrap items-center justify-between gap-4">
-      <div className="text-sm">
-        <p><strong>{liveRooms}</strong> live rooms · <strong>{choices}</strong> available course choices</p>
-        {choices === 0 && <p className="mt-1 text-muted-foreground">
-          No course with an active learner attempt is currently available at this Site.
-          Approved rehearsal options are checked independently in the classroom workspace.
-        </p>}
+    {authorized && <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="space-y-2 text-sm">
+          <StatusBadge tone={choices ? "info" : "attention"}>
+            {choices ? "Authorized Course choices available" : "No Course eligible to start"}
+          </StatusBadge>
+          <p><strong>{liveRooms}</strong> live rooms · <strong>{choices}</strong> available course choices</p>
+        </div>
+        <Button asChild size="sm">
+          <Link to="/canonical/lab/facilitated">Open facilitated classrooms</Link>
+        </Button>
       </div>
-      <Button asChild size="sm">
-        <Link to="/canonical/lab/facilitated">Open facilitated classrooms</Link>
-      </Button>
+      {choices === 0 && <WorkspaceNotice tone="attention">
+        <p>No published Course with an active learner attempt is available through an
+          authorized active deployment at this Site. Your Site administrator should
+          verify the deployment, published Course and learner participation before
+          scheduling a live learning room. Approved media rehearsal is checked separately.</p>
+        <p className="mt-2">Physical room coverage, qualified backup staff, supervision and
+          verified onsite attendance remain separate requirements. Opening this workspace
+          does not approve a school day or establish presence.</p>
+      </WorkspaceNotice>}
     </div>}
   </WorkspacePanel>;
 }
