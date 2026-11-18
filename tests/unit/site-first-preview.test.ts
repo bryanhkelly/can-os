@@ -54,6 +54,26 @@ describe("Private Site preview pulls data channels through the actual template",
         expect(html).toContain('data-content-channel="'+channel+'"');
     }
   });
+  it("renders approved Class links on every template without claiming enrollment is open", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    const classBlock=defaultSiteContentChannelConfig.blocks.find(block=>block.channel==="learning.classes")!;
+    const blocks=resolveSiteContentBlocks({
+      version:2,revision:1,blocks:[classBlock],
+    },{
+      mode:"public",enrollmentOrigin:"https://app.example.org",
+      classes:[{classId:id,title:"AI Skills Workshop",deliveryMode:"facilitated",nextStartsAt:null}],
+    });
+    expect(blocks[0]?.items[0]?.link?.href).toBe(
+      "https://app.example.org/class?classId="+id,
+    );
+    for(const templateId of siteTemplateIds) {
+      const html=renderPublicSiteHtml({...base(templateId),contentBlocks:blocks});
+      expect(html).toContain("https://app.example.org/class?classId="+id);
+      expect(html).toContain("View this Class");
+      expect(html).not.toContain("Enroll in Class");
+    }
+  });
+
   it("keeps a dark modern theme for programs instead of a mismatched white insert", () => {
     const html = renderPublicSiteHtml({...base("modern"), contentBlocks: channels}, {localPreview: true});
     expect(html).toContain("body.template-modern .site-content-block .site-channel-card");
