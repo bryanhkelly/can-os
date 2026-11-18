@@ -6,7 +6,6 @@ import { MutationFeedback } from "@/components/workspace";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { useWorkspaceSession } from "@/components/shell/WorkspaceSession";
 import { getMyNoncreditSelfEnrollments, getMyNoncreditRegistrationById } from "@/modules/enrollment/noncredit-self-enrollment.functions";
-import { openMyNoncreditCourse } from "@/modules/enrollment/noncredit-self-enrollment-resume.functions";
 import { withdrawMyNoncreditRegistration } from "@/modules/enrollment/noncredit-self-enrollment-withdraw.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import {getMyNoncreditWaitlist,getMyNoncreditWaitlistByRelease,cancelMyNoncreditWaitlist} from "@/modules/enrollment/noncredit-waitlist.functions";
@@ -45,7 +44,7 @@ export function NoncreditEnrollmentManagement({registrationId,releaseId}:{regist
     if(busy)return;
     setBusy(courseAttemptId);setError("");
     try{
-      await openMyNoncreditCourse({data:{courseAttemptId}});
+      // The course workspace restores its verified session for all entry paths.
       await navigate({to:"/learn/course/$courseAttemptId",params:{courseAttemptId}});
     }catch(e){
       setError(normalizeClientError(e,"Could not open the current learner course.").message);
