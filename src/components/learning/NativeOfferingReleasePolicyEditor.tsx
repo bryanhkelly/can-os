@@ -5,7 +5,8 @@ import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { normalizeClientError } from "@/lib/client-error";
+import { useMutationFeedback } from "@/lib/mutation-feedback";
+import { MutationFeedback, WorkspaceNotice } from "@/components/workspace";
 import {
   getNativeOfferingReleasePolicyReview,saveNativeOfferingReleasePolicy,
 } from "@/modules/learning/native-offering-release.functions";
@@ -26,9 +27,14 @@ export function NativeOfferingReleasePolicyEditor({
   const [drafts,setDrafts]=useState<Record<string,DraftPolicy>>({});
   const [evidenceVersionId,setEvidenceVersionId]=useState("");
   const [rationale,setRationale]=useState("");
-  const [busy,setBusy]=useState(false);
-  const [error,setError]=useState("");
-  const [notice,setNotice]=useState("");
+  const [validationError,setValidationError]=useState("");
+  const feedback=useMutationFeedback(async()=>{
+    await Promise.all([
+      client.invalidateQueries({queryKey:["native-offering-release-policy",offeringVersionId]}),
+      client.invalidateQueries({queryKey:["native-offering-release-review-queue"]}),
+      client.invalidateQueries({queryKey:["native-offering-release-overview",offeringVersionId]}),
+    ]);
+  });
   useEffect(()=>{
     if(!query.data)return;
     setDrafts(Object.fromEntries(query.data.courses.map(course=>{
@@ -41,8 +47,9 @@ export function NativeOfferingReleasePolicyEditor({
     })));
   },[query.dataUpdatedAt]);
   async function save(event:FormEvent){
-    event.preventDefault();setError("");setNotice("");
-    if(!query.data||query.data.lifecycle!=="draft"||busy)return;
+    event.preventDefault();setValidationError("");
+    if(!query.data||query.data.lifecycle!=="draft"||
+      feedback.pending||feedback.refreshFailed)return;
     const requirements=query.data.courses.map(course=>{
       const draft=drafts[course.courseVersionId];
       return {
@@ -57,27 +64,19 @@ export function NativeOfferingReleasePolicyEditor({
     if(requirements.some(item=>!Number.isInteger(item.minimumApprovedPrimaryTracks)||
       item.minimumApprovedPrimaryTracks<0||item.minimumApprovedPrimaryTracks>10||
       item.completeLessonCoverageRequired&&item.minimumApprovedPrimaryTracks<1)){
-      setError("Use 0 to 10 approved primary tracks per Course. Complete recorded lesson coverage requires at least one.");
+      setValidationError("Use 0 to 10 approved primary tracks per Course. Complete recorded lesson coverage requires at least one.");
       return;
     }
-    setBusy(true);
-    try{
-      await saveNativeOfferingReleasePolicy({data:{
-        offeringVersionId,expectedManuscriptHash:query.data.manuscriptHash,
-        expectedPolicyRevision:query.data.revision,
-        requirements,reviewEvidenceVersionId:evidenceVersionId.trim(),
-        rationale:rationale.trim(),
-      }});
-      setNotice("Release policy saved with verified independent review evidence. Any asset-backed manifest submitted before this change needs fresh review.");
-      await Promise.all([
-        client.invalidateQueries({queryKey:["native-offering-release-policy",offeringVersionId]}),
-        client.invalidateQueries({queryKey:["native-offering-release-review-queue"]}),
-        client.invalidateQueries({queryKey:["native-offering-release-overview",offeringVersionId]}),
-      ]);
-    }catch(cause){
-      setError(normalizeClientError(cause,
-        "Release policy was not saved. Verify your independent Course review appointment and current evidence.").message);
-    }finally{setBusy(false)}
+    await feedback.run(()=>saveNativeOfferingReleasePolicy({data:{
+      offeringVersionId,expectedManuscriptHash:query.data!.manuscriptHash,
+      expectedPolicyRevision:query.data!.revision,
+      requirements,reviewEvidenceVersionId:evidenceVersionId.trim(),
+      rationale:rationale.trim(),
+    }}),{
+      successMessage:"Release policy saved with independent verified evidence. Any previous asset-backed review now needs a fresh snapshot.",
+      commandErrorMessage:"Release policy was not saved. Verify your current independent Course reviewer appointment and evidence.",
+      refreshErrorMessage:"Release policy saved, but current policy records could not refresh. Retry refresh before another decision.",
+    });
   }
   return <section className="mt-4 border border-border p-4" aria-label="Native Offering release requirements">
     <h4 className="font-semibold">Course release requirements</h4>
@@ -87,9 +86,9 @@ export function NativeOfferingReleasePolicyEditor({
       Changes are evidence-backed, audited and invalidate prior asset-backed snapshots.
     </p>
     {query.isPending&&<p role="status" className="mt-3 text-sm">Checking native Course policy…</p>}
-    {query.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
+    {query.isError&&<WorkspaceNotice tone="danger" className="mt-3">
       Current policy is unavailable under your verified reviewer appointment.
-    </p>}
+    </WorkspaceNotice>}
     {query.data&&<form className="mt-4 grid gap-4" onSubmit={event=>void save(event)}>
       {query.data.courses.map(course=>{
         const current=drafts[course.courseVersionId];
@@ -131,12 +130,15 @@ export function NativeOfferingReleasePolicyEditor({
           value={rationale} onChange={event=>setRationale(event.target.value)}
           placeholder="Explain the required recorded tracks and coverage decision"/>
       </Field>
-      <div><Button type="submit" disabled={busy||query.data.lifecycle!=="draft"||
-        !evidenceVersionId.trim()||rationale.trim().length<10}>
-        {busy?"Saving independently reviewed policy…":"Save governed release requirements"}
+      <div><Button type="submit" disabled={feedback.pending||feedback.refreshFailed||
+        query.data.lifecycle!=="draft"||!evidenceVersionId.trim()||rationale.trim().length<10}>
+        {feedback.pending?"Saving independently reviewed policy…":"Save governed release requirements"}
       </Button></div>
     </form>}
-    {notice&&<p role="status" className="mt-3 text-sm">{notice}</p>}
-    {error&&<p role="alert" className="mt-3 text-sm text-destructive">{error}</p>}
+    {validationError&&<WorkspaceNotice tone="attention" className="mt-3">
+      {validationError}
+    </WorkspaceNotice>}
+    <MutationFeedback state={feedback} className="mt-3"
+      pendingMessage="Verifying the current Course appointment and policy evidence…"/>
   </section>;
 }
