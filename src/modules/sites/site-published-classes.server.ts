@@ -31,7 +31,7 @@ export async function readLinkedSitePublishedClasses(
        WHERE cs.class_id=c.id AND ds.starts_at>=CURRENT_TIMESTAMP
       ) AS "nextStartsAt"
     FROM education_v30.classes c
-    INNER JOIN education_v30.class_offerings co ON co.class_id=c.id
+    INNER JOIN public.class_offerings co ON co.class_id=c.id
     INNER JOIN education_v30.class_offering_versions cv
       ON cv.class_id=c.id AND cv.class_offering_id=co.id
     INNER JOIN public.sites s
