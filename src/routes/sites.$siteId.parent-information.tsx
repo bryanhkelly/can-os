@@ -99,7 +99,7 @@ function SiteParentInformationEditor({data}:{
     </p>
     <MutationFeedback state={mutation} className="mt-5"
       pendingMessage="Saving the institutional review…"/>
-    <section className="mt-5 rounded-xl border bg-card p-4" aria-label="Review provenance">
+    <section className="mt-5  border bg-card p-4" aria-label="Review provenance">
       <h2 className="text-sm font-semibold">Institutional review history</h2>
       <dl className="mt-2 grid gap-2 text-sm sm:grid-cols-2">
         <div><dt className="text-muted-foreground">Most recent review</dt>
@@ -121,7 +121,7 @@ function SiteParentInformationEditor({data}:{
     </section>
 
     <form noValidate onSubmit={save} className="mt-6 space-y-5">
-      <fieldset className="rounded-xl border bg-card p-5">
+      <fieldset className=" border bg-card p-5">
         <legend className="px-2 text-lg font-semibold">Public school location</legend>
         {location?<p className="text-sm">{location.street1}
           {location.street2?", "+location.street2:""}, {location.city}, {location.state} {location.postalCode}, {location.country}</p>:
@@ -144,7 +144,7 @@ function SiteParentInformationEditor({data}:{
           <Checkbox checked={publicLocationConfirmed} disabled={busy} onChange={e=>setPublicLocationConfirmed(e.target.checked)}/>
         </Field>}
       </fieldset>
-      <fieldset className="rounded-xl border bg-card p-5">
+      <fieldset className=" border bg-card p-5">
         <legend className="px-2 text-lg font-semibold">School-controlled public contact</legend>
         {contact?<div className="text-sm">
           <p>Display: {contact.displayName}</p>
