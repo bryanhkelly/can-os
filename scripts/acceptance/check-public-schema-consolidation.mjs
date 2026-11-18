@@ -35,6 +35,7 @@ const repoFiles=[
   "database/production/2026-11-18-consolidate-three-active-empty-leaf-tables.sql",
   "database/production/2026-11-18-consolidate-education-operation-sites.sql",
   "database/production/2026-11-18-consolidate-three-active-view-backed-tables.sql",
+  "database/production/2026-11-18-consolidate-approved-deployment-adoptions.sql",
 ];
 const referenceRowCounts={
   feedback_categories:8,workforce_families:9,workforce_delivery_modes:5,
@@ -47,6 +48,7 @@ const referenceRowCounts={
   survey_definitions:0,
   education_operations:1,
   education_operation_sites:1,
+  deployment_offering_adoptions:1,
   facilitated_learning_participants:0,facilitated_learning_playback:0,program_publication_claims:0,
   publication_withdrawals:0,learner_outcomes:0,qualification_resource_fulfillments:0,
   noncredit_enrollment_waitlist:0,
@@ -132,6 +134,8 @@ async function run(){
             THEN (SELECT count(*) FROM public.education_operations)
         WHEN c.relname='education_operation_sites'
             THEN (SELECT count(*) FROM public.education_operation_sites)
+        WHEN c.relname='deployment_offering_adoptions'
+            THEN (SELECT count(*) FROM public.deployment_offering_adoptions)
         WHEN c.relname='facilitated_learning_participants'
             THEN (SELECT count(*) FROM public.facilitated_learning_participants)
         WHEN c.relname='facilitated_learning_playback'
@@ -230,6 +234,22 @@ async function run(){
         JSON.stringify(['search_path=pg_catalog, education_v30, pg_temp']))
     throw new Error("Public-site projection/security contract changed after Operation Site consolidation");
 
+
+  // The instructional-track publication validator continues to enforce its
+  // original business rule under the same locked-down function configuration.
+  const [adoptionValidator]=await sql`
+    SELECT p.prosecdef AS security_definer,p.proconfig AS path,
+      p.proacl::text AS acl,
+      (p.prosrc LIKE '%FROM public.deployment_offering_adoptions a%') AS reads_public
+    FROM pg_proc p
+    WHERE p.oid='education_v30.validate_instructional_track_policy_publication()'::regprocedure
+  `;
+  if(!adoptionValidator || adoptionValidator.security_definer ||
+      !adoptionValidator.reads_public || adoptionValidator.acl!==null ||
+      JSON.stringify(adoptionValidator.path)!==
+        JSON.stringify(['search_path=education_v30, pg_catalog']))
+    throw new Error("Deployment adoption publication validator cutover failed");
+
   // Security must not be weakened by a physical schema move. The two guarded
   // protected-table batches retained their existing FORCE RLS and policies.
   const protectedNames=[
@@ -272,8 +292,10 @@ async function run(){
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
     ...readFileSync("database/production/2026-11-18-consolidate-three-active-view-backed-tables.sql","utf8")
       .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
+    ...readFileSync("database/production/2026-11-18-consolidate-approved-deployment-adoptions.sql","utf8")
+      .matchAll(/^ALTER TABLE education_v30\.([a-z_]+) SET SCHEMA public;$/gm),
   ].map(match=>match[1]);
-  if(protectedNames.length!==86)throw new Error("Expected 86 reviewed protected table relocations");
+  if(protectedNames.length!==87)throw new Error("Expected 87 reviewed protected table relocations");
   const security=await sql`
     SELECT c.relname AS name,c.relrowsecurity AS rls,c.relforcerowsecurity AS forced,
       (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policy_count
