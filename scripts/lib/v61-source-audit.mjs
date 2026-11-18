@@ -215,7 +215,7 @@ export function checkChangedFiles(root, base = process.env.V61_BASE_REF || "HEAD
     try { previous = analyzeSource(git(src, ["show", base + ":" + path]), file); }
     catch { previous = { native: [], corners: [] }; }
     result.checked += 1;
-    for (const key of ["native", "corners"]) {
+    for (const key of ["native", "corners", "syntaxErrors"]) {
       if (current[key].length > previous[key].length) {
         result.errors.push(path + ": " + key + " increased from " +
           previous[key].length + " to " + current[key].length);
