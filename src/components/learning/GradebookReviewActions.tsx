@@ -14,8 +14,10 @@ export function GradebookReviewActions(props: {
     <Button type="button" disabled={props.busy} onClick={props.onPostGrade}>
       Post grade
     </Button>
-    <Button asChild variant="ghost"><Link to="/teacher/gradebook" search={{section:props.sectionId}}>
-      Close review
-    </Link></Button>
+    {props.busy
+      ? <Button type="button" variant="ghost" disabled>Close review</Button>
+      : <Button asChild variant="ghost"><Link to="/teacher/gradebook" search={{section:props.sectionId}}>
+          Close review
+        </Link></Button>}
   </div>;
 }
