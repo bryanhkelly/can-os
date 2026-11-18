@@ -564,6 +564,35 @@ const migratedV61RouteControls = {
     "@/components/ui/button", "@/components/ui/choice", "@/components/ui/field",
     "<StatCard", "<WorkspaceNotice",
   ],
+  "routes/guardian.course-approvals.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/label",
+    "<WorkspaceNotice", "<EmptyState",
+  ],
+  "routes/teacher.missing-work.tsx": [
+    "@/components/ui/button", "<Button", "<StatCard", "<WorkspaceNotice",
+  ],
+  "routes/student.discussions.tsx": [
+    "@/components/ui/button", "@/components/ui/field", "@/components/ui/textarea",
+    "<Button", "<EmptyState",
+  ],
+  "routes/student.courses.tsx": [
+    "@/components/ui/button", "<StatCard", "<StatusBadge", "<WorkspaceNotice",
+  ],
+  "routes/class.tsx": [
+    "@/components/ui/input", "@/components/ui/label", "@/components/ui/select",
+    "@/components/ui/choice", "<Checkbox", "<Select",
+  ],
+  "routes/admissions.index.tsx": [
+    "@/components/ui/button", "@/components/ui/select", "@/components/ui/label",
+    "<StatCard", "<StatusBadge",
+  ],
+  "routes/teacher.gradebook.tsx": [
+    "@/components/ui/button", "<Button", "<WorkspaceNotice",
+  ],
+  "routes/calendar.tsx": [
+    "@/components/ui/button", "@/components/ui/choice", "@/components/ui/label",
+    "<Button", "<Checkbox", "<Select",
+  ],
 };
 for (const [file, required] of Object.entries(migratedV61RouteControls)) {
   const source = readFileSync(join(srcRoot, file), "utf8");
