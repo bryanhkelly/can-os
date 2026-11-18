@@ -56,7 +56,7 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
   });
   it("offers recoverable UX without claiming a new user's identity is already verified",()=>{
     const ui=read("src/routes/class.tsx");
-    expect(read("src/modules/classes/native-class-entry.client.ts")).toContain("resumeLinkedNativeClassLearner()");
+    expect(read("src/modules/classes/native-class-entry.ts")).toContain("resumeLinkedNativeClassLearner()");
     expect(ui).toContain("Restore verified Class access");
     expect(ui).toContain("New learner identities and age");
     expect(ui).toContain("independent identity review");
@@ -66,7 +66,7 @@ describe("existing CAN-only adult canonical learner session recovery",()=>{
 
 describe("native Class enrollment with one interactive CAN sign-in",()=>{
  const uiPath="src/routes/class.tsx";
- const commandPath="src/modules/classes/native-class-entry.client.ts";
+ const commandPath="src/modules/classes/native-class-entry.ts";
  it("keeps recovery and enrollment in one reusable browser application flow",()=>{
    const service=read(commandPath);
    const first=service.indexOf("return await enrollInNativeClass(input);");
