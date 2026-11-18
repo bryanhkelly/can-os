@@ -113,7 +113,8 @@ export async function getCanonicalCommandContext(request: Request): Promise<Comm
   const hasNative = readCookie(request, canonicalSessionCookie) !== undefined;
   if (hasCan) {
     const actor = await getIdentityContext(request);
-    if (actor.role === "site_admin" || actor.role === "registrar") {
+    if (actor.role === "site_admin" || actor.role === "registrar" ||
+        actor.role === "room_facilitator") {
       return resolveCanonicalSiteStaffFromCan(actor, request);
     }
     if (!actor.actorPersonId || actor.sessionAccountId) {
