@@ -47,6 +47,6 @@ INSERT INTO education_v30.deployment_sites (id,deployment_id,site_id,purpose)
 VALUES ('ca270000-0000-4000-8000-000000000055','ca270000-0000-4000-8000-000000000052','ca270000-0000-4000-8000-000000000002','instruction')
 ON CONFLICT (id) DO NOTHING;
 
-INSERT INTO education_v30.deployment_offering_adoptions (id,deployment_id,offering_id,offering_version_id,valid_from,approval_status,approved_by_person_id,approved_at)
+INSERT INTO public.deployment_offering_adoptions (id,deployment_id,offering_id,offering_version_id,valid_from,approval_status,approved_by_person_id,approved_at)
 VALUES ('ca270000-0000-4000-8000-000000000053','ca270000-0000-4000-8000-000000000052','ca270000-0000-4000-8000-000000000050','ca270000-0000-4000-8000-000000000051','2026-11-17T00:00:00Z','proposed',NULL,NULL)
 ON CONFLICT (id) DO NOTHING;
