@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
-import { analyzeSource, createInventory, checkChangedFiles } from "./v61-source-audit.mjs";
+import { analyzeSource, createInventory, checkChangedFiles, findSharedLayerGeometryViolations } from "./v61-source-audit.mjs";
 
 function temp(run) {
   const root = mkdtempSync(join(tmpdir(), "v61-audit-"));
@@ -104,4 +104,21 @@ test("lazy-loaded feature components appear in the composed source audit", () =>
   assert.equal(inventory.routes[0].reachableNative, 1);
   assert.equal(inventory.routes[0].reachableCorners, 1);
   assert.equal(inventory.routes[0].composedSourceClean, false);
+}));
+
+test("shared-layer geometry rules follow new components without a manifest", () => temp(({root, write}) => {
+  write("src/components/ui/future-control.tsx",
+    'export const FutureControl = () => <input className="rounded-lg"/>;');
+  write("src/components/workspace/new-surface.tsx",
+    'export const NewSurface = () => <div className="rounded-xl"/>;');
+  write("src/components/learning/legacy-feature.tsx",
+    'export const Legacy = () => <div className="rounded-xl"/>;');
+  const inventory = createInventory(root);
+  const problems = findSharedLayerGeometryViolations(inventory);
+  assert.equal(problems.length, 2);
+  assert.deepEqual(problems.map(p => p.file).sort(), [
+    "src/components/ui/future-control.tsx",
+    "src/components/workspace/new-surface.tsx",
+  ]);
+  assert.equal(inventory.totals.directlyCleanComponents, 0);
 }));
