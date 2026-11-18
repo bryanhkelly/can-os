@@ -144,7 +144,7 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
         <p className="mt-2 text-xs text-muted-foreground">
           Select up to four unallocated future meetings below, review their dates, and
           attach them to this specific cohort in one transaction.
-          Existing linked meetings are preserved.
+          Existing linked meetings are preserved. Per-session attendance is independently attested; a booked or opened room is not proof of presence.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium">{selectedPlanIds.length} selected</span>
@@ -186,6 +186,10 @@ export function NoncreditReleaseOperations({releaseId}:{releaseId:string}){
               </label>}
             <div><p className="text-sm font-medium">{new Date(session.startsAt).toLocaleString()}</p>
             <p className="text-xs text-muted-foreground">Ends {new Date(session.endsAt).toLocaleString()} · {session.state}</p>
+            {session.linked&&<p className="mt-1 text-xs text-muted-foreground">
+              {session.roomOpened?"Classroom room opened":"Classroom room not opened"}
+              {" · "}{session.verifiedAttendees} verified attendee{session.verifiedAttendees===1?"":"s"}
+            </p>}
             </div>
           </div>
           {session.linked?<span className="text-xs text-muted-foreground">Assigned to this cohort</span>:
