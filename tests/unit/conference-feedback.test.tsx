@@ -170,6 +170,31 @@ describe("conference mutation feedback", () => {
     expect(state.create.mock.calls[3][0].data.seriesId).not.toBe(original.seriesId);
   });
 
+  it("blocks an invalid or too-short office-hour window before calling the booking service", async () => {
+    state.hooks[0] = { connected: true, series: [], bookings: [] };
+    // Local start/end state is the fifth hook in TeacherConferencePanel.
+    state.hooks[4] = { startsAt: "2030-02-12T12:00", endsAt: "2030-02-12T11:00" };
+    publish(teacher());
+    await settle();
+    expect(state.create).not.toHaveBeenCalled();
+    const first = teacher();
+    expect(nodes(first).some(node => node.props.children ===
+      "The appointment window must end after it starts.")).toBe(true);
+
+    // A valid chronological window still needs to fit at least one slot.
+    state.hooks[4] = { startsAt: "2030-02-12T12:00", endsAt: "2030-02-12T12:10" };
+    publish(teacher());
+    await settle();
+    expect(state.create).not.toHaveBeenCalled();
+
+    state.hooks[4] = { startsAt: "2030-02-12T12:00", endsAt: "2030-02-12T13:00" };
+    state.create.mockResolvedValue({ seriesId: "series-1" });
+    state.read.mockResolvedValue({ connected: true, series: [], bookings: [] });
+    publish(teacher());
+    await settle();
+    expect(state.create).toHaveBeenCalledOnce();
+  });
+
   it("preserves guardian cancellation success when the router resolves with a failed read", async () => {
     const data = {
       connected: true, viewerRole: "guardian" as const, events: [], notices: [], slots: [],
