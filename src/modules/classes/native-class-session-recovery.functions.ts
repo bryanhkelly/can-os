@@ -15,7 +15,6 @@ import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-ad
 import { DomainError } from "@/domain/errors";
 import { verifiedAdultOn } from "@/domain/native-class-enrollment";
 import { probeCanonicalAuthReader } from "@/modules/identity/canonical-command-context.server";
-import { assertUnambiguousAdultAccount } from "@/modules/identity/unambiguous-adult-account.server";
 import {
   requireVerifiedAdultAccount, issueNativeLearnerSession,
 } from "@/modules/enrollment/noncredit-self-enrollment-identity.server";
