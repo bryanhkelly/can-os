@@ -25,6 +25,20 @@ export function attributableNoncreditFeedback(input: {
     input.latestSubmittedAt >= input.registeredAt;
 }
 
+/**
+ * National and cross-Site reach is a distinct-Person count, not the number of
+ * registrations or Course Attempts. Returns an aggregate only; identities
+ * never leave the authorized server report.
+ */
+export function countDistinctNoncreditLearners(personIds:readonly string[]):number {
+  const unique=new Set<string>();
+  for(const personId of personIds){
+    if(!personId)throw new Error("Noncredit reach requires canonical Person identity");
+    unique.add(personId);
+  }
+  return unique.size;
+}
+
 export type PilotParticipantFact = {
   registrationId:string;
   trainingVersionId:string;
