@@ -33,7 +33,7 @@ export const requestNativeClassApproval=createServerFn({method:"POST"})
  .handler(async({data})=>{
   guard();const request=getRequest();
   const actor=await getCanonicalCommandContext(request);
-  if(!learnerPersonId||actor.role!=="learner")
+  if(!actor.actorPersonId||actor.role!=="learner")
    throw new AuthorizationError("verified canonical adult learner");
   assertCapability(actor,"learning.participate");
   const learnerPersonId=actor.actorPersonId;
