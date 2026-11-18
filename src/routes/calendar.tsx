@@ -17,6 +17,8 @@ import { addCalendarDays, calendarWeekday, dateKeyInTimezone, dateOnlyDayBoundsI
 import { calendarSources, calendarViews, calendarEventDetailsDestination, calendarItemDestination, calendarRecordDestination, filterCalendarItems, type CalendarSource, type CalendarView } from "@/domain/calendar-view";
 import { WorkspacePanel, WorkspaceShell } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/choice";
+import { Label } from "@/components/ui/label";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -505,7 +507,7 @@ function CalendarPage() {
         ? <Link {...assignmentDestination} className="text-sm font-semibold text-primary underline">Open assignment</Link>
         : recordDestination &&
           <Link {...recordDestination} className="text-sm font-semibold text-primary underline">{recordLabel}</Link>}
-      rail={<WorkspacePanel title="Record context" className="rounded-none shadow-none">
+      rail={<WorkspacePanel title="Record context" className=" shadow-none">
         <dl className="space-y-4 text-sm">
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Calendar status</dt>
@@ -535,7 +537,7 @@ function CalendarPage() {
       </WorkspacePanel>}
     >
       <div className="mt-6 grid gap-5">
-        <WorkspacePanel title="Event details" description="Schedule and description for this calendar event." className="rounded-none shadow-none">
+        <WorkspacePanel title="Event details" description="Schedule and description for this calendar event." className=" shadow-none">
           <dl className="grid gap-5 sm:grid-cols-2">
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Date</dt>
@@ -563,57 +565,57 @@ function CalendarPage() {
             </div>}
           </dl>
         </WorkspacePanel>
-        <WorkspacePanel title="Description" className="rounded-none shadow-none">
+        <WorkspacePanel title="Description" className=" shadow-none">
           <p className="whitespace-pre-wrap text-sm leading-6">
             {selectedEvent.description || "No additional description has been provided."}
           </p>
         </WorkspacePanel>
-        {selectedEvent.manageable&&<WorkspacePanel title="Manage event" className="rounded-none shadow-none">
+        {selectedEvent.manageable&&<WorkspacePanel title="Manage event" className=" shadow-none">
           {manageMode?.id!==selectedEvent.id&&confirmCancelId!==selectedEvent.id&&<div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"edit")} className="rounded-none">Edit details</Button>
-            <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"reschedule")} className="rounded-none">Move event</Button>
-            <Button type="button" variant="outline" onClick={()=>setConfirmCancelId(selectedEvent.id)} className="rounded-none border-danger/50 text-danger hover:bg-danger/10">Cancel event</Button>
+            <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"edit")} className="">Edit details</Button>
+            <Button type="button" variant="outline" onClick={()=>startManage(selectedEvent,"reschedule")} className="">Move event</Button>
+            <Button type="button" variant="outline" onClick={()=>setConfirmCancelId(selectedEvent.id)} className=" border-danger/50 text-danger hover:bg-danger/10">Cancel event</Button>
           </div>}
           {manageMode?.id===selectedEvent.id&&manageMode.mode==="edit"&&<div className="space-y-3">
             <Field label="Title" required error={manageAttempted&&editTitle.trim().length<3?"Enter a title with at least 3 characters.":undefined}>
-              <Input value={editTitle} onChange={event=>setEditTitle(event.target.value)} minLength={3} maxLength={200} className="rounded-none" />
+              <Input value={editTitle} onChange={event=>setEditTitle(event.target.value)} minLength={3} maxLength={200} className="" />
             </Field>
             <Field label="Description">
-              <Textarea value={editDescription} onChange={event=>setEditDescription(event.target.value)} maxLength={2000} rows={3} className="rounded-none shadow-none" />
+              <Textarea value={editDescription} onChange={event=>setEditDescription(event.target.value)} maxLength={2000} rows={3} className=" shadow-none" />
             </Field>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" disabled={saving} onClick={()=>submitManage(selectedEvent)} className="rounded-none">{saving?"Saving…":"Save"}</Button>
-              <Button type="button" variant="outline" onClick={()=>{setManageMode(null);setManageAttempted(false);}} className="rounded-none">Back</Button>
+              <Button type="button" variant="outline" disabled={saving} onClick={()=>submitManage(selectedEvent)} className="">{saving?"Saving…":"Save"}</Button>
+              <Button type="button" variant="outline" onClick={()=>{setManageMode(null);setManageAttempted(false);}} className="">Back</Button>
             </div>
           </div>}
           {manageMode?.id===selectedEvent.id&&manageMode.mode==="reschedule"&&<div className="space-y-3">
             <Field label="Date" required error={manageAttempted&&!moveDate?"Choose a date.":undefined}>
-              <Input type="date" value={moveDate} onChange={event=>setMoveDate(event.target.value)} className="rounded-none" />
+              <Input type="date" value={moveDate} onChange={event=>setMoveDate(event.target.value)} className="" />
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Start" required error={manageAttempted&&!moveStart?"Choose a start time.":undefined}>
-                <Input type="time" value={moveStart} onChange={event=>setMoveStart(event.target.value)} className="rounded-none" />
+                <Input type="time" value={moveStart} onChange={event=>setMoveStart(event.target.value)} className="" />
               </Field>
               <Field label="End (optional)" error={manageAttempted&&moveEnd&&moveEnd<=moveStart?"Choose an end after the start.":undefined}>
-                <Input type="time" value={moveEnd} onChange={event=>setMoveEnd(event.target.value)} className="rounded-none" />
+                <Input type="time" value={moveEnd} onChange={event=>setMoveEnd(event.target.value)} className="" />
               </Field>
             </div>
             <p className="text-xs text-muted-foreground">Times use {selectedEvent.timezone}.</p>
             <div className="flex gap-2">
-              <Button type="button" variant="outline" disabled={saving} onClick={()=>submitManage(selectedEvent)} className="rounded-none">{saving?"Saving…":"Save"}</Button>
-              <Button type="button" variant="outline" onClick={()=>{setManageMode(null);setManageAttempted(false);}} className="rounded-none">Back</Button>
+              <Button type="button" variant="outline" disabled={saving} onClick={()=>submitManage(selectedEvent)} className="">{saving?"Saving…":"Save"}</Button>
+              <Button type="button" variant="outline" onClick={()=>{setManageMode(null);setManageAttempted(false);}} className="">Back</Button>
             </div>
           </div>}
           {confirmCancelId===selectedEvent.id&&<div className="border border-danger/50 bg-danger/10 p-3">
             <p className="text-sm">Cancel “{selectedEvent.title}”? Participants are notified and the change is audited.</p>
             <div className="mt-3 flex gap-2">
-              <Button type="button" variant="destructive" size="sm" disabled={saving} onClick={()=>submitCancel(selectedEvent)} className="rounded-none">Confirm cancellation</Button>
-              <Button type="button" variant="outline" size="sm" onClick={()=>setConfirmCancelId(null)} className="rounded-none">Keep event</Button>
+              <Button type="button" variant="destructive" size="sm" disabled={saving} onClick={()=>submitCancel(selectedEvent)} className="">Confirm cancellation</Button>
+              <Button type="button" variant="outline" size="sm" onClick={()=>setConfirmCancelId(null)} className="">Keep event</Button>
             </div>
           </div>}
         </WorkspacePanel>}
         {data?.viewerRole === "guardian" && selectedEvent.source === "assessment" &&
-          (selectedEvent.guardianStudents?.length ?? 0) > 1 && <WorkspacePanel title="Student assignments" className="rounded-none shadow-none">
+          (selectedEvent.guardianStudents?.length ?? 0) > 1 && <WorkspacePanel title="Student assignments" className=" shadow-none">
           <ul className="space-y-3 text-sm">{selectedEvent.guardianStudents!.map(student => {
             const destination = calendarItemDestination(selectedEvent, "guardian", student.studentPersonId);
             return destination ? <li key={student.studentPersonId}>
@@ -633,24 +635,24 @@ function CalendarPage() {
             {calendarViews.map(nextView=><Link key={nextView} to="/calendar" search={{...search,view:nextView,date:nextView==="month"||nextView==="agenda"?search.date:anchorDate,event:undefined}} aria-current={view===nextView?"page":undefined}
               className={"inline-flex min-h-10 items-center border px-3 py-2 focus-visible:outline-2 focus-visible:outline-ring "+(view===nextView?"border-primary bg-primary text-primary-foreground":"border-border bg-card text-foreground hover:bg-muted")}>{nextView[0]!.toUpperCase()+nextView.slice(1)}</Link>)}
           </nav>
-          <label className="flex min-h-10 items-center text-sm">
+          <Label className="flex min-h-10 items-center text-sm">
             <span className="sr-only">Search calendar events</span>
-            <Input type="search" value={search.q??""} onChange={event=>void navigate({search:{...search,q:event.target.value||undefined,event:undefined}})} placeholder="Search events" className="min-h-10 w-48 rounded-none shadow-none" />
-          </label>
-          <label className="flex items-center text-sm">Show
-            <Select value={search.source??""} onChange={event=>void navigate({search:{...search,source:calendarSources.find(source=>source===event.target.value),event:undefined}})} className="ml-2 min-h-10 w-auto max-w-full rounded-none shadow-none">
+            <Input type="search" value={search.q??""} onChange={event=>void navigate({search:{...search,q:event.target.value||undefined,event:undefined}})} placeholder="Search events" className="min-h-10 w-48  shadow-none" />
+          </Label>
+          <Label className="flex items-center text-sm">Show
+            <Select value={search.source??""} onChange={event=>void navigate({search:{...search,source:calendarSources.find(source=>source===event.target.value),event:undefined}})} className="ml-2 min-h-10 w-auto max-w-full  shadow-none">
               <option value="">{isRoomFacilitator ? "All room events" : "All event types"}</option>
               <option value="section">Class events</option>{!isRoomFacilitator&&<><option value="assessment">Assignment deadlines</option>
               <option value="personal">Personal</option><option value="study_group">Study groups</option></>}
               <option value="site">School events</option>
             </Select>
-          </label>
-          {sectionOptions.length>0&&<label className="flex items-center text-sm">Section
-            <Select value={search.section??""} onChange={event=>void navigate({search:{...search,section:event.target.value||undefined,event:undefined}})} className="ml-2 min-h-10 w-auto max-w-full rounded-none shadow-none">
+          </Label>
+          {sectionOptions.length>0&&<Label className="flex items-center text-sm">Section
+            <Select value={search.section??""} onChange={event=>void navigate({search:{...search,section:event.target.value||undefined,event:undefined}})} className="ml-2 min-h-10 w-auto max-w-full  shadow-none">
               <option value="">All sections</option>
               {sectionOptions.map(section=><option key={section.id} value={section.id}>{section.label}</option>)}
             </Select>
-          </label>}
+          </Label>}
           {search.section&&<><span className="text-sm">Selected class only</span><Link to="/calendar" search={{...search,section:undefined,event:undefined}} className="text-sm text-primary underline">Show all classes</Link></>}
           {data?.viewerRole==="student"&&<Link to="/calendar-export" className="text-sm text-primary underline">Export deadlines (.ics)</Link>}
         </div>
@@ -660,11 +662,11 @@ function CalendarPage() {
         {!composerOpen && <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving calendar change..."/>}
 
         <div className="mt-6 flex flex-wrap items-center gap-3">
-          <Button type="button" variant="outline" onClick={goToToday} className="rounded-none">Today</Button>
-          <Button type="button" variant="outline" aria-label={`Previous ${view}`} onClick={() => shiftPeriod(-1)} className="rounded-none"><ChevronLeft aria-hidden="true" />Prev</Button>
+          <Button type="button" variant="outline" onClick={goToToday} className="">Today</Button>
+          <Button type="button" variant="outline" aria-label={`Previous ${view}`} onClick={() => shiftPeriod(-1)} className=""><ChevronLeft aria-hidden="true" />Prev</Button>
           <h2 className="font-serif text-section">{periodLabel}</h2>
-          <Button type="button" variant="outline" aria-label={`Next ${view}`} onClick={() => shiftPeriod(1)} className="rounded-none">Next<ChevronRight aria-hidden="true" /></Button>
-          <Input type="date" aria-label="Choose calendar date" value={anchorDate} onChange={event=>chooseDate(event.target.value)} className="w-auto rounded-none shadow-none" />
+          <Button type="button" variant="outline" aria-label={`Next ${view}`} onClick={() => shiftPeriod(1)} className="">Next<ChevronRight aria-hidden="true" /></Button>
+          <Input type="date" aria-label="Choose calendar date" value={anchorDate} onChange={event=>chooseDate(event.target.value)} className="w-auto  shadow-none" />
           {loading && <span className="text-xs text-muted-foreground">Loading…</span>}
         </div>
 
@@ -717,18 +719,18 @@ function CalendarPage() {
                       selectedDay === cell.key ? "border-primary ring-1 ring-primary" : "border-border"
                     }`}
                   >
-                    <button
+                    <Button variant="ghost" size="sm"
                       id={`calendar-day-${cell.key}`}
                       type="button"
                       onClick={() => openDay(cell.key)}
                       onKeyDown={event=>onCalendarDayKeyDown(event,cell.key)}
                       tabIndex={selectedDay===cell.key||(!selectedDay&&cell.day===1)?0:-1}
                       aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
-                      className="block min-h-10 w-full text-left focus-visible:outline-2 focus-visible:outline-ring"
+                      className="block h-auto min-h-10 w-full p-0 text-left font-normal"
                       aria-label={`Select ${cell.key}`}
                     >
                       <span className="font-semibold">{cell.day}</span>
-                    </button>
+                    </Button>
                     <span className="mt-1 flex flex-col gap-1">
                       {(byDay.get(cell.key) ?? []).map((item) => (
                         <Link
@@ -773,9 +775,9 @@ function CalendarPage() {
 
                     {item.manageable && !manageMode && confirmCancelId !== item.id && (
                       <div className="mt-2 flex gap-2">
-                        <Button type="button" variant="outline" size="sm" onClick={() => startManage(item, "edit")} className="rounded-none">Edit</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => startManage(item, "reschedule")} className="rounded-none">Move</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => setConfirmCancelId(item.id)} className="rounded-none border-danger/50 text-danger hover:bg-danger/10">Cancel event</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => startManage(item, "edit")} className="">Edit</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => startManage(item, "reschedule")} className="">Move</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => setConfirmCancelId(item.id)} className=" border-danger/50 text-danger hover:bg-danger/10">Cancel event</Button>
                       </div>
                     )}
 
@@ -783,22 +785,22 @@ function CalendarPage() {
                       <div className="mt-2 border border-danger/50 bg-danger/10 p-2">
                         <p className="text-xs">Cancel "{item.title}"? Participants are notified and the change is audited.</p>
                         <div className="mt-2 flex gap-2">
-                          <Button type="button" variant="destructive" size="sm" disabled={saving} onClick={() => submitCancel(item)} className="rounded-none">Confirm cancellation</Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => setConfirmCancelId(null)} className="rounded-none">Keep event</Button>
+                          <Button type="button" variant="destructive" size="sm" disabled={saving} onClick={() => submitCancel(item)} className="">Confirm cancellation</Button>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setConfirmCancelId(null)} className="">Keep event</Button>
                         </div>
                       </div>
                     )}
 
                     {manageMode?.id === item.id && manageMode.mode === "edit" && (
                       <div className="mt-2 space-y-2 border-t border-border pt-2">
-                        <label className="block text-xs">
+                        <Label className="block text-xs">
                           Title
-                          <Input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required minLength={3} maxLength={200} className="mt-1 rounded-none" />
-                        </label>
-                        <label className="block text-xs">
+                          <Input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} required minLength={3} maxLength={200} className="mt-1 " />
+                        </Label>
+                        <Label className="block text-xs">
                           Description
-                          <Textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} rows={2} className="mt-1 min-h-20 rounded-none shadow-none" />
-                        </label>
+                          <Textarea value={editDescription} onChange={(event) => setEditDescription(event.target.value)} maxLength={2000} rows={2} className="mt-1 min-h-20  shadow-none" />
+                        </Label>
                       </div>
                     )}
 
@@ -821,8 +823,8 @@ function CalendarPage() {
 
                     {manageMode?.id === item.id && (
                       <div className="mt-2 flex gap-2">
-                        <Button type="button" variant="outline" disabled={saving} size="sm" onClick={() => submitManage(item)} className="rounded-none">{saving ? "Saving…" : "Save"}</Button>
-                        <Button type="button" variant="outline" size="sm" onClick={() => {setManageMode(null);setManageAttempted(false);}} className="rounded-none">Back</Button>
+                        <Button type="button" variant="outline" disabled={saving} size="sm" onClick={() => submitManage(item)} className="">{saving ? "Saving…" : "Save"}</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => {setManageMode(null);setManageAttempted(false);}} className="">Back</Button>
                       </div>
                     )}
                   </li>
@@ -892,23 +894,23 @@ function CalendarPage() {
                 {!loading && <div className="mt-3 max-h-64 space-y-4 overflow-y-auto border-y border-border py-3">
                   {visibleInviteGroups.length > 0 && <fieldset className="space-y-2">
                     <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Groups</legend>
-                    {visibleInviteGroups.map(group => <label key={group.id} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
-                      <input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={inviteGroupIds.includes(group.id)}
+                    {visibleInviteGroups.map(group => <Label key={group.id} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
+                      <Checkbox className="mt-0.5 size-4 accent-primary" checked={inviteGroupIds.includes(group.id)}
                         onChange={event => setInviteGroupIds(ids => event.target.checked
                           ? [...ids, group.id] : ids.filter(id => id !== group.id))} />
                       <span className="min-w-0"><span className="block font-medium">{group.title}</span>
                         <span className="block text-xs text-muted-foreground">{group.members.length} eligible {group.members.length === 1 ? "member" : "members"}</span></span>
-                    </label>)}
+                    </Label>)}
                   </fieldset>}
                   <fieldset className="space-y-2">
                     <legend className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">People</legend>
-                    {visibleInvitePeople.map(contact => <label key={contact.personId} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
-                      <input type="checkbox" className="mt-0.5 size-4 accent-primary" checked={inviteePersonIds.includes(contact.personId)}
+                    {visibleInvitePeople.map(contact => <Label key={contact.personId} className="flex cursor-pointer items-start gap-3 py-1 text-sm">
+                      <Checkbox className="mt-0.5 size-4 accent-primary" checked={inviteePersonIds.includes(contact.personId)}
                         onChange={event => setInviteePersonIds(ids => event.target.checked
                           ? [...ids, contact.personId] : ids.filter(id => id !== contact.personId))} />
                       <span className="min-w-0"><span className="block font-medium">{contact.name}</span>
                         <span className="block text-xs text-muted-foreground">{contact.label}</span></span>
-                    </label>)}
+                    </Label>)}
                     {!visibleInvitePeople.length && <p className="text-sm text-muted-foreground">No matching people in your authorized address list.</p>}
                   </fieldset>
                   {!visibleInviteGroups.length && !visibleInvitePeople.length && inviteSearch &&
