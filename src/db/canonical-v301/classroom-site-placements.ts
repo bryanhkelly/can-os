@@ -6,7 +6,7 @@ import { educationV30 } from "./core";
  * placed at the exact Site hosting a facilitated room. These are read models,
  * not new migrations or classroom enrollments.
  */
-export const classroomDeploymentSites = educationV30.table("deployment_sites", {
+export const classroomDeploymentSites = pgTable("deployment_sites", {
   id: uuid("id").primaryKey(),
   deploymentId: uuid("deployment_id").notNull(),
   siteId: uuid("site_id").notNull(),
