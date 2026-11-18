@@ -44,7 +44,7 @@ export const networkMemberships = educationV30.table("network_reporting_membersh
 
 /** A network-assigned church, chapter or affiliate number is a mapping
  * onto an existing membership. It never replaces canonical identity. */
-export const networkMemberIdentifiers=educationV30.table("network_member_identifiers",{
+export const networkMemberIdentifiers=pgTable("network_member_identifiers",{
   id:id(),
   networkOrganizationId:uuid("network_organization_id").notNull(),
   networkMembershipId:uuid("network_membership_id").notNull(),
