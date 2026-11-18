@@ -211,7 +211,8 @@ export const attachFourWeekCohortPlans=createServerFn({method:"POST"})
       }).from(facilitatedClassroomPlans)
         .innerJoin(canonicalDeliverySessions,eq(
           canonicalDeliverySessions.id,facilitatedClassroomPlans.deliverySessionId))
-        .where(inArray(facilitatedClassroomPlans.id,data.planIds));
+        .where(inArray(facilitatedClassroomPlans.id,data.planIds))
+        .for("update");
       if(slots.length!==4||!isFourWeeklyCohort(slots))
         throw new AuthorizationError("exactly four distinct weekly classroom meetings");
       const assigned=[];
