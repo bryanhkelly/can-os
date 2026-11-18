@@ -116,7 +116,7 @@ describe("enrolled learning workspace", () => {
     expect(html).toContain("Please revise.");
     expect(html).not.toContain("Unrelated algebra");
     expect(html).toContain("not a finalized course grade");
-    expect(html).toContain('href="/student/assignments?section=english&amp;assessment=essay"');
+    expect(html).toContain('href="/student/assignments/essay?section=english"');
     expect(html).toContain('href="/student/discussions?section=english"');
     expect(html).toContain('href="/calendar?section=english"');
     expect(html).toContain('href="/student/courses?section=english&amp;tab=grades" aria-current="page"');
