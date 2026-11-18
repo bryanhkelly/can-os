@@ -47,9 +47,9 @@ export const canonicalRoleCapabilities: Readonly<Record<
 });
 
 /**
- * A verified native grant or an independently linked CAN staff grant can be
- * projected into the same narrowly scoped canonical authorization context.
- * Neither caller can provide these fields from a browser payload.
+ * An exact current CAN Site staff grant or a not-yet-retired native learning
+ * grant projects into the same narrowly scoped canonical authorization model.
+ * No second staff account, Person mapping or browser-supplied grant is accepted.
  */
 export function projectCanonicalPrincipalContext(row: Pick<CanonicalSessionRow,
   "person_id" | "role_code" | "organization_id" | "site_id">): CommandContext {
