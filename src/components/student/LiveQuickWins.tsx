@@ -1,5 +1,8 @@
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { StatusBadge } from "@/components/workspace";
+import { Button } from "@/components/ui/button";
+import { StudentAssignmentLink } from "./StudentAssignmentLink";
 import { Link, useRouter } from "@tanstack/react-router";
 import { finishQuickWinAction } from "@/modules/actions/student-actions.functions";
 import { canCompleteStudentAction } from "@/modules/actions/student-action-policy";
@@ -25,27 +28,28 @@ export function LiveQuickWins({ actions, connected, actionId }: { actions: Actio
     });
   }
 
-  return <section className="mt-8 rounded-2xl border-2 border-foreground/15 bg-card p-5 sm:p-7">
+  return <section className="mt-8 border border-border bg-card p-5 sm:p-7">
     <Link to="/home" className="text-xs font-semibold underline">Back to Student Today</Link>
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div><p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Your actions</p><h2 className="mt-2 font-serif text-3xl">Your saved actions</h2><p className="mt-2 text-sm text-muted-foreground">Your assigned actions and support requests.</p></div>
-      <span className="rounded-full bg-stone-warm px-3 py-2 text-xs font-semibold">{connected ? "School actions available" : "School actions unavailable"}</span>
+      <StatusBadge tone={connected ? "success" : "attention"}>{connected ? "School actions available" : "School actions unavailable"}</StatusBadge>
     </div>
     <MutationFeedback state={mutation} className="mt-4" pendingMessage="Saving action..."/>
     <div className="mt-5 space-y-3">
       {visible.map(action => {
-        const target = action.subjectType === "assessment" && action.subjectId
-          ? { to: "/student/assignments" as const, search: { assessment: action.subjectId } }
-          : { to: "/student/experiences" as const, search: { action: action.id } };
+        const assessmentId = action.subjectType === "assessment" ? action.subjectId : undefined;
         return <div key={action.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-background p-4">
-        <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{String(action.metadata.source ?? action.type)} · {action.priority} priority</p><p className="mt-1 text-sm font-semibold"><Link {...target} className="hover:underline">{action.title}</Link></p><p className="mt-1 text-xs text-muted-foreground">{action.description}</p></div>
-        {(target.to === "/student/assignments" || !actionId) &&
-          <Link {...target} className="text-xs font-semibold underline">{target.to === "/student/assignments" ? "Review assignment" : "Review action"}</Link>}
-        <span className={"text-xs font-semibold capitalize"+(action.status==="resolved"?" text-emerald-800":" text-muted-foreground")}>
+        <div className="min-w-0 flex-1"><p className="text-xs text-muted-foreground">{String(action.metadata.source ?? action.type)} · {action.priority} priority</p><p className="mt-1 text-sm font-semibold">{assessmentId
+          ? <StudentAssignmentLink assessmentId={assessmentId} className="hover:underline">{action.title}</StudentAssignmentLink>
+          : <Link to="/student/experiences" search={{action:action.id}} className="hover:underline">{action.title}</Link>}</p><p className="mt-1 text-xs text-muted-foreground">{action.description}</p></div>
+        {(assessmentId || !actionId) && (assessmentId
+          ? <StudentAssignmentLink assessmentId={assessmentId} className="text-xs font-semibold underline">Review assignment</StudentAssignmentLink>
+          : <Link to="/student/experiences" search={{action:action.id}} className="text-xs font-semibold underline">Review action</Link>)}
+        <StatusBadge tone={action.status==="resolved"?"success":"neutral"}>
           {action.status==="resolved"?"Completed":action.status.replaceAll("_"," ")}
-        </span>
+        </StatusBadge>
         {canCompleteStudentAction(action) && action.canComplete !== false &&
-          <button disabled={busy||!connected} onClick={()=>finish(action.id)} className="rounded-lg bg-foreground px-4 py-2 text-xs font-semibold text-background disabled:opacity-50">Mark complete</button>}
+          <Button type="button" size="sm" disabled={busy||!connected} onClick={()=>void finish(action.id)}>Mark complete</Button>}
         {action.status==="open"&&(!canCompleteStudentAction(action)||action.canComplete===false)&&
           <p className="text-xs text-muted-foreground">
             {action.type==="student_learning_goal"
