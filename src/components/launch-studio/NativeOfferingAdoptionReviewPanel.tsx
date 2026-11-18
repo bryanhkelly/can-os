@@ -8,6 +8,8 @@ import { WorkspacePanel, MutationFeedback, WorkspaceNotice } from "@/components/
 import { useMutationFeedback } from "@/lib/mutation-feedback";
 import { invalidateNativeClassAvailability } from "@/lib/native-class-availability-cache";
 import { publisherReleaseAvailableForAdoption } from "@/domain/native-offering-adoption-publication";
+import { adoptionPreviewAllowsAttempt } from "@/domain/native-adoption-readiness";
+import { NativeAdoptionEvidenceChecklist } from "./NativeAdoptionEvidenceChecklist";
 import {
   approveNativeOfferingAdoption,getNativeOfferingAdoptionReviewQueue,
 } from "@/modules/programs/native-offering-adoption-review.functions";
@@ -19,6 +21,7 @@ function AdoptionReview({item}:{item:Adoption}){
   const [evidence,setEvidence]=useState("");
   const [reason,setReason]=useState("");
   const publisherReleaseReady=publisherReleaseAvailableForAdoption(item);
+  const prerequisitesVisible=adoptionPreviewAllowsAttempt(item);
   const feedback=useMutationFeedback(async()=>{
     await Promise.all([
       client.invalidateQueries({queryKey:["native-adoption-review-queue"]},
@@ -28,7 +31,7 @@ function AdoptionReview({item}:{item:Adoption}){
   });
   async function approve(event:FormEvent){
     event.preventDefault();
-    if(!publisherReleaseReady||feedback.pending||feedback.refreshFailed)return;
+    if(!prerequisitesVisible||feedback.pending||feedback.refreshFailed)return;
     await feedback.run(()=>approveNativeOfferingAdoption({data:{
       adoptionId:item.adoptionId,evidenceVersionId:evidence.trim(),
       rationale:reason.trim(),
@@ -49,6 +52,7 @@ function AdoptionReview({item}:{item:Adoption}){
       Offering publication must finish before this adoption can be approved. This proposal
       remains visible, but a Blueprint reviewer cannot publish the publisher Offering.
     </WorkspaceNotice>}
+    <NativeAdoptionEvidenceChecklist state={item}/>
     <p className="mt-2 text-sm">
       Approval requires an independently reviewed exact-version Blueprint execution,
       approved operator relationship, active authorized Sites, verified operating,
@@ -62,7 +66,7 @@ function AdoptionReview({item}:{item:Adoption}){
       <Field label="Verified adoption evidence version UUID">
         <Input required value={evidence} onChange={event=>setEvidence(event.target.value)}/>
       </Field>
-      <div><Button type="submit" disabled={!publisherReleaseReady||feedback.pending||feedback.refreshFailed||reason.trim().length<10||!evidence.trim()}>
+      <div><Button type="submit" disabled={!prerequisitesVisible||feedback.pending||feedback.refreshFailed||reason.trim().length<10||!evidence.trim()}>
         {feedback.pending?"Checking approval…":"Approve verified adoption"}
       </Button></div>
     </form>
