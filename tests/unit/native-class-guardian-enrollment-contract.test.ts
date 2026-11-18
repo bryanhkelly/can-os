@@ -8,12 +8,14 @@ const lifecycle=read("src/modules/classes/native-class-lifecycle.functions.ts");
 const ui=read("src/routes/guardian.native-classes.tsx");
 
 describe("native Class guardian and minor enrollment",()=>{
- it("requires one existing real CAN guardian session and verified canonical identity link",()=>{
+ it("requires one real CAN guardian and returns only its immutable public Person",()=>{
   expect(guard).toContain('actor.role!=="guardian"');
   expect(guard).toContain("actor.sessionAccountId");
   expect(guard).toContain("account?.personId!==actor.actorPersonId");
-  expect(guard).toContain("accessAccountCanonicalPrincipals.revokedAt");
-  expect(guard).toContain("links.length!==1");
+  expect(guard).toContain('assertCapability(actor,"enrollment.apply")');
+  expect(guard).toContain("return {personId:actor.actorPersonId}");
+  expect(guard).not.toContain("accessAccountCanonicalPrincipals");
+  expect(guard).not.toContain("canonical guardian mapping");
  });
  it("requires current, independently verified minor enrollment authority",()=>{
   expect(guard).toContain("guardianAuthorities.verifiedAt");
