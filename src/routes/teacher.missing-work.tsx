@@ -43,9 +43,9 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
         <StatCard value={items.length} label="Overdue student-assignment items" />
         <StatCard value={studentCount} label="Students needing follow-up" />
       </div>}
-      <WorkspacePanel className="mt-6" title="Follow-up queue"
+      {connected && <WorkspacePanel className="mt-6" title="Follow-up queue"
         description="Review overdue assignments in your assigned Sections. Follow-ups are recorded in the shared Operations workflow.">
-        <ul className="space-y-3">
+        {items.length > 0 ? <ul className="space-y-3">
         {items.map(x => (
           <li key={x.assessmentId + ":" + x.studentProfileId} className="border border-border bg-card p-4 sm:p-5">
             <p className="text-xs text-muted-foreground"><Link to="/classes" search={{section:x.sectionId}} className="underline">{x.course}</Link> · due {formatDateOnly(dateKeyInTimezone(x.dueAt,x.timezone))}</p>
@@ -97,9 +97,8 @@ function TeacherMissingWorkView({ data }: { data: Awaited<ReturnType<typeof load
 
           </li>
         ))}
-        {connected && !items.length && <EmptyState title="No overdue missing work in your assigned classes." />}
-        </ul>
-      </WorkspacePanel>
+        </ul> : <EmptyState title="No overdue missing work in your assigned classes." />}
+      </WorkspacePanel>}
     </WorkspaceShell>
   );
 }
