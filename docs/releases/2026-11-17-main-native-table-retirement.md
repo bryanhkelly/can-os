@@ -207,3 +207,61 @@ may be making concurrent changes. The database migration and direct SQL
 verification passed; the new executable script, Vitest and browser
 acceptance remain unexecuted. The safeguarding queue, session records
 and database-role organization bindings are not part of this pass.
+
+## Authorization and safeguarding cutover
+
+This production-main cleanup moved two existing empty tables into `public`
+without copying, deleting or manufacturing authorization records:
+
+| Original table | Preserved OID | Validated foreign keys |
+|---|---|---:|
+| `database_role_organization_bindings` | `416485` | 1 |
+| `safeguarding_triage_queue` | `412764` | 2 |
+
+The original one-policy, owner-only `FORCE ROW LEVEL SECURITY` state and
+direct-access denial to `authenticated` and `anonymous` were retained.
+The original five indexes and three foreign keys remain validated.
+The two role authorization routines and three existing safeguarding trigger
+routines were rewritten in their migration transactions to target the new
+`public` table locations. Their OIDs, signatures and security-definer
+settings did not change. Each safeguarding routine retains its one dependent
+database trigger.
+
+Active Blueprint, survey, assessment and program-catalog role-provisioning
+scripts, restricted-role verification scripts and authorization preflight
+readers have been updated to use
+`public.database_role_organization_bindings`.
+The existing canonical test-branch catalog acceptance query was made
+schema-aware for the moved role table.
+
+A first attempt at the safeguarding migration failed its SQL preflight due
+to a PL/pgSQL local record name colliding with a SQL alias. That entire
+transaction rolled back; the guard was fixed and the retry committed.
+Afterward database verification confirmed both public tables, no old
+physical locations, original object OIDs, three validated FKs, forced RLS,
+one policy each and no direct authenticated or anonymous SELECT. The
+two role functions rejected a fabricated unapproved organization/purpose,
+and all three safeguarding trigger dependencies remain present. These are
+negative-path and metadata checks, not positive safeguarding-case acceptance.
+
+- Migrations:
+  `database/production/2026-11-17-consolidate-role-organization-bindings.sql`
+  and `database/production/2026-11-17-consolidate-safeguarding-triage.sql`
+- Main-only read-only acceptance:
+  `scripts/acceptance/check-main-role-and-safeguarding-cutover.mjs`
+- Source regression contracts:
+  `tests/unit/main-role-safeguarding-cutover.test.ts`
+
+At final verification: **304** `education_v30` base tables,
+**366** `public` base tables and **7** separate `education_v30_secure`
+tables. Other concurrent main changes can affect these totals.
+Migration SQL and direct DB metadata/negative authorization checks passed;
+the new executable acceptance script, Vitest and browser-based tests
+have not been run.
+
+**Do not relocate `canonical_sessions` merely to reduce the table count.**
+It participates in session credentials, active grants, runtime
+`canonicalSessions` models and audit/device session lifecycle. First
+reconcile it with the authoritative shared account/session model and
+exercise positive and negative login, refresh, expiry and revocation
+tests without introducing an additional identity system.
