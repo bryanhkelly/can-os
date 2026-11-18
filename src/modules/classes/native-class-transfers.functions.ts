@@ -4,11 +4,16 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,asc,count,eq,inArray} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
- auditEvents,domainEvents,canonicalClasses,canonicalClassEnrollments,
- canonicalClassOfferingVersions,canonicalClassOfferings,
- canonicalClassEnrollmentTransferRequests,canonicalPersons,
- learnerCourseAttempts,participationAttributions,
+  canonicalClasses,
+  canonicalClassEnrollments,
+  canonicalClassOfferingVersions,
+  canonicalClassOfferings,
+  canonicalClassEnrollmentTransferRequests,
+  canonicalPersons,
+  learnerCourseAttempts,
+  participationAttributions,
 } from "@/db/canonical-v301";
 import {AuthorizationError,assertCapability} from "@/domain/command-context";
 import {getCanonicalCommandContext} from "@/modules/identity/canonical-command-context.server";
@@ -224,11 +229,11 @@ export const transferMyNativeClassEnrollment=createServerFn({method:"POST"})
     sourceAttemptIdsClosed:live.map(x=>x.id),destinationCourseAttemptId:attempt.id,
     sourceSiteId:sourceAuthority.siteId,destinationSiteId:destinationAuthority.siteId,
     consentVersion:terms.consentVersion,consentSha256};
-   await tx.insert(auditEvents).values({actorPersonId:actor.actorPersonId,
+   await writeCanonicalAudit(tx,{actorPersonId:actor.actorPersonId,
     owningOrganizationId:sourceClass.operatingOrganizationId,
     eventCode:"class.enrollment.transferred",entityKind:"class_enrollment_transfer",
     entityId:transfer.id,payload});
-   await tx.insert(domainEvents).values({actorPersonId:actor.actorPersonId,
+   await emitCanonicalDomainEvent(tx,{actorPersonId:actor.actorPersonId,
     eventType:"ClassEnrollmentTransferred",aggregateType:"class_enrollment_transfer",
     aggregateId:transfer.id,payload});
    return {sourceEnrollmentId:source.id,
