@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { personDisplayName } from "@/domain/person-name";
 import { guardianRelationshipPredicate } from "@/domain/guardian-relationship";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
+import { studentAssignmentHref } from "@/domain/student-assignment-navigation";
 import { setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { z } from "zod";
@@ -184,7 +185,7 @@ async function searchAssignments(actor: Actor, like: string): Promise<SearchHit[
     label: row.title,
     sub: row.dueAt ? `${row.sectionTitle} · due ${dateKeyInTimezone(row.dueAt, row.timezone)}` : row.sectionTitle,
     to: actor.role === "student"
-      ? `/student/assignments?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`
+      ? studentAssignmentHref(row.id, { sectionId: row.sectionId })
       : `/teacher/gradebook?section=${encodeURIComponent(row.sectionId)}&assessment=${encodeURIComponent(row.id)}`,
   }));
 }
