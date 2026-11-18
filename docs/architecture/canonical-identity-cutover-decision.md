@@ -31,9 +31,9 @@ independent authorization flags must not be set while noncredit self-enrollment
 or reviewed Class onboarding still creates `canonicalPersons` and
 `canonicalAccounts` or issues a second learner cookie. The existing
 `verify:person:runtime-main -- --strict` command continues to report these
-blockers. The three empty correspondence tables may be removed only after
-their application readers, protected adult-review history and learner session
-ownership are migrated. Do not remap correspondence IDs onto public People
+blockers. The two empty correspondence tables and the separate empty protected
+adult-review ledger may be removed only after their application readers,
+protected adult-review history and learner session ownership are migrated. Do not remap correspondence IDs onto public People
 without an independently verified evidence-preserving decision.
 
 **Verification:** direct SQL catalog and record-count checks on Neon `main`
