@@ -108,19 +108,19 @@ export function Publisher({data,mode="history"}:{data:Data;mode?:"history"|"comp
   </form>}
   {mode==="history"&&<section className="mt-8 space-y-3">
    <h2 className="text-lg font-semibold">Recent published notices</h2>
-   {data.items.map(item=><article key={item.id} className="rounded-lg border bg-card p-4">
+   {data.items.map(item=><article key={item.id} className=" border bg-card p-4">
     <p className="font-semibold">{item.title}</p>
     <p className="mt-1 text-xs text-muted-foreground">{String(item.kind).replaceAll("_"," ")} · {new Date(item.publishedAt).toLocaleString()}</p>
     <p className="mt-2 whitespace-pre-wrap text-sm">{item.description}</p>
     <p className="mt-3 text-sm">{item.recipients} in-app recipients · {item.acknowledged} marked read</p>
     <p className="mt-1 text-sm">Email: {item.emailAccepted}/{item.emailQueued} accepted by provider · SMS: {item.smsAccepted}/{item.smsQueued} accepted by provider</p>
-    {item.deliveryFailed>0&&Date.now()-new Date(item.publishedAt).getTime()<48*60*60*1000&&<button type="button" disabled={busy} className="mt-2 rounded border px-3 py-1.5 text-xs font-semibold disabled:opacity-50" onClick={()=>void retry(item.id)}>Retry exhausted delivery attempts</button>}
+    {item.deliveryFailed>0&&Date.now()-new Date(item.publishedAt).getTime()<48*60*60*1000&&<Button type="button" variant="outline" size="sm" disabled={busy} className="mt-2" onClick={()=>void retry(item.id)}>Retry exhausted delivery attempts</Button>}
     {(item.deliveryFailed>0||item.deliverySuppressed>0)&&<p className="mt-1 text-sm">
       {item.deliveryFailed} attempts exhausted · {item.deliverySuppressed} deliveries suppressed after authorization/preference review
     </p>}
     <p className="mt-2 text-xs text-muted-foreground">Accepted does not mean delivered, read or acknowledged. Urgent safety incidents require direct follow-up.</p>
    </article>)}
-   {!data.items.length&&<p className="rounded-lg border p-4 text-sm">No published family notices in your authorized schools.</p>}
+   {!data.items.length&&<p className=" border p-4 text-sm">No published family notices in your authorized schools.</p>}
   </section>}
  </WorkspaceShell>;
 }
