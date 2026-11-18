@@ -84,12 +84,12 @@ SELECT format(
  :'application_role')
 \gexec
 
-INSERT INTO education_v30.instructional_learner_login_bindings
+INSERT INTO public.instructional_learner_login_bindings
  (db_login,course_attempt_id,status,valid_from)
 SELECT :'application_role'::name,:'course_attempt_id'::uuid,
        'approved',clock_timestamp()
 WHERE NOT EXISTS (
- SELECT 1 FROM education_v30.instructional_learner_login_bindings b
+ SELECT 1 FROM public.instructional_learner_login_bindings b
  WHERE b.db_login=:'application_role'::name
    AND b.course_attempt_id=:'course_attempt_id'::uuid
 );
