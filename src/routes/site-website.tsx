@@ -14,6 +14,7 @@ import { Link } from "@tanstack/react-router";
 import { mutationErrorMessage, useMutationFeedback } from "@/lib/mutation-feedback";
 import { normalizeClientError } from "@/lib/client-error";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { WorkspaceNotice } from "@/components/workspace";
 import { GuidedSetupShell } from "@/components/workflow";
 import { Eye } from "lucide-react";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
@@ -170,7 +171,7 @@ function WebsiteInformationChecklist({ data }: {
   const required = readiness.gaps.filter(gap => gap.required);
   const optional = readiness.gaps.filter(gap => !gap.required);
   return <section aria-labelledby="website-readiness-title"
-    className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+    className="mt-6  border border-border/70 bg-card p-6 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Parent information</p>
     <h2 id="website-readiness-title" className="mt-2 font-serif text-2xl font-semibold">
       What families can learn about this school
@@ -181,19 +182,19 @@ function WebsiteInformationChecklist({ data }: {
       school-opening authority, admissions approval, or live website hosting.
     </p>
     <div className="mt-4 grid gap-3 sm:grid-cols-3">
-      <div className="rounded-lg border p-3 text-sm">
+      <div className=" border p-3 text-sm">
         <p className="font-semibold">Website marketing</p>
         <p className="mt-1 text-muted-foreground">{readiness.marketing === "published"
           ? "Published in the Site registry; public host still needs verification"
           : "Not published"}</p>
       </div>
-      <div className="rounded-lg border p-3 text-sm">
+      <div className=" border p-3 text-sm">
         <p className="font-semibold">Information</p>
         <p className="mt-1 text-muted-foreground">{required.length === 0
           ? "Required parent information categories represented"
           : `${required.length} required information gaps`}</p>
       </div>
-      <div className="rounded-lg border p-3 text-sm">
+      <div className=" border p-3 text-sm">
         <p className="font-semibold">Institutional authority</p>
         <p className="mt-1 text-muted-foreground">Not verified by this preview</p>
       </div>
@@ -204,7 +205,7 @@ function WebsiteInformationChecklist({ data }: {
         .filter(group => group.gaps.length).map(group =>
           <div key={group.label}>
             <h3 className="text-sm font-semibold">{group.label}</h3>
-            <ul className="mt-2 divide-y rounded-lg border">
+            <ul className="mt-2 divide-y  border">
               {group.gaps.map(gap => <li key={`${gap.category}:${gap.owner}:${gap.message}`}
                 className="flex flex-wrap items-start justify-between gap-2 px-3 py-3 text-sm">
                 <span className="max-w-2xl">{gap.message}</span>
@@ -248,7 +249,7 @@ function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartne
       help:"Families should have a published contact channel or an approved Program inquiry route."},
   ];
   const completed=items.filter(item=>item.ready).length;
-  return <section aria-labelledby="school-website-design-readiness" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+  return <section aria-labelledby="school-website-design-readiness" className="mt-6  border border-border/70 bg-card p-6 shadow-sm">
     <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Website quality</p>
     <h2 id="school-website-design-readiness" className="mt-2 font-serif text-2xl font-semibold">Make this site feel like your school</h2>
     <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
@@ -258,7 +259,7 @@ function WebsiteDesignChecklist({data}:{data:Awaited<ReturnType<typeof getPartne
     </p>
     <p className="mt-3 text-sm font-semibold" role="status">{completed} of {items.length} content-quality signals represented</p>
     <ul className="mt-4 grid gap-3 md:grid-cols-2">
-      {items.map(item=><li key={item.title} className="rounded-lg border p-4">
+      {items.map(item=><li key={item.title} className=" border p-4">
         <p className="text-sm font-semibold">{item.ready?"✓ ":"○ "}{item.title}</p>
         {!item.ready&&<p className="mt-2 text-sm text-muted-foreground">{item.help}</p>}
       </li>)}
@@ -278,12 +279,12 @@ function WebsitePreviewPanel({ data, draftPreview }: {
   const pages = Object.entries(htmlPages);
   // Never show another page's or an older revision's HTML for a missing page.
   const activeHtml = Object.hasOwn(htmlPages, selected) ? htmlPages[selected] : null;
-  return <section aria-labelledby="partner-preview-title" className="mt-6 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+  return <section aria-labelledby="partner-preview-title" className="mt-6  border border-border/70 bg-card p-6 shadow-sm">
     <h2 id="partner-preview-title" className="flex items-center gap-2 font-serif text-2xl font-semibold"><Eye className="size-5 text-primary" /> {draftPreview ? "Preview of current changes · not saved" : !saved ? "No saved website design yet" : data.localContentStatus === "published" ? "Latest saved and published website" : "Latest saved private design · revision " + data.currentRevision}</h2>
     <p className="mt-2 text-sm text-muted-foreground">This read-only preview uses the same design as the hosted site. It does not submit forms or publish changes.</p>
     {pages.length > 0 && <div role="group" aria-label="Preview a website page" className="mt-4 flex flex-wrap gap-2">
       {pages.map(([path]) => <Button variant="outline" key={path} type="button" aria-pressed={selected === path}
-        onClick={() => setSelected(path)} className="rounded-lg border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+        onClick={() => setSelected(path)} className=" border px-3 py-2 text-sm aria-pressed:bg-primary aria-pressed:text-primary-foreground">
         {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
       </Button>)}
     </div>}
@@ -537,7 +538,7 @@ function LocalWebsiteCopyEditor({
   };
 
   return <section aria-label="Website content setup">
-    {data.demonstration && !data.editingContent && <div role="note" className="mt-3 rounded-lg border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
+    {data.demonstration && !data.editingContent && <div role="note" className="mt-3  border border-amber-300/70 bg-amber-50 p-3 text-sm text-amber-950">
       <p className="font-semibold">Fictional sample prepared for this demo school</p>
       <p className="mt-1">We filled the draft with an example welcome, community story, vision and theme.
         This content has not been saved or published. Review and edit the story, then
@@ -552,15 +553,15 @@ function LocalWebsiteCopyEditor({
       <Button variant="outline" type="button" onClick={loadLatestRevision}
         className="min-h-11 border px-3 py-2 font-semibold">Discard my edits and load latest</Button>
     </div>}
-    {!data.canPublish && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+    {!data.canPublish && <WorkspaceNotice tone="attention" className="mt-3">
       You can preview this Site, but your current verified Site assignment has not
       been granted local website publishing. Ask the Site administrator to assign
       that specific capability; CAN academic approval is not required for church copy.
-    </p>}
-    {data.localContentStatus === "review_required" && <p role="status" className="mt-3 rounded-lg border p-3 text-sm">
+    </WorkspaceNotice>}
+    {data.localContentStatus === "review_required" && <WorkspaceNotice tone="attention" className="mt-3">
       Your latest proposed wording includes a protected claim. It is held for review;
       the last published church copy remains unchanged.
-    </p>}
+    </WorkspaceNotice>}
     {data.approvedPhotoCount === 0 && !content.branding.heroImage && <p role="status" className="mt-3 border p-3 text-sm">Using illustrative template images. No school photography selected.</p>}
     {artworkGaps.length > 0 &&
       <div role="status" className="mt-3 border p-3 text-sm">
@@ -569,7 +570,7 @@ function LocalWebsiteCopyEditor({
         <ul className="mt-2 list-disc pl-5">{[...new Set(artworkGaps)].map(gap =>
           <li key={gap}>{gap}</li>)}</ul>
       </div>}
-    {error && <p role="alert" className="mt-3 rounded-lg border p-3 text-sm">{error}</p>}
+    {error && <WorkspaceNotice tone="danger" className="mt-3">{error}</WorkspaceNotice>}
     <MutationFeedback state={mutation} className="mt-3" pendingMessage="Saving website changes..."/>
     <div className="space-y-5">
       {step === 0 && <div className="space-y-5">
@@ -637,7 +638,7 @@ function LocalWebsiteCopyEditor({
         <p className="text-xs leading-5 text-muted-foreground">
           Your chosen website design provides the visual structure. These colors and fonts become the same versioned school identity used by the site and downloadable wordmark.
         </p>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3  border p-4">
           <div>
             <p className="font-medium">Recommended brand for {schoolBrandDesigns[content.branding.templateId ?? "heritage"].name}</p>
             <p className="mt-1 text-xs text-muted-foreground">Apply the matching starter palette and typography without changing your school's name, copy or photos.</p>
@@ -650,7 +651,7 @@ function LocalWebsiteCopyEditor({
             } };
           })}>Apply recommended brand</Button>
         </div>
-        <div className="rounded-xl border p-4">
+        <div className=" border p-4">
           <p className="font-medium">Choose your school's visual identity</p>
           <p className="mt-1 text-xs text-muted-foreground">CAN Signature gives you a complete editorial design.
             Inspired by your church uses approved palette and typography choices; automatic source discovery
@@ -663,7 +664,7 @@ function LocalWebsiteCopyEditor({
               return <Button variant="outline" type="button" key={id} aria-pressed={(content.branding.paletteId ?? "signature")===id}
                 onClick={()=>setContent(old=>({...old,branding:{...old.branding,paletteId:id}}))}
                 className="min-h-14 w-full flex-col items-stretch justify-start gap-0 whitespace-normal border p-3 text-left text-sm capitalize aria-pressed:ring-2 aria-pressed:ring-primary">
-                <span aria-hidden="true" className="mb-2 flex h-5 overflow-hidden rounded">
+                <span aria-hidden="true" className="mb-2 flex h-5 overflow-hidden ">
                   <span className="flex-1" style={{backgroundColor:palette.ink}}/>
                   <span className="flex-1" style={{backgroundColor:palette.secondary}}/>
                   <span className="flex-1" style={{backgroundColor:palette.accent}}/>
@@ -678,7 +679,7 @@ function LocalWebsiteCopyEditor({
             <Select value={content.branding.typographyId ?? "editorial"}
               onChange={event=>setContent(old=>({...old,branding:{...old.branding,
                 typographyId:event.target.value as SiteTypographyId, headingFontId:undefined, bodyFontId:undefined}}))}
-              className="mt-2 min-h-11 w-full rounded-lg border bg-background px-3">
+              className="mt-2 min-h-11 w-full  border bg-background px-3">
               {siteTypographyIds.map(id=><option key={id} value={id}>
                 {id === "editorial" ? "Editorial serif + modern sans" :
                   id === "traditional" ? "Heritage serif + clean sans" : "Contemporary humanist sans"}
@@ -688,7 +689,7 @@ function LocalWebsiteCopyEditor({
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {(["headingFontId", "bodyFontId"] as const).map(key => <Label key={key} className="block text-sm">
               {key === "headingFontId" ? "Heading font" : "Body font"}
-              <Select className="mt-2 min-h-11 w-full rounded border bg-background px-3" value={content.branding[key] ?? ""}
+              <Select className="mt-2 min-h-11 w-full  border bg-background px-3" value={content.branding[key] ?? ""}
                 onChange={event => setContent(old => ({...old, branding:{...old.branding, [key]:event.target.value ? event.target.value as SiteFontId : undefined}}))}>
                 <option value="">Use recommended pairing</option>
                 {Object.entries(siteFontCatalog).map(([id,font]) => <option key={id} value={id}>{font.label}</option>)}
@@ -718,15 +719,15 @@ function LocalWebsiteCopyEditor({
           <Input type="file" accept="image/png,image/jpeg" onChange={event => void selectArtwork(event, field)}
             className="mt-2 block w-full text-sm" />
         </Label>
-        {artwork && <div className="space-y-3 rounded-lg bg-muted/40 p-3">
+        {artwork && <div className="space-y-3  bg-muted/40 p-3">
           <img src={artwork.dataUrl} alt={field === "logoImage" ? "Selected logo preview" : "Selected artwork preview"}
-            className="h-52 w-full rounded-lg object-contain" />
+            className="h-52 w-full  object-contain" />
           <Label className="block text-sm">
             <span className="font-medium">Artwork description for screen readers</span>
             <Input type="text" maxLength={180} value={artwork.altText}
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 [field]: old.branding[field] ? { ...old.branding[field], altText: event.target.value } : null,
-              } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm" />
+              } }))} className="mt-2 w-full  border bg-background p-2 text-sm" />
           </Label>
           <Label className="flex items-start gap-2 text-sm">
             <Checkbox checked={artwork.rightsConfirmed}
@@ -741,7 +742,7 @@ function LocalWebsiteCopyEditor({
               onChange={event => setContent(old => ({ ...old, branding: { ...old.branding,
                 [field]: old.branding[field] ? { ...old.branding[field],
                   childImageConsent: event.target.value as SiteLocalImageConsent } : null,
-              } }))} className="mt-2 w-full rounded-lg border bg-background p-2 text-sm">
+              } }))} className="mt-2 w-full  border bg-background p-2 text-sm">
               <option value="unconfirmed">Choose a confirmation</option>
               <option value="no_identifiable_children">No identifiable children appear</option>
               <option value="guardian_consent_confirmed">Documented guardian consent covers every identifiable child</option>
@@ -749,7 +750,7 @@ function LocalWebsiteCopyEditor({
           </Label>
           <Button variant="outline" type="button" onClick={() => setContent(old => ({
             ...old, branding: { ...old.branding, [field]: null },
-          }))} className="rounded-lg border px-3 py-1 text-xs">{field === "logoImage" ? "Remove logo" : "Remove artwork"}</Button>
+          }))} className=" border px-3 py-1 text-xs">{field === "logoImage" ? "Remove logo" : "Remove artwork"}</Button>
         </div>}
         </div>;
         })}
@@ -787,7 +788,7 @@ function LocalWebsiteCopyEditor({
         <p className="text-xs text-muted-foreground">The full-page link uses your existing CAN OS sign-in. It never publishes a draft. {data.currentRevision > 0 ? "It shows the latest saved revision." : "Until the first save, it shows a clearly marked sample, not your unsaved edits."} {dirty ? "You have unsaved edits; save them before sharing the latest design." : ""}</p>
         {data.currentRevision === 0 && <p className="border p-3 text-sm" role="status">No saved website draft exists yet. The full-page preview shows an illustrative sample. You can test unsaved changes below; sharing your customized design requires saving.</p>}
         {shareMessage && <p role="status" className="border p-3 text-sm">{shareMessage}</p>}
-        {previewError&&<p role="alert" className="border border-destructive p-3 text-sm">{previewError}</p>}
+        {previewError&&<WorkspaceNotice tone="danger">{previewError}</WorkspaceNotice>}
         <WebsitePreviewPanel data={data} draftPreview={draftPreview?.source === content ? draftPreview.rendered : null} />
         <details className="border p-4">
           <summary className="cursor-pointer text-sm font-semibold">Review family information readiness</summary>
@@ -802,7 +803,7 @@ function LocalWebsiteCopyEditor({
           You can preview this Site, but your verified Site assignment does not include local website publishing.
         </p>}
         <Button type="button" disabled={busy || !data.canPublish || revisionConflict} onClick={() => void submit()}
-          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+          className=" bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
           {busy ? "Publishing…" : "Publish church-owned content"}
         </Button>
         <p className="text-xs text-muted-foreground">
@@ -818,7 +819,7 @@ function LocalWebsiteCopyEditor({
                 {" · "}{new Date(version.createdAt).toLocaleString()}</span>
               {data.canPublish && version.status === "published" && version.revision < data.currentRevision &&
                 <Button variant="outline" type="button" disabled={busy || revisionConflict} onClick={() => void restore(version.revision)}
-                  className="rounded-lg border px-3 py-1 text-xs disabled:opacity-50">
+                  className=" border px-3 py-1 text-xs disabled:opacity-50">
                   Restore as new revision
                 </Button>}
             </li>)}
@@ -833,7 +834,7 @@ function LocalWebsiteCopyEditor({
       <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
         <Button variant="outline" type="button" disabled={step === 0}
           onClick={() => onStepChange(Math.max(0, step - 1))}
-          className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50">
+          className=" border px-4 py-2 text-sm font-semibold disabled:opacity-50">
           Back
         </Button>
         <Button variant="outline" type="button" disabled={busy || !data.canPublish || !data.draftStorageReady || revisionConflict} onClick={()=>void saveDraft()}
@@ -842,7 +843,7 @@ function LocalWebsiteCopyEditor({
         </Button>
         {step < 5 && <Button type="button"
           onClick={() => onStepChange(Math.min(5, step + 1))}
-          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background">
+          className=" bg-foreground px-4 py-2 text-sm font-semibold text-background">
           Continue
         </Button>}
       </div>
