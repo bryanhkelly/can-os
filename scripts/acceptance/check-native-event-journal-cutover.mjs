@@ -30,6 +30,7 @@ walk(sourceRoot);
 const consumers=[];
 const directWriters=[];
 const explicitSql=[];
+const roleScopedSharedWriters=[];
 for(const absolute of files){
   const file=relative(root,absolute).replaceAll("\\","/");
   const content=readFileSync(absolute,"utf8");
@@ -51,6 +52,13 @@ for(const absolute of files){
       if(occurrences.length)directWriters.push({file,model:identifier,count:occurrences.length});
     }
   }
+  // Public event journals deliberately reject reads/writes from restricted
+  // database roles. A caller that SET LOCAL ROLE must retain an independently
+  // authorized native writer until an explicitly reviewed SQL permission path exists.
+  if(/SET\\s+LOCAL\\s+ROLE/i.test(content)
+     && /\\b(?:writeCanonicalAudit|emitCanonicalDomainEvent)\\s*\\(/.test(content)){
+    roleScopedSharedWriters.push(file);
+  }
   const references=[...content.matchAll(/education_v30\.(audit_events|domain_events)\b/g)];
   if(references.length)explicitSql.push({file,relations:[...new Set(references.map(m=>m[1]))].sort()});
 }
@@ -60,11 +68,12 @@ const output={
   legacy_model_consumer_files:consumers.length,
   legacy_direct_writer_calls:directWriters.reduce((n,x)=>n+x.count,0),
   legacy_sql_reference_files:explicitSql.length,
-  consumers,directWriters,explicitSql,
+  unsafe_restricted_role_public_writers:roleScopedSharedWriters.length,
+  consumers,directWriters,explicitSql,roleScopedSharedWriters,
   schema_drop_authorized:false,
 };
 console.log(JSON.stringify(output,null,2));
-if(consumers.length||directWriters.length||explicitSql.length){
+if(consumers.length||directWriters.length||explicitSql.length||roleScopedSharedWriters.length){
   console.error("BLOCKED: native event journal consumers or SQL references remain.");
   process.exitCode=2;
 }else{
