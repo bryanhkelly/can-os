@@ -1,6 +1,7 @@
 import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { auditEvents, canonicalDeliverySessions, classroomDeploymentSites, classroomOfferingCourses, courseVersions, deploymentOfferingAdoptions, domainEvents, facilitatedClassroomPlans, offeringVersions } from "@/db/canonical-v301";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
+import { canonicalDeliverySessions, classroomDeploymentSites, classroomOfferingCourses, courseVersions, deploymentOfferingAdoptions, facilitatedClassroomPlans, offeringVersions } from "@/db/canonical-v301";
 import { AuthorizationError } from "@/domain/command-context";
 import { validClassroomScheduleWindow } from "@/domain/classroom-scheduling";
 import { requireCanonicalFacilitator } from "./canonical-facilitator-access.server";
@@ -48,14 +49,14 @@ export async function approvedSiteCourse(
   return site.id;
 }
 export async function auditPlan(tx:Tx,host:Host,planId:string,event:string,payload:Record<string,string>){
-  await tx.insert(auditEvents).values({
+  await writeCanonicalAudit(tx,{
     actorPersonId:host.actor.actorPersonId!,
     owningOrganizationId:host.organizationId,
     eventCode:"learning.classroom.plan."+event,
     entityKind:"facilitated_classroom_plan",entityId:planId,
     payload,
   });
-  await tx.insert(domainEvents).values({
+  await emitCanonicalDomainEvent(tx,{
     actorPersonId:host.actor.actorPersonId!,
     eventType:"ClassroomPlan"+(event[0]??"").toUpperCase()+event.slice(1),
     aggregateType:"facilitated_classroom_plan",aggregateId:planId,
