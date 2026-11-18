@@ -38,7 +38,7 @@ describe("first-class My Activity resilience and source-scoped enrollment",()=>{
   it("keeps registration and waitlist query caches separate by selected ID and verified grant",()=>{
     const source=read("src/components/learning/NoncreditEnrollmentManagement.tsx");
     expect(source).toContain('["my-noncredit-self-enrollments",scopeKey,registrationId??"all"]');
-    expect(source).toContain('["my-noncredit-waitlist",scopeKey,releaseId??"all"]');
+    expect(source).toContain("noncreditWaitlistQueryKeys.pages(scopeKey,releaseId)");
     expect(source).toContain("getMyNoncreditRegistrationById({data:{registrationId}})");
     expect(source).toContain("getMyNoncreditWaitlistByRelease({data:{releaseId}})");
     expect(source).toContain('enabled:authorized&&!releaseId');
