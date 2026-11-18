@@ -32,7 +32,7 @@ export async function resolveAction(
     auditOwnedByExecute: true,
     // The domain service owns row locking, resource authorization, event and
     // audit writes. All remain in the same transaction.
-    execute: (tx, actor, parsed) => resolveActionInTransaction(tx, actor, parsed),
+    execute: (tx: Tx, actor, parsed) => resolveActionInTransaction(tx, actor, parsed),
   });
 }
 
