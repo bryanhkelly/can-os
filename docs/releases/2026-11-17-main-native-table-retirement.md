@@ -365,3 +365,41 @@ remained and **370** tables were in `public`. The seven
 `education_v30_secure` tables were unchanged. Concurrent updates to
 main may account for additional inventory changes; do not attribute all
 movement exclusively to this batch.
+
+## Native session retirement preflight
+
+A new main-only, **read-only, fail-closed** gate makes the next core-identity
+retirement decision explicit:
+`scripts/acceptance/check-main-canonical-session-retirement.mjs`.
+Source regression checks:
+`tests/unit/main-canonical-session-retirement-preflight.test.ts`.
+
+Current direct production evidence:
+
+- Four `education_v30` identity tables (`persons`, `canonical_accounts`,
+  `canonical_account_grants`, and `canonical_sessions`) each have **zero
+  rows**. Shared `public.access_sessions` retains **274** historical sessions.
+- The remaining native Person, canonical Account, and canonical grant tables
+  have **14**, **5**, and **2** inbound FKs respectively. No inbound FK
+  references the native session table.
+- Existing database routines still reference native sessions (**2**),
+  native account grants (**6**) and native accounts (**4**). Some references
+  overlap in the same routines.
+- Live server modules still issue, read, touch, and revoke the second native
+  session cookie and can create native Person/account/grant rows for new
+  learners.
+- Forced RLS and denied direct authenticated SELECT/UPDATE on all three
+  authoritative public authentication tables were reverified.
+
+**Result: not safe to delete or move `canonical_sessions` in isolation.**
+The required exit is a shared-session issuer, account and Person mapping,
+grant authorization, restricted reader, mutation-time revalidation,
+revocation and activity-lifetime path that preserves exact existing
+security invariants and does not invent an identity bridge. Only after
+positive and negative end-to-end authentication tests pass should the
+native credential tables be retired. No user records were altered by
+this preflight.
+
+The new checker and Vitest source contracts are committed but were not run
+as scripts in this pass; the database portions were verified directly
+through read-only SQL on production main.
