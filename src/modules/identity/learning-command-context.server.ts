@@ -5,6 +5,19 @@ import { getCanonicalCommandContext, getCanonicalSessionRow } from "./canonical-
 import { getCommandContext } from "./command-context.server";
 
 /**
+ * A delegated/demo-admin actor is not the learner whose Person owns learning
+ * evidence. A real current account and nondelegated CAN Person are mandatory.
+ */
+async function getDirectCANLearningContext(request: Request): Promise<CommandContext & {
+  sessionId?: string;
+}> {
+  const actor = await getCommandContext(request);
+  if (!actor.actorPersonId || actor.sessionAccountId)
+    throw new AuthorizationError("direct CAN Person learning session");
+  return actor;
+}
+
+/**
  * Instructional access always starts with the ONE current CAN login.
  * A native bearer alone cannot establish learner authority or silently
  * select a different Person. The temporary dual-cookie route still checks
@@ -15,7 +28,7 @@ export async function getInstructionalLearnerContext(
 ): Promise<CommandContext> {
   return canLearningCookieMode(request) === "can_with_native"
     ? getCanonicalCommandContext(request)
-    : getCommandContext(request);
+    : getDirectCANLearningContext(request);
 }
 
 /**
@@ -38,7 +51,7 @@ export async function getInstructionalLearnerSession(request: Request): Promise<
       throw new AuthorizationError("one verified learning Person");
     return { context, sessionId: row.session_id };
   }
-  const context = await getCommandContext(request);
+  const context = await getDirectCANLearningContext(request);
   if (!context.sessionId) throw new AuthorizationError("authenticated session");
   return { context, sessionId: context.sessionId };
 }
