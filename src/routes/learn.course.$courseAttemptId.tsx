@@ -6,7 +6,7 @@ import { getMyNoncreditCourseByAttemptId } from "@/modules/enrollment/noncredit-
 import { openMyNoncreditCourse } from "@/modules/enrollment/noncredit-self-enrollment-resume.functions";
 import { normalizeClientError } from "@/lib/client-error";
 import { Button } from "@/components/ui/button";
-import { WorkspaceShell } from "@/components/workspace";
+import { QueryState, WorkspaceShell } from "@/components/workspace";
 import { AuthorizationError } from "@/domain/command-context";
 import { safeLoader } from "@/lib/safe-loader";
 import { LoaderFailure } from "@/lib/loader-failure";
@@ -55,16 +55,14 @@ function VerifiedCourseAccess({course}:{course:NoncreditCourse}){
   },[course.courseAttemptId,retry]);
   if(status!=="ready")return <WorkspaceShell eyebrow="Learning" width="wide"
     title={course.trainingTitle} subtitle="Restore your verified learner session to continue this course.">
-    {status==="loading"?<p role="status" className="mt-6 text-sm">Verifying course access…</p>:
-      <div className="mt-6 space-y-4">
-        <p role="alert" className="text-sm">{error}</p>
-        <Button type="button" variant="outline" onClick={()=>{
-          setError("");setStatus("loading");setRetry(value=>value+1);
-        }}>Retry course access</Button>
-        <Link to="/learn/my-activity" className="ml-3 text-sm font-semibold underline">
-          Return to My Activity
-        </Link>
-      </div>}
+    <QueryState loading={status==="loading"?"Verifying course access…":undefined}
+      error={status==="error"?error:undefined}
+      onRetry={()=>{
+        setError("");setStatus("loading");setRetry(value=>value+1);
+      }}/>
+    {status==="error"&&<Button asChild variant="outline" className="mt-4">
+      <Link to="/learn/my-activity">Return to My Activity</Link>
+    </Button>}
   </WorkspaceShell>;
   return <UnifiedCoursePlayer context="training" title={course.trainingTitle}
     subtitle="Your individual Course Attempt keeps lesson progress and practice across recorded instructors. Room pairing is not independently verified attendance."
@@ -86,19 +84,27 @@ function VerifiedCourseAccess({course}:{course:NoncreditCourse}){
 
 function ActiveNoncreditSession({courseAttemptId}:{courseAttemptId:string}) {
   useEffect(()=>{
-    let lastSentAt=0;
-    let unavailable=false;
+    let active=true;
+    let inFlight=false;
+    let nextAttemptAt=0;
     function touch(event:Event){
-      if(unavailable||!event.isTrusted||document.visibilityState!=="visible")return;
+      if(!active||inFlight||!event.isTrusted||document.visibilityState!=="visible")return;
       const now=Date.now();
-      if(now-lastSentAt<60_000)return;
-      lastSentAt=now;
+      if(now<nextAttemptAt)return;
+      // This is a session keepalive, never Course completion or attendance.
+      // Only actual trusted interaction can trigger a retry after transient loss.
+      inFlight=true;
+      nextAttemptAt=now+60_000;
       void touchMyNoncreditLearningSession({data:{courseAttemptId}})
-        .catch(()=>{unavailable=true;});
+        .catch(()=>{
+          if(active)nextAttemptAt=Date.now()+30_000;
+        })
+        .finally(()=>{inFlight=false;});
     }
     document.addEventListener("pointerdown",touch,{passive:true});
     document.addEventListener("keydown",touch);
     return ()=>{
+      active=false;
       document.removeEventListener("pointerdown",touch);
       document.removeEventListener("keydown",touch);
     };
