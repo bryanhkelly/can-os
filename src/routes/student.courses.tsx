@@ -7,6 +7,7 @@ import { getAssignments } from "@/modules/student-experience/assignments.functio
 import { WorkspaceShell, WorkspacePanel, DetailNavigation, SectionTab, StatusBadge, EmptyState, StatCard, WorkspaceNotice } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { ClassroomWorkspace } from "@/components/learning/ClassroomWorkspace";
+import { StudentAssignmentLink } from "@/components/student/StudentAssignmentLink";
 import { dateKeyInTimezone } from "@/modules/calendar/timezone";
 import { useHydrated } from "@/lib/use-hydrated";
 import { useMutationFeedback } from "@/lib/mutation-feedback";
@@ -176,7 +177,7 @@ function StudentClasses({data}:{data:Awaited<ReturnType<typeof loadCourseRegistr
     </WorkspacePanel> : <WorkspacePanel title={tab==="grades"?"Grades & feedback":"Classwork"}
      description={tab==="grades"?"Assignment scores are not a finalized course grade. See your published report card for official results.":"Open an assignment to read instructions, submit your work or review feedback."}>
      <div className="divide-y">{work.filter(item=>tab!=="grades"||item.status==="graded"||item.status==="returned").map(item=><article key={item.assessmentId} className="flex flex-wrap items-start justify-between gap-3 py-4 first:pt-0">
-      <div className="min-w-0"><h3 className="font-semibold"><Link to="/student/assignments" search={{section:course.id,assessment:item.assessmentId}} className="underline">{item.title}</Link></h3>
+      <div className="min-w-0"><h3 className="font-semibold"><StudentAssignmentLink assessmentId={item.assessmentId} sectionId={course.id} className="underline">{item.title}</StudentAssignmentLink></h3>
        <p className="mt-1 text-sm text-muted-foreground">{item.dueAt?`Due ${new Date(item.dueAt).toLocaleDateString()}`:"No due date"}{item.score!==null?` · ${item.score} / ${item.pointsPossible??"—"}`:""}</p>
        {tab==="grades"&&item.feedbackText&&<p className="mt-2 whitespace-pre-wrap text-sm">{item.feedbackText}</p>}</div>
       <StatusBadge tone={item.timeliness==="missing"?"attention":item.status==="graded"?"success":"neutral"}>{item.timeliness==="missing"?"Missing":item.status??"Assigned"}</StatusBadge>
