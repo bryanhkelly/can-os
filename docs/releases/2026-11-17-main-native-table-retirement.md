@@ -265,3 +265,57 @@ It participates in session credentials, active grants, runtime
 reconcile it with the authoritative shared account/session model and
 exercise positive and negative login, refresh, expiry and revocation
 tests without introducing an additional identity system.
+
+## P0 shared authentication hardening before session convergence
+
+The follow-on identity review found the canonical native identity tables
+(`education_v30.canonical_accounts`, `canonical_account_grants`, `canonical_sessions`,
+and `persons`) all empty, but the active shared system contained 15
+`public.access_accounts`, 21 `account_person_grants`, 274
+`access_sessions`, and 142 `public.people`. All observed shared
+sessions were expired at the time of inspection. The presence of native
+login, enrollment, revocation, restricted reader, and account/person
+linkage code means an empty native session table is **not** evidence it
+can be dropped safely.
+
+Before any shared-session cutover, the migration
+`database/production/2026-11-17-harden-shared-auth-rls.sql` enabled
+and forced RLS on `public.access_accounts`, `access_sessions`, and
+`account_person_grants`, removed direct SQL access for
+`authenticated`/`anonymous`, and added an explicit restrictive deny
+policy to each. The owner service role remains authorized as before.
+
+Separately,
+`database/production/2026-11-17-revoke-shared-identity-metadata-client-acl.sql`
+removed unnecessary `authenticated` CRUD privileges from the existing
+forced-RLS, owner-only tables
+`public.access_account_canonical_principals`,
+`public.access_account_noncredit_principals`, and
+`public.access_adult_learning_reviews`.
+
+**Verified directly on Neon main:** all six protected public relations
+have forced RLS, no direct anonymous or authenticated SELECT/INSERT/
+UPDATE/DELETE, one unchanged or appropriately restrictive owner/deny
+policy, and the server owner retains SELECT. Before/after checks show
+15 shared accounts, 274 shared sessions, 21 grants, and zero rows in
+each of the three protected identity/review ledgers. A synthetic invalid
+staff-session hash returned zero grants.
+
+**Reader acceptance limitation:** `neondb_owner` is a member of
+`can_v30_canonical_auth_reader` but cannot SET ROLE to it
+(`pg_has_role(...,'SET') = false`). Its EXECUTE permission is present
+on both canonical session projections. The negative reader result was
+tested through the privileged owner context, **not** a real restricted
+reader connection. No role membership or grant changes were made to
+circumvent that boundary. The actual `CAN_CANONICAL_AUTH_DATABASE_URL`
+connection still needs positive and negative end-to-end authorization
+testing after the schema hardening.
+
+- Read-only acceptance: `scripts/acceptance/check-main-shared-auth-rls.mjs`
+- Source regression: `tests/unit/main-shared-auth-rls.test.ts`
+
+These security changes do not retire the native identity/session tables
+and are **not** an assertion that shared login, staff role switching,
+adult review or learner enrollment browser workflows have passed.
+Complete unified-session design and acceptance before deleting
+`canonical_sessions` or its related account/grant tables.
