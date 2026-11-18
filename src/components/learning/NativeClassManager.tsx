@@ -5,6 +5,7 @@ import { WorkspaceShell } from "@/components/workspace";
 import { NativeClassLaunchReadiness } from "@/components/learning/NativeClassLaunchReadiness";
 import { NativeClassSummary } from "@/components/learning/NativeClassSummary";
 import { selectAuthorizedClassSite } from "@/domain/class-site-selection";
+import { nativeClassOperatorQueryKeys } from "@/domain/native-class-operator-query-keys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/choice";
@@ -60,7 +61,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   const operatorSites=useQuery({
     queryKey:["native-class-operator-sites"],queryFn:()=>getNativeClassOperatorSites(),retry:false,
   });
-  const classes=useQuery({queryKey:["native-class-operator-classes",preferredSiteId??null],
+  const classes=useQuery({queryKey:nativeClassOperatorQueryKeys.site(preferredSiteId),
     queryFn:()=>getMyUnifiedClassDrafts({data:{siteId:preferredSiteId}}),retry:false});
   const [choice,setChoice]=useState("");
   const [recipeText,setRecipeText]=useState("");
@@ -225,7 +226,7 @@ export function NativeClassManager({preferredSiteId,preferredOfferingVersionId,n
   async function refresh(){
     await Promise.all([
       client.invalidateQueries({queryKey:["native-class-course-options"]}),
-      client.invalidateQueries({queryKey:["native-class-operator-classes"]}),
+      client.invalidateQueries({queryKey:nativeClassOperatorQueryKeys.root}),
     ]);
   }
   async function create(event:FormEvent<HTMLFormElement>){
