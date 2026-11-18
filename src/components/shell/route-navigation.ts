@@ -221,6 +221,7 @@ export const routeNavigation = {
   "/learn/my-activity": hidden("Canonical personal activity, participation and history", []),
   "/reports/classes/$classId": hidden("Authorized Class participation report", []),
   "/reports": hidden("Restricted reports index", []),
+  "/api/webhooks/resend": endpoint,
 } satisfies Record<keyof FileRoutesByTo, RouteNavigationMetadata>;
 
 export function ownedRoutes(role: WorkspaceRole, owner: string): string[] {
