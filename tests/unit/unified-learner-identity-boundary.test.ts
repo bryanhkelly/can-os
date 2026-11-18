@@ -62,7 +62,7 @@ describe("one canonical learning Person across Courses and Classes",()=>{
    expect(auth).toContain('adultReview.status!=="approved"');
  });
  it("keeps cookie recovery on separate browser RPCs",()=>{
-   const flow=read("src/modules/classes/native-class-entry.client.ts");
+   const flow=read("src/modules/classes/native-class-entry.ts");
    expect(flow).toContain("Each createServerFn call is its own HTTP round trip");
    expect(flow).toContain("return await enrollInNativeClass(input)");
    expect(flow).toContain("await resumeLinkedNativeClassLearner()");
