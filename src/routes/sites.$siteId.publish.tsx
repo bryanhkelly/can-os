@@ -3,7 +3,8 @@ import { MutationFeedback } from "@/components/workspace/mutation-feedback";
 import { DomainError } from "@/domain/errors";
 import { useState, type FormEvent } from "react";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { WorkspaceShell } from "@/components/workspace";
+import { StatusBadge, WorkspaceNotice, WorkspaceShell } from "@/components/workspace";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -137,9 +138,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
   return <WorkspaceShell eyebrow="Site publishing" title={data.site.name + " · website & domains"}
     subtitle="Your school has a default CAN OS address; custom domains are optional. A live public site requires verified hosting and publication."
     breadcrumbs={<><Link to="/sites/$siteId/profile" params={{ siteId: data.site.id }} className="underline">School profile</Link><span>/</span><span>Public site</span></>}>
-    {error && <p role="alert" className="mt-5 rounded-lg border border-red-500 p-3 text-sm">{error}</p>}
+    {error && <WorkspaceNotice tone="danger" className="mt-5">{error}</WorkspaceNotice>}
     <MutationFeedback state={mutation} className="mt-5" pendingMessage="Saving public site change..."/>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 className="text-xl font-semibold">Default school website</h2>
       <p className="mt-2 text-sm text-muted-foreground">Addresses must be globally unique. Reserving one does not activate DNS, allow public access, or open applications.</p>
       {data.address ? <div className="mt-4 space-y-2">
@@ -152,10 +153,9 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           {data.localPreviewEnabled &&
             <a href={`/published-site?site=${encodeURIComponent(data.address.slug)}`}
               className="text-sm font-semibold underline">Open local public preview</a>}
-          <button type="button" disabled={verifying || saving} onClick={() => void verifyPublicWebsite()}
-            className="rounded-lg border px-3 py-2 text-sm font-semibold disabled:opacity-50">
+          <Button type="button" variant="outline" disabled={verifying || saving} onClick={() => void verifyPublicWebsite()}>
             {verifying ? "Checking HTTPS site…" : "Check live website"}
-          </button>
+          </Button>
           {reachability === "live" &&
             <a href={"https://" + data.address.host + "/"} target="_blank" rel="noopener noreferrer"
               className="text-sm font-semibold underline">Open verified live website</a>}
@@ -182,12 +182,12 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         Check the actual HTTPS Site address, CAN registration application, and the source revision serving visitors.
         A saved publication record or a GitHub commit does not prove the Site is live.
       </p>
-      <label className="mt-5 block max-w-xl text-sm font-semibold">
+      <Label className="mt-5 block max-w-xl text-sm font-semibold">
         Expected `main` commit SHA
         <Input className="mt-2" value={sourceSha} maxLength={40}
           onChange={event=>setSourceSha(event.target.value.trim())}
           placeholder="40-character Git commit (required to verify exact deployment)"/>
-      </label>
+      </Label>
       <Button className="mt-3" type="button" disabled={handoffBusy||saving||
         (sourceSha.length>0&&!/^[a-f0-9]{40}$/i.test(sourceSha))}
         onClick={()=>void verifyEnrollmentHandoff()}>
@@ -204,10 +204,10 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
           :"Release not accepted. Review the failed or incomplete checks above."}</p>
       </div>}
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5" aria-label="Custom domain settings">
+    <section className="mt-6  border bg-card p-5" aria-label="Custom domain settings">
       <h2 className="text-xl font-semibold">Custom domain</h2>
       <p className="mt-2 text-sm text-muted-foreground">Optional. Schools can eventually use an address they own while keeping the CAN OS default address. No custom domain is connected to this school.</p>
-      <div className="mt-4 rounded-lg border bg-muted/30 p-4">
+      <div className="mt-4  border bg-muted/30 p-4">
         <p className="text-sm font-semibold">Not connected</p>
         <p className="mt-1 text-sm text-muted-foreground">Custom domain activation requires verified domain ownership, tenant-bound hostname routing, TLS certificate issuance and primary-domain redirects. These are not yet enabled in this deployment.</p>
         <p className="mt-3 text-xs text-muted-foreground">Until these checks are implemented, CAN OS will not accept a custom hostname or describe it as live. Contact the platform administrator to coordinate hosting.</p>
@@ -215,7 +215,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       <h3 className="mt-5 text-sm font-semibold">Primary website address</h3>
       <p className="mt-1 text-sm text-muted-foreground">Default CAN OS address (selected). Custom domains become eligible as a primary address only after verification.</p>
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 className="text-xl font-semibold">Public campus and family contact approval</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Your reserved website URL is different from your physical Site location.
@@ -224,11 +224,11 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         address and school-controlled contact, with expiry, evidence and withdrawal.
       </p>
       <Link to="/sites/$siteId/parent-information" params={{siteId:data.site.id}}
-        className="mt-3 inline-block rounded-lg border px-4 py-2 text-sm font-semibold">
+        className="mt-3 inline-block  border px-4 py-2 text-sm font-semibold">
         Review public address and contact
       </Link>
     </section>
-    {data.canRename && data.address && <section className="mt-6 rounded-xl border bg-card p-5">
+    {data.canRename && data.address && <section className="mt-6  border bg-card p-5">
       <h2 className="text-xl font-semibold">School name and address</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         A reviewed rename keeps this Site, its people and existing publication approval.
@@ -258,7 +258,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </Button>
       </form>
     </section>}
-    <section aria-labelledby="website-preview" className="mt-6 rounded-xl border bg-card p-5">
+    <section aria-labelledby="website-preview" className="mt-6  border bg-card p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="website-preview" className="text-xl font-semibold">Website draft preview</h2>
@@ -269,20 +269,19 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
             family applications or registrations are enabled.
           </p>
         </div>
-        <span className="rounded-full border px-3 py-1 text-xs font-semibold">
+        <StatusBadge tone={data.address?.status === "published" ? "success" : "neutral"}>
           {data.address?.status === "published"
             ? (data.hostingConfigured ? "Published · hosting configured (DNS not verified)" : "Published · hosting disabled")
             : "Private draft"}
-        </span>
+        </StatusBadge>
       </div>
       {data.previewHtml ? <>
         <div role="group" aria-label="Preview school website pages" className="mt-4 flex flex-wrap gap-2">
           {Object.keys(data.previewPages).map(path =>
-            <button type="button" key={path} aria-pressed={previewPath === path}
-              onClick={() => setPreviewPath(path)}
-              className="rounded-md border px-3 py-2 text-sm font-semibold aria-pressed:bg-primary aria-pressed:text-primary-foreground">
+            <Button type="button" variant={previewPath === path ? "default" : "outline"} key={path} aria-pressed={previewPath === path}
+              onClick={() => setPreviewPath(path)}>
               {path === "/" ? "Home" : path.slice(1).replace(/-/g, " ")}
-            </button>)}
+            </Button>)}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
           Select a page above to preview it. Navigation inside this isolated frame
@@ -296,17 +295,17 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </p>
         <iframe key={previewPath} title={`${data.site.name} ${previewPath} private website draft preview`}
           srcDoc={data.previewPages[previewPath] ?? data.previewHtml} sandbox="" referrerPolicy="no-referrer"
-          loading="lazy" className="mt-3 h-[680px] w-full rounded-lg border bg-white"
+          loading="lazy" className="mt-3 h-[680px] w-full  border bg-white"
         />
         <p className="mt-2 text-xs text-muted-foreground">
           The iframe is origin-isolated, and all form submission and scripts are disabled.
           Content approval and public hosting are separate operations.
         </p>
-      </> : <p role="status" className="mt-4 rounded-lg border p-4 text-sm">
+      </> : <p role="status" className="mt-4  border p-4 text-sm">
         Reserve a public address above to see the website draft. No content is public.
       </p>}
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Internal program and catalog review · authenticated only</p>
       <div className="mt-5 border-b pb-5">
         <p className="font-serif text-3xl">{data.site.name}</p>
@@ -316,7 +315,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       <h2 className="mt-5 text-xl font-semibold">Programs at this site</h2>
       <p className="mt-2 text-sm text-muted-foreground">These are authorized internal program summaries, not public listings. No applications or registrations can be submitted here.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {data.programs.map(program => <article key={program.id} className="rounded-lg border p-4">
+        {data.programs.map(program => <article key={program.id} className=" border p-4">
           <h3 className="font-medium">{program.name}</h3>
           <p className="mt-1 text-sm text-muted-foreground">{program.type.replaceAll("_"," ")} · Grades {program.gradeRange.min}–{program.gradeRange.max}</p>
           <p className="mt-2 text-xs text-muted-foreground">Internal status: {program.status}. Not in the public enrichment catalog.</p>
@@ -324,7 +323,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         {!data.programs.length && <p className="text-sm text-muted-foreground">No programs are currently available for this private preview.</p>}
       </div>
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 className="text-xl font-semibold">Enrichment catalog preview</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Existing independently published summer and after-school Seasons at this Site.
@@ -332,7 +331,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         registration availability or Program status.
       </p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {data.catalogPreview.map(item => <article key={item.seasonId} className="rounded-lg border p-4">
+        {data.catalogPreview.map(item => <article key={item.seasonId} className=" border p-4">
           <h3 className="font-semibold">{item.title}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             {item.season} · {item.startsOn} to {item.endsOn}
@@ -354,7 +353,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
         </p>}
       </div>
     </section>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 className="text-xl font-semibold">Academic program marketing</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Approve individual school-year Programs for public discovery. Programs may
@@ -375,7 +374,7 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       <SitePublicPeopleReviewPanel siteId={data.site.id}/>
       <FamilyServicesSetupPanel siteId={data.site.id}/>
     </div>
-    <section className="mt-6 rounded-xl border bg-card p-5">
+    <section className="mt-6  border bg-card p-5">
       <h2 className="text-xl font-semibold">Site publication decision</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         Approving this Site displays its separately approved academic and enrichment listings.
@@ -387,35 +386,34 @@ function DraftPublisher({ data }: { data: Awaited<ReturnType<typeof getSitePubli
       </p> : <div className="mt-4 space-y-4">
         <p className="text-sm">Current state: <strong>{data.address.status}</strong></p>
         {data.address.status === "draft" && !hasApprovedPublicContent &&
-          <p role="status" className="rounded-lg border p-3 text-sm">
+          <p role="status" className=" border p-3 text-sm">
             Publishing blocked: approve an academic Program listing or a summer / after-school
             enrichment offering first.
           </p>}
-        <label className="block text-sm">
+        <Label className="block text-sm">
           Publication decision reason (10–500 characters; no student information)
-          <textarea aria-label="Publication decision reason"
-            className="mt-1 block w-full rounded-lg border bg-background p-2"
+          <Textarea aria-label="Publication decision reason"
+            className="mt-1"
             value={reason} onChange={event => setReason(event.target.value)}
             minLength={10} maxLength={500} rows={3}
             placeholder={data.address.status === "published"
               ? "Reason for withdrawing this site catalog"
               : "What content was reviewed and approved?"}/>
-        </label>
-        {data.address.status === "draft" && <label className="flex items-start gap-2 text-sm">
-          <input type="checkbox" checked={contentReviewed}
+        </Label>
+        {data.address.status === "draft" && <Label className="flex items-start gap-2 text-sm">
+          <Checkbox checked={contentReviewed}
             onChange={event => setContentReviewed(event.target.checked)}/>
           <span>I reviewed this Site's identity and eligible academic and enrichment listings,
             including program titles, descriptions, dates, pricing, and disclosures.</span>
-        </label>}
-        <button type="button"
+        </Label>}
+        <Button type="button"
           onClick={() => void updatePublication(data.address!.status === "published" ? "unpublish" : "publish")}
           disabled={saving || reason.trim().length < 10 ||
             (data.address.status === "draft" &&
-              (!contentReviewed || !hasApprovedPublicContent))}
-          className="rounded-lg bg-foreground px-4 py-2 text-sm font-semibold text-background disabled:opacity-50">
+              (!contentReviewed || !hasApprovedPublicContent))}>
           {saving ? "Saving…" : data.address.status === "published"
             ? "Unpublish public catalog" : "Approve public catalog"}
-        </button>
+        </Button>
       </div>}
     </section>
   </WorkspaceShell>;
