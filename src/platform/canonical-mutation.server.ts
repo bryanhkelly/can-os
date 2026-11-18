@@ -4,7 +4,7 @@ import { emitEvent, writeAudit } from "@/platform/mutation";
 
 /**
  * Compatibility contract for native Class and noncredit callers.
- * All runtime writes now use the one authoritative public.audit_events and
+ * This adapter routes its writes into the one authoritative public.audit_events and
  * public.domain_events journals through the shared platform writers.
  *
  * Native operation codes, organization attribution, payload, actor and
