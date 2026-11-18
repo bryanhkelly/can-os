@@ -110,7 +110,7 @@ export const canonicalClassAwards = pgTable("class_awards", {
 /** Class-specific instructional authority; a Site-wide role or publisher
  * presenter identity never grants access to an individual Class roster.
  * An independently verified canonical role/grant remains required. */
-export const canonicalClassStaffAssignments = educationV30.table("class_staff_assignments", {
+export const canonicalClassStaffAssignments = pgTable("class_staff_assignments", {
   id:id(),
   classId:uuid("class_id").notNull(),
   personId:uuid("person_id").notNull(),
