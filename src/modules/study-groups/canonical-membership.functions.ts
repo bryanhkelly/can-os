@@ -493,27 +493,19 @@ export const decideCanonicalGroupMembership = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const actor = await requireActor(["teacher"]);
     return db.transaction(async tx => {
-      const [group] = await tx.select().from(s.studyGroups)
-        .where(and(eq(s.studyGroups.id, data.groupId), eq(s.studyGroups.status, "active"),
-          eq(s.studyGroups.facilitatorPersonId, actor.actorPersonId))).for("update").limit(1);
-      if (!group || data.studentPersonId === actor.actorPersonId)
+      // The shared facilitator guard rechecks the exact delegated Section,
+      // active teaching eligibility and provider agreement inside this lock.
+      const group = await facilitatedGroup(tx, actor, data.groupId);
+      if (data.studentPersonId === actor.actorPersonId)
         throw new AuthorizationError("facilitator group membership approval");
-      assertGroupScope(actor, group);
-      if (group.sectionId) {
-        const [assignment] = await tx.select({ id: s.sectionTeachers.id }).from(s.sectionTeachers)
-          .innerJoin(s.sections, eq(s.sections.id, s.sectionTeachers.sectionId))
-          .where(and(eq(s.sectionTeachers.sectionId, group.sectionId),
-            eq(s.sectionTeachers.personId, actor.actorPersonId),
-            eq(s.sections.active, true))).limit(1);
-        if (!assignment) throw new AuthorizationError("current teaching assignment");
-      }
       const [member] = await tx.select().from(s.studyGroupMemberships)
         .where(and(eq(s.studyGroupMemberships.groupId, group.id),
           eq(s.studyGroupMemberships.personId, data.studentPersonId),
           eq(s.studyGroupMemberships.status, "pending"))).for("update").limit(1);
       if (!member) throw new Error("Pending membership not found");
       if (data.approve) {
-        await eligibleStudent(tx, data.studentPersonId, group, actor.scope.programIds ?? []);
+        await eligibleStudent(tx, data.studentPersonId, group,
+          group.sectionId ? [group.programId!] : actor.scope.programIds ?? []);
         const guardians = await tx.select({ personId: s.guardianRelationships.guardianPersonId })
           .from(s.guardianRelationships).where(guardianRelationshipPredicate({
             studentPersonId: data.studentPersonId, access: "enrollment",
