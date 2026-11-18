@@ -103,6 +103,26 @@ async function main(){
       /canonical-can-staff-bridge\.server/,
     ),
   };
+  // A separate, positive release invariant: transitional native learner
+  // sessions must NEVER be sufficient to authenticate an instructional
+  // command, even though the second native bearer is not yet retired.
+  const oneLoginGuards={
+    canCookieRequired:sourceHas(
+      "src/domain/can-learning-cookie-boundary.ts",
+      /if \(!can \|\|/,
+    ),
+    instructionalResolverUsesCANBoundary:sourceHas(
+      "src/modules/identity/learning-command-context.server.ts",
+      /canLearningCookieMode\(request\)/,
+    ) && !sourceHas(
+      "src/modules/identity/learning-command-context.server.ts",
+      /projectCanonicalCommandContext\(row\)/,
+    ),
+    canonicalLearnerRefusesNativeOnly:sourceHas(
+      "src/modules/identity/canonical-command-context.server.ts",
+      /if \(legacy\.role_code === "learner"\)/,
+    ),
+  };
   const blockers=[];
   if(identity.native_persons||identity.native_accounts||identity.live_native_sessions)
     blockers.push("Native identities or current native sessions need evidence-preserving reconciliation");
@@ -120,13 +140,15 @@ async function main(){
     blockers.push("Existing Person correspondence rows require independent review");
   for(const [name,stillActive] of Object.entries(runtime))
     if(stillActive)blockers.push("Runtime dependency remains: "+name);
+  for(const [name,guardPresent] of Object.entries(oneLoginGuards))
+    if(!guardPresent)blockers.push("Missing CAN-only learner guard: "+name);
   if(identity.historical_person_differences)
     blockers.push("Retain and reconcile historical multi-Person grant evidence, without reactivation or ID guessing");
 
   const report={
     target:"CAN OS Neon main",readOnly:true,
     state:blockers.length?"BLOCKED":"DATA_AND_SOURCE_PREFLIGHT_ONLY",
-    identity,runtime,blockers,
+    identity,runtime,oneLoginGuards,blockers,
     caveat:"A clean preflight is not authenticated enrollment, guardian, RLS, browser, CI or rollback acceptance",
   };
   console.log(JSON.stringify(report,null,2));
