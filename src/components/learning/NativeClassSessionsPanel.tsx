@@ -1,5 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Checkbox, Radio } from "@/components/ui/choice";
 import { Link } from "@tanstack/react-router";
 import { normalizeClientError } from "@/lib/client-error";
 import { buildSiteClassMeetings, displaySiteClassTime, siteWallWeek, type LocalMeeting } from "@/domain/class-session-local-time";
@@ -163,13 +167,13 @@ export function NativeClassSessionsPanel({
           ["room","Participant joining instructions ready"],
           ["captions","Captions/transcript and readable slides checked"],
           ["backup","Bandwidth and facilitator recovery plan checked"],
-        ] as const).map(([key,label])=><label key={key}
+        ] as const).map(([key,label])=><Label key={key}
           className="flex min-h-11 items-start gap-2 border border-border p-3 text-sm">
-          <input type="checkbox" checked={prepared[key]}
+          <Checkbox checked={prepared[key]}
             onChange={e=>setPrepared(current=>({...current,[key]:e.target.checked}))}
             className="mt-1"/>
           {label}
-        </label>)}
+        </Label>)}
       </div>
       {!Object.values(prepared).every(Boolean)&&<p className="mt-2 text-xs text-muted-foreground">
         {Object.values(prepared).filter(Boolean).length} of {Object.values(prepared).length} preparation checks acknowledged.
@@ -221,10 +225,10 @@ export function NativeClassSessionsPanel({
               onClick={()=>{setRevoking(session.id);setRevocationReason("");}}>
               Emergency revoke room
             </Button>:<>
-              <label htmlFor={"revoke-"+session.id} className="block text-xs font-semibold">
+              <Label htmlFor={"revoke-"+session.id} className="block text-xs font-semibold">
                 Revocation reason (audited)
-              </label>
-              <textarea id={"revoke-"+session.id} rows={2} minLength={15} maxLength={500}
+              </Label>
+              <Textarea id={"revoke-"+session.id} rows={2} minLength={15} maxLength={500}
                 className="w-full border border-border bg-background p-2 text-sm"
                 value={revocationReason}
                 onChange={event=>setRevocationReason(event.target.value)}/>
@@ -254,37 +258,37 @@ export function NativeClassSessionsPanel({
                 <fieldset className="flex flex-wrap gap-4 text-sm">
                   <legend className="font-semibold">Change type</legend>
                   {([["replace","Reschedule"],["cancel","Cancel without replacement"]] as const)
-                    .map(([value,label])=><label key={value} className="flex items-center gap-2">
-                      <input type="radio" checked={changeMode===value}
+                    .map(([value,label])=><Label key={value} className="flex items-center gap-2">
+                      <Radio checked={changeMode===value}
                         name={"change-"+session.id} onChange={()=>{setChangeMode(value);
                           setChangeRequestId(crypto.randomUUID());}}/>
                       {label}
-                    </label>)}
+                    </Label>)}
                 </fieldset>
                 {changeMode==="replace"&&<div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-semibold">
+                  <Label className="text-xs font-semibold">
                     New date and time ({siteTimeZone})
-                    <input type="datetime-local" value={changeLocalStart} required
+                    <Input type="datetime-local" value={changeLocalStart} required
                       className="mt-1 min-h-11 w-full border border-border bg-background px-2"
                       onChange={e=>{setChangeLocalStart(e.target.value);
                         setChangeRequestId(crypto.randomUUID());}}/>
-                  </label>
-                  <label className="text-xs font-semibold">
+                  </Label>
+                  <Label className="text-xs font-semibold">
                     Length (minutes)
-                    <input type="number" min={15} max={480} step={15}
+                    <Input type="number" min={15} max={480} step={15}
                       value={changeDuration}
                       className="mt-1 min-h-11 w-full border border-border bg-background px-2"
                       onChange={e=>{setChangeDuration(Number(e.target.value));
                         setChangeRequestId(crypto.randomUUID());}}/>
-                  </label>
+                  </Label>
                 </div>}
-                <label className="block text-xs font-semibold">
+                <Label className="block text-xs font-semibold">
                   Reason (audited, at least 15 characters)
-                  <textarea value={changeReason} rows={2} maxLength={500}
+                  <Textarea value={changeReason} rows={2} maxLength={500}
                     className="mt-1 w-full border border-border bg-background p-2"
                     onChange={e=>{setChangeReason(e.target.value);
                       setChangeRequestId(crypto.randomUUID());}}/>
-                </label>
+                </Label>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" size="sm" disabled={busy||
                     changeReason.trim().length<15||
@@ -363,25 +367,25 @@ export function NativeClassSessionsPanel({
           ["weekly","Four weekly Sessions"],
           ["single","One Session"],
           ["custom","Custom dates (up to 12)"],
-        ] as const).map(([value,label])=><label key={value}
+        ] as const).map(([value,label])=><Label key={value}
           className="flex min-h-11 items-center gap-2 border border-border px-3 text-sm">
-          <input type="radio" name={"native-schedule-"+workspace.classId}
+          <Radio name={"native-schedule-"+workspace.classId}
             checked={mode===value} onChange={()=>{setMode(value);resetSchedule();}}/>
           {label}
-        </label>)}
+        </Label>)}
       </fieldset>
       {mode!=="custom"?<div className="grid gap-3 sm:grid-cols-2">
-        <div><label htmlFor="native-series-start" className="block text-sm font-semibold">
+        <div><Label htmlFor="native-series-start" className="block text-sm font-semibold">
           {mode==="weekly"?"First Session":"Session"} start ({siteTimeZone})
-        </label>
-          <input id="native-series-start" type="datetime-local" required value={first}
+        </Label>
+          <Input id="native-series-start" type="datetime-local" required value={first}
             onChange={e=>{setFirst(e.target.value);resetSchedule();}}
             className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
         </div>
-        <div><label htmlFor="native-series-duration" className="block text-sm font-semibold">
+        <div><Label htmlFor="native-series-duration" className="block text-sm font-semibold">
           Duration (minutes)
-        </label>
-          <input id="native-series-duration" type="number" required min={15} max={480}
+        </Label>
+          <Input id="native-series-duration" type="number" required min={15} max={480}
             value={minutes} onChange={e=>{setMinutes(Number(e.target.value));resetSchedule();}}
             className="mt-2 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
         </div>
@@ -389,18 +393,18 @@ export function NativeClassSessionsPanel({
         {customRows.map((row,index)=><div key={row.id}
           className="grid items-end gap-3 border border-border p-3 sm:grid-cols-[minmax(0,1fr)_9rem_auto]">
           <div>
-            <label className="text-sm font-semibold" htmlFor={"class-custom-"+row.id}>
+            <Label className="text-sm font-semibold" htmlFor={"class-custom-"+row.id}>
               Session {index+1} start ({siteTimeZone})
-            </label>
-            <input id={"class-custom-"+row.id} type="datetime-local" required
+            </Label>
+            <Input id={"class-custom-"+row.id} type="datetime-local" required
               value={row.localStart} onChange={e=>changeRow(row.id,{localStart:e.target.value})}
               className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
           </div>
           <div>
-            <label className="text-sm font-semibold" htmlFor={"class-minutes-"+row.id}>
+            <Label className="text-sm font-semibold" htmlFor={"class-minutes-"+row.id}>
               Minutes
-            </label>
-            <input id={"class-minutes-"+row.id} type="number" min={15} max={480} required
+            </Label>
+            <Input id={"class-minutes-"+row.id} type="number" min={15} max={480} required
               value={row.minutes} onChange={e=>changeRow(row.id,{minutes:Number(e.target.value)})}
               className="mt-1 min-h-11 w-full border border-border bg-background px-3 text-sm"/>
           </div>
