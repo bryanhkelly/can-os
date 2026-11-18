@@ -51,7 +51,7 @@ export function ClassSupplementForm({
     // Recognized video URLs are videos, even if the resource was initially a generic link.
     if (resolveClassVideo(next) && kind !== "video") onKindChange("video");
   }
-  return <section className="mb-5 space-y-4 rounded-lg border p-4" aria-label="Add class resource">
+  return <section className="mb-5 space-y-4  border p-4" aria-label="Add class resource">
     <div>
       <h3 className="text-sm font-semibold">Add class or lesson resource</h3>
       <p className="mt-1 text-xs text-muted-foreground">Embed YouTube or Vimeo, upload a private video to CAN, or share another learning resource. Publisher lessons stay unchanged.</p>
