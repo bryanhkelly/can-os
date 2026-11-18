@@ -10,8 +10,8 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
   studentCount: number | null;
   classroom: FirstClassroom | null;
 }) {
-  const readiness = classroom === null ? "Readiness unavailable"
-    : classroom.ready ? "Ready to teach" : "Needs attention";
+  const readiness = classroom === null ? "readiness unavailable"
+    : classroom.ready ? "ready to teach" : "needs attention";
   return <DashboardPanel title={title}
     description={studentCount === null ? "Student roster temporarily unavailable"
       : `${studentCount} enrolled ${studentCount === 1 ? "student" : "students"}`}
@@ -20,7 +20,7 @@ export function TeacherFirstWeekCard({ id, title, studentCount, classroom }: {
     </Link>}>
     <div className="space-y-3">
       <StatusBadge tone={classroom === null ? "neutral" : classroom.ready ? "success" : "attention"}>
-        {readiness}
+        First week: {readiness}
       </StatusBadge>
       {classroom === null
         ? <p role="status" className="text-sm text-muted-foreground">
