@@ -1,0 +1,67 @@
+#!/usr/bin/env node
+/**
+ * Read-only production retirement gate for the legacy canonical schemas.
+ * Usage: CAN_EDUCATION_RETIREMENT_CHECK=1 DATABASE_URL=<actual Neon main>
+ *        node scripts/acceptance/check-education-v30-retirement.mjs
+ * This is deliberately failing until the full application cutover is complete.
+ */
+import { neon } from "@neondatabase/serverless";
+
+async function main() {
+  if(process.env.CAN_EDUCATION_RETIREMENT_CHECK!=="1"||!process.env.DATABASE_URL)
+    throw new Error("Explicit opt-in and DATABASE_URL required");
+  const sql=neon(process.env.DATABASE_URL);
+  const [target]=await sql`
+    SELECT current_setting('neon.project_id',true) AS project,
+           current_setting('neon.branch_id',true) AS branch
+  `;
+  if(target.project!=="sweet-hall-62441909"||
+     target.branch!=="br-restless-sea-ar9ooo55")
+    throw new Error("Only the production Neon main branch may be assessed");
+  const [inventory]=await sql`
+    SELECT
+      (SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+       WHERE n.nspname='education_v30' AND c.relkind IN ('r','p')) AS native_tables,
+      (SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+       WHERE n.nspname='education_v30_secure' AND c.relkind IN ('r','p')) AS secure_tables,
+      (SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+       WHERE n.nspname IN ('education_v30','education_v30_secure')) AS old_relations,
+      (SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+       WHERE n.nspname IN ('education_v30','education_v30_secure')) AS old_routines,
+      (SELECT count(*)::int FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace
+       WHERE n.nspname IN ('education_v30','education_v30_secure')) AS old_types,
+      (SELECT count(*)::int FROM pg_constraint k
+         JOIN pg_class c ON c.oid=k.conrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+         JOIN pg_class target ON target.oid=k.confrelid
+         JOIN pg_namespace tn ON tn.oid=target.relnamespace
+       WHERE k.contype='f'
+         AND ((n.nspname='public' AND tn.nspname IN ('education_v30','education_v30_secure'))
+           OR (tn.nspname='public' AND n.nspname IN ('education_v30','education_v30_secure')))) AS crossing_fks,
+      (SELECT count(*)::int FROM pg_namespace n
+       WHERE n.nspname IN ('education_v30','education_v30_secure')) AS old_schemas,
+      (SELECT c.relrowsecurity AND c.relforcerowsecurity FROM pg_class c
+       WHERE c.oid='public.sites'::regclass) AS public_site_rls_enforced
+  `;
+  const [collision]=await sql`
+    SELECT count(*)::int AS count FROM pg_class a
+    JOIN pg_namespace an ON an.oid=a.relnamespace
+    JOIN pg_class b ON a.relname=b.relname
+    JOIN pg_namespace bn ON bn.oid=b.relnamespace
+    WHERE an.nspname='education_v30' AND bn.nspname='public'
+      AND a.relkind IN ('r','p') AND b.relkind IN ('r','p')
+  `;
+  const result={
+    project:target.project,branch:target.branch,readOnly:true,
+    ...inventory,colliding_names:collision.count,
+    old_schema_absent:inventory.old_schemas===0
+  };
+  console.log(JSON.stringify(result,null,2));
+  const safe=inventory.old_relations===0&&inventory.old_routines===0&&
+    inventory.old_types===0&&inventory.crossing_fks===0&&
+    collision.count===0&&inventory.public_site_rls_enforced===true;
+  if(!safe){
+    console.error("NOT READY: preserve old schemas. Resolve all dependencies and validate live flows before guarded DROP SCHEMA RESTRICT.");
+    process.exitCode=2;
+  } else console.log("Structural retirement gate passed. Application and permission acceptance remain separately required.");
+}
+main().catch(err=>{console.error(err.message);process.exitCode=1;});
