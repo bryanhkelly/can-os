@@ -1,7 +1,7 @@
 import { Link, useRouter } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { lazy, Suspense, useRef, useState, type FormEvent } from "react";
-import { WorkspaceShell, MutationFeedback } from "@/components/workspace";
+import { WorkspaceShell, MutationFeedback, WorkspaceNotice, EmptyState } from "@/components/workspace";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -31,9 +31,9 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
   });
 
   if(workspace.isPending)return <WorkspaceShell title="My instructional content" eyebrow="CAN OS"><p role="status">Checking current content appointments…</p></WorkspaceShell>;
-  if(workspace.isError||!workspace.data)return <WorkspaceShell title="Content unavailable" eyebrow="CAN OS"><p role="alert">Content production is unavailable under your current verified account and Course appointments.</p></WorkspaceShell>;
+  if(workspace.isError||!workspace.data)return <WorkspaceShell title="Content unavailable" eyebrow="CAN OS"><WorkspaceNotice tone="danger">Content production is unavailable under your current verified account and Course appointments. No Course authority is inferred.</WorkspaceNotice></WorkspaceShell>;
   if (workspace.data.role !== "academic_content_creator") return <WorkspaceShell title="Creator access required">
-    <p role="alert">Switch to a verified academic content creator membership. This page never grants additional content authority.</p>
+    <WorkspaceNotice tone="attention">Use your verified academic content creator membership. This page never grants additional content authority.</WorkspaceNotice>
   </WorkspaceShell>;
   const { courses, tracks, assignmentsLimited } = workspace.data;
   const versions = courses.flatMap(course => course.publishedVersions.map(version => ({
@@ -63,7 +63,13 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
     title="My instructional content"
     subtitle="Edit assigned native Course lessons before release, and build recorded teacher tracks for published Courses. A verified Course-specific appointment is required. Drafts remain private until independently reviewed and published.">
     {navigation}
-    {assignmentsLimited && <p role="alert" className="mt-5 border border-warning p-4 text-sm">The provider inventory reached its safety limit. Ask the academic administrator to narrow or review appointments before relying on this queue.</p>}
+    {assignmentsLimited && <WorkspaceNotice tone="attention" className="mt-5">
+      The provider inventory reached its safety limit. Ask the academic administrator to review Course appointments before relying on this queue.
+    </WorkspaceNotice>}
+    {!courses.length&&<EmptyState className="mt-5"
+      title="No verified Course appointments"
+      description="Your current account has no independently verified Course-specific creator appointment. An Organization login alone cannot authorize native Course editing. A qualified administrator must establish legitimate identity and evidence-backed appointment records."
+    />}
     <section className="mt-6 border border-border bg-card p-5" aria-labelledby="create-track-title">
       <h2 id="create-track-title" className="font-serif text-2xl">Start a recorded teacher track</h2>
       <p className="mt-2 text-sm text-muted-foreground">Only published Course versions under your current independently verified appointment appear here.</p>
@@ -88,7 +94,9 @@ export function ProviderInstructionHome({navigation}:{navigation?:import("react"
         </Button></div>
       </form>
       <MutationFeedback state={mutation} className="mt-4" pendingMessage="Creating content draft…"/>
-      {!versions.length && <p role="status" className="mt-4 text-sm">No published Course versions are assigned to your currently verified provider appointment.</p>}
+      {!versions.length && <WorkspaceNotice className="mt-4">
+        No published Course versions are assigned to your current verified provider appointment. Draft native Course authoring remains separate from recorded teacher production.
+      </WorkspaceNotice>}
     </section>
     {draftVersions.length>0&&<Suspense fallback={<p role="status" className="mt-5 text-sm">
       Opening authorized Course drafts…
