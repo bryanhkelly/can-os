@@ -408,13 +408,13 @@ route-specific kit or change domain commands to make a page easier to style.
 
 - Repository inventory: 180 route TSX files and 368 component TSX files
   (excluding `.stories.tsx`; test/spec TSX files may still be included).
-- 20 routes are now protected by the route-level source-control manifest in
-  `scripts/check-design-system.mjs`; 19 were edited during this increment
-  and `/access` already used the approved visible control patterns.
-- All 20 source-gated routes were fetched and scanned from `main`: zero visible
+- 28 routes are now protected by the route-level source-control manifest in
+  `scripts/check-design-system.mjs`; 27 were edited during these source migration
+  increments and `/access` already used the approved visible control patterns.
+- All 28 source-gated routes were fetched and scanned from `main`: zero visible
   raw JSX form controls and zero legacy radius utilities in those route files.
   Authentication's native `type="hidden"` POST fields are intentionally excluded.
-- This is **not** 20 fully accepted journeys. Imported feature components may
+- This is **not** 28 fully accepted journeys. Imported feature components may
   still contain legacy presentation, and browser behavior, keyboard/accessibility,
   responsive and themed visual acceptance are not verified.
 - `npm run design:routes` reports every route filename, URL, direct and
@@ -425,22 +425,23 @@ route-specific kit or change domain commands to make a page easier to style.
 | --- | --- |
 | Authentication | `/access`, `/access/register`, `/access/verify` |
 | Account | `/account`, `/account/sessions` |
-| Discovery and learning | `/explore`, `/learn/enroll`, `/learn/my-activity`, `/student/settings`, `/student/assignments` |
-| Family | `/guardian/students`, `/guardian/report-cards`, `/guardian/attendance`, `/guardian/enrichment`, `/guardian/field-trips` |
-| Staff and operations | `/teacher/discussions`, `/operations/insights`, `/operations/course-requests`, `/admissions/families`, `/platform` |
+| Discovery and learning | `/explore`, `/learn/enroll`, `/learn/my-activity`, `/student/settings`, `/student/assignments`, `/student/discussions`, `/student/courses`, `/class` |
+| Family | `/guardian/students`, `/guardian/report-cards`, `/guardian/attendance`, `/guardian/enrichment`, `/guardian/field-trips`, `/guardian/course-approvals` |
+| Staff and operations | `/teacher/discussions`, `/teacher/missing-work`, `/teacher/gradebook`, `/operations/insights`, `/operations/course-requests`, `/admissions`, `/admissions/families`, `/calendar`, `/platform` |
 
 **Next inspection areas, page by page:**
 
-1. `/class` and related native Class pages, `/classes`, `/student/courses`:
-   preserve roster identity, assessment scope, enrollment authorization and
-   specialized classroom/gradebook keyboard mechanics.
-2. `/calendar`, attendance, Site Day, and related operations workspaces:
+1. `/classes` and imported native Class/classroom feature components: preserve
+   roster identity, assessment scope, enrollment authority and media behavior.
+   The `/class` route is source-gated, not browser accepted.
+2. Calendar imported panels, attendance, Site Day, and operating workspaces:
    preserve date controls, calendar ownership, timezone semantics and incident access.
-3. `/admissions` and remaining family/registrar workflow pages:
-   preserve independent approval gates, evidence review and saved-but-refresh-failed states.
-4. `/launch`, Blueprint Studio, school settings and site websites:
-   align compositional shells, dialogs, records and editing controls without
-   adding duplicate setup models.
+   The `/calendar` route is source-gated, not browser accepted.
+3. Remaining Admissions and registrar workflows: preserve independent approval
+   gates, evidence review and saved-but-refresh-failed states; `/admissions`
+   itself has migrated controls, not fully accepted downstream flows.
+4. Remaining `/launch`, school settings and site website feature components:
+   align shells, dialogs, records and editors without duplicate setup models.
 5. Remaining public, network, staff, teacher and student pages:
    retire legacy geometry and visual status variants only after feature inspection.
 
@@ -450,3 +451,33 @@ relevant tests and 390/768/1024/1440 visual/keyboard review on the exact SHA.
 No GitHub Actions or Netlify dependency is assumed. **Typecheck, build, lint,
 Storybook, and authenticated browser acceptance were not executed for this
 source-only increment.**
+
+ 
+### November 17 continuation: academic workflows and shared Launch Studio components
+
+The following eight route-level sources were migrated and enrolled in the
+automated V6.1 regression manifest: `/guardian/course-approvals`,
+`/teacher/missing-work`, `/student/discussions`, `/student/courses`,
+`/class`, `/admissions`, `/teacher/gradebook`, and `/calendar`.
+They now compose canonical controls and rectangular geometry. None of their
+authorization readers, domain commands, or persistence were intentionally changed.
+
+The Calendar's native month-day action and the Gradebook's assessment grid
+cells now use canonical Button while preserving their existing arrow-key event
+handlers, focus/identification attributes and direct record navigation.
+The checker includes explicit source guards for those keyboard contracts.
+Specialized grids remain specialized; neither is rewritten as DirectoryTable.
+
+Four shared Launch Studio components are now source-gated:
+`CanonicalBlueprintWorkspace` (Blueprint configuration and reference choices),
+`WebsiteTemplateGallery` (preview page selector),
+`SiteInformationConfiguration` (context checkboxes), and
+`SchoolLaunchHub` (square navigation link).
+These edits reuse the already approved Input, Label, Checkbox and Select
+primitives without replacing Blueprint ownership, reviews or activation gates.
+
+**Verification boundary:** Source-level checks were performed against the
+committed GitHub files. The checker was updated, but local Node execution,
+TypeScript typecheck, build, Storybook/axe, keyboard browser interaction and
+authenticated role journeys have **not** run on the latest main commit.
+Do not mark these source-gated pages or components as production accepted.
