@@ -130,7 +130,7 @@ async function main() {
       FROM pg_class c
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE (n.nspname = 'education_v30'
-          OR (n.nspname='public' AND c.relname='published_asset_reviews'))
+          OR (n.nspname='public' AND c.relname IN ('published_asset_reviews','instructional_track_command_receipts')))
         AND c.relname = ANY($1::text[])
         AND c.relrowsecurity
         AND c.relforcerowsecurity
@@ -672,7 +672,7 @@ async function main() {
       JOIN pg_class c ON c.oid = p.polrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
       WHERE (n.nspname = 'education_v30'
-          OR (n.nspname='public' AND c.relname='published_asset_reviews'))
+          OR (n.nspname='public' AND c.relname IN ('published_asset_reviews','instructional_track_command_receipts')))
         AND c.relname = ANY($1::text[])
     `, [[
       "instructional_track_policy_versions",
@@ -702,7 +702,8 @@ async function main() {
       FROM pg_trigger t
       JOIN pg_class c ON c.oid = t.tgrelid
       JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE n.nspname = 'education_v30'
+      WHERE (n.nspname = 'education_v30'
+        OR (n.nspname='public' AND c.relname='instructional_track_command_receipts'))
         AND t.tgname = ANY($1::text[])
         AND NOT t.tgisinternal
     `, [[
