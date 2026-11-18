@@ -52,7 +52,7 @@ describe("browser account handoff clears only CAN-owned data",()=>{
     const after=accessClientInstance();
     expect(after).not.toBe(before);
     expect(localStorage.getItem("can-shared-device-mode")).toBe("1");
-    expect(localStorage.getItem("can-session-revocation")).toMatch(/^\\d+:[0-9a-f-]{36}$/i);
+    expect(localStorage.getItem("can-session-revocation")).toMatch(/^\d+:[0-9a-f-]{36}$/i);
     setSharedDeviceMode(false);
     expect(isSharedDeviceMode()).toBe(false);
   });

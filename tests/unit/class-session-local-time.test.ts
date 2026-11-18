@@ -39,7 +39,8 @@ describe("host Site wall-clock Class scheduling",()=>{
       requestId:"d",localStart:"2027-01-12T10:30",durationMinutes:30,
     }],"America/New_York");
     expect(meeting[0]!.startsAt).toBe("2027-01-12T15:30:00.000Z");
-  });  it("rejects invalid weekly start dates instead of silently moving a meeting",()=>{
+  });
+  it("rejects invalid weekly start dates instead of silently moving a meeting",()=>{
     expect(()=>siteWallWeek("2027-02-30T10:00",1)).toThrow(/real calendar/);
     expect(()=>siteWallWeek("2027-01-01T25:00",1)).toThrow(/real calendar/);
     expect(()=>siteWallWeek("2027-01-01T10:60",1)).toThrow(/real calendar/);
