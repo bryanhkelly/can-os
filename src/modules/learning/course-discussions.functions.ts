@@ -3,6 +3,7 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {getCommandContext} from "@/modules/identity/command-context.server";
 import {assertCapability,AuthorizationError} from "@/domain/command-context";
 import {and,eq,inArray,desc,sql} from "drizzle-orm";
+import {alias} from "drizzle-orm/pg-core";
 import {discussionTree} from "@/domain/course-discussions";
 /** Read enrolled section discussions through verified student and program access. */
 export const getCourseDiscussions=createServerFn({method:"GET"}).handler(async()=>{
@@ -13,9 +14,24 @@ export const getCourseDiscussions=createServerFn({method:"GET"}).handler(async()
  const [{db},s]=await Promise.all([import("@/db/client"),import("@/db/schema")]);
  const [profile]=await db.select({id:s.studentProfiles.id}).from(s.studentProfiles).where(eq(s.studentProfiles.personId,actor.actorPersonId)).limit(1);
  if(!profile)return [];
+ // Use the same live Program + Section + school-year boundary as Class.
+ // Stale active Section rows must not expose private classroom discussions.
+ const currentProgram=alias(s.enrollments,"discussion_current_program_enrollment");
  const enrollments=await db.select({sectionId:s.enrollments.sectionId}).from(s.enrollments)
   .innerJoin(s.sections,eq(s.sections.id,s.enrollments.sectionId))
-  .where(and(eq(s.enrollments.studentProfileId,profile.id),eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),eq(s.sections.active,true),inArray(s.sections.siteId,actor.scope.siteIds),inArray(s.sections.programId,actor.scope.programIds??[])));
+  .innerJoin(s.terms,eq(s.terms.id,s.sections.termId))
+  .innerJoin(currentProgram,and(
+   eq(currentProgram.studentProfileId,s.enrollments.studentProfileId),
+   eq(currentProgram.programId,s.sections.programId),
+   eq(currentProgram.schoolYearId,s.terms.schoolYearId),
+   eq(currentProgram.kind,"program"),eq(currentProgram.status,"active")))
+  .where(and(eq(s.enrollments.studentProfileId,profile.id),
+   eq(s.enrollments.kind,"section"),eq(s.enrollments.status,"active"),
+   eq(s.enrollments.programId,s.sections.programId),
+   eq(s.enrollments.schoolYearId,s.terms.schoolYearId),
+   eq(s.sections.active,true),
+   inArray(s.sections.siteId,actor.scope.siteIds),
+   inArray(s.sections.programId,actor.scope.programIds??[])));
  const sectionIds=enrollments.map(x=>x.sectionId).filter((x):x is string=>Boolean(x));
  if(!sectionIds.length)return [];
  const rows=await db.select({id:s.communicationThreads.id,subject:s.communicationThreads.subject,contextId:s.communicationThreads.contextId,metadata:s.communicationThreads.metadata,lastMessageAt:s.communicationThreads.lastMessageAt}).from(s.communicationThreads).where(and(eq(s.communicationThreads.contextType,"section"),inArray(s.communicationThreads.contextId,sectionIds),sql`${s.communicationThreads.metadata}->>'kind' = 'course_discussion'`)).orderBy(desc(s.communicationThreads.createdAt)).limit(40);
