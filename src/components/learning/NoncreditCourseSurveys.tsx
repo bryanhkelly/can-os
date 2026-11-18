@@ -38,7 +38,7 @@ function NoncreditSurveySession({courseAttemptId,knowledgeCheckRevision}:{
   </WorkspaceNotice>;
   if(surveys===null)return <p role="status" className="text-sm">Checking for invited feedback surveys…</p>;
   if(!surveys.length)return <EmptyState title="No feedback survey available"
-    description="Your provider must publish a survey and invite you before it appears here. Contact the organizer if a survey was expected."/>;
+    description="If your provider enabled feedback, an invitation may appear after your knowledge check is submitted. Contact the organizer if a survey was expected."/>;
   return <section aria-label="Course feedback" className="space-y-4">
     <div className="border-b pb-3">
       <h3 className="text-base font-semibold">Your invited feedback</h3>
