@@ -207,3 +207,24 @@ This is a **staged implementation checkpoint**, not P0 closure. Current
 runtime still has native-session and cross-account authorization consumers.
 The staged SQL must not run before those consumers and end-to-end journeys
 are updated and accepted.
+
+## Staff correspondence write retirement (November 17)
+
+The legacy `/site-identity` page no longer offers staff Person pairing, and the
+old `verifyCANStaffCanonicalPrincipal` server command rejects every new link.
+The authoritative CAN account Person remains the immutable
+`public.access_accounts.person_id` referencing `public.people`. Explicit
+`public.account_person_grants` are the only legitimate Site role grants.
+A separate independent decision is still required for high-risk authority.
+
+The `revokeCANStaffCanonicalPrincipal` path is retained **only** to revoke
+historical links with audit evidence, requiring the independent verified CAN
+network steward and an exact transaction-time, locked reviewer grant check.
+The production correspondence table was empty at the checkpoint; **no
+correspondence rows or production identity data were changed**.
+
+This removes creation of a second staff Person while the read-side canonical
+session, guardian, learner, class authority, FK and RLS code are migrated.
+Do not treat the revoked creation path as proof that the other historical
+callers are retired, and do not drop legacy Person tables until those
+consumers are removed and verified.
