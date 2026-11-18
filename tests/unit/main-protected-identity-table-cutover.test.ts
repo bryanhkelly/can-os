@@ -13,7 +13,7 @@ describe("Neon main identity-protected table consolidation",()=>{
     ]) expect(sql).toContain("ALTER TABLE education_v30."+table+" SET SCHEMA public");
     expect(sql).toContain("relforcerowsecurity");
     expect(sql).toContain("p.prosecdef");
-    expect(sql).toContain("REPLACE");
+    expect(sql).toContain("EXECUTE updated;");
     expect(sql).not.toMatch(/\bDROP\s+TABLE\b|\bCREATE\s+TABLE\b|\bINSERT\s+INTO\b|\bDISABLE\s+ROW\s+LEVEL\s+SECURITY\b/i);
   });
 
