@@ -3,13 +3,21 @@ import {getRequest,setResponseHeader} from "@tanstack/react-start/server";
 import {and,asc,desc,eq,inArray,lte,sql} from "drizzle-orm";
 import {z} from "zod";
 import {db} from "@/db/client";
+import { writeCanonicalAudit, emitCanonicalDomainEvent } from "@/platform/canonical-mutation.server";
 import {
-  auditEvents,canonicalDeliverySessions,canonicalPersons,domainEvents,
-  facilitatedClassroomPlans,facilitatedRoomAttendanceAssertions,
-  learnerCourseAttempts,noncreditCompletionDecisions,
-  noncreditRegistrations,noncreditSelfEnrollmentClaims,noncreditReleasedSeats,
-  noncreditEnrollmentWaitlist,noncreditWaitlistEmailDeliveries,
-  noncreditSelfEnrollmentReleases,noncreditTrainingVersions,
+  canonicalDeliverySessions,
+  canonicalPersons,
+  facilitatedClassroomPlans,
+  facilitatedRoomAttendanceAssertions,
+  learnerCourseAttempts,
+  noncreditCompletionDecisions,
+  noncreditRegistrations,
+  noncreditSelfEnrollmentClaims,
+  noncreditReleasedSeats,
+  noncreditEnrollmentWaitlist,
+  noncreditWaitlistEmailDeliveries,
+  noncreditSelfEnrollmentReleases,
+  noncreditTrainingVersions,
 } from "@/db/canonical-v301";
 import {AuthorizationError} from "@/domain/command-context";
 import {validClassroomSessionWindows} from "@/domain/classroom-scheduling";
@@ -276,13 +284,13 @@ export const releaseWithdrawnNoncreditSeat=createServerFn({method:"POST"})
       if(!saved)throw new Error("Could not save seat release");
       const payload={releaseId:release.id,registrationId:record.registrationId,
         reason:data.reason};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:provider.actor.actorPersonId!,
         owningOrganizationId:provider.organizationId,
         eventCode:"noncredit.enrollment.seat_released",
         entityKind:"noncredit_released_seat",entityId:saved.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"NoncreditEnrollmentSeatReleased",
         aggregateType:"noncredit_self_enrollment_release",aggregateId:release.id,
         actorPersonId:provider.actor.actorPersonId!,payload,
@@ -337,13 +345,13 @@ export const inviteNextNoncreditWaitlist=createServerFn({method:"POST"})
       }).onConflictDoNothing();
       const payload={releaseId:release.id,waitlistId:next.id,
         invitationExpiresAt:until.toISOString(),expiredPriorHolds:expired.length};
-      await tx.insert(auditEvents).values({
+      await writeCanonicalAudit(tx,{
         actorPersonId:provider.actor.actorPersonId!,
         owningOrganizationId:provider.organizationId,
         eventCode:"noncredit.waitlist.invited",
         entityKind:"noncredit_enrollment_waitlist",entityId:next.id,payload,
       });
-      await tx.insert(domainEvents).values({
+      await emitCanonicalDomainEvent(tx,{
         eventType:"NoncreditWaitlistInvited",
         aggregateType:"noncredit_enrollment_waitlist",
         aggregateId:next.id,actorPersonId:provider.actor.actorPersonId!,payload,
