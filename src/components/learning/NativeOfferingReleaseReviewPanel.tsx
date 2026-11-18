@@ -8,7 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { WorkspacePanel } from "@/components/workspace";
 import { normalizeClientError } from "@/lib/client-error";
 import {
-  getNativeOfferingReleaseReviewQueue, decideNativeOfferingRelease,
+  getNativeOfferingReleaseReviewQueue, getNativeOfferingReviewContent,
+  decideNativeOfferingRelease,
   publishNativeOfferingCourses, publishNativeOfferingVersion,
 } from "@/modules/learning/native-offering-release.functions";
 
@@ -17,6 +18,15 @@ const categories=["academic","rights","accessibility","coverage","safety"] as co
 
 function ReleaseReview({item}:{item:Item}){
   const client=useQueryClient();
+  const [inspect,setInspect]=useState(false);
+  const content=useQuery({
+    queryKey:["native-offering-review-content",item.id,item.manifestHash],
+    queryFn:()=>getNativeOfferingReviewContent({data:{
+      offeringVersionId:item.offeringVersionId,manifestId:item.id,
+      expectedHash:item.manifestHash,
+    }}),
+    enabled:inspect&&item.current,retry:false,
+  });
   const [category,setCategory]=useState<(typeof categories)[number]>("academic");
   const [decision,setDecision]=useState<"rejected"|"approved">("rejected");
   const [evidence,setEvidence]=useState("");
@@ -57,6 +67,62 @@ function ReleaseReview({item}:{item:Item}){
     {!item.current&&<p role="alert" className="mt-3 text-sm text-destructive">
       Content changed after submission. The publisher must submit a new version for review.
     </p>}
+    <div className="mt-3">
+      <Button type="button" variant="outline" disabled={!item.current}
+        onClick={()=>setInspect(value=>!value)}>
+        {inspect?"Hide reviewed Course material":"Inspect exact submitted Course material"}
+      </Button>
+      {inspect&&content.isPending&&<p role="status" className="mt-3 text-sm">
+        Loading authorized syllabus and lesson evidence…
+      </p>}
+      {inspect&&content.isError&&<p role="alert" className="mt-3 text-sm text-destructive">
+        Exact submitted Course content is unavailable. Do not approve a snapshot that cannot be inspected.
+      </p>}
+      {inspect&&content.isSuccess&&<section className="mt-3 grid gap-3 border border-border p-3"
+        aria-label="Exact publisher Course manuscript">
+        <p className="text-xs text-muted-foreground">
+          Reviewer view of {content.data.lessonCount} lesson(s) across
+          {" "}{content.data.courseCount} Course version(s). Manifest
+          {" "}{content.data.reviewedManifestHash.slice(0,12)}.
+        </p>
+        <details className="border border-border p-3 text-xs">
+          <summary className="cursor-pointer font-semibold">Publisher Offering definition</summary>
+          <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap">
+            {JSON.stringify(content.data.productDefinition,null,2)}
+          </pre>
+        </details>
+        {content.data.courses.map(course=><article key={course.courseVersionId}
+          className="border border-border p-3">
+          <h4 className="font-semibold">{course.courseTitle} · {course.courseCode}</h4>
+          <details className="mt-2 text-xs">
+            <summary className="cursor-pointer">Review complete Course syllabus</summary>
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap">
+              {JSON.stringify(course.syllabus,null,2)}
+            </pre>
+          </details>
+          {course.units.map(unit=><div key={unit.id} className="mt-3 border-t border-border pt-3">
+            <h5 className="font-semibold">{unit.sequenceNo}. {unit.title}</h5>
+            <details className="mt-1 text-xs">
+              <summary className="cursor-pointer">Unit metadata</summary>
+              <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap">
+                {JSON.stringify(unit.content,null,2)}
+              </pre>
+            </details>
+            <div className="mt-2 grid gap-2">
+              {unit.lessons.map(lesson=><details key={lesson.id}
+                className="border border-border p-3 text-sm">
+                <summary className="cursor-pointer font-medium">
+                  {lesson.lessonOrder}. {lesson.title}
+                </summary>
+                <pre className="mt-2 max-h-60 overflow-auto whitespace-pre-wrap text-xs">
+                  {JSON.stringify(lesson.content,null,2)}
+                </pre>
+              </details>)}
+            </div>
+          </div>)}
+        </article>)}
+      </section>}
+    </div>
     <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
       {categories.map(kind=><div key={kind} className="border border-border p-2 text-xs">
         <strong className="capitalize">{kind}</strong>
@@ -85,7 +151,7 @@ function ReleaseReview({item}:{item:Item}){
         <Input value={evidence} required={decision==="approved"}
           onChange={event=>setEvidence(event.target.value)}/>
       </Field>
-      <Button type="submit" disabled={!item.current||busy||reason.trim().length<10||
+      <Button type="submit" disabled={!item.current||!content.isSuccess||busy||reason.trim().length<10||
         decision==="approved"&&!evidence.trim()}>Record decision</Button>
     </form>}
     <div className="mt-4 flex flex-wrap gap-3">
