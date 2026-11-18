@@ -61,7 +61,7 @@ export async function provisionVerifiedSchoolSignup(tx: Tx, signup: Signup, acco
     const [createdPerson] = await tx.insert(people).values({
       legalFirstName: signup.firstName, legalLastName: signup.lastName, email,
     }).returning({id:people.id});
-    personId=createdPerson?.id;
+    personId=createdPerson?.id??null;
   }
   if (!personId) throw new Error("School administrator identity could not be created");
 
