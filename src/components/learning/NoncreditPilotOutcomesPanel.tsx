@@ -1,4 +1,6 @@
-import { useEffect,useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { EmptyState, QueryState } from "@/components/workspace";
 import { getNoncreditPilotOutcomes } from "@/modules/learning/noncredit-pilot-outcomes.functions";
 type Report=Awaited<ReturnType<typeof getNoncreditPilotOutcomes>>;
 
@@ -6,38 +8,46 @@ const count=(n:number)=>n.toLocaleString("en-US");
 
 /** Reusable, provider-only learning-outcomes panel, using Design System 6.1. */
 export function NoncreditPilotOutcomesPanel(){
-  const [report,setReport]=useState<Report|null>(null);
-  const [error,setError]=useState(false);
-  useEffect(()=>{
-    let active=true;
-    void getNoncreditPilotOutcomes({data:{}})
-      .then(data=>{if(active)setReport(data);})
-      .catch(()=>{if(active)setError(true);});
-    return ()=>{active=false;};
-  },[]);
+  const query=useQuery<Report>({
+    queryKey:["noncredit-pilot-outcomes"],
+    queryFn:()=>getNoncreditPilotOutcomes({data:{}}),
+    retry:false,
+    staleTime:30_000,
+  });
+  const report=query.data;
   const summary=report?.totals;
   return <section aria-label="Noncredit program evidence" className="space-y-4">
-    <div className="space-y-1">
-      <h2 className="font-serif text-2xl font-semibold">Program evidence</h2>
-      <p className="text-sm text-muted-foreground">
-        Provider-private, noncredit operational outcomes for the preceding 90 days.
-        These measures distinguish participation, demonstrated understanding,
-        feedback and formally recorded training completion.
-      </p>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="space-y-1">
+        <h2 className="font-serif text-2xl font-semibold">Program evidence</h2>
+        <p className="text-sm text-muted-foreground">
+          Private provider-scoped outcomes for the previous 90 days.
+          Participation, understanding, feedback and completion are separately measured.
+        </p>
+        {report&&<p className="text-xs text-muted-foreground">
+          Registration cohort: {report.from.slice(0,10)} through {report.to.slice(0,10)} (UTC).
+        </p>}
+      </div>
+      <Button type="button" size="sm" variant="outline" disabled={query.isFetching}
+        loading={query.isFetching} onClick={()=>void query.refetch()}>
+        Refresh evidence
+      </Button>
     </div>
-    {error&&<p role="alert" className="border border-border p-3 text-sm">
-      Program evidence is currently unavailable.
-    </p>}
-    {!error&&!report&&<p role="status" className="text-sm">Loading pilot outcomes...</p>}
-    {summary&&<>
+    <QueryState loading={query.isPending?"Loading verified program evidence…":undefined}
+      error={query.isError?"Program evidence is unavailable or exceeds the bounded report size.":undefined}
+      retrying={query.isFetching} onRetry={()=>void query.refetch()}/>
+    {summary?.registrations===0&&<EmptyState
+      title="No registrations in this reporting window"
+      description="Publish approved training and an enrollment release. Results appear here after learners register and participate."/>}
+    {summary&&summary.registrations>0&&<>
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
         {([
           ["Registrations",summary.registrations],
           ["Engaged learners",summary.engagedParticipants],
           ["Lessons marked complete",summary.lessonsMarkedComplete],
-          ["Knowledge checks submitted",summary.knowledgeCheckSubmissions],
+          ["Learners submitting a knowledge check",summary.knowledgeCheckSubmissions],
           ["Passed final knowledge checks",summary.knowledgeCheckPasses],
-          ["Feedback respondents",summary.surveyRespondents],
+          ["Learners responding to feedback",summary.surveyRespondents],
           ["Confirmed completions",summary.confirmedNoncreditCompletions],
           ["Paired before/after checks",summary.pairedKnowledgeChecks],
         ] as const).map(([label,value])=>
