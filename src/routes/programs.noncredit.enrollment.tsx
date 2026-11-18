@@ -10,6 +10,7 @@ import {
 import { normalizeClientError } from "@/lib/client-error";
 import { NoncreditReleaseOperations } from "@/components/enrollment/NoncreditReleaseOperations";
 import { NoncreditNetworkReportPanel } from "@/components/enrollment/NoncreditNetworkReportPanel";
+import { NoncreditPilotOutcomesPanel } from "@/components/learning/NoncreditPilotOutcomesPanel";
 
 export const Route=createFileRoute("/programs/noncredit/enrollment")({
   validateSearch:(search:Record<string,unknown>):{publicSiteId?:string}=>({
@@ -261,6 +262,9 @@ function NoncreditPublicationPage(){
       </section>
     </div>}
     {managedRelease&&<NoncreditReleaseOperations key={managedRelease} releaseId={managedRelease}/>} 
-    {query.isSuccess&&<NoncreditNetworkReportPanel/>}
+    {query.isSuccess&&<>
+      <NoncreditNetworkReportPanel/>
+      <div className="mt-8"><NoncreditPilotOutcomesPanel/></div>
+    </>}
   </WorkspaceShell>;
 }
