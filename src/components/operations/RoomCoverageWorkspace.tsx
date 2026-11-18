@@ -9,6 +9,7 @@ import { Field, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MutationFeedback } from "@/components/workspace/mutation-feedback";
+import { StatusBadge } from "@/components/workspace";
 
 type Model = Awaited<ReturnType<typeof getRoomCoverageWorkspaceFn>>;
 type Schedule = Model["schedules"][number];
@@ -24,8 +25,8 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
   const [roomAttempted, setRoomAttempted] = useState(false);
   const busy = feedback.pending || feedback.refreshFailed;
   const model = query.data;
-  return <section aria-label="All-day room coverage" className="mt-6 rounded-xl border p-5">
-    <h2 className="font-serif text-2xl">All-day room coverage</h2>
+  return <section aria-label="All-day room coverage" className="mt-6 border border-border bg-card p-5">
+    <h2 className="font-serif text-2xl">{model?.canManage ? "All-day room coverage" : "My assigned room coverage"}</h2>
     <p className="mt-2 text-sm">One onsite facilitator supervises a physical room while its students take
       different virtual courses. Course teaching assignments remain separate.</p>
     <p className="mt-2 text-sm text-muted-foreground">A saved assignment is a plan, not verified arrival,
@@ -42,16 +43,25 @@ export function RoomCoverageWorkspace({ siteId }: { siteId?: string }) {
     </div>}
     {model && <>
       <p className="mt-3 text-sm">School timezone: {model.timezone}</p>
-      {!model.schedules.length && <p role="status" className="mt-3 text-sm">No room coverage assignments recorded.</p>}
-      <ul className="mt-3 space-y-3">{model.schedules.map(schedule => <li key={schedule.id + ":" + schedule.revision} className="rounded-lg border p-3">
+      {!model.schedules.length && <p role="status" className="mt-3 border border-border bg-muted/30 p-4 text-sm">
+         {model.canManage
+           ? "No room coverage assignments recorded. Assign an accepted facilitator, backup, room and linked classes before opening the onsite day."
+           : "No room coverage assignments recorded for your current Site. Contact your Site Leader to confirm your room, backup adult and assigned classes before supervising learners."}
+       </p>}
+      <ul className="mt-3 space-y-3">{model.schedules.map(schedule => <li key={schedule.id + ":" + schedule.revision} className="border border-border bg-background p-4">
         <h3 className="font-semibold">{model.rooms.find(room => room.id === schedule.roomId)?.name ?? "Unavailable room"}</h3>
         <p className="mt-1 text-sm">{schedule.weekdays.map(day => days[day]).join(", ")} · {schedule.startsAtLocal}-{schedule.endsAtLocal}</p>
-        <p className="text-sm">{schedule.startsOn} through {schedule.endsOn} · {roomCoverageOccurs(schedule, model.today) ? "Scheduled today" : "Not scheduled today"}</p>
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+           <span>{schedule.startsOn} through {schedule.endsOn}</span>
+           <StatusBadge tone={roomCoverageOccurs(schedule, model.today) ? "info" : "neutral"}>
+             {roomCoverageOccurs(schedule, model.today) ? "Scheduled today" : "Not scheduled today"}
+           </StatusBadge>
+         </div>
         <p className="mt-1 text-sm">Primary: {model.staff.find(person => person.id === schedule.primaryPersonId)?.name ?? "Identity no longer eligible"} ·
           {" "}Backup: {model.staff.find(person => person.id === schedule.backupPersonId)?.name ?? "Not assigned or no longer eligible"}</p>
         <p className="text-sm">Room occupancy limit: {model.rooms.find(room => room.id === schedule.roomId)?.capacity ?? "Unavailable"}</p>
         <p className="mt-1 text-sm">Courses served: {schedule.sectionIds.map(id => model.classes.find(section => section.id === id)?.title ?? "Unavailable class").join(", ") || "No classes linked yet"}</p>
-        {(!schedule.backupPersonId || !schedule.sectionIds.length) && <p role="status" className="mt-2 text-sm">
+        {(!schedule.backupPersonId || !schedule.sectionIds.length) && <p role="status" className="mt-2 border-l-2 border-warning px-3 text-sm">
           Setup incomplete: {!schedule.backupPersonId ? "assign a separate qualified backup adult. " : ""}
           {!schedule.sectionIds.length ? "Link the classes whose onsite students use this room." : ""}
         </p>}
