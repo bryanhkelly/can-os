@@ -52,6 +52,47 @@ A GitHub Actions `startup_failure` is not a passing test. Do not claim integrate
 - **Provider UI:** the existing canonical noncredit lab now embeds `NoncreditCompletionPolicyPanel` and `NoncreditPilotOutcomesPanel`, without creating new navigation paths.
 - **Scale guard:** the initial interactive report has an explicit 5,000-participant ceiling per query; larger network reports require batched/warehouse-style aggregation rather than silently truncated results.
 
+### Phase 1 pilot configuration and accountable reporting
+
+The one-hour partner training is **configuration**, not a special denomination
+schema, route, role or enrollment workflow. Use the same governed Offering,
+published Course, noncredit training version, approved completion policy and
+enrollment release as every other adult training.
+
+- Prepare the Course lessons (five short modules in the proposed pilot),
+  the separately published objective knowledge check and the separately
+  published feedback survey. Five questions in each are content settings,
+  **not** application-level question limits.
+- Select an explicitly authorized existing Site for the online release and
+  its reporting. Site attribution is **not inferred** from network affiliation,
+  even when instruction is fully self-paced.
+- The feedback campaign must name the **same Offering** as the Course Attempt
+  through `survey_campaigns.offering_id`. Deployment-wide campaigns with no
+  Offering ID are not Course feedback. The opt-in knowledge-check trigger also
+  requires exact Offering scope, verified permission evidence and a personal
+  invitation.
+- The normal `/programs/noncredit/enrollment` workspace now includes
+  the Site-scoped pilot outcomes panel. It requires the existing
+  `noncredit.enrollment.read` capability and matches self-enrollment claims
+  to approved releases. Provider-assisted registrations without an evidenced
+  Site are excluded, not guessed.
+- Course feedback reporting matches Person, Deployment, Offering, operating
+  Organization and submission after registration. Ambiguous repeated
+  registrations cannot claim the same response twice. Historical Course
+  Attempts retain evidence; a lesson checkmark is never verified attendance.
+- On current Neon main, `public.survey_trigger_rules` and
+  `public.survey_definitions` are authoritative. The reviewed patch source
+  now references those shared tables. **No production SQL was executed.**
+
+Before partner activation, execute a restricted-principal isolated run:
+publish an approved release; register an adult using one account; resume
+lessons on a second device; submit the knowledge check; confirm only the
+matching Offering survey is offered; submit feedback once; confirm the
+independent completion decision; and reconcile the operator's private
+metrics. Repeat with a second Offering in the same Deployment, an unrelated
+Site operator, a withdrawal and a closed knowledge-check window.
+Source-code contract tests are not live end-to-end acceptance evidence.
+
 ### Acceptance before pilot activation
 
 ```bash
