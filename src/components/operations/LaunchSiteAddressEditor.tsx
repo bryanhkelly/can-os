@@ -28,7 +28,7 @@ export function LaunchSiteAddressEditor({
   const addressValidation = physicalSiteAddressSchema.safeParse(address);
   const locationMismatch = address.country === "US" && address.postalCode.trim().startsWith("94513") && address.state !== "CA";
   const complete = addressValidation.success && !locationMismatch;
-  return <div className="rounded-lg border p-3">
+  return <div className="border p-3">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-sm text-muted-foreground">School address</p>
       <Button type="button" size="sm" variant="outline"
