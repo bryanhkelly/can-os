@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { DirectoryTable, DirectoryWindowPagination } from "@/components/workspace";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import {
   getPendingCompletionEvidenceReviews,
   decideCompletionEvidenceReview,
@@ -118,22 +119,22 @@ export function CompletionEvidenceReviewQueuePanel(){
         in the existing award issuance ledger. A regular Site role is not
         issuer authority. The reason must match the reviewed request exactly.
       </p>
-      <label className="block space-y-1 text-sm font-medium">
+      <Label className="block space-y-1 text-sm font-medium">
         Original canonical issuance ID
         <Input value={issuanceId} onChange={event=>setIssuanceId(event.target.value)}
           placeholder="Credential issuance UUID"/>
-      </label>
-      <label className="block space-y-1 text-sm font-medium">
+      </Label>
+      <Label className="block space-y-1 text-sm font-medium">
         Verified evidence version ID
         <Input value={evidenceVersionId}
           onChange={event=>setEvidenceVersionId(event.target.value)}
           placeholder="Provider-owned verified evidence UUID"/>
-      </label>
-      <label className="block space-y-1 text-sm font-medium">
+      </Label>
+      <Label className="block space-y-1 text-sm font-medium">
         Independently reviewed reason
         <Textarea value={reason} onChange={event=>setReason(event.target.value)}
           placeholder="Document the precise evidentiary basis for revocation"/>
-      </label>
+      </Label>
       <div className="flex flex-wrap gap-2">
         <Button variant="outline" disabled={!valid||requestRevocation.isPending}
           onClick={()=>requestRevocation.mutate()}>
