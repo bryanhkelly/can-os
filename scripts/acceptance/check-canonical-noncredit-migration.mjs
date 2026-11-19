@@ -10,7 +10,7 @@ try {
   const [columns,functions,triggers,completionBody,privilegedFns]=await Promise.all([
     pool.query(`
       SELECT table_name,column_name FROM information_schema.columns
-      WHERE table_schema='education_v30' AND (
+      WHERE table_schema='public' AND (
         (table_name='noncredit_registrations' AND column_name='completion_policy_id') OR
         (table_name='noncredit_completion_policies' AND column_name IN ('completion_mode','require_all_lessons')) OR
         (table_name='noncredit_completion_decisions' AND column_name='decision_source') OR
@@ -30,7 +30,7 @@ try {
     pool.query(`
       SELECT tgname FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid
       JOIN pg_namespace n ON n.oid=c.relnamespace
-      WHERE n.nspname='education_v30' AND NOT t.tgisinternal
+      WHERE n.nspname='public' AND NOT t.tgisinternal
         AND tgname IN ('v301_noncredit_auto_on_participation','v301_noncredit_auto_on_lesson',
           'v301_noncredit_auto_on_assessment','v301_noncredit_auto_on_course',
           'v301_noncredit_auto_on_evidence','noncredit_registration_policy_pin')
