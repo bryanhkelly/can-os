@@ -34,10 +34,10 @@ async function main(){
     "two distinct valid Class IDs required");
   const sql=neon(url);
   const [schema]=await sql`
-    SELECT to_regclass('education_v30.class_session_agenda_revisions') IS NOT NULL AS agendas,
-      to_regclass('education_v30.class_completion_policy_versions') IS NOT NULL AS completion_policies,
-      to_regclass('education_v30.facilitated_room_attendance_assertions') IS NOT NULL AS attendance,
-      to_regclass('education_v30.facilitated_learning_playback') IS NOT NULL AS playback
+    SELECT to_regclass('public.class_session_agenda_revisions') IS NOT NULL AS agendas,
+      to_regclass('public.class_completion_policy_versions') IS NOT NULL AS completion_policies,
+      to_regclass('public.facilitated_room_attendance_assertions') IS NOT NULL AS attendance,
+      to_regclass('public.facilitated_learning_playback') IS NOT NULL AS playback
   `;
   assert(schema&&Object.values(schema).every(Boolean),
     "required WS3/WS4 schema missing; run approved QA migrations first");
@@ -48,11 +48,11 @@ async function main(){
       p.site_id::text AS site_id,p.state AS plan_state,
       p.facilitated_session_id::text AS room_id,
       d.starts_at AS starts_at,d.ends_at AS ends_at,
-      (SELECT count(*)::int FROM education_v30.class_session_agenda_revisions a
+      (SELECT count(*)::int FROM public.class_session_agenda_revisions a
        WHERE a.class_session_id=cs.id) AS agenda_revisions,
-      (SELECT count(*)::int FROM education_v30.facilitated_learning_playback v
+      (SELECT count(*)::int FROM public.facilitated_learning_playback v
        WHERE v.facilitated_session_id=p.facilitated_session_id AND v.kind='played') AS playback_events,
-      (SELECT count(*)::int FROM education_v30.facilitated_room_attendance_assertions a
+      (SELECT count(*)::int FROM public.facilitated_room_attendance_assertions a
        WHERE a.facilitated_session_id=p.facilitated_session_id AND a.status='present'
          AND a.facilitator_person_id=cs.facilitator_person_id) AS attestations,
       (SELECT count(*)::int FROM public.facilitated_room_presence_events v
@@ -60,14 +60,14 @@ async function main(){
       (SELECT count(*)::int FROM public.facilitated_room_presence_events v
        WHERE v.facilitated_session_id=p.facilitated_session_id
          AND v.event_kind='heartbeat') AS heartbeats,
-      (SELECT count(*)::int FROM education_v30.facilitated_learning_participants v
+      (SELECT count(*)::int FROM public.facilitated_learning_participants v
        WHERE v.facilitated_session_id=p.facilitated_session_id
          AND v.last_paired_at>v.joined_at) AS paired_again
-    FROM education_v30.class_sessions cs
-    JOIN education_v30.classes c ON c.id=cs.class_id
-    JOIN education_v30.facilitated_classroom_plans p
+    FROM public.class_sessions cs
+    JOIN public.classes c ON c.id=cs.class_id
+    JOIN public.facilitated_classroom_plans p
       ON p.id=cs.classroom_plan_id AND p.delivery_session_id=cs.delivery_session_id
-    JOIN education_v30.delivery_sessions d ON d.id=cs.delivery_session_id
+    JOIN public.delivery_sessions d ON d.id=cs.delivery_session_id
     WHERE cs.class_id IN (${classIds[0]}::uuid,${classIds[1]}::uuid)
     ORDER BY cs.class_id,d.starts_at
   `;
