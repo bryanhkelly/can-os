@@ -49,12 +49,14 @@ const guardedBatchFiles=[
   ["database/production/2026-11-19-consolidate-eight-assessment-grading-tables.sql",8,"json"],
   ["database/production/2026-11-19-consolidate-12-blueprint-tables.sql",12,"json"],
   ["database/production/2026-11-19-consolidate-38-assessment-survey-qualification-completion-tables.sql",38,"json"],
+  ["database/production/2026-11-19-consolidate-nine-instructional-track-tables.sql",9,"json"],
+  ["database/production/2026-11-19-consolidate-10-content-professional-tables.sql",10,"json"],
 ];
 
 function guardedTableNames(file,expected,arity){
   const source=readFileSync(file,"utf8");
   if(arity==="json"){
-    const match=source.match(/snapshot jsonb := '([^']+)'::jsonb/);
+    const match=source.match(/snapshot\s+jsonb\s*:=\s*'([^']+)'::jsonb/);
     if(!match)throw new Error("Missing pinned snapshot: "+file);
     const rows=JSON.parse(match[1]);
     if(rows.length!==expected||new Set(rows.map(x=>x.name)).size!==expected)
