@@ -112,7 +112,7 @@ const modulePlans: Record<PrepareModuleIdV61, ModulePlan> = {
     handoffs: [
       { title: "Review opening and compliance", detail: "Resolve real opening blockers in the institutional preparation workflow.", href: id => "/settings/school/compliance?siteId=" + scoped(id) },
       { title: "Review Site qualification", detail: "Inspect recorded facility and program-fit evidence, where authorized.", href: () => "/canonical/lab/site-qualification" },
-      { title: "Return to Blueprint planning", detail: "Verify the selected operating model, not just the intended Program.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
+      { title: "Return to Solution planning", detail: "Verify the selected operating model, not just the intended Program.", href: id => "/canonical/blueprints?siteId=" + scoped(id) },
     ],
   },
   "publish-site": {
@@ -212,7 +212,7 @@ export function LaunchPrepareV61({ module, siteId, intent, delivery, intentUnava
           <div className="grid gap-3 md:grid-cols-3">
             {[
               ["Program", "Your high-level intention, captured in Establish."],
-              ["Solution / Blueprint", "The packaged operating configuration: roles, rooms, activities, equipment, schedules, safety and evidence."],
+              ["Solution", "The packaged operating configuration: roles, rooms, activities, equipment, schedules, safety and evidence."],
               ["Offering", "The approved, configured experience learners may enroll in, when separately authorized."],
             ].map(([name, detail], i) => <div key={name} className="border bg-background p-4">
               <p className="text-xs font-semibold text-muted-foreground">0{i + 1}</p>
