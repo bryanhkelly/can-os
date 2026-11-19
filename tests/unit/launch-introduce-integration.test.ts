@@ -62,7 +62,7 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     const create=source("src/routes/operations.interest-events_.new.tsx");
     const workspace=source("src/routes/operations.interest-events.tsx");
     expect(packages).toContain("module===\"interest-events\"");
-    expect(packages).toContain("packageId=\\${encodeURIComponent(record.id)}");
+    expect(packages).toContain("packageId=${encodeURIComponent(record.id)}");
     expect(create).toContain("listSiteMarketingPackagesV61");
     expect(create).toContain("readSiteMarketingSuggestionsV61");
     expect(create).toContain('item.content.purpose==="event-invitation"');
