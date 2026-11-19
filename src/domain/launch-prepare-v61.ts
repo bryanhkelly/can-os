@@ -10,3 +10,21 @@ export const prepareStageModulesV61 = [
 ] as const;
 
 export type PrepareStageModuleIdV61 = (typeof prepareStageModulesV61)[number]["id"];
+
+/** Search and selection are pure UI projections. Never infer Site authorization. */
+export function filterPublishedSolutionRecipes<T extends {
+  title: string; components: readonly { key: string }[];
+}>(templates: readonly T[], query: string): T[] {
+  const term = query.trim().toLocaleLowerCase();
+  if (!term) return [...templates];
+  return templates.filter(template =>
+    [template.title, ...template.components.map(component => component.key)]
+      .some(value => value.toLocaleLowerCase().includes(term)));
+}
+
+/** A hidden/out-of-filter recipe must never remain in the visible detail pane. */
+export function resolveVisibleSolutionRecipe<T extends { blueprintVersionId: string }>(
+  visible: readonly T[], selectedId: string | null,
+): T | undefined {
+  return visible.find(template => template.blueprintVersionId === selectedId) ?? visible[0];
+}
