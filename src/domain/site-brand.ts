@@ -33,6 +33,8 @@ export type ResolvedSiteBrand={
   directionId:SiteBrandConfiguration["directionId"];
   paletteId:SiteBrandConfiguration["paletteId"];
   typographyId:SiteBrandConfiguration["typographyId"];
+  headingFontId:SiteBrandConfiguration["headingFontId"];
+  bodyFontId:SiteBrandConfiguration["bodyFontId"];
   theme:ReturnType<typeof resolveSiteTheme>;
   logo:SiteBrandAsset|null;hero:SiteBrandAsset|null;
 };
@@ -47,6 +49,7 @@ export function resolveSiteBrandVersion(version:SavedSiteBrandVersion,assets:Rea
   const hero=c.heroAssetId?assets.get(c.heroAssetId)??null:null;
   return {siteId:version.siteId,brandVersionId:version.id,revision:version.revision,
     displayName:c.displayName,directionId:c.directionId,paletteId:c.paletteId,typographyId:c.typographyId,
+    headingFontId:c.headingFontId,bodyFontId:c.bodyFontId,
     theme:resolveSiteTheme(c.paletteId,c.typographyId,c.headingFontId??undefined,c.bodyFontId??undefined),
     logo,hero};
 }
@@ -70,11 +73,13 @@ export function siteBrandPresentationIdentity(
   };
   const config=siteBrandConfigurationSchema.parse({
     directionId:brand.directionId,paletteId:brand.paletteId,typographyId:brand.typographyId,
-    headingFontId:null,bodyFontId:null,displayName:brand.displayName,
+    headingFontId:brand.headingFontId,bodyFontId:brand.bodyFontId,displayName:brand.displayName,
     logoAssetId:brand.logo?.id??null,heroAssetId:brand.hero?.id??null,
   });
   return {
     theme:"classic",templateId,paletteId:config.paletteId,typographyId:config.typographyId,
+    ...(config.headingFontId?{headingFontId:config.headingFontId}:{}),
+    ...(config.bodyFontId?{bodyFontId:config.bodyFontId}:{}),
     ...(brand.directionId?{brandDirectionId:brand.directionId}:{}),
     heroImage:image(brand.hero),logoImage:image(brand.logo),
   };
