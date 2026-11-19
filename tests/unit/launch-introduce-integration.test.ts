@@ -67,7 +67,7 @@ describe("Launch Studio V6.1 Introduce integration", () => {
     expect(create).toContain("readSiteMarketingSuggestionsV61");
     expect(create).toContain('item.content.purpose==="event-invitation"');
     expect(create).toContain("containsProtectedInstitutionalClaim(savedHeadline)");
-    expect(create).toContain("authorizedSite=deps.siteId");
+    expect(create).toContain("data.programs.some(program=>program.siteId===deps.siteId)");
     expect(workspace).toContain("suggestedTitle?.trim()");
     expect(workspace).toContain("titleSource===\"saved-package\"");
     expect(workspace).toContain("programId:selectedProgram.id");
