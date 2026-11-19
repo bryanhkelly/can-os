@@ -21,7 +21,7 @@ SPA navigation retains exact Site scope; the active stage re-expands on module c
 | Establish / Website & Brand | Direct entry to existing `/launch/website` studio; exact selected Site and return to Launch | Live editor/save/preview/return path and publishing-role checks |
 | Introduce / Promote | Site-scoped Marketing Package library, purpose-specific Story/intent suggestions, immutable Brand-pinned output and downloads | Sending/distribution and recipient management are not implemented |
 | Introduce / Recruit Families / Learners | Reuses the same Marketing Packages and source projection, focused on interest invitations and program ideas; exact-Site handoff to existing consent-aware preopening family outreach with canonical Brand and editable Story suggestions | Site-level CRM is not implemented; interest invitation sending is separately registrar-authorized, not an automatic Marketing Package action |
-| Introduce / Interest Events | Reuses the same Marketing Packages for event invitation materials; existing Program-linked event and registration handoff | Generic pre-Program Site events and automatic messaging/distribution are not implemented |
+| Introduce / Interest Events | Uses the same Brand-pinned Marketing Packages; an active invitation package or the canonical Site editorial suggestion can seed the editable title of an authorized Program-linked event | Generic pre-Program Site events and automatic marketing distribution are not implemented; the operator must create the event independently |
 | Prepare / Invite Your Team | Existing exact-Site verified staff invitation/access workspace | Test verified role acceptance; no implicit appointment |
 | Prepare / Program Catalog | Source-backed canonical published-Offering discovery panel plus Blueprint/Class handoffs | Requires independently verified canonical grant and enabled catalog; Solution adoption, requirements and readiness are independent |
 | Prepare / Opening & Compliance | Existing authenticated compliance and canonical qualification review destinations | Site-specific evidence and jurisdiction review acceptance |
@@ -97,3 +97,12 @@ Follow-on integration also enables the existing `purpose=interest` family invita
 - Added or updated focused regression tests for navigation, invitation validation, canonical preview behavior and publication permission projections.
 - No migrations, production commands or `main` changes have been made. Build, TypeScript checks, database acceptance, authenticated browser tests and actual network-delivery checks remain unexecuted.
 
+
+## 2026-11-19 · Unified preview and event creation follow-up
+
+- Corrected private website preview return links from invalid `step=preview` to the supported `step=review` and HTML-escaped query separators.
+- Both full-page preview entry points now resolve the current saved Site Brand and display name without introducing a second identity store. The first-visit Website editor preview also uses the saved Brand even with no Site website-copy revision. A new regression test verifies this behavior.
+- Both private preview entry points use the same `projectPlannedSiteProgramsForPreview` against saved Programs & Audiences; no new Offering is created.
+- After a new Interest Event is created, the detail link uses the created event's actual Program rather than an unrelated earlier URL filter. Event Program changes validate the timezone and send timezone corrections to Establish / Site Profile.
+- A saved event-invitation Marketing Package can now hand off its headline to the existing independently governed event creation screen, scoped by Site and package ID. With no usable package, the same Site editorial suggestion is available. No message distribution, event persistence or registration is triggered by the read-only prefill.
+- Added source contracts and server-rendered component tests, but none have been executed. Netlify PR deploys are currently skipped due to account build-usage limits, which do not establish a compile failure.
