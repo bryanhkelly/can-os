@@ -13,6 +13,7 @@ export { MutationFeedback } from "./mutation-feedback";
 export { LocalDateTimeField } from "./local-datetime-field";
 export { ActionDialog } from "./action-dialog";
 export { ActionFooter } from "./action-footer";
+export { DisclosureSection } from "./disclosure-section";
 export { PageNavigation } from "./page-navigation";
 export { DirectoryPagination } from "./directory-pagination";
 export { DirectoryWindowPagination } from "./directory-window-pagination";
