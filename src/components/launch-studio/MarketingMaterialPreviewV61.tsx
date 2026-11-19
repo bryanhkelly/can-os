@@ -23,17 +23,21 @@ export function MarketingMaterialPreviewV61({siteId,brandVersionId,format,conten
     setPending(true);
     setPreview(null);
     setError("");
-    void previewSiteMarketingArtifact({data:{siteId,brandVersionId,format,content}})
-      .then(result=>{
-        if(live){setPreview(result);setPending(false);}
-      })
-      .catch(cause=>{
-        if(live){
-          setError(cause instanceof Error?cause.message:"Unable to render this preview.");
-          setPending(false);
-        }
-      });
-    return ()=>{live=false;};
+    // Debounce typing. Previous requests may finish after later edits, so
+    // invalidate their results in cleanup and never show stale branded copy.
+    const timer=window.setTimeout(()=>{
+      void previewSiteMarketingArtifact({data:{siteId,brandVersionId,format,content}})
+        .then(result=>{
+          if(live){setPreview(result);setPending(false);}
+        })
+        .catch(cause=>{
+          if(live){
+            setError(cause instanceof Error?cause.message:"Unable to render this preview.");
+            setPending(false);
+          }
+        });
+    },350);
+    return ()=>{live=false;window.clearTimeout(timer);};
   },[siteId,brandVersionId,format,content,retry]);
 
   const label=marketingFormatOptions.find(option=>option.id===format)?.label??format;

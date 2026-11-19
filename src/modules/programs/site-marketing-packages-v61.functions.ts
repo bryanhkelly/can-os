@@ -1,14 +1,18 @@
-import { siteBrandVersions, siteArtifactReleases } from "@/db/schema";
+import { siteBrandVersions, siteArtifactReleases, siteLocalContentVersions } from "@/db/schema";
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest, setResponseHeader } from "@tanstack/react-start/server";
 import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { sites, siteMarketingPackages } from "@/db/schema";
+import { siteStorySourceV61Schema } from "@/domain/site-information-v61";
+import { readSiteProgramsAudiencesV61 } from "@/domain/site-launch-preferences";
+import { normalizeSiteLocalContent } from "@/domain/site-local-content";
+import { suggestMarketingStarterV61, type MarketingStarterSourcesV61 } from "@/domain/site-marketing-suggestions-v61";
 import { assertSiteSetupScope } from "@/domain/site-setup-scope";
 import { DomainError } from "@/domain/errors";
 import {
-  initialMarketingContent, marketingPackageContentSchema, marketingPurposeIds,
+  marketingPackageContentSchema, marketingPurposeIds,
 } from "@/domain/marketing-package-v61";
 import { getCommandContext } from "@/modules/identity/command-context.server";
 import { emitEvent, writeAudit } from "@/platform/mutation";
@@ -50,11 +54,48 @@ async function authorizedSite(
 ) {
   const actor = await getCommandContext(getRequest());
   const [site] = await executor.select({
-    id: sites.id, organizationId: sites.organizationId, name: sites.name,
+    id: sites.id, organizationId: sites.organizationId, name: sites.name, metadata: sites.metadata,
   }).from(sites).where(eq(sites.id, siteId)).limit(1);
   assertSiteSetupScope(actor, site, capability);
   return { actor, site };
 }
+
+/**
+ * Authorized projection of previously saved Establish information.
+ * Only purpose-specific editorial suggestions leave the server; raw private
+ * Story answers are never added to package metadata, audit or analytics.
+ */
+async function marketingSource(
+  site:{id:string;metadata:typeof sites.$inferSelect.metadata},
+  reader:Pick<typeof db,"select">=db,
+):Promise<MarketingStarterSourcesV61>{
+  const source=site.metadata.siteStoryV61;
+  const story=source == null ? null : siteStorySourceV61Schema.parse(source).answers;
+  const plan=site.metadata.launchPreferences;
+  const intent=plan == null ? null : readSiteProgramsAudiencesV61(plan);
+  const [savedWebsite]=await reader.select({content:siteLocalContentVersions.content})
+    .from(siteLocalContentVersions).where(eq(siteLocalContentVersions.siteId,site.id))
+    .orderBy(desc(siteLocalContentVersions.revision)).limit(1);
+  const copy=savedWebsite
+    ? normalizeSiteLocalContent(savedWebsite.content,{allowIncompleteImage:true})
+    : null;
+  return {story,intent,websiteCopy:copy
+    ? {heroHeadline:copy.heroHeadline,welcomeMessage:copy.welcomeMessage,
+        schoolVision:copy.schoolVision,communityOutreach:copy.communityOutreach}
+    : null};
+}
+
+export const readSiteMarketingSuggestionsV61=createServerFn({method:"GET"})
+  .validator((input:unknown)=>siteInput.parse(input))
+  .handler(async ({data})=>{
+    setResponseHeader("Cache-Control","private, no-store");
+    const {site}=await authorizedSite(data.siteId,"program.read");
+    const source=await marketingSource(site);
+    return Object.fromEntries(marketingPurposeIds.map(purpose=>
+      [purpose,suggestMarketingStarterV61(site.name,purpose,source)])) as
+      Record<(typeof marketingPurposeIds)[number],
+        ReturnType<typeof suggestMarketingStarterV61>>;
+  });
 
 const scopedPackage = (siteId:string,packageId:string) => and(
   eq(siteMarketingPackages.siteId,siteId), eq(siteMarketingPackages.id,packageId),
@@ -82,7 +123,8 @@ export const createSiteMarketingPackageV61 = createServerFn({method:"POST"})
     const [created]=await tx.insert(siteMarketingPackages).values({
       siteId:site.id,organizationId:site.organizationId,
       createdByPersonId:actor.actorPersonId!,title:data.title,
-      brandVersionId:currentBrand.id,content:initialMarketingContent(site.name,data.purpose),
+      brandVersionId:currentBrand.id,
+      content:suggestMarketingStarterV61(site.name,data.purpose,await marketingSource(site,tx)).content,
     }).returning();
     if(!created)throw new DomainError("UNAVAILABLE","Unable to create package");
     await writeAudit(tx,actor,{

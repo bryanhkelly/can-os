@@ -44,10 +44,10 @@ export const launchModuleDestinationsV61: Record<DestinationModuleId, Destinatio
     ],
   },
   open: {
-    subtitle: "Enable Enrollment only for Offerings independently authorized to receive learners."
-    intro: "Funding and admissions are prepared before opening. Publishing the Site website does not enable enrollment. Each Offering must have an approved operating model, required safeguards, capacity and a receiving Program before its registration may be activated."
+    subtitle: "Enable Enrollment only for Offerings independently authorized to receive learners.",
+    intro: "Funding and admissions are prepared before opening. Publishing the Site website does not enable enrollment. Each Offering must have an approved operating model, required safeguards, capacity and a receiving Program before its registration may be activated.",
     state: "governed",
-    note: "Enable Enrollment is an independent action in the authorized receiving service, not a Site-wide toggle. Publishing the website or completing Prepare never activates registration."
+    note: "Enable Enrollment is an independent action in the authorized receiving service, not a Site-wide toggle. Publishing the website or completing Prepare never activates registration.",
     links: [
       { label: "Review readiness and opening authority", path: id => `/settings/school/compliance?siteId=${scope(id)}`, detail: "Independent approval and operational requirements" },
       { label: "Review Site publication", path: id => `/launch/site?siteId=${scope(id)}&module=publish-site`, detail: "Official website publication and independent HTTPS reachability" },

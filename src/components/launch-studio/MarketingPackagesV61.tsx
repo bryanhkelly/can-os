@@ -18,11 +18,13 @@ import {
 import {
   archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
   deleteSiteMarketingPackageV61, duplicateSiteMarketingPackageV61,
-  listSiteMarketingPackagesV61, saveSiteMarketingPackageV61, selectSiteMarketingPackageBrandV61,
+  listSiteMarketingPackagesV61, readSiteMarketingSuggestionsV61,
+  saveSiteMarketingPackageV61, selectSiteMarketingPackageBrandV61,
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 
 type PackageRecord = Awaited<ReturnType<typeof listSiteMarketingPackagesV61>>[number];
+type MarketingSuggestions = Awaited<ReturnType<typeof readSiteMarketingSuggestionsV61>>;
 const steps: readonly MarketingPackageStep[] = ["menu", "audience", "messages", "assets"];
 const stepLabels = ["Menu", "Audience", "Messages", "Collateral & Assets"] as const;
 
@@ -30,16 +32,19 @@ function message(error:unknown) {
   return error instanceof Error ? error.message : "The package operation could not be completed.";
 }
 
-export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
-  siteId:string;siteName:string;initial:PackageRecord[];onExit:()=>void;
+export function MarketingPackagesV61({siteId,siteName,initial,suggestions,onExit}:{
+  siteId:string;siteName:string;initial:PackageRecord[];
+  suggestions:MarketingSuggestions|null;onExit:()=>void;
 }) {
   const router=useRouter();
+  const starter=(purpose:MarketingPackageContent["purpose"])=>(
+    suggestions?.[purpose]?.content??initialMarketingContent(siteName,purpose));
   const [packages,setPackages]=useState(initial);
   const [view,setView]=useState<"library"|"wizard"|"detail">("library");
   const [record,setRecord]=useState<PackageRecord|null>(null);
   const [title,setTitle]=useState("");
   const [content,setContent]=useState<MarketingPackageContent>(()=>
-    initialMarketingContent(siteName,"site-announcement"));
+    starter("site-announcement"));
   const [step,setStep]=useState(0);
   const [previewFormat,setPreviewFormat]=useState<MarketingFormat>("flyer");
   const [showArchived,setShowArchived]=useState(false);
@@ -77,7 +82,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
     setStep(0);setView(editing?"wizard":"detail");setError("");setNotice("");
   }
   function start() {
-    setRecord(null);setTitle("");setContent(initialMarketingContent(siteName,"site-announcement"));
+    setRecord(null);setTitle("");setContent(starter("site-announcement"));
     setStep(0);setView("wizard");setError("");setNotice("");
   }
   function patch(value:Partial<MarketingPackageContent>) {
@@ -203,6 +208,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   }
 
   const visible=packages.filter(item=>showArchived?item.status==="archived":item.status!=="archived");
+  const currentSuggestion=suggestions?.[content.purpose]??null;
   const activePreviewFormat=content.formats.includes(previewFormat)?previewFormat:content.formats[0]??null;
   const titleText=view==="library"?"Marketing Packages":view==="wizard"?"Build a Marketing Package":record?.title??"Marketing Package";
   const rail=<div className="space-y-4">
@@ -229,7 +235,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
         <div className="grid gap-3 sm:grid-cols-2">
           {marketingPurposeOptions.map(option=><button key={option.id} type="button"
             className="border bg-card p-5 text-left hover:border-primary focus-visible:ring-2 focus-visible:ring-ring"
-            onClick={()=>{start();setTitle(option.label);setContent(initialMarketingContent(siteName,option.id));}}>
+            onClick={()=>{start();setTitle(option.label);setContent(starter(option.id));}}>
             <Megaphone className="mb-3 size-5 text-primary" aria-hidden="true"/>
             <strong className="block text-sm">{option.label}</strong>
             <span className="mt-2 block text-xs leading-5 text-muted-foreground">{option.description}</span>
@@ -286,7 +292,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
                 (content.purpose===option.id?"border-primary bg-accent":"bg-card")}>
               <Radio name="package-purpose" className="mt-1"
                 checked={content.purpose===option.id} onChange={()=>
-                  patch({...initialMarketingContent(siteName,option.id),audiences:content.audiences,formats:content.formats})}/>
+                  patch({...starter(option.id),audiences:content.audiences,formats:content.formats})}/>
               <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
             </label>)}
           </div>
@@ -313,7 +319,38 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
           </Field></div>
         </WorkspacePanel>}
 
-        {step===2&&<WorkspacePanel title="Your message" description="Suggested copy is editable and never asserts school approval or open enrollment.">
+        {step===2&&<WorkspacePanel title="Your message"
+          description="Start with your Site's saved vision and learning interests. Review each suggestion before sharing it.">
+          {currentSuggestion&&<div className="mt-4 space-y-3 border bg-muted/30 p-4">
+            <p className="text-sm font-semibold">Built from what you already shared</p>
+            <p className="text-xs leading-5 text-muted-foreground">
+              {currentSuggestion.sources.length
+                ? currentSuggestion.sources.join(" · ")
+                : "No saved Site Story or program interests yet. Start with this editable introduction."}
+              {" "}These are proposed plans, not verified offerings or enrollment claims.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={busy}
+                onClick={()=>patch({
+                  headline:starter(content.purpose).headline,
+                  message:starter(content.purpose).message,
+                  callToAction:starter(content.purpose).callToAction,
+                })}>Restore suggested message</Button>
+              {currentSuggestion.websiteAlternative&&<Button type="button" size="sm"
+                variant="outline" disabled={busy}
+                onClick={()=>{
+                  const alternative=currentSuggestion.websiteAlternative;
+                  if(alternative)patch({
+                    headline:alternative.headline||content.headline,
+                    message:alternative.message,
+                  });
+                }}>Use saved website wording</Button>}
+            </div>
+            {currentSuggestion.websiteAlternative&&<p className="text-xs leading-5 text-muted-foreground">
+              Website wording is a separate suggestion and never overwrites your edits automatically.
+              Review any private planning details before generating materials.
+            </p>}
+          </div>}
           <div className="mt-4 space-y-5">
             <Field label="Headline" required><Input maxLength={160} value={content.headline}
               onChange={event=>patch({headline:event.target.value})}/></Field>
