@@ -36,7 +36,7 @@ const stages = [
   { id: "Establish", icon: Building2, summary: "Complete your Site, explore programs and audiences, and create your website." },
   { id: "Introduce", icon: Megaphone, summary: "Promote your community, connect with prospective learners and host events." },
   { id: "Prepare", icon: ClipboardCheck, summary: "Select Solutions, verify facilities, people, safeguards and funding, then explicitly publish the public Site website." },
-  { id: "Open", icon: Rocket, summary: "Activate registration only for independently approved, enrollable Offerings." },
+  { id: "Open", icon: Rocket, summary: "Enable Enrollment only for independently approved, enrollable Offerings." },
 ] as const;
 
 /**
