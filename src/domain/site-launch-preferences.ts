@@ -82,10 +82,12 @@ export function readSiteProgramsAudiencesV61(raw: unknown): SiteProgramsAudience
 /** Merge only planning fields with the latest delivery under the Site row lock. */
 export function applySiteProgramsAudiencesV61(
   previous: unknown, draft: SiteProgramsAudiencesV61,
-  fallbackDelivery?: SiteLaunchPreferences["delivery"],
+  authoritativeDelivery?: SiteLaunchPreferences["delivery"],
 ): SiteLaunchPreferences {
   const old = previous == null ? null : siteLaunchPreferencesSchema.parse(previous);
-  const delivery = old?.delivery ?? fallbackDelivery;
+  // Site Information is authoritative when it has been saved. Legacy intent
+  // remains a fallback for Sites created before that module existed.
+  const delivery = authoritativeDelivery ?? old?.delivery;
   if (!delivery) throw new Error("Save Learning Environment in Site Information before choosing Programs & Audiences.");
   const plan = siteProgramsAudiencesV61Schema.parse(draft);
   return siteLaunchPreferencesSchema.parse({
