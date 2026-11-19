@@ -1,13 +1,13 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "@tanstack/react-router";
 import { canPlanOffering, type AvailableOffering } from "@/domain/program-discovery";
 import { normalizeClientError } from "@/lib/client-error";
 import { discoverLaunchSitePrograms } from "@/modules/programs/program-discovery.functions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { StatusBadge } from "@/components/workspace";
+import { EmptyState, FilterBar, StatusBadge } from "@/components/workspace";
+import { Field } from "@/components/ui/field";
 
 const deliveryOptions = [
   { value: "onsite", label: "On site" },
@@ -30,17 +30,22 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
   const [availabilityFilter, setAvailabilityFilter] = useState<AvailabilityFilter>("all");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const requestVersion = useRef(0);
 
   useEffect(() => {
+    // A response from an older Site or an unmounted catalog must not be shown.
+    requestVersion.current += 1;
     setOfferings(null);
     setCanonicalSiteId(null);
     setError(null);
     setQuery("");
     setAvailabilityFilter("all");
+    return () => { requestVersion.current += 1; };
   }, [siteId]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const version = ++requestVersion.current;
     setLoading(true);
     setError(null);
     setOfferings(null);
@@ -49,12 +54,14 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
       const result = await discoverLaunchSitePrograms({
         data: { publicSiteId: siteId, deliveryContext },
       });
+      if (version !== requestVersion.current) return;
       setOfferings(result.items);
       setCanonicalSiteId(result.canonicalSiteId);
     } catch (caught) {
-      setError(normalizeClientError(caught, "Program discovery could not be completed. Try again.").message);
+      if (version === requestVersion.current)
+        setError(normalizeClientError(caught, "Program discovery could not be completed. Try again.").message);
     } finally {
-      setLoading(false);
+      if (version === requestVersion.current) setLoading(false);
     }
   }
 
@@ -93,28 +100,22 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
     </form>
     {error && <p className="mt-4 text-sm text-destructive" role="alert">{error}</p>}
     {offerings && <>
-      <div className="mt-5 grid gap-3 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        <Label htmlFor="program-catalog-search" className="text-sm">
-          Search titles or codes
-          <Input id="program-catalog-search" className="mt-2" value={query} maxLength={120}
-            onChange={event => setQuery(event.target.value)} placeholder="Search available Offerings" />
-        </Label>
-        <Label htmlFor="program-catalog-availability" className="text-sm">
-          Availability
-          <Select id="program-catalog-availability" className="mt-2" value={availabilityFilter}
+      <FilterBar label="Published Offerings" query={query} onQueryChange={setQuery}
+        searchLabel="Search titles or codes" searchPlaceholder="Search published Offerings"
+        filters={<Field label="Availability" className="min-w-48">
+          <Select value={availabilityFilter}
             onChange={event => setAvailabilityFilter(event.target.value as AvailabilityFilter)}>
             <option value="all">All published results</option>
             <option value="plan">Available for planning</option>
             <option value="review">Requires further work</option>
           </Select>
-        </Label>
-      </div>
+        </Field>} />
       <p className="mt-4 text-xs text-muted-foreground" role="status">
         Showing {visible.length} of {offerings.length} published Offerings for {deliveryOptions.find(item => item.value === deliveryContext)?.label}.
       </p>
-      {visible.length === 0 && <p className="mt-3 border bg-muted p-4 text-sm">
-        No Offerings match this selection. Try a different delivery model or filter.
-      </p>}
+      {visible.length === 0 && <EmptyState className="mt-3" kind={offerings.length ? "matches" : "records"}
+        title={offerings.length ? "No matching Offerings" : "No published Offerings available"}
+        description="Try another search, availability filter, or delivery model." />
       {visible.length > 0 && <div className="mt-4 grid gap-3 md:grid-cols-2" aria-live="polite">
         {visible.map(item => {
           const { offering, availability } = item;
@@ -122,7 +123,7 @@ export function ProgramDiscoveryPanel({ siteId }: { siteId: string }) {
           return <article key={offering.offeringVersionId} className="flex flex-col border bg-background p-5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-xs font-medium text-muted-foreground">{offering.code} · v{offering.versionNo}</span>
-              <StatusBadge tone={planEligible ? "info" : "attention"}>
+              <StatusBadge tone={planEligible ? "neutral" : "attention"}>
                 {planEligible ? "Planning possible" : "Review needed"}
               </StatusBadge>
             </div>
