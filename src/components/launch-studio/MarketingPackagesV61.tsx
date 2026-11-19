@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { readSiteBrandVersionView } from "@/modules/sites/site-brand.functions";
+import { createSiteMarketingRelease, listSiteMarketingReleases, getSiteMarketingReleaseOutput } from "@/modules/programs/site-marketing-artifacts.functions";
+import { useEffect, useState } from "react";
 import { useRouter } from "@tanstack/react-router";
-import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2 } from "lucide-react";
+import { Archive, ArrowLeft, ArrowRight, Check, Copy, FileText, Megaphone, Plus, RotateCcw, Trash2, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { Field } from "@/components/ui/field";
@@ -15,7 +17,7 @@ import {
 import {
   archiveSiteMarketingPackageV61, createSiteMarketingPackageV61,
   deleteSiteMarketingPackageV61, duplicateSiteMarketingPackageV61,
-  listSiteMarketingPackagesV61, saveSiteMarketingPackageV61,
+  listSiteMarketingPackagesV61, saveSiteMarketingPackageV61, selectSiteMarketingPackageBrandV61,
 } from "@/modules/programs/site-marketing-packages-v61.functions";
 import { useLaunchUnsavedChanges } from "./useLaunchUnsavedChanges";
 
@@ -43,6 +45,21 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
   const [deleteCandidate,setDeleteCandidate]=useState<PackageRecord|null>(null);
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
+  const [releases,setReleases]=useState<Awaited<ReturnType<typeof listSiteMarketingReleases>>>([]);
+  const [currentBrand,setCurrentBrand]=useState<{id:string;revision:number}|null>(null);
+  useEffect(()=>{
+    if(view!=="detail"||!record)return;
+    let live=true;
+    void Promise.all([
+      listSiteMarketingReleases({data:{siteId,packageId:record.id}}),
+      readSiteBrandVersionView({data:{siteId}}),
+    ]).then(([records,brand])=>{
+      if(live){setReleases(records);
+        setCurrentBrand(brand.current?.version
+          ? {id:brand.current.version.id,revision:brand.current.version.revision}:null);}
+    }).catch(error=>{if(live)setError(message(error));});
+    return ()=>{live=false;};
+  },[view,record?.id,siteId]);
   const dirty=view==="wizard" && (!record || title!==record.title ||
     JSON.stringify(content)!==JSON.stringify(record.content));
   const releaseNavigation=useLaunchUnsavedChanges(()=>dirty||busy,
@@ -140,6 +157,38 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
       setRecord(null);setView("library");setDeleteCandidate(null);setNotice("Package deleted.");
     });
   }
+  async function selectCurrentBrand(){
+    if(!record||!currentBrand||record.brandVersionId===currentBrand.id)return;
+    await run(async()=>{
+      const saved=await selectSiteMarketingPackageBrandV61({data:{
+        siteId,packageId:record.id,expectedRevision:record.revision,brandVersionId:currentBrand.id,
+      }});
+      updateList(saved);
+      setNotice("Package updated to Brand v"+currentBrand.revision+". Existing releases remain unchanged.");
+    });
+  }
+  async function generate(format:MarketingPackageContent["formats"][number]){
+    if(!record)return;
+    await run(async()=>{
+      await createSiteMarketingRelease({data:{
+        siteId,packageId:record.id,expectedPackageRevision:record.revision,format,
+      }});
+      setReleases(await listSiteMarketingReleases({data:{siteId,packageId:record.id}}));
+      setNotice("A new immutable "+format+" was generated. Earlier releases are unchanged.");
+    });
+  }
+  async function downloadRelease(id:string){
+    await run(async()=>{
+      const output=await getSiteMarketingReleaseOutput({data:{siteId,releaseId:id}});
+      const url=URL.createObjectURL(new Blob([output.content],{type:output.mimeType}));
+      const link=document.createElement("a");
+      try{
+        link.href=url;link.download=output.fileName;link.style.display="none";
+        document.body.append(link);link.click();link.remove();
+      }finally{window.setTimeout(()=>URL.revokeObjectURL(url),1000);}
+      setNotice("Original generated file downloaded.");
+    });
+  }
   async function exitLaunch() {
     releaseNavigation();
     await router.invalidate().catch(()=>undefined);
@@ -153,7 +202,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
       <p className="text-sm leading-6 text-muted-foreground">You already have trusted community relationships. Start with a clear message and a few materials to share with them.</p>
     </WorkspacePanel>
     <WorkspacePanel title="What CAN prepares">
-      <p className="text-sm leading-6 text-muted-foreground">Save the audience, message and preferred formats in one reusable package. Branded files will use the shared Website &amp; Brand foundation once connected.</p>
+      <p className="text-sm leading-6 text-muted-foreground">Save the audience, message and preferred formats in one reusable package. Generated downloads use the exact saved Site Brand version of their Package.</p>
     </WorkspacePanel>
     <WorkspaceNotice tone="info">Saved package content is private planning information. It does not publish a Site, create an event, open enrollment or send email.</WorkspaceNotice>
   </div>;
@@ -278,7 +327,7 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
               <span><strong>{option.label}</strong><span className="mt-1 block text-xs text-muted-foreground">{option.description}</span></span>
             </label>)}
           </div>
-          <WorkspaceNotice tone="info">This step saves format preferences, not downloadable collateral. No emails or public links are generated here yet.</WorkspaceNotice>
+          <WorkspaceNotice tone="info">Save selected formats, then generate immutable branded files. This does not send messages.</WorkspaceNotice>
         </WorkspacePanel>}
 
         <ActionFooter>
@@ -306,7 +355,40 @@ export function MarketingPackagesV61({siteId,siteName,initial,onExit}:{
               {record.content.formats.map(id=>marketingFormatOptions.find(option=>option.id===id)?.label??id).join(", ")||"Not selected"}</dd></div>
           </dl>
         </WorkspacePanel>
-        <WorkspaceNotice tone="info">The package's content is saved. Branded files, external distribution and email sending will become available after their authorized services are connected.</WorkspaceNotice>
+        <WorkspaceNotice tone="info">The package's content is saved. New branded releases are available to download. Sending marketing email requires separate authorization.</WorkspaceNotice>
+        <WorkspacePanel title="Brand version and generated materials"
+          description="Generated files retain their original Brand and message.">
+          <div className="space-y-3">
+            <p className="text-sm">Selected identity:
+              <strong>{record.brandVersionId?" Brand "+record.brandVersionId.slice(0,8):" No saved Brand selected"}</strong>
+            </p>
+            {currentBrand&&currentBrand.id!==record.brandVersionId&&
+              <div className="flex flex-wrap items-center justify-between gap-3 border p-3">
+                <p className="text-sm">A newer saved Brand (v{currentBrand.revision}) is available.
+                  Existing releases remain unchanged.</p>
+                <Button type="button" variant="outline" disabled={busy||record.status==="archived"}
+                  onClick={()=>void selectCurrentBrand()}>Update package Brand</Button>
+              </div>}
+            <div className="flex flex-wrap gap-2">
+              {record.content.formats.map(format=><Button key={format} type="button" variant="outline"
+                disabled={busy||record.status==="archived"||!record.brandVersionId}
+                onClick={()=>void generate(format)}>Generate {format}</Button>)}
+            </div>
+            {releases.length>0&&<ul className="space-y-2 border-t pt-3">
+              {releases.map(item=><li key={item.id}
+                className="flex flex-wrap items-center justify-between gap-3 border p-3">
+                <span className="text-xs">{item.format} · Package revision {item.packageRevision}
+                  {" · "}{new Date(item.createdAt).toLocaleDateString()}
+                  {item.withdrawnAt?" · Withdrawn":""}</span>
+                <Button type="button" variant="outline" size="sm"
+                  disabled={busy||Boolean(item.withdrawnAt)}
+                  onClick={()=>void downloadRelease(item.id)}>
+                  <Download className="size-4" aria-hidden="true"/> Download original
+                </Button>
+              </li>)}
+            </ul>}
+          </div>
+        </WorkspacePanel>
         <ActionFooter>
           <Button variant="outline" onClick={()=>{setView("library");setRecord(null);}}>All packages</Button>
           <Button variant="outline" disabled={busy} onClick={()=>void duplicate(record)}><Copy aria-hidden="true"/> Duplicate</Button>
