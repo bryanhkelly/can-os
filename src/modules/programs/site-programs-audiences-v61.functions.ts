@@ -44,6 +44,7 @@ export const readSiteProgramsAudiencesV61 = createServerFn({ method: "GET" })
       siteId: site.id,
       revision: site.updatedAt.toISOString(),
       intent,
+      delivery: preferences?.delivery ?? null,
       saved: !!preferences && (preferences.planningVersion === 2 ||
         preferences.interestIds.length > 0),
     };
