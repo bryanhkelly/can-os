@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
-import { educationV30, type JsonObject, type JsonValue } from "./core";
+import type { JsonObject, JsonValue } from "./core";
 
 const id = () => uuid("id").defaultRandom().primaryKey();
 const createdAt = () => timestamp("created_at", { withTimezone: true }).defaultNow().notNull();
@@ -45,7 +45,7 @@ export const blueprints = pgTable(
   ],
 );
 
-export const blueprintVersions = educationV30.table(
+export const blueprintVersions = pgTable(
   "blueprint_versions",
   {
     id: id(),
@@ -66,7 +66,7 @@ export const blueprintVersions = educationV30.table(
   ],
 );
 
-export const blueprintComponents = educationV30.table(
+export const blueprintComponents = pgTable(
   "blueprint_components",
   {
     id: id(),
@@ -88,7 +88,7 @@ export const blueprintComponents = educationV30.table(
   ],
 );
 
-export const blueprintConfigurations = educationV30.table(
+export const blueprintConfigurations = pgTable(
   "blueprint_configurations",
   {
     id: id(),
@@ -102,7 +102,7 @@ export const blueprintConfigurations = educationV30.table(
   ],
 );
 
-export const blueprintConfigurationVersions = educationV30.table(
+export const blueprintConfigurationVersions = pgTable(
   "blueprint_configuration_versions",
   {
     id: id(),
@@ -140,7 +140,7 @@ export const blueprintConfigurationVersions = educationV30.table(
   ],
 );
 
-export const blueprintConfigurationComponents = educationV30.table(
+export const blueprintConfigurationComponents = pgTable(
   "blueprint_configuration_components",
   {
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -159,7 +159,7 @@ export const blueprintConfigurationComponents = educationV30.table(
   ],
 );
 
-export const blueprintConfigurationLocalExperiences = educationV30.table(
+export const blueprintConfigurationLocalExperiences = pgTable(
   "blueprint_configuration_local_experiences",
   {
     id: id(),
@@ -180,7 +180,7 @@ export const blueprintConfigurationLocalExperiences = educationV30.table(
   ],
 );
 
-export const blueprintConfigurationOfferingIntents = educationV30.table(
+export const blueprintConfigurationOfferingIntents = pgTable(
   "blueprint_configuration_offering_intents",
   {
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -200,7 +200,7 @@ export const blueprintConfigurationOfferingIntents = educationV30.table(
   ],
 );
 
-export const configurationReviews = educationV30.table(
+export const configurationReviews = pgTable(
   "configuration_reviews",
   {
     id: id(),
@@ -221,7 +221,7 @@ export const configurationReviews = educationV30.table(
   ],
 );
 
-export const blueprintComponentApprovalDecisions = educationV30.table(
+export const blueprintComponentApprovalDecisions = pgTable(
   "blueprint_component_approval_decisions",
   {
     id: id(),
@@ -244,7 +244,7 @@ export const blueprintComponentApprovalDecisions = educationV30.table(
   ],
 );
 
-export const blueprintExecutionBatches = educationV30.table(
+export const blueprintExecutionBatches = pgTable(
   "blueprint_execution_batches",
   {
     id: id(),
@@ -321,7 +321,7 @@ export const blueprintReferenceItemVersions = pgTable(
   ],
 );
 
-export const blueprintConfigurationComponentReferences = educationV30.table(
+export const blueprintConfigurationComponentReferences = pgTable(
   "blueprint_configuration_component_references",
   {
     configurationVersionId: uuid("configuration_version_id").notNull(),
@@ -340,7 +340,7 @@ export const blueprintConfigurationComponentReferences = educationV30.table(
   ],
 );
 
-export const blueprintOutputs = educationV30.table(
+export const blueprintOutputs = pgTable(
   "blueprint_outputs",
   {
     id: id(),
@@ -369,7 +369,7 @@ export const blueprintOutputs = educationV30.table(
   ],
 );
 
-export const offerings = educationV30.table(
+export const offerings = pgTable(
   "offerings",
   {
     id: id(),
@@ -384,7 +384,7 @@ export const offerings = educationV30.table(
   ],
 );
 
-export const offeringVersions = educationV30.table(
+export const offeringVersions = pgTable(
   "offering_versions",
   {
     id: id(),
@@ -403,7 +403,7 @@ export const offeringVersions = educationV30.table(
 
 /** Existing publisher-defined, immutable-after-publication release policy.
  * Each required Course needs an explicit record before Offering release. */
-export const offeringReleaseRequirements = educationV30.table(
+export const offeringReleaseRequirements = pgTable(
   "offering_release_requirements",
   {
     id: id(),
@@ -421,7 +421,7 @@ export const offeringReleaseRequirements = educationV30.table(
   ],
 );
 
-export const programDeployments = educationV30.table(
+export const programDeployments = pgTable(
   "program_deployments",
   {
     id: id(),
@@ -444,7 +444,7 @@ export const programDeployments = educationV30.table(
 );
 
 /** Existing native deployment readiness evidence; not a new table or approval system. */
-export const deploymentReadinessReviews = educationV30.table(
+export const deploymentReadinessReviews = pgTable(
   "deployment_readiness_reviews", {
     id: id(),
     deploymentId: uuid("deployment_id").notNull(),
